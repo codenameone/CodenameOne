@@ -1,0 +1,36 @@
+# The tab-motion probe: an instrumented UITabBarController app plus the XCUITest
+# bundle that taps it. Generated with xcodegen by scripts/probe-ios-tab-motion.sh;
+# see README.md for what it measures and how the measurements are used.
+name: TabProbe
+options:
+  bundleIdPrefix: com.codenameone.tabprobe
+targets:
+  TabProbe:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - App
+      # The same backdrop the fidelity tiles are rendered over, so a material
+      # measured here is directly comparable with the committed goldens.
+      - path: ../../common/src/main/resources/glass-backdrop.png
+        buildPhase: resources
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.tabprobe
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+      SWIFT_VERSION: "5.0"
+      CODE_SIGNING_ALLOWED: NO
+  TabProbeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [UITests]
+    dependencies:
+      - target: TabProbe
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.tabprobe.uitests
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_TARGET_NAME: TabProbe
+      SWIFT_VERSION: "5.0"

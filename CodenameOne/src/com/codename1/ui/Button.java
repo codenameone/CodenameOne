@@ -92,6 +92,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     private Image disabledIcon;
     private Command cmd;
     private boolean toggle;
+    /// Paint-time override used by Tabs for the Liquid Glass selection: the tab bar
+    /// paints every tab twice, once as unselected content and once as the accent
+    /// copy seen through the moving lens, regardless of which tab is selected.
+    /// GLASS_PAINT_NONE outside that paint; never set it anywhere else.
+    int glassPaintState = GLASS_PAINT_NONE;
+    static final int GLASS_PAINT_NONE = 0;
+    static final int GLASS_PAINT_DEFAULT = 1;
+    static final int GLASS_PAINT_SELECTED = 2;
     private int releaseRadius;
     private boolean autoRelease;
     /// Duration in millis of the iOS-style release dim-out (0 disables it). Read
@@ -666,7 +674,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if (!isEnabled() && getDisabledIcon() != null) {
             return getDisabledIcon();
         }
-        if (isToggle() && isSelected()) {
+        if (glassPaintState == GLASS_PAINT_DEFAULT) {
+            return icon;
+        }
+        if (glassPaintState == GLASS_PAINT_SELECTED || (isToggle() && isSelected())) {
             icon = rolloverPressedIcon;
             if (icon == null) {
                 icon = getPressedIcon();
@@ -948,8 +959,24 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         return getStyle().getBorder();
     }
 
+    /// {@inheritDoc}
+    ///
+    /// While Tabs paints its Liquid Glass passes the forced state wins over focus
+    /// and selection: a focused tab would otherwise answer its selected style and
+    /// keep the accent colour outside the lens.
+    @Override
+    public Style getStyle() {
+        if (glassPaintState != GLASS_PAINT_NONE && isEnabled()) {
+            return glassPaintState == GLASS_PAINT_SELECTED ? getPressedStyle() : getUnselectedStyle();
+        }
+        return super.getStyle();
+    }
+
     @Override
     boolean isPressedStyle() {
+        if (glassPaintState != GLASS_PAINT_NONE) {
+            return glassPaintState == GLASS_PAINT_SELECTED;
+        }
         // if a toggle button has focus we should draw the selected state not the pressed state
         // however if shouldRenderSelection is false the selected state won't be painted so
         // we should draw the pressed state

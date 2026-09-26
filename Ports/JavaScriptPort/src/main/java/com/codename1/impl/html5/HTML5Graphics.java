@@ -477,6 +477,16 @@ public class HTML5Graphics {
                 magnify, aberration, tintColor, tintStrength));
     }
 
+    /**
+     * In-place colour matrix (Graphics.colorMatrixRegion); see
+     * {@link com.codename1.impl.html5.graphics.ColorMatrixRegion}.
+     */
+    public void colorMatrixRegion(int x, int y, int width, int height, float[] matrix,
+            HTML5Implementation.NativeImage mask, float cornerRadius, float amount) {
+        dispatchOp(new com.codename1.impl.html5.graphics.ColorMatrixRegion(x, y, width, height,
+                matrix, mask, cornerRadius, amount));
+    }
+
     public void clearRect(int x, int y, int width, int height) {
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }

@@ -700,6 +700,90 @@ doubles the bounce.
 |The accent the dark glyph is tinted to inside the drop.
 |===
 
+The iOS 27 theme uses a third preset, `ios27`, which is time based rather
+than a fixed-duration morph. Its curves are measured from a real
+`UITabBarController` on the iOS 27 simulator, frame by frame, and played back
+by `TabGlassMotion`:
+
+* on a tap the selection lens *lifts*: it grows, its platter fades so it
+  becomes clear glass, and the tab content seen through it magnifies;
+* it travels on a spring, stretching while it accelerates and squashing on
+  arrival in proportion to the distance, then settles with a second, smaller
+  wobble;
+* the whole bar -- glass, content and lens -- pulses in scale, and a soft glow
+  spreads from the touch point.
+
+The motion follows the gesture, not just the tap, the way UIKit's does:
+
+* holding a press keeps the lens lifted and the bar grown until the finger
+  lifts;
+* pressing the selected tab lifts and pulses the lens in place;
+* dragging along the bar pulls the lens with the finger (a *scrub*), and
+  letting go selects the tab under the finger, with the lens settling there;
+* every release ends in a small wobble about a second after the finger lifts.
+
+The accent color lives in a second copy of the tab content, visible only
+through the lens, so the color travels with the glass. Where the port
+supports `Graphics.colorMatrixRegion` (iOS, macOS, the JavaScript port and the
+simulator), the tab content is *vibrant* like UIKit's: each glyph pixel is a
+color matrix of the glass behind it rather than flat paint, so labels and the
+accent pick up the colors under the bar. The selection platter is likewise the
+bar's own glass seen through a color matrix, not a translucent fill. With this
+preset the tabs are painted with their normal style outside the lens and with
+their *pressed* style inside it: the theme's `Tab`/`TabIcon` colors are the
+unselected ones and `Tab.pressed`/`TabIcon.pressed` the selected ones. Tab
+backgrounds should stay transparent.
+
+The motion reaches past the bar's visible pill, so the bar reserves room for
+it inside its own bounds: the theme widens the `TabsContainer` padding by the
+slack, narrows its margin by the same amount so the pill stays where it was,
+and names the slack in constants. Everything the motion paints then stays
+inside the bar's own bounds and repaint region.
+
+[cols="3,1,4", options="header"]
+|===
+|Constant |iOS 27 |Effect
+
+|`@tabsMorphPreset`
+|`ios27`
+|Selects the measured time-based motion described above.
+
+|`@tabsGlassSlackXMm` / `@tabsGlassSlackYMm`
+|`2` / `1`
+|How much of the `TabsContainer` padding is motion slack rather than pill.
+
+|`@tabSelInsetMm`
+|`0.66`
+|Inset of the resting lens inside the pill.
+
+|`@tabSelPillColorInt` / `@tabSelPillAlphaInt`
+|`0` / `35`
+|Color and alpha of the resting selection platter on ports without
+`colorMatrixRegion`.
+
+|`@tabSelPillColorDarkInt` / `@tabSelPillAlphaDarkInt`
+|`0` / `67`
+|The same platter in the dark appearance; defaults to the light values.
+
+|`@tabGlassLensLightAlphaInt`
+|`28`
+|White wash of the lifted lens, which reads brighter than the bar.
+
+|`@tabGlassRimAlphaInt` / `@tabGlassEdgeAlphaInt`
+|`150` / `110`
+|Alpha of the lifted lens's bright inner rim and dark edge ring, scaled by
+the lift.
+
+|`@tabGlassGlowPct`
+|`40`
+|Strength of the touch glow; `0` turns it off.
+
+|`@tabGlassSpecularAlphaInt` / `@tabGlassSpecularDarkAlphaInt`
+|`145` / `90`
+|Peak alpha of the bright rim along the bar's top and bottom edges; `0`
+(the default) draws none.
+|===
+
 Similarly, the *Liquid Glass backdrop materials* themselves are typed,
 named recipes (`GlassRecipe`): a theme assigns `chrome` (edge-anchored
 bars), `pill` (the floating tab bar) or `panel` (buttons, dialogs, panels

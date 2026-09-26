@@ -3430,6 +3430,63 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isGlassLensRegionSupported(Object graphics) {
+        return ((NativeGraphics) graphics).associatedImage == null;
+    }
+
+    @Override
+    public boolean glassLensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float[] optics, float amount) {
+        if (width <= 0 || height <= 0 || amount <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen only, on the GPU (cn1_fs_glass_lens), like colorMatrixRegion.
+        if (ng.associatedImage != null || optics == null) {
+            return false;
+        }
+        ng.checkControl();
+        nativeInstance.nativeGlassLensScreenRegion(x, y, width, height, cornerRadius, optics, amount);
+        return true;
+    }
+
+    @Override
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        return ((NativeGraphics) graphics).associatedImage == null;
+    }
+
+    @Override
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            com.codename1.ui.Image mask, float cornerRadius, float amount) {
+        if (width <= 0 || height <= 0 || amount <= 0) {
+            return true;
+        }
+        NativeGraphics ng = (NativeGraphics) graphics;
+        // Live screen only, on the GPU (cn1_fs_colormatrix). Off-screen images return
+        // false so the caller can fall back, as lensRegion does.
+        if (ng.associatedImage != null || matrix == null || matrix.length < 12) {
+            return false;
+        }
+        long maskPeer = 0;
+        if (mask != null) {
+            Object nativeMask = mask.getImage();
+            if (!(nativeMask instanceof NativeImage)) {
+                return false;
+            }
+            maskPeer = ((NativeImage) nativeMask).peer;
+        }
+        // Hand control back to the screen first: the mask was usually just painted,
+        // and finishing it here gives its NativeImage the finished peer the op must
+        // sample (the native side cannot update the Java peer).
+        ng.checkControl();
+        if (mask != null) {
+            maskPeer = ((NativeImage) mask.getImage()).peer;
+        }
+        nativeInstance.nativeColorMatrixScreenRegion(x, y, width, height, matrix, maskPeer, cornerRadius, amount);
+        return true;
+    }
+
+    @Override
     public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
         if (width <= 0 || height <= 0) {
             return true;

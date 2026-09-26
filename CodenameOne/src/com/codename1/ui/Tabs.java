@@ -35,8 +35,10 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.GlassLensBlend;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.plaf.VibrancyMatrix;
 import com.codename1.ui.util.EventDispatcher;
 
 /// A component that lets the user switch between a group of components by
@@ -171,6 +173,37 @@ public class Tabs extends Container {
     private int indicatorToX;
     private int indicatorToW;
 
+    // ---- iOS 27 Liquid Glass selection motion (tabsMorphPreset "ios27") ----
+    // The motion is MEASURED from UIKit, see TabGlassMotion. paintGlassTabs draws
+    // the whole bar -- glass, grey platter, tab content and lens -- from one
+    // time-based frame, and reveals an ACCENT copy of the tabs through the lens
+    // (Button.GLASS_PAINT_SELECTED), so the selection colour travels with the glass
+    // the way UIKit composites its SelectedContentView under a lens-shaped hole.
+    private long glassMotionStart = -1;
+    private int glassTargetIndex = -1;
+    // Lens centre and width at the start and end of the motion, in the inner-x
+    // space capsuleCellBounds answers in. Floats, so an interrupted motion restarts
+    // from exactly where the lens is drawn.
+    private float glassFromCenter;
+    private float glassFromW;
+    private float glassToCenter;
+    private float glassToW;
+    // Where the last press landed, tabsContainer-relative (-1 = unknown); the touch
+    // glow expands from there.
+    private int glassPressX = -1;
+    private int glassPressY = -1;
+    private int glassTouchX = -1;
+    private int glassTouchY = -1;
+    // The live press driving the motion (hold, scrub, release), or null for a
+    // selection made in code, which plays the captured tap motion as is.
+    private TabGlassGesture glassGesture;
+    // Where the press driving glassGesture landed, tabsContainer-relative x.
+    private int glassGesturePressX = -1;
+    // TEST-ONLY: when >= 0 the glass motion is frozen this many ms after its start.
+    private int glassTestElapsedMs = -1;
+    private static final int GLASS_TEST_MS_PER_PERCENT = 8;
+    private static final long GLASS_MAX_PRESS_MS = 60000;
+
     /// Creates an empty `TabbedPane` with a default
     /// tab placement of `Component.TOP`.
     public Tabs() {
@@ -197,7 +230,22 @@ public class Tabs extends Container {
         // a plain Container.
         tabsContainer = new Container() {
             @Override
+            void paintBackgroundLayer(Graphics g) {
+                if (isGlassMotion()) {
+                    paintGlassBarBackground(g);
+                    return;
+                }
+                super.paintBackgroundLayer(g);
+            }
+
+            @Override
             public void paint(Graphics g) {
+                if (isGlassMotion()) {
+                    layoutForPaint();
+                    paintGlassTabs(g);
+                    paintBottomDivider(g);
+                    return;
+                }
                 super.paint(g);
                 // The iOS 26 selection "drop" is a LENS painted OVER the bar + the
                 // (black) glyphs -- it magnifies, chromatically aberrates and
@@ -232,7 +280,7 @@ public class Tabs extends Container {
             // Forcing the margin to 0 here defeated the float. The host below is a
             // transparent spacer that only absorbs the safe-area inset; the pill
             // itself paints the glass, so the host must not tint behind it.
-            tabsContainerHost = new Container(new BorderLayout());
+            tabsContainerHost = new Container(new GlassHostLayout());
             // Dedicated UIID so a theme can tune the host (e.g. a negative bottom
             // margin to pull the floating pill closer to the home indicator).
             // Defaults to transparent so only the pill paints the glass.
@@ -393,6 +441,27 @@ public class Tabs extends Container {
     @Override
     public boolean animate() {
         boolean b = super.animate();
+        if (glassMotionStart >= 0) {
+            // One repaint of the bar per tick while the measured motion runs, then ONE
+            // more once it is over so the resting frame replaces the last animated one.
+            // Not `b = true`: that asks the form to repaint the whole Tabs as well, so
+            // every frame of the motion was painted twice.
+            tabsContainer.repaint();
+            long elapsed = System.currentTimeMillis() - glassMotionStart;
+            if (glassGesture != null && glassGesture.getUpS() < 0 && elapsed > GLASS_MAX_PRESS_MS) {
+                // The release never reached us (listeners detached mid-press):
+                // let the lens settle rather than hold it lifted forever.
+                glassGesture.up(elapsed / 1000f);
+            }
+            boolean over = glassGesture != null ? glassGesture.isFinished(elapsed / 1000f)
+                    : elapsed >= TabGlassMotion.durationMs();
+            if (over) {
+                glassMotionStart = -1;
+                glassTargetIndex = -1;
+                glassGesture = null;
+                deregisterAnimatedInternal();
+            }
+        }
         // Indicator-animation tick: redraw the tab bar each frame while
         // the motion is in flight. We let the existing super.animate /
         // slide motion control deregistration; the indicator motion is
@@ -469,7 +538,8 @@ public class Tabs extends Container {
         // indicator morph are done. Previously a finished 200ms slide deregistered the
         // animation while the 550ms morph was still in flight, freezing the drop mid-travel.
         if ((slideToDestMotion == null || slideToDestMotion.isFinished())
-                && (indicatorAnimMotion == null || indicatorAnimMotion.isFinished())) {
+                && (indicatorAnimMotion == null || indicatorAnimMotion.isFinished())
+                && glassMotionStart < 0) {
             TopLevelContainer f = getTopLevelContainer();
             if (f != null) {
                 TopLevelSupport.deregisterAnimatedInternal(f, this);
@@ -1456,6 +1526,10 @@ public class Tabs extends Container {
                 || toIndex < 0 || toIndex >= tabsContainer.getComponentCount()) {
             return;
         }
+        if (isGlassMotion()) {
+            startGlassMotion(fromIndex, toIndex);
+            return;
+        }
         Component fromTab = tabsContainer.getComponentAt(fromIndex);
         Component toTab = tabsContainer.getComponentAt(toIndex);
         // The selection capsule fills the whole CELL (and hugs the pill edge for the
@@ -1543,6 +1617,9 @@ public class Tabs extends Container {
 
     /// The thin frost rim left around the selection capsule (tabSelInsetMm, default a hair).
     private int selectionCapsuleInsetPx() {
+        if (isGlassMotion()) {
+            return Math.round(glassPx(glassConstantPt("tabsGlassInsetPt", GLASS_INSET_PT)));
+        }
         float insetMm = 0.1f;
         String iv = getUIManager().getThemeConstant("tabSelInsetMm", null);
         if (iv != null) {
@@ -1564,6 +1641,15 @@ public class Tabs extends Container {
         int n = tabsContainer.getComponentCount();
         Component t = tabsContainer.getComponentAt(index);
         int padLeft = tabsContainer.getInnerX() - tabsContainer.getX();
+        if (tabsContainer.getLayout() instanceof GlassTabsLayout) {
+            // UITabBar's resting lens: the tab's own button bounds, centred on the
+            // tab, not the cell between its neighbours.
+            float centre = t.getX() + t.getWidth() / 2f;
+            float half = glassLensWidth / 2f;
+            out[0] = Math.round(centre - half) - padLeft;
+            out[1] = Math.round(centre + half) - Math.round(centre - half);
+            return;
+        }
         int padRight = (tabsContainer.getX() + tabsContainer.getWidth())
                 - (tabsContainer.getInnerX() + tabsContainer.getInnerWidth());
         int left;
@@ -1573,14 +1659,17 @@ public class Tabs extends Container {
         // padding), so the midpoint branches must subtract padLeft to land in the
         // same inner-x space as the first/last branches -- otherwise every non-first
         // tab's capsule drifts right by padLeft (the first tab compensated, hiding it).
+        // With the glass motion the container's padding also holds the reserved motion
+        // slack, which lies OUTSIDE the visible pill.
+        int slack = glassSlackXPx();
         if (index <= 0) {
-            left = -padLeft + inset;                       // pill outer left edge
+            left = -padLeft + slack + inset;               // pill outer left edge
         } else {
             Component p = tabsContainer.getComponentAt(index - 1);
             left = (p.getX() + p.getWidth() + t.getX()) / 2 - padLeft;   // midpoint to previous tab
         }
         if (index >= n - 1) {
-            right = tabsContainer.getInnerWidth() + padRight - inset;   // pill outer right edge
+            right = tabsContainer.getInnerWidth() + padRight - slack - inset;   // pill outer right edge
         } else {
             Component nx = tabsContainer.getComponentAt(index + 1);
             right = (t.getX() + t.getWidth() + nx.getX()) / 2 - padLeft;          // midpoint to next tab
@@ -1598,6 +1687,13 @@ public class Tabs extends Container {
         if (tabsContainer == null || tabsContainer.getComponentCount() == 0) {
             return;
         }
+        if (isGlassMotion()) {
+            // The measured ios27 motion is time based: progress 0..100 maps onto its
+            // first 800 ms (lift, travel, arrival squash), so a progress-frame
+            // capture spec keeps working; setGlassMotionTestTime takes exact times.
+            setGlassMotionTestTime(fromIndex, toIndex, value < 0 ? -1 : value * GLASS_TEST_MS_PER_PERCENT);
+            return;
+        }
         if (value >= 0) {
             int cInset = selectionCapsuleInsetPx();
             int[] from = new int[2];
@@ -1612,6 +1708,935 @@ public class Tabs extends Container {
         }
         morphTestValue = value;
         tabsContainer.repaint();
+    }
+
+    /// TEST-ONLY hook for the measured iOS 27 motion (`tabsMorphPreset: "ios27"`):
+    /// freezes the selection change from `fromIndex` to `toIndex` exactly
+    /// `elapsedMs` milliseconds after it started, so a capture tool can render
+    /// deterministic frames of the motion (lens, bar scale, platter, accent content
+    /// and glow). Pass `elapsedMs` &lt; 0 to clear and resume normal behaviour. Has no
+    /// effect unless the theme selects the ios27 motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fromIndex`: the tab the selection leaves
+    ///
+    /// - `toIndex`: the tab the selection moves to
+    ///
+    /// - `elapsedMs`: milliseconds since the selection started, or &lt; 0 to clear
+    public void setGlassMotionTestTime(int fromIndex, int toIndex, int elapsedMs) {
+        if (tabsContainer == null || tabsContainer.getComponentCount() == 0 || !isGlassMotion()) {
+            return;
+        }
+        if (elapsedMs >= 0) {
+            int inset = selectionCapsuleInsetPx();
+            int[] cb = new int[2];
+            capsuleCellBounds(fromIndex, inset, cb);
+            glassFromCenter = cb[0] + cb[1] / 2f;
+            glassFromW = cb[1];
+            capsuleCellBounds(toIndex, inset, cb);
+            glassToCenter = cb[0] + cb[1] / 2f;
+            glassToW = cb[1];
+            activeComponent = toIndex;
+        }
+        glassTestElapsedMs = elapsedMs;
+        tabsContainer.repaint();
+    }
+
+    /// True when the theme selects the measured iOS 27 Liquid Glass selection motion
+    /// (`tabsMorphPreset: "ios27"` together with `tabsSelectionCapsuleBool`).
+    boolean isGlassMotion() {
+        return selectionCapsule && tabsContainer != null
+                && "ios27".equals(getUIManager().getThemeConstant("tabsMorphPreset", "ios26"));
+    }
+
+    /// The motion slack the theme reserved around the pill, in pixels. The bar
+    /// scales, and the lifted lens overshoots its ends by up to ~11 pt, so the
+    /// theme widens TabsContainer's padding by this much (and narrows its margin to
+    /// match) and names the amount here: the pill is the bounds minus the slack,
+    /// and the whole motion stays inside the component's own repaint region.
+    private int glassSlackXPx() {
+        return isGlassMotion() ? mmConstantPx("tabsGlassSlackXMm") : 0;
+    }
+
+    private int glassSlackYPx() {
+        return isGlassMotion() ? mmConstantPx("tabsGlassSlackYMm") : 0;
+    }
+
+    private int mmConstantPx(String name) {
+        String v = getUIManager().getThemeConstant(name, null);
+        if (v == null) {
+            return 0;
+        }
+        try {
+            return Display.getInstance().convertToPixels(Float.parseFloat(v.trim()));
+        } catch (NumberFormatException ignore) {
+            return 0;   // malformed constant -> no slack
+        }
+    }
+
+    /// Remembers where a press landed on the tab bar, so the touch glow of the
+    /// selection it triggers expands from the finger like the native one.
+    void recordGlassPress(int x, int y) {
+        if (tabsContainer != null && tabsContainer.visibleBoundsContains(x, y)) {
+            glassPressX = x - tabsContainer.getAbsoluteX();
+            glassPressY = y - tabsContainer.getAbsoluteY();
+            // UIKit moves the lens on touch-DOWN; the selection itself still happens
+            // on release, and finds this motion already in flight to its target.
+            if (isGlassMotion()) {
+                Component target = tabsContainer.getComponentAt(x, y);
+                int idx = target == null ? -1 : tabsContainer.getComponentIndex(target);
+                if (idx >= 0) {
+                    // A press on the selected tab lifts and pulses the lens in place.
+                    int pressX = glassPressX;
+                    startGlassMotion(activeComponent, idx, true);
+                    glassGesturePressX = pressX;
+                }
+            }
+        } else {
+            glassPressX = -1;
+            glassPressY = -1;
+        }
+    }
+
+    /// True while the glass motion is travelling to tab `index` (package-private,
+    /// for tests).
+    boolean isGlassMotionRunningTo(int index) {
+        return glassMotionStart >= 0 && glassTargetIndex == index;
+    }
+
+    /// Points to pixels for the glass geometry (the pill height over the native
+    /// bar's 62 pt).
+    private float glassPtPx() {
+        int ph = tabsContainer.getHeight() - 2 * glassSlackYPx();
+        return ph > 0 ? ph / TabGlassMotion.BAR_HEIGHT_PT : 1f;
+    }
+
+    /// The finger moved along the bar during a glass press: once it has travelled
+    /// far enough the lens follows it (a scrub).
+    void recordGlassDrag(int x) {
+        TabGlassGesture gg = glassGesture;
+        if (gg == null || glassMotionStart < 0 || gg.getUpS() >= 0 || glassGesturePressX < 0) {
+            return;
+        }
+        float s = (System.currentTimeMillis() - glassMotionStart) / 1000f;
+        int rel = x - tabsContainer.getAbsoluteX();
+        if (!gg.isScrubbing()) {
+            if (Math.abs(rel - glassGesturePressX) < Display.getInstance().convertToPixels(1.5f)) {
+                return;
+            }
+            int inset = selectionCapsuleInsetPx();
+            int[] cb = new int[2];
+            int n = tabsContainer.getComponentCount();
+            capsuleCellBounds(0, inset, cb);
+            float first = cb[0] + cb[1] / 2f;
+            capsuleCellBounds(n - 1, inset, cb);
+            float last = cb[0] + cb[1] / 2f;
+            float ptPx = glassPtPx();
+            gg.startScrub(s, first / ptPx, last / ptPx);
+        }
+        gg.finger(s, fingerInnerX(rel) / glassPtPx());
+    }
+
+    /// A tabsContainer-relative x in the inner-x space of capsuleCellBounds.
+    private float fingerInnerX(int rel) {
+        return rel + tabsContainer.getX() - tabsContainer.getInnerX();
+    }
+
+    /// Touch-up of a glass press. A scrub selects the tab nearest the finger (a
+    /// tie keeps the current tab) and the lens settles there.
+    void recordGlassRelease(int x) {
+        TabGlassGesture gg = glassGesture;
+        if (gg == null || glassMotionStart < 0 || gg.getUpS() >= 0) {
+            return;
+        }
+        float s = (System.currentTimeMillis() - glassMotionStart) / 1000f;
+        if (!gg.isScrubbing()) {
+            gg.up(s);
+            return;
+        }
+        float ptPx = glassPtPx();
+        float fx = fingerInnerX(x - tabsContainer.getAbsoluteX());
+        gg.finger(s, fx / ptPx);
+        // The tab whose cell holds the finger -- for equal cells, the centre nearest
+        // it (natively a finger exactly between two keeps the current tab).
+        int inset = selectionCapsuleInsetPx();
+        int[] cb = new int[2];
+        int n = tabsContainer.getComponentCount();
+        int best = n - 1;
+        for (int i = 0; i < n; i++) {
+            capsuleCellBounds(i, inset, cb);
+            float right = cb[0] + cb[1];
+            if (fx < right || i == n - 1) {
+                best = i;
+                if (fx == right && i == activeComponent - 1) {
+                    best = activeComponent;
+                }
+                break;
+            }
+        }
+        capsuleCellBounds(best, inset, cb);
+        glassToCenter = cb[0] + cb[1] / 2f;
+        glassToW = cb[1];
+        glassTargetIndex = best;
+        gg.settleTo(glassToCenter / ptPx);
+        gg.up(s);
+        if (best != activeComponent && best >= 0) {
+            setSelectedIndex(best);
+        }
+    }
+
+    /// After a release has been processed: a press that started the lens towards a
+    /// tab but did not select it (released elsewhere, turned into a swipe) sends the
+    /// lens back to the selected tab.
+    void checkGlassPressOutcome() {
+        if (glassGesture != null && glassGesture.isScrubbing()) {
+            return;
+        }
+        if (glassMotionStart >= 0 && glassTargetIndex >= 0 && glassTargetIndex != activeComponent
+                && (slideToDestMotion == null || active != glassTargetIndex)) {
+            startGlassMotion(glassTargetIndex, activeComponent);
+        }
+    }
+
+    private void startGlassMotion(int fromIndex, int toIndex) {
+        startGlassMotion(fromIndex, toIndex, false);
+    }
+
+    /// `press` starts a live gesture (hold, scrub) instead of the captured tap.
+    private void startGlassMotion(int fromIndex, int toIndex, boolean press) {
+        if (!press && glassMotionStart >= 0 && toIndex == glassTargetIndex) {
+            // Same target already in flight (the content slide re-selecting it); let
+            // it finish rather than restarting the lift.
+            return;
+        }
+        int inset = selectionCapsuleInsetPx();
+        int[] cb = new int[2];
+        if (glassMotionStart >= 0) {
+            // Interrupted: restart from where the lens is drawn right now.
+            GlassFrame f = glassFrame();
+            glassFromCenter = f.centerInner;
+            glassFromW = f.restWidth;
+        } else {
+            capsuleCellBounds(fromIndex, inset, cb);
+            glassFromCenter = cb[0] + cb[1] / 2f;
+            glassFromW = cb[1];
+        }
+        capsuleCellBounds(toIndex, inset, cb);
+        glassToCenter = cb[0] + cb[1] / 2f;
+        glassToW = cb[1];
+        glassTargetIndex = toIndex;
+        if (press) {
+            float ptPx = glassPtPx();
+            glassGesture = new TabGlassGesture(glassFromCenter / ptPx, glassToCenter / ptPx);
+        } else {
+            glassGesture = null;
+        }
+        glassTouchX = glassPressX;
+        glassTouchY = glassPressY;
+        glassPressX = -1;
+        glassPressY = -1;
+        glassMotionStart = System.currentTimeMillis();
+        TopLevelContainer f = getTopLevelContainer();
+        if (f != null) {
+            TopLevelSupport.registerAnimatedInternal(f, this);
+        }
+        tabsContainer.repaint();
+    }
+
+    /// One resolved frame of the glass selection, in tabsContainer PARENT
+    /// coordinates (the space getX()/getY() answer in), before the bar scale.
+    static final class GlassFrame {
+        TabGlassMotion motion;
+        float ptPx;
+        int pillX;
+        int pillY;
+        int pillW;
+        int pillH;
+        float barScale;
+        float pivotX;
+        float pivotY;
+        float centerInner;   // lens centre in the capsuleCellBounds inner-x space
+        float restWidth;     // resting lens width at this point of the travel
+        float lensX;
+        float lensY;
+        float lensW;
+        float lensH;
+        float glowX;
+        float glowY;
+    }
+
+    private GlassFrame glassFrame() {
+        GlassFrame f = new GlassFrame();
+        Container tc = tabsContainer;
+        int sx = glassSlackXPx();
+        int sy = glassSlackYPx();
+        f.pillX = tc.getX() + sx;
+        f.pillY = tc.getY() + sy;
+        f.pillW = tc.getWidth() - 2 * sx;
+        f.pillH = tc.getHeight() - 2 * sy;
+        // Native geometry is expressed in points on a 62 pt tall bar; deriving the
+        // scale from the pill makes the motion follow the theme's bar height.
+        f.ptPx = f.pillH > 0 ? f.pillH / TabGlassMotion.BAR_HEIGHT_PT : 1f;
+        int inset = selectionCapsuleInsetPx();
+        float restH = f.pillH - 2 * inset;
+        boolean live = glassTestElapsedMs >= 0 || glassMotionStart >= 0;
+        float fromC;
+        float fromW;
+        float toC;
+        float toW;
+        if (live) {
+            fromC = glassFromCenter;
+            fromW = glassFromW;
+            toC = glassToCenter;
+            toW = glassToW;
+        } else {
+            int[] cb = new int[2];
+            int idx = activeComponent < 0 ? 0 : Math.min(activeComponent, tc.getComponentCount() - 1);
+            capsuleCellBounds(idx, inset, cb);
+            fromC = cb[0] + cb[1] / 2f;
+            fromW = cb[1];
+            toC = fromC;
+            toW = fromW;
+        }
+        float travelPt = (toC - fromC) / f.ptPx;
+        TabGlassMotion m;
+        float gestureCentre = Float.NaN;
+        if (glassTestElapsedMs >= 0) {
+            m = TabGlassMotion.at(glassTestElapsedMs, travelPt);
+        } else if (glassMotionStart >= 0 && glassGesture != null) {
+            float[] c = new float[1];
+            m = glassGesture.at((System.currentTimeMillis() - glassMotionStart) / 1000f, c);
+            if (glassGesture.isScrubbing()) {
+                gestureCentre = c[0] * f.ptPx;
+            }
+        } else if (glassMotionStart >= 0) {
+            m = TabGlassMotion.at(System.currentTimeMillis() - glassMotionStart, travelPt);
+        } else {
+            m = TabGlassMotion.rest();
+        }
+        f.motion = m;
+        float p = m.position;
+        float pw = p < 0 ? 0 : (p > 1 ? 1 : p);
+        f.centerInner = fromC + (toC - fromC) * p;
+        f.restWidth = fromW + (toW - fromW) * pw;
+        if (gestureCentre == gestureCentre) {
+            // Scrubbing: the lens is wherever the finger has pulled it.
+            f.centerInner = gestureCentre;
+            f.restWidth = toW;
+        }
+        float lift = TabGlassMotion.LIFT_PT * f.ptPx * m.lift;
+        f.lensW = (f.restWidth + lift) * m.scaleX;
+        f.lensH = (restH + lift) * m.scaleY;
+        float cx = tc.getInnerX() + f.centerInner + m.leadPt * f.ptPx;
+        float cy = f.pillY + f.pillH / 2f;
+        f.lensX = cx - f.lensW / 2f;
+        f.lensY = cy - f.lensH / 2f;
+        f.barScale = f.pillW > 0 ? 1f + m.barGrowPt * f.ptPx / f.pillW : 1f;
+        f.pivotX = f.pillX + f.pillW / 2f;
+        f.pivotY = cy;
+        f.glowX = glassTouchX >= 0 ? tc.getX() + glassTouchX : tc.getInnerX() + toC;
+        if (gestureCentre == gestureCentre) {
+            // A scrub's glow rides the lens, not the spot the finger first touched.
+            f.glowX = cx;
+        }
+        f.glowY = glassTouchY >= 0 ? tc.getY() + glassTouchY : cy;
+        return f;
+    }
+
+    /// Scales a coordinate about a pivot (the bar pulse, for the ops that draw
+    /// straight into the frame and so cannot ride the Graphics transform).
+    private static float scaleAbout(float v, float pivot, float scale) {
+        return pivot + (v - pivot) * scale;
+    }
+
+    /// The bar's own glass and fill, drawn into the (scaled) pill instead of the
+    /// slack-padded bounds.
+    void paintGlassBarBackground(Graphics g) {
+        GlassFrame f = glassFrame();
+        float s = f.barScale;
+        int x = Math.round(scaleAbout(f.pillX, f.pivotX, s));
+        int y = Math.round(scaleAbout(f.pillY, f.pivotY, s));
+        int r = Math.round(scaleAbout(f.pillX + f.pillW, f.pivotX, s));
+        int b = Math.round(scaleAbout(f.pillY + f.pillH, f.pivotY, s));
+        tabsContainer.paintBackgroundLayerAt(g, x, y, r - x, b - y);
+        paintGlassBarRim(g, x, y, r - x, b - y, f.ptPx * f.barScale);
+    }
+
+    /// Relative strength of each row of the specular rim, from the edge inwards.
+    private static final float[] GLASS_RIM_FALLOFF = {1f, 0.7f, 0.43f, 0.2f};
+
+    /// The selection platter's colour matrix, read back from the native bar
+    /// (the colorMatrix filter UIKit puts on the platter's backdrop layer): rows
+    /// r, g, b of [r, g, b, offset]. It turns the dark bar's 134 grey into 98.8
+    /// and the light bar's 195 into 169.4, the measured platter.
+    private static final float[] GLASS_PLATTER_DARK = {
+        1.1298f, -0.2361f, -0.0237f, -0.07f,
+        -0.0701f, 0.964f, -0.0238f, -0.07f,
+        -0.0702f, -0.236f, 1.1762f, -0.07f
+    };
+    private static final float[] GLASS_PLATTER_LIGHT = {
+        1.1851f, -0.0502f, -0.005f, -0.2f,
+        -0.0149f, 1.1499f, -0.0051f, -0.2f,
+        -0.0149f, -0.05f, 1.1949f, -0.2f
+    };
+
+    /// The lifted native lens, measured over flat grey and colour backdrops (lossless
+    /// screenshots of a held press, motion probe): a circular-bevel rim of the height
+    /// UIKit gives its displacement effect (11.2 pt) that pulls the bar edge in by
+    /// 3 pt at 8 pt depth; a one-pixel ring at x0.70; a rim highlight of +49 then +19
+    /// levels on the top and bottom, +14 at the ends; interior brightening of +4
+    /// (light) / +10 (dark) over the pressed bar; a shadow band 4 pt below at -7
+    /// levels. Points, converted per frame; see GlassLensBlend for the model.
+    private static final float GLASS_LENS_BEVEL_PT = 11.2f;
+    private static final float GLASS_LENS_MAX_SHIFT_PT = 30f;
+    private static final float GLASS_LENS_DISPERSION = 0.08f;
+    private static final float GLASS_LENS_OUTLINE = 0.30f;
+    private static final float GLASS_LENS_OUTLINE_PT = 0.5f;
+    private static final float GLASS_LENS_RIM = 22 / 255f;
+    private static final float GLASS_LENS_RIM_VERTICAL = 40 / 255f;
+    private static final float GLASS_LENS_RIM_PT = 0.6f;
+    private static final float GLASS_LENS_END_SHADE = 0.05f;
+    private static final float GLASS_LENS_END_SHADE_PT = 8f;
+    private static final float GLASS_LENS_BRIGHT_LIGHT = 4 / 255f;
+    private static final float GLASS_LENS_BRIGHT_DARK = 10 / 255f;
+    private static final float GLASS_LENS_SHADOW = 0.055f;
+    private static final float GLASS_LENS_SHADOW_PT = 4f;
+
+    private float[] glassLensOptics(boolean dark) {
+        float[] o = new float[GlassLensBlend.COUNT];
+        o[GlassLensBlend.BEVEL] = glassPx(GLASS_LENS_BEVEL_PT);
+        o[GlassLensBlend.MAX_SHIFT] = glassPx(GLASS_LENS_MAX_SHIFT_PT);
+        o[GlassLensBlend.DISPERSION] = GLASS_LENS_DISPERSION;
+        o[GlassLensBlend.OUTLINE] = GLASS_LENS_OUTLINE;
+        o[GlassLensBlend.OUTLINE_WIDTH] = glassPx(GLASS_LENS_OUTLINE_PT);
+        o[GlassLensBlend.RIM_LIGHT] = GLASS_LENS_RIM;
+        o[GlassLensBlend.RIM_LIGHT_VERTICAL] = GLASS_LENS_RIM_VERTICAL;
+        o[GlassLensBlend.RIM_WIDTH] = glassPx(GLASS_LENS_RIM_PT);
+        o[GlassLensBlend.END_SHADE] = GLASS_LENS_END_SHADE;
+        o[GlassLensBlend.END_SHADE_WIDTH] = glassPx(GLASS_LENS_END_SHADE_PT);
+        o[GlassLensBlend.BRIGHTNESS] = dark ? GLASS_LENS_BRIGHT_DARK : GLASS_LENS_BRIGHT_LIGHT;
+        o[GlassLensBlend.SHADOW] = GLASS_LENS_SHADOW;
+        o[GlassLensBlend.SHADOW_WIDTH] = glassPx(GLASS_LENS_SHADOW_PT);
+        return o;
+    }
+
+    /// Coverage masks for the vibrant content, reused between frames.
+    private Image glassMaskDefault;
+    private Image glassMaskSelected;
+
+    /// The native iOS 27 bar is lit along its top and bottom edges: over flat grey
+    /// the outermost rows read +42/+29/+18/+7 levels (dark) and +36/+26/+17/+8
+    /// (light) above the interior, while its sides carry the dark outline instead
+    /// (GlassRecipe.getOutline). Drawn as white rows that fade inwards over about
+    /// 1.3 pt, only along the straight top and bottom runs and the upper and lower
+    /// quarters of the rounded ends.
+    private void paintGlassBarRim(Graphics g, int x, int y, int w, int h, float ptPx) {
+        int fg = tabsContainer.getStyle().getFgColor();
+        boolean dark = 0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff) > 128;
+        int peak = getUIManager().getThemeConstant(dark ? "tabGlassSpecularDarkAlphaInt" : "tabGlassSpecularAlphaInt", 0);
+        if (peak <= 0 || w <= 0 || h <= 0) {
+            return;
+        }
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        boolean aa = g.isAntiAliased();
+        g.setAntiAliased(true);
+        g.setColor(0xffffff);
+        // Rows are about a third of a point each, like the native @3x pixels.
+        int step = Math.max(1, Math.round(ptPx / 3f));
+        int d = h;
+        for (int i = 0; i < GLASS_RIM_FALLOFF.length; i++) {
+            int alpha = Math.round(peak * GLASS_RIM_FALLOFF[i]);
+            if (alpha <= 0) {
+                continue;
+            }
+            g.setAlpha(alpha);
+            int inset = i * step;
+            int ix = x + inset;
+            int iy = y + inset;
+            int iw = w - 2 * inset;
+            int ih = h - 2 * inset;
+            int dd = d - 2 * inset;
+            if (iw <= dd || ih <= 0) {
+                break;
+            }
+            for (int t = 0; t < step; t++) {
+                // straight top and bottom runs
+                g.drawLine(ix + dd / 2, iy + t, ix + iw - dd / 2, iy + t);
+                g.drawLine(ix + dd / 2, iy + ih - 1 - t, ix + iw - dd / 2, iy + ih - 1 - t);
+                // upper and lower quarters of both rounded ends (45 degrees either side
+                // of vertical, where the edge normal is mostly vertical)
+                int ax = ix + t;
+                int ay = iy + t;
+                int aw = dd - 2 * t;
+                g.drawArc(ax, ay, aw, aw, 90, 45);
+                g.drawArc(ax, ay, aw, aw, 225, 45);
+                g.drawArc(ix + iw - dd + t, ay, aw, aw, 45, 45);
+                g.drawArc(ix + iw - dd + t, ay, aw, aw, 270, 45);
+            }
+        }
+        g.setAntiAliased(aa);
+        g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
+    }
+
+    /// Paints the tab content and the selection for the ios27 motion. Order, bottom
+    /// to top, as UIKit composites it: grey platter under the lens, the tabs as
+    /// UNSELECTED content everywhere outside the lens, the tabs as SELECTED (accent)
+    /// content inside the lens magnified by the lift, then the lens rim and the
+    /// touch glow. Everything except the rim and glow rides one transform that
+    /// scales the whole bar about its centre.
+    void paintGlassTabs(Graphics g) {
+        Container tc = tabsContainer;
+        GlassFrame f = glassFrame();
+        TabGlassMotion m = f.motion;
+        int fg = tc.getStyle().getFgColor();
+        boolean dark = 0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff) > 128;
+        boolean vibrant = g.isColorMatrixRegionSupported();
+        if (vibrant && m.platterOpacity > 0) {
+            // The native platter is the bar's own glass seen through a colour matrix
+            // (a CABackdropLayer filter), not a translucent fill; it fades out while
+            // the lens is lifted.
+            float s = f.barScale;
+            int px = Math.round(scaleAbout(f.lensX, f.pivotX, s));
+            int py = Math.round(scaleAbout(f.lensY, f.pivotY, s));
+            int pr = Math.round(scaleAbout(f.lensX + f.lensW, f.pivotX, s));
+            int pb = Math.round(scaleAbout(f.lensY + f.lensH, f.pivotY, s));
+            g.colorMatrixRegion(px, py, pr - px, pb - py, dark ? GLASS_PLATTER_DARK : GLASS_PLATTER_LIGHT, null, -1,
+                    m.platterOpacity);
+        }
+        if (vibrant && m.lift > 0) {
+            // While pressed the whole native bar brightens by ~11 levels (measured over
+            // flat grey in both appearances: 196 -> 207 light, 136 -> 147 dark).
+            float s = f.barScale;
+            int bx = Math.round(scaleAbout(f.pillX, f.pivotX, s));
+            int by = Math.round(scaleAbout(f.pillY, f.pivotY, s));
+            int br = Math.round(scaleAbout(f.pillX + f.pillW, f.pivotX, s));
+            int bb = Math.round(scaleAbout(f.pillY + f.pillH, f.pivotY, s));
+            float lift = getUIManager().getThemeConstant("tabGlassPressLiftInt", 11) / 255f;
+            float[] brighten = {1, 0, 0, lift, 0, 1, 0, lift, 0, 0, 1, lift};
+            g.colorMatrixRegion(bx, by, br - bx, bb - by, brighten, null, -1, m.lift);
+        }
+        boolean xf = f.barScale != 1f && g.isTransformSupported();
+        Transform saved = null;
+        if (xf) {
+            saved = g.getTransform();
+            Transform t = Transform.makeTranslation(f.pivotX, f.pivotY);
+            t.scale(f.barScale, f.barScale);
+            t.translate(-f.pivotX, -f.pivotY);
+            g.transform(t);
+        }
+        boolean aa = g.isAntiAliased();
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        g.setAntiAliased(true);
+
+        // Selection platter fallback for ports without colorMatrixRegion; a dark bar
+        // has its own platter constants, falling back to the light ones.
+        UIManager uim = getUIManager();
+        int pillColor = uim.getThemeConstant("tabSelPillColorInt", 0x767680);
+        int pillAlpha = uim.getThemeConstant("tabSelPillAlphaInt", 34);
+        if (dark) {
+            pillColor = uim.getThemeConstant("tabSelPillColorDarkInt", pillColor);
+            pillAlpha = uim.getThemeConstant("tabSelPillAlphaDarkInt", pillAlpha);
+        }
+        int platterAlpha = Math.round(pillAlpha * m.platterOpacity);
+        int lx = Math.round(f.lensX);
+        int ly = Math.round(f.lensY);
+        int lw = Math.round(f.lensX + f.lensW) - lx;
+        int lh = Math.round(f.lensY + f.lensH) - ly;
+        int radius = Math.min(lw, lh);
+        if (!vibrant && platterAlpha > 0 && lw > 0 && lh > 0) {
+            g.setColor(pillColor);
+            g.setAlpha(platterAlpha);
+            g.fillRoundRect(lx, ly, lw, lh, radius, radius);
+        }
+        // The lifted lens is clear glass and reads BRIGHTER than the bar around it
+        // (+8 levels light, +11 dark over flat grey on the native bar).
+        int lensLight = Math.round(uim.getThemeConstant("tabGlassLensLightAlphaInt", 28) * m.lift);
+        if (lensLight > 0 && lw > 0 && lh > 0 && !g.isGlassLensRegionSupported()) {
+            g.setColor(0xffffff);
+            g.setAlpha(lensLight);
+            g.fillRoundRect(lx, ly, lw, lh, radius, radius);
+        }
+        g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
+
+        // Content, in tabsContainer-relative coordinates like Container.paint.
+        int ox = tc.getX();
+        int oy = tc.getY();
+        if (!vibrant) {
+            g.translate(ox, oy);
+            paintGlassContent(g, g, lx - ox, ly - oy, lw, lh, m.contentScale);
+            g.translate(-ox, -oy);
+        }
+
+        g.setAntiAliased(aa);
+        if (xf) {
+            g.setTransform(saved);
+        }
+        if (vibrant) {
+            paintGlassContentVibrant(g, f, dark, lx - ox, ly - oy, lw, lh);
+        }
+        if (m.lift > 0 && g.isGlassLensRegionSupported()) {
+            float s = f.barScale;
+            int gx = Math.round(scaleAbout(f.lensX, f.pivotX, s));
+            int gy = Math.round(scaleAbout(f.lensY, f.pivotY, s));
+            int gr = Math.round(scaleAbout(f.lensX + f.lensW, f.pivotX, s));
+            int gb = Math.round(scaleAbout(f.lensY + f.lensH, f.pivotY, s));
+            g.glassLensRegion(gx, gy, gr - gx, gb - gy, -1, glassLensOptics(dark), m.lift);
+        }
+        paintGlassRimAndGlow(g, f);
+        g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
+    }
+
+    /// Paints every tab twice through complementary clips: unselected outside the
+    /// lens capsule, selected (accent, scaled by `contentScale` about each tab's
+    /// centre) inside it. The capsule's round ends are tiled with thin horizontal
+    /// bands -- a staircase whose steps are about a point tall -- because the
+    /// complement of a capsule is not convex and a native shape clip only handles
+    /// convex polygons; plain rectangles are exact on every port. Bands only cover
+    /// the rows the tab content occupies, and a tab is only painted into a band it
+    /// intersects.
+    private void paintGlassContent(Graphics g, Graphics sel, int lx, int ly, int lw, int lh, float contentScale) {
+        Container tc = tabsContainer;
+        int n = tc.getComponentCount();
+        int w = tc.getWidth();
+        // Rows holding tab content.
+        int top = Integer.MAX_VALUE;
+        int bottom = Integer.MIN_VALUE;
+        for (int i = 0; i < n; i++) {
+            Component c = tc.getComponentAt(i);
+            top = Math.min(top, c.getY());
+            bottom = Math.max(bottom, c.getY() + c.getHeight());
+        }
+        if (top >= bottom) {
+            return;
+        }
+        int lensTop = Math.max(top, ly);
+        int lensBottom = Math.min(bottom, ly + lh);
+        // Above and below the lens: unselected, full width.
+        paintGlassRegion(g, 0, top, w, lensTop - top, Button.GLASS_PAINT_DEFAULT, 1f);
+        paintGlassRegion(g, 0, lensBottom, w, bottom - lensBottom, Button.GLASS_PAINT_DEFAULT, 1f);
+        if (lensBottom > lensTop) {
+            // Left and right of the lens box: unselected.
+            paintGlassRegion(g, 0, lensTop, lx, lensBottom - lensTop, Button.GLASS_PAINT_DEFAULT, 1f);
+            paintGlassRegion(g, lx + lw, lensTop, w - lx - lw, lensBottom - lensTop, Button.GLASS_PAINT_DEFAULT, 1f);
+            float r = Math.min(lw, lh) / 2f;
+            float mid = ly + lh / 2f;
+            float step = Math.max(1f, tc.getHeight() / 62f);
+            int y = lensTop;
+            while (y < lensBottom) {
+                int inset = capsuleInset(y + 0.5f, mid, r, step);
+                int y2 = y + 1;
+                while (y2 < lensBottom && capsuleInset(y2 + 0.5f, mid, r, step) == inset) {
+                    y2++;
+                }
+                int bh = y2 - y;
+                if (inset > 0) {
+                    paintGlassRegion(g, lx, y, inset, bh, Button.GLASS_PAINT_DEFAULT, 1f);
+                    paintGlassRegion(g, lx + lw - inset, y, inset, bh, Button.GLASS_PAINT_DEFAULT, 1f);
+                }
+                paintGlassRegion(sel, lx + inset, y, lw - 2 * inset, bh, Button.GLASS_PAINT_SELECTED, contentScale);
+                y = y2;
+            }
+        }
+    }
+
+    /// The native tab content is VIBRANT: each glyph pixel is a colour matrix of
+    /// whatever lies behind it, weighted by the glyph's coverage (see
+    /// VibrancyMatrix), so the unselected labels and the accent through the lens
+    /// pick up the glass under them instead of being flat paint. The content is
+    /// painted into two coverage masks -- unselected outside the lens, selected
+    /// (accent, magnified) inside it -- in the bar's scaled frame, and each mask
+    /// then drives Graphics.colorMatrixRegion with the matrix for its tint.
+    private void paintGlassContentVibrant(Graphics g, GlassFrame f, boolean dark, int lx, int ly, int lw, int lh) {
+        Container tc = tabsContainer;
+        int mw = tc.getWidth();
+        int mh = tc.getHeight();
+        if (mw <= 0 || mh <= 0) {
+            return;
+        }
+        // The masks are the bar's own size, unscaled, so they are allocated once;
+        // colorMatrixRegion stretches them over the pulsing bar.
+        // Each tab is painted once per mask; then the lens capsule is cut out of the
+        // unselected mask and everything outside it out of the selected one. One
+        // mask is finished before the other is touched (see cutGlassCapsule).
+        glassMaskDefault = clearedGlassMask(glassMaskDefault, mw, mh);
+        Graphics dg = glassMaskDefault.getGraphics();
+        paintGlassMaskTabs(dg, Button.GLASS_PAINT_DEFAULT, 1f);
+        cutGlassCapsule(dg, lx, ly, lw, lh, mw, mh, false);
+        glassMaskSelected = clearedGlassMask(glassMaskSelected, mw, mh);
+        Graphics sg = glassMaskSelected.getGraphics();
+        paintGlassMaskTabs(sg, Button.GLASS_PAINT_SELECTED, f.motion.contentScale);
+        cutGlassCapsule(sg, lx, ly, lw, lh, mw, mh, true);
+        float s = f.barScale;
+        int rx = Math.round(scaleAbout(tc.getX(), f.pivotX, s));
+        int ry = Math.round(scaleAbout(tc.getY(), f.pivotY, s));
+        int rr = Math.round(scaleAbout(tc.getX() + mw, f.pivotX, s));
+        int rb = Math.round(scaleAbout(tc.getY() + mh, f.pivotY, s));
+        int defaultTint = glassContentTint(Button.GLASS_PAINT_DEFAULT);
+        int selectedTint = glassContentTint(Button.GLASS_PAINT_SELECTED);
+        g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(defaultTint, dark), glassMaskDefault, 0, 1f);
+        g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(selectedTint, dark), glassMaskSelected, 0, 1f);
+    }
+
+    /// Paints every tab once into a mask, in the given glass paint state, each
+    /// scaled by `scale` about its own centre (the accent copy's magnification).
+    private void paintGlassMaskTabs(Graphics mg, int state, float scale) {
+        Container tc = tabsContainer;
+        int n = tc.getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = tc.getComponentAt(i);
+            Button b = c instanceof Button ? (Button) c : null;
+            int oldState = b == null ? 0 : b.glassPaintState;
+            if (b != null) {
+                b.glassPaintState = state;
+            }
+            boolean xf = scale != 1f && mg.isTransformSupported();
+            if (xf) {
+                float px = c.getX() + c.getWidth() / 2f;
+                float py = c.getY() + c.getHeight() / 2f;
+                Transform t = Transform.makeTranslation(px, py);
+                t.scale(scale, scale);
+                t.translate(-px, -py);
+                mg.setTransform(t);
+            }
+            try {
+                mg.setClip(0, 0, tc.getWidth(), tc.getHeight());
+                c.paintInternal(mg, false);
+            } finally {
+                if (xf) {
+                    mg.setTransform(Transform.makeIdentity());
+                }
+                if (b != null) {
+                    b.glassPaintState = oldState;
+                }
+            }
+        }
+    }
+
+    /// Clears the lens capsule (lx, ly, lw, lh, tabsContainer coordinates) out of
+    /// a mask, or with `keepInside` everything but the capsule: whole rectangles
+    /// around the lens box, then one strip per pixel row across the round ends.
+    /// Callers finish one mask before touching the other -- on ports that render
+    /// images on the GPU, every switch between two images' graphics closes one
+    /// drawing pass and opens another.
+    private static void cutGlassCapsule(Graphics g, int lx, int ly, int lw, int lh, int mw, int mh,
+            boolean keepInside) {
+        g.setClip(0, 0, mw, mh);
+        if (lw <= 0 || lh <= 0) {
+            if (keepInside) {
+                g.clearRect(0, 0, mw, mh);
+            }
+            return;
+        }
+        if (keepInside) {
+            g.clearRect(0, 0, mw, Math.max(0, ly));
+            g.clearRect(0, ly + lh, mw, Math.max(0, mh - ly - lh));
+            g.clearRect(0, ly, Math.max(0, lx), lh);
+            g.clearRect(lx + lw, ly, Math.max(0, mw - lx - lw), lh);
+        }
+        cutCapsuleRows(g, lx, ly, lw, lh, keepInside);
+    }
+
+    /// Per pixel row of the capsule, clears either its two round-end slivers
+    /// (`ends`) or its interior.
+    private static void cutCapsuleRows(Graphics g, int lx, int ly, int lw, int lh, boolean ends) {
+        float r = Math.min(lw, lh) / 2f;
+        float mid = ly + lh / 2f;
+        int y = ly;
+        while (y < ly + lh) {
+            int inset = capsuleInset(y + 0.5f, mid, r, 1f);
+            int y2 = y + 1;
+            while (y2 < ly + lh && capsuleInset(y2 + 0.5f, mid, r, 1f) == inset) {
+                y2++;
+            }
+            if (ends) {
+                if (inset > 0) {
+                    g.clearRect(lx, y, inset, y2 - y);
+                    g.clearRect(lx + lw - inset, y, inset, y2 - y);
+                }
+            } else if (lw - 2 * inset > 0) {
+                g.clearRect(lx + inset, y, lw - 2 * inset, y2 - y);
+            }
+            y = y2;
+        }
+    }
+
+    /// A transparent mask of the given size, reusing the previous frame's when it fits.
+    private static Image clearedGlassMask(Image mask, int w, int h) {
+        if (mask == null || mask.getWidth() != w || mask.getHeight() != h) {
+            return Image.createImage(w, h, 0);
+        }
+        Graphics mg = mask.getGraphics();
+        if (mg.isTransformSupported()) {
+            mg.setTransform(Transform.makeIdentity());
+        }
+        mg.setClip(0, 0, w, h);
+        mg.clearRect(0, 0, w, h);
+        return mask;
+    }
+
+    /// The foreground colour the tab content is painted with in the given glass
+    /// paint state (the unselected label colour, or the accent).
+    private int glassContentTint(int state) {
+        Container tc = tabsContainer;
+        int n = tc.getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = tc.getComponentAt(i);
+            if (c instanceof Button) {
+                Button b = (Button) c;
+                int old = b.glassPaintState;
+                b.glassPaintState = state;
+                try {
+                    return b.getStyle().getFgColor();
+                } finally {
+                    b.glassPaintState = old;
+                }
+            }
+        }
+        return state == Button.GLASS_PAINT_SELECTED ? 0x0091ff : 0;
+    }
+
+    /// Horizontal inset of a capsule of radius `r` from its bounding box at row
+    /// `y`, quantized to `step` pixels so neighbouring rows merge into one band.
+    private static int capsuleInset(float y, float mid, float r, float step) {
+        float dy = Math.abs(y - mid);
+        float inset = dy >= r ? r : r - (float) Math.sqrt(r * r - dy * dy);
+        return Math.round(Math.round(inset / step) * step);
+    }
+
+    private void paintGlassRegion(Graphics g, int x, int y, int w, int h, int state, float scale) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        int clipX = g.getClipX();
+        int clipY = g.getClipY();
+        int clipW = g.getClipWidth();
+        int clipH = g.getClipHeight();
+        try {
+            paintGlassRegionClipped(g, x, y, w, h, state, scale, clipX, clipY, clipW, clipH);
+        } finally {
+            g.setClip(clipX, clipY, clipW, clipH);
+        }
+    }
+
+    private void paintGlassRegionClipped(Graphics g, int x, int y, int w, int h, int state, float scale,
+            int clipX, int clipY, int clipW, int clipH) {
+        Container tc = tabsContainer;
+        g.clipRect(x, y, w, h);
+        if (g.getClipWidth() <= 0 || g.getClipHeight() <= 0) {
+            return;
+        }
+        int n = tc.getComponentCount();
+        for (int i = 0; i < n; i++) {
+            Component c = tc.getComponentAt(i);
+            int grow = scale == 1f ? 0 : Math.round(Math.max(c.getWidth(), c.getHeight()) * (scale - 1f) / 2f);
+            if (c.getX() - grow >= x + w || c.getX() + c.getWidth() + grow <= x
+                    || c.getY() - grow >= y + h || c.getY() + c.getHeight() + grow <= y) {
+                continue;
+            }
+            Button b = c instanceof Button ? (Button) c : null;
+            int oldState = b == null ? 0 : b.glassPaintState;
+            if (b != null) {
+                b.glassPaintState = state;
+            }
+            Transform saved = null;
+            boolean xf = scale != 1f && g.isTransformSupported();
+            if (xf) {
+                saved = g.getTransform();
+                float px = c.getX() + c.getWidth() / 2f;
+                float py = c.getY() + c.getHeight() / 2f;
+                Transform t = Transform.makeTranslation(px, py);
+                t.scale(scale, scale);
+                t.translate(-px, -py);
+                g.transform(t);
+            }
+            try {
+                c.paintInternal(Display.impl.getComponentScreenGraphics(tc, g), false);
+            } finally {
+                if (xf) {
+                    g.setTransform(saved);
+                }
+                if (b != null) {
+                    b.glassPaintState = oldState;
+                }
+            }
+            g.setClip(clipX, clipY, clipW, clipH);
+            g.clipRect(x, y, w, h);
+        }
+    }
+
+    /// The lifted lens's bright rim and the touch glow. Both are drawn in the frame
+    /// directly (manually scaled by the bar pulse) after the transformed content.
+    private void paintGlassRimAndGlow(Graphics g, GlassFrame f) {
+        TabGlassMotion m = f.motion;
+        float s = f.barScale;
+        boolean aa = g.isAntiAliased();
+        g.setAntiAliased(true);
+        if (m.lift > 0.01f && !g.isGlassLensRegionSupported()) {
+            float x = scaleAbout(f.lensX, f.pivotX, s);
+            float y = scaleAbout(f.lensY, f.pivotY, s);
+            float w = f.lensW * s;
+            float h = f.lensH * s;
+            // Without glassLensRegion: an approximation of the native edge -- a thin
+            // dark ring on the boundary and a bright rim just inside it.
+            int rimAlpha = Math.round(getUIManager().getThemeConstant("tabGlassRimAlphaInt", 150) * m.lift);
+            int edgeAlpha = Math.round(getUIManager().getThemeConstant("tabGlassEdgeAlphaInt", 110) * m.lift);
+            int ix = Math.round(x);
+            int iy = Math.round(y);
+            int iw = Math.round(x + w) - ix;
+            int ih = Math.round(y + h) - iy;
+            int rr = Math.min(iw, ih);
+            if (edgeAlpha > 0) {
+                g.setColor(0x000000);
+                g.setAlpha(edgeAlpha);
+                g.drawRoundRect(ix, iy, iw - 1, ih - 1, rr, rr);
+            }
+            if (rimAlpha > 0 && iw > 4 && ih > 4) {
+                g.setColor(0xffffff);
+                g.setAlpha(rimAlpha);
+                g.drawRoundRect(ix + 1, iy + 1, iw - 3, ih - 3, rr - 2, rr - 2);
+            }
+        }
+        if (m.glowOpacity > 0.003f) {
+            float d = TabGlassMotion.GLOW_DIAMETER_PT * m.glowScale * f.ptPx * s;
+            int alpha = Math.round(255 * m.glowOpacity * getUIManager().getThemeConstant("tabGlassGlowPct", 40) / 100f);
+            if (alpha > 0) {
+                int ocx = g.getClipX();
+                int ocy = g.getClipY();
+                int ocw = g.getClipWidth();
+                int och = g.getClipHeight();
+                int px = Math.round(scaleAbout(f.pillX, f.pivotX, s));
+                int py = Math.round(scaleAbout(f.pillY, f.pivotY, s));
+                g.clipRect(px, py, Math.round(f.pillW * s), Math.round(f.pillH * s));
+                float gx = scaleAbout(f.glowX, f.pivotX, s);
+                float gy = scaleAbout(f.glowY, f.pivotY, s);
+                // A soft disc: nested translucent discs whose alphas sum to `alpha` at
+                // the centre and fall off linearly to nothing at the rim.
+                g.setColor(0xffffff);
+                int rings = 16;
+                int painted = 0;
+                for (int i = rings; i >= 1; i--) {
+                    // cumulative alpha at ring i is alpha * (rings - i + 1) / rings
+                    int target = alpha * (rings - i + 1) / rings;
+                    int a = target - painted;
+                    if (a <= 0) {
+                        continue;
+                    }
+                    painted = target;
+                    g.setAlpha(a);
+                    float rd = d / 2f * i / rings;
+                    int dd = Math.round(rd * 2);
+                    g.fillArc(Math.round(gx - rd), Math.round(gy - rd), dd, dd, 0, 360);
+                }
+                g.setClip(ocx, ocy, ocw, och);
+            }
+        }
+        g.setAntiAliased(aa);
     }
 
     /// The iOS "selected cell" background: a subtle grey capsule kept at bar height
@@ -1980,6 +3005,12 @@ public class Tabs extends Container {
     }
 
     private void setTabsLayout(int tabPlacement) {
+        if ((tabPlacement == TOP || tabPlacement == BOTTOM) && isGlassMotion()) {
+            tabsContainer.setLayout(new GlassTabsLayout());
+            tabsContainer.setScrollableX(false);
+            tabsContainer.setScrollableY(false);
+            return;
+        }
         if (tabPlacement == TOP || tabPlacement == BOTTOM) {
             // Equal-width cells filling the row (native UITabBar even spacing): a
             // NON-scrolling GridLayout divides the row width into equal columns, so a
@@ -2245,6 +3276,136 @@ public class Tabs extends Container {
         return super.setPropertyValue(name, value);
     }
 
+    // ---- iOS 27 floating tab bar geometry (tabsMorphPreset ios27), in points ----
+    // Read off a real UITabBarController (the motion probe's layer log): the pill
+    // is 62 pt tall with its lower edge 21 pt above the screen's, and as wide as its
+    // tabs need -- 86 pt a tab plus 16 -- but never closer than 21 pt to the sides.
+    // Each tab's button is 54 pt tall, 4 pt inside the pill, and is where the lens
+    // rests: 94 pt wide at the natural pitch, never narrower than 84.05 pt, which is
+    // why the buttons of a crowded bar overlap. A theme may override each number.
+    static final float GLASS_BAR_PT = 62f;
+    static final float GLASS_PITCH_PT = 86f;
+    static final float GLASS_INSET_PT = 4f;
+    static final float GLASS_MIN_LENS_PT = 84.05f;
+    static final float GLASS_EDGE_PT = 21f;
+    // Width of the resting lens, set by GlassTabsLayout.
+    private float glassLensWidth;
+
+    private float glassConstantPt(String name, float def) {
+        String v = getUIManager().getThemeConstant(name, null);
+        if (v == null) {
+            return def;
+        }
+        try {
+            return Float.parseFloat(v.trim());
+        } catch (NumberFormatException ignore) {
+            return def;
+        }
+    }
+
+    /// Points to pixels: the screen's own scale where the port knows it (UIScreen
+    /// on iOS), else through the physical size of a 1/163 inch point.
+    static float glassPx(float pt) {
+        float ratio = Display.getInstance().getDevicePixelRatio();
+        if (ratio <= 0) {
+            ratio = Display.getInstance().convertToPixels(10f) / 10f * 25.4f / 163f;
+        }
+        return pt * ratio;
+    }
+
+    /// The pill width the tabs ask for, in pixels (before the side limit).
+    private float glassNaturalPillWidth(int n) {
+        return glassPx(n * glassConstantPt("tabsGlassPitchPt", GLASS_PITCH_PT)
+                + 4 * glassConstantPt("tabsGlassInsetPt", GLASS_INSET_PT));
+    }
+
+    /// Places the tabs inside the iOS 27 pill like UITabBar: equal pitch, each
+    /// button centred on its tab and as wide as the resting lens.
+    class GlassTabsLayout extends Layout {
+        @Override
+        public void layoutContainer(Container parent) {
+            int n = parent.getComponentCount();
+            if (n == 0) {
+                return;
+            }
+            int sx = glassSlackXPx();
+            int sy = glassSlackYPx();
+            float pillX = sx;
+            float pillW = parent.getWidth() - 2 * sx;
+            float pillH = parent.getHeight() - 2 * sy;
+            float inset = glassPx(glassConstantPt("tabsGlassInsetPt", GLASS_INSET_PT));
+            float span = pillW - 2 * inset;
+            float lensW;
+            float pitch;
+            if (n == 1) {
+                lensW = span;
+                pitch = 0;
+            } else {
+                pitch = (span - 2 * inset) / n;
+                lensW = pitch + 2 * inset;
+                float minLens = glassPx(glassConstantPt("tabsGlassMinLensPt", GLASS_MIN_LENS_PT));
+                if (lensW < minLens) {
+                    lensW = Math.min(minLens, span);
+                    pitch = (span - lensW) / (n - 1);
+                }
+            }
+            glassLensWidth = lensW;
+            int top = Math.round(sy + inset);
+            int h = Math.max(0, Math.round(pillH - 2 * inset));
+            for (int i = 0; i < n; i++) {
+                Component c = parent.getComponentAt(i);
+                float centre = pillX + inset + lensW / 2f + i * pitch;
+                int left = Math.round(centre - lensW / 2f);
+                c.setX(left);
+                c.setY(top);
+                c.setWidth(Math.round(centre + lensW / 2f) - left);
+                c.setHeight(h);
+            }
+        }
+
+        @Override
+        public Dimension getPreferredSize(Container parent) {
+            return new Dimension(Math.round(glassNaturalPillWidth(parent.getComponentCount())) + 2 * glassSlackXPx(),
+                    Math.round(glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT))) + 2 * glassSlackYPx());
+        }
+    }
+
+    /// The wrapper around the floating tab bar. With the iOS 27 motion it sizes
+    /// and places the pill the way UITabBar does (centred, as wide as its tabs,
+    /// its lower edge a fixed distance above the bottom -- inside the home
+    /// indicator's safe area, as native draws it); otherwise it is a BorderLayout.
+    class GlassHostLayout extends BorderLayout {
+        @Override
+        public void layoutContainer(Container parent) {
+            if (!isGlassMotion() || tabsContainer == null || tabsContainer.getParent() != parent) { //NOPMD CompareObjectsWithEquals
+                super.layoutContainer(parent);
+                return;
+            }
+            int sx = glassSlackXPx();
+            int sy = glassSlackYPx();
+            float edge = glassPx(glassConstantPt("tabsGlassEdgePt", GLASS_EDGE_PT));
+            float barH = glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT));
+            float pillW = Math.min(glassNaturalPillWidth(tabsContainer.getComponentCount()),
+                    parent.getWidth() - 2 * edge);
+            int w = Math.round(pillW) + 2 * sx;
+            int h = Math.round(barH) + 2 * sy;
+            tabsContainer.setX((parent.getWidth() - w) / 2);
+            tabsContainer.setY(Math.round(parent.getHeight() - edge - barH) - sy);
+            tabsContainer.setWidth(w);
+            tabsContainer.setHeight(h);
+        }
+
+        @Override
+        public Dimension getPreferredSize(Container parent) {
+            if (!isGlassMotion() || tabsContainer == null) {
+                return super.getPreferredSize(parent);
+            }
+            float edge = glassPx(glassConstantPt("tabsGlassEdgePt", GLASS_EDGE_PT));
+            float barH = glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT));
+            return new Dimension(tabsContainer.getPreferredW(), Math.round(barH + edge) + glassSlackYPx());
+        }
+    }
+
     class TabsLayout extends Layout {
 
         @Override
@@ -2354,6 +3515,19 @@ public class Tabs extends Container {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
+            if (type == PRESS) {
+                recordGlassPress(evt.getX(), evt.getY());
+            } else if (type == DRAG) {
+                recordGlassDrag(evt.getX());
+            } else if (type == RELEASE && glassMotionStart >= 0) {
+                recordGlassRelease(evt.getX());
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        checkGlassPressOutcome();
+                    }
+                });
+            }
 
             if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) {
                 return;

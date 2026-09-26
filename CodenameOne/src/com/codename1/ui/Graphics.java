@@ -1692,6 +1692,107 @@ public final class Graphics {
         return impl.lensRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, cornerRadius, magnify, aberration, tintColor, tintStrength);
     }
 
+    /// True when this graphics context can run `#glassLensRegion`.
+    ///
+    /// #### Returns
+    ///
+    /// true if glassLensRegion is supported on this context
+    public boolean isGlassLensRegionSupported() {
+        return impl.isGlassLensRegionSupported(nativeGraphics);
+    }
+
+    /// Lays the optics of a raised Liquid Glass lens over what is already painted:
+    /// the rim refracts the surface around it inwards (so the edge of whatever the
+    /// lens floats over bends into its rim), with slight colour dispersion, a thin
+    /// outline, a rim highlight, shading along its ends, interior brightening and a
+    /// soft shadow below. The math and the meaning of each parameter are in
+    /// `com.codename1.ui.plaf.GlassLensBlend`; the lens may sample up to
+    /// `optics[GlassLensBlend.MAX_SHIFT]` pixels outside its own rectangle and
+    /// paints up to `GlassLensBlend.margin(optics)` pixels outside it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: lens left edge
+    ///
+    /// - `y`: lens top edge
+    ///
+    /// - `width`: lens width
+    ///
+    /// - `height`: lens height
+    ///
+    /// - `cornerRadius`: corner radius, negative for a capsule
+    ///
+    /// - `optics`: `GlassLensBlend.COUNT` parameters, lengths in pixels
+    ///
+    /// - `amount`: overall strength 0..1 (0 leaves the surface untouched)
+    ///
+    /// #### Returns
+    ///
+    /// false when the port cannot do this (nothing is painted then)
+    public boolean glassLensRegion(int x, int y, int width, int height, float cornerRadius, float[] optics,
+            float amount) {
+        if (width <= 0 || height <= 0 || amount <= 0) {
+            return true;
+        }
+        return impl.glassLensRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, cornerRadius,
+                optics, amount);
+    }
+
+    /// True when this graphics context can run `#colorMatrixRegion`.
+    ///
+    /// #### Returns
+    ///
+    /// true if colorMatrixRegion is supported on this context
+    public boolean isColorMatrixRegionSupported() {
+        return impl.isColorMatrixRegionSupported(nativeGraphics);
+    }
+
+    /// Recolours what is ALREADY painted in a region through a colour matrix: every
+    /// pixel `p` becomes `mix(p, clamp(M * p + offset), k)`. This is how iOS draws
+    /// vibrant content over glass -- a vibrant glyph's colour is a function of what
+    /// lies behind it, see com.codename1.ui.plaf.VibrancyMatrix -- and how a glass
+    /// selection platter derives its material from the glass it sits on.
+    ///
+    /// The coverage `k` is `amount`, times the anti-aliased coverage of a rounded
+    /// rectangle filling the region when `cornerRadius` is not zero (negative makes
+    /// a capsule), times the alpha of `mask` when one is given. The mask covers the
+    /// region pixel for pixel, so painting glyphs into a transparent mutable image
+    /// and passing it here draws them the way a template image is drawn natively.
+    ///
+    /// The region is in this context's coordinates; the current transform is not
+    /// applied. com.codename1.ui.plaf.ColorMatrixBlend is the reference
+    /// implementation of the per-pixel operation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: region x
+    ///
+    /// - `y`: region y
+    ///
+    /// - `width`: region width
+    ///
+    /// - `height`: region height
+    ///
+    /// - `matrix`: 12 floats: rows r, g, b of `[r, g, b, offset]`, in 0..1 units
+    ///
+    /// - `mask`: optional mask the size of the region, or null
+    ///
+    /// - `cornerRadius`: 0 for the whole rectangle, a radius, or negative for a capsule
+    ///
+    /// - `amount`: overall strength 0..1
+    ///
+    /// #### Returns
+    ///
+    /// false when the port cannot do this (nothing is painted then)
+    public boolean colorMatrixRegion(int x, int y, int width, int height, float[] matrix, Image mask,
+            float cornerRadius, float amount) {
+        if (width <= 0 || height <= 0 || amount <= 0) {
+            return true;
+        }
+        return impl.colorMatrixRegion(nativeGraphics, x + xTranslate, y + yTranslate, width, height, matrix, mask,
+                cornerRadius, amount);
+    }
+
     /// Fills a rectangle with an optionally translucent fill color
     ///
     /// #### Parameters

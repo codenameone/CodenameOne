@@ -41,6 +41,11 @@ public class FidelityApp extends Lifecycle {
         // freezing the UI thread (mirrors the hellocodenameone runner).
         Thread runner = new Thread(new Runnable() {
             public void run() {
+                String showcase = FidelityDeviceRunner.requestedTabsShowcase();
+                if (showcase != null) {
+                    new FidelityDeviceRunner().runTabsShowcase(showcase);
+                    return;
+                }
                 new FidelityDeviceRunner().runSuite();
             }
         }, "CN1SS-Fidelity-Runner");

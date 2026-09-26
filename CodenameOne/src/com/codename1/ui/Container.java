@@ -2534,6 +2534,15 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
+    /// Runs the layout-on-paint step of {@link #paint(Graphics)} for a subclass that
+    /// paints its children itself (the Tabs bar paints each tab twice for the
+    /// Liquid Glass selection) and so cannot call super.paint().
+    final void layoutForPaint() {
+        if (allowEnableLayoutOnPaint && enableLayoutOnPaint) {
+            layoutContainer();
+        }
+    }
+
     /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {

@@ -514,6 +514,321 @@ fragment float4 cn1_fs_lens(
     return float4(fr / 255.0 * alpha, fg / 255.0 * alpha, fb / 255.0 * alpha, alpha);
 }
 
+// Graphics.colorMatrixRegion. Mirrors com.codename1.ui.plaf.ColorMatrixBlend (the
+// reference the JavaSE port runs): v = clamp(M.p + off), k = amount * shape * mask
+// alpha, result mix(p, v, k). Drawn premultiplied as (v*k, k) OVER p, which is the
+// same mix and leaves the destination alpha alone.
+fragment float4 cn1_fs_colormatrix(
+    VertexOutTextured in [[stage_in]],
+    constant float4 *rows [[buffer(0)]],  // 3 matrix rows (r,g,b,off), then (fw, fh, cornerRadiusPx, amount)
+    constant float4 &flags [[buffer(1)]], // x: 1 = mask bound
+    texture2d<float> src [[texture(0)]],
+    texture2d<float> mask [[texture(1)]])
+{
+    constexpr sampler nearestSmp(mag_filter::nearest, min_filter::nearest, address::clamp_to_edge);
+    // The mask may be stretched over the region (the pulsing tab bar), so it is
+    // filtered; the source is the region itself, pixel for pixel.
+    constexpr sampler maskSmp(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float fw = rows[3].x, fh = rows[3].y, cornerRadius = rows[3].z, amount = rows[3].w;
+    float hw = fw * 0.5, hh = fh * 0.5;
+    float k = amount;
+    if (cornerRadius != 0.0) {
+        float r = (cornerRadius < 0.0) ? min(hw, hh) : min(cornerRadius, min(hw, hh));
+        float px = in.texcoord.x * fw - hw;
+        float py = in.texcoord.y * fh - hh;
+        float dxe = abs(px) - (hw - r);
+        float dye = abs(py) - (hh - r);
+        float ax = max(dxe, 0.0), ay = max(dye, 0.0);
+        float sdf = sqrt(ax * ax + ay * ay) + min(max(dxe, dye), 0.0) - r;
+        k *= clamp(0.5 - sdf, 0.0, 1.0);
+    }
+    if (flags.x > 0.5) {
+        k *= mask.sample(maskSmp, in.texcoord).a;
+    }
+    if (k <= 0.0) { return float4(0.0); }
+    float3 p = src.sample(nearestSmp, in.texcoord).rgb;
+    float3 v = float3(dot(rows[0].xyz, p) + rows[0].w,
+                      dot(rows[1].xyz, p) + rows[1].w,
+                      dot(rows[2].xyz, p) + rows[2].w);
+    v = clamp(v, 0.0, 1.0);
+    k = min(k, 1.0);
+    return float4(v * k, k);
+}
+
+// ---- Liquid Glass on the GPU (CN1MetalGlassEncode / CN1MetalDrawGlass) ----
+// A port of METALView.m's CPU glass (the material loop, glassGaussianBlur and
+// glassApplyOptics) that keeps its integer rounding: every intermediate is an
+// 8-bit value, truncated or rounded exactly where the C code does, so the GPU
+// patch matches the CPU one.
+
+struct VertexOutFullscreen {
+    float4 position [[position]];
+};
+
+// One triangle covering the viewport; the fragment works from [[position]].
+vertex VertexOutFullscreen cn1_vs_fullscreen(uint vid [[vertex_id]]) {
+    float2 p = float2(float((vid << 1) & 2), float(vid & 2));
+    VertexOutFullscreen o;
+    o.position = float4(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0, 1.0);
+    return o;
+}
+
+static inline int cn1_glass_byte(float unit) {
+    return int(rint(unit * 255.0));
+}
+
+// params: x,y = the padded buffer's origin inside `src`; z,w = src size.
+// material: sat, scale, offset, curve; material2.x = curveMid.
+fragment float4 cn1_fs_glass_material(
+    VertexOutFullscreen in [[stage_in]],
+    constant int4 &params [[buffer(0)]],
+    constant float4 &material [[buffer(1)]],
+    constant float4 &material2 [[buffer(2)]],
+    texture2d<float, access::read> src [[texture(0)]])
+{
+    int bx = int(in.position.x);
+    int by = int(in.position.y);
+    int ax = clamp(bx + params.x, 0, params.z - 1);
+    int ay = clamp(by + params.y, 0, params.w - 1);
+    float4 c = src.read(uint2(ax, ay));
+    float rch = float(cn1_glass_byte(c.r));
+    float gch = float(cn1_glass_byte(c.g));
+    float bch = float(cn1_glass_byte(c.b));
+    float sat = material.x, scale = material.y, offset = material.z, curve = material.w;
+    float lum = 0.2126 * rch + 0.7152 * gch + 0.0722 * bch;
+    float rr = (lum + (rch - lum) * sat) * scale + offset;
+    float gg = (lum + (gch - lum) * sat) * scale + offset;
+    float bb = (lum + (bch - lum) * sat) * scale + offset;
+    if (curve != 0.0) {
+        float d = lum / 255.0 - material2.x;
+        float k = curve * 255.0 * d * d;
+        rr += k; gg += k; bb += k;
+    }
+    // (int) in C truncates toward zero; the clamp comes first.
+    float ri = rr < 0.0 ? 0.0 : (rr > 255.0 ? 255.0 : trunc(rr));
+    float gi = gg < 0.0 ? 0.0 : (gg > 255.0 ? 255.0 : trunc(gg));
+    float bi = bb < 0.0 ? 0.0 : (bb > 255.0 ? 255.0 : trunc(bb));
+    return float4(ri, gi, bi, 255.0) / 255.0;
+}
+
+// One direction of a box-blur iteration: the mean of 2r+1 edge-clamped
+// samples, rounded like glassBoxBlurOnce. params: x = r, y = width, z = height.
+static inline float4 cn1_glass_box(VertexOutFullscreen in, int4 params,
+                                   texture2d<float, access::read> src, bool horizontal) {
+    int x = int(in.position.x);
+    int y = int(in.position.y);
+    int r = params.x;
+    int sr = 0, sg = 0, sb = 0;
+    for (int k = -r; k <= r; k++) {
+        int xx = horizontal ? clamp(x + k, 0, params.y - 1) : x;
+        int yy = horizontal ? y : clamp(y + k, 0, params.z - 1);
+        float4 c = src.read(uint2(xx, yy));
+        sr += cn1_glass_byte(c.r);
+        sg += cn1_glass_byte(c.g);
+        sb += cn1_glass_byte(c.b);
+    }
+    float norm = 1.0 / float(2 * r + 1);
+    return float4(float(int(float(sr) * norm + 0.5)), float(int(float(sg) * norm + 0.5)),
+                  float(int(float(sb) * norm + 0.5)), 255.0) / 255.0;
+}
+
+fragment float4 cn1_fs_glass_box_h(VertexOutFullscreen in [[stage_in]], constant int4 &params [[buffer(0)]],
+                                   texture2d<float, access::read> src [[texture(0)]]) {
+    return cn1_glass_box(in, params, src, true);
+}
+
+fragment float4 cn1_fs_glass_box_v(VertexOutFullscreen in [[stage_in]], constant int4 &params [[buffer(0)]],
+                                   texture2d<float, access::read> src [[texture(0)]]) {
+    return cn1_glass_box(in, params, src, false);
+}
+
+static inline int cn1_glass_bilerp(int c00, int c10, int c01, int c11, float tx, float ty) {
+    float top = float(c00) + float(c10 - c00) * tx;
+    float bot = float(c01) + float(c11 - c01) * tx;
+    return int(top + (bot - top) * ty + 0.5);
+}
+
+static inline int3 cn1_glass_texel(texture2d<float, access::read> t, int x, int y) {
+    float4 c = t.read(uint2(x, y));
+    return int3(cn1_glass_byte(c.r), cn1_glass_byte(c.g), cn1_glass_byte(c.b));
+}
+
+static inline int cn1_glass_outline_channel(int c, int b, float alpha, float w) {
+    float v = float(c) * alpha;
+    float under = float(b) * (1.0 - alpha);
+    v = v + under;
+    float dark = 76.0 * w;
+    float alt = 0.78 * w * float(b);
+    if (alt < dark) { dark = alt; }
+    v = v - dark;
+    return v <= 0.0 ? 0 : (v >= 255.0 ? 255 : int(v + 0.5));
+}
+
+// The optics of glassApplyOptics, drawn as the patch itself.
+// p0: fw, fh, cornerRadius (logical; < 0 = capsule), s
+// p1: refract, specular, outline, unused
+// p2 (int): pad, bw, bh, unused;  p3 (int): rawX, rawY, rawW, rawH
+fragment float4 cn1_fs_glass_optics(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &p0 [[buffer(0)]],
+    constant float4 &p1 [[buffer(1)]],
+    constant int4 &p2 [[buffer(2)]],
+    constant int4 &p3 [[buffer(3)]],
+    texture2d<float, access::read> blurred [[texture(0)]],
+    texture2d<float, access::read> raw [[texture(1)]])
+{
+    float fw = p0.x, fh = p0.y, cornerRadius = p0.z, s = p0.w;
+    float refract = p1.x, specular = p1.y, outline = p1.z;
+    int pad = p2.x, bw = p2.y, bh = p2.z;
+    int x = clamp(int(in.texcoord.x * fw), 0, int(fw) - 1);
+    int y = clamp(int(in.texcoord.y * fh), 0, int(fh) - 1);
+    int rw = int(fw), rh = int(fh);
+    float hw = float(rw) / 2.0, hh = float(rh) / 2.0;
+    float minhh = hw < hh ? hw : hh;
+    float r;
+    if (cornerRadius < 0.0) { r = minhh; } else { r = cornerRadius * s; if (r > minhh) r = minhh; }
+    if (r < 0.0) r = 0.0;
+    float band = minhh * 0.6;
+    float rimW = 3.0 * s;
+    float px = float(x) + 0.5, py = float(y) + 0.5;
+    float dx = fabs(px - hw) - (hw - r);
+    float dy = fabs(py - hh) - (hh - r);
+    float axx = dx > 0.0 ? dx : 0.0, ayy = dy > 0.0 ? dy : 0.0;
+    float outside = sqrt(axx * axx + ayy * ayy);
+    float mxv = dx > dy ? dx : dy;
+    float inside = mxv < 0.0 ? mxv : 0.0;
+    float depth = -(outside + inside - r);
+    if (depth <= 0.0) { return float4(0.0); }
+    float alpha = depth >= 1.0 ? 1.0 : depth;
+    if (cornerRadius == 0.0) {
+        float fb = float(rh) * 0.22;
+        if (fb > 1.0 && py > float(rh) - fb) {
+            float fade = (float(rh) - py) / fb;
+            if (fade < 0.0) fade = 0.0;
+            alpha *= fade;
+        }
+    }
+    float sx = float(x), sy = float(y);
+    if (refract > 0.0 && band > 0.0 && depth < band) {
+        float t = 1.0 - depth / band;
+        float distortion = 1.0 - sqrt(max(0.0, 1.0 - t * t));
+        sx = float(x) - (px - hw) * distortion * refract;
+        sy = float(y) - (py - hh) * distortion * refract;
+    }
+    float fx = sx + float(pad), fy = sy + float(pad);
+    fx = clamp(fx, 0.0, float(bw - 1));
+    fy = clamp(fy, 0.0, float(bh - 1));
+    int x0 = int(fx), y0 = int(fy);
+    int x1 = x0 + 1 < bw ? x0 + 1 : x0, y1 = y0 + 1 < bh ? y0 + 1 : y0;
+    float tx = fx - float(x0), ty = fy - float(y0);
+    int3 c00 = cn1_glass_texel(blurred, x0, y0), c10 = cn1_glass_texel(blurred, x1, y0);
+    int3 c01 = cn1_glass_texel(blurred, x0, y1), c11 = cn1_glass_texel(blurred, x1, y1);
+    int rr = cn1_glass_bilerp(c00.x, c10.x, c01.x, c11.x, tx, ty);
+    int gg = cn1_glass_bilerp(c00.y, c10.y, c01.y, c11.y, tx, ty);
+    int bb = cn1_glass_bilerp(c00.z, c10.z, c01.z, c11.z, tx, ty);
+    if (specular > 0.0 && depth < rimW) {
+        float rim = 1.0 - depth / rimW;
+        float topBias = 0.55 + 0.45 * (1.0 - py / float(rh));
+        int add = int(specular * rim * topBias * 70.0);
+        rr = min(rr + add, 255);
+        gg = min(gg + add, 255);
+        bb = min(bb + add, 255);
+    }
+    if (outline > 0.0 && depth < 1.0 && p3.z > 0) {
+        float wx;
+        if (dx > 0.0 && dy > 0.0) { wx = outside > 0.0 ? axx / outside : 0.0; }
+        else { wx = dx >= dy ? 1.0 : 0.0; }
+        float ow = outline * wx;
+        if (ow > 0.0) {
+            int3 bk = cn1_glass_texel(raw, clamp(x + p3.x, 0, p3.z - 1), clamp(y + p3.y, 0, p3.w - 1));
+            rr = cn1_glass_outline_channel(rr, bk.x, alpha, ow);
+            gg = cn1_glass_outline_channel(gg, bk.y, alpha, ow);
+            bb = cn1_glass_outline_channel(bb, bk.z, alpha, ow);
+            return float4(float(rr), float(gg), float(bb), 255.0) / 255.0;
+        }
+    }
+    int a = int(alpha * 255.0);
+    return float4(float(rr * a / 255), float(gg * a / 255), float(bb * a / 255), float(a)) / 255.0;
+}
+
+// Graphics.glassLensRegion -- a line-for-line port of
+// com.codename1.ui.plaf.GlassLensBlend.apply (the reference the JavaSE port runs).
+// geo: the quad in physical pixels; lens: the lens rect (physical);
+// src: the blit's physical origin and size; misc.x: corner radius (< 0 capsule),
+// misc.y: amount; o: the GlassLensBlend parameters (lengths in physical pixels).
+static inline float cn1_glass_lens_disp(float s, float h, float mx) {
+    if (s >= h || h <= 0.0) { return 0.0; }
+    float t = (h - s) / h;
+    float d = (h - s) / sqrt(max(1e-6, 1.0 - t * t));
+    return min(d, mx);
+}
+
+fragment float4 cn1_fs_glass_lens(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &geo [[buffer(0)]],
+    constant float4 &lens [[buffer(1)]],
+    constant float4 &srcr [[buffer(2)]],
+    constant float4 &misc [[buffer(3)]],
+    constant float *o [[buffer(4)]],
+    texture2d<float> src [[texture(0)]])
+{
+    constexpr sampler lin(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float2 P = geo.xy + in.texcoord * geo.zw;              // pixel centre, physical
+    float2 size = float2(src.get_width(), src.get_height());
+    float2 tp = P - srcr.xy;                               // inside the blit
+    float4 base4 = src.sample(lin, tp / size);
+    float3 base = base4.rgb;
+    float amount = misc.y;
+    float hw = lens.z * 0.5, hh = lens.w * 0.5;
+    float2 c = lens.xy + float2(hw, hh);
+    float r = misc.x < 0.0 ? min(hw, hh) : min(misc.x, min(hw, hh));
+    float px = P.x - c.x, py = P.y - c.y;
+    float dx = fabs(px) - (hw - r), dy = fabs(py) - (hh - r);
+    float ax = max(dx, 0.0), ay = max(dy, 0.0);
+    float outsideD = sqrt(ax * ax + ay * ay);
+    float sdf = outsideD + min(max(dx, dy), 0.0) - r;
+    float nx, ny;
+    if (dx > 0.0 && dy > 0.0 && outsideD > 0.0) { nx = ax / outsideD; ny = ay / outsideD; }
+    else if (dx > dy) { nx = 1.0; ny = 0.0; }
+    else { nx = 0.0; ny = 1.0; }
+    nx = px < 0.0 ? -nx : nx;
+    ny = py < 0.0 ? -ny : ny;
+    float s = -sdf;
+    float3 outc = base;
+    if (s > 0.0) {
+        float d = cn1_glass_lens_disp(s, o[0], o[1]);
+        float disp = o[2];
+        float2 n = float2(nx, ny);
+        float cr = src.sample(lin, (tp + n * d * (1.0 - disp)) / size).r;
+        float cg = src.sample(lin, (tp + n * d) / size).g;
+        float cb = src.sample(lin, (tp + n * d * (1.0 + disp)) / size).b;
+        float shade = 1.0;
+        if (o[9] > 0.0) {
+            float w = o[9];
+            float band = s < w * 0.7 ? 1.0 : (s >= w ? 0.0 : smoothstep(0.0, 1.0, (w - s) / (w * 0.3)));
+            shade -= o[8] * fabs(nx) * band;
+        }
+        float rim = 0.0;
+        float past = s - o[4];
+        if (o[7] > 0.0 && past >= 0.0) {
+            rim = (o[5] + o[6] * fabs(ny)) * exp(-past / o[7]);
+        }
+        float3 inside = float3(cr, cg, cb) * shade + o[10] + rim;
+        float cov = min(s, 1.0);
+        outc = base + (inside - base) * cov;
+    } else if (o[11] > 0.0 && o[12] > 0.0 && ny > 0.0) {
+        float t = (sdf - o[12]) / o[12];
+        outc *= 1.0 - o[11] * ny * exp(-t * t);
+    }
+    if (o[4] > 0.0) {
+        float halfW = o[4] * 0.5;
+        float ring = 1.0 - fabs(s - halfW) / halfW;
+        if (ring > 0.0) { outc *= 1.0 - o[3] * min(ring, 1.0); }
+    }
+    outc = base + (clamp(outc, 0.0, 1.0) - base) * amount;
+    return float4(outc, base4.a);
+}
+
 // Gaussian blur is implemented via MPSImageGaussianBlur on the host side
 // (CN1Metalcompat.m) rather than a hand-rolled fragment shader. MPS picks
 // the kernel width automatically from sigma and stays accurate across the

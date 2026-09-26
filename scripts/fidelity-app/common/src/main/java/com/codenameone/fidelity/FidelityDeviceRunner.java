@@ -86,6 +86,80 @@ public class FidelityDeviceRunner {
         }
     }
 
+    /// File in the app home that switches the app from the capture suite to a live
+    /// tab-bar screen for side-by-side screen recordings against the native bar
+    /// (scripts/record-ios-tabs-side-by-side.sh). Its content is the appearance.
+    public static final String TABS_SHOWCASE_FILE = "tabs-showcase.txt";
+
+    /// The appearance the showcase was asked for, or null when the suite should run.
+    public static String requestedTabsShowcase() {
+        try {
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            String path = fs.getAppHomePath() + TABS_SHOWCASE_FILE;
+            Log.p("CN1SS:INFO:fidelity tabs showcase flag " + path);
+            if (!fs.exists(path)) {
+                return null;
+            }
+            InputStream in = fs.openInputStream(path);
+            try {
+                String v = Util.readToString(in).trim();
+                return "dark".equals(v) ? "dark" : "light";
+            } finally {
+                Util.cleanup(in);
+            }
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /// Shows the iOS tab bar the Tabs goldens are built from -- same tabs, theme and
+    /// backdrop -- as a live, touchable screen, and stays up. Nothing is captured;
+    /// the screen is recorded from outside while real touches drive it.
+    public void runTabsShowcase(final String appearance) {
+        platform = resolvePlatform();
+        spec = loadSpec();
+        if (spec == null) {
+            println("CN1SS:ERR:fidelity spec failed to load from " + SPEC_RESOURCE);
+            return;
+        }
+        installNativeTheme();
+        applyAppearance(appearance);
+        ComponentSpec tabsSpec = null;
+        List components = spec.getComponents();
+        for (int i = 0; i < components.size(); i++) {
+            ComponentSpec c = (ComponentSpec) components.get(i);
+            if ("Tabs".equals(c.getId())) {
+                tabsSpec = c;
+            }
+        }
+        if (tabsSpec == null) {
+            println("CN1SS:ERR:fidelity no Tabs row in the spec");
+            return;
+        }
+        final ComponentSpec ts = tabsSpec;
+        runOnEdtSync(new Runnable() {
+            public void run() {
+                Form f = new Form(new BorderLayout());
+                f.getTitleArea().setHidden(true);
+                Image backdrop = getGlassBackdrop();
+                com.codename1.ui.plaf.Style fs = f.getAllStyles();
+                if (backdrop != null) {
+                    fs.setBgImage(backdrop);
+                    fs.setBackgroundType(com.codename1.ui.plaf.Style.BACKGROUND_IMAGE_SCALED);
+                    fs.setBgTransparency(255);
+                }
+                f.getContentPane().getAllStyles().setBgTransparency(0);
+                com.codename1.ui.Tabs tabs = (com.codename1.ui.Tabs) Cn1WidgetRenderer.build(ts, "normal", appearance);
+                tabs.setTabPlacement(Component.BOTTOM);
+                tabs.getAllStyles().setBgTransparency(0);
+                tabs.getContentPane().getAllStyles().setBgTransparency(0);
+                f.add(BorderLayout.CENTER, tabs);
+                f.show();
+                println("CN1SS:INFO:fidelity tabs showcase up (" + appearance + ")");
+            }
+        });
+    }
+
     private void runSuiteImpl() {
         platform = resolvePlatform();
         // Default OFF: native references are captured LOCALLY by the standalone
@@ -124,6 +198,10 @@ public class FidelityDeviceRunner {
             }
             if (!Cn1WidgetRenderer.isSupported(c.getId())) {
                 println("CN1SS:INFO:fidelity skip " + c.getId() + " (CN1 renderer not implemented yet)");
+                continue;
+            }
+            if (!c.appliesToGeneration(goldenGenerationPrefix())) {
+                println("CN1SS:INFO:fidelity skip " + c.getId() + " (not captured for " + goldenGenerationPrefix() + ")");
                 continue;
             }
             for (int a = 0; a < appearances.size(); a++) {
@@ -363,7 +441,11 @@ public class FidelityDeviceRunner {
             runOnEdtSync(new Runnable() {
                 public void run() {
                     Component comp = compHolder[0];
-                    if (comp instanceof com.codename1.ui.Tabs) {
+                    if (comp instanceof com.codename1.ui.Tabs && "TabsGlassMotion".equals(c.getId())) {
+                        // Time-based iOS 27 motion: the frame value is tens of ms.
+                        com.codename1.ui.Tabs tabs = (com.codename1.ui.Tabs) comp;
+                        tabs.setGlassMotionTestTime(0, Math.max(0, tabs.getTabCount() - 1), value * 10);
+                    } else if (comp instanceof com.codename1.ui.Tabs) {
                         com.codename1.ui.Tabs tabs = (com.codename1.ui.Tabs) comp;
                         int last = Math.max(0, tabs.getTabCount() - 1);
                         tabs.setMorphTestState(0, last, value);
@@ -626,9 +708,18 @@ public class FidelityDeviceRunner {
         // the same widget over a flat backdrop (geometry-isolation), so it lays out
         // identically.
         boolean centered = "ios".equals(platform) && ("Tabs".equals(compId) || "TabsGeom".equals(compId)
-                || "TabsMorph".equals(compId) || "TabOne".equals(compId));
+                || "TabsMorph".equals(compId) || "TabsGlassMotion".equals(compId) || "TabOne".equals(compId));
         Container tile;
-        if (centered) {
+        int glassSlackY = centered ? glassTabsSlackPx() : 0;
+        if (glassSlackY > 0) {
+            // The iOS 27 bar reserves motion slack INSIDE its bounds (see
+            // tabsGlassSlackYMm in native-themes/ios-modern/gen27.css): its visible
+            // pill starts that far below the component's top. In an app the bar is
+            // bottom-anchored and the slack costs nothing; this tile anchors the bar
+            // at the TOP like the native reference, so raise it by the slack to put
+            // the pill where the native one is.
+            tile = new Container(new RaisedCenterLayout(glassSlackY));
+        } else if (centered) {
             tile = new Container(new FlowLayout(Component.CENTER, Component.TOP));
         } else if (fullWidth) {
             tile = new Container(new BorderLayout());
@@ -660,6 +751,54 @@ public class FidelityDeviceRunner {
             tile.add(comp);
         }
         return tile;
+    }
+
+    /// Vertical motion slack the iOS 27 tab bar reserves, in pixels (0 for other themes).
+    private int glassTabsSlackPx() {
+        UIManager uim = UIManager.getInstance();
+        if (!"ios27".equals(uim.getThemeConstant("tabsMorphPreset", ""))) {
+            return 0;
+        }
+        try {
+            return Display.getInstance().convertToPixels(Float.parseFloat(
+                    uim.getThemeConstant("tabsGlassSlackYMm", "0").trim()));
+        } catch (NumberFormatException nfe) {
+            return 0;
+        }
+    }
+
+    /// Centres its single child horizontally at its preferred size and places it
+    /// `raise` pixels ABOVE the top edge (the part above is clipped by the tile).
+    private static final class RaisedCenterLayout extends com.codename1.ui.layouts.Layout {
+        private final int raise;
+
+        RaisedCenterLayout(int raise) {
+            this.raise = raise;
+        }
+
+        @Override
+        public void layoutContainer(Container parent) {
+            for (int i = 0; i < parent.getComponentCount(); i++) {
+                Component c = parent.getComponentAt(i);
+                int w = Math.min(c.getPreferredW(), parent.getLayoutWidth());
+                c.setWidth(w);
+                c.setHeight(c.getPreferredH());
+                c.setX((parent.getLayoutWidth() - w) / 2);
+                c.setY(-raise);
+            }
+        }
+
+        @Override
+        public com.codename1.ui.geom.Dimension getPreferredSize(Container parent) {
+            int w = 0;
+            int h = 0;
+            for (int i = 0; i < parent.getComponentCount(); i++) {
+                Component c = parent.getComponentAt(i);
+                w = Math.max(w, c.getPreferredW());
+                h = Math.max(h, c.getPreferredH() - raise);
+            }
+            return new com.codename1.ui.geom.Dimension(w, h);
+        }
     }
 
     /// Full-width widgets that fill the whole tile (both CN1 and the native
@@ -935,6 +1074,16 @@ public class FidelityDeviceRunner {
         } finally {
             Util.cleanup(in);
         }
+    }
+
+    /// Golden-set prefix of the design generation this run renders ("ios-27-" for
+    /// the iOS 27 theme), or null when the platform has a single generation.
+    private String goldenGenerationPrefix() {
+        if (!"ios".equals(platform)) {
+            return null;
+        }
+        String theme = resolveThemeResource();
+        return theme != null && theme.indexOf("27") >= 0 ? "ios-27-" : "ios-26-";
     }
 
     private String resolveThemeResource() {

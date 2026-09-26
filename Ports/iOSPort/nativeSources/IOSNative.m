@@ -2393,6 +2393,38 @@ void com_codename1_impl_ios_IOSNative_nativeGlassScreenRegion___int_int_int_int_
     POOL_END();
 }
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassLensScreenRegionImpl(int x, int y, int width, int height, float cornerRadius, const float* optics, int count, float amount);
+void com_codename1_impl_ios_IOSNative_nativeGlassLensScreenRegion___int_int_int_int_float_float_1ARRAY_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_FLOAT cornerRadius, JAVA_OBJECT optics, JAVA_FLOAT amount)
+{
+    POOL_BEGIN();
+    if (optics != JAVA_NULL) {
+        float o[16];
+        int n = ((JAVA_ARRAY)optics)->length;
+        if (n > 16) { n = 16; }
+        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)optics)->data;
+        for (int i = 0; i < n; i++) {
+            o[i] = data[i];
+        }
+        Java_com_codename1_impl_ios_IOSImplementation_nativeGlassLensScreenRegionImpl(x, y, w, h, cornerRadius, o, n, amount);
+    }
+    POOL_END();
+}
+
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeColorMatrixScreenRegionImpl(int x, int y, int width, int height, const float* matrix, void* maskPeer, float cornerRadius, float amount);
+void com_codename1_impl_ios_IOSNative_nativeColorMatrixScreenRegion___int_int_int_int_float_1ARRAY_long_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_OBJECT matrix, JAVA_LONG maskPeer, JAVA_FLOAT cornerRadius, JAVA_FLOAT amount)
+{
+    POOL_BEGIN();
+    if (matrix != JAVA_NULL && ((JAVA_ARRAY)matrix)->length >= 12) {
+        float m[12];
+        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)matrix)->data;
+        for (int i = 0; i < 12; i++) {
+            m[i] = data[i];
+        }
+        Java_com_codename1_impl_ios_IOSImplementation_nativeColorMatrixScreenRegionImpl(x, y, w, h, m, (void*)maskPeer, cornerRadius, amount);
+    }
+    POOL_END();
+}
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
 void com_codename1_impl_ios_IOSNative_nativeLensScreenRegion___int_int_int_int_float_float_float_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_INT n8, JAVA_FLOAT n9)
 {

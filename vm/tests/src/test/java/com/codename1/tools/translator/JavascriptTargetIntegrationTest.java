@@ -154,6 +154,13 @@ class JavascriptTargetIntegrationTest {
                         && browserBridge.contains("_goffset = nums[ni++]")
                         && browserBridge.contains("ctx.drawImage(outputCanvas, rx, ry)"),
                 "Browser bridge should preserve and render the complete native glass recipe");
+        assertTrue(browserBridge.contains("COLOR_MATRIX_SELF_REGION: 83")
+                        && browserBridge.contains("function colorMatrixBlendInPlace")
+                        && browserBridge.contains("function applyColorMatrixSelfRegion")
+                        && browserBridge.contains("function colorMatrixMaskAlpha")
+                        && browserBridge.contains("_cmaskSurface = nums[ni++]")
+                        && browserBridge.contains("_cmaskImage = objs[oi++]"),
+                "Browser bridge should replay Graphics.colorMatrixRegion with its mask");
         assertFalse(browserBridge.contains("var _lsw = _lw / _lm"),
                 "Glass-tab lens must not regress to the coarse uniform-zoom fallback");
         assertTrue(protocolDoc.contains("Version: 1")

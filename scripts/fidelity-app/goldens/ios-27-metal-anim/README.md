@@ -19,18 +19,19 @@ on an iPhone 16 simulator running the iOS 27.0 runtime, with Xcode 27
   app finishes launching. Those seconds were cut, so each video opens in the app,
   as the iOS 26 references do. Each contains six tap-driven selections.
 
-- **`cn1-tabs-*.mov`** — the Codename One morph in motion, 1088x290 at 60 fps,
-  the same frame the `../ios-27-metal-frames/TabsMorph_*` goldens use. The
-  sequence is a half-second hold on the first tab, the first-to-last-tab
-  selection morph, then a one-second hold on the last tab.
+- **`cn1-tabs-*.mov`** — the Codename One tab bar in motion, 1178x448 at 60 fps:
+  the Codename One half of `docs/videos/tabs-side-by-side-*-bar.mp4`. Both come
+  from `scripts/record-ios-tabs-side-by-side.sh`, which records the fidelity
+  app's live tab showcase (the same `Tabs`, theme and backdrop as the goldens)
+  and the native motion probe with the simulator's own recorder while one
+  XCUITest driver gives both the same real touches: six taps, a held press, a
+  tap on the selected tab, a slow drag and a flick. Each gesture gets a 4.2 s
+  slot, aligned on its touch, so the two sides line up gesture by gesture.
 
-  Unlike the iOS 26 video, which was rendered in the JavaSE simulator, these
-  frames come from the real iOS renderer: the fidelity app on the same iOS 27
-  simulator, with the iOS 27 theme installed. Each frame is the morph frozen
-  through `Tabs.setMorphTestState` at the linear timeline value a 60 fps
-  display would sample during the theme's 480 ms
-  `tabsAnimatedIndicatorDurationInt`, so it is exactly the motion the animation
-  plays, with no timing jitter. The morph is shown in one direction only.
+  To compare motion frame by frame with UIKit, use the native snapshots of
+  `scripts/probe-ios-tab-motion.sh` (see
+  `../../ios-native-ref/motion-probe/README.md`) rather than these recordings:
+  a screen recording is lossy and variable-rate.
 
 - **`native-switch-*.mov`** — the real `UISwitch` toggle. The switch morph is
   not interaction-gated, so the self-animating recording path is fine there.

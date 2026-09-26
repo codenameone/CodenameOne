@@ -2328,6 +2328,7 @@
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
     BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82,
+    COLOR_MATRIX_SELF_REGION: 83,
     // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
     // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
     TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
@@ -2939,6 +2940,165 @@
     }
   }
 
+  // Graphics.colorMatrixRegion. colorMatrixBlendInPlace is a line-for-line
+  // mirror of com.codename1.ui.plaf.ColorMatrixBlend.apply (the reference every
+  // port matches) over RGBA ImageData instead of packed ARGB. Every float
+  // operation is Math.fround-ed in Java's evaluation order so the result is
+  // bit-identical to the Java reference, not merely close; the parity gate in
+  // scripts/verify-javascript-lens-parity.mjs pins that with checksums.
+  // maskAlpha is one byte per mask pixel (the mask's alpha), or null.
+  function colorMatrixBlendInPlace(data, w, h, matrix, maskAlpha, maskW, maskH,
+                                   cornerRadius, amount) {
+    var f = Math.fround;
+    amount = f(amount);
+    cornerRadius = f(cornerRadius);
+    if (amount <= 0 || w <= 0 || h <= 0) {
+      return;
+    }
+    var m = [];
+    for (var mi = 0; mi < 12; mi++) {
+      m.push(f(matrix[mi]));
+    }
+    var hw = f(w / 2);
+    var hh = f(h / 2);
+    var r = 0;
+    if (cornerRadius !== 0) {
+      r = cornerRadius < 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+    }
+    var inset = f(0.5);
+    var hwr = f(hw - r), hhr = f(hh - r);
+    for (var y = 0; y < h; y++) {
+      var py = f(f(y + inset) - hh);
+      for (var x = 0; x < w; x++) {
+        var k = amount;
+        if (r > 0) {
+          var px = f(f(x + inset) - hw);
+          var dx = f(Math.abs(px) - hwr);
+          var dy = f(Math.abs(py) - hhr);
+          var ax = dx > 0 ? dx : 0;
+          var ay = dy > 0 ? dy : 0;
+          var sdf = f(f(f(Math.sqrt(f(f(ax * ax) + f(ay * ay))))
+                        + Math.min(Math.max(dx, dy), 0)) - r);
+          var cov = f(inset - sdf);
+          k = f(k * (cov < 0 ? 0 : (cov > 1 ? 1 : cov)));
+        }
+        if (maskAlpha) {
+          var mx = Math.floor(x * maskW / w);
+          var my = Math.floor(y * maskH / h);
+          k = f(k * f(maskAlpha[my * maskW + mx] / 255));
+        }
+        if (k <= 0) {
+          continue;
+        }
+        var i = (y * w + x) * 4;
+        var pr = f(data[i] / 255);
+        var pg = f(data[i + 1] / 255);
+        var pb = f(data[i + 2] / 255);
+        for (var row = 0; row < 3; row++) {
+          var o4 = row * 4;
+          var v = f(f(f(f(m[o4] * pr) + f(m[o4 + 1] * pg)) + f(m[o4 + 2] * pb)) + m[o4 + 3]);
+          v = v < 0 ? 0 : (v > 1 ? 1 : v);
+          var src = row === 0 ? pr : (row === 1 ? pg : pb);
+          var o = f(src + f(f(v - src) * k));
+          data[i + row] = Math.round(f(o * 255));
+        }
+        // data[i + 3], the destination alpha, is kept.
+      }
+    }
+  }
+
+  // The alpha channel of a colorMatrixRegion mask at its own pixel size, or
+  // null when the source cannot be read (not decoded yet, zero sized, or a
+  // cross-origin image that taints the scratch canvas).
+  function colorMatrixMaskAlpha(source) {
+    if (!drawableImageSource(source)) {
+      return null;
+    }
+    var mw = (typeof source.naturalWidth === 'number' ? source.naturalWidth : source.width) | 0;
+    var mh = (typeof source.naturalHeight === 'number' ? source.naturalHeight : source.height) | 0;
+    if (mw <= 0 || mh <= 0) {
+      return null;
+    }
+    var scratch = createGlassScratchCanvas(mw, mh);
+    var scratchContext = scratch && scratch.getContext('2d');
+    if (!scratchContext) {
+      return null;
+    }
+    scratchContext.drawImage(source, 0, 0, mw, mh);
+    var rgba = scratchContext.getImageData(0, 0, mw, mh).data;
+    var alpha = new Uint8ClampedArray(mw * mh);
+    for (var ai = 0; ai < alpha.length; ai++) {
+      alpha[ai] = rgba[ai * 4 + 3];
+    }
+    return { alpha: alpha, w: mw, h: mh };
+  }
+
+  // In-place colour matrix over this surface's own pixels. The region is
+  // resolved through the context transform exactly like the lens; pixels off
+  // the canvas are left out but the shape and the mask stay anchored to the
+  // FULL region (as JavaSEPort.colorMatrixRegion does), so a region that is
+  // partly scrolled off does not squeeze its rounded corners or its glyphs.
+  // The result is drawn back through clearRect + drawImage rather than
+  // putImageData so the current clip is honoured (putImageData ignores it),
+  // matching the Metal draw on iOS.
+  // mask: null, or { alpha, w, h } from colorMatrixMaskAlpha.
+  function applyColorMatrixSelfRegion(ctx, x, y, width, height, matrix, mask,
+                                      cornerRadius, amount) {
+    if (!ctx.canvas || width <= 0 || height <= 0 || amount <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var fullW = rect.w, fullH = rect.h;
+    var rx = rect.x, ry = rect.y, rw = fullW, rh = fullH, ox = 0, oy = 0;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { ox = -rx; rw += rx; rx = 0; }
+    if (ry < 0) { oy = -ry; rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+    var part = ctx.getImageData(rx, ry, rw, rh).data;
+    var full = new Uint8ClampedArray(fullW * fullH * 4);
+    var row;
+    for (row = 0; row < rh; row++) {
+      full.set(part.subarray(row * rw * 4, (row + 1) * rw * 4), ((row + oy) * fullW + ox) * 4);
+    }
+    var scaledCorner = cornerRadius < 0 ? cornerRadius : Math.fround(cornerRadius * rect.scale);
+    colorMatrixBlendInPlace(full, fullW, fullH, matrix, mask ? mask.alpha : null,
+                            mask ? mask.w : 0, mask ? mask.h : 0, scaledCorner, amount);
+    var outputCanvas = createGlassScratchCanvas(rw, rh);
+    var outputContext = outputCanvas && outputCanvas.getContext('2d');
+    if (!outputContext) {
+      return;
+    }
+    var result = outputContext.createImageData(rw, rh);
+    for (row = 0; row < rh; row++) {
+      var from = ((row + oy) * fullW + ox) * 4;
+      result.data.set(full.subarray(from, from + rw * 4), row * rw * 4);
+    }
+    outputContext.putImageData(result, 0, 0);
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      try { ctx.filter = 'none'; } catch (_ecf) {}
+      ctx.shadowColor = 'rgba(0,0,0,0)';
+      // Clear first: the output keeps the destination alpha, and drawing a
+      // translucent pixel source-over would blend it with the original
+      // instead of replacing it. Both calls are clipped, so pixels outside the
+      // clip are untouched.
+      ctx.clearRect(rx, ry, rw, rh);
+      ctx.drawImage(outputCanvas, rx, ry);
+    } finally {
+      ctx.restore();
+    }
+  }
+
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
   function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
     var ni = 0; // num cursor
@@ -3097,6 +3257,41 @@
                                    _gsat, _gscale, _goffset, _grefract, _gspecular,
                                    _gcurve, _gcurveMid, _goutline);
             } catch (_egr) {
+            }
+          }
+          break;
+        }
+        case SURF.COLOR_MATRIX_SELF_REGION: {
+          // Graphics.colorMatrixRegion. 20 nums: x, y, w, h, cornerRadius,
+          // amount, the 12 matrix floats, maskKind (0 none, 1 image in the obj
+          // slot, 2 surface), maskSurfaceId. Always 1 obj: the image marker, or
+          // null. Every argument is consumed before anything can fail, so a
+          // skipped op never desyncs the ops behind it.
+          var _cx = nums[ni++], _cy = nums[ni++], _cw = nums[ni++], _ch = nums[ni++];
+          var _ccr = nums[ni++], _camount = nums[ni++];
+          var _cmatrix = [];
+          for (var _cmi = 0; _cmi < 12; _cmi++) {
+            _cmatrix.push(nums[ni++]);
+          }
+          var _cmaskKind = nums[ni++] | 0, _cmaskSurface = nums[ni++] | 0;
+          var _cmaskImage = objs[oi++];
+          if (_cw > 0 && _ch > 0 && _camount > 0 && ctx.canvas) {
+            try {
+              var _cmask = null;
+              var _cmaskOk = true;
+              if (_cmaskKind === 1 || _cmaskKind === 2) {
+                var _cmsrc = _cmaskKind === 1 ? surfaceImageSource(_cmaskImage)
+                    : (surfaceTable[_cmaskSurface] ? surfaceTable[_cmaskSurface].canvas : null);
+                _cmask = colorMatrixMaskAlpha(_cmsrc);
+                // A mask that cannot be read yet paints nothing: applying the
+                // matrix unmasked would recolour the whole region.
+                _cmaskOk = _cmask != null;
+              }
+              if (_cmaskOk) {
+                applyColorMatrixSelfRegion(ctx, _cx, _cy, _cw, _ch, _cmatrix, _cmask,
+                                           _ccr, _camount);
+              }
+            } catch (_ecm) {
             }
           }
           break;

@@ -3080,29 +3080,39 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    void internalPaintImpl(Graphics g, boolean paintIntersects) {
-        g.clipRect(getX(), getY(), getWidth(), getHeight());
-        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
-        // already been painted behind this component (the clip confines it to our
-        // bounds) BEFORE our own translucent background and content paint on top. This
-        // runs regardless of opacity, since a glass surface is by definition
-        // translucent (opaque would be false and skip paintComponentBackground). The
-        // port blurs the destination region in place; an unsupported port returns
-        // false and the component simply paints without the blur.
-        // COST/CACHING POLICY (per paint path):
-        //  * A glass surface only pays when it repaints; static chrome over static
-        //    content costs nothing between repaints.
-        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
-        //    frame's own command buffer -- no sync, no readback, no cache needed.
-        //  * iOS live screen, glass material: the backdrop readback is required
-        //    (the material is a function of the pixels behind the glass), but the
-        //    composed patch is CACHED per rect+params+backdrop-hash in the port
-        //    (METALView glass patch cache), so a repaint over an unchanged
-        //    backdrop skips the colour transform + blur + optics; scrolling
-        //    content under the glass recomposes that frame from the real bytes.
-        //  * Offscreen mutable images (capture tooling) and the desktop simulator
-        //    blur per paint -- capture renders once, and the simulator is not a
-        //    shipping surface.
+    /// Paints the backdrop material (the CSS `backdrop-filter` glass or blur) and the
+    /// style background. Called by the paint pipeline right after the component clip
+    /// is set; a component whose visible surface is not its bounds (the Tabs bar,
+    /// whose glass pill scales inside reserved slack) overrides this and calls
+    /// {@link #paintBackgroundLayerAt}.
+    void paintBackgroundLayer(Graphics g) {
+        paintBackgroundLayerImpl(g);
+    }
+
+    /// Paints {@link #paintBackgroundLayer} into the given rect (parent coordinates,
+    /// like getX()/getY()) instead of the bounds. The bounds are swapped on the raw
+    /// rectangle so nothing observes the change: setX()/setWidth() would fire
+    /// accessibility bounds events on every animation frame.
+    final void paintBackgroundLayerAt(Graphics g, int x, int y, int w, int h) {
+        int ox = bounds.getX();
+        int oy = bounds.getY();
+        int ow = bounds.getSize().getWidth();
+        int oh = bounds.getSize().getHeight();
+        bounds.setX(x);
+        bounds.setY(y);
+        bounds.getSize().setWidth(w);
+        bounds.getSize().setHeight(h);
+        try {
+            paintBackgroundLayerImpl(g);
+        } finally {
+            bounds.setX(ox);
+            bounds.setY(oy);
+            bounds.getSize().setWidth(ow);
+            bounds.getSize().setHeight(oh);
+        }
+    }
+
+    private void paintBackgroundLayerImpl(Graphics g) {
         float backdropBlur = getStyle().getBackdropFilterBlurRadius();
         if (backdropBlur > 0) {
             // The glass surface's material INTENT comes from a typed, named
@@ -3145,6 +3155,32 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         paintComponentBackground(g);
+    }
+
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        g.clipRect(getX(), getY(), getWidth(), getHeight());
+        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
+        // already been painted behind this component (the clip confines it to our
+        // bounds) BEFORE our own translucent background and content paint on top. This
+        // runs regardless of opacity, since a glass surface is by definition
+        // translucent (opaque would be false and skip paintComponentBackground). The
+        // port blurs the destination region in place; an unsupported port returns
+        // false and the component simply paints without the blur.
+        // COST/CACHING POLICY (per paint path):
+        //  * A glass surface only pays when it repaints; static chrome over static
+        //    content costs nothing between repaints.
+        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
+        //    frame's own command buffer -- no sync, no readback, no cache needed.
+        //  * iOS live screen, glass material: the backdrop readback is required
+        //    (the material is a function of the pixels behind the glass), but the
+        //    composed patch is CACHED per rect+params+backdrop-hash in the port
+        //    (METALView glass patch cache), so a repaint over an unchanged
+        //    backdrop skips the colour transform + blur + optics; scrolling
+        //    content under the glass recomposes that frame from the real bytes.
+        //  * Offscreen mutable images (capture tooling) and the desktop simulator
+        //    blur per paint -- capture renders once, and the simulator is not a
+        //    shipping surface.
+        paintBackgroundLayer(g);
 
         if (isScrollable()) {
             if (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() &&

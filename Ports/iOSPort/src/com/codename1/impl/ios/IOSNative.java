@@ -108,6 +108,12 @@ public final class IOSNative {
     native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline);
     // Queues a live-screen iOS 26 selection-drop LENS op (magnify + chromatic
     // aberration + dark->accent tint over the painted content). See lensScreenRegionX.
+    // Graphics.colorMatrixRegion on the live screen: matrix is 12 floats (3 rows of
+    // r, g, b, offset), maskPeer an image peer or 0. See colorMatrixScreenRegionX.
+    // Graphics.glassLensRegion on the live screen: optics are the GlassLensBlend
+    // parameters. See glassLensScreenRegionX.
+    native void nativeGlassLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float[] optics, float amount);
+    native void nativeColorMatrixScreenRegion(int x, int y, int width, int height, float[] matrix, long maskPeer, float cornerRadius, float amount);
     native void nativeLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
     // Renders an Apple SF Symbol to a GLUIImage peer (iOS 13+). Returns 0 when the
     // symbol is unavailable; writes the pixel width/height into widthHeight[0]/[1].

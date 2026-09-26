@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -63,6 +85,7 @@ public class MorphFrameValidator {
         Path outJson = null;
         Path stripDir = null;
         Path specPath = null;
+        String goldenSet = null;
         boolean seedMissing = false;
         int maxChannelDelta = 8;
         double maxMismatchPercent = 0.5d;
@@ -74,6 +97,7 @@ public class MorphFrameValidator {
                 case "--out-json" -> outJson = Path.of(args[++i]);
                 case "--strip-dir" -> stripDir = Path.of(args[++i]);
                 case "--spec" -> specPath = Path.of(args[++i]);
+                case "--golden-set" -> goldenSet = args[++i];
                 case "--seed-missing" -> seedMissing = true;
                 case "--max-channel-delta" -> maxChannelDelta = Integer.parseInt(args[++i]);
                 case "--max-mismatch-percent" -> maxMismatchPercent = Double.parseDouble(args[++i]);
@@ -92,7 +116,24 @@ public class MorphFrameValidator {
         // The DECLARED frame set per component id (fidelity-tests.yaml `frames:`),
         // so a capture that died mid-sequence cannot validate green on just the
         // frames it happened to deliver.
-        Map<String, List<Integer>> declaredFrames = loadDeclaredFrames(specPath);
+        Map<String, String> goldenSets = new TreeMap<>();
+        Map<String, String> motionChecks = new TreeMap<>();
+        Map<String, List<Integer>> declaredFrames = loadDeclaredFrames(specPath, goldenSets, motionChecks);
+        // A frames row naming golden sets belongs to those generations only: the
+        // device skips it in any other run, so it must not be required here either.
+        if (goldenSet != null) {
+            for (Map.Entry<String, String> e : goldenSets.entrySet()) {
+                boolean member = false;
+                for (String g : e.getValue().split(",")) {
+                    if (g.trim().equals(goldenSet)) {
+                        member = true;
+                    }
+                }
+                if (!member) {
+                    declaredFrames.remove(e.getKey());
+                }
+            }
+        }
 
         // Group delivered frames by (id, appearance), ordered by progress value.
         Map<String, TreeMap<Integer, Path>> groups = new TreeMap<>();
@@ -192,6 +233,10 @@ public class MorphFrameValidator {
                 changedFraction.put(t, (double) count / changed.length);
                 rightmost.put(t, rx);
             }
+            // motion_checks: distinct -- a motion that is not a monotonic sweep (the
+            // iOS 27 selection pulses the whole bar outward and back and overshoots)
+            // keeps the stuck-frame and did-it-move checks but not monotonic travel.
+            boolean monotonic = !"distinct".equals(motionChecks.get(componentId));
             if (ts.size() < 3) {
                 groupPropertyFailures.add(name + ": only " + ts.size() + " frame(s) delivered; need at least 3");
             } else {
@@ -226,7 +271,7 @@ public class MorphFrameValidator {
                 // snaps back toward the source tab is a whole cell (~30%+) and fails.
                 int settleAllowancePx = Math.max(overshootPx, base.getWidth() * 15 / 100);
                 int maxSeen = -1;
-                for (int i = 1; i < ts.size(); i++) {
+                for (int i = 1; monotonic && i < ts.size(); i++) {
                     int t = ts.get(i);
                     int rx = rightmost.get(t);
                     boolean settleWindow = t >= 86;
@@ -330,7 +375,8 @@ public class MorphFrameValidator {
     /// Loads the per-component `frames:` declarations from fidelity-tests.yaml
     /// (the same flat subset ProcessScreenshots reads). Returns an empty map when
     /// no spec is given/readable -- delivered-set completeness is then not checked.
-    private static Map<String, List<Integer>> loadDeclaredFrames(Path specPath) {
+    private static Map<String, List<Integer>> loadDeclaredFrames(Path specPath, Map<String, String> goldenSets,
+            Map<String, String> motionChecks) {
         Map<String, List<Integer>> out = new TreeMap<>();
         if (specPath == null || !Files.isRegularFile(specPath)) {
             if (specPath != null) {
@@ -367,6 +413,10 @@ public class MorphFrameValidator {
                 String value = unquote(line.substring(idx + 1).trim());
                 if ("id".equals(key)) {
                     id = value;
+                } else if ("golden_sets".equals(key) && id != null) {
+                    goldenSets.put(id, value);
+                } else if ("motion_checks".equals(key) && id != null) {
+                    motionChecks.put(id, value);
                 } else if ("frames".equals(key) && id != null) {
                     List<Integer> vals = new ArrayList<>();
                     for (String part : value.split(",")) {

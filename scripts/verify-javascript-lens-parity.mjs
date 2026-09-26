@@ -27,11 +27,29 @@ const end = bridge.indexOf('  // Replay one command stream', start);
 if (start < 0 || end < 0) {
   throw new Error('Unable to locate the lens implementation in browser_bridge.js');
 }
-const sandbox = { Math, Uint8ClampedArray };
+// `global` backs createGlassScratchCanvas, which the colour-matrix path uses
+// for the canvas it draws its result back from.
+class FakeScratchCanvas {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.pixels = new Uint8ClampedArray(width * height * 4);
+  }
+  getContext() {
+    const canvas = this;
+    return {
+      createImageData(w, h) { return { data: new Uint8ClampedArray(w * h * 4) }; },
+      putImageData(image) { canvas.pixels.set(image.data); }
+    };
+  }
+}
+const sandbox = { Math, Uint8ClampedArray, global: { OffscreenCanvas: FakeScratchCanvas } };
 vm.runInNewContext(bridge.substring(start, end)
     + '\nthis.applyLens = applyLensSelfRegion;'
     + '\nthis.applyMaterial = glassMaterialInPlace;'
-    + '\nthis.applyOptics = applyGlassOptics;', sandbox);
+    + '\nthis.applyOptics = applyGlassOptics;'
+    + '\nthis.colorMatrixBlend = colorMatrixBlendInPlace;'
+    + '\nthis.applyColorMatrix = applyColorMatrixSelfRegion;', sandbox);
 
 // The same foreground lens is implemented four times because each backend has
 // a different pixel API. Fail before the CRC probe if a tuning constant drifts.
@@ -215,4 +233,100 @@ for (const probe of [
         + `expected ${probe.expected.toString(16)}, got ${outlineCrc.toString(16)}`);
   }
   console.log(`glass outline parity PASS ${probe.name} crc=${outlineCrc.toString(16)}`);
+}
+
+// Graphics.colorMatrixRegion. The expected CRCs come from the core reference,
+// com.codename1.ui.plaf.ColorMatrixBlend.apply, over the same inputs (a probe
+// that fills packed ARGB with colorMatrixPattern, applies the blend and CRCs the
+// ARGB bytes). colorMatrixBlendInPlace frounds every float operation in Java's
+// order, so these are exact, not approximate. The matrix has negative and >1
+// terms so both clamps are exercised; the mask is a non-divisor size so the
+// nearest-sample stretch is too.
+function colorMatrixPattern(width, height, originX, originY) {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const px = x + originX, py = y + originY, offset = (y * width + x) * 4;
+      pixels[offset] = (px * 17 + py * 3) & 0xff;
+      pixels[offset + 1] = (px * 5 + py * 19) & 0xff;
+      pixels[offset + 2] = (px * 11 + py * 7) & 0xff;
+      pixels[offset + 3] = (px * 7 + py * 13 + 31) & 0xff;
+    }
+  }
+  return pixels;
+}
+
+function colorMatrixMask(width, height) {
+  const alpha = new Uint8ClampedArray(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      alpha[y * width + x] = (x * 37 + y * 53) & 0xff;
+    }
+  }
+  return { alpha, w: width, h: height };
+}
+
+const vibrantMatrix = [0.4, -0.9, 1.7, 0.12, -0.35, 1.25, 0.3, -0.05, 1.1, 0.2, -0.6, 0.33]
+    .map(Math.fround);
+const greyMatrix = [0.2126, 0.7152, 0.0722, 0, 0.2126, 0.7152, 0.0722, 0,
+  0.2126, 0.7152, 0.0722, 0].map(Math.fround);
+for (const probe of [
+  { name: 'rect-vibrant', w: 40, h: 24, matrix: vibrantMatrix, mask: null, corner: 0,
+    amount: 1, expected: 0x9bce8eee },
+  { name: 'capsule-grey', w: 52, h: 30, matrix: greyMatrix, mask: null, corner: -1,
+    amount: 0.8, expected: 0x71cccd47 },
+  { name: 'rounded-masked', w: 50, h: 28, matrix: vibrantMatrix, mask: colorMatrixMask(13, 9),
+    corner: 7, amount: 0.65, expected: 0x6a55dd05 }
+]) {
+  const pixels = colorMatrixPattern(probe.w, probe.h, 0, 0);
+  sandbox.colorMatrixBlend(pixels, probe.w, probe.h, probe.matrix,
+      probe.mask ? probe.mask.alpha : null, probe.mask ? probe.mask.w : 0,
+      probe.mask ? probe.mask.h : 0, probe.corner, probe.amount);
+  const actual = crc32(rgbaToArgb(pixels));
+  if (actual !== probe.expected) {
+    throw new Error(`Colour matrix parity failed for ${probe.name}: `
+        + `expected ${probe.expected.toString(16)}, got ${actual.toString(16)}`);
+  }
+  console.log(`colour matrix parity PASS ${probe.name} crc=${actual.toString(16)}`);
+}
+
+// The replayed op end to end, on a region hanging off the top-left of the
+// canvas: only the visible part is read and written, but the capsule and the
+// mask stay anchored to the FULL region, which is what JavaSEPort does. The
+// Java side of this CRC applies the blend to the whole 44x26 region and then
+// crops the visible 38x20.
+{
+  const canvasWidth = 60, canvasHeight = 20;
+  const calls = [];
+  let drawn = null;
+  const context = {
+    canvas: { width: canvasWidth, height: canvasHeight },
+    getTransform() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    getImageData(x, y, w, h) {
+      calls.push(['getImageData', x, y, w, h]);
+      return { data: colorMatrixPattern(w, h, x, y) };
+    },
+    putImageData() { throw new Error('putImageData ignores the clip; the op must not use it'); },
+    save() { calls.push(['save']); },
+    restore() { calls.push(['restore']); },
+    setTransform(...args) { calls.push(['setTransform', ...args]); },
+    clearRect(...args) { calls.push(['clearRect', ...args]); },
+    drawImage(source, x, y) { calls.push(['drawImage', x, y]); drawn = source; }
+  };
+  sandbox.applyColorMatrix(context, -6, -3, 44, 26, vibrantMatrix, colorMatrixMask(11, 7), -1, 0.9);
+  const expectedCalls = JSON.stringify([
+    ['getImageData', 0, 0, 38, 20], ['save'], ['setTransform', 1, 0, 0, 1, 0, 0],
+    ['clearRect', 0, 0, 38, 20], ['drawImage', 0, 0], ['restore']
+  ]);
+  if (JSON.stringify(calls) !== expectedCalls) {
+    throw new Error(`Colour matrix replay call sequence: ${JSON.stringify(calls)}`);
+  }
+  if (!drawn || drawn.width !== 38 || drawn.height !== 20) {
+    throw new Error('Colour matrix replay drew back the wrong size');
+  }
+  const actual = crc32(rgbaToArgb(drawn.pixels));
+  if (actual !== 0x48ee53ca) {
+    throw new Error(`Colour matrix off-canvas parity failed: expected 48ee53ca, got ${actual.toString(16)}`);
+  }
+  console.log(`colour matrix replay PASS offcanvas crc=${actual.toString(16)}`);
 }

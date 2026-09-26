@@ -1314,6 +1314,36 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     int pad = (int)ceilf(rad) * 3 + 1;
     int bw = fw + 2 * pad, bh = fh + 2 * pad;
 
+    // GPU path: the whole material on the frame's own command buffer, no sync and
+    // no readback (see CN1MetalGlassEncode). The CPU path below is the fallback
+    // when the pipelines are unavailable, and CN1_GLASS_CPU=1 forces it.
+    static int cn1GlassForceCpu = -1;
+    if (cn1GlassForceCpu < 0) {
+        const char *env = getenv("CN1_GLASS_CPU");
+        cn1GlassForceCpu = (env != NULL && env[0] == '1') ? 1 : 0;
+    }
+    if (!cn1GlassForceCpu) {
+        if (self.renderCommandEncoder != nil) {
+            CN1MetalEndFrame();
+            [self.renderCommandEncoder endEncoding];
+            self.renderCommandEncoder = nil;
+        }
+        if (self.commandBuffer == nil) {
+            self.commandBuffer = [self.commandQueue commandBuffer];
+        }
+        CN1MetalGlassPatch patch;
+        if (CN1MetalGlassEncode(self.commandBuffer, [self backdropTexture], fx, fy, fw, fh, rad, sat, scale, offset,
+                                curve, curveMid, &patch)) {
+            [self createRenderPassDescriptor];
+            if (self.renderPassDescriptor == nil) { return; }
+            self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+            [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
+            CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
+            CN1MetalDrawGlass(&patch, x, y, w, h, fw, fh, cornerRadius, (float)s, refract, specular, outline);
+            return;
+        }
+    }
+
     // 1) End + commit the screen encoder so screenTexture holds the backdrop.
     if (self.renderCommandEncoder != nil) {
         CN1MetalEndFrame();
@@ -1542,7 +1572,12 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 4) Restart a render encoder on the SAME command buffer (loadAction Load preserves the
     //    bar) and re-publish it to the CN1Metalcompat draw layer.
     [self createRenderPassDescriptor];
-    if (self.renderPassDescriptor == nil) { return; }
+    if (self.renderPassDescriptor == nil) {
+#ifndef CN1_USE_ARC
+        [scratch release];
+#endif
+        return;
+    }
     self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
     [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
     CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
@@ -1550,6 +1585,139 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 5) Draw the lens quad sampling scratch (cornerRadius logical -> physical px; < 0 = capsule).
     float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
     CN1MetalDrawLens(scratch, x, y, w, h, fw, fh, magnify, aberration, tintColor, tintStrength, crPx);
+    // The command buffer retains what it encodes; drop the +1 from newTexture.
+#ifndef CN1_USE_ARC
+    [scratch release];
+#endif
+}
+
+// Graphics.colorMatrixRegion on the live screen. Same GPU route as the lens: end
+// the encoder, blit the painted region to a scratch texture on the frame's own
+// command buffer, restart the encoder, then draw a quad that reads the scratch
+// copy (and the mask) through cn1_fs_colormatrix. No CPU readback.
+- (void)colorMatrixScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h matrix:(const float*)matrix
+                            mask:(id<MTLTexture>)mask cornerRadius:(float)cornerRadius amount:(float)amount {
+    if ([self backdropTexture] == nil || w <= 0 || h <= 0 || amount <= 0.0f) {
+        return;
+    }
+    float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
+    CGFloat s = self.contentScaleFactor / sv;
+    int texW = (int)[self backdropTexture].width, texH = (int)[self backdropTexture].height;
+    int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
+    if (fx < 0) { fw += fx; fx = 0; }
+    if (fy < 0) { fh += fy; fy = 0; }
+    if (fx + fw > texW) { fw = texW - fx; }
+    if (fy + fh > texH) { fh = texH - fy; }
+    if (fw <= 0 || fh <= 0) { return; }
+
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    if (self.commandBuffer == nil) {
+        self.commandBuffer = [self.commandQueue commandBuffer];
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:fw height:fh mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("colorMatrixScratch", scratch);
+    if (scratch == nil) { [self setFramebuffer]; return; }
+    id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
+    [blit copyFromTexture:[self backdropTexture] sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
+                 toTexture:scratch destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+
+    [self createRenderPassDescriptor];
+    if (self.renderPassDescriptor == nil) {
+#ifndef CN1_USE_ARC
+        [scratch release];
+#endif
+        return;
+    }
+    self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
+    CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
+
+    float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
+    CN1MetalDrawColorMatrix(scratch, mask, x, y, w, h, fw, fh, matrix, crPx, amount);
+    // The command buffer retains what it encodes; drop the +1 from newTexture.
+#ifndef CN1_USE_ARC
+    [scratch release];
+#endif
+}
+
+// Graphics.glassLensRegion on the live screen, on the GPU like the colour matrix:
+// blit the lens plus the distance its refraction may reach, then draw the lens
+// plus its margin (outline, shadow) with cn1_fs_glass_lens sampling the copy.
+- (void)glassLensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
+                        optics:(const float*)optics amount:(float)amount {
+    if ([self backdropTexture] == nil || w <= 0 || h <= 0 || amount <= 0.0f || optics == NULL) {
+        return;
+    }
+    float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
+    CGFloat s = self.contentScaleFactor / sv;
+    float o[16];
+    for (int i = 0; i < 16; i++) { o[i] = optics[i]; }
+    // GlassLensBlend lengths: bevel, max shift, outline width, rim width, end-shade
+    // width, shadow width -- logical units in, physical pixels here.
+    static const int lengths[6] = { 0, 1, 4, 7, 9, 12 };
+    for (int i = 0; i < 6; i++) { o[lengths[i]] *= (float)s; }
+    int margin = (int)ceilf(o[12] * 3.0f) + 1;
+    int reach = (int)ceilf(o[1]) + 1 + margin;
+    float lx = x * (float)s, ly = y * (float)s, lw = w * (float)s, lh = h * (float)s;
+    int texW = (int)[self backdropTexture].width, texH = (int)[self backdropTexture].height;
+    int sx0 = MAX(0, (int)floorf(lx) - reach), sy0 = MAX(0, (int)floorf(ly) - reach);
+    int sx1 = MIN(texW, (int)ceilf(lx + lw) + reach), sy1 = MIN(texH, (int)ceilf(ly + lh) + reach);
+    if (sx1 <= sx0 || sy1 <= sy0) { return; }
+    int sw = sx1 - sx0, sh = sy1 - sy0;
+    int ml = (int)ceilf(margin / (float)s);
+    int qx = x - ml, qy = y - ml, qw = w + 2 * ml, qh = h + 2 * ml;
+
+    if (self.renderCommandEncoder != nil) {
+        CN1MetalEndFrame();
+        [self.renderCommandEncoder endEncoding];
+        self.renderCommandEncoder = nil;
+    }
+    if (self.commandBuffer == nil) {
+        self.commandBuffer = [self.commandQueue commandBuffer];
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:sw height:sh mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("glassLensScratch", scratch);
+    if (scratch == nil) { [self setFramebuffer]; return; }
+    id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
+    [blit copyFromTexture:[self backdropTexture] sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(sx0, sy0, 0) sourceSize:MTLSizeMake(sw, sh, 1)
+                 toTexture:scratch destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+
+    [self createRenderPassDescriptor];
+    if (self.renderPassDescriptor == nil) {
+#ifndef CN1_USE_ARC
+        [scratch release];
+#endif
+        return;
+    }
+    self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
+    CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
+
+    float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
+    CN1MetalDrawGlassLens(scratch, sx0, sy0, sw, sh, qx, qy, qw, qh, (float)s, lx, ly, lw, lh, crPx, o, amount);
+#ifndef CN1_USE_ARC
+    [scratch release];
+#endif
 }
 
 // Put the frame held in screenTexture onto \a dst (a drawable's texture),
