@@ -210,43 +210,7 @@ rm -rf "$OUT/out"; mkdir -p "$OUT/out"
     > "$OUT/translate.log" 2>&1 \
     || { echo "TRANSLATE FAILED"; tail -40 "$OUT/translate.log"; exit 1; }
 
-# 8. compile. The .S as well as the .c: the virtual-thread context switch is emitted
-#    beside the generated sources and the C half references it, so a *.c-only
-#    invocation links against a missing cn1VirtualThreadSwitch.
-SRCDIR="$OUT/out/dist/$APP-src"
-ASMS=$(ls "$SRCDIR"/*.S 2>/dev/null || true)
+# 8. compile, through the function build-bench.sh shares (compile-dist.sh).
 BIN="$OUT/parpar$( [ "$OPT" = "-O3" ] && echo "-O3" || echo "" )$EXE"
-if [ "$WINDOWS" = 1 ]; then
-    # The translator's own CMake project, turned into an executable the way
-    # CleanTargetIntegrationTest does it, so this compiles exactly what that test proves
-    # compiles on Windows. Release plus /clang:$OPT; no ThinLTO, which would need lld-link
-    # and is not what the Windows builder ships.
-    CMAKE_LISTS="$OUT/out/dist/CMakeLists.txt"
-    "$PYTHON" - "$CMAKE_LISTS" <<'PYEOF'
-import sys
-path = sys.argv[1]
-text = open(path, encoding='utf-8').read()
-at = text.index('add_library(${PROJECT_NAME}')
-end = text.index(')', at)
-text = text[:at] + 'add_executable(' + text[at + len('add_library('):end + 1] + text[end + 1:]
-open(path, 'w', encoding='utf-8').write(text)
-PYEOF
-    rm -rf "$OUT/cmake-build"
-    cmake -S "$(native_path "$OUT/out/dist")" -B "$(native_path "$OUT/cmake-build")" -G Ninja \
-        -DCMAKE_C_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release \
-        "-DCMAKE_C_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /clang:$OPT $CN1_SELFHOST_CFLAGS_WINDOWS" \
-        > "$OUT/cc.log" 2>&1 \
-        && cmake --build "$(native_path "$OUT/cmake-build")" >> "$OUT/cc.log" 2>&1 \
-        || { echo "COMPILE FAILED"; tail -40 "$OUT/cc.log"; exit 1; }
-    cp "$OUT/cmake-build/$APP.exe" "$BIN"
-    CN1_BUILD_FLAGS="Release /clang:$OPT $CN1_SELFHOST_CFLAGS_WINDOWS" CN1_SELFHOST_CC=clang-cl \
-        "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
-    echo "built $BIN"
-    exit 0
-fi
-$CC $OPT -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
-    $CN1_SELFHOST_CFLAGS -I"$SRCDIR" "$SRCDIR"/*.c $ASMS -lm -lpthread -o "$BIN" \
-    2> "$OUT/cc.log" || { echo "COMPILE FAILED"; tail -40 "$OUT/cc.log"; exit 1; }
-CN1_BUILD_FLAGS="$OPT -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf $CN1_SELFHOST_CFLAGS" \
-    "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --record-build "$BIN"
-echo "built $BIN"
+. "$REPO/vm/selfhost/compile-dist.sh"
+cn1_compile_dist "$OUT/out/dist" "$APP" "$BIN" "$OPT" "$OUT/cc.log"

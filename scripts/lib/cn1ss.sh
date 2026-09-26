@@ -804,6 +804,18 @@ cn1ss_process_and_report() {
     return 14
   fi
 
+  # A section the caller renders itself, appended verbatim: the ParparVM vs JDK 25
+  # performance table each platform build measures. The stats-file hook above cannot carry
+  # it -- it renders two-column key/value rows -- and it has to land in THIS platform's
+  # comment, beside that platform's screenshots, whether or not any screenshot changed.
+  if [ -n "${CN1SS_EXTRA_MARKDOWN:-}" ] && [ -s "${CN1SS_EXTRA_MARKDOWN}" ]; then
+    {
+      [ -s "$comment_out" ] && printf '\n'
+      cat "$CN1SS_EXTRA_MARKDOWN"
+    } >> "$comment_out"
+    cn1ss_log "  -> Appended $CN1SS_EXTRA_MARKDOWN to the PR comment"
+  fi
+
   if [ -s "$summary_out" ]; then
     cn1ss_log "  -> Wrote summary entries to $summary_out ($(wc -l < "$summary_out" 2>/dev/null || echo 0) line(s))"
   else

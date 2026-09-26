@@ -64,11 +64,11 @@ jobs:
           sudo apt-get install -y clang time
 
       # ONLY A JDK 8 HERE. This workflow used to set up a JDK 25 as well, for a
-      # performance step that has since moved to parparvm-perf.yml; nothing left in
-      # this job reads JDK_25_HOME, so setting it up would just be a slower runner.
-      # The perf workflow still needs it and sets it up there -- and bench-selfhost.py
-      # now names each arm after the JDK's real feature version, so a missing JDK 25
-      # raises instead of silently measuring JDK 8 against itself.
+      # performance step that has since moved into each platform's own build (see the
+      # note further down); nothing left in this job reads JDK_25_HOME, so setting it up
+      # would just be a slower runner. bench-selfhost.py names each arm after the JDK's
+      # real feature version, so a missing JDK 25 raises instead of silently measuring
+      # JDK 8 against itself.
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with:
@@ -116,7 +116,10 @@ jobs:
             com_codename1_tools_translator_ByteCodeTranslator \
             com.codename1.tools.translator
 
-      # PERFORMANCE MOVED OUT, to .github/workflows/parparvm-perf.yml.
+      # PERFORMANCE MOVED OUT, into every platform's own build: vm/selfhost/ci-perf-gate.sh
+      # runs in linux-build-run.yml (x64, arm64), parparvm-tests-windows.yml (x64, arm64)
+      # and scripts-macos.yml, fails that build on a regression and puts the per-benchmark
+      # table in that platform's PR comment.
       #
       # It used to live here, building the translator a second time at -O3 and then
       # reporting (never gating) the ratio against JDK 25. Two reasons it is gone:
@@ -128,8 +131,8 @@ jobs:
       #  - Keeping it in both places would pay for the expensive -O3 self-host build
       #    twice on any PR carrying the `selfhost` label.
       #
-      # The ceilings, the per-platform metric note and the noise guard all live with
-      # the gate now: vm/selfhost/perf-guard.sh.
+      # The baselines and tolerance live in vm/selfhost/perf-baseline.json, the
+      # measurement in vm/selfhost/perf-gate.py.
 
       # Both trees, so a divergence can be inspected rather than guessed at from
       # a one-line summary.

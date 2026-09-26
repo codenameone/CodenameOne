@@ -1764,6 +1764,50 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
+    /**
+     * Appends this translation's inputs to the file CN1_TRANSLATION_RECORD names, one JSON
+     * object per line. vm/selfhost/perf-gate.py replays the platform suite's own
+     * translation from it, so the build's performance gate measures exactly the workload
+     * the build just translated rather than a corpus borrowed from another platform.
+     * Nothing is written when the variable is unset.
+     */
+    static void recordTranslation(String sources, String appName, String appType) throws java.io.IOException {
+        String record = System.getenv("CN1_TRANSLATION_RECORD");
+        if (record == null || record.trim().isEmpty()) {
+            return;
+        }
+        StringBuilder json = new StringBuilder("{\"app\":");
+        appendJsonString(json, appName);
+        json.append(",\"package\":\"com.example.hello\",\"type\":");
+        appendJsonString(json, appType);
+        json.append(",\"sources\":[");
+        String[] roots = sources.split(";");
+        for (int i = 0; i < roots.length; i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            appendJsonString(json, roots[i]);
+        }
+        json.append("]}\n");
+        Files.write(Paths.get(record.trim()), json.toString().getBytes(StandardCharsets.UTF_8),
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+    }
+
+    private static void appendJsonString(StringBuilder out, String value) {
+        out.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"' || c == '\\') {
+                out.append('\\').append(c);
+            } else if (c < 0x20) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        out.append('"');
+    }
+
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         runTranslator(classesDir, outputDir, appName, "ios");
     }
@@ -1773,6 +1817,7 @@ class CleanTargetIntegrationTest {
     }
 
     static void runTranslatorImpl(String sources, Path outputDir, String appName, String appType) throws Exception {
+        recordTranslation(sources, appName, appType);
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
         URL[] systemUrls;

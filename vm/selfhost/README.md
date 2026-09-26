@@ -76,40 +76,53 @@ assembly evidence, and the subsequent whole-workload comparison.
 
 ## The CI performance gate
 
-`.github/workflows/parparvm-perf.yml` runs `perf-gate.py` on Linux x64, Linux arm64,
-macOS arm64 and Windows x64 for every pull request that touches `vm/`. It builds the
-self-hosted translator at `-O3`, and measures it translating the HelloCodenameOne
-corpus against JDK 25 at 1, 2 and 4 cores (as many as the runner has):
+Every platform's own build measures ParparVM against JDK 25 and fails on a regression:
+the Linux legs of `linux-build-run.yml` (x64, arm64), the Windows capture jobs of
+`parparvm-tests-windows.yml` (x64, arm64) and the macOS job of `scripts-macos.yml`. Each
+runs `ci-perf-gate.sh` after it has built and run its application, puts the table into
+that platform's PR comment beside its screenshots, and fails the job in its last step:
 
 ```bash
-python3 vm/selfhost/prepare-hello-corpus.py
-python3 vm/selfhost/perf-gate.py --cores 1,2,4 --rounds 5
+vm/selfhost/ci-perf-gate.sh run <platform> <outDir> [--hello-workload FILE --hello-app NAME]
+vm/selfhost/ci-perf-gate.sh verdict <outDir>
 ```
 
+`run` fetches JDK 25 into a private directory (no later step sees a different JDK),
+builds the self-hosted translator (`build-selfhost.sh -O3`) and the Bench binary
+(`build-bench.sh -O3`, compiled through the same `compile-dist.sh`), and runs
+`perf-gate.py`. It never fails its own step, so a regression cannot stop the screenshots
+and the comment that report it; `verdict` does.
+
+**The benchmarks**, each at 1, 2 and 4 cores:
+
+| Benchmark | ParparVM arm | JDK 25 arm |
+|---|---|---|
+| hello | the self-hosted translator translating this build's application -- the exact translation the build just ran (`CN1_TRANSLATION_RECORD`), or on macOS the corpus `prepare-hello-corpus.py` takes from the macOS build | the same translator classes |
+| translator | the self-hosted translator translating itself | the same |
+| each Bench workload | `bench-O3 <reps> <workload>`, one process per workload | `java com.bench.Bench <reps> <workload>` |
+
 **JDK 25 is the unit of measure.** Each round runs both arms back to back, alternating
-which goes first, and yields a paired ratio -- ParparVM's elapsed time and peak memory
-over the JDK run beside it. The result is the median of those ratios. Nothing absolute
-is printed or kept: a shared runner that is slow today slows both halves of a pair, so
-one baseline holds on a fast runner and a slow one. Every run's output is compared byte
-for byte, as in the comparisons above.
+which goes first, and yields a paired ratio; the result is the median. Nothing absolute
+is printed or kept, so one baseline holds on a fast runner and a slow one. Translation
+time is the whole process; a workload's time is its fastest measured repetition inside
+the process, so JVM startup does not count against the JDK. RAM is the process peak
+(peak footprint on macOS, maximum RSS on Linux, peak working set on Windows). Every run is
+verified: translation output byte for byte, workload checksums across arms and rounds.
 
 Core counts are pinned with CPU affinity on Linux and Windows. macOS has no affinity
 API, so there the count is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
-`-XX:ActiveProcessorCount`) and neither is confined to it. That makes the macOS
-one-core row a different comparison -- the JDK's compiler threads still run on the
-other cores -- and the report marks it.
+`-XX:ActiveProcessorCount`) and neither is confined to it; the table marks those rows.
 
-**The gate compares against `perf-baseline.json`**: a ratio per platform and core count,
-and a tolerance per metric. A ratio more than the tolerance above its baseline fails the
-job and the pull request. The report job merges every platform into one table, posts it
-as a single pull-request comment that later runs update, and is red on a regression or
-on a platform that produced no result.
+**The gate compares against `perf-baseline.json`**: a ratio per platform, benchmark and
+core count, and a tolerance per metric. A ratio more than the tolerance above its
+baseline fails the build, and the comment names the benchmark, the metric and the size
+of the change.
 
 **Calibrating.** Baselines must come from the runners that enforce them: a ratio depends
 on the hardware, so one measured on a developer machine is not a baseline for CI. A
-platform or core count with no entry is reported as "not gated", and the job log prints
-the entry to add. When a change moves performance on purpose, update the entries in the
-same pull request, from that pull request's own run.
+benchmark with no entry is reported as "not gated", and the comment carries the entry to
+add. When a change moves performance on purpose, update the entries in the same pull
+request, from that pull request's own run.
 
 ## Native collection and string implementation
 
