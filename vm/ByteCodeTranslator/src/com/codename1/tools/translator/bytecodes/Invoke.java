@@ -412,7 +412,9 @@ public class Invoke extends Instruction {
             // (the args were evaluated onto the operand stack BEFORE this <init>),
             // so no temp hoisting is needed.
             String cType = Util.mangle(owner);
-            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1);
+            // No retire guard on this path: the retire analysis wires guards to the
+            // CustomInvoke that follows a NEW, never to a plain Invoke.
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1, -1);
             return true;
         }
         b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one

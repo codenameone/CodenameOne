@@ -439,8 +439,7 @@ public class CustomInvoke extends Instruction {
             // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
             // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
             String cType = Util.mangle(owner);
-            inlineCtorPlan.setDeadGuardId(deadGuardId);
-            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1, deadGuardId);
             return true;
         }
         b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one

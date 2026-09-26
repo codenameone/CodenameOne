@@ -93,17 +93,6 @@ public final class InlinableConstructor {
 
     private final List<Store> stores;
 
-    /// Frame-exit retire guard this fused allocation writes, or -1.
-    ///
-    /// The NEW this replaces only emits a NULL placeholder (init-before-publish), so the
-    /// guard cannot be written there -- the object does not exist yet at that point. It
-    /// is written at the PUBLISH line below, where __ibp is fully constructed.
-    private int deadGuardId = -1;
-
-    public void setDeadGuardId(int id) {
-        this.deadGuardId = id;
-    }
-
     private InlinableConstructor(List<Store> stores) {
         this.stores = stores;
     }
@@ -201,8 +190,16 @@ public final class InlinableConstructor {
      *                     (published via {@code SP[-k].data.o})
      * @param pop          number of stack slots to pop (receiver + on-stack args)
      */
+    /// @param deadGuardId the frame-exit retire guard THIS call site writes, or -1.
+    ///     The NEW this replaces only emits a NULL placeholder, so the guard is written at
+    ///     the publish line, where __ibp is fully constructed. A parameter, not a field:
+    ///     this plan is cached on the constructor and shared by every call site of it, so
+    ///     a field set by one site was emitted by the next -- Invoke never set it, and
+    ///     inherited whatever guard the last CustomInvoke left, into a method that
+    ///     declared no guard at all (an undeclared __cn1dead_N on the macOS build).
     public void appendInitBeforePublish(StringBuilder b, String cType, String[] argExprs,
-                                        char[] argCats, int survivorSlot, int pop) {
+                                        char[] argCats, int survivorSlot, int pop,
+                                        int deadGuardId) {
         b.append("    {\n");
         if (argCats != null) {
             argExprs = appendArgTemps(b, argExprs, argCats);
