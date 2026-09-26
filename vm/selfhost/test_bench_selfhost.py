@@ -26,6 +26,19 @@ class BenchmarkTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Process exited'):
                 bench.run(['/bin/sh', '-c', 'exit 7'], {}, Path(root) / 'run.log', platform.system())
 
+    def test_stderr_never_lands_inside_a_stdout_line(self):
+        # The shape that split a BENCH checksum on Windows: half a record on stdout, a
+        # diagnostic on stderr, then the rest of the record.
+        script = ("import sys\n"
+                  "sys.stdout.write('BENCH w rep 0 ns=5 checksum=-12345'); sys.stdout.flush()\n"
+                  "sys.stderr.write('[GC] diagnostic\\n'); sys.stderr.flush()\n"
+                  "sys.stdout.write('678\\n'); sys.stdout.flush()\n")
+        with tempfile.TemporaryDirectory() as root:
+            log = Path(root) / 'run.log'
+            bench.run([sys.executable, '-c', script], {}, log, platform.system())
+            self.assertEqual('BENCH w rep 0 ns=5 checksum=-12345678\n', log.read_text())
+            self.assertIn('[GC] diagnostic', bench.error_log(log).read_text())
+
     def test_stalled_process_never_becomes_a_sample(self):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaises(subprocess.TimeoutExpired):

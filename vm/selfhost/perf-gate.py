@@ -77,9 +77,10 @@ TRANSLATOR_PKG = 'com.codename1.tools.translator'
 WORKLOADS = ['intArithmetic', 'longArithmetic', 'mathTranscendental', 'arraySequential',
              'arrayRandom', 'objectAllocation', 'valueEscape', 'hashMapChurn',
              'stringBuilding', 'recursion', 'quicksort']
-# Not anchored to the line start: the run log carries stdout AND stderr, and on Windows a
-# runtime diagnostic can land on the same line ahead of a BENCH record, which an anchored
-# pattern then silently dropped (24 of 25 repetitions found).
+# Read from the run's stdout log only (bench.error_log holds stderr). The two once shared a
+# file, and a runtime diagnostic landing inside a BENCH record both hid records from an
+# anchored pattern and split one mid-checksum. Left unanchored anyway: the pattern is
+# specific enough, and the program itself may print ahead of a record.
 BENCH_LINE = re.compile(r'BENCH (\S+) rep (\d+) ns=(\d+) checksum=(-?\d+)')
 PLATFORM_NAMES = {'linux-x64': 'Linux x64', 'linux-arm64': 'Linux arm64',
                   'macos-arm64': 'macOS arm64', 'windows-x64': 'Windows x64',

@@ -72,6 +72,19 @@ def parse_usage(output, system):
     return {'peak_bytes': int(peak[1]) * factor, 'cpu_seconds': sum(cpu)}
 
 
+def error_log(log):
+    """Where a run's stderr goes: beside its stdout log, never into it.
+
+    The two used to share one file, and they are separate handles with separate
+    buffering, so a runtime diagnostic on stderr could land between two chunks of one
+    stdout line. A BENCH record was split mid-number that way on Windows arm64 -- the
+    checksum read -228848789171527 in one repetition and -2288487891715278 in the
+    rest -- which failed a row on a parse, not on a result. The stdout log now holds
+    only what the program printed, and resource usage (GNU/BSD time reports on
+    stderr) is read from this file."""
+    return log.with_name(log.name + '.err')
+
+
 def run_windows(command, env, log, timeout):
     """Windows has no /usr/bin/time. The peak working set and CPU times are read off the
     process handle after exit -- still open, because Popen keeps it until the object is
@@ -89,8 +102,8 @@ def run_windows(command, env, log, timeout):
                     ('PagefileUsage', ctypes.c_size_t), ('PeakPagefileUsage', ctypes.c_size_t)]
 
     start = time.monotonic()
-    with log.open('w') as output:
-        process = subprocess.Popen(command, env=env, stdout=output, stderr=output)
+    with log.open('w') as output, error_log(log).open('w') as errors:
+        process = subprocess.Popen(command, env=env, stdout=output, stderr=errors)
         try:
             process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -113,7 +126,8 @@ def run_windows(command, env, log, timeout):
                                                       ctypes.byref(user)):
             raise RuntimeError('GetProcessTimes failed; see the run log')
     if process.returncode:
-        raise RuntimeError('Process exited with %s: %s' % (process.returncode, log))
+        raise RuntimeError('Process exited with %s: %s (stderr: %s)'
+                           % (process.returncode, log, error_log(log)))
 
     def seconds(filetime):
         return ((filetime.dwHighDateTime << 32) | filetime.dwLowDateTime) / 1e7
@@ -129,8 +143,8 @@ def run(command, env, log, system, timeout=300):
         return run_windows(command, env, log, timeout)
     wrapper = ['/usr/bin/time', '-l' if system == 'Darwin' else '-v']
     start = time.monotonic()
-    with log.open('w') as output:
-        result = subprocess.Popen(wrapper + command, env=env, stdout=output, stderr=output,
+    with log.open('w') as output, error_log(log).open('w') as errors:
+        result = subprocess.Popen(wrapper + command, env=env, stdout=output, stderr=errors,
                                   start_new_session=True)
         timed_out = threading.Event()
 
@@ -165,8 +179,9 @@ def run(command, env, log, system, timeout=300):
         finally:
             watchdog.cancel()
     if result.returncode:
-        raise RuntimeError('Process exited with %s: %s' % (result.returncode, log))
-    usage = parse_usage(log.read_text(errors='replace'), system)
+        raise RuntimeError('Process exited with %s: %s (stderr: %s)'
+                           % (result.returncode, log, error_log(log)))
+    usage = parse_usage(error_log(log).read_text(errors='replace'), system)
     usage['elapsed_seconds'] = elapsed
     return usage
 
