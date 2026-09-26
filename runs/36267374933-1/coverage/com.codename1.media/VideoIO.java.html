@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VideoIO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">VideoIO.java</span></div><h1>VideoIO.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// Low level video encoding and decoding using the platform's native codecs. `VideoIO`
+/// is to video what `com.codename1.ui.util.ImageIO` is to still images, but goes deeper:
+/// it can enumerate the codecs the device actually supports, encode application rendered
+/// frames and audio into a standard container (`VideoWriter`), and decode an existing
+/// clip into frame accurate RGBA frames and PCM audio (`VideoReader`).
+///
+/// It is supported on iOS, macOS, Android, Windows, Linux, JavaScript and the desktop
+/// simulator. It is not available on the TV, Watch or Car targets. As with other
+/// optional platform features, always gate usage with `#isSupported()`:
+///
+/// ```java
+/// if (VideoIO.isSupported()) {
+///     VideoIO io = VideoIO.getVideoIO();
+///     // ... encode / decode
+/// }
+/// ```
+///
+/// ### Encoding
+///
+/// Configure a `VideoWriterBuilder`, build a `VideoWriter`, push frames and audio, then
+/// close it. Every frame is an ordinary `com.codename1.ui.Image`, so the application has
+/// full control over the pixels.
+///
+/// ### Decoding
+///
+/// `#openReader(String)` returns a `VideoReader` exposing duration, dimensions and frame
+/// rate, frame accurate `VideoReader#frameAt(long)`, a variable to constant frame rate
+/// resampler `VideoReader#readFrames(float, com.codename1.media.VideoReader.FrameCallback)`
+/// and the audio track as PCM via `VideoReader#readAudio()`.
+<span class="fc" id="L62">public abstract class VideoIO {</span>
+    /// Codec id for H.264 / AVC video, the most broadly compatible video codec.
+    public static final String CODEC_H264 = &quot;h264&quot;;
+    /// Codec id for H.265 / HEVC video.
+    public static final String CODEC_HEVC = &quot;hevc&quot;;
+    /// Codec id for VP8 video.
+    public static final String CODEC_VP8 = &quot;vp8&quot;;
+    /// Codec id for VP9 video.
+    public static final String CODEC_VP9 = &quot;vp9&quot;;
+    /// Codec id for AV1 video.
+    public static final String CODEC_AV1 = &quot;av1&quot;;
+    /// Codec id for AAC audio, the most broadly compatible audio codec.
+    public static final String CODEC_AAC = &quot;aac&quot;;
+    /// Codec id for Opus audio.
+    public static final String CODEC_OPUS = &quot;opus&quot;;
+    /// Codec id for uncompressed 16 bit PCM audio.
+    public static final String CODEC_PCM = &quot;pcm&quot;;
+
+    /// Container id for the MPEG 4 (.mp4) container.
+    public static final String CONTAINER_MP4 = &quot;mp4&quot;;
+    /// Container id for the WebM (.webm) container.
+    public static final String CONTAINER_WEBM = &quot;webm&quot;;
+    /// Container id for the QuickTime (.mov) container.
+    public static final String CONTAINER_MOV = &quot;mov&quot;;
+    /// Container id for the Matroska (.mkv) container.
+    public static final String CONTAINER_MKV = &quot;mkv&quot;;
+
+    /// Returns the `VideoIO` instance for the current platform, or null when video
+    /// encoding/decoding is not supported. Prefer `#isSupported()` for a simple boolean
+    /// check.
+    ///
+    /// #### Returns
+    ///
+    /// the platform `VideoIO`, or null if unsupported
+    public static VideoIO getVideoIO() {
+<span class="fc" id="L97">        return Display.getInstance().getVideoIO();</span>
+    }
+
+    /// Convenience test for whether this platform supports the `VideoIO` API.
+    ///
+    /// #### Returns
+    ///
+    /// true if video encoding/decoding is available
+    public static boolean isSupported() {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        return Display.getInstance().getVideoIO() != null;</span>
+    }
+
+    /// Lists the codecs that can be used for encoding on this device. The set is device
+    /// dependent and may include hardware accelerated entries (see
+    /// `VideoCodec#isHardwareAccelerated()`).
+    ///
+    /// #### Returns
+    ///
+    /// the available encoder codecs (never null, possibly empty)
+    public abstract VideoCodec[] getAvailableEncoders();
+
+    /// Lists the codecs that can be used for decoding on this device.
+    ///
+    /// #### Returns
+    ///
+    /// the available decoder codecs (never null, possibly empty)
+    public abstract VideoCodec[] getAvailableDecoders();
+
+    /// Tests whether a given codec id can be used for encoding on this device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codecId`: one of the `#CODEC_H264` style constants
+    ///
+    /// #### Returns
+    ///
+    /// true if an encoder for the codec exists
+    public boolean isEncoderSupported(String codecId) {
+<span class="fc" id="L135">        return containsCodec(getAvailableEncoders(), codecId);</span>
+    }
+
+    /// Tests whether a given codec id can be used for decoding on this device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codecId`: one of the `#CODEC_H264` style constants
+    ///
+    /// #### Returns
+    ///
+    /// true if a decoder for the codec exists
+    public boolean isDecoderSupported(String codecId) {
+<span class="fc" id="L148">        return containsCodec(getAvailableDecoders(), codecId);</span>
+    }
+
+    private static boolean containsCodec(VideoCodec[] codecs, String codecId) {
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (codecs == null || codecId == null) {</span>
+<span class="nc" id="L153">            return false;</span>
+        }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (VideoCodec c : codecs) {</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (codecId.equals(c.getId())) {</span>
+<span class="fc" id="L157">                return true;</span>
+            }
+        }
+<span class="fc" id="L160">        return false;</span>
+    }
+
+    /// Creates a `VideoWriter` for the supplied configuration. Application code normally
+    /// uses `VideoWriterBuilder#build()` rather than calling this directly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cfg`: the encoder configuration
+    ///
+    /// #### Returns
+    ///
+    /// a ready to use writer
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the writer cannot be created
+    public abstract VideoWriter createWriter(VideoWriterBuilder cfg) throws IOException;
+
+    /// Opens a `VideoReader` for the clip at the supplied
+    /// `com.codename1.io.FileSystemStorage` path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filePath`: the FileSystemStorage path of the clip to decode
+    ///
+    /// #### Returns
+    ///
+    /// a reader positioned at the start of the clip
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the clip cannot be opened
+    public abstract VideoReader openReader(String filePath) throws IOException;
+
+    /// Opens a `VideoReader` for a clip supplied as a stream. The default implementation
+    /// spools the stream to a temporary file and opens that; platforms that can decode
+    /// directly from a stream may override it. The stream is fully consumed and closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stream`: the clip data
+    ///
+    /// - `mimeType`: the clip mime type (e.g. &quot;video/mp4&quot;), used to pick a file suffix; may be null
+    ///
+    /// #### Returns
+    ///
+    /// a reader for the clip
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the clip cannot be opened
+    public VideoReader openReader(InputStream stream, String mimeType) throws IOException {
+<span class="nc" id="L213">        String suffix = &quot;.mp4&quot;;</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (mimeType != null) {</span>
+<span class="nc" id="L215">            int slash = mimeType.indexOf('/');</span>
+<span class="nc bnc" id="L216" title="All 4 branches missed.">            if (slash &gt; -1 &amp;&amp; slash &lt; mimeType.length() - 1) {</span>
+<span class="nc" id="L217">                suffix = &quot;.&quot; + mimeType.substring(slash + 1);</span>
+            }
+        }
+<span class="nc" id="L220">        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L221">        String path = fs.getAppHomePath() + &quot;/cn1-videoio-&quot; + System.currentTimeMillis() + suffix;</span>
+<span class="nc" id="L222">        OutputStream os = null; //NOPMD CloseResource</span>
+        try {
+<span class="nc" id="L224">            os = fs.openOutputStream(path);</span>
+<span class="nc" id="L225">            Util.copy(stream, os);</span>
+        } finally {
+<span class="nc" id="L227">            Util.cleanup(os);</span>
+            // Util.copy does not close its input; the contract says the stream is
+            // fully consumed and closed, so close it here.
+<span class="nc" id="L230">            Util.cleanup(stream);</span>
+        }
+        // Wrap so closing the reader also deletes the spool file we created.
+<span class="nc" id="L233">        return new SpooledVideoReader(openReader(path), path);</span>
+    }
+
+    /// A `VideoReader` opened from a temporary spool file (see
+    /// {@link #openReader(InputStream, String)}) that deletes the spool file when
+    /// it is closed, delegating everything else to the underlying reader.
+    private static final class SpooledVideoReader extends VideoReader {
+        private final VideoReader delegate;
+        private final String spoolPath;
+
+<span class="nc" id="L243">        SpooledVideoReader(VideoReader delegate, String spoolPath) {</span>
+<span class="nc" id="L244">            this.delegate = delegate;</span>
+<span class="nc" id="L245">            this.spoolPath = spoolPath;</span>
+<span class="nc" id="L246">        }</span>
+
+        @Override
+        public int getWidth() {
+<span class="nc" id="L250">            return delegate.getWidth();</span>
+        }
+
+        @Override
+        public int getHeight() {
+<span class="nc" id="L255">            return delegate.getHeight();</span>
+        }
+
+        @Override
+        public long getDurationMillis() {
+<span class="nc" id="L260">            return delegate.getDurationMillis();</span>
+        }
+
+        @Override
+        public float getFrameRate() {
+<span class="nc" id="L265">            return delegate.getFrameRate();</span>
+        }
+
+        @Override
+        public boolean hasVideo() {
+<span class="nc" id="L270">            return delegate.hasVideo();</span>
+        }
+
+        @Override
+        public boolean hasAudio() {
+<span class="nc" id="L275">            return delegate.hasAudio();</span>
+        }
+
+        @Override
+        public int getAudioSampleRate() {
+<span class="nc" id="L280">            return delegate.getAudioSampleRate();</span>
+        }
+
+        @Override
+        public int getAudioChannels() {
+<span class="nc" id="L285">            return delegate.getAudioChannels();</span>
+        }
+
+        @Override
+        public VideoFrame frameAt(long millis) throws IOException {
+<span class="nc" id="L290">            return delegate.frameAt(millis);</span>
+        }
+
+        @Override
+        public void readFrames(float fps, FrameCallback callback) throws IOException {
+<span class="nc" id="L295">            delegate.readFrames(fps, callback);</span>
+<span class="nc" id="L296">        }</span>
+
+        @Override
+        public AudioBuffer readAudio() throws IOException {
+<span class="nc" id="L300">            return delegate.readAudio();</span>
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+<span class="nc" id="L306">                delegate.close();</span>
+            } finally {
+                try {
+<span class="nc" id="L309">                    FileSystemStorage.getInstance().delete(spoolPath);</span>
+<span class="nc" id="L310">                } catch (Throwable ignored) {</span>
+                    // best-effort spool cleanup
+<span class="nc" id="L312">                }</span>
+            }
+<span class="nc" id="L314">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

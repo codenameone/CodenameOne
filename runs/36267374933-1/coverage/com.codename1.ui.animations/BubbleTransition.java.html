@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BubbleTransition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">BubbleTransition.java</span></div><h1>BubbleTransition.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.animations;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.plaf.Style;
+
+/// A Transitions that animates the destination component as a growing window
+/// until the destination is displayed in place.
+/// The Bubble window can be round on supported platforms
+///
+/// ```java
+/// Form hi = new Form(&quot;Bubble&quot;);
+/// Button showBubble = new Button(&quot;+&quot;);
+/// showBubble.setName(&quot;BubbleButton&quot;);
+/// Style buttonStyle = showBubble.getAllStyles();
+/// buttonStyle.setBorder(Border.createEmpty());
+/// buttonStyle.setFgColor(0xffffff);
+/// buttonStyle.setBgPainter((g, rect) -&gt; {
+///     g.setColor(0xff);
+///     int actualWidth = rect.getWidth();
+///     int actualHeight = rect.getHeight();
+///     int xPos, yPos;
+///     int size;
+///     if(actualWidth &gt; actualHeight) {
+///         yPos = rect.getY();
+///         xPos = rect.getX() + (actualWidth - actualHeight) / 2;
+///         size = actualHeight;
+///     } else {
+///         yPos = rect.getY() + (actualHeight - actualWidth) / 2;
+///         xPos = rect.getX();
+///         size = actualWidth;
+///     }
+///     g.setAntiAliased(true);
+///     g.fillArc(xPos, yPos, size, size, 0, 360);
+/// });
+/// hi.add(showBubble);
+/// hi.setTintColor(0);
+/// showBubble.addActionListener((e) -&gt; {
+///     Dialog dlg = new Dialog(&quot;Bubbled&quot;);
+///     dlg.setLayout(new BorderLayout());
+///     SpanLabel sl = new SpanLabel(&quot;This dialog should appear with a bubble transition from the button&quot;, &quot;DialogBody&quot;);
+///     sl.getTextUnselectedStyle().setFgColor(0xffffff);
+///     dlg.add(BorderLayout.CENTER, sl);
+///     dlg.setTransitionInAnimator(new BubbleTransition(500, &quot;BubbleButton&quot;));
+///     dlg.setTransitionOutAnimator(new BubbleTransition(500, &quot;BubbleButton&quot;));
+///     dlg.setDisposeWhenPointerOutOfBounds(true);
+///     dlg.getTitleStyle().setFgColor(0xffffff);
+///
+///     Style dlgStyle = dlg.getDialogStyle();
+///     dlgStyle.setBorder(Border.createEmpty());
+///     dlgStyle.setBgColor(0xff);
+///     dlgStyle.setBgTransparency(0xff);
+///     dlg.showPacked(BorderLayout.NORTH, true);
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// @author Chen
+public class BubbleTransition extends Transition {
+
+    private Component originSrc;
+    private Component originDest;
+    private Image destBuffer;
+    private Motion clipMotion;
+    private Motion locMotionX;
+    private Motion locMotionY;
+<span class="pc" id="L97">    private int duration = 200;</span>
+    private int clipSize;
+    private int x;
+    private int y;
+    private String componentName;
+<span class="pc" id="L102">    private boolean roundBubble = true;</span>
+    private GeneralPath bubbleShape;
+
+
+    /// Creates a Bubble Transition
+<span class="nc" id="L107">    public BubbleTransition() {</span>
+<span class="nc" id="L108">    }</span>
+
+    /// Creates a Bubble Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the transition
+<span class="fc" id="L115">    public BubbleTransition(int duration) {</span>
+<span class="fc" id="L116">        this.duration = duration;</span>
+<span class="fc" id="L117">    }</span>
+
+    /// Creates a Bubble Transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration of the transition
+    ///
+    /// - `componentName`: @param componentName the name of the component from the source Form that
+    /// this transition should start from.
+    public BubbleTransition(int duration, String componentName) {
+<span class="fc" id="L128">        this(duration);</span>
+<span class="fc" id="L129">        this.componentName = componentName;</span>
+<span class="fc" id="L130">    }</span>
+
+    private static Component findByName(Container root, String componentName) {
+<span class="nc" id="L133">        int count = root.getComponentCount();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L135">            Component c = root.getComponentAt(iter);</span>
+<span class="nc" id="L136">            String n = c.getName();</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">            if (n != null &amp;&amp; n.equals(componentName)) {</span>
+<span class="nc" id="L138">                return c;</span>
+            }
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L141">                c = findByName((Container) c, componentName);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (c != null) {</span>
+<span class="nc" id="L143">                    return c;</span>
+                }
+            }
+        }
+<span class="nc" id="L147">        return null;</span>
+    }
+
+    /// the name of the component from the source Form that
+    /// this transition should start from.
+    ///
+    /// #### Parameters
+    ///
+    /// - `componentName`: name of the component to start the transition from
+    public void setComponentName(String componentName) {
+<span class="nc" id="L157">        this.componentName = componentName;</span>
+<span class="nc" id="L158">    }</span>
+
+    @Override
+    public void initTransition() {
+
+<span class="nc" id="L163">        Component source = getSource();</span>
+<span class="nc" id="L164">        Component destination = getDestination();</span>
+<span class="nc" id="L165">        int w = source.getWidth();</span>
+<span class="nc" id="L166">        int h = source.getHeight();</span>
+
+        // a transition might occur with illegal source or destination values (common with
+        // improper replace() calls, this may still be valid and shouldn't fail
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L171">            return;</span>
+        }
+
+<span class="nc" id="L174">        Form sourceForm = source.getComponentForm();</span>
+<span class="nc" id="L175">        originSrc = findByName(sourceForm, componentName);</span>
+<span class="nc" id="L176">        Form destForm = destination.getComponentForm();</span>
+<span class="nc" id="L177">        originDest = findByName(destForm, componentName);</span>
+
+<span class="nc" id="L179">        Display d = Display.getInstance();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (getDestination() instanceof Dialog) {</span>
+<span class="nc" id="L181">            Dialog dlg = (Dialog) destination;</span>
+            // transparent image!
+<span class="nc" id="L183">            destBuffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),</span>
+<span class="nc" id="L184">                    Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight()</span>
+                    ), 0);
+<span class="nc" id="L186">            Style stl = dlg.getDialogComponent().getStyle();</span>
+<span class="nc" id="L187">            byte bgt = stl.getBgTransparency();</span>
+<span class="nc" id="L188">            stl.setBgTransparency(0xff);</span>
+<span class="nc" id="L189">            drawDialogCmp(destBuffer.getGraphics(), dlg);</span>
+<span class="nc" id="L190">            stl.setBgTransparency(bgt &amp; 0xff, true);</span>
+
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        } else if (getSource() instanceof Dialog) {</span>
+<span class="nc" id="L193">            Dialog dlg = (Dialog) source;</span>
+            // transparent image!
+<span class="nc" id="L195">            destBuffer = Image.createImage(Math.min(d.getDisplayWidth(), getDialogParent(dlg).getWidth()),</span>
+<span class="nc" id="L196">                    Math.min(d.getDisplayHeight(), dlg.getContentPane().getParent().getHeight()</span>
+                    ), 0);
+<span class="nc" id="L198">            Style stl = dlg.getDialogComponent().getStyle();</span>
+<span class="nc" id="L199">            byte bgt = stl.getBgTransparency();</span>
+<span class="nc" id="L200">            stl.setBgTransparency(0xff);</span>
+<span class="nc" id="L201">            drawDialogCmp(destBuffer.getGraphics(), dlg);</span>
+<span class="nc" id="L202">            stl.setBgTransparency(bgt &amp; 0xff, true);</span>
+
+<span class="nc" id="L204">        } else {</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (originDest != null) {</span>
+<span class="nc" id="L206">                destBuffer = createMutableImage(source.getWidth(), source.getHeight());</span>
+<span class="nc" id="L207">                paint(destBuffer.getGraphics(), source, -source.getAbsoluteX(), -source.getAbsoluteY());</span>
+            } else {
+<span class="nc" id="L209">                destBuffer = createMutableImage(destination.getWidth(), destination.getHeight());</span>
+<span class="nc" id="L210">                paint(destBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());</span>
+            }
+        }
+<span class="nc" id="L213">        Component dest = getDestination();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (dest instanceof Dialog) {</span>
+<span class="nc" id="L215">            dest = getDialogParent(dest);</span>
+        }
+<span class="nc" id="L217">        Component src = getSource();</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (src instanceof Dialog) {</span>
+<span class="nc" id="L219">            src = getDialogParent(src);</span>
+        }
+
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (originSrc != null) {</span>
+<span class="nc" id="L224">            locMotionX = Motion.createLinearMotion(originSrc.getAbsoluteX() + originSrc.getWidth() / 2 - dest.getWidth() / 2, dest.getAbsoluteX(), duration);</span>
+<span class="nc" id="L225">            locMotionX.start();</span>
+<span class="nc" id="L226">            locMotionY = Motion.createLinearMotion(originSrc.getAbsoluteY() + originSrc.getHeight() / 2 - dest.getHeight() / 2, dest.getAbsoluteY(), duration);</span>
+<span class="nc" id="L227">            locMotionY.start();</span>
+<span class="nc" id="L228">            clipMotion = Motion.createLinearMotion(Math.min(originSrc.getWidth(), originSrc.getHeight()), Math.max(dest.getWidth(), dest.getHeight()) * 3 / 2, duration);</span>
+        } else {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            if (originDest != null) {</span>
+<span class="nc" id="L231">                locMotionX = Motion.createLinearMotion(src.getAbsoluteX(), originDest.getAbsoluteX() + originDest.getWidth() / 2 - src.getWidth() / 2, duration);</span>
+<span class="nc" id="L232">                locMotionX.start();</span>
+<span class="nc" id="L233">                locMotionY = Motion.createLinearMotion(src.getAbsoluteY(), originDest.getAbsoluteY() + originDest.getHeight() / 2 - src.getHeight() / 2, duration);</span>
+<span class="nc" id="L234">                locMotionY.start();</span>
+<span class="nc" id="L235">                clipMotion = Motion.createLinearMotion(Math.max(src.getWidth(), src.getHeight()) * 3 / 2, Math.min(originDest.getWidth(), originDest.getHeight()), duration);</span>
+            } else {
+<span class="nc" id="L237">                x = dest.getAbsoluteX();</span>
+<span class="nc" id="L238">                y = dest.getAbsoluteY();</span>
+<span class="nc" id="L239">                clipMotion = Motion.createLinearMotion(0, Math.max(dest.getWidth(), dest.getHeight()) * 3 / 2, duration);</span>
+            }
+        }
+<span class="nc" id="L242">        clipMotion.start();</span>
+
+<span class="nc" id="L244">    }</span>
+
+    @Override
+    public boolean animate() {
+<span class="nc" id="L248">        clipSize = clipMotion.getValue();</span>
+<span class="nc bnc" id="L249" title="All 4 branches missed.">        if (originSrc != null || originDest != null) {</span>
+<span class="nc" id="L250">            x = locMotionX.getValue();</span>
+<span class="nc" id="L251">            y = locMotionY.getValue();</span>
+        }
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        return !clipMotion.isFinished();</span>
+    }
+
+    private GeneralPath getBubbleShape() {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (bubbleShape == null) {</span>
+<span class="nc" id="L258">            bubbleShape = new GeneralPath();</span>
+        }
+<span class="nc" id="L260">        return bubbleShape;</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="nc" id="L265">        Component source = getSource();</span>
+<span class="nc" id="L266">        Component dest = getDestination();</span>
+
+<span class="nc" id="L268">        Component srcCmp = source;</span>
+<span class="nc" id="L269">        Component destCmp = dest;</span>
+
+<span class="nc bnc" id="L271" title="All 6 branches missed.">        if ((source instanceof Dialog &amp;&amp; dest instanceof Form)</span>
+                || originDest != null) {
+<span class="nc" id="L273">            srcCmp = dest;</span>
+<span class="nc" id="L274">            destCmp = source;</span>
+        }
+
+
+<span class="nc" id="L278">        paint(g, srcCmp, -srcCmp.getAbsoluteX(), -srcCmp.getAbsoluteY(), true);</span>
+
+<span class="nc" id="L280">        int[] clip = g.getClip();</span>
+
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (destCmp instanceof Dialog) {</span>
+<span class="nc" id="L283">            destCmp = getDialogParent(destCmp);</span>
+        }
+<span class="nc bnc" id="L285" title="All 4 branches missed.">        if (roundBubble &amp;&amp; g.isShapeClipSupported()) {</span>
+
+<span class="nc" id="L287">            GeneralPath p = getBubbleShape();</span>
+<span class="nc" id="L288">            p.reset();</span>
+<span class="nc" id="L289">            p.arc(x + destCmp.getWidth() / 2 - clipSize / 2, y + destCmp.getHeight() / 2 - clipSize / 2, clipSize, clipSize, 0, Math.toRadians(360));</span>
+<span class="nc" id="L290">            g.setClip(p);</span>
+<span class="nc" id="L291">        } else {</span>
+<span class="nc" id="L292">            g.setClip(x + destCmp.getWidth() / 2 - clipSize / 2, y + destCmp.getHeight() / 2 - clipSize / 2, clipSize, clipSize);</span>
+        }
+<span class="nc" id="L294">        g.drawImage(destBuffer, x, y);</span>
+<span class="nc" id="L295">        g.setClip(clip);</span>
+<span class="nc" id="L296">    }</span>
+
+    /// Determines if the Bubble is a round circle or a rectangle.
+    /// Round bubble apply to platforms who supports shaped clipping.
+    /// See Graphics.isShapeClipSupported().
+    ///
+    /// #### Parameters
+    ///
+    /// - `roundBubble`: true if the bubble should be round
+    public void setRoundBubble(boolean roundBubble) {
+<span class="fc" id="L306">        this.roundBubble = roundBubble;</span>
+<span class="fc" id="L307">    }</span>
+
+    private Image createMutableImage(int w, int h) {
+<span class="nc" id="L310">        Display d = Display.getInstance();</span>
+<span class="nc" id="L311">        return Image.createImage(Math.min(d.getDisplayWidth(), w), Math.min(d.getDisplayHeight(), h));</span>
+    }
+
+    private void paint(Graphics g, Component cmp, int x, int y) {
+<span class="nc" id="L315">        paint(g, cmp, x, y, false);</span>
+<span class="nc" id="L316">    }</span>
+
+    private void paint(Graphics g, Component cmp, int x, int y, boolean background) {
+<span class="nc" id="L319">        int cx = g.getClipX();</span>
+<span class="nc" id="L320">        int cy = g.getClipY();</span>
+<span class="nc" id="L321">        int cw = g.getClipWidth();</span>
+<span class="nc" id="L322">        int ch = g.getClipHeight();</span>
+<span class="nc" id="L323">        g.translate(x, y);</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (cmp instanceof Dialog) {</span>
+<span class="nc" id="L325">            ((Dialog) cmp).getDialogComponent().paintComponent(g);</span>
+        } else {
+<span class="nc" id="L327">            cmp.paintComponent(g, background);</span>
+        }
+<span class="nc" id="L329">        g.translate(-x, -y);</span>
+
+<span class="nc" id="L331">        g.setClip(cx, cy, cw, ch);</span>
+<span class="nc" id="L332">    }</span>
+
+    @Override
+    public void cleanup() {
+<span class="fc" id="L336">        destBuffer = null;</span>
+<span class="fc" id="L337">        originSrc = null;</span>
+<span class="fc" id="L338">        originDest = null;</span>
+<span class="fc" id="L339">    }</span>
+
+    /// The duration for the transition
+    ///
+    /// #### Returns
+    ///
+    /// the duration
+    public int getDuration() {
+<span class="fc" id="L347">        return duration;</span>
+    }
+
+    /// The duration for the transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: the duration to set
+    public void setDuration(int duration) {
+<span class="nc" id="L356">        this.duration = duration;</span>
+<span class="nc" id="L357">    }</span>
+
+    private void drawDialogCmp(Graphics g, Dialog dlg) {
+<span class="nc" id="L360">        Painter p = dlg.getStyle().getBgPainter();</span>
+<span class="nc" id="L361">        dlg.getStyle().setBgPainter(null);</span>
+<span class="nc" id="L362">        g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());</span>
+<span class="nc" id="L363">        g.translate(-getDialogParent(dlg).getX(), -getDialogParent(dlg).getY());</span>
+<span class="nc" id="L364">        getDialogParent(dlg).paintComponent(g, false);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (dlg.getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L366">            Component menuBar = dlg.getSoftButton(0).getParent();</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">            if (menuBar != null) {</span>
+<span class="nc" id="L368">                g.setClip(0, 0, dlg.getWidth(), dlg.getHeight());</span>
+<span class="nc" id="L369">                menuBar.paintComponent(g, false);</span>
+            }
+        }
+
+<span class="nc" id="L373">        dlg.getStyle().setBgPainter(p);</span>
+<span class="nc" id="L374">    }</span>
+
+    private Container getDialogParent(Component dlg) {
+<span class="nc" id="L377">        return ((Dialog) dlg).getDialogComponent();</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// #### Parameters
+    ///
+    /// - `reverse`: {@inheritDoc}
+    ///
+    /// #### Returns
+    ///
+    /// {@inheritDoc}
+    @Override
+    public Transition copy(boolean reverse) {
+<span class="fc" id="L391">        BubbleTransition bt = new BubbleTransition(duration, componentName);</span>
+<span class="fc" id="L392">        bt.roundBubble = roundBubble;</span>
+<span class="fc" id="L393">        return bt;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

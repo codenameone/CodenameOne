@@ -1,0 +1,1782 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MenuBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">MenuBar.java</span></div><h1>MenuBar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Vector;
+
+/// This class represents the Form MenuBar.
+/// This class is responsible to show the Form Commands and to handle device soft
+/// keys, back key, clear key, etc...
+/// This class can be overridden and replaced in the LookAndFeel
+///
+/// @author Chen Fishbein
+///
+/// #### See also
+///
+/// - LookAndFeel#setMenuBarClass(java.lang.Class)
+<span class="fc" id="L53">public class MenuBar extends Container implements ActionListener {</span>
+    /// This member holds the left soft key value
+    static int leftSK;
+    /// This member holds the right soft key value
+    static int rightSK;
+    /// This member holds the 2nd right soft key value
+    /// this is used for different BB devices
+    static int rightSK2;
+    /// This member holds the back command key value
+    static int backSK;
+    /// This member holds the clear command key value
+    static int clearSK;
+    static int backspaceSK;
+
+    static {
+        // RIM and potentially other devices reinitialize the static initializer thus overriding
+        // the new static values set by the initialized display
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (Display.getInstance() == null || Display.getInstance().getImplementation() == null) {</span>
+<span class="nc" id="L71">            leftSK = -6;</span>
+<span class="nc" id="L72">            rightSK = -7;</span>
+<span class="nc" id="L73">            rightSK2 = -7;</span>
+<span class="nc" id="L74">            backSK = -11;</span>
+<span class="nc" id="L75">            clearSK = -8;</span>
+<span class="nc" id="L76">            backspaceSK = -8;</span>
+        }
+<span class="fc" id="L78">    }</span>
+
+<span class="fc" id="L80">    private final Vector commands = new Vector();</span>
+<span class="fc" id="L81">    private boolean minimizeOnBack = true;</span>
+    private Command selectCommand;
+    private Command defaultCommand;
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+    private Command backCommand;
+    /// Indicates the command that is defined as the clear command out of this form similar
+    /// in spirit to the back command
+    private Command clearCommand;
+    private Command menuCommand;
+    private Button[] soft;
+    private Command[] softCommand;
+    private Button left;
+    private Button right;
+    private Button main;
+    private ListCellRenderer menuCellRenderer;
+    private Transition transitionIn;
+    private Transition transitionOut;
+    private Component commandList;
+    private Style menuStyle;
+    private Command selectMenuItem;
+    private Command cancelMenuItem;
+    private Form parent;
+    private boolean thirdSoftButton;
+    private boolean hideEmptyCommands;
+    private boolean menuDisplaying;
+
+    static boolean isLSK(int keyCode) {
+<span class="fc bfc" id="L111" title="All 4 branches covered.">        return keyCode != 0 &amp;&amp; keyCode == leftSK;</span>
+    }
+
+    static boolean isRSK(int keyCode) {
+<span class="pc bpc" id="L115" title="2 of 6 branches missed.">        return keyCode != 0 &amp;&amp; (keyCode == rightSK || keyCode == rightSK2);</span>
+    }
+
+    private int componentCountOffset(Container c) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;paintsTitleBarBool&quot;, false)) {</span>
+<span class="nc" id="L120">            Container t = getTitleAreaContainer();</span>
+<span class="nc bnc" id="L121" title="All 4 branches missed.">            if (t == c &amp;&amp; ((BorderLayout) t.getLayout()).getNorth() != null) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L122">                return 1;</span>
+            }
+        }
+<span class="fc" id="L125">        return 0;</span>
+    }
+
+    /// Initialize the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `parent`: the associated Form
+    protected void initMenuBar(Form parent) {
+<span class="fc" id="L134">        this.parent = parent;</span>
+<span class="fc" id="L135">        selectMenuItem = createMenuSelectCommand();</span>
+<span class="fc" id="L136">        cancelMenuItem = createMenuCancelCommand();</span>
+<span class="fc" id="L137">        UIManager manager = parent.getUIManager();</span>
+<span class="fc" id="L138">        LookAndFeel lf = manager.getLookAndFeel();</span>
+        //don't minimize the app if it's a Dialog
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">        minimizeOnBack = manager.isThemeConstant(&quot;minimizeOnBackBool&quot;, true) &amp;&amp; !(parent instanceof Dialog);</span>
+<span class="fc" id="L141">        hideEmptyCommands = manager.isThemeConstant(&quot;hideEmptyCommandsBool&quot;, false);</span>
+<span class="fc" id="L142">        menuStyle = manager.getComponentStyle(&quot;Menu&quot;);</span>
+<span class="fc" id="L143">        setUIID(&quot;SoftButton&quot;);</span>
+<span class="fc" id="L144">        menuCommand = new Command(manager.localize(&quot;menu&quot;, &quot;Menu&quot;), lf.getMenuIcons()[2]);</span>
+        // use the slide transition by default
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (lf.getDefaultMenuTransitionIn() != null || lf.getDefaultMenuTransitionOut() != null) {</span>
+<span class="nc" id="L147">            transitionIn = lf.getDefaultMenuTransitionIn();</span>
+<span class="nc" id="L148">            transitionOut = lf.getDefaultMenuTransitionOut();</span>
+        } else {
+<span class="fc" id="L150">            transitionIn = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300, true);</span>
+<span class="fc" id="L151">            transitionOut = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300, true);</span>
+        }
+<span class="fc" id="L153">        menuCellRenderer = lf.getMenuRenderer();</span>
+<span class="fc" id="L154">        int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();</span>
+<span class="fc" id="L155">        thirdSoftButton = Display.getInstance().isThirdSoftButton();</span>
+
+<span class="fc" id="L157">        int commandBehavior = getCommandBehavior();</span>
+<span class="fc bfc" id="L158" title="All 4 branches covered.">        if (softkeyCount &gt; 1 &amp;&amp; commandBehavior &lt; Display.COMMAND_BEHAVIOR_BUTTON_BAR) {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (thirdSoftButton) {</span>
+<span class="nc" id="L160">                setLayout(new GridLayout(1, 3));</span>
+<span class="nc" id="L161">                soft = new Button[]{createSoftButton(&quot;SoftButtonCenter&quot;), createSoftButton(&quot;SoftButtonLeft&quot;), createSoftButton(&quot;SoftButtonRight&quot;)};</span>
+<span class="nc" id="L162">                main = soft[0];</span>
+<span class="nc" id="L163">                left = soft[1];</span>
+<span class="nc" id="L164">                right = soft[2];</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                if (parent.isRTL()) {</span>
+<span class="nc" id="L166">                    right.setUIID(&quot;SoftButtonLeft&quot;);</span>
+<span class="nc" id="L167">                    left.setUIID(&quot;SoftButtonRight&quot;);</span>
+<span class="nc" id="L168">                    addComponent(right);</span>
+<span class="nc" id="L169">                    addComponent(main);</span>
+<span class="nc" id="L170">                    addComponent(left);</span>
+                } else {
+<span class="nc" id="L172">                    addComponent(left);</span>
+<span class="nc" id="L173">                    addComponent(main);</span>
+<span class="nc" id="L174">                    addComponent(right);</span>
+                }
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                if (isReverseSoftButtons()) {</span>
+<span class="nc" id="L177">                    Button b = soft[1];</span>
+<span class="nc" id="L178">                    soft[1] = soft[2];</span>
+<span class="nc" id="L179">                    soft[2] = b;</span>
+<span class="nc" id="L180">                }</span>
+            } else {
+<span class="fc" id="L182">                setLayout(new GridLayout(1, 2));</span>
+<span class="fc" id="L183">                soft = new Button[]{createSoftButton(&quot;SoftButtonLeft&quot;), createSoftButton(&quot;SoftButtonRight&quot;)};</span>
+<span class="fc" id="L184">                main = soft[0];</span>
+<span class="fc" id="L185">                left = soft[0];</span>
+<span class="fc" id="L186">                right = soft[1];</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                if (parent.isRTL()) {</span>
+<span class="fc" id="L188">                    right.setUIID(&quot;SoftButtonLeft&quot;);</span>
+<span class="fc" id="L189">                    left.setUIID(&quot;SoftButtonRight&quot;);</span>
+<span class="fc" id="L190">                    addComponent(right);</span>
+<span class="fc" id="L191">                    addComponent(left);</span>
+                } else {
+<span class="fc" id="L193">                    addComponent(left);</span>
+<span class="fc" id="L194">                    addComponent(right);</span>
+                }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                if (isReverseSoftButtons()) {</span>
+<span class="fc" id="L197">                    Button b = soft[0];</span>
+<span class="fc" id="L198">                    soft[0] = soft[1];</span>
+<span class="fc" id="L199">                    soft[1] = b;</span>
+                }
+            }
+            // It doesn't make sense for softbuttons to have ... at the end
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (Button button : soft) {</span>
+<span class="fc" id="L204">                button.setEndsWith3Points(false);</span>
+            }
+        } else {
+            // special case for touch screens we still want the 3 softbutton areas...
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (thirdSoftButton) {</span>
+<span class="nc" id="L209">                setLayout(new GridLayout(1, 3));</span>
+<span class="nc" id="L210">                soft = new Button[]{createSoftButton(&quot;SoftButtonCenter&quot;), createSoftButton(&quot;SoftButtonLeft&quot;), createSoftButton(&quot;SoftButtonRight&quot;)};</span>
+<span class="nc" id="L211">                main = soft[0];</span>
+<span class="nc" id="L212">                left = soft[1];</span>
+<span class="nc" id="L213">                right = soft[2];</span>
+<span class="nc" id="L214">                addComponent(left);</span>
+<span class="nc" id="L215">                addComponent(main);</span>
+<span class="nc" id="L216">                addComponent(right);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (isReverseSoftButtons()) {</span>
+<span class="nc" id="L218">                    Button b = soft[1];</span>
+<span class="nc" id="L219">                    soft[1] = soft[2];</span>
+<span class="nc" id="L220">                    soft[2] = b;</span>
+<span class="nc" id="L221">                }</span>
+            } else {
+<span class="fc" id="L223">                soft = new Button[]{createSoftButton(&quot;SoftButtonCenter&quot;)};</span>
+            }
+        }
+
+<span class="fc" id="L227">        softCommand = new Command[soft.length];</span>
+<span class="fc" id="L228">    }</span>
+
+    /// This method removes empty softbuttons that don't have a command
+    public void removeEmptySoftbuttons() {
+<span class="pc bpc" id="L232" title="5 of 6 branches missed.">        if (left != null &amp;&amp; left.getParent() != null &amp;&amp; &quot;&quot;.equals(left.getText())) {</span>
+<span class="nc" id="L233">            left.getParent().removeComponent(left);</span>
+<span class="nc" id="L234">            revalidate();</span>
+        }
+<span class="pc bpc" id="L236" title="5 of 6 branches missed.">        if (right != null &amp;&amp; right.getParent() != null &amp;&amp; &quot;&quot;.equals(right.getText())) {</span>
+<span class="nc" id="L237">            right.getParent().removeComponent(right);</span>
+<span class="nc" id="L238">            revalidate();</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+    public int getCommandBehavior() {
+<span class="fc" id="L243">        int i = Display.getInstance().getCommandBehavior();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (Display.getInstance().getImplementation().getSoftkeyCount() == 0) {</span>
+<span class="pc bpc" id="L245" title="4 of 8 branches missed.">            if (i != Display.COMMAND_BEHAVIOR_BUTTON_BAR &amp;&amp; i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK</span>
+                    &amp;&amp; i != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT &amp;&amp; i != Display.COMMAND_BEHAVIOR_ICS) {
+<span class="fc" id="L247">                return Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK;</span>
+            }
+<span class="nc" id="L249">            return i;</span>
+        }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (i == Display.COMMAND_BEHAVIOR_DEFAULT) {</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (Display.getInstance().isTouchScreenDevice()) {</span>
+<span class="fc" id="L253">                return Display.COMMAND_BEHAVIOR_TOUCH_MENU;</span>
+            }
+<span class="nc" id="L255">            return Display.COMMAND_BEHAVIOR_SOFTKEY;</span>
+        }
+<span class="fc" id="L257">        return i;</span>
+    }
+
+    /// Default command is invoked when a user presses fire, this functionality works
+    /// well in some situations but might collide with elements such as navigation
+    /// and combo boxes. Use with caution.
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as default
+    public Command getDefaultCommand() {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (selectCommand != null) {</span>
+<span class="nc" id="L269">            return selectCommand;</span>
+        }
+<span class="fc" id="L271">        return defaultCommand;</span>
+    }
+
+    /// Default command is invoked when a user presses fire, this functionality works
+    /// well in some situations but might collide with elements such as navigation
+    /// and combo boxes. Use with caution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultCommand`: the command to treat as default
+    public void setDefaultCommand(Command defaultCommand) {
+<span class="fc" id="L282">        this.defaultCommand = defaultCommand;</span>
+<span class="fc" id="L283">    }</span>
+
+    /// Indicates the command that is defined as the clear command in this form.
+    /// A clear command can be used both to map to a &quot;clear&quot; hardware button
+    /// if such a button exists.
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as the clear Command
+    public Command getClearCommand() {
+<span class="nc" id="L293">        return clearCommand;</span>
+    }
+
+    /// Indicates the command that is defined as the clear command in this form.
+    /// A clear command can be used both to map to a &quot;clear&quot; hardware button
+    /// if such a button exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clearCommand`: the command to treat as the clear Command
+    public void setClearCommand(Command clearCommand) {
+<span class="nc" id="L304">        this.clearCommand = clearCommand;</span>
+<span class="nc" id="L305">    }</span>
+
+    /// Find the command component instance if such an instance exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the command instance
+    ///
+    /// #### Returns
+    ///
+    /// the button instance
+    public Button findCommandComponent(Command c) {
+<span class="fc" id="L317">        Button b = findCommandComponent(c, this);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="fc" id="L319">            return findCommandComponent(c, getTitleAreaContainer());</span>
+        }
+<span class="fc" id="L321">        return b;</span>
+    }
+
+    private Button findCommandComponent(Command c, Container cnt) {
+<span class="fc" id="L325">        int count = cnt.getComponentCount();</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L327">            Component current = cnt.getComponentAt(iter);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            if (current instanceof Button) {</span>
+<span class="fc" id="L329">                Button b = (Button) current;</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                if (b.getCommand() == c) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L331">                    return b;</span>
+                }
+<span class="fc" id="L333">            } else {</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (current instanceof Container) {</span>
+<span class="nc" id="L335">                    Button b = findCommandComponent(c, (Container) current);</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">                    if (b != null) {</span>
+<span class="nc" id="L337">                        return b;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L342">        return null;</span>
+    }
+
+    void adaptTitleLayoutBackCommandStructure() {
+<span class="nc" id="L346">        Container t = getTitleAreaContainer();</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (t.getComponentCount() - componentCountOffset(t) == 3) {</span>
+<span class="nc" id="L348">            return;</span>
+        }
+<span class="nc" id="L350">        BorderLayout titleLayout = (BorderLayout) t.getLayout();</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (Display.COMMAND_BEHAVIOR_ICS == getCommandBehavior()) {</span>
+<span class="nc" id="L352">            titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+<span class="nc" id="L353">            getTitleComponent().getUnselectedStyle().setAlignment(Component.LEFT, true);</span>
+        } else {
+<span class="nc" id="L355">            titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+        }
+<span class="nc" id="L357">        t.removeAll();</span>
+<span class="nc" id="L358">        t.addComponent(BorderLayout.CENTER, getTitleComponent());</span>
+<span class="nc" id="L359">        Container leftContainer = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L360">        Container rightContainer = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L361">        t.addComponent(BorderLayout.EAST, rightContainer);</span>
+<span class="nc" id="L362">        t.addComponent(BorderLayout.WEST, leftContainer);</span>
+<span class="nc" id="L363">        initTitleBarStatus();</span>
+<span class="nc" id="L364">    }</span>
+
+    private Container findLeftTitleContainer() {
+<span class="nc" id="L367">        Component cmp = ((BorderLayout) getTitleAreaContainer().getLayout()).getWest();</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L369">            return (Container) cmp;</span>
+        }
+<span class="nc" id="L371">        return null;</span>
+    }
+
+    private Container findRightTitleContainer() {
+<span class="nc" id="L375">        return (Container) ((BorderLayout) getTitleAreaContainer().getLayout()).getEast();</span>
+    }
+
+    private void updateTitleCommandPlacement() {
+<span class="fc" id="L379">        int commandBehavior = getCommandBehavior();</span>
+<span class="fc" id="L380">        Container t = getTitleAreaContainer();</span>
+<span class="fc" id="L381">        BorderLayout titleLayout = (BorderLayout) t.getLayout();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (getParent() == null) {</span>
+<span class="fc" id="L383">            installMenuBar();</span>
+        } else {
+<span class="pc bpc" id="L385" title="5 of 6 branches missed.">            if (getParent() == getTitleAreaContainer() &amp;&amp; commandBehavior != Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT //NOPMD CompareObjectsWithEquals</span>
+                    &amp;&amp; commandBehavior != Display.COMMAND_BEHAVIOR_ICS) {
+<span class="nc" id="L387">                getParent().removeComponent(this);</span>
+<span class="nc" id="L388">                installMenuBar();</span>
+            }
+        }
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (!(parent instanceof Dialog)) {</span>
+<span class="pc bpc" id="L392" title="2 of 6 branches missed.">            if ((commandBehavior == Display.COMMAND_BEHAVIOR_ICS ||</span>
+                    commandBehavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION ||
+                    commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)
+<span class="pc bpc" id="L395" title="2 of 4 branches missed.">                    &amp;&amp; parent.getTitle() != null &amp;&amp; parent.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L396">                synchronizeCommandsWithButtonsInBackbutton();</span>
+
+<span class="nc" id="L398">                return;</span>
+            } else {
+<span class="pc bpc" id="L400" title="2 of 4 branches missed.">                if (commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT</span>
+                        || commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK) {
+<span class="nc bnc" id="L402" title="All 2 branches missed.">                    if (getParent() != null) {</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                        if (getParent() == getTitleAreaContainer()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L404">                            return;</span>
+                        }
+<span class="nc" id="L406">                        getParent().removeComponent(this);</span>
+                    }
+                    //getTitleAreaContainer().addComponent(BorderLayout.EAST, findRightTitleContainer());
+<span class="nc" id="L409">                    return;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (t.getComponentCount() - componentCountOffset(t) &gt; 1) {</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            if (Display.COMMAND_BEHAVIOR_ICS == getCommandBehavior()) {</span>
+<span class="nc" id="L415">                titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+            } else {
+<span class="nc" id="L417">                titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+            }
+<span class="nc" id="L419">            Component l = getTitleComponent();</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            if (l.getParent() != null) {</span>
+<span class="nc" id="L421">                l.getParent().removeComponent(l);</span>
+            }
+<span class="nc" id="L423">            t.removeAll();</span>
+<span class="nc" id="L424">            t.addComponent(BorderLayout.CENTER, l);</span>
+<span class="nc" id="L425">            initTitleBarStatus();</span>
+        }
+<span class="fc" id="L427">    }</span>
+
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+    ///
+    /// #### Returns
+    ///
+    /// the command to treat as the back Command
+    public Command getBackCommand() {
+<span class="fc" id="L438">        return backCommand;</span>
+    }
+
+    /// Indicates the command that is defined as the back command out of this form.
+    /// A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
+    /// and by elements such as transitions etc. to change the behavior based on
+    /// direction (e.g. slide to the left to enter screen and slide to the right to exit with back).
+    ///
+    /// #### Parameters
+    ///
+    /// - `backCommand`: the command to treat as the back Command
+    public void setBackCommand(Command backCommand) {
+<span class="fc" id="L450">        this.backCommand = backCommand;</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        if (parent.getToolbar() != null) {</span>
+<span class="fc" id="L452">            return;</span>
+        }
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">        if (backCommand != null &amp;&amp; UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false)) {</span>
+<span class="nc" id="L455">            removeCommand(backCommand);</span>
+        }
+
+<span class="fc" id="L458">        int b = getCommandBehavior();</span>
+<span class="pc bpc" id="L459" title="1 of 4 branches missed.">        if (b == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || b == Display.COMMAND_BEHAVIOR_ICS</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                || Display.getInstance().isNativeTitle()) {</span>
+<span class="fc" id="L461">            int i = commands.indexOf(backCommand);</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">            if (i &gt; -1) {</span>
+<span class="nc" id="L463">                commands.removeElementAt(i);</span>
+            }
+        }
+<span class="fc" id="L466">        updateTitleCommandPlacement();</span>
+<span class="fc" id="L467">    }</span>
+
+    /// The selectCommand is the command to invoke when a Component has foucs in
+    /// Third Soft Button state.
+    ///
+    /// #### Returns
+    ///
+    /// the select command
+    public Command getSelectCommand() {
+<span class="fc" id="L476">        return selectCommand;</span>
+    }
+
+    /// Sets the select command
+    ///
+    /// #### Parameters
+    ///
+    /// - `selectCommand`
+    public void setSelectCommand(Command selectCommand) {
+<span class="fc" id="L485">        this.selectCommand = selectCommand;</span>
+<span class="fc" id="L486">    }</span>
+
+    /// Updates the command mapping to the softbuttons
+    private void updateCommands() {
+<span class="fc" id="L490">        int commandBehavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {</span>
+            // Reachable only where the platform really has a menu bar:
+            // CodenameOneImplementation.setCommandBehavior normalises NATIVE away on a
+            // platform that does not, because returning here without one drops every
+            // command silently.
+<span class="nc" id="L496">            Display.getInstance().getImplementation().setNativeCommands(commands);</span>
+<span class="nc" id="L497">            return;</span>
+        }
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (commandBehavior &gt;= Display.COMMAND_BEHAVIOR_BUTTON_BAR) {</span>
+<span class="fc" id="L500">            return;</span>
+        }
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (soft.length &gt; 1) {</span>
+<span class="fc" id="L503">            soft[0].setText(&quot;&quot;);</span>
+<span class="fc" id="L504">            soft[1].setText(&quot;&quot;);</span>
+<span class="fc" id="L505">            soft[0].setIcon(null);</span>
+<span class="fc" id="L506">            soft[1].setIcon(null);</span>
+<span class="fc" id="L507">            int commandSize = getCommandCount();</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">            if (soft.length &gt; 2) {</span>
+<span class="nc" id="L509">                soft[2].setText(&quot;&quot;);</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">                if (commandSize &gt; 2) {</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                    if (commandSize &gt; 3) {</span>
+<span class="nc" id="L512">                        softCommand[2] = menuCommand;</span>
+                    } else {
+<span class="nc" id="L514">                        softCommand[2] = getCommand(getCommandCount() - 3);</span>
+                    }
+<span class="nc" id="L516">                    soft[2].setText(softCommand[2].getCommandName());</span>
+<span class="nc" id="L517">                    soft[2].setIcon(softCommand[2].getIcon());</span>
+                } else {
+<span class="nc" id="L519">                    softCommand[2] = null;</span>
+                }
+            }
+<span class="fc bfc" id="L522" title="All 2 branches covered.">            if (commandSize &gt; 0) {</span>
+<span class="fc" id="L523">                softCommand[0] = getCommand(getCommandCount() - 1);</span>
+<span class="fc" id="L524">                soft[0].setText(softCommand[0].getCommandName());</span>
+<span class="fc" id="L525">                soft[0].setIcon(softCommand[0].getIcon());</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">                if (commandSize &gt; 1) {</span>
+<span class="pc bpc" id="L527" title="2 of 4 branches missed.">                    if (soft.length == 2 &amp;&amp; commandSize &gt; 2) {</span>
+<span class="nc" id="L528">                        softCommand[1] = menuCommand;</span>
+                    } else {
+<span class="fc" id="L530">                        softCommand[1] = getCommand(getCommandCount() - 2);</span>
+                    }
+<span class="fc" id="L532">                    soft[1].setText(softCommand[1].getCommandName());</span>
+<span class="fc" id="L533">                    soft[1].setIcon(softCommand[1].getIcon());</span>
+                } else {
+<span class="fc" id="L535">                    softCommand[1] = null;</span>
+                }
+            } else {
+<span class="fc" id="L538">                softCommand[0] = null;</span>
+<span class="fc" id="L539">                softCommand[1] = null;</span>
+            }
+
+            // we need to add the menu bar to an already visible form
+<span class="fc bfc" id="L543" title="All 2 branches covered.">            if (commandSize == 1) {</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">                if (parent.isVisible()) {</span>
+<span class="fc" id="L545">                    parent.revalidate();</span>
+                }
+            }
+<span class="fc" id="L548">            repaint();</span>
+        }
+<span class="fc" id="L550">    }</span>
+
+    /// Invoked when a softbutton is pressed
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        if (evt.isConsumed()) {</span>
+<span class="nc" id="L556">            return;</span>
+        }
+<span class="nc" id="L558">        Object src = evt.getSource();</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        if (commandList == null) {</span>
+<span class="nc" id="L560">            Button source = (Button) src;</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">            for (int iter = 0; iter &lt; soft.length; iter++) {</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                if (source == soft[iter]) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    if (softCommand[iter] == menuCommand) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L564">                        showMenu();</span>
+<span class="nc" id="L565">                        return;</span>
+                    }
+<span class="nc bnc" id="L567" title="All 2 branches missed.">                    if (softCommand[iter] != null) {</span>
+<span class="nc" id="L568">                        ActionEvent e = new ActionEvent(softCommand[iter], ActionEvent.Type.Command);</span>
+<span class="nc" id="L569">                        softCommand[iter].actionPerformed(e);</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                        if (!e.isConsumed()) {</span>
+<span class="nc" id="L571">                            parent.actionCommandImpl(softCommand[iter]);</span>
+                        }
+                    }
+<span class="nc" id="L574">                    return;</span>
+                }
+            }
+<span class="nc" id="L577">        } else {</span>
+            // the list for the menu sent the event
+<span class="nc bnc" id="L579" title="All 2 branches missed.">            if (src instanceof Button) {</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">                for (int iter = 0; iter &lt; soft.length; iter++) {</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">                    if (soft[iter].equals(src)) {</span>
+<span class="nc" id="L582">                        Container parent = commandList.getParent();</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">                        while (parent != null) {</span>
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                            if (parent instanceof Dialog) {</span>
+<span class="nc" id="L585">                                ((Dialog) parent).actionCommand(softCommand[iter]);</span>
+<span class="nc" id="L586">                                return;</span>
+                            }
+<span class="nc" id="L588">                            parent = parent.getParent();</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L593">            Command c = getComponentSelectedCommand(commandList);</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">            if (!c.isEnabled()) {</span>
+<span class="nc" id="L595">                return;</span>
+            }
+<span class="nc" id="L597">            Container p = commandList.getParent();</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">            while (p != null) {</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">                if (p instanceof Dialog) {</span>
+<span class="nc" id="L600">                    ((Dialog) p).actionCommand(c);</span>
+<span class="nc" id="L601">                    return;</span>
+                }
+<span class="nc" id="L603">                p = p.getParent();</span>
+            }
+        }
+
+<span class="nc" id="L607">    }</span>
+
+    /// Creates a soft button Component
+    ///
+    /// #### Returns
+    ///
+    /// the softbutton component
+    protected Button createSoftButton(String uiid) {
+<span class="fc" id="L615">        Button b = new Button();</span>
+<span class="fc" id="L616">        b.setUIID(uiid);</span>
+<span class="fc" id="L617">        b.addActionListener(this);</span>
+<span class="fc" id="L618">        b.setFocusable(false);</span>
+<span class="fc" id="L619">        b.setTactileTouch(true);</span>
+<span class="fc" id="L620">        updateSoftButtonStyle(b);</span>
+<span class="fc" id="L621">        return b;</span>
+    }
+
+    private void updateSoftButtonStyle(Button b) {
+<span class="fc" id="L625">        int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">        if (softkeyCount &lt; 2) {</span>
+<span class="fc" id="L627">            b.getStyle().setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L628">            b.getStyle().setPadding(0, 0, 0, 0);</span>
+        }
+<span class="fc" id="L630">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setUnselectedStyle(Style style) {
+<span class="fc" id="L635">        style.setMargin(Component.TOP, 0, true);</span>
+<span class="fc" id="L636">        style.setMargin(Component.BOTTOM, 0, true);</span>
+<span class="fc" id="L637">        super.setUnselectedStyle(style);</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">        if (soft != null) {</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">            for (Button button : soft) {</span>
+<span class="fc" id="L640">                updateSoftButtonStyle(button);</span>
+            }
+        }
+<span class="fc" id="L643">    }</span>
+
+    /// Prevents scaling down of the menu when there is no text on the menu bar
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L648" title="All 2 branches covered.">        if (soft.length &gt; 1) {</span>
+<span class="fc" id="L649">            Dimension d = super.calcPreferredSize();</span>
+<span class="pc bpc" id="L650" title="1 of 4 branches missed.">            if ((soft[0].getText() == null || &quot;&quot;.equals(soft[0].getText()))</span>
+<span class="pc bpc" id="L651" title="2 of 4 branches missed.">                    &amp;&amp; (soft[1].getText() == null || &quot;&quot;.equals(soft[1].getText()))</span>
+<span class="pc bpc" id="L652" title="3 of 6 branches missed.">                    &amp;&amp; soft[0].getIcon() == null &amp;&amp; soft[1].getIcon() == null</span>
+                    &amp;&amp; (soft.length &lt; 3
+<span class="nc bnc" id="L654" title="All 6 branches missed.">                    || ((soft[2].getText() == null || &quot;&quot;.equals(soft[2].getText())) &amp;&amp; soft[2].getIcon() == null))) {</span>
+<span class="fc" id="L655">                d.setHeight(0);</span>
+            }
+<span class="fc" id="L657">            return d;</span>
+        }
+<span class="fc" id="L659">        return super.calcPreferredSize();</span>
+    }
+
+    /// Sets the menu transitions for showing/hiding the menu, can be null...
+    public void setTransitions(Transition transitionIn, Transition transitionOut) {
+<span class="fc" id="L664">        this.transitionIn = transitionIn;</span>
+<span class="fc" id="L665">        this.transitionOut = transitionOut;</span>
+<span class="fc" id="L666">    }</span>
+
+    /// This method will return true if the menu dialog is currently displaying
+    ///
+    /// #### Returns
+    ///
+    /// true of the menu dialog is displaying
+    public boolean isMenuShowing() {
+<span class="fc" id="L674">        return menuDisplaying;</span>
+    }
+
+    /// This method shows the menu on the Form.
+    /// The method creates a Dialog with the commands and calls showMenuDialog.
+    /// The method blocks until the user dispose the dialog.
+    public void showMenu() {
+<span class="nc" id="L681">        final Dialog d = new Dialog(&quot;Menu&quot;, &quot;&quot;);</span>
+<span class="nc" id="L682">        d.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc" id="L683">        d.setMenu(true);</span>
+<span class="nc" id="L684">        d.addOrientationListener(new MenuDisposerActionListener(d));</span>
+<span class="nc" id="L685">        d.setTransitionInAnimator(transitionIn);</span>
+<span class="nc" id="L686">        d.setTransitionOutAnimator(transitionOut);</span>
+<span class="nc" id="L687">        d.setLayout(new BorderLayout());</span>
+<span class="nc" id="L688">        d.setScrollable(false);</span>
+        //calling parent.createCommandComponent is done only for backward
+        //compatability reasons, in the next version this call be replaced with
+        //calling directly to createCommandComponent
+<span class="nc" id="L692">        d.getMenuBar().commandList = createCommandComponent(commands);</span>
+<span class="nc bnc" id="L693" title="All 4 branches missed.">        if (menuCellRenderer != null &amp;&amp; d.getMenuBar().commandList instanceof List) {</span>
+<span class="nc" id="L694">            ((List) d.getMenuBar().commandList).setListCellRenderer(menuCellRenderer);</span>
+        }
+<span class="nc" id="L696">        d.getContentPane().getStyle().setMargin(0, 0, 0, 0);</span>
+<span class="nc" id="L697">        d.addComponent(BorderLayout.CENTER, d.getMenuBar().commandList);</span>
+<span class="nc bnc" id="L698" title="All 2 branches missed.">        if (thirdSoftButton) {</span>
+<span class="nc" id="L699">            d.addCommand(selectMenuItem);</span>
+<span class="nc" id="L700">            d.addCommand(cancelMenuItem);</span>
+        } else {
+<span class="nc" id="L702">            d.addCommand(cancelMenuItem);</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">            if (soft.length &gt; 1) {</span>
+<span class="nc" id="L704">                d.addCommand(selectMenuItem);</span>
+            }
+        }
+<span class="nc" id="L707">        d.setClearCommand(cancelMenuItem);</span>
+<span class="nc" id="L708">        d.setBackCommand(cancelMenuItem);</span>
+
+<span class="nc bnc" id="L710" title="All 2 branches missed.">        if (d.getMenuBar().commandList instanceof List) {</span>
+<span class="nc" id="L711">            ((List) d.getMenuBar().commandList).addActionListener(d.getMenuBar());</span>
+        }
+<span class="nc" id="L713">        menuDisplaying = true;</span>
+<span class="nc" id="L714">        Command result = showMenuDialog(d);</span>
+<span class="nc" id="L715">        menuDisplaying = false;</span>
+<span class="nc bnc" id="L716" title="All 2 branches missed.">        if (result != cancelMenuItem) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L717">            Command c = null;</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">            if (result == selectMenuItem) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L719">                c = getComponentSelectedCommand(d.getMenuBar().commandList);</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">                if (c != null) {</span>
+<span class="nc" id="L721">                    ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);</span>
+<span class="nc" id="L722">                    c.actionPerformed(e);</span>
+<span class="nc" id="L723">                }</span>
+            } else {
+<span class="nc" id="L725">                c = result;</span>
+                // a touch menu will always send its commands on its own...
+<span class="nc bnc" id="L727" title="All 4 branches missed.">                if (!isTouchMenus() &amp;&amp; c != null) {</span>
+<span class="nc" id="L728">                    ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);</span>
+<span class="nc" id="L729">                    c.actionPerformed(e);</span>
+                }
+            }
+            // menu item was handled internally in a touch interface that is not a touch menu
+<span class="nc bnc" id="L733" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L734">                parent.actionCommandImpl(c);</span>
+            }
+        }
+<span class="nc bnc" id="L737" title="All 2 branches missed.">        if (d.getMenuBar().commandList instanceof List) {</span>
+<span class="nc" id="L738">            ((List) d.getMenuBar().commandList).removeActionListener(d.getMenuBar());</span>
+        }
+
+<span class="nc" id="L741">        Form upcoming = Display.getInstance().getCurrentUpcoming();</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">        if (upcoming == parent) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L743">            d.disposeImpl();</span>
+        } else {
+<span class="nc" id="L745">            parent.tint = (upcoming instanceof Dialog);</span>
+        }
+<span class="nc" id="L747">    }</span>
+
+    Button[] getSoftButtons() {
+<span class="fc" id="L750">        return soft;</span>
+    }
+
+    private void updateBackBorderToRTL(Style s) {
+<span class="nc" id="L754">        Border b = s.getBorder();</span>
+<span class="nc bnc" id="L755" title="All 2 branches missed.">        if (b != null) {</span>
+<span class="nc" id="L756">            b = b.mirrorBorder();</span>
+<span class="nc" id="L757">            s.setBorder(b);</span>
+        }
+<span class="nc" id="L759">    }</span>
+
+    void verifyBackCommandRTL(Button bg) {
+<span class="nc bnc" id="L762" title="All 4 branches missed.">        if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK &amp;&amp; isRTL()) {</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">            if (bg.getClientProperty(&quot;$cn1BackRTL&quot;) == null) {</span>
+<span class="nc" id="L764">                bg.putClientProperty(&quot;$cn1BackRTL&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L765">                updateBackBorderToRTL(bg.getUnselectedStyle());</span>
+<span class="nc" id="L766">                updateBackBorderToRTL(bg.getSelectedStyle());</span>
+<span class="nc" id="L767">                updateBackBorderToRTL(bg.getPressedStyle());</span>
+            }
+        }
+<span class="nc" id="L770">    }</span>
+
+    private void addTwoTitleButtons(Container leftContainer, Container rightContainer) {
+<span class="nc" id="L773">        ensureCommandsInContainer(getCommand(0), null, rightContainer, &quot;TitleCommand&quot;, null);</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">        if (parent.getBackCommand() != null) {</span>
+<span class="nc" id="L775">            ensureCommandsInContainer(parent.getBackCommand(), null, leftContainer, &quot;BackCommand&quot;, null);</span>
+<span class="nc" id="L776">            updateGridCommands(1);</span>
+        } else {
+<span class="nc bnc" id="L778" title="All 2 branches missed.">            if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L779">                ensureCommandsInContainer(getCommand(1), null, rightContainer, &quot;TitleCommand&quot;, null);</span>
+            } else {
+<span class="nc" id="L781">                ensureCommandsInContainer(getCommand(1), null, leftContainer, &quot;TitleCommand&quot;, null);</span>
+            }
+<span class="nc" id="L783">            updateGridCommands(2);</span>
+        }
+<span class="nc" id="L785">    }</span>
+
+    private void updateGridCommands(int startOffset) {
+<span class="nc" id="L788">        int cmdCount = getCommandCount() - startOffset;</span>
+<span class="nc bnc" id="L789" title="All 4 branches missed.">        if (cmdCount &lt;= 0 || getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L790">            return;</span>
+        }
+<span class="nc" id="L792">        setLayout(new GridLayout(1, cmdCount));</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">        while (cmdCount &lt; getComponentCount()) {</span>
+<span class="nc" id="L794">            removeComponent(getComponentAt(getComponentCount() - 1));</span>
+        }
+<span class="nc" id="L796">        int off = startOffset;</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">        while (getComponentCount() &lt; cmdCount) {</span>
+<span class="nc" id="L798">            Button btn = new Button(getCommand(off));</span>
+<span class="nc" id="L799">            btn.setUIID(&quot;TouchCommand&quot;);</span>
+<span class="nc" id="L800">            off++;</span>
+<span class="nc" id="L801">            addComponent(btn);</span>
+<span class="nc" id="L802">        }</span>
+<span class="nc bnc" id="L803" title="All 2 branches missed.">        for (int iter = 0; iter &lt; cmdCount; iter++) {</span>
+<span class="nc" id="L804">            Button btn = (Button) getComponentAt(iter);</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">            if (btn.getCommand() != getCommand(iter + startOffset)) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L806">                btn.setCommand(getCommand(iter + startOffset));</span>
+            }
+        }
+<span class="nc" id="L809">    }</span>
+
+    protected Button createBackCommandButton() {
+<span class="nc" id="L812">        Button back = new Button(parent.getBackCommand());</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">        if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L814">            back.setText(&quot;&lt;&quot;);</span>
+<span class="nc" id="L815">            back.setIcon(null);</span>
+        }
+<span class="nc" id="L817">        return back;</span>
+    }
+
+    void synchronizeCommandsWithButtonsInBackbutton() {
+<span class="nc" id="L821">        adaptTitleLayoutBackCommandStructure();</span>
+<span class="nc" id="L822">        Container leftContainer = findLeftTitleContainer();</span>
+
+<span class="nc bnc" id="L824" title="All 4 branches missed.">        if (leftContainer == null &amp;&amp; getCommandBehavior() == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {</span>
+<span class="nc" id="L825">            return;</span>
+        }
+
+<span class="nc" id="L828">        Container rightContainer = findRightTitleContainer();</span>
+
+<span class="nc" id="L830">        int componentCount = getCommandCount();</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">        if (parent.getBackCommand() != null &amp;&amp;</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                (!UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false) ||</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">                        UIManager.getInstance().isThemeConstant(&quot;showBackCommandOnTitleBool&quot;, false))) {</span>
+<span class="nc bnc" id="L834" title="All 2 branches missed.">            if (leftContainer.getComponentCount() - componentCountOffset(leftContainer) &lt;= 0) {</span>
+<span class="nc" id="L835">                Button back = createBackCommandButton();</span>
+<span class="nc" id="L836">                leftContainer.addComponent(back);</span>
+<span class="nc bnc" id="L837" title="All 2 branches missed.">                if (!back.getUIID().startsWith(&quot;BackCommand&quot;)) {</span>
+<span class="nc" id="L838">                    back.setUIID(&quot;BackCommand&quot;);</span>
+                }
+<span class="nc" id="L840">                hideEmptyCommand(back);</span>
+<span class="nc" id="L841">                verifyBackCommandRTL(back);</span>
+<span class="nc" id="L842">            } else {</span>
+<span class="nc" id="L843">                Button b = (Button) leftContainer.getComponentAt(0);</span>
+<span class="nc bnc" id="L844" title="All 2 branches missed.">                if (b.getCommand() != parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L845">                    b.setCommand(parent.getBackCommand());</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">                    if (!b.getUIID().startsWith(&quot;BackCommand&quot;)) {</span>
+<span class="nc" id="L847">                        b.setUIID(&quot;BackCommand&quot;);</span>
+                    }
+<span class="nc" id="L849">                    verifyBackCommandRTL(b);</span>
+<span class="nc" id="L850">                    hideEmptyCommand(b);</span>
+                }
+            }
+<span class="nc" id="L853">            componentCount++;</span>
+        }
+
+<span class="nc bnc" id="L856" title="All 5 branches missed.">        switch (componentCount) {</span>
+            case 0:
+<span class="nc" id="L858">                leftContainer.removeAll();</span>
+<span class="nc" id="L859">                rightContainer.removeAll();</span>
+<span class="nc" id="L860">                removeAll();</span>
+<span class="nc" id="L861">                initTitleBarStatus();</span>
+<span class="nc" id="L862">                break;</span>
+            case 1:
+<span class="nc bnc" id="L864" title="All 2 branches missed.">                if (parent.getBackCommand() != null) {</span>
+<span class="nc" id="L865">                    rightContainer.removeAll();</span>
+<span class="nc" id="L866">                    ensureCommandsInContainer(parent.getBackCommand(), null, leftContainer, &quot;BackCommand&quot;, null);</span>
+                } else {
+<span class="nc" id="L868">                    leftContainer.removeAll();</span>
+<span class="nc" id="L869">                    ensureCommandsInContainer(getCommand(0), null, rightContainer, &quot;TitleCommand&quot;, null);</span>
+                }
+<span class="nc bnc" id="L871" title="All 2 branches missed.">                if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L872">                    removeAll();</span>
+<span class="nc" id="L873">                    initTitleBarStatus();</span>
+                }
+                break;
+            case 2:
+<span class="nc" id="L877">                addTwoTitleButtons(leftContainer, rightContainer);</span>
+<span class="nc" id="L878">                break;</span>
+            case 3:
+<span class="nc bnc" id="L880" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc bnc" id="L881" title="All 2 branches missed.">                    if (parent.getBackCommand() != null) {</span>
+                        //ensureCommandsInContainer(getCommand(1), getCommand(0), rightContainer, &quot;TitleCommand&quot;, &quot;TitleCommand&quot;);
+<span class="nc" id="L883">                        ensureCommandsInContainer(parent.getBackCommand(), null, leftContainer, &quot;BackCommand&quot;, null);</span>
+                    }
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                    if (getCommandBehavior() != Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L886">                        removeAll();</span>
+<span class="nc" id="L887">                        initTitleBarStatus();</span>
+                    }
+                } else {
+<span class="nc" id="L890">                    addTwoTitleButtons(leftContainer, rightContainer);</span>
+<span class="nc" id="L891">                    break;</span>
+                }
+            default:
+<span class="nc bnc" id="L894" title="All 2 branches missed.">                if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L895">                    rightContainer.removeAll();</span>
+<span class="nc" id="L896">                    Image i = UIManager.getInstance().getThemeImageConstant(&quot;menuImage&quot;);</span>
+<span class="nc bnc" id="L897" title="All 2 branches missed.">                    if (i == null) {</span>
+                        //i = Resources.getSystemResource().getImage(&quot;of_menu.png&quot;);
+<span class="nc" id="L899">                        i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, getUIManager().getComponentStyle(&quot;TouchCommand&quot;));</span>
+                    }
+<span class="nc" id="L901">                    Button menu = createTouchCommandButton(new Command(&quot;&quot;, i) {</span>
+
+                        @Override
+                        public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L905">                            showMenu();</span>
+<span class="nc" id="L906">                        }</span>
+                    });
+                    //rightContainer.addComponent(createTouchCommandButton(getCommand(0)));
+                    //rightContainer.addComponent(createTouchCommandButton(getCommand(1)));
+<span class="nc" id="L910">                    rightContainer.addComponent(menu);</span>
+<span class="nc" id="L911">                    rightContainer.revalidate();</span>
+<span class="nc" id="L912">                } else {</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">                    if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L914">                        ensureCommandsInContainer(getCommand(0), getCommand(2), rightContainer, &quot;TitleCommand&quot;, &quot;TitleCommand&quot;);</span>
+<span class="nc bnc" id="L915" title="All 2 branches missed.">                        if (parent.getBackCommand() != null) {</span>
+<span class="nc" id="L916">                            ensureCommandsInContainer(parent.getBackCommand(), getCommand(1), leftContainer, &quot;BackCommand&quot;, &quot;TitleCommand&quot;);</span>
+<span class="nc" id="L917">                            updateGridCommands(3);</span>
+                        } else {
+<span class="nc" id="L919">                            ensureCommandsInContainer(getCommand(1), getCommand(3), leftContainer, &quot;TitleCommand&quot;, &quot;TitleCommand&quot;);</span>
+<span class="nc" id="L920">                            updateGridCommands(4);</span>
+                        }
+                    } else {
+<span class="nc" id="L923">                        addTwoTitleButtons(leftContainer, rightContainer);</span>
+                    }
+                }
+                break;
+        }
+<span class="nc" id="L928">    }</span>
+
+    void hideEmptyCommand(Button b) {
+<span class="nc bnc" id="L931" title="All 2 branches missed.">        if (hideEmptyCommands) {</span>
+<span class="nc bnc" id="L932" title="All 4 branches missed.">            if (b.getText() == null || b.getText().length() == 0) {</span>
+<span class="nc" id="L933">                b.setUIID(&quot;Container&quot;);</span>
+            }
+        }
+<span class="nc" id="L936">    }</span>
+
+    private void ensureCommandsInContainer(Command a, Command b, Container c, String styleA, String styleB) {
+<span class="nc bnc" id="L939" title="All 2 branches missed.">        if (c.getComponentCount() - componentCountOffset(c) == 0) {</span>
+<span class="nc" id="L940">            Button btn = new Button(a);</span>
+<span class="nc bnc" id="L941" title="All 2 branches missed.">            if (!btn.getUIID().startsWith(styleA)) {</span>
+<span class="nc" id="L942">                btn.setUIID(styleA);</span>
+            }
+<span class="nc" id="L944">            c.addComponent(btn);</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L946">                btn = new Button(b);</span>
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                if (!btn.getUIID().equals(styleB)) {</span>
+<span class="nc" id="L948">                    btn.setUIID(styleB);</span>
+                }
+<span class="nc" id="L950">                c.addComponent(btn);</span>
+            }
+<span class="nc" id="L952">            hideEmptyCommand(btn);</span>
+<span class="nc" id="L953">            return;</span>
+        }
+<span class="nc bnc" id="L955" title="All 2 branches missed.">        if (c.getComponentCount() - componentCountOffset(c) == 1) {</span>
+<span class="nc" id="L956">            Button btn = (Button) c.getComponentAt(0);</span>
+<span class="nc bnc" id="L957" title="All 2 branches missed.">            if (!btn.getUIID().equals(styleA)) {</span>
+<span class="nc" id="L958">                btn.setUIID(styleA);</span>
+            }
+<span class="nc bnc" id="L960" title="All 2 branches missed.">            if (btn.getCommand() != a) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L961">                btn.setCommand(a);</span>
+            }
+<span class="nc bnc" id="L963" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L964">                btn = new Button(b);</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">                if (!btn.getUIID().equals(styleB)) {</span>
+<span class="nc" id="L966">                    btn.setUIID(styleB);</span>
+                }
+<span class="nc" id="L968">                c.addComponent(btn);</span>
+            }
+<span class="nc" id="L970">            hideEmptyCommand(btn);</span>
+<span class="nc" id="L971">            return;</span>
+        }
+<span class="nc bnc" id="L973" title="All 2 branches missed.">        if (c.getComponentCount() - componentCountOffset(c) == 2) {</span>
+<span class="nc" id="L974">            Button btn = (Button) c.getComponentAt(0);</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">            if (!btn.getUIID().equals(styleA)) {</span>
+<span class="nc" id="L976">                btn.setUIID(styleA);</span>
+            }
+<span class="nc bnc" id="L978" title="All 2 branches missed.">            if (btn.getCommand() != a) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L979">                btn.setCommand(a);</span>
+            }
+<span class="nc" id="L981">            hideEmptyCommand(btn);</span>
+<span class="nc bnc" id="L982" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L983">                btn = (Button) c.getComponentAt(1);</span>
+<span class="nc bnc" id="L984" title="All 2 branches missed.">                if (!btn.getUIID().equals(styleB)) {</span>
+<span class="nc" id="L985">                    btn.setUIID(styleB);</span>
+                }
+<span class="nc bnc" id="L987" title="All 2 branches missed.">                if (btn.getCommand() != b) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L988">                    btn.setCommand(b);</span>
+                }
+<span class="nc" id="L990">                hideEmptyCommand(btn);</span>
+            } else {
+<span class="nc" id="L992">                c.removeComponent(c.getComponentAt(1));</span>
+            }
+        }
+<span class="nc" id="L995">    }</span>
+
+    /// Adds a Command to the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to add
+    public void addCommand(Command cmd) {
+        // prevent duplicate commands which might happen in some edge cases
+        // with the select command
+<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">        if (commands.contains(cmd)) {</span>
+<span class="nc" id="L1006">            return;</span>
+        }
+
+<span class="pc bpc" id="L1009" title="3 of 4 branches missed.">        if (getBackCommand() == cmd &amp;&amp; UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false)) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1010">            return;</span>
+        }
+
+        // special case for default commands which are placed at the end and aren't overriden later
+<span class="pc bpc" id="L1014" title="3 of 4 branches missed.">        if (soft.length &gt; 2 &amp;&amp; cmd == parent.getDefaultCommand()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1015">            commands.addElement(cmd);</span>
+        } else {
+<span class="fc" id="L1017">            commands.insertElementAt(cmd, 0);</span>
+        }
+
+<span class="pc bpc" id="L1020" title="1 of 2 branches missed.">        if (!(parent instanceof Dialog)) {</span>
+<span class="fc" id="L1021">            int behavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1022" title="2 of 8 branches missed.">            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK</span>
+                    || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT || behavior == Display.COMMAND_BEHAVIOR_ICS) {
+<span class="pc bpc" id="L1024" title="3 of 4 branches missed.">                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK &amp;&amp; (cmd == parent.getBackCommand() //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">                        || findCommandComponent(cmd) != null)) {</span>
+<span class="nc" id="L1026">                    return;</span>
+                }
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">                if (parent.getBackCommand() != cmd) { //NOPMD CompareObjectsWithEquals</span>
+<span class="pc bpc" id="L1029" title="1 of 2 branches missed.">                    if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)</span>
+<span class="nc bnc" id="L1030" title="All 4 branches missed.">                            &amp;&amp; parent.getTitle() != null &amp;&amp; parent.getTitle().length() &gt; 0) {</span>
+<span class="nc" id="L1031">                        synchronizeCommandsWithButtonsInBackbutton();</span>
+<span class="nc" id="L1032">                        return;</span>
+                    }
+
+<span class="fc" id="L1035">                    setLayout(new GridLayout(1, getCommandCount()));</span>
+<span class="fc" id="L1036">                    addComponent(createTouchCommandButton(cmd));</span>
+                } else {
+<span class="nc" id="L1038">                    commands.removeElement(cmd);</span>
+                }
+<span class="fc" id="L1040">                return;</span>
+            }
+        }
+
+<span class="fc" id="L1044">        updateCommands();</span>
+<span class="fc" id="L1045">    }</span>
+
+    /// Returns the command occupying the given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: offset of the command
+    ///
+    /// #### Returns
+    ///
+    /// the command at the given index
+    public Command getCommand(int index) {
+<span class="pc bpc" id="L1057" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= commands.size()) {</span>
+<span class="nc" id="L1058">            return null;</span>
+        }
+<span class="fc" id="L1060">        return (Command) commands.elementAt(index);</span>
+    }
+
+    /// Returns number of commands
+    ///
+    /// #### Returns
+    ///
+    /// number of commands
+    public int getCommandCount() {
+<span class="fc" id="L1069">        return commands.size();</span>
+    }
+
+    /// Add a Command to the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to Add
+    ///
+    /// - `index`: determines the order of the added commands
+    protected void addCommand(Command cmd, int index) {
+<span class="pc bpc" id="L1080" title="1 of 4 branches missed.">        if (getCommandCount() == 0 &amp;&amp; parent != null) {</span>
+<span class="fc" id="L1081">            installMenuBar();</span>
+        }
+        // prevent duplicate commands which might happen in some edge cases
+        // with the select command
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">        if (commands.contains(cmd)) {</span>
+<span class="nc" id="L1086">            return;</span>
+        }
+<span class="fc" id="L1088">        commands.insertElementAt(cmd, index);</span>
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">        if (!(parent instanceof Dialog)) {</span>
+<span class="fc" id="L1090">            int behavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1091" title="3 of 10 branches missed.">            if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR</span>
+                    || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
+                    || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
+                    || behavior == Display.COMMAND_BEHAVIOR_ICS
+                    || behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+<span class="pc bpc" id="L1096" title="3 of 4 branches missed.">                if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK &amp;&amp; cmd == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1097">                    return;</span>
+                }
+<span class="fc bfc" id="L1099" title="All 2 branches covered.">                if (behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {</span>
+<span class="fc" id="L1100">                    return;</span>
+                }
+<span class="pc bpc" id="L1102" title="2 of 4 branches missed.">                if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK || behavior == Display.COMMAND_BEHAVIOR_ICS)</span>
+<span class="pc bpc" id="L1103" title="2 of 4 branches missed.">                        &amp;&amp; parent.getTitle() != null &amp;&amp; parent.getTitle().length() &gt; 0) {</span>
+<span class="fc" id="L1104">                    synchronizeCommandsWithButtonsInBackbutton();</span>
+<span class="fc" id="L1105">                    return;</span>
+                }
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">                if (parent.getBackCommand() != cmd) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L1108" title="All 2 branches missed.">                    if (behavior != Display.COMMAND_BEHAVIOR_ICS) {</span>
+<span class="nc" id="L1109">                        setLayout(new GridLayout(1, getComponentCount() + 1));</span>
+<span class="nc" id="L1110">                        addComponent(Math.min(getComponentCount(), index), createTouchCommandButton(cmd));</span>
+<span class="nc" id="L1111">                        revalidate();</span>
+                    }
+                } else {
+<span class="nc" id="L1114">                    commands.removeElement(cmd);</span>
+                }
+<span class="nc" id="L1116">                return;</span>
+            }
+        }
+<span class="fc" id="L1119">        updateCommands();</span>
+<span class="fc" id="L1120">    }</span>
+
+    /// Adds the MenuBar on the parent Form
+    protected void installMenuBar() {
+<span class="fc bfc" id="L1124" title="All 2 branches covered.">        if (getParent() == null) {</span>
+<span class="fc" id="L1125">            int type = getCommandBehavior();</span>
+<span class="pc bpc" id="L1126" title="1 of 6 branches missed.">            if (type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT</span>
+                    || type == Display.COMMAND_BEHAVIOR_ICS
+                    || type == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+                //getTitleAreaContainer().addComponent(BorderLayout.EAST, this);
+<span class="fc" id="L1130">                return;</span>
+            }
+<span class="fc" id="L1132">            int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();</span>
+<span class="pc bpc" id="L1133" title="2 of 6 branches missed.">            if (softkeyCount &gt; 1 || type == Display.COMMAND_BEHAVIOR_BUTTON_BAR</span>
+                    || type == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK) {
+<span class="pc bpc" id="L1135" title="1 of 2 branches missed.">                if (Display.getInstance().getProperty(&quot;adPaddingBottom&quot;, null) == null) {</span>
+<span class="fc" id="L1136">                    parent.addComponentToForm(BorderLayout.SOUTH, this);</span>
+                }
+            }
+        }
+<span class="fc" id="L1140">    }</span>
+
+    /// Removes the MenuBar from the parent Form
+    protected void unInstallMenuBar() {
+<span class="fc" id="L1144">        parent.removeComponentFromForm(this);</span>
+<span class="fc" id="L1145">        Container t = getTitleAreaContainer();</span>
+<span class="fc" id="L1146">        BorderLayout titleLayout = (BorderLayout) t.getLayout();</span>
+<span class="fc" id="L1147">        titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+<span class="fc" id="L1148">        Component l = getTitleComponent();</span>
+<span class="fc" id="L1149">        t.removeAll();</span>
+<span class="fc bfc" id="L1150" title="All 2 branches covered.">        if (l.getParent() != null) {</span>
+<span class="fc" id="L1151">            l.getParent().removeComponent(l);</span>
+        }
+<span class="fc" id="L1153">        t.addComponent(BorderLayout.CENTER, l);</span>
+<span class="fc" id="L1154">        initTitleBarStatus();</span>
+<span class="fc" id="L1155">    }</span>
+
+    /// Remove all commands from the menuBar
+    protected void removeAllCommands() {
+<span class="fc" id="L1159">        commands.removeAllElements();</span>
+<span class="fc" id="L1160">        int behavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1161" title="4 of 8 branches missed.">        if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR</span>
+                || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
+                || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
+                || behavior == Display.COMMAND_BEHAVIOR_ICS) {
+
+<span class="nc" id="L1166">            Component titleComp = getTitleComponent();</span>
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">            if (titleComp != null) {</span>
+<span class="nc" id="L1168">                Container parent = titleComp.getParent();</span>
+<span class="nc bnc" id="L1169" title="All 2 branches missed.">                if (parent != null) {</span>
+<span class="nc" id="L1170">                    parent.removeAll();</span>
+                }
+            }
+<span class="nc" id="L1173">            Container titleContainer = getTitleAreaContainer();</span>
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">            if (titleContainer != null) {</span>
+<span class="nc" id="L1175">                titleContainer.removeAll();</span>
+<span class="nc bnc" id="L1176" title="All 2 branches missed.">                if (titleComp != null) {</span>
+<span class="nc" id="L1177">                    titleContainer.addComponent(BorderLayout.CENTER, titleComp);</span>
+                }
+<span class="nc" id="L1179">                removeAll();</span>
+<span class="nc" id="L1180">                initTitleBarStatus();</span>
+            }
+<span class="nc" id="L1182">            return;</span>
+        }
+<span class="fc" id="L1184">        updateCommands();</span>
+<span class="fc" id="L1185">    }</span>
+
+    /// Removes a Command from the MenuBar
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: Command to remove
+    protected void removeCommand(Command cmd) {
+<span class="fc" id="L1193">        int behavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1194" title="2 of 8 branches missed.">        if (behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR</span>
+                || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK
+                || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
+                || behavior == Display.COMMAND_BEHAVIOR_ICS) {
+<span class="fc" id="L1198">            int i = commands.indexOf(cmd);</span>
+<span class="fc bfc" id="L1199" title="All 2 branches covered.">            if (i &gt; -1) {</span>
+<span class="fc" id="L1200">                commands.removeElementAt(i);</span>
+<span class="fc" id="L1201">                Button b = findCommandComponent(cmd);</span>
+<span class="pc bpc" id="L1202" title="2 of 4 branches missed.">                if (b != null &amp;&amp; b.getParent() != null) {</span>
+<span class="fc" id="L1203">                    b.getParent().removeComponent(b);</span>
+                }
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">                if (getCommandCount() &gt; 0) {</span>
+<span class="fc" id="L1206">                    setLayout(new GridLayout(1, getCommandCount()));</span>
+                }
+            }
+<span class="fc" id="L1209">            return;</span>
+        }
+<span class="fc" id="L1211">        commands.removeElement(cmd);</span>
+<span class="fc" id="L1212">        updateCommands();</span>
+<span class="fc" id="L1213">    }</span>
+
+    void addSelectCommand(String selectText) {
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">        if (thirdSoftButton) {</span>
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">            if (selectCommand == null) {</span>
+<span class="nc" id="L1218">                selectCommand = createSelectCommand();</span>
+            }
+<span class="nc" id="L1220">            selectCommand.setCommandName(selectText);</span>
+<span class="nc" id="L1221">            addCommand(selectCommand);</span>
+        }
+<span class="fc" id="L1223">    }</span>
+
+    void removeSelectCommand() {
+<span class="pc bpc" id="L1226" title="1 of 2 branches missed.">        if (thirdSoftButton) {</span>
+<span class="nc" id="L1227">            removeCommand(selectCommand);</span>
+        }
+<span class="fc" id="L1229">    }</span>
+
+    /// Factory method that returns the Form select Command.
+    /// This Command is used when Display.getInstance().isThirdSoftButton()
+    /// returns true.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
+    protected Command createSelectCommand() {
+<span class="nc" id="L1240">        return new Command(parent.getUIManager().localize(&quot;select&quot;, &quot;Select&quot;));</span>
+    }
+
+    /// Factory method that returns the Form Menu select Command.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
+    protected Command createMenuSelectCommand() {
+<span class="fc" id="L1250">        UIManager manager = parent.getUIManager();</span>
+<span class="fc" id="L1251">        LookAndFeel lf = manager.getLookAndFeel();</span>
+<span class="fc" id="L1252">        return new Command(manager.localize(&quot;select&quot;, &quot;Select&quot;), lf.getMenuIcons()[0]);</span>
+    }
+
+    /// Factory method that returns the Form Menu cancel Command.
+    /// This method can be overridden to customize the Command on the Form.
+    ///
+    /// #### Returns
+    ///
+    /// Command
+    protected Command createMenuCancelCommand() {
+<span class="fc" id="L1262">        UIManager manager = parent.getUIManager();</span>
+<span class="fc" id="L1263">        LookAndFeel lf = manager.getLookAndFeel();</span>
+<span class="fc" id="L1264">        return new Command(manager.localize(&quot;cancel&quot;, &quot;Cancel&quot;), lf.getMenuIcons()[1]);</span>
+    }
+
+    /// The MenuBar default implementation shows the menu commands in a List
+    /// contained in a Dialog.
+    /// This method replaces the menu ListCellRenderer of the Menu List.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menuCellRenderer`
+    public void setMenuCellRenderer(ListCellRenderer menuCellRenderer) {
+<span class="fc" id="L1275">        this.menuCellRenderer = menuCellRenderer;</span>
+<span class="fc" id="L1276">    }</span>
+
+    /// Returns the Menu Dialog Style
+    ///
+    /// #### Returns
+    ///
+    /// Menu Dialog Style
+    public Style getMenuStyle() {
+<span class="fc" id="L1284">        return menuStyle;</span>
+    }
+
+    /// This method returns true if the MenuBar should handle the given keycode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: to determine if the MenuBar is responsible for.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if the keycode is a MenuBar related keycode such as softkey,
+    /// back button, clear button, ...
+    public boolean handlesKeycode(int keyCode) {
+<span class="pc bpc" id="L1298" title="1 of 2 branches missed.">        if (keyCode == 0) {</span>
+<span class="nc" id="L1299">            return false;</span>
+        }
+<span class="fc" id="L1301">        int game = Display.getInstance().getGameAction(keyCode);</span>
+<span class="pc bpc" id="L1302" title="10 of 18 branches missed.">        return isLSK(keyCode) || isRSK(keyCode) || keyCode == backSK</span>
+                || (keyCode == clearSK &amp;&amp; clearCommand != null)
+                || (keyCode == backspaceSK &amp;&amp; clearCommand != null)
+                || (thirdSoftButton &amp;&amp; game == Display.GAME_FIRE);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="fc" id="L1311">        int commandBehavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1312" title="1 of 2 branches missed.">        if (commandBehavior &gt;= Display.COMMAND_BEHAVIOR_BUTTON_BAR) {</span>
+<span class="nc" id="L1313">            return;</span>
+        }
+<span class="pc bpc" id="L1315" title="1 of 2 branches missed.">        if (getCommandCount() &gt; 0) {</span>
+<span class="nc bnc" id="L1316" title="All 2 branches missed.">            if (isLSK(keyCode)) {</span>
+<span class="nc bnc" id="L1317" title="All 2 branches missed.">                if (left != null) {</span>
+<span class="nc" id="L1318">                    left.pressed();</span>
+                }
+            } else {
+                // it might be a back command or the fire...
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">                if (isRSK(keyCode)) {</span>
+<span class="nc bnc" id="L1323" title="All 2 branches missed.">                    if (right != null) {</span>
+<span class="nc" id="L1324">                        right.pressed();</span>
+                    }
+                } else {
+<span class="nc bnc" id="L1327" title="All 2 branches missed.">                    if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {</span>
+<span class="nc" id="L1328">                        main.pressed();</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1333">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="fc" id="L1338">        int commandBehavior = getCommandBehavior();</span>
+<span class="pc bpc" id="L1339" title="7 of 8 branches missed.">        if (commandBehavior &gt;= Display.COMMAND_BEHAVIOR_BUTTON_BAR &amp;&amp; keyCode != backSK &amp;&amp; keyCode != clearSK &amp;&amp; keyCode != backspaceSK) {</span>
+<span class="nc" id="L1340">            return;</span>
+        }
+<span class="pc bpc" id="L1342" title="1 of 2 branches missed.">        if (getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L1343">            int softkeyCount = Display.getInstance().getImplementation().getSoftkeyCount();</span>
+<span class="nc bnc" id="L1344" title="All 4 branches missed.">            if (softkeyCount &lt; 2 &amp;&amp; isLSK(keyCode)) {</span>
+<span class="nc bnc" id="L1345" title="All 2 branches missed.">                if (commandList != null) {</span>
+<span class="nc" id="L1346">                    Container parent = commandList.getParent();</span>
+<span class="nc bnc" id="L1347" title="All 2 branches missed.">                    while (parent != null) {</span>
+<span class="nc bnc" id="L1348" title="All 4 branches missed.">                        if (parent instanceof Dialog &amp;&amp; ((Dialog) parent).isMenu()) {</span>
+<span class="nc" id="L1349">                            return;</span>
+                        }
+<span class="nc" id="L1351">                        parent = parent.getParent();</span>
+                    }
+                }
+<span class="nc" id="L1354">                showMenu();</span>
+<span class="nc" id="L1355">                return;</span>
+            } else {
+<span class="nc bnc" id="L1357" title="All 2 branches missed.">                if (isLSK(keyCode)) {</span>
+<span class="nc bnc" id="L1358" title="All 2 branches missed.">                    if (left != null) {</span>
+<span class="nc" id="L1359">                        left.released();</span>
+                    }
+<span class="nc" id="L1361">                    return;</span>
+                } else {
+                    // it might be a back command...
+<span class="nc bnc" id="L1364" title="All 2 branches missed.">                    if (isRSK(keyCode)) {</span>
+<span class="nc bnc" id="L1365" title="All 2 branches missed.">                        if (right != null) {</span>
+<span class="nc" id="L1366">                            right.released();</span>
+                        }
+<span class="nc" id="L1368">                        return;</span>
+                    } else {
+<span class="nc bnc" id="L1370" title="All 2 branches missed.">                        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {</span>
+<span class="nc" id="L1371">                            main.released();</span>
+<span class="nc" id="L1372">                            return;</span>
+                        }
+                    }
+                }
+            }
+        }
+
+        // allows a back/clear command to occur regardless of whether the
+        // command was added to the form
+<span class="fc" id="L1381">        Command c = null;</span>
+<span class="pc bpc" id="L1382" title="1 of 2 branches missed.">        if (keyCode == backSK) {</span>
+            // the back command should be invoked
+<span class="nc" id="L1384">            c = parent.getBackCommand();</span>
+<span class="nc bnc" id="L1385" title="All 4 branches missed.">            if (c == null &amp;&amp; minimizeOnBack) {</span>
+<span class="nc" id="L1386">                Display.getInstance().minimizeApplication();</span>
+<span class="nc" id="L1387">                return;</span>
+            }
+        } else {
+<span class="pc bpc" id="L1390" title="2 of 4 branches missed.">            if (keyCode == clearSK || keyCode == backspaceSK) {</span>
+<span class="nc" id="L1391">                c = getClearCommand();</span>
+            }
+        }
+<span class="pc bpc" id="L1394" title="1 of 2 branches missed.">        if (c != null) {</span>
+            // PopGuard hook: hardware back-key path. We check before invoking the
+            // back command so a vetoing guard suppresses the entire back chain
+            // (including any user-supplied action listener registered with the
+            // back command). Only consults the guard for the back-command path --
+            // clear/backspace keys (handled through getClearCommand above) are
+            // not pop events.
+<span class="nc bnc" id="L1401" title="All 4 branches missed.">            if (keyCode == backSK &amp;&amp; c == parent.getBackCommand()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L1402" title="All 2 branches missed.">                if (!parent.checkPopGuard(com.codename1.router.PopReason.HARDWARE_BACK)) {</span>
+<span class="nc" id="L1403">                    return;</span>
+                }
+            }
+<span class="nc" id="L1406">            ActionEvent ev = new ActionEvent(c, keyCode);</span>
+<span class="nc" id="L1407">            c.actionPerformed(ev);</span>
+<span class="nc bnc" id="L1408" title="All 2 branches missed.">            if (!ev.isConsumed()) {</span>
+<span class="nc" id="L1409">                parent.actionCommandImpl(c);</span>
+            }
+        }
+<span class="fc" id="L1412">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+<span class="fc" id="L1417">        super.refreshTheme(merge);</span>
+<span class="fc" id="L1418">        UIManager manager = parent.getUIManager();</span>
+<span class="pc bpc" id="L1419" title="3 of 4 branches missed.">        if (menuStyle.isModified() &amp;&amp; merge) {</span>
+<span class="nc" id="L1420">            menuStyle.merge(manager.getComponentStyle(&quot;Menu&quot;));</span>
+        } else {
+<span class="fc" id="L1422">            menuStyle = manager.getComponentStyle(&quot;Menu&quot;);</span>
+        }
+<span class="pc bpc" id="L1424" title="1 of 2 branches missed.">        if (menuCellRenderer != null) {</span>
+<span class="nc" id="L1425">            List tmp = new List();</span>
+<span class="nc" id="L1426">            tmp.setListCellRenderer(menuCellRenderer);</span>
+<span class="nc" id="L1427">            tmp.refreshTheme(merge);</span>
+        }
+<span class="fc bfc" id="L1429" title="All 2 branches covered.">        for (Button button : soft) {</span>
+<span class="fc" id="L1430">            updateSoftButtonStyle(button);</span>
+        }
+
+<span class="fc" id="L1433">        revalidate();</span>
+<span class="fc" id="L1434">    }</span>
+
+    /*private void fixCommandAlignment() {
+    if (left != null) {
+    if (parent.isRTL()) {
+    left.setAlignment(Label.RIGHT);
+    right.setAlignment(Label.LEFT);
+    } else {
+    left.setAlignment(Label.LEFT);
+    right.setAlignment(Label.RIGHT);
+    }
+    if(main != null &amp;&amp; main != left &amp;&amp; main != right) {
+    main.setAlignment(CENTER);
+    }
+    }
+    }*/
+
+    /// A menu is implemented as a dialog, this method allows you to override dialog
+    /// display in order to customize the dialog menu in various ways
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: a dialog containing menu options that can be customized
+    ///
+    /// #### Returns
+    ///
+    /// @return the command selected by the user in the dialog (not menu) Select
+    /// or Cancel
+    protected Command showMenuDialog(Dialog menu) {
+<span class="nc" id="L1463">        UIManager manager = parent.getUIManager();</span>
+<span class="nc" id="L1464">        boolean pref = manager.isThemeConstant(&quot;menuPrefSizeBool&quot;, false);</span>
+        int height;
+        int marginLeft;
+<span class="nc" id="L1467">        int marginRight = 0;</span>
+<span class="nc bnc" id="L1468" title="All 2 branches missed.">        if (pref) {</span>
+<span class="nc" id="L1469">            Container dialogContentPane = menu.getDialogComponent();</span>
+<span class="nc" id="L1470">            marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()</span>
+<span class="nc" id="L1471">                    + menu.getStyle().getHorizontalPadding());</span>
+<span class="nc" id="L1472">            marginLeft = Math.max(0, marginLeft);</span>
+<span class="nc bnc" id="L1473" title="All 2 branches missed.">            if (parent.getSoftButtonCount() &gt; 1) {</span>
+<span class="nc" id="L1474">                height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();</span>
+            } else {
+<span class="nc" id="L1476">                height = parent.getHeight() - dialogContentPane.getPreferredH();</span>
+            }
+<span class="nc" id="L1478">            height = Math.max(0, height);</span>
+<span class="nc" id="L1479">        } else {</span>
+<span class="nc" id="L1480">            float menuWidthPercent = 1 - Float.parseFloat(manager.getThemeConstant(&quot;menuWidthPercent&quot;, &quot;75&quot;)) / 100;</span>
+<span class="nc" id="L1481">            float menuHeightPercent = 1 - Float.parseFloat(manager.getThemeConstant(&quot;menuHeightPercent&quot;, &quot;50&quot;)) / 100;</span>
+<span class="nc" id="L1482">            height = (int) (parent.getHeight() * menuHeightPercent);</span>
+<span class="nc" id="L1483">            marginLeft = (int) (parent.getWidth() * menuWidthPercent);</span>
+        }
+
+<span class="nc bnc" id="L1486" title="All 2 branches missed.">        if (isReverseSoftButtons()) {</span>
+<span class="nc" id="L1487">            marginRight = marginLeft;</span>
+<span class="nc" id="L1488">            marginLeft = 0;</span>
+        }
+
+<span class="nc bnc" id="L1491" title="All 4 branches missed.">        if (manager.getLookAndFeel().isTouchMenus() &amp;&amp; manager.isThemeConstant(&quot;PackTouchMenuBool&quot;, true)) {</span>
+<span class="nc" id="L1492">            return menu.showPacked(BorderLayout.SOUTH, true);</span>
+        } else {
+<span class="nc" id="L1494">            return menu.show(height, 0, marginLeft, marginRight, true);</span>
+        }
+    }
+
+    /// Allows an individual form to reverse the layout direction of the softbuttons, this method is RTL
+    /// sensitive and might reverse the result based on RTL state
+    ///
+    /// #### Returns
+    ///
+    /// The value of UIManager.getInstance().getLookAndFeel().isReverseSoftButtons()
+    protected boolean isReverseSoftButtons() {
+<span class="fc" id="L1505">        LookAndFeel lf = parent.getUIManager().getLookAndFeel();</span>
+<span class="fc bfc" id="L1506" title="All 2 branches covered.">        if (isRTL()) {</span>
+<span class="pc bpc" id="L1507" title="1 of 2 branches missed.">            return !lf.isReverseSoftButtons();</span>
+        }
+<span class="fc" id="L1509">        return lf.isReverseSoftButtons();</span>
+    }
+
+    /// Calculates the amount of columns to give to the touch commands within the
+    /// grid
+    ///
+    /// #### Parameters
+    ///
+    /// - `grid`: @param grid container that will be arranged in the grid containing the
+    /// components
+    ///
+    /// #### Returns
+    ///
+    /// an integer representing the touch command grid size
+    protected int calculateTouchCommandGridColumns(Container grid) {
+<span class="nc" id="L1524">        int count = grid.getComponentCount();</span>
+<span class="nc" id="L1525">        int maxWidth = 10;</span>
+<span class="nc bnc" id="L1526" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L1527">            Component c = grid.getComponentAt(iter);</span>
+<span class="nc" id="L1528">            Style s = c.getUnselectedStyle();</span>
+            // bidi doesn't matter since this is just a summary of width
+<span class="nc" id="L1530">            maxWidth = Math.max(maxWidth,</span>
+<span class="nc" id="L1531">                    c.getPreferredW()</span>
+<span class="nc" id="L1532">                            + s.getHorizontalMargins());</span>
+        }
+<span class="nc" id="L1534">        return Math.max(2, Display.getInstance().getDisplayWidth() / maxWidth);</span>
+    }
+
+    /// Sets the command UIID to the given UIID, notice that this won't work for all menu types since some menu
+    /// types might be implemented natively or as a list in which case the UIID won't apply!
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `uiid`: the uiid for the given command
+    public void setCommandUIID(Command cmd, String uiid) {
+<span class="nc" id="L1546">        Button b = findCommandComponent(cmd);</span>
+<span class="nc bnc" id="L1547" title="All 2 branches missed.">        if (b != null) {</span>
+<span class="nc" id="L1548">            b.setUIID(uiid);</span>
+<span class="nc" id="L1549">            revalidate();</span>
+        }
+<span class="nc" id="L1551">        cmd.putClientProperty(&quot;cn1$CommandUIID&quot;, uiid);</span>
+<span class="nc" id="L1552">    }</span>
+
+    /// Creates a touch command for use as a touch menu item
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: command to map into the returned button
+    ///
+    /// #### Returns
+    ///
+    /// a button that would fire the touch command appropriately
+    protected Button createTouchCommandButton(Command c) {
+<span class="fc" id="L1564">        Button b = new Button(c);</span>
+<span class="fc bfc" id="L1565" title="All 2 branches covered.">        if (b.getIcon() == null) {</span>
+            // some themes look awful without any icon
+<span class="fc" id="L1567">            b.setIcon(parent.getUIManager().getThemeImageConstant(&quot;defaultCommandImage&quot;));</span>
+        } else {
+<span class="pc bpc" id="L1569" title="1 of 2 branches missed.">            if (UIManager.getInstance().isThemeConstant(&quot;commandAsIconBool&quot;, false)) {</span>
+<span class="nc" id="L1570">                b.setText(&quot;&quot;);</span>
+            }
+        }
+<span class="fc" id="L1573">        b.setTactileTouch(true);</span>
+<span class="fc" id="L1574">        b.setTextPosition(Label.BOTTOM);</span>
+<span class="fc" id="L1575">        b.setEndsWith3Points(false);</span>
+<span class="fc" id="L1576">        String uiid = (String) c.getClientProperty(&quot;cn1$CommandUIID&quot;);</span>
+<span class="pc bpc" id="L1577" title="1 of 2 branches missed.">        if (uiid != null) {</span>
+<span class="nc" id="L1578">            b.setUIID(uiid);</span>
+        } else {
+<span class="fc" id="L1580">            b.setUIID(&quot;TouchCommand&quot;);</span>
+        }
+<span class="fc" id="L1582">        Integer gap = (Integer) c.getClientProperty(&quot;iconGap&quot;);</span>
+<span class="pc bpc" id="L1583" title="1 of 2 branches missed.">        if (gap != null) {</span>
+<span class="nc" id="L1584">            b.setGap(gap.intValue());</span>
+        }
+<span class="fc" id="L1586">        return b;</span>
+    }
+
+    /// Creates the component containing the commands within the given vector
+    /// used for showing the menu dialog, this method calls the createCommandList
+    /// method by default however it allows more elaborate menu creation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: list of command objects
+    ///
+    /// #### Returns
+    ///
+    /// Component that will result in the parent menu dialog recieving a command event
+    protected Component createCommandComponent(Vector commands) {
+<span class="nc" id="L1601">        UIManager manager = parent.getUIManager();</span>
+        // Create a touch based menu interface
+<span class="nc bnc" id="L1603" title="All 2 branches missed.">        if (manager.getLookAndFeel().isTouchMenus()) {</span>
+<span class="nc" id="L1604">            Container menu = new Container();</span>
+<span class="nc" id="L1605">            menu.setScrollableY(true);</span>
+<span class="nc bnc" id="L1606" title="All 2 branches missed.">            for (int iter = 0; iter &lt; commands.size(); iter++) {</span>
+<span class="nc" id="L1607">                Command c = (Command) commands.elementAt(iter);</span>
+<span class="nc" id="L1608">                menu.addComponent(createTouchCommandButton(c));</span>
+            }
+<span class="nc bnc" id="L1610" title="All 2 branches missed.">            if (!manager.isThemeConstant(&quot;touchCommandFlowBool&quot;, false)) {</span>
+<span class="nc" id="L1611">                int cols = calculateTouchCommandGridColumns(menu);</span>
+<span class="nc bnc" id="L1612" title="All 2 branches missed.">                if (cols &gt; getCommandCount()) {</span>
+<span class="nc" id="L1613">                    cols = getCommandCount();</span>
+                }
+<span class="nc bnc" id="L1615" title="All 2 branches missed.">                int rows = Math.max(1, getCommandCount() / cols + (getCommandCount() % cols != 0 ? 1 : 0));</span>
+<span class="nc bnc" id="L1616" title="All 2 branches missed.">                if (rows &gt; 1) {</span>
+                    // try to prevent too many columns concentraiting within a single row
+<span class="nc" id="L1618">                    int remainingColumns = (rows * cols) % getCommandCount();</span>
+<span class="nc" id="L1619">                    int newCols = cols;</span>
+<span class="nc" id="L1620">                    int newRows = rows;</span>
+<span class="nc bnc" id="L1621" title="All 6 branches missed.">                    while (remainingColumns != 0 &amp;&amp; remainingColumns &gt; 1 &amp;&amp; newCols &gt;= 2) {</span>
+<span class="nc" id="L1622">                        newCols--;</span>
+<span class="nc bnc" id="L1623" title="All 2 branches missed.">                        newRows = Math.max(1, getCommandCount() / newCols + (getCommandCount() % newCols != 0 ? 1 : 0));</span>
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">                        if (newRows != rows) {</span>
+<span class="nc" id="L1625">                            break;</span>
+                        }
+<span class="nc" id="L1627">                        remainingColumns = (newRows * newCols) % getCommandCount();</span>
+                    }
+<span class="nc bnc" id="L1629" title="All 2 branches missed.">                    if (newRows == rows) {</span>
+<span class="nc" id="L1630">                        cols = newCols;</span>
+<span class="nc" id="L1631">                        rows = newRows;</span>
+                    }
+                }
+<span class="nc" id="L1634">                GridLayout g = new GridLayout(rows, cols);</span>
+<span class="nc" id="L1635">                g.setFillLastRow(manager.isThemeConstant(&quot;touchCommandFillBool&quot;, true));</span>
+<span class="nc" id="L1636">                menu.setLayout(g);</span>
+<span class="nc" id="L1637">            } else {</span>
+<span class="nc" id="L1638">                ((FlowLayout) menu.getLayout()).setFillRows(true);</span>
+            }
+<span class="nc" id="L1640">            menu.setPreferredW(Display.getInstance().getDisplayWidth());</span>
+<span class="nc" id="L1641">            return menu;</span>
+        }
+<span class="nc" id="L1643">        return createCommandList(commands);</span>
+    }
+
+    /// This method returns a Vector of Command objects
+    ///
+    /// #### Returns
+    ///
+    /// Vector of Command objects
+    protected Vector getCommands() {
+<span class="fc" id="L1652">        return commands;</span>
+    }
+
+    /// Creates the list component containing the commands within the given vector
+    /// used for showing the menu dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: list of command objects
+    ///
+    /// #### Returns
+    ///
+    /// List object
+    protected List createCommandList(Vector commands) {
+<span class="nc" id="L1666">        List l = new List(commands);</span>
+<span class="nc" id="L1667">        l.setUIID(&quot;CommandList&quot;);</span>
+<span class="nc" id="L1668">        Component c = (Component) l.getRenderer();</span>
+<span class="nc" id="L1669">        c.setUIID(&quot;Command&quot;);</span>
+<span class="nc" id="L1670">        c = l.getRenderer().getListFocusComponent(l);</span>
+<span class="nc" id="L1671">        c.setUIID(&quot;CommandFocus&quot;);</span>
+
+<span class="nc" id="L1673">        l.setFixedSelection(List.FIXED_NONE_CYCLIC);</span>
+<span class="nc bnc" id="L1674" title="All 2 branches missed.">        if (parent.getUIManager().isThemeConstant(&quot;menuPrefSizeBool&quot;, false)) {</span>
+            // an entry way down in the list might be noticeably wider
+<span class="nc" id="L1676">            l.setListSizeCalculationSampleCount(50);</span>
+        }
+<span class="nc" id="L1678">        return l;</span>
+    }
+
+    Command getComponentSelectedCommand(Component cmp) {
+<span class="nc bnc" id="L1682" title="All 2 branches missed.">        if (cmp instanceof List) {</span>
+<span class="nc" id="L1683">            List l = (List) cmp;</span>
+<span class="nc" id="L1684">            return (Command) l.getSelectedItem();</span>
+        } else {
+<span class="nc" id="L1686">            cmp = cmp.getComponentForm().getFocused();</span>
+<span class="nc bnc" id="L1687" title="All 2 branches missed.">            if (cmp instanceof Button) {</span>
+<span class="nc" id="L1688">                return ((Button) cmp).getCommand();</span>
+            }
+        }
+        // nothing to do for this case...
+<span class="nc" id="L1692">        return null;</span>
+    }
+
+    /// This method returns the select menu item, when a menu is opened
+    ///
+    /// #### Returns
+    ///
+    /// select Command
+    protected Command getSelectMenuItem() {
+<span class="nc" id="L1701">        return selectMenuItem;</span>
+    }
+
+    /// This method returns the cancel menu item, when a menu is opened
+    ///
+    /// #### Returns
+    ///
+    /// cancel Command
+    protected Command getCancelMenuItem() {
+<span class="fc" id="L1710">        return cancelMenuItem;</span>
+    }
+
+    /// When set to true the physical back button will minimize the application
+    ///
+    /// #### Returns
+    ///
+    /// the minimizeOnBack
+    public boolean isMinimizeOnBack() {
+<span class="nc" id="L1719">        return minimizeOnBack;</span>
+    }
+
+    /// When set to true the physical back button will minimize the application
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimizeOnBack`: the minimizeOnBack to set
+    public void setMinimizeOnBack(boolean minimizeOnBack) {
+<span class="nc" id="L1728">        this.minimizeOnBack = minimizeOnBack;</span>
+<span class="nc" id="L1729">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected int getDragRegionStatus(int x, int y) {
+<span class="nc" id="L1734">        return DRAG_REGION_NOT_DRAGGABLE;</span>
+    }
+
+    /// Returns the parent Form title area
+    ///
+    /// #### Returns
+    ///
+    /// the title area Container
+    protected Container getTitleAreaContainer() {
+<span class="fc" id="L1743">        return parent.getTitleArea();</span>
+    }
+
+    /// Gets the Form titleComponent
+    ///
+    /// #### Returns
+    ///
+    /// titleComponent
+    protected Component getTitleComponent() {
+<span class="fc" id="L1752">        return parent.getTitleComponent();</span>
+    }
+
+    Form getParentForm() {
+<span class="fc" id="L1756">        return parent;</span>
+    }
+
+    void initTitleBarStatus() {
+<span class="fc" id="L1760">        parent.initTitleBarStatus();</span>
+<span class="fc" id="L1761">    }</span>
+
+    private boolean isTouchMenus() {
+<span class="nc" id="L1764">        int t = getCommandBehavior();</span>
+<span class="nc bnc" id="L1765" title="All 4 branches missed.">        return t == Display.COMMAND_BEHAVIOR_TOUCH_MENU ||</span>
+<span class="nc bnc" id="L1766" title="All 2 branches missed.">                (t == Display.COMMAND_BEHAVIOR_DEFAULT &amp;&amp; Display.getInstance().isTouchScreenDevice());</span>
+    }
+
+    private static class MenuDisposerActionListener implements ActionListener {
+        private final Dialog d;
+
+<span class="nc" id="L1772">        public MenuDisposerActionListener(Dialog d) {</span>
+<span class="nc" id="L1773">            this.d = d;</span>
+<span class="nc" id="L1774">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1778">            d.dispose();</span>
+<span class="nc" id="L1779">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

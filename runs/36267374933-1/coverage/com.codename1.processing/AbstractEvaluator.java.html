@@ -1,0 +1,1130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">AbstractEvaluator.java</span></div><h1>AbstractEvaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import com.codename1.util.StringUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Private class, do not use.
+///
+/// An abstract predicate evaluator handles common tasks of breaking the
+/// expression down to lvalue, rvalue, and comparator, then calling the
+/// appropriate abstracted method with the result.
+///
+/// Example predicates:
+///
+/// `Test price attribute:
+///
+///  [@price &gt; 45]
+///
+///  Test Child node:
+///
+///  [town='Exeter']
+///
+///  Test attribute exists
+///
+///  [@price]
+///
+///  Test attribute doesn't exist:
+///
+///  [@price = null]
+///
+///  Select by index:
+///
+///  [3]
+///
+///  Select by position:
+///
+///  [position() &lt; 5]
+///
+///  Select by position:
+///
+///  [last() - 5]`
+///
+/// @author Eric Coolman
+abstract class AbstractEvaluator implements Evaluator {
+
+    private final String expr;
+
+    /// Construct with the full predicate expression.
+    ///
+    /// #### Parameters
+    ///
+    /// - `expr`: The full predicate expression
+<span class="fc" id="L76">    protected AbstractEvaluator(String expr) {</span>
+<span class="fc" id="L77">        this.expr = expr;</span>
+<span class="fc" id="L78">    }</span>
+
+    /// Evaluate the predicate expression against a given element.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element to apply predicate against.
+    @Override
+    public Object evaluate(StructuredContent element) {
+<span class="nc" id="L87">        return evaluateInternal(element);</span>
+    }
+
+    /// Evaluate the predicate expression against an array of elements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elements`: an array of elements to apply predicate against.
+    @Override
+    public Object evaluate(List elements) {
+<span class="fc" id="L97">        return evaluateInternal(elements);</span>
+    }
+
+    /// This internal method takes care of determining the style of expression
+    /// (less-than, greater-than, equals, etc), and passing on the to next
+    /// internal processor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: source element, either a List or StructuredContent
+    ///
+    /// #### Returns
+    ///
+    /// either a List or StructuredContent
+    ///
+    /// #### Throws
+    ///
+    /// - `ResultException`
+    ///
+    /// #### See also
+    ///
+    /// - `int)`
+    ///
+    /// - #evaluateSingleInternal(Object)
+    private Object evaluateInternal(Object element) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (element == null) {</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+<span class="fc" id="L125">        int index = expr.indexOf(&quot;=&quot;);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L127">            return evaluateInternal(element, index);</span>
+        }
+<span class="fc" id="L129">        index = expr.indexOf(&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L131">            return evaluateInternal(element, index);</span>
+        }
+<span class="fc" id="L133">        index = expr.indexOf(&quot;&lt;&quot;);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L135">            return evaluateInternal(element, index);</span>
+        }
+<span class="fc" id="L137">        index = expr.indexOf(&quot;%&quot;);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (index != -1) {</span>
+<span class="fc" id="L139">            return evaluateInternal(element, index);</span>
+        }
+<span class="fc" id="L141">        return evaluateSingleInternal(element);</span>
+
+    }
+
+    /// This internal method handles breaking down an expression into it's
+    /// components (lvalue, rvalue, comparand), and then passing along to the
+    /// next internal processor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a List or a StructuredContent object
+    ///
+    /// - `index`: pointer to the comparator within the predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a List or a StructuredContent object
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftEqualsRightInternal(Object, String, String)
+    ///
+    /// - #evaluateLeftGreaterRightInternal(Object, String, String)
+    ///
+    /// - #evaluateLeftLessRightInternal(Object, String, String)
+    private Object evaluateInternal(Object element, int index) {
+<span class="fc" id="L167">        String lvalue = expr.substring(0, index).trim();</span>
+<span class="fc" id="L168">        String rvalue = expr.substring(index + 1).trim();</span>
+<span class="fc" id="L169">        char comparator = expr.charAt(index);</span>
+<span class="pc bpc" id="L170" title="1 of 5 branches missed.">        switch (comparator) {</span>
+            case '=':
+<span class="fc" id="L172">                return evaluateLeftEqualsRightInternal(element, lvalue, rvalue);</span>
+            case '&gt;':
+<span class="fc" id="L174">                return evaluateLeftGreaterRightInternal(element, lvalue, rvalue);</span>
+            case '&lt;':
+<span class="fc" id="L176">                return evaluateLeftLessRightInternal(element, lvalue, rvalue);</span>
+            case '%':
+<span class="fc" id="L178">                return evaluateLeftContainsRightInternal(element, lvalue, rvalue);</span>
+            default:
+<span class="nc" id="L180">                return null;</span>
+        }
+    }
+
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftLessRight(StructuredContent, String, String)
+    ///
+    /// - #evaluateLeftLessRight(List, String, String)
+    private Object evaluateLeftLessRightInternal(Object element, String lvalue,
+                                                 String rvalue) {
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L207">            return evaluateLeftLessRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L209">            return evaluateLeftLessRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftGreaterRight(StructuredContent, String, String)
+    ///
+    /// - #evaluateLeftGreaterRight(List, String, String)
+    private Object evaluateLeftGreaterRightInternal(Object element, String lvalue,
+                                                    String rvalue) {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L237">            return evaluateLeftGreaterRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L239">            return evaluateLeftGreaterRight((StructuredContent) element,</span>
+                    lvalue, rvalue);
+        }
+    }
+
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftEqualsRight(List, String, String)
+    ///
+    /// - #evaluateLeftEqualsRight(StructuredContent, String, String)
+    private Object evaluateLeftEqualsRightInternal(Object element, String lvalue,
+                                                   String rvalue) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L267">            return evaluateLeftEqualsRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L269">            return evaluateLeftEqualsRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateLeftContainsRight(List, String, String)
+    ///
+    /// - #evaluateLeftContainsRight(StructuredContent, String, String)
+    private Object evaluateLeftContainsRightInternal(Object element, String lvalue,
+                                                     String rvalue) {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L297">            return evaluateLeftContainsRight((List) element, lvalue, rvalue);</span>
+        } else {
+<span class="nc" id="L299">            return evaluateLeftContainsRight((StructuredContent) element, lvalue,</span>
+                    rvalue);
+        }
+    }
+
+    /// This internal method simply makes a type safe call the the proper
+    /// abstract method based on the type of element passed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: either a StructuredContent or List object.
+    ///
+    /// - `lvalue`: lvalue of predicate expression
+    ///
+    /// - `rvalue`: rvalue of predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// either a StructuredContent or List object.
+    ///
+    /// #### See also
+    ///
+    /// - #evaluateSingle(StructuredContent, String)
+    ///
+    /// - #evaluateSingle(List, String)
+    private Object evaluateSingleInternal(Object element) {
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (element instanceof List) {</span>
+<span class="fc" id="L326">            return evaluateSingle((List) element, expr);</span>
+        } else {
+<span class="nc" id="L328">            return evaluateSingle((StructuredContent) element, expr);</span>
+        }
+    }
+
+    /// Utility method for subclasses to determine if a string is a number
+    ///
+    /// Digits, and also a leading sign, one decimal point and an exponent --
+    /// the grammar `Double.parseDouble` reads, because that is what the
+    /// callers hand it. Digits alone was too narrow once an attribute
+    /// expression could read a JSON field: the parser returns numbers as
+    /// doubles, so a rank of 1 arrives as &quot;1.0&quot; and a rank of ten million as
+    /// &quot;1.0E7&quot;. A comparison that cannot see either as a number falls through
+    /// to comparing them as text, where &quot;5.0&quot; is less than &quot;3&quot; and &quot;1.0E7&quot;
+    /// comes before it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to test
+    ///
+    /// #### Returns
+    ///
+    /// true when the value is a number
+    protected boolean isNumeric(String text) {
+<span class="fc" id="L351">        String value = text.trim();</span>
+<span class="fc" id="L352">        int length = value.length();</span>
+<span class="fc" id="L353">        int at = 0;</span>
+<span class="pc bpc" id="L354" title="2 of 6 branches missed.">        if (at &lt; length &amp;&amp; (value.charAt(at) == '-' || value.charAt(at) == '+')) {</span>
+<span class="fc" id="L355">            at++;</span>
+        }
+<span class="fc" id="L357">        int digits = 0;</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">        while (at &lt; length &amp;&amp; Character.isDigit(value.charAt(at))) {</span>
+<span class="fc" id="L359">            at++;</span>
+<span class="fc" id="L360">            digits++;</span>
+        }
+<span class="fc bfc" id="L362" title="All 4 branches covered.">        if (at &lt; length &amp;&amp; value.charAt(at) == '.') {</span>
+<span class="fc" id="L363">            at++;</span>
+<span class="fc bfc" id="L364" title="All 4 branches covered.">            while (at &lt; length &amp;&amp; Character.isDigit(value.charAt(at))) {</span>
+<span class="fc" id="L365">                at++;</span>
+<span class="fc" id="L366">                digits++;</span>
+            }
+        }
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        if (digits == 0) {</span>
+<span class="fc" id="L370">            return false;</span>
+        }
+<span class="pc bpc" id="L372" title="1 of 6 branches missed.">        if (at &lt; length &amp;&amp; (value.charAt(at) == 'e' || value.charAt(at) == 'E')) {</span>
+<span class="fc" id="L373">            at++;</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            if (at &lt; length</span>
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">                    &amp;&amp; (value.charAt(at) == '-' || value.charAt(at) == '+')) {</span>
+<span class="fc" id="L376">                at++;</span>
+            }
+<span class="fc" id="L378">            int exponent = 0;</span>
+<span class="pc bpc" id="L379" title="1 of 4 branches missed.">            while (at &lt; length &amp;&amp; Character.isDigit(value.charAt(at))) {</span>
+<span class="fc" id="L380">                at++;</span>
+<span class="fc" id="L381">                exponent++;</span>
+            }
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">            if (exponent == 0) {</span>
+<span class="nc" id="L384">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        return at == length;</span>
+    }
+
+    /// Compares two numeric strings, exactly where the values allow it.
+    ///
+    /// Whole numbers are compared digit by digit, at any size. Coercing them
+    /// to `double` loses precision above 2^53, which is inside the range of an
+    /// ordinary 64-bit id -- 9007199254740992 and 9007199254740993 are the
+    /// same double, so a predicate written for one selected both -- and a
+    /// `long` only moves the edge to 2^63 rather than removing it. Digits have
+    /// no edge. Anything with a decimal point or an exponent is a `double`,
+    /// which is what it was parsed as and what it has to be compared as.
+    ///
+    /// - `left`: the value read from the document
+    ///
+    /// - `right`: the value written in the predicate
+    ///
+    /// #### Returns
+    ///
+    /// negative, zero or positive, as `compareTo` does
+    protected int compareNumbers(String left, String right) {
+        // Exponents are written out rather than parsed. A document can carry
+        // one -- an XML attribute holds whatever text it likes -- and through
+        // a double, 9007199254740992e0 and 9007199254740993e0 are one value
+        // while 1e309 and 2e309 are both infinity.
+<span class="fc" id="L412">        String l = left.trim();</span>
+<span class="fc" id="L413">        String r = right.trim();</span>
+<span class="fc bfc" id="L414" title="All 4 branches covered.">        if (isBeyondExpansion(l) || isBeyondExpansion(r)) {</span>
+<span class="fc" id="L415">            return compareBeyondExpansion(l, r);</span>
+        }
+<span class="fc" id="L417">        return compareFixedPoint(withoutExponent(l), withoutExponent(r));</span>
+    }
+
+    /// Whether writing this value out would take more digits than it is worth.
+    private boolean isBeyondExpansion(String text) {
+<span class="fc" id="L422">        int marker = exponentMarker(text);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (marker &lt; 0) {</span>
+<span class="fc" id="L424">            return false;</span>
+        }
+<span class="fc" id="L426">        String exponent = text.substring(marker + 1).trim();</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        int at = exponent.length() &gt; 0</span>
+<span class="pc bpc" id="L428" title="1 of 4 branches missed.">                &amp;&amp; (exponent.charAt(0) == '-' || exponent.charAt(0) == '+')</span>
+                ? 1 : 0;
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        while (at &lt; exponent.length()</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                &amp;&amp; Character.digit(exponent.charAt(at), 10) == 0) {</span>
+<span class="fc" id="L432">            at++;</span>
+        }
+        // By length rather than by value, so no ceiling is involved: more
+        // digits than the limit has cannot be inside it.
+<span class="fc" id="L436">        int digits = exponent.length() - at;</span>
+<span class="fc bfc" id="L437" title="All 4 branches covered.">        return digits &gt; EXPONENT_LIMIT_DIGITS</span>
+                || (digits == EXPONENT_LIMIT_DIGITS
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    &amp;&amp; exponent.substring(at).compareTo(EXPONENT_LIMIT_TEXT) &gt; 0);</span>
+    }
+
+    /// Orders two values at least one of which is too large to write out.
+    ///
+    /// By sign, then by the power of ten the first significant digit sits at,
+    /// then by the digits. No expansion, and exact for any exponent a long
+    /// holds -- which is every exponent anything can produce.
+    private int compareBeyondExpansion(String left, String right) {
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        boolean leftNegative = left.charAt(0) == '-';</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        boolean rightNegative = right.charAt(0) == '-';</span>
+<span class="fc" id="L450">        String leftDigits = significantOf(left);</span>
+<span class="fc" id="L451">        String rightDigits = significantOf(right);</span>
+<span class="fc bfc" id="L452" title="All 4 branches covered.">        if (leftDigits.length() == 0 || rightDigits.length() == 0) {</span>
+            // One of them is zero, and zero is below every positive value and
+            // above every negative one.
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            if (leftDigits.length() == rightDigits.length()) {</span>
+<span class="nc" id="L456">                return 0;</span>
+            }
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (leftDigits.length() == 0) {</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">                return rightNegative ? 1 : -1;</span>
+            }
+<span class="fc bfc" id="L461" title="All 2 branches covered.">            return leftNegative ? -1 : 1;</span>
+        }
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (leftNegative != rightNegative) {</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            return leftNegative ? -1 : 1;</span>
+        }
+<span class="fc" id="L466">        int magnitude = compareIntegerText(orderOf(left), orderOf(right));</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        if (magnitude == 0) {</span>
+<span class="fc" id="L468">            magnitude = compareFraction(leftDigits, rightDigits);</span>
+        }
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        return leftNegative ? -magnitude : magnitude;</span>
+    }
+
+    /// The power of ten the first significant digit of this value sits at.
+    ///
+    /// As a signed digit string rather than a number, because the exponent it
+    /// is built from has no bound: clamping one to any ceiling makes every
+    /// value past that ceiling equal, which is the defect this replaced.
+    private String orderOf(String text) {
+<span class="fc" id="L479">        int marker = exponentMarker(text);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        String exponent = marker &lt; 0 ? &quot;0&quot; : text.substring(marker + 1);</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        String mantissa = marker &lt; 0 ? text : text.substring(0, marker);</span>
+<span class="fc" id="L482">        int at = 0;</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">        if (at &lt; mantissa.length()</span>
+<span class="pc bpc" id="L484" title="1 of 4 branches missed.">                &amp;&amp; (mantissa.charAt(at) == '-' || mantissa.charAt(at) == '+')) {</span>
+<span class="fc" id="L485">            at++;</span>
+        }
+<span class="fc" id="L487">        int point = mantissa.indexOf('.');</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        int whole = (point &lt; 0 ? mantissa.length() : point) - at;</span>
+<span class="fc" id="L489">        int leading = 0;</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">        for (int i = at; i &lt; mantissa.length(); i++) {</span>
+<span class="fc" id="L491">            char c = mantissa.charAt(i);</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">            if (c == '.') {</span>
+<span class="fc" id="L493">                continue;</span>
+            }
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            if (Character.digit(c, 10) != 0) {</span>
+<span class="fc" id="L496">                break;</span>
+            }
+<span class="fc" id="L498">            leading++;</span>
+        }
+<span class="fc" id="L500">        return addSmall(exponent, whole - leading - 1);</span>
+    }
+
+    /// Adds a small whole number to an integer written as text.
+    ///
+    /// Digit by digit, so an exponent of any length keeps every digit it was
+    /// written with. `delta` is the handful of places the mantissa shifts the
+    /// point by, never more than the mantissa is long.
+    private String addSmall(String text, int delta) {
+<span class="fc" id="L509">        String value = text.trim();</span>
+<span class="pc bpc" id="L510" title="1 of 4 branches missed.">        boolean negative = value.length() &gt; 0 &amp;&amp; value.charAt(0) == '-';</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        if (value.length() &gt; 0</span>
+<span class="pc bpc" id="L512" title="1 of 4 branches missed.">                &amp;&amp; (value.charAt(0) == '-' || value.charAt(0) == '+')) {</span>
+<span class="fc" id="L513">            value = value.substring(1);</span>
+        }
+<span class="fc" id="L515">        int at = 0;</span>
+<span class="pc bpc" id="L516" title="1 of 4 branches missed.">        while (at &lt; value.length() - 1 &amp;&amp; Character.digit(value.charAt(at), 10) == 0) {</span>
+<span class="nc" id="L517">            at++;</span>
+        }
+<span class="fc" id="L519">        value = value.substring(at);</span>
+        // Signed arithmetic, one step at a time: the magnitudes are what the
+        // digits hold, and delta is small enough that stepping is exact and
+        // bounded by the mantissa's length.
+        //
+        // The direction is decided per step, not once. A value walking down
+        // through zero changes sign, and from there the same delta moves it
+        // AWAY from zero rather than towards it -- decided once, the steps
+        // after the crossing went back the way they came, so 1e-10001 and the
+        // same number written out in full did not compare equal.
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        int steps = delta &lt; 0 ? -delta : delta;</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        boolean adding = delta &gt; 0;</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        for (int i = 0; i &lt; steps; i++) {</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (isZeroDigits(value)) {</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                negative = !adding;</span>
+<span class="fc" id="L534">                value = &quot;1&quot;;</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">            } else if (adding != negative) {</span>
+<span class="fc" id="L536">                value = incrementDigits(value);</span>
+            } else {
+<span class="nc" id="L538">                value = decrementDigits(value);</span>
+            }
+        }
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (isZeroDigits(value)) {</span>
+<span class="nc" id="L542">            negative = false;</span>
+        }
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        return negative ? &quot;-&quot; + value : value;</span>
+    }
+
+    /// Adds one to a string of digits.
+    private String incrementDigits(String digits) {
+<span class="fc" id="L549">        StringBuilder out = new StringBuilder(digits);</span>
+<span class="fc" id="L550">        int at = out.length() - 1;</span>
+<span class="fc bfc" id="L551" title="All 2 branches covered.">        while (at &gt;= 0) {</span>
+<span class="fc" id="L552">            int digit = Character.digit(out.charAt(at), 10) + 1;</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">            if (digit &lt; 10) {</span>
+<span class="fc" id="L554">                out.setCharAt(at, (char) ('0' + digit));</span>
+<span class="fc" id="L555">                return out.toString();</span>
+            }
+<span class="fc" id="L557">            out.setCharAt(at, '0');</span>
+<span class="fc" id="L558">            at--;</span>
+<span class="fc" id="L559">        }</span>
+<span class="fc" id="L560">        return &quot;1&quot; + out.toString();</span>
+    }
+
+    /// Subtracts one from a string of digits that is not zero.
+    private String decrementDigits(String digits) {
+<span class="nc" id="L565">        StringBuilder out = new StringBuilder(digits);</span>
+<span class="nc" id="L566">        int at = out.length() - 1;</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">        while (at &gt;= 0) {</span>
+<span class="nc" id="L568">            int digit = Character.digit(out.charAt(at), 10);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">            if (digit &gt; 0) {</span>
+<span class="nc" id="L570">                out.setCharAt(at, (char) ('0' + (digit - 1)));</span>
+<span class="nc" id="L571">                break;</span>
+            }
+<span class="nc" id="L573">            out.setCharAt(at, '9');</span>
+<span class="nc" id="L574">            at--;</span>
+<span class="nc" id="L575">        }</span>
+<span class="nc" id="L576">        int lead = 0;</span>
+<span class="nc bnc" id="L577" title="All 4 branches missed.">        while (lead &lt; out.length() - 1 &amp;&amp; out.charAt(lead) == '0') {</span>
+<span class="nc" id="L578">            lead++;</span>
+        }
+        // Through the String: StringBuilder.substring is not in the class
+        // library Codename One compiles against -- CLDC11 has no such method
+        // and the VM's copy returns a StringBuilder -- so this is a compile
+        // error on the framework build even though it is fine on the JDK.
+<span class="nc" id="L584">        return out.toString().substring(lead);</span>
+    }
+
+    /// Whether every character is a zero digit.
+    private boolean isZeroDigits(String digits) {
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        for (int i = 0; i &lt; digits.length(); i++) {</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">            if (Character.digit(digits.charAt(i), 10) != 0) {</span>
+<span class="fc" id="L591">                return false;</span>
+            }
+        }
+<span class="fc" id="L594">        return true;</span>
+    }
+
+    /// Compares two whole numbers written as signed text, at any length.
+    private int compareIntegerText(String left, String right) {
+<span class="pc bpc" id="L599" title="1 of 4 branches missed.">        boolean leftNegative = left.length() &gt; 0 &amp;&amp; left.charAt(0) == '-';</span>
+<span class="pc bpc" id="L600" title="1 of 4 branches missed.">        boolean rightNegative = right.length() &gt; 0 &amp;&amp; right.charAt(0) == '-';</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">        String leftDigits = leftNegative ? left.substring(1) : left;</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">        String rightDigits = rightNegative ? right.substring(1) : right;</span>
+<span class="pc bpc" id="L603" title="3 of 4 branches missed.">        if (isZeroDigits(leftDigits) &amp;&amp; isZeroDigits(rightDigits)) {</span>
+<span class="nc" id="L604">            return 0;</span>
+        }
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">        if (leftNegative != rightNegative) {</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">            return leftNegative ? -1 : 1;</span>
+        }
+<span class="fc" id="L609">        int magnitude = compareDigits(leftDigits, rightDigits);</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        return leftNegative ? -magnitude : magnitude;</span>
+    }
+
+    /// The significant digits of a value, ignoring sign, point and exponent.
+    private String significantOf(String text) {
+<span class="fc" id="L615">        int marker = exponentMarker(text);</span>
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        String mantissa = marker &lt; 0 ? text : text.substring(0, marker);</span>
+<span class="fc" id="L617">        StringBuilder digits = new StringBuilder();</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        for (int i = 0; i &lt; mantissa.length(); i++) {</span>
+<span class="fc" id="L619">            char c = mantissa.charAt(i);</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">            if (Character.digit(c, 10) &gt;= 0) {</span>
+<span class="pc bpc" id="L621" title="1 of 4 branches missed.">                if (digits.length() &gt; 0 || Character.digit(c, 10) != 0) {</span>
+<span class="fc" id="L622">                    digits.append(c);</span>
+                }
+            }
+        }
+<span class="fc" id="L626">        int end = digits.length();</span>
+<span class="pc bpc" id="L627" title="1 of 4 branches missed.">        while (end &gt; 0 &amp;&amp; Character.digit(digits.charAt(end - 1), 10) == 0) {</span>
+<span class="nc" id="L628">            end--;</span>
+        }
+<span class="fc" id="L630">        return digits.toString().substring(0, end);</span>
+    }
+
+    /// Where the exponent begins, or -1.
+    private int exponentMarker(String text) {
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L636">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L637" title="All 4 branches covered.">            if (c == 'e' || c == 'E') {</span>
+<span class="fc" id="L638">                return i;</span>
+            }
+        }
+<span class="fc" id="L641">        return -1;</span>
+    }
+
+    /// Rewrites a number in exponent form as plain digits.
+    ///
+    /// - `text`: a value [#isNumeric] already accepted
+    ///
+    /// #### Returns
+    ///
+    /// the same value with the point moved and the exponent gone
+    private String withoutExponent(String text) {
+<span class="fc" id="L652">        int marker = exponentMarker(text);</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        if (marker &lt; 0) {</span>
+<span class="fc" id="L654">            return text;</span>
+        }
+<span class="fc" id="L656">        int exponent = parseExponent(text.substring(marker + 1));</span>
+<span class="fc" id="L657">        String mantissa = text.substring(0, marker);</span>
+<span class="fc" id="L658">        String sign = &quot;&quot;;</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        if (mantissa.length() &gt; 0</span>
+<span class="pc bpc" id="L660" title="2 of 4 branches missed.">                &amp;&amp; (mantissa.charAt(0) == '-' || mantissa.charAt(0) == '+')) {</span>
+<span class="nc bnc" id="L661" title="All 2 branches missed.">            sign = mantissa.charAt(0) == '-' ? &quot;-&quot; : &quot;&quot;;</span>
+<span class="nc" id="L662">            mantissa = mantissa.substring(1);</span>
+        }
+<span class="fc" id="L664">        int point = mantissa.indexOf('.');</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">        String digits = point &lt; 0 ? mantissa</span>
+<span class="fc" id="L666">                : mantissa.substring(0, point) + mantissa.substring(point + 1);</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">        int pointAt = (point &lt; 0 ? mantissa.length() : point) + exponent;</span>
+<span class="fc" id="L668">        StringBuilder out = new StringBuilder();</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">        if (pointAt &lt;= 0) {</span>
+<span class="nc" id="L670">            out.append(&quot;0.&quot;);</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">            for (int i = 0; i &lt; -pointAt; i++) {</span>
+<span class="nc" id="L672">                out.append('0');</span>
+            }
+<span class="nc" id="L674">            out.append(digits);</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">        } else if (pointAt &gt;= digits.length()) {</span>
+<span class="fc" id="L676">            out.append(digits);</span>
+<span class="fc bfc" id="L677" title="All 2 branches covered.">            for (int i = digits.length(); i &lt; pointAt; i++) {</span>
+<span class="fc" id="L678">                out.append('0');</span>
+            }
+        } else {
+<span class="nc" id="L681">            out.append(digits.substring(0, pointAt));</span>
+<span class="nc" id="L682">            out.append('.');</span>
+<span class="nc" id="L683">            out.append(digits.substring(pointAt));</span>
+        }
+<span class="fc" id="L685">        return sign + out.toString();</span>
+    }
+
+    /// Reads a small exponent's digits, which [#isNumeric] has already checked.
+    ///
+    /// Only reached for an exponent inside the expansion limit, so it fits an
+    /// int by construction. Every larger one is compared as text instead --
+    /// reading it into a number at all is what made 1e1000020 and 1e1000029
+    /// the same value, whether by stopping partway through the digits or by
+    /// clamping them to a shared ceiling.
+    private int parseExponent(String text) {
+<span class="pc bpc" id="L696" title="2 of 4 branches missed.">        boolean negative = text.length() &gt; 0 &amp;&amp; text.charAt(0) == '-';</span>
+<span class="pc bpc" id="L697" title="3 of 6 branches missed.">        int at = negative || (text.length() &gt; 0 &amp;&amp; text.charAt(0) == '+')</span>
+                ? 1 : 0;
+<span class="fc" id="L699">        int value = 0;</span>
+<span class="fc bfc" id="L700" title="All 2 branches covered.">        for (int i = at; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L701">            value = value * 10 + Character.digit(text.charAt(i), 10);</span>
+        }
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        return negative ? -value : value;</span>
+    }
+
+    /// The largest exponent worth writing out as digits.
+    ///
+    /// Ten thousand places is already far past anything a document carries,
+    /// and past it the digits are compared instead of expanded.
+    private static final String EXPONENT_LIMIT_TEXT = &quot;10000&quot;;
+
+    /// How long that limit is, so the test can be made on length first.
+    private static final int EXPONENT_LIMIT_DIGITS = 5;
+
+    /// Compares two numbers written without an exponent, digit by digit.
+    ///
+    /// - `left`: a number with no exponent
+    ///
+    /// - `right`: a number with no exponent
+    ///
+    /// #### Returns
+    ///
+    /// negative, zero or positive
+    private int compareFixedPoint(String left, String right) {
+<span class="fc" id="L725">        String leftWhole = wholePart(left);</span>
+<span class="fc" id="L726">        String rightWhole = wholePart(right);</span>
+<span class="fc" id="L727">        String leftFraction = fractionPart(left);</span>
+<span class="fc" id="L728">        String rightFraction = fractionPart(right);</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">        boolean leftNegative = left.charAt(0) == '-'</span>
+<span class="pc bpc" id="L730" title="2 of 4 branches missed.">                &amp;&amp; !(leftWhole.length() == 0 &amp;&amp; leftFraction.length() == 0);</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        boolean rightNegative = right.charAt(0) == '-'</span>
+<span class="pc bpc" id="L732" title="3 of 4 branches missed.">                &amp;&amp; !(rightWhole.length() == 0 &amp;&amp; rightFraction.length() == 0);</span>
+<span class="fc bfc" id="L733" title="All 2 branches covered.">        if (leftNegative != rightNegative) {</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            return leftNegative ? -1 : 1;</span>
+        }
+<span class="fc" id="L736">        int magnitude = compareDigits(leftWhole, rightWhole);</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">        if (magnitude == 0) {</span>
+<span class="fc" id="L738">            magnitude = compareFraction(leftFraction, rightFraction);</span>
+        }
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">        return leftNegative ? -magnitude : magnitude;</span>
+    }
+
+    /// Compares two whole-number digit strings by value.
+    ///
+    /// Digit by digit rather than by comparing the strings: isNumeric accepts
+    /// whatever Character.isDigit does, so a value can be written in
+    /// Arabic-Indic or any other decimal script, and those code points do not
+    /// sort in numeric order against ASCII. Integer.parseInt read them as
+    /// numbers, and so does this.
+    private int compareDigits(String left, String right) {
+<span class="fc bfc" id="L751" title="All 2 branches covered.">        if (left.length() != right.length()) {</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">            return left.length() &lt; right.length() ? -1 : 1;</span>
+        }
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        for (int i = 0; i &lt; left.length(); i++) {</span>
+<span class="fc" id="L755">            int l = Character.digit(left.charAt(i), 10);</span>
+<span class="fc" id="L756">            int r = Character.digit(right.charAt(i), 10);</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">            if (l != r) {</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">                return l &lt; r ? -1 : 1;</span>
+            }
+        }
+<span class="fc" id="L761">        return 0;</span>
+    }
+
+    /// Compares two fractional digit strings, padding the shorter with zeros.
+    private int compareFraction(String left, String right) {
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">        int length = left.length() &gt; right.length()</span>
+<span class="pc" id="L767">                ? left.length() : right.length();</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc bfc" id="L769" title="All 2 branches covered.">            int l = i &lt; left.length() ? Character.digit(left.charAt(i), 10) : 0;</span>
+<span class="pc bpc" id="L770" title="1 of 2 branches missed.">            int r = i &lt; right.length() ? Character.digit(right.charAt(i), 10) : 0;</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">            if (l != r) {</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">                return l &lt; r ? -1 : 1;</span>
+            }
+        }
+<span class="fc" id="L775">        return 0;</span>
+    }
+
+    /// The digits before the point, without sign or leading zeros.
+    private String wholePart(String text) {
+<span class="fc" id="L780">        int at = 0;</span>
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">        if (at &lt; text.length()</span>
+<span class="pc bpc" id="L782" title="1 of 4 branches missed.">                &amp;&amp; (text.charAt(at) == '-' || text.charAt(at) == '+')) {</span>
+<span class="fc" id="L783">            at++;</span>
+        }
+<span class="fc" id="L785">        int point = text.indexOf('.');</span>
+<span class="fc bfc" id="L786" title="All 2 branches covered.">        int end = point &lt; 0 ? text.length() : point;</span>
+<span class="fc bfc" id="L787" title="All 4 branches covered.">        while (at &lt; end &amp;&amp; Character.digit(text.charAt(at), 10) == 0) {</span>
+<span class="fc" id="L788">            at++;</span>
+        }
+<span class="fc" id="L790">        return text.substring(at, end);</span>
+    }
+
+    /// The digits after the point, without trailing zeros.
+    private String fractionPart(String text) {
+<span class="fc" id="L795">        int point = text.indexOf('.');</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        if (point &lt; 0) {</span>
+<span class="fc" id="L797">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L799">        int end = text.length();</span>
+<span class="fc bfc" id="L800" title="All 4 branches covered.">        while (end &gt; point + 1 &amp;&amp; Character.digit(text.charAt(end - 1), 10) == 0) {</span>
+<span class="fc" id="L801">            end--;</span>
+        }
+<span class="fc" id="L803">        return text.substring(point + 1, end);</span>
+    }
+
+    /// Utility method for subclasses to determine strip single/double quotes
+    /// from a string
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to transform
+    ///
+    /// #### Returns
+    ///
+    /// the value without quotes.
+    protected String stripQuotes(String rvalue) {
+<span class="fc" id="L817">        StringBuffer buf = new StringBuffer();</span>
+<span class="fc" id="L818">        int rvlen = rvalue.length();</span>
+<span class="fc bfc" id="L819" title="All 2 branches covered.">        for (int i = 0; i &lt; rvlen; i++) {</span>
+<span class="fc" id="L820">            char ch = rvalue.charAt(i);</span>
+<span class="pc bpc" id="L821" title="1 of 4 branches missed.">            if (ch != '\'' &amp;&amp; ch != '\&quot;') {</span>
+<span class="fc" id="L822">                buf.append(ch);</span>
+            }
+        }
+<span class="fc" id="L825">        return buf.toString();</span>
+    }
+
+    /// Utility method for subclasses to convert a string to an array, delimited
+    /// by comma, optionally enclosed in brackets, and elements optionally
+    /// enclosed in quotes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: value to transform
+    ///
+    /// #### Returns
+    ///
+    /// the value as an array.
+    protected String[] explode(String arrayAsString) {
+<span class="fc" id="L840">        arrayAsString = arrayAsString.trim();</span>
+<span class="pc bpc" id="L841" title="1 of 4 branches missed.">        if (arrayAsString.startsWith(&quot;(&quot;) &amp;&amp; arrayAsString.endsWith(&quot;)&quot;)) {</span>
+<span class="fc" id="L842">            arrayAsString = arrayAsString.substring(1, arrayAsString.length() - 1);</span>
+        }
+<span class="fc" id="L844">        List v = StringUtil.tokenizeString(arrayAsString, ',');</span>
+<span class="fc" id="L845">        String[] a = new String[v.size()];</span>
+<span class="fc" id="L846">        int index = 0;</span>
+<span class="fc bfc" id="L847" title="All 2 branches covered.">        for (Object item : v) {</span>
+<span class="fc" id="L848">            a[index++] = stripQuotes(item.toString().trim());</span>
+<span class="fc" id="L849">        }</span>
+<span class="fc" id="L850">        return a;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression with no
+    /// comparator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateSingle(StructuredContent element, String expr) {
+<span class="fc" id="L867">        return null;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression with no
+    /// comparator. By default, this implementation will call evaluateSingle()
+    /// against each element of the array, and return an array of all elements
+    /// that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateSingle(List elements, String expr) {
+        List array;
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L888">            array = new java.util.Vector();</span>
+        } else {
+<span class="fc" id="L890">            array = new ArrayList();</span>
+        }
+<span class="fc bfc" id="L892" title="All 2 branches covered.">        for (Object o : elements) {</span>
+<span class="pc bpc" id="L893" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L894">                o = evaluateSingle((StructuredContent) o, expr);</span>
+<span class="fc bfc" id="L895" title="All 2 branches covered.">                if (o != null) {</span>
+<span class="fc" id="L896">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L899">        }</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        if (array.size() == 1) {</span>
+<span class="fc" id="L901">            return array.get(0);</span>
+        }
+<span class="fc" id="L903">        return array;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue &lt; rvalue. By default, this implementation will call
+    /// evaluateLeftLessRight() against each element of the array, and return an
+    /// array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftLessRight(List elements, String lvalue,
+                                           String rvalue) {
+        List array;
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L925">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L927">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L930" title="All 2 branches covered.">        for (Object o : elements) {</span>
+<span class="pc bpc" id="L931" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L932">                o = evaluateLeftLessRight((StructuredContent) o, lvalue, rvalue);</span>
+<span class="fc bfc" id="L933" title="All 2 branches covered.">                if (o != null) {</span>
+<span class="fc" id="L934">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L937">        }</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">        if (array.size() == 1) {</span>
+<span class="fc" id="L939">            return array.get(0);</span>
+        }
+<span class="fc" id="L941">        return array;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue &lt; rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftLessRight(StructuredContent element,
+                                           String lvalue, String rvalue) {
+<span class="nc" id="L959">        return null;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue &gt; rvalue. By default, this implementation will call
+    /// evaluateLeftGreaterRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftGreaterRight(List elements, String lvalue,
+                                              String rvalue) {
+        List array;
+<span class="pc bpc" id="L980" title="1 of 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L981">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L983">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L986" title="All 2 branches covered.">        for (Object o : elements) {</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L988">                o = evaluateLeftGreaterRight((StructuredContent) o, lvalue, rvalue);</span>
+<span class="fc bfc" id="L989" title="All 2 branches covered.">                if (o != null) {</span>
+<span class="fc" id="L990">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L993">        }</span>
+<span class="fc bfc" id="L994" title="All 2 branches covered.">        if (array.size() == 1) {</span>
+<span class="fc" id="L995">            return array.get(0);</span>
+        }
+<span class="fc" id="L997">        return array;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue &gt; rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftGreaterRight(StructuredContent element,
+                                              String lvalue, String rvalue) {
+<span class="nc" id="L1015">        return null;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue = rvalue. By default, this implementation will call
+    /// evaluateLeftEqualsRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftEqualsRight(List elements, String lvalue,
+                                             String rvalue) {
+        List array;
+<span class="fc bfc" id="L1036" title="All 2 branches covered.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L1037">            array = new java.util.Vector();</span>
+        } else {
+<span class="fc" id="L1039">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L1042" title="All 2 branches covered.">        for (Object o : elements) {</span>
+<span class="pc bpc" id="L1043" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L1044">                o = evaluateLeftEqualsRight((StructuredContent) o, lvalue, rvalue);</span>
+<span class="fc bfc" id="L1045" title="All 2 branches covered.">                if (o != null) {</span>
+<span class="fc" id="L1046">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L1049">        }</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">        if (array.size() == 1) {</span>
+<span class="fc" id="L1051">            return array.get(0);</span>
+        }
+<span class="fc" id="L1053">        return array;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue = rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftEqualsRight(StructuredContent element,
+                                             String lvalue, String rvalue) {
+<span class="nc" id="L1071">        return null;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue % rvalue. By default, this implementation will call
+    /// evaluateLeftContainsRight() against each element of the array, and return
+    /// an array of all elements that didn't return null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: an array of StructuredContent elements
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftContainsRight(List elements, String lvalue,
+                                               String rvalue) {
+        List array;
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">        if (elements instanceof java.util.Vector) {</span>
+<span class="fc" id="L1093">            array = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L1095">            array = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L1098" title="All 2 branches covered.">        for (Object o : elements) {</span>
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="fc" id="L1100">                o = evaluateLeftContainsRight((StructuredContent) o, lvalue, rvalue);</span>
+<span class="fc bfc" id="L1101" title="All 2 branches covered.">                if (o != null) {</span>
+<span class="fc" id="L1102">                    array.add(o);</span>
+                }
+            }
+<span class="fc" id="L1105">        }</span>
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">        if (array.size() == 1) {</span>
+<span class="fc" id="L1107">            return array.get(0);</span>
+        }
+<span class="fc" id="L1109">        return array;</span>
+    }
+
+    /// Override this element to handle testing a predicate expression where
+    /// lvalue % rvalue.
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: a single StructuredContent element
+    ///
+    /// - `expr`: the full predicate expression
+    ///
+    /// #### Returns
+    ///
+    /// @return either a single StructuredContent or an array (List) of
+    /// StructuredContent object.
+    protected Object evaluateLeftContainsRight(StructuredContent element,
+                                               String lvalue, String rvalue) {
+<span class="nc" id="L1127">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrismaticJointDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">PrismaticJointDef.java</span></div><h1>PrismaticJointDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+
+/// Prismatic joint definition. This requires defining a line of
+/// motion using an axis and an anchor point. The definition uses local
+/// anchor points and a local axis so that the initial configuration
+/// can violate the constraint slightly. The joint translation is zero
+/// when the local anchor points coincide in world space. Using local
+/// anchors and a local axis helps when saving and loading a game.
+/// @warning at least one body should by dynamic with a non-fixed rotation.
+/// @author Daniel
+public class PrismaticJointDef extends JointDef {
+
+
+	/// The local anchor point relative to body1's origin.
+	public final Vec2 localAnchorA;
+
+	/// The local anchor point relative to body2's origin.
+	public final Vec2 localAnchorB;
+
+	/// The local translation axis in body1.
+	public final Vec2 localAxisA;
+
+	/// The constrained angle between the bodies: body2_angle - body1_angle.
+	public float referenceAngle;
+
+	/// Enable/disable the joint limit.
+	public boolean enableLimit;
+
+	/// The lower translation limit, usually in meters.
+	public float lowerTranslation;
+
+	/// The upper translation limit, usually in meters.
+	public float upperTranslation;
+
+	/// Enable/disable the joint motor.
+	public boolean enableMotor;
+
+	/// The maximum motor torque, usually in N-m.
+	public float maxMotorForce;
+
+	/// The desired motor speed in radians per second.
+	public float motorSpeed;
+	
+<span class="fc" id="L70">	public PrismaticJointDef(){</span>
+<span class="fc" id="L71">		type = JointType.PRISMATIC;</span>
+<span class="fc" id="L72">		localAnchorA = new Vec2();</span>
+<span class="fc" id="L73">		localAnchorB = new Vec2();</span>
+<span class="fc" id="L74">		localAxisA = new Vec2(1.0f, 0.0f);</span>
+<span class="fc" id="L75">		referenceAngle = 0.0f;</span>
+<span class="fc" id="L76">		enableLimit = false;</span>
+<span class="fc" id="L77">		lowerTranslation = 0.0f;</span>
+<span class="fc" id="L78">		upperTranslation = 0.0f;</span>
+<span class="fc" id="L79">		enableMotor = false;</span>
+<span class="fc" id="L80">		maxMotorForce = 0.0f;</span>
+<span class="fc" id="L81">		motorSpeed = 0.0f;</span>
+<span class="fc" id="L82">	}</span>
+
+	
+	/// Initialize the bodies, anchors, axis, and reference angle using the world
+	/// anchor and world axis.
+	public void initialize(Body b1, Body b2, Vec2 anchor, Vec2 axis){
+<span class="fc" id="L88">		bodyA = b1;</span>
+<span class="fc" id="L89">		bodyB = b2;</span>
+<span class="fc" id="L90">		bodyA.getLocalPointToOut(anchor, localAnchorA);</span>
+<span class="fc" id="L91">		bodyB.getLocalPointToOut(anchor, localAnchorB);</span>
+<span class="fc" id="L92">		bodyA.getLocalVectorToOut(axis, localAxisA);</span>
+<span class="fc" id="L93">		referenceAngle = bodyB.getAngle() - bodyA.getAngle();</span>
+<span class="fc" id="L94">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

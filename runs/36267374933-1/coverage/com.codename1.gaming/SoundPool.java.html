@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SoundPool.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">SoundPool.java</span></div><h1>SoundPool.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.media.CompletionAwareSoundPoolPeer;
+import com.codename1.media.MediaManager;
+import com.codename1.media.SoundPoolPeer;
+import com.codename1.media.VoiceCompletionListener;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import java.io.IOException;
+import java.io.InputStream;
+
+/// Plays many short, overlapping sound effects with low latency.
+///
+/// A `SoundPool` is built for game audio: gunshots, coins, footsteps -- sounds that
+/// must trigger instantly and play several at once. Load each clip once with
+/// `#load(String)` and trigger it repeatedly with `#play(SoundEffect)`; the pool
+/// mixes up to `#getMaxStreams()` voices simultaneously and drops the request
+/// (returning -1) rather than blocking when that limit is reached.
+///
+/// ```java
+/// SoundPool sfx = SoundPool.create(8);
+/// SoundEffect coin = sfx.load(&quot;/coin.wav&quot;);
+/// // ... in the game loop:
+/// coin.play();
+/// ```
+///
+/// On platforms with a purpose built low latency audio engine (Android, iOS, the
+/// desktop simulator and the browser) the pool uses it directly, supporting per
+/// play volume, stereo pan and pitch/rate. Where no native backend exists it falls
+/// back to a `com.codename1.media.MediaManager` based pool that still works
+/// everywhere but has higher latency and ignores pan and rate --
+/// `#isNativeAccelerated()` reports which path is in use.
+public final class SoundPool {
+    private final SoundPoolPeer peer;
+    private final boolean nativeAccelerated;
+    private final int maxStreams;
+    private VoiceListener voiceListener;
+
+<span class="fc" id="L61">    private SoundPool(SoundPoolPeer peer, boolean nativeAccelerated, int maxStreams) {</span>
+<span class="fc" id="L62">        this.peer = peer;</span>
+<span class="fc" id="L63">        this.nativeAccelerated = nativeAccelerated;</span>
+<span class="fc" id="L64">        this.maxStreams = maxStreams;</span>
+<span class="fc" id="L65">    }</span>
+
+    /// Creates a sound pool that mixes up to `maxStreams` voices at once.
+    public static SoundPool create(int maxStreams) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (maxStreams &lt; 1) {</span>
+<span class="nc" id="L70">            maxStreams = 1;</span>
+        }
+<span class="fc" id="L72">        SoundPoolPeer nativePeer = Display.getInstance().createSoundPool(maxStreams);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        boolean nativeAccel = nativePeer != null;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        SoundPoolPeer peer = nativeAccel ? nativePeer : MediaManager.createFallbackSoundPoolPeer(maxStreams);</span>
+<span class="fc" id="L75">        return new SoundPool(peer, nativeAccel, maxStreams);</span>
+    }
+
+    /// True if a native low latency audio backend is in use; false if the cross
+    /// platform `MediaManager` fallback is in use.
+    public boolean isNativeAccelerated() {
+<span class="fc" id="L81">        return nativeAccelerated;</span>
+    }
+
+    /// True if this pool can report voice completion to a `VoiceListener`. The
+    /// cross-platform fallback mixer supports it; some native engines (e.g. Android's
+    /// `SoundPool`) do not.
+    public boolean isVoiceCompletionSupported() {
+<span class="fc" id="L88">        return peer instanceof CompletionAwareSoundPoolPeer;</span>
+    }
+
+    /// Registers a listener notified (on the EDT) as each voice finishes playing, or
+    /// `null` to clear it. Has no effect on backends where
+    /// `#isVoiceCompletionSupported()` is false.
+    public void setVoiceListener(VoiceListener listener) {
+<span class="fc" id="L95">        this.voiceListener = listener;</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (peer instanceof CompletionAwareSoundPoolPeer) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            ((CompletionAwareSoundPoolPeer) peer).setVoiceCompletionListener(</span>
+<span class="fc" id="L98">                    listener == null ? null : new VoiceCompletionListener() {</span>
+                        @Override
+                        public void onVoiceComplete(final int voiceId) {
+<span class="nc" id="L101">                            final VoiceListener l = voiceListener;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                            if (l != null) {</span>
+<span class="nc" id="L103">                                Display.getInstance().callSerially(new Runnable() {</span>
+                                    @Override
+                                    public void run() {
+<span class="nc" id="L106">                                        l.onComplete(voiceId);</span>
+<span class="nc" id="L107">                                    }</span>
+                                });
+                            }
+<span class="nc" id="L110">                        }</span>
+                    });
+        }
+<span class="fc" id="L113">    }</span>
+
+    /// The maximum number of voices that can play simultaneously.
+    public int getMaxStreams() {
+<span class="fc" id="L117">        return maxStreams;</span>
+    }
+
+    /// Loads a sound effect from a uri (for example a `/sound.wav` resource path).
+    public SoundEffect load(String uri) throws IOException {
+<span class="nc" id="L122">        return new SoundEffect(this, peer.loadSound(uri));</span>
+    }
+
+    /// Loads a sound effect from a stream of the given mime type. The stream is
+    /// fully read and closed.
+    public SoundEffect load(InputStream data, String mimeType) throws IOException {
+<span class="nc" id="L128">        return new SoundEffect(this, peer.loadSound(data, mimeType));</span>
+    }
+
+    /// Loads a sound effect from a uri on a background thread, completing the
+    /// returned resource on success or error.
+    public AsyncResource&lt;SoundEffect&gt; loadAsync(final String uri) {
+<span class="nc" id="L134">        final AsyncResource&lt;SoundEffect&gt; result = new AsyncResource&lt;SoundEffect&gt;();</span>
+<span class="nc" id="L135">        new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L139">                    result.complete(load(uri));</span>
+<span class="nc" id="L140">                } catch (Throwable t) {</span>
+<span class="nc" id="L141">                    result.error(t);</span>
+<span class="nc" id="L142">                }</span>
+<span class="nc" id="L143">            }</span>
+<span class="nc" id="L144">        }, &quot;SoundPool.loadAsync&quot;).start();</span>
+<span class="nc" id="L145">        return result;</span>
+    }
+
+    /// Plays the effect once at full volume, centered, normal rate. Returns a voice
+    /// id, or -1 if no voice was available.
+    public int play(SoundEffect effect) {
+<span class="nc" id="L151">        return play(effect, 1f, 0f, 1f, 0);</span>
+    }
+
+    /// Plays the effect with explicit parameters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effect`: the loaded sound to play
+    ///
+    /// - `volume`: 0.0 (silent) to 1.0 (full)
+    ///
+    /// - `pan`: -1.0 (full left) to 1.0 (full right), 0.0 centered (ignored by the
+    /// fallback)
+    ///
+    /// - `rate`: playback rate / pitch, 1.0 normal, typically 0.5 to 2.0 (ignored
+    /// by the fallback)
+    ///
+    /// - `loop`: 0 plays once, -1 loops forever, n repeats n extra times
+    ///
+    /// #### Returns
+    ///
+    /// a voice id usable with `#stop(int)` etc., or -1 if the pool is exhausted
+    public int play(SoundEffect effect, float volume, float pan, float rate, int loop) {
+<span class="nc" id="L174">        return peer.play(effect.getNativeSound(), volume, pan, rate, loop);</span>
+    }
+
+    /// Sets the volume (0.0 to 1.0) of a playing voice.
+    public void setVolume(int voiceId, float volume) {
+<span class="fc" id="L179">        peer.setVolume(voiceId, volume);</span>
+<span class="fc" id="L180">    }</span>
+
+    /// Sets the playback rate / pitch of a playing voice (native backends only).
+    public void setRate(int voiceId, float rate) {
+<span class="fc" id="L184">        peer.setRate(voiceId, rate);</span>
+<span class="fc" id="L185">    }</span>
+
+    /// Sets the stereo pan (-1.0 to 1.0) of a playing voice (native backends only).
+    public void setPan(int voiceId, float pan) {
+<span class="fc" id="L189">        peer.setPan(voiceId, pan);</span>
+<span class="fc" id="L190">    }</span>
+
+    /// Pauses a playing voice.
+    public void pause(int voiceId) {
+<span class="fc" id="L194">        peer.pauseVoice(voiceId);</span>
+<span class="fc" id="L195">    }</span>
+
+    /// Resumes a paused voice.
+    public void resume(int voiceId) {
+<span class="fc" id="L199">        peer.resumeVoice(voiceId);</span>
+<span class="fc" id="L200">    }</span>
+
+    /// Stops a voice.
+    public void stop(int voiceId) {
+<span class="fc" id="L204">        peer.stopVoice(voiceId);</span>
+<span class="fc" id="L205">    }</span>
+
+    /// Stops every playing voice.
+    public void stopAll() {
+<span class="fc" id="L209">        peer.stopAll();</span>
+<span class="fc" id="L210">    }</span>
+
+    /// Pauses all playback, for example when the app is backgrounded.
+    public void autoPause() {
+<span class="nc" id="L214">        peer.autoPause();</span>
+<span class="nc" id="L215">    }</span>
+
+    /// Resumes playback paused by `#autoPause()`.
+    public void autoResume() {
+<span class="nc" id="L219">        peer.autoResume();</span>
+<span class="nc" id="L220">    }</span>
+
+    void unload(SoundEffect effect) {
+<span class="nc" id="L223">        peer.unloadSound(effect.getNativeSound());</span>
+<span class="nc" id="L224">    }</span>
+
+    /// Releases the pool and all loaded effects. The pool must not be used
+    /// afterwards.
+    public void release() {
+<span class="fc" id="L229">        peer.release();</span>
+<span class="fc" id="L230">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

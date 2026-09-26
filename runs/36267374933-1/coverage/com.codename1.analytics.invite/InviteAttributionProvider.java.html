@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InviteAttributionProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics.invite</a> &gt; <span class="el_source">InviteAttributionProvider.java</span></div><h1>InviteAttributionProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics.invite;
+
+import com.codename1.analytics.AbstractAnalyticsProvider;
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsCapability;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.AnalyticsContext;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+// The seam that lets invite attribution honour an erasure request and a
+// consent change without any edit to the Analytics facade.
+//
+// Analytics already calls init(context) on every provider from
+// resetClientId(), with a context carrying the NEW client id, and
+// onConsentChanged(consent) on every provider from setConsent(). Registering
+// a provider is therefore enough to observe both, and this class exists only
+// to do that.
+//
+// It matters because Analytics.resetClientId() does not clear custom
+// dimensions. That is the right default -- an application's own dimensions
+// are its data and it never asked to lose them -- but the referral dimensions
+// identify an inviter, so leaving them behind would re-link a freshly issued
+// pseudonymous id to the same person and defeat the erasure. Widening
+// resetClientId to clear everything would have taken the application's
+// dimensions with it, so the scoped erase lives here instead.
+//
+// The provider reports no capabilities and does nothing with events; it is a
+// listener wearing a provider's interface.
+<span class="fc" id="L55">final class InviteAttributionProvider extends AbstractAnalyticsProvider {</span>
+    // The last client id this provider saw. A change means resetClientId()
+    // ran, which is what an erasure request looks like from here.
+    // Package private: a test models a genuinely first launch by removing it,
+    // which is the state that decides whether a reset is seen as an identity
+    // change at all.
+    static final String PREF_LAST_CLIENT_ID = &quot;cn1$inviteLastClientId&quot;;
+
+    @Override
+    public String getName() {
+<span class="nc" id="L65">        return &quot;invite-attribution&quot;;</span>
+    }
+
+    @Override
+    public void init(AnalyticsContext context) {
+<span class="fc" id="L70">        super.init(context);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        String seen = context == null ? null : context.getClientId();</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (seen == null) {</span>
+<span class="nc" id="L73">            return;</span>
+        }
+<span class="fc" id="L75">        String last = baseline();</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (last == null || last.length() == 0) {</span>
+            // No baseline, and with a VERIFIED store that now means one thing.
+            //
+            // It used to mean two, because the baseline lived in Preferences:
+            // set() updates a static table and swallows the store's answer, so
+            // a write that failed left exactly the same empty value as a write
+            // that never happened. Records beside an empty baseline were read
+            // as an erasure that never finished, and eraseInternal() ran --
+            // which on a first launch whose baseline write had merely failed
+            // DELETED a perfectly good invite. One storage hiccup was enough:
+            // a direct link or an App Clip persists a pending invite, the
+            // process exits, and the next launch destroys it.
+            //
+            // The baseline is a checked InviteStore write now, so an absent one
+            // means the write never landed -- a storage failure, not a reset,
+            // and storage that cannot hold this could not have held the records
+            // either. So the baseline is simply (re)written, and nothing is
+            // erased on the strength of its absence.
+            //
+            // A real reset is not detected by absence anyway. It is detected by
+            // the baseline DIFFERING below, and by the durable erasure marker
+            // that reset() and eraseInternal() leave when they cannot finish,
+            // which resumeOwedErasure() retries on every entry point.
+<span class="fc" id="L99">            rememberBaseline(seen);</span>
+<span class="fc" id="L100">            return;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!last.equals(seen)) {</span>
+            // The baseline moves only once the erasure is durable.
+            //
+            // Recording the new id regardless meant a failed marker write ended
+            // the erasure for good: the held copy is retried by the next read of
+            // the record, but a process that exits before one loses it, and the
+            // next launch sees no change of identity, does not erase again, and
+            // finds a state indistinguishable from a fresh install -- free to
+            // start deferred attribution and be handed the same inviter back
+            // under the new id. Leaving the baseline where it is costs one
+            // repeated erasure and is the only thing here that survives the
+            // process.
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (Invites.eraseInternal()) {</span>
+<span class="fc" id="L115">                rememberBaseline(seen);</span>
+            }
+        }
+<span class="fc" id="L118">    }</span>
+
+    /// The client id this provider last saw, or the empty string.
+    ///
+    /// Reads the durable record, falling back to the Preferences key earlier
+    /// builds used so an upgrade does not look like a first launch -- which
+    /// would be harmless now, but would still cost a needless rewrite.
+    private static String baseline() {
+<span class="fc" id="L126">        Map&lt;String, String&gt; record = InviteStore.read(InviteStore.BASELINE);</span>
+<span class="fc" id="L127">        String stored = InviteStore.get(record, &quot;clientId&quot;, null);</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">        if (stored != null &amp;&amp; stored.length() &gt; 0) {</span>
+<span class="fc" id="L129">            return stored;</span>
+        }
+<span class="fc" id="L131">        return Preferences.get(PREF_LAST_CLIENT_ID, &quot;&quot;);</span>
+    }
+
+    /// Records the baseline durably.
+    ///
+    /// The Preferences key is kept in step so a downgrade, or any code still
+    /// reading it, sees the same answer. It is the copy that cannot be
+    /// trusted, not the one that is wrong.
+    ///
+    /// A write that does not land is reported rather than returned, because
+    /// there is nothing a caller could do about it: the answer is to try again
+    /// on the next entry point, which is what happens anyway.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`: the id now in force
+    private static void rememberBaseline(String clientId) {
+<span class="fc" id="L148">        Map&lt;String, String&gt; record = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L149">        record.put(&quot;clientId&quot;, clientId);</span>
+<span class="fc" id="L150">        boolean stored = InviteStore.write(InviteStore.BASELINE, record);</span>
+<span class="fc" id="L151">        Preferences.set(PREF_LAST_CLIENT_ID, clientId);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!stored) {</span>
+<span class="nc" id="L153">            Log.p(&quot;invite: the identity baseline could not be stored, so an identity &quot;</span>
+                    + &quot;change may go unnoticed until it can be&quot;, Log.WARNING);
+        }
+<span class="fc" id="L156">    }</span>
+
+    @Override
+    public void onConsentChanged(AnalyticsConsent consent) {
+        // The argument cannot be trusted to distinguish &quot;refused&quot; from &quot;not
+        // asked yet&quot;. Analytics.addProvider synthesizes AnalyticsConsent.denied()
+        // for the null state, and this provider is registered on every facade
+        // entry -- so a second launch before the user has answered the prompt
+        // would arrive here looking exactly like an explicit refusal, delete
+        // the deferred profile captured on the first launch, and move to
+        // DECLINED. A later grant could then never resume, and the invite that
+        // caused the install would be lost for a user who never refused
+        // anything.
+        //
+        // Analytics.getConsent() returns null until there is a real choice on
+        // record, so ask it instead of believing the argument.
+<span class="fc" id="L172">        AnalyticsConsent recorded = Analytics.getConsent();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (recorded != null) {</span>
+<span class="fc" id="L174">            Invites.onConsentChanged(recorded.isAnalytics());</span>
+<span class="fc" id="L175">            return;</span>
+        }
+        // No choice on record. Under OPT_IN that means the prompt has not been
+        // answered and there is nothing to act on -- returning is the whole
+        // point of the paragraph above. Under OPT_OUT it means something else
+        // entirely: the mode's implicit allow is back in force, which is a real
+        // transition. Clearing an explicit denial there resumed ordinary
+        // analytics while a declined invite lookup stayed stopped and a
+        // resolved attribution's dimensions stayed cleared, so the two
+        // disagreed about the same user.
+        // No recorded choice, so the MODE decides -- and the two answers are
+        // not &quot;allowed&quot; and &quot;refused&quot;. Under OPT_IN the prompt is simply
+        // unanswered and NOTHING happens: reporting a refusal there would
+        // delete the profile captured on the first launch and move to DECLINED
+        // for a user who has refused nothing, which is the paragraph above.
+        // Under OPT_OUT the implicit allow is in force and that is a real
+        // transition.
+        //
+        // Analytics.setConsentMode now dispatches here when the mode changes,
+        // which is what lets a switch to OPT_OUT reach this at all -- ordinary
+        // analytics used to resume on that switch while a declined lookup
+        // stayed stopped and an attribution's dimensions stayed cleared.
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {</span>
+<span class="fc" id="L198">            Invites.onConsentChanged(true);</span>
+<span class="fc" id="L199">            return;</span>
+        }
+        // OPT_IN with nothing on record, which is a transition in the other
+        // direction: the mode's implicit allow has just been withdrawn, so
+        // allowed() answers no from here on. Requests queued a moment ago have
+        // already passed that gate and would transmit the client id and the
+        // invite metadata after transmission stopped being permitted.
+        //
+        // Killing them is all that happens. onConsentChanged(false) is the
+        // refusal path -- it settles the lookup and clears the dimensions --
+        // and nothing has been refused here: the prompt has not been answered.
+<span class="fc" id="L210">        Invites.suspendTransmission();</span>
+<span class="fc" id="L211">    }</span>
+
+    @Override
+    public boolean supports(AnalyticsCapability capability) {
+<span class="nc" id="L215">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

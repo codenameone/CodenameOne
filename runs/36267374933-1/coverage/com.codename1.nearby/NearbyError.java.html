@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NearbyError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby</a> &gt; <span class="el_source">NearbyError.java</span></div><h1>NearbyError.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby;
+
+/// Typed error codes carried by every [NearbyException] thrown through the
+/// failure path of the `com.codename1.nearby` APIs. Callers branch on these
+/// via [NearbyException#getError()] rather than string-matching a message.
+<span class="fc" id="L28">public enum NearbyError {</span>
+    /// The requested feature is not available on this port, this OS version
+    /// or this hardware. The capability queries -- `isSupported()` on each
+    /// entry point, plus the finer-grained
+    /// [com.codename1.nearby.ranging.RangingCapabilities] -- let
+    /// cross-platform code branch before ever seeing this code, and the
+    /// inert fallback bridges fail every operation with it.
+<span class="fc" id="L35">    NOT_SUPPORTED,</span>
+
+    /// A required runtime permission or OS authorization is missing. On
+    /// Android that is `UWB_RANGING`, the Bluetooth runtime grants or
+    /// location; on iOS it is the Nearby Interaction or local network
+    /// authorization the user declined. See the `requestPermissions` method
+    /// on the relevant entry point.
+<span class="fc" id="L42">    UNAUTHORIZED,</span>
+
+    /// The radio this feature needs is switched off or otherwise
+    /// unavailable right now -- UWB disabled in settings, Bluetooth powered
+    /// off, Wi-Fi off. Unlike [#NOT_SUPPORTED] this is recoverable: the
+    /// same call may succeed once the user turns the radio on.
+<span class="fc" id="L48">    RADIO_UNAVAILABLE,</span>
+
+    /// The peer, accessory or endpoint could not be reached, or moved out of
+    /// range before the operation completed.
+<span class="fc" id="L52">    PEER_UNAVAILABLE,</span>
+
+    /// A ranging or transport session could not be started -- an invalid
+    /// configuration, too many concurrent sessions, or a platform-level
+    /// refusal.
+<span class="fc" id="L57">    SESSION_FAILED,</span>
+
+    /// A running session was invalidated by the platform and cannot be
+    /// resumed. Start a new one.
+<span class="fc" id="L61">    SESSION_INVALIDATED,</span>
+
+    /// The supplied token, accessory configuration, endpoint identifier or
+    /// device filter could not be decoded or used, or came from a different
+    /// platform. Tokens are opaque and are not portable between iOS and
+    /// Android.
+    ///
+    /// A device filter reports this rather than being dropped: an
+    /// association request whose filter cannot be installed would otherwise
+    /// offer the user every visible device instead of the ones asked for,
+    /// and they could associate the wrong accessory from a picker that was
+    /// never meant to show it.
+<span class="fc" id="L73">    INVALID_TOKEN,</span>
+
+    /// The platform never delivered a completion callback within the safety
+    /// timeout, or a discovery/connection attempt timed out.
+<span class="fc" id="L77">    TIMEOUT,</span>
+
+    /// A conflicting operation is already in progress -- for example a
+    /// second association flow while the system chooser is open.
+<span class="fc" id="L81">    BUSY,</span>
+
+    /// The user dismissed a system dialog (the device chooser, the
+    /// association prompt, a permission request) or the operation was
+    /// cancelled through `AsyncResource.cancel()`.
+<span class="fc" id="L86">    USER_CANCELED,</span>
+
+    /// Transport-level I/O failure while moving a payload. Blocking stream
+    /// payloads throw plain `java.io.IOException` instead.
+<span class="fc" id="L90">    IO_ERROR,</span>
+
+    /// Unclassified failure; the exception message carries the details.
+<span class="fc" id="L93">    UNKNOWN</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

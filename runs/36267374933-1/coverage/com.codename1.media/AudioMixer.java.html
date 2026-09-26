@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioMixer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">AudioMixer.java</span></div><h1>AudioMixer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.util.Simd;
+
+import java.util.ArrayList;
+
+/// Mixes multiple PCM tracks into a single `AudioBuffer`.
+///
+/// `AudioMixer` is a platform-neutral helper for building a sample-accurate
+/// PCM timeline.  All tracks are locked to the mixer sample rate and channel
+/// count.  Track offsets are converted to sample frames on that clock, and the
+/// mixed output uses interleaved float PCM samples in the same format as
+/// `AudioBuffer` and `WAVWriter`.
+///
+/// ```java
+/// AudioMixer mixer = new AudioMixer(44100, 2);
+/// mixer.addTrack(musicBuffer, 0, 0.5f);
+/// mixer.addTrack(effectBuffer, 250, 1.0f);
+/// AudioBuffer mixed = mixer.mix();
+/// float[] pcm = new float[mixed.getSize()];
+/// mixed.copyTo(pcm);
+/// wavWriter.write(pcm, 0, mixed.getSize());
+/// ```
+public class AudioMixer {
+<span class="fc" id="L47">    private final ArrayList&lt;Track&gt; tracks = new ArrayList&lt;Track&gt;();</span>
+    private final int sampleRate;
+    private final int numChannels;
+<span class="fc" id="L50">    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();</span>
+
+    /// Creates a new mixer locked to a single sample clock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sampleRate`: The sample rate in frames per second.  E.g. 44100.
+    /// - `numChannels`: The number of interleaved channels.  E.g. 1 or 2.
+<span class="fc" id="L58">    public AudioMixer(int sampleRate, int numChannels) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (sampleRate &lt;= 0) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;sampleRate must be greater than zero&quot;);</span>
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (numChannels &lt;= 0) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(&quot;numChannels must be greater than zero&quot;);</span>
+        }
+<span class="fc" id="L65">        this.sampleRate = sampleRate;</span>
+<span class="fc" id="L66">        this.numChannels = numChannels;</span>
+<span class="fc" id="L67">    }</span>
+
+    /// Indicates whether the mixer should use SIMD-backed kernels when the
+    /// current platform supports them.
+    ///
+    /// #### Returns
+    ///
+    /// true when SIMD optimizations are enabled.
+    public static boolean isSimdOptimizationsEnabled() {
+<span class="nc" id="L76">        return simdOptimizationsEnabled;</span>
+    }
+
+    /// Enables or disables SIMD-backed mixer optimizations.
+    ///
+    /// This only affects internal implementation choices; mixed samples and
+    /// clipping semantics are unchanged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to use SIMD where supported, false to force scalar loops.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+<span class="nc" id="L88">        simdOptimizationsEnabled = enabled;</span>
+<span class="nc" id="L89">    }</span>
+
+    /// Restores the default SIMD optimization setting for this platform.
+    public static void resetSimdOptimizationsEnabled() {
+<span class="nc" id="L93">        simdOptimizationsEnabled = Simd.get().isSupported();</span>
+<span class="nc" id="L94">    }</span>
+
+    /// Gets the sample rate used by this mixer.
+    ///
+    /// #### Returns
+    ///
+    /// the sample rate in frames per second.
+    public int getSampleRate() {
+<span class="nc" id="L102">        return sampleRate;</span>
+    }
+
+    /// Gets the number of interleaved channels used by this mixer.
+    ///
+    /// #### Returns
+    ///
+    /// the number of channels.
+    public int getNumChannels() {
+<span class="nc" id="L111">        return numChannels;</span>
+    }
+
+    /// Gets the number of tracks currently in the mixer.
+    ///
+    /// #### Returns
+    ///
+    /// the number of tracks.
+    public int getTrackCount() {
+<span class="nc" id="L120">        return tracks.size();</span>
+    }
+
+    /// Removes all tracks from this mixer.
+    public void clear() {
+<span class="nc" id="L125">        tracks.clear();</span>
+<span class="nc" id="L126">    }</span>
+
+    /// Adds an `AudioBuffer` track at the given millisecond offset.
+    ///
+    /// The source samples are copied when the track is added so the source
+    /// buffer can be reused or modified afterwards.  The offset is rounded to
+    /// the nearest sample frame on the mixer clock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: Source PCM buffer.  Its sample rate and channel count must
+    /// match the mixer.
+    /// - `offsetMs`: Offset from the start of the timeline in milliseconds.
+    /// - `gain`: Gain multiplier for this track.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// this mixer.
+    public AudioMixer addTrack(AudioBuffer source, long offsetMs, float gain) {
+<span class="fc" id="L145">        return addTrackAtFrame(source, framesFromMilliseconds(offsetMs), gain);</span>
+    }
+
+    /// Adds an `AudioBuffer` track at an exact sample-frame offset.
+    ///
+    /// Use this method when the track position is already known in frames and
+    /// no millisecond conversion should be applied.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: Source PCM buffer.  Its sample rate and channel count must
+    /// match the mixer.
+    /// - `offsetFrame`: Offset from the start of the timeline in sample frames.
+    /// - `gain`: Gain multiplier for this track.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// this mixer.
+    public AudioMixer addTrackAtFrame(AudioBuffer source, int offsetFrame, float gain) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;source must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (source.getSampleRate() != sampleRate) {</span>
+<span class="fc" id="L168">            throw new IllegalArgumentException(&quot;Track sampleRate &quot; + source.getSampleRate() + &quot; does not match mixer sampleRate &quot; + sampleRate);</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (source.getNumChannels() != numChannels) {</span>
+<span class="fc" id="L171">            throw new IllegalArgumentException(&quot;Track numChannels &quot; + source.getNumChannels() + &quot; does not match mixer numChannels &quot; + numChannels);</span>
+        }
+<span class="fc" id="L173">        float[] pcm = new float[source.getSize()];</span>
+<span class="fc" id="L174">        source.copyTo(pcm);</span>
+<span class="fc" id="L175">        return addTrackAtFrame(pcm, 0, source.getSize(), offsetFrame, gain);</span>
+    }
+
+    /// Adds an interleaved PCM track at the given millisecond offset.
+    ///
+    /// The source samples are copied when the track is added.  The offset is
+    /// rounded to the nearest sample frame on the mixer clock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pcmData`: Interleaved PCM samples.
+    /// - `offsetMs`: Offset from the start of the timeline in milliseconds.
+    /// - `gain`: Gain multiplier for this track.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// this mixer.
+    public AudioMixer addTrack(float[] pcmData, long offsetMs, float gain) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (pcmData == null) {</span>
+<span class="nc" id="L194">            throw new IllegalArgumentException(&quot;pcmData must not be null&quot;);</span>
+        }
+<span class="fc" id="L196">        return addTrack(pcmData, 0, pcmData.length, offsetMs, gain);</span>
+    }
+
+    /// Adds an interleaved PCM track range at the given millisecond offset.
+    ///
+    /// The source samples are copied when the track is added.  The offset is
+    /// rounded to the nearest sample frame on the mixer clock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pcmData`: Interleaved PCM samples.
+    /// - `offset`: Offset in `pcmData` to start copying from.
+    /// - `len`: Number of samples to copy.
+    /// - `offsetMs`: Offset from the start of the timeline in milliseconds.
+    /// - `gain`: Gain multiplier for this track.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// this mixer.
+    public AudioMixer addTrack(float[] pcmData, int offset, int len, long offsetMs, float gain) {
+<span class="fc" id="L216">        return addTrackAtFrame(pcmData, offset, len, framesFromMilliseconds(offsetMs), gain);</span>
+    }
+
+    /// Adds an interleaved PCM track range at an exact sample-frame offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pcmData`: Interleaved PCM samples.
+    /// - `offset`: Offset in `pcmData` to start copying from.
+    /// - `len`: Number of samples to copy.
+    /// - `offsetFrame`: Offset from the start of the timeline in sample frames.
+    /// - `gain`: Gain multiplier for this track.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// this mixer.
+    public AudioMixer addTrackAtFrame(float[] pcmData, int offset, int len, int offsetFrame, float gain) {
+<span class="fc" id="L233">        validatePcmRange(pcmData, offset, len);</span>
+<span class="fc" id="L234">        validateOffsetFrame(offsetFrame);</span>
+<span class="fc" id="L235">        validateGain(gain);</span>
+<span class="fc" id="L236">        int frameCount = len / numChannels;</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (offsetFrame &gt; Integer.MAX_VALUE - frameCount) {</span>
+<span class="nc" id="L238">            throw new IllegalArgumentException(&quot;Track offset is too large for this mixer&quot;);</span>
+        }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (offsetFrame + frameCount &gt; Integer.MAX_VALUE / numChannels) {</span>
+<span class="nc" id="L241">            throw new IllegalArgumentException(&quot;Track output is too large for this mixer&quot;);</span>
+        }
+<span class="fc" id="L243">        float[] pcm = allocFloat(len);</span>
+<span class="fc" id="L244">        System.arraycopy(pcmData, offset, pcm, 0, len);</span>
+<span class="fc" id="L245">        tracks.add(new Track(pcm, offsetFrame, frameCount, gain));</span>
+<span class="fc" id="L246">        return this;</span>
+    }
+
+    /// Gets the number of sample frames in the mixed output.
+    ///
+    /// #### Returns
+    ///
+    /// the mixed timeline length in sample frames.
+    public int getOutputFrameCount() {
+<span class="fc" id="L255">        int outputFrameCount = 0;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (Track track : tracks) {</span>
+<span class="fc" id="L257">            outputFrameCount = Math.max(outputFrameCount, track.offsetFrame + track.frameCount);</span>
+<span class="fc" id="L258">        }</span>
+<span class="fc" id="L259">        return outputFrameCount;</span>
+    }
+
+    /// Gets the number of interleaved samples in the mixed output.
+    ///
+    /// #### Returns
+    ///
+    /// the mixed timeline length in samples.
+    public int getOutputSize() {
+<span class="fc" id="L268">        return getOutputFrameCount() * numChannels;</span>
+    }
+
+    /// Mixes all tracks into a new `AudioBuffer`.
+    ///
+    /// The output is clipped to the normalized PCM range `[-1, 1]` so it can
+    /// be passed directly to `WAVWriter`.
+    ///
+    /// #### Returns
+    ///
+    /// a new `AudioBuffer` containing the mixed PCM timeline.
+    public AudioBuffer mix() {
+<span class="fc" id="L280">        int outputSize = getOutputSize();</span>
+<span class="fc" id="L281">        float[] output = allocFloat(outputSize);</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        for (Track track : tracks) {</span>
+<span class="fc" id="L283">            int destOffset = track.offsetFrame * numChannels;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            for (int i = 0; i &lt; track.pcm.length; i++) {</span>
+<span class="fc" id="L285">                output[destOffset + i] += track.pcm[i] * track.gain;</span>
+            }
+<span class="fc" id="L287">        }</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (shouldUseSimd(output.length)) {</span>
+<span class="nc" id="L289">            Simd.get().clamp(output, output, -1.0f, 1.0f, 0, output.length);</span>
+        } else {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            for (int i = 0; i &lt; output.length; i++) {</span>
+<span class="fc" id="L292">                output[i] = clamp(output[i]);</span>
+            }
+        }
+<span class="fc" id="L295">        AudioBuffer out = new AudioBuffer(output.length);</span>
+<span class="fc" id="L296">        out.copyFrom(sampleRate, numChannels, output);</span>
+<span class="fc" id="L297">        return out;</span>
+    }
+
+    private static float[] allocFloat(int size) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (size &gt;= 16) {</span>
+<span class="nc" id="L302">            return Simd.get().allocFloat(size);</span>
+        }
+<span class="fc" id="L304">        return new float[size];</span>
+    }
+
+    private static boolean shouldUseSimd(int size) {
+<span class="pc bpc" id="L308" title="5 of 6 branches missed.">        return simdOptimizationsEnabled &amp;&amp; Simd.get().isSupported() &amp;&amp; size &gt;= 16;</span>
+    }
+
+    private int framesFromMilliseconds(long offsetMs) {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (offsetMs &lt; 0) {</span>
+<span class="fc" id="L313">            throw new IllegalArgumentException(&quot;offsetMs must not be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (offsetMs &gt; (Long.MAX_VALUE - 500L) / sampleRate) {</span>
+<span class="nc" id="L316">            throw new IllegalArgumentException(&quot;offsetMs is too large for this mixer&quot;);</span>
+        }
+<span class="fc" id="L318">        long frames = (offsetMs * (long) sampleRate + 500L) / 1000L;</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (frames &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L320">            throw new IllegalArgumentException(&quot;offsetMs is too large for this mixer&quot;);</span>
+        }
+<span class="fc" id="L322">        return (int) frames;</span>
+    }
+
+    private void validatePcmRange(float[] pcmData, int offset, int len) {
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (pcmData == null) {</span>
+<span class="nc" id="L327">            throw new IllegalArgumentException(&quot;pcmData must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L329" title="3 of 6 branches missed.">        if (offset &lt; 0 || len &lt; 0 || offset &gt; pcmData.length - len) {</span>
+<span class="nc" id="L330">            throw new IllegalArgumentException(&quot;Invalid pcmData range&quot;);</span>
+        }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (len % numChannels != 0) {</span>
+<span class="fc" id="L333">            throw new IllegalArgumentException(&quot;Track sample length must be a multiple of numChannels&quot;);</span>
+        }
+<span class="fc" id="L335">    }</span>
+
+    private void validateOffsetFrame(int offsetFrame) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (offsetFrame &lt; 0) {</span>
+<span class="nc" id="L339">            throw new IllegalArgumentException(&quot;offsetFrame must not be negative&quot;);</span>
+        }
+<span class="fc" id="L341">    }</span>
+
+    private void validateGain(float gain) {
+<span class="pc bpc" id="L344" title="1 of 4 branches missed.">        if (Float.isNaN(gain) || Float.isInfinite(gain)) {</span>
+<span class="fc" id="L345">            throw new IllegalArgumentException(&quot;gain must be finite&quot;);</span>
+        }
+<span class="fc" id="L347">    }</span>
+
+    private float clamp(float sample) {
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (sample &gt; 1.0f) {</span>
+<span class="fc" id="L351">            return 1.0f;</span>
+        }
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (sample &lt; -1.0f) {</span>
+<span class="fc" id="L354">            return -1.0f;</span>
+        }
+<span class="fc" id="L356">        return sample;</span>
+    }
+
+    private static class Track {
+        private final float[] pcm;
+        private final int offsetFrame;
+        private final int frameCount;
+        private final float gain;
+
+<span class="fc" id="L365">        Track(float[] pcm, int offsetFrame, int frameCount, float gain) {</span>
+<span class="fc" id="L366">            this.pcm = pcm;</span>
+<span class="fc" id="L367">            this.offsetFrame = offsetFrame;</span>
+<span class="fc" id="L368">            this.frameCount = frameCount;</span>
+<span class="fc" id="L369">            this.gain = gain;</span>
+<span class="fc" id="L370">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

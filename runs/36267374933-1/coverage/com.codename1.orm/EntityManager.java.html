@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntityManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.orm</a> &gt; <span class="el_source">EntityManager.java</span></div><h1>EntityManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.orm;
+
+import com.codename1.db.Database;
+import com.codename1.ui.Display;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Public entry point for the build-time SQLite ORM.
+///
+/// `@Entity` classes get a generated dao at build time. Each dao's static
+/// initializer self-registers with this registry. The registry stays empty
+/// until something triggers each generated class's `&lt;clinit&gt;`:
+///
+/// - **iOS / Android** -- the build server probes the project zip for
+///   `cn1app.DaoBootstrap` and splices a `new cn1app.DaoBootstrap();` into
+///   the per-build application stub before `Display.init`.
+/// - **JavaSE simulator + desktop** -- `JavaSEPort#postInit` calls
+///   `Class.forName(&quot;cn1app.DaoBootstrap&quot;)` so the registry is populated
+///   on the same boundary.
+/// - **Unit tests / manual init** -- application code can call
+///   `EntityManager.registerDao(...)` directly.
+///
+/// ```java
+/// EntityManager em = EntityManager.open(&quot;MyApp.db&quot;);
+/// Dao&lt;User&gt; users = em.dao(User.class);
+/// users.createTable();
+/// users.insert(new User(&quot;alice&quot;));
+/// for (User u : users.findAll()) { ... }
+/// em.close();
+/// ```
+///
+/// The registry is keyed on `getClass().getName()` so it survives ParparVM
+/// rename and R8 obfuscation: both the registration site and the lookup
+/// site see the same renamed name within a single execution.
+public final class EntityManager {
+
+<span class="fc" id="L60">    private final Map&lt;String, Dao&lt;?&gt;&gt; daos = new HashMap&lt;String, Dao&lt;?&gt;&gt;();</span>
+    private final Database db;
+    private boolean closed;
+
+<span class="fc" id="L64">    private EntityManager(Database db) {</span>
+<span class="fc" id="L65">        this.db = db;</span>
+<span class="fc" id="L66">    }</span>
+
+    /// Opens (or creates) the SQLite file `databaseName` via
+    /// `Display.openOrCreate`. Throws `IOException` when the platform
+    /// refuses to provide a SQLite database.
+    public static EntityManager open(String databaseName) throws IOException {
+<span class="fc" id="L72">        Database db = Display.getInstance().openOrCreate(databaseName);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (db == null) {</span>
+<span class="nc" id="L74">            throw new IOException(&quot;Platform does not support SQLite: &quot; + Display.getInstance().getPlatformName());</span>
+        }
+<span class="fc" id="L76">        return open(db);</span>
+    }
+
+    /// Wraps an existing `Database` (e.g. one opened with a custom path)
+    /// in an `EntityManager`. The caller retains ownership; `close()`
+    /// closes the database.
+    public static EntityManager open(Database db) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (db == null) {</span>
+<span class="fc" id="L84">            throw new IllegalArgumentException(&quot;database is null&quot;);</span>
+        }
+<span class="fc" id="L86">        return new EntityManager(db);</span>
+    }
+
+    /// Installs `dao` under `dao.type().getName()`. The generated
+    /// per-class dao's static initializer calls this; hand-written daos
+    /// for classes outside the build's annotation scan call it
+    /// explicitly.
+    public static &lt;T&gt; void registerDao(Dao&lt;T&gt; dao) {
+<span class="fc" id="L94">        com.codename1.impl.orm.DaoRegistry.register(dao);</span>
+<span class="fc" id="L95">    }</span>
+
+    /// Returns the dao for `entityClass`, freshly attached to this
+    /// entity manager's `Database`. Throws `IllegalStateException` when
+    /// no dao was generated for the class -- typically because `@Entity`
+    /// is missing or the process-annotations Mojo did not run.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public &lt;T&gt; Dao&lt;T&gt; dao(Class&lt;T&gt; entityClass) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (entityClass == null) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(&quot;entityClass is null&quot;);</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (com.codename1.impl.orm.Models.requiresSession(entityClass)) {</span>
+<span class="nc" id="L107">            throw new IllegalStateException(&quot;This entity mapping requires openSession() managed persistence&quot;);</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L110">            throw new IllegalStateException(&quot;Entity manager is closed&quot;);</span>
+        }
+<span class="fc" id="L112">        Dao&lt;T&gt; d = (Dao&lt;T&gt;) daos.get(entityClass.getName());</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (d != null) {</span>
+<span class="fc" id="L114">            d.attach(db);</span>
+<span class="fc" id="L115">            return d;</span>
+        }
+<span class="fc" id="L117">        d = com.codename1.impl.orm.DaoRegistry.create(entityClass);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (d == null) {</span>
+<span class="fc" id="L119">            throw new IllegalStateException(&quot;No dao registered for &quot; + entityClass.getName() +</span>
+                                            &quot;. Add @Entity and ensure the &quot;
+                                            + &quot;cn1:process-annotations Mojo ran during build, then re-run -- &quot;
+                                            + &quot;the generated DaoBootstrap populates this registry at startup.&quot;);
+        }
+<span class="fc" id="L124">        d.attach(db);</span>
+<span class="fc" id="L125">        daos.put(entityClass.getName(), d);</span>
+<span class="fc" id="L126">        return d;</span>
+    }
+
+    /// Opens an independent managed persistence context over this manager's database.
+    /// The caller must close the session. Use one thread per session and complete
+    /// every transaction on that thread. Closing a session never commits it.
+    /// @return a new persistence context with independent managed entity state
+    /// @throws IllegalStateException if this manager is closed
+    public com.codename1.orm.session.Session openSession() {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L136">            throw new IllegalStateException(&quot;Entity manager is closed&quot;);</span>
+        }
+<span class="nc" id="L138">        return new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.SessionSqlAccess(db));</span>
+    }
+
+    /// The underlying `Database`. Use it for raw SQL when the dao surface
+    /// isn't enough.
+    public Database database() {
+<span class="fc" id="L144">        return db;</span>
+    }
+
+    /// Begin a transaction. Equivalent to `database().beginTransaction()`.
+    public void beginTransaction() throws IOException {
+<span class="fc" id="L149">        db.beginTransaction();</span>
+<span class="fc" id="L150">    }</span>
+
+    /// Commit the current transaction.
+    public void commitTransaction() throws IOException {
+<span class="fc" id="L154">        db.commitTransaction();</span>
+<span class="fc" id="L155">    }</span>
+
+    /// Roll back the current transaction.
+    public void rollbackTransaction() throws IOException {
+<span class="fc" id="L159">        db.rollbackTransaction();</span>
+<span class="fc" id="L160">    }</span>
+
+    /// Close the underlying database. Idempotent.
+    public void close() throws IOException {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L165">            return;</span>
+        }
+<span class="fc" id="L167">        closed = true;</span>
+<span class="fc" id="L168">        db.close();</span>
+<span class="fc" id="L169">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

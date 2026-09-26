@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GestureEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.sensors</a> &gt; <span class="el_source">GestureEngine.java</span></div><h1>GestureEngine.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.sensors;
+
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Platform independent gesture recognizer. It is fed a stream of accelerometer
+/// samples together with a low pass estimate of the gravity vector and returns
+/// the gestures it recognizes. Keeping the recognition here means every port
+/// that can produce accelerometer readings gets the full gesture set for free.
+///
+/// This class is intentionally free of any framework dependency (no EDT, no
+/// `Display`) so it can be unit tested with synthetic data. All tuning
+/// constants are package visible and surfaced through setters on
+/// [MotionSensorManager].
+<span class="fc" id="L39">class GestureEngine {</span>
+
+    private static final double G = MotionSensorManager.STANDARD_GRAVITY;
+    // Sentinel for &quot;this gesture has not fired yet&quot;. Comparisons guard against
+    // it explicitly so we never compute time - TIME_NONE (which would overflow).
+    private static final long TIME_NONE = Long.MIN_VALUE;
+
+    // ---- shake tuning ----
+<span class="fc" id="L47">    double shakeThreshold = 12.0;            // linear acceleration spike, m/s^2</span>
+<span class="fc" id="L48">    long shakeWindowMs = 800;                // jolts must fall inside this window</span>
+<span class="fc" id="L49">    int shakeJoltsNeeded = 3;                // number of jolts that make a shake</span>
+<span class="fc" id="L50">    long shakeCooldownMs = 1000;             // minimum gap between two shakes</span>
+
+    // ---- flip tuning ----
+<span class="fc" id="L53">    double flipGravityFraction = 0.72;       // fraction of gravity on z to be flat</span>
+<span class="fc" id="L54">    long flipStableMs = 350;                 // orientation must hold this long</span>
+
+    // ---- tilt tuning ----
+<span class="fc" id="L57">    double tiltEnterAngle = 0.6;             // ~34 degrees, radians</span>
+<span class="fc" id="L58">    double tiltExitAngle = 0.35;             // hysteresis back to flat, radians</span>
+
+    // ---- pick up tuning ----
+<span class="fc" id="L61">    double pickUpRestLinear = 0.7;           // max linear accel while at rest</span>
+<span class="fc" id="L62">    long pickUpRestMs = 350;                 // time at rest before a pick up counts</span>
+<span class="fc" id="L63">    double pickUpMoveLinear = 2.8;           // movement that triggers the pick up</span>
+<span class="fc" id="L64">    long pickUpCooldownMs = 1500;</span>
+
+    // ---- free fall tuning ----
+<span class="fc" id="L67">    double freeFallThreshold = 3.0;          // total acceleration, m/s^2</span>
+<span class="fc" id="L68">    long freeFallMinMs = 80;                 // sustained for this long</span>
+<span class="fc" id="L69">    long freeFallCooldownMs = 1500;</span>
+
+    // ---- shake state ----
+<span class="fc" id="L72">    private final ArrayList&lt;Long&gt; joltTimes = new ArrayList&lt;Long&gt;();</span>
+    private boolean shakeAbove;
+    private double shakePeak;
+<span class="fc" id="L75">    private long lastShakeTime = Long.MIN_VALUE;</span>
+
+    // ---- flip state ----
+    private static final int FACE_UNKNOWN = 0;
+    private static final int FACE_UP = 1;
+    private static final int FACE_DOWN = 2;
+<span class="fc" id="L81">    private int faceState = FACE_UNKNOWN;</span>
+<span class="fc" id="L82">    private int faceCandidate = FACE_UNKNOWN;</span>
+    private long faceCandidateSince;
+
+    // ---- tilt state ----
+    private static final int FLAT = 0;
+    private static final int NEG = 1;
+    private static final int POS = 2;
+<span class="fc" id="L89">    private int rollState = FLAT;</span>
+<span class="fc" id="L90">    private int pitchState = FLAT;</span>
+
+    // ---- pick up state ----
+    private boolean resting;
+<span class="fc" id="L94">    private long restSince = Long.MIN_VALUE;</span>
+<span class="fc" id="L95">    private long lastPickUpTime = Long.MIN_VALUE;</span>
+
+    // ---- free fall state ----
+<span class="fc" id="L98">    private long freeFallSince = Long.MIN_VALUE;</span>
+<span class="fc" id="L99">    private long lastFreeFallTime = Long.MIN_VALUE;</span>
+
+    /// Resets all internal state. Used when sampling is (re)started so that
+    /// stale orientation does not produce a spurious gesture on the first sample.
+    void reset() {
+<span class="fc" id="L104">        joltTimes.clear();</span>
+<span class="fc" id="L105">        shakeAbove = false;</span>
+<span class="fc" id="L106">        shakePeak = 0;</span>
+<span class="fc" id="L107">        lastShakeTime = Long.MIN_VALUE;</span>
+<span class="fc" id="L108">        faceState = FACE_UNKNOWN;</span>
+<span class="fc" id="L109">        faceCandidate = FACE_UNKNOWN;</span>
+<span class="fc" id="L110">        faceCandidateSince = 0;</span>
+<span class="fc" id="L111">        rollState = FLAT;</span>
+<span class="fc" id="L112">        pitchState = FLAT;</span>
+<span class="fc" id="L113">        resting = false;</span>
+<span class="fc" id="L114">        restSince = Long.MIN_VALUE;</span>
+<span class="fc" id="L115">        lastPickUpTime = Long.MIN_VALUE;</span>
+<span class="fc" id="L116">        freeFallSince = Long.MIN_VALUE;</span>
+<span class="fc" id="L117">        lastFreeFallTime = Long.MIN_VALUE;</span>
+<span class="fc" id="L118">    }</span>
+
+    /// Feeds a single sample to the recognizer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ax`, `ay`, `az`: the raw accelerometer reading in m/s^2 including gravity
+    /// - `gx`, `gy`, `gz`: a low pass estimate of the gravity vector in m/s^2
+    /// - `time`: the sample time in milliseconds
+    ///
+    /// #### Returns
+    ///
+    /// the gestures recognized for this sample, never `null` (usually empty)
+    List&lt;GestureEvent&gt; onSample(double ax, double ay, double az,
+                                double gx, double gy, double gz, long time) {
+<span class="fc" id="L133">        List&lt;GestureEvent&gt; events = new ArrayList&lt;GestureEvent&gt;(2);</span>
+
+<span class="fc" id="L135">        double lx = ax - gx;</span>
+<span class="fc" id="L136">        double ly = ay - gy;</span>
+<span class="fc" id="L137">        double lz = az - gz;</span>
+<span class="fc" id="L138">        double linearMag = Math.sqrt(lx * lx + ly * ly + lz * lz);</span>
+<span class="fc" id="L139">        double totalMag = Math.sqrt(ax * ax + ay * ay + az * az);</span>
+
+<span class="fc" id="L141">        detectShake(linearMag, time, events);</span>
+<span class="fc" id="L142">        detectFlip(gz, time, events);</span>
+<span class="fc" id="L143">        detectTilt(gx, gy, gz, time, events);</span>
+<span class="fc" id="L144">        detectPickUp(gz, linearMag, time, events);</span>
+<span class="fc" id="L145">        detectFreeFall(totalMag, time, events);</span>
+
+<span class="fc" id="L147">        return events;</span>
+    }
+
+    private void detectShake(double linearMag, long time, List&lt;GestureEvent&gt; events) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (linearMag &gt; shakeThreshold) {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (!shakeAbove) {</span>
+<span class="fc" id="L153">                shakeAbove = true;</span>
+<span class="fc" id="L154">                shakePeak = linearMag;</span>
+<span class="fc" id="L155">                joltTimes.add(Long.valueOf(time));</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            } else if (linearMag &gt; shakePeak) {</span>
+<span class="nc" id="L157">                shakePeak = linearMag;</span>
+            }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        } else if (linearMag &lt; shakeThreshold * 0.7) {</span>
+<span class="fc" id="L160">            shakeAbove = false;</span>
+        }
+
+<span class="fc" id="L163">        long windowStart = time - shakeWindowMs;</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">        while (!joltTimes.isEmpty() &amp;&amp; joltTimes.get(0).longValue() &lt; windowStart) {</span>
+<span class="nc" id="L165">            joltTimes.remove(0);</span>
+        }
+
+<span class="pc bpc" id="L168" title="1 of 6 branches missed.">        if (joltTimes.size() &gt;= shakeJoltsNeeded</span>
+                &amp;&amp; (lastShakeTime == TIME_NONE || time - lastShakeTime &gt;= shakeCooldownMs)) {
+<span class="fc" id="L170">            lastShakeTime = time;</span>
+<span class="fc" id="L171">            double peak = shakePeak;</span>
+<span class="fc" id="L172">            joltTimes.clear();</span>
+<span class="fc" id="L173">            shakePeak = 0;</span>
+<span class="fc" id="L174">            events.add(new GestureEvent(GestureEvent.TYPE_SHAKE, peak, time));</span>
+        }
+<span class="fc" id="L176">    }</span>
+
+    private void detectFlip(double gz, long time, List&lt;GestureEvent&gt; events) {
+<span class="fc" id="L179">        double flat = G * flipGravityFraction;</span>
+        int instant;
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (gz &gt; flat) {</span>
+<span class="fc" id="L182">            instant = FACE_UP;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        } else if (gz &lt; -flat) {</span>
+<span class="fc" id="L184">            instant = FACE_DOWN;</span>
+        } else {
+<span class="fc" id="L186">            instant = FACE_UNKNOWN;</span>
+        }
+
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (instant != faceCandidate) {</span>
+<span class="fc" id="L190">            faceCandidate = instant;</span>
+<span class="fc" id="L191">            faceCandidateSince = time;</span>
+<span class="fc" id="L192">            return;</span>
+        }
+<span class="fc bfc" id="L194" title="All 4 branches covered.">        if (instant == FACE_UNKNOWN || instant == faceState) {</span>
+<span class="fc" id="L195">            return;</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (time - faceCandidateSince &gt;= flipStableMs) {</span>
+<span class="fc" id="L198">            faceState = instant;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (instant == FACE_DOWN) {</span>
+<span class="fc" id="L200">                events.add(new GestureEvent(GestureEvent.TYPE_FLIP_FACE_DOWN, gz, time));</span>
+            } else {
+<span class="fc" id="L202">                events.add(new GestureEvent(GestureEvent.TYPE_FLIP_FACE_UP, gz, time));</span>
+            }
+        }
+<span class="fc" id="L205">    }</span>
+
+    private void detectTilt(double gx, double gy, double gz, long time, List&lt;GestureEvent&gt; events) {
+<span class="fc" id="L208">        double horizontal = Math.sqrt(gx * gx + gz * gz);</span>
+<span class="fc" id="L209">        double roll = MathUtil.atan2(gx, gz);</span>
+<span class="fc" id="L210">        double pitch = MathUtil.atan2(-gy, horizontal);</span>
+
+<span class="fc" id="L212">        rollState = tiltAxis(roll, rollState, GestureEvent.TYPE_TILT_RIGHT,</span>
+                GestureEvent.TYPE_TILT_LEFT, time, events);
+<span class="fc" id="L214">        pitchState = tiltAxis(pitch, pitchState, GestureEvent.TYPE_TILT_BACKWARD,</span>
+                GestureEvent.TYPE_TILT_FORWARD, time, events);
+<span class="fc" id="L216">    }</span>
+
+    private int tiltAxis(double angle, int state, int posType, int negType,
+                         long time, List&lt;GestureEvent&gt; events) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (state == FLAT) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            if (angle &gt; tiltEnterAngle) {</span>
+<span class="fc" id="L222">                events.add(new GestureEvent(posType, angle, time));</span>
+<span class="fc" id="L223">                return POS;</span>
+            }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (angle &lt; -tiltEnterAngle) {</span>
+<span class="nc" id="L226">                events.add(new GestureEvent(negType, angle, time));</span>
+<span class="nc" id="L227">                return NEG;</span>
+            }
+<span class="fc" id="L229">            return FLAT;</span>
+        }
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (Math.abs(angle) &lt; tiltExitAngle) {</span>
+<span class="nc" id="L232">            return FLAT;</span>
+        }
+<span class="fc" id="L234">        return state;</span>
+    }
+
+    private void detectPickUp(double gz, double linearMag, long time, List&lt;GestureEvent&gt; events) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        boolean flatFaceUp = gz &gt; G * 0.8;</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">        if (flatFaceUp &amp;&amp; linearMag &lt; pickUpRestLinear) {</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (restSince == Long.MIN_VALUE) {</span>
+<span class="fc" id="L241">                restSince = time;</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            } else if (time - restSince &gt;= pickUpRestMs) {</span>
+<span class="fc" id="L243">                resting = true;</span>
+            }
+        } else {
+<span class="pc bpc" id="L246" title="3 of 8 branches missed.">            if (resting &amp;&amp; linearMag &gt; pickUpMoveLinear</span>
+                    &amp;&amp; (lastPickUpTime == TIME_NONE || time - lastPickUpTime &gt;= pickUpCooldownMs)) {
+<span class="fc" id="L248">                lastPickUpTime = time;</span>
+<span class="fc" id="L249">                events.add(new GestureEvent(GestureEvent.TYPE_PICK_UP, linearMag, time));</span>
+            }
+<span class="fc" id="L251">            resting = false;</span>
+<span class="fc" id="L252">            restSince = Long.MIN_VALUE;</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    private void detectFreeFall(double totalMag, long time, List&lt;GestureEvent&gt; events) {
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (totalMag &lt; freeFallThreshold) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (freeFallSince == Long.MIN_VALUE) {</span>
+<span class="fc" id="L259">                freeFallSince = time;</span>
+<span class="pc bpc" id="L260" title="1 of 6 branches missed.">            } else if (time - freeFallSince &gt;= freeFallMinMs</span>
+                    &amp;&amp; (lastFreeFallTime == TIME_NONE || time - lastFreeFallTime &gt;= freeFallCooldownMs)) {
+<span class="fc" id="L262">                lastFreeFallTime = time;</span>
+<span class="fc" id="L263">                freeFallSince = Long.MIN_VALUE;</span>
+<span class="fc" id="L264">                events.add(new GestureEvent(GestureEvent.TYPE_FREE_FALL, totalMag, time));</span>
+            }
+        } else {
+<span class="fc" id="L267">            freeFallSince = Long.MIN_VALUE;</span>
+        }
+<span class="fc" id="L269">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Scene.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">Scene.java</span></div><h1>Scene.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A named set of accessory states that can be applied in one go: HomeKit's
+/// `HMActionSet`, a Google Home scene.
+///
+/// Run one with [SmartHome#executeScene(Scene)].
+///
+/// #### Scenes, and not automations
+///
+/// A scene is a list of things to set. An automation is a scene plus a
+/// *trigger* -- a time, a sensor crossing a threshold, someone arriving -- and
+/// the three ecosystems model triggers in three incompatible ways: HomeKit has
+/// `HMTimerTrigger`, `HMEventTrigger` and `HMCharacteristicThreshold`, Google
+/// has its own automations language, and Matter has nothing at all. There is
+/// no honest common shape, so this release exposes scenes and
+/// [SmartHome#isAutomationSupported()] answers `false` everywhere.
+///
+/// An immutable snapshot.
+public final class Scene {
+
+    private final String id;
+    private final String name;
+    private final String structureId;
+    private final SceneType type;
+    private final boolean executable;
+    private final List&lt;SceneAction&gt; actions;
+
+    /// Creates a scene snapshot. Called by the ports and by the local home.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the scene identifier
+    ///
+    /// - `name`: the user-visible name, or `null` for none
+    ///
+    /// - `structureId`: the structure this scene belongs to
+    ///
+    /// - `type`: what kind of scene it is; `null` becomes
+    ///   [SceneType#USER_DEFINED]
+    ///
+    /// - `executable`: whether it can be run from here
+    ///
+    /// - `actions`: what it does; `null` becomes empty, which is also what a
+    ///   backend that will not enumerate a scene's contents produces
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `id` is `null` or empty
+    public Scene(String id, String name, String structureId, SceneType type,
+<span class="fc" id="L76">            boolean executable, List&lt;SceneAction&gt; actions) {</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(&quot;scene id is required&quot;);</span>
+        }
+<span class="fc" id="L80">        this.id = id;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        this.name = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L82">        this.structureId = structureId;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        this.type = type == null ? SceneType.USER_DEFINED : type;</span>
+<span class="fc" id="L84">        this.executable = executable;</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">        if (actions == null || actions.isEmpty()) {</span>
+<span class="fc" id="L86">            this.actions = Collections.&lt;SceneAction&gt;emptyList();</span>
+        } else {
+<span class="fc" id="L88">            this.actions = Collections.unmodifiableList(</span>
+                    new ArrayList&lt;SceneAction&gt;(actions));
+        }
+<span class="fc" id="L91">    }</span>
+
+    /// The identifier this scene is addressed by.
+    ///
+    /// #### Returns
+    ///
+    /// the identifier, never `null`
+    public String getId() {
+<span class="fc" id="L99">        return id;</span>
+    }
+
+    /// The user-visible name, empty when the scene has none. The user's own
+    /// text; treat it as untrusted beyond display.
+    ///
+    /// #### Returns
+    ///
+    /// the name, never `null`
+    public String getName() {
+<span class="fc" id="L109">        return name;</span>
+    }
+
+    /// The structure this scene belongs to.
+    ///
+    /// #### Returns
+    ///
+    /// the structure identifier, or `null` when unknown
+    public String getStructureId() {
+<span class="fc" id="L118">        return structureId;</span>
+    }
+
+    /// What kind of scene this is.
+    ///
+    /// #### Returns
+    ///
+    /// the type, never `null`
+    public SceneType getType() {
+<span class="nc" id="L127">        return type;</span>
+    }
+
+    /// Whether this scene can be run with [SmartHome#executeScene(Scene)].
+    ///
+    /// `false` for a [SceneType#TRIGGER_OWNED] scene, and for one the user's
+    /// permissions on this home do not let them run. Calling
+    /// `executeScene` anyway fails with [HomeError#UNAUTHORIZED] rather than
+    /// quietly doing nothing, but checking first is how you avoid offering a
+    /// button that cannot work.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the scene can be run
+    public boolean isExecutable() {
+<span class="fc" id="L142">        return executable;</span>
+    }
+
+    /// What this scene does.
+    ///
+    /// **Empty is not the same as &quot;does nothing&quot;.** Some backends will run a
+    /// scene without enumerating its contents, so an empty list means the
+    /// platform did not say. Do not render &quot;this scene is empty&quot; from it.
+    ///
+    /// #### Returns
+    ///
+    /// an immutable list, possibly empty
+    public List&lt;SceneAction&gt; getActions() {
+<span class="fc" id="L155">        return actions;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        return &quot;Scene[&quot; + id + (name.length() &gt; 0 ? &quot; &quot; + name : &quot;&quot;) + &quot; &quot;</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                + type.name() + (executable ? &quot;&quot; : &quot; not-executable&quot;) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

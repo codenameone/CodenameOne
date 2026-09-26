@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VRView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vr</a> &gt; <span class="el_source">VRView.java</span></div><h1>VRView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vr;
+
+import com.codename1.gpu.Camera;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Quaternion;
+import com.codename1.gpu.RenderView;
+import com.codename1.gpu.Renderer;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.layouts.BorderLayout;
+
+/// Component that renders an application scene in virtual reality: stereo
+/// side-by-side per-eye views with sensor-fusion head tracking, built
+/// entirely on the portable `com.codename1.gpu` pipeline so it works on every
+/// platform where `Display#isGpuSupported()` is true - including the
+/// simulator.
+///
+/// Supply a `VRRenderer` that draws the scene; the view clears the frame,
+/// splits the viewport per eye, positions a `VRCameraRig` from the
+/// `HeadTracker` orientation and invokes the renderer once per eye.
+///
+/// IMPORTANT: `VRRenderer` callbacks run on the platform render thread, never
+/// on the EDT. Do not touch Codename One UI components from them.
+///
+/// ```java
+/// VRView vr = new VRView(new VRRenderer() {
+///     Mesh cube;
+///     Material material;
+///     public void onInit(GraphicsDevice device) {
+///         cube = Primitives.cube(device, 0.5f);
+///         material = new Material(Material.Type.PHONG).setColor(0xff3366ff);
+///     }
+///     public void onEyeFrame(GraphicsDevice device, VREye eye, Camera camera) {
+///         device.draw(cube, material, Matrix4.translation(0, 0, -2));
+///     }
+///     public void onDispose(GraphicsDevice device) { }
+/// });
+/// vr.setContinuous(true);
+/// form.add(BorderLayout.CENTER, vr);
+/// ```
+public class VRView extends Container {
+    private final VRRenderer vrRenderer;
+    private final VRSettings settings;
+    private final HeadTracker tracker;
+    private final VRCameraRig rig;
+    private final RenderView renderView;
+<span class="nc" id="L69">    private final Camera eyeCamera = new Camera();</span>
+<span class="nc" id="L70">    private final float[] quat = Quaternion.identity();</span>
+    // Guards the settings the EDT writes and the render thread reads each
+    // frame (the codebase convention is locking over volatile fields).
+<span class="nc" id="L73">    private final Object stateLock = new Object();</span>
+    private boolean stereo;
+<span class="nc" id="L75">    private boolean headTrackingEnabled = true;</span>
+<span class="nc" id="L76">    private int clearColor = 0xff000000;</span>
+    private float posX;
+    private float posY;
+    private float posZ;
+    // Written and read on the render thread only.
+<span class="nc" id="L81">    private int surfaceWidth = 1;</span>
+<span class="nc" id="L82">    private int surfaceHeight = 1;</span>
+
+    /// Creates a VR view with default settings.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: draws the scene, once per eye per frame
+    public VRView(VRRenderer renderer) {
+<span class="nc" id="L90">        this(renderer, new VRSettings());</span>
+<span class="nc" id="L91">    }</span>
+
+    /// Creates a VR view.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderer`: draws the scene, once per eye per frame
+    ///
+    /// - `settings`: eye separation and lens parameters; null uses defaults
+    public VRView(VRRenderer renderer, VRSettings settings) {
+<span class="nc" id="L101">        super(new BorderLayout());</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (renderer == null) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;renderer is required&quot;);</span>
+        }
+<span class="nc" id="L105">        this.vrRenderer = renderer;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        this.settings = settings == null ? new VRSettings() : settings;</span>
+<span class="nc" id="L107">        this.stereo = this.settings.isStereo();</span>
+<span class="nc" id="L108">        this.tracker = new HeadTracker();</span>
+<span class="nc" id="L109">        this.rig = new VRCameraRig(this.settings);</span>
+<span class="nc" id="L110">        this.renderView = new RenderView(new EyeLoop());</span>
+<span class="nc" id="L111">        add(BorderLayout.CENTER, renderView);</span>
+<span class="nc" id="L112">    }</span>
+
+    /// True when the current platform provides a 3D backend. Equivalent to
+    /// `Display#isGpuSupported()`.
+    public boolean isSupported() {
+<span class="nc" id="L117">        return Display.getInstance().isGpuSupported();</span>
+    }
+
+    /// The settings this view was created with.
+    public VRSettings getSettings() {
+<span class="nc" id="L122">        return settings;</span>
+    }
+
+    /// The head tracker driving this view. Exposed to tune the fusion filter
+    /// or observe the raw orientation.
+    public HeadTracker getHeadTracker() {
+<span class="nc" id="L128">        return tracker;</span>
+    }
+
+    /// Enables or disables head tracking. When disabled the last orientation
+    /// freezes; combine with `VRCameraRig` manually for custom control.
+    public void setHeadTrackingEnabled(boolean enabled) {
+<span class="nc" id="L134">        synchronized (stateLock) {</span>
+<span class="nc" id="L135">            this.headTrackingEnabled = enabled;</span>
+<span class="nc" id="L136">        }</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (enabled) {</span>
+<span class="nc" id="L139">                tracker.start();</span>
+            } else {
+<span class="nc" id="L141">                tracker.stop();</span>
+            }
+        }
+<span class="nc" id="L144">        renderView.requestRender();</span>
+<span class="nc" id="L145">    }</span>
+
+    /// True when head tracking drives the view orientation.
+    public boolean isHeadTrackingEnabled() {
+<span class="nc" id="L149">        synchronized (stateLock) {</span>
+<span class="nc" id="L150">            return headTrackingEnabled;</span>
+        }
+    }
+
+    /// Rotates the view so the current direction becomes &quot;straight ahead&quot;.
+    public void recenter() {
+<span class="nc" id="L156">        tracker.recenter();</span>
+<span class="nc" id="L157">        renderView.requestRender();</span>
+<span class="nc" id="L158">    }</span>
+
+    /// Switches between side-by-side stereo and a single centered viewpoint.
+    public void setStereo(boolean stereo) {
+<span class="nc" id="L162">        synchronized (stateLock) {</span>
+<span class="nc" id="L163">            this.stereo = stereo;</span>
+<span class="nc" id="L164">        }</span>
+<span class="nc" id="L165">        renderView.requestRender();</span>
+<span class="nc" id="L166">    }</span>
+
+    /// True when rendering side-by-side stereo.
+    public boolean isStereo() {
+<span class="nc" id="L170">        synchronized (stateLock) {</span>
+<span class="nc" id="L171">            return stereo;</span>
+        }
+    }
+
+    /// Sets the head center position in world space, for example to move the
+    /// viewer through the scene.
+    public void setPosition(float x, float y, float z) {
+<span class="nc" id="L178">        synchronized (stateLock) {</span>
+<span class="nc" id="L179">            posX = x;</span>
+<span class="nc" id="L180">            posY = y;</span>
+<span class="nc" id="L181">            posZ = z;</span>
+<span class="nc" id="L182">        }</span>
+<span class="nc" id="L183">        renderView.requestRender();</span>
+<span class="nc" id="L184">    }</span>
+
+    /// The background clear color as `0xAARRGGBB`. Default opaque black.
+    public void setClearColor(int argb) {
+<span class="nc" id="L188">        synchronized (stateLock) {</span>
+<span class="nc" id="L189">            this.clearColor = argb;</span>
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">        renderView.requestRender();</span>
+<span class="nc" id="L192">    }</span>
+
+    /// Controls whether the view renders continuously or only when
+    /// `#requestRender()` is called. Head tracked scenes normally want
+    /// continuous rendering.
+    public VRView setContinuous(boolean continuous) {
+<span class="nc" id="L198">        renderView.setContinuous(continuous);</span>
+<span class="nc" id="L199">        return this;</span>
+    }
+
+    /// Requests that a single frame be rendered.
+    public void requestRender() {
+<span class="nc" id="L204">        renderView.requestRender();</span>
+<span class="nc" id="L205">    }</span>
+
+    /// The underlying render view, exposed for advanced integration.
+    public RenderView getRenderView() {
+<span class="nc" id="L209">        return renderView;</span>
+    }
+
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L214">        super.initComponent();</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (isHeadTrackingEnabled()) {</span>
+<span class="nc" id="L216">            tracker.start();</span>
+        }
+<span class="nc" id="L218">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L222">        tracker.stop();</span>
+<span class="nc" id="L223">        super.deinitialize();</span>
+<span class="nc" id="L224">    }</span>
+
+    /// The internal `Renderer` that splits each frame into per-eye passes.
+<span class="nc" id="L227">    private final class EyeLoop implements Renderer {</span>
+        @Override
+        public void onInit(GraphicsDevice device) {
+<span class="nc" id="L230">            vrRenderer.onInit(device);</span>
+<span class="nc" id="L231">        }</span>
+
+        @Override
+        public void onResize(GraphicsDevice device, int width, int height) {
+<span class="nc" id="L235">            surfaceWidth = Math.max(1, width);</span>
+<span class="nc" id="L236">            surfaceHeight = Math.max(1, height);</span>
+<span class="nc" id="L237">        }</span>
+
+        @Override
+        public void onFrame(GraphicsDevice device) {
+            boolean trackingNow;
+            boolean stereoNow;
+            int clearNow;
+            float px;
+            float py;
+            float pz;
+<span class="nc" id="L247">            synchronized (stateLock) {</span>
+<span class="nc" id="L248">                trackingNow = headTrackingEnabled;</span>
+<span class="nc" id="L249">                stereoNow = stereo;</span>
+<span class="nc" id="L250">                clearNow = clearColor;</span>
+<span class="nc" id="L251">                px = posX;</span>
+<span class="nc" id="L252">                py = posY;</span>
+<span class="nc" id="L253">                pz = posZ;</span>
+<span class="nc" id="L254">            }</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (trackingNow) {</span>
+<span class="nc" id="L256">                tracker.getOrientation(quat);</span>
+<span class="nc" id="L257">                rig.setOrientation(quat);</span>
+            }
+<span class="nc" id="L259">            rig.setPosition(px, py, pz);</span>
+<span class="nc" id="L260">            int w = surfaceWidth;</span>
+<span class="nc" id="L261">            int h = surfaceHeight;</span>
+<span class="nc" id="L262">            device.clear(clearNow, true, true);</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (stereoNow) {</span>
+<span class="nc" id="L264">                int half = w / 2;</span>
+<span class="nc" id="L265">                renderEye(device, VREye.LEFT, 0, 0, half, h);</span>
+<span class="nc" id="L266">                renderEye(device, VREye.RIGHT, half, 0, w - half, h);</span>
+<span class="nc" id="L267">                device.setViewport(0, 0, w, h);</span>
+<span class="nc" id="L268">            } else {</span>
+<span class="nc" id="L269">                renderEye(device, VREye.CENTER, 0, 0, w, h);</span>
+            }
+<span class="nc" id="L271">        }</span>
+
+        private void renderEye(GraphicsDevice device, VREye eye,
+                               int x, int y, int w, int h) {
+<span class="nc" id="L275">            device.setViewport(x, y, w, h);</span>
+<span class="nc" id="L276">            rig.apply(eyeCamera, eye, (float) w / (float) Math.max(1, h));</span>
+<span class="nc" id="L277">            device.setCamera(eyeCamera);</span>
+<span class="nc" id="L278">            vrRenderer.onEyeFrame(device, eye, eyeCamera);</span>
+<span class="nc" id="L279">        }</span>
+
+        @Override
+        public void onDispose(GraphicsDevice device) {
+<span class="nc" id="L283">            vrRenderer.onDispose(device);</span>
+<span class="nc" id="L284">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

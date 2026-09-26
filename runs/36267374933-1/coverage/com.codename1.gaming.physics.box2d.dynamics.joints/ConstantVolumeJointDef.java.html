@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConstantVolumeJointDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">ConstantVolumeJointDef.java</span></div><h1>ConstantVolumeJointDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import java.util.ArrayList;
+
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+
+/// Definition for a {@link ConstantVolumeJoint}, which connects a group a bodies together so they
+/// maintain a constant volume within them.
+public class ConstantVolumeJointDef extends JointDef {
+  public float frequencyHz;
+  public float dampingRatio;
+
+  ArrayList&lt;Body&gt; bodies;
+  ArrayList&lt;DistanceJoint&gt; joints;
+
+<span class="fc" id="L39">  public ConstantVolumeJointDef() {</span>
+<span class="fc" id="L40">    type = JointType.CONSTANT_VOLUME;</span>
+<span class="fc" id="L41">    bodies = new ArrayList&lt;Body&gt;();</span>
+<span class="fc" id="L42">    joints = null;</span>
+<span class="fc" id="L43">    collideConnected = false;</span>
+<span class="fc" id="L44">    frequencyHz = 0.0f;</span>
+<span class="fc" id="L45">    dampingRatio = 0.0f;</span>
+<span class="fc" id="L46">  }</span>
+
+  /// Adds a body to the group
+  ///
+  /// @param argBody
+  public void addBody(Body argBody) {
+<span class="fc" id="L52">    bodies.add(argBody);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">    if (bodies.size() == 1) {</span>
+<span class="fc" id="L54">      bodyA = argBody;</span>
+    }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">    if (bodies.size() == 2) {</span>
+<span class="fc" id="L57">      bodyB = argBody;</span>
+    }
+<span class="fc" id="L59">  }</span>
+
+  /// Adds a body and the pre-made distance joint. Should only be used for deserialization.
+  public void addBodyAndJoint(Body argBody, DistanceJoint argJoint) {
+<span class="nc" id="L63">    addBody(argBody);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">    if (joints == null) {</span>
+<span class="nc" id="L65">      joints = new ArrayList&lt;DistanceJoint&gt;();</span>
+    }
+<span class="nc" id="L67">    joints.add(argJoint);</span>
+<span class="nc" id="L68">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

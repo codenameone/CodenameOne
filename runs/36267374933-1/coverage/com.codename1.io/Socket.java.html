@@ -1,0 +1,576 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Socket.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Socket.java</span></div><h1>Socket.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.ui.Display;
+
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// Class implementing the socket API
+///
+/// @author Shai Almog
+public final class Socket {
+    private Socket() {
+    }
+
+    /// Returns true if sockets are supported in this port, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if sockets are supported in this port, false otherwise
+    public static boolean isSupported() {
+<span class="fc" id="L47">        return Util.getImplementation().isSocketAvailable();</span>
+    }
+
+    /// Returns true if server sockets are supported in this port, if this method returns
+    /// false invocations of listen will always fail
+    ///
+    /// #### Returns
+    ///
+    /// true if server sockets are supported in this port, false otherwise
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated server sockets are only supported on Android and Desktop and as such
+    /// we recommend against using them
+    public static boolean isServerSocketSupported() {
+<span class="fc" id="L62">        return Util.getImplementation().isServerSocketAvailable();</span>
+    }
+
+    /// Returns true if this port can listen on the LOOPBACK interface only, so the
+    /// channel is reachable from the device itself but not from the network.
+    ///
+    /// This is a strictly narrower capability than [#isServerSocketSupported()], which
+    /// binds the wildcard address and therefore publishes the port on every network
+    /// interface. A port must implement loopback binding explicitly; there is no
+    /// fallback to a wildcard bind, because silently widening the reach of a channel a
+    /// caller asked to keep local would be the wrong failure.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#listenLoopback(int, Class)] is usable on this port
+    public static boolean isLoopbackServerSocketSupported() {
+<span class="fc" id="L78">        return Util.getImplementation().isLoopbackServerSocketAvailable();</span>
+    }
+
+    /// Connect to a remote host
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the host
+    ///
+    /// - `port`: the connection port
+    ///
+    /// - `sc`: callback for when the connection is established or fails
+    public static void connect(final String host, final int port, final SocketConnection sc) {
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        if (host.indexOf('.') &gt; -1 &amp;&amp; host.indexOf(':') &gt; -1) {</span>
+<span class="fc" id="L92">            throw new IllegalArgumentException(&quot;Port should be provided separately&quot;);</span>
+        }
+<span class="fc" id="L94">        Display.getInstance().startThread(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L97">                Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (connection != null) {</span>
+<span class="fc" id="L99">                    sc.setConnected(true);</span>
+<span class="fc" id="L100">                    sc.input = new SocketInputStream(connection, sc);</span>
+<span class="fc" id="L101">                    sc.output = new SocketOutputStream(connection, sc);</span>
+<span class="fc" id="L102">                    sc.connectionEstablished(sc.input, sc.output);</span>
+                } else {
+<span class="fc" id="L104">                    sc.setConnected(false);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                    if (connection == null) {</span>
+<span class="fc" id="L106">                        sc.connectionError(-1, &quot;Failed to connect&quot;);</span>
+                    } else {
+<span class="nc" id="L108">                        sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));</span>
+                    }
+                }
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">        }, &quot;Connection to &quot; + host).start();</span>
+<span class="fc" id="L113">    }</span>
+
+    /// Connect to a remote host
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the host
+    ///
+    /// - `port`: the connection port
+    ///
+    /// - `sc`: callback for when the connection is established or fails
+    public static Close connectWithClose(final String host, final int port, final SocketConnection sc) {
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        if (host.indexOf('.') &gt; -1 &amp;&amp; host.indexOf(':') &gt; -1) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(&quot;Port should be provided separately&quot;);</span>
+        }
+<span class="fc" id="L128">        final Object[] connection = new Object[1];</span>
+<span class="fc" id="L129">        Display.getInstance().startThread(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L132">                connection[0] = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                if (connection[0] != null) {</span>
+<span class="fc" id="L134">                    sc.setConnected(true);</span>
+<span class="fc" id="L135">                    sc.input = new SocketInputStream(connection[0], sc);</span>
+<span class="fc" id="L136">                    sc.output = new SocketOutputStream(connection[0], sc);</span>
+<span class="fc" id="L137">                    sc.connectionEstablished(sc.input, sc.output);</span>
+                } else {
+<span class="nc" id="L139">                    sc.setConnected(false);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                    if (connection[0] == null) {</span>
+<span class="nc" id="L141">                        sc.connectionError(-1, &quot;Failed to connect&quot;);</span>
+                    } else {
+<span class="nc" id="L143">                        sc.connectionError(Util.getImplementation().getSocketErrorCode(connection[0]),</span>
+<span class="nc" id="L144">                                Util.getImplementation().getSocketErrorMessage(connection[0]));</span>
+                    }
+                }
+<span class="fc" id="L147">            }</span>
+<span class="fc" id="L148">        }, &quot;Connection to &quot; + host).start();</span>
+<span class="fc" id="L149">        return new Close() {</span>
+            @Override
+            public void close() throws IOException {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                while (connection[0] == null) {</span>
+                    try {
+<span class="nc" id="L154">                        Thread.sleep(200);</span>
+<span class="nc" id="L155">                    } catch (InterruptedException e) {</span>
+<span class="nc" id="L156">                        Log.e(e);</span>
+<span class="nc" id="L157">                        throw new RuntimeException(e.getMessage(), e);</span>
+<span class="nc" id="L158">                    }</span>
+                }
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                if (Util.getImplementation().isSocketConnected(connection[0])) {</span>
+<span class="fc" id="L161">                    Util.getImplementation().disconnectSocket(connection[0]);</span>
+                }
+<span class="fc" id="L163">                connection[0] = null;</span>
+<span class="fc" id="L164">            }</span>
+        };
+    }
+
+    /// Listen to incoming connections on port
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the device port
+    ///
+    /// - `scClass`: @param scClass class of callback for when the connection is established or fails, this class
+    /// will be instantiated for every incoming connection and must have a public no argument constructor.
+    ///
+    /// #### Returns
+    ///
+    /// StopListening instance that allows the the caller to stop listening on a server socket
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated server sockets are only supported on Android and Desktop and as such
+    /// we recommend against using them
+    public static StopListening listen(final int port, final Class scClass) {
+<span class="fc" id="L186">        return listenImpl(port, scClass, false);</span>
+    }
+
+    /// Listens on the given port on the LOOPBACK interface only, so the channel is
+    /// reachable from this device but not from the network. Otherwise identical to
+    /// [#listen(int, Class)]: `scClass` is instantiated per incoming connection and
+    /// must have a public no-argument constructor.
+    ///
+    /// Use this for anything that is local by nature - a debug or automation channel,
+    /// an on-device tool talking to a companion process. Callers that genuinely want to
+    /// serve the network should use [#listen(int, Class)] and say so.
+    ///
+    /// Fails (never falls back to a wildcard bind) when
+    /// [#isLoopbackServerSocketSupported()] is false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `port`: the device port
+    ///
+    /// - `scClass`: class of callback for each incoming connection
+    ///
+    /// #### Returns
+    ///
+    /// StopListening instance that allows the caller to stop listening
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if this platform cannot bind a loopback server socket.
+    /// Thrown here rather than on the listener thread so a caller cannot walk away
+    /// believing it is listening when nothing ever bound.
+    public static StopListening listenLoopback(final int port, final Class scClass) {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (!isLoopbackServerSocketSupported()) {</span>
+<span class="fc" id="L218">            throw new IllegalStateException(&quot;This platform cannot bind a loopback server &quot;</span>
+                    + &quot;socket; check Socket.isLoopbackServerSocketSupported() first&quot;);
+        }
+<span class="fc" id="L221">        return listenImpl(port, scClass, true);</span>
+    }
+
+    private static StopListening listenImpl(final int port, final Class scClass, final boolean loopbackOnly) {
+<span class="fc" id="L225">        class Listener implements StopListening, Runnable {</span>
+            /// Written by stop() on the caller's thread and read by the accept loop on
+            /// another, so it needs a memory barrier rather than a plain field. Without
+            /// one the loop can miss the write, and since closing the listening socket
+            /// makes the port's cache hand out a FRESH socket on the next call, the
+            /// listener would quietly resurrect itself instead of stopping.
+<span class="fc" id="L231">            private final AtomicBoolean stopped = new AtomicBoolean();</span>
+
+            /// The backoff after a failed accept. It starts short, doubles while the
+            /// failure persists and is capped, so a port that can never be bound settles
+            /// into one attempt every few seconds instead of two a second forever. Reset
+            /// as soon as an accept succeeds, so a listener that saw one bad moment is not
+            /// left sluggish. Slept in slices so a stop is still noticed promptly.
+            private static final int BACKOFF_MIN_MS = 50;
+            private static final int BACKOFF_MAX_MS = 5000;
+            private static final int BACKOFF_SLICE_MS = 50;
+<span class="fc" id="L241">            private int backoffMs = BACKOFF_MIN_MS;</span>
+
+            @Override
+            public void run() {
+                try {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                    while (!stopped.get()) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                        final Object connection = loopbackOnly</span>
+<span class="fc" id="L248">                                ? Util.getImplementation().listenSocketLoopback(port)</span>
+<span class="fc" id="L249">                                : Util.getImplementation().listenSocket(port);</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                        if (stopped.get()) {</span>
+                            // stop() was called while this thread sat inside accept. The
+                            // connection that unblocked it belongs to a listener the caller
+                            // has already abandoned, so hand it back rather than serving it.
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                            if (connection != null) {</span>
+<span class="nc" id="L255">                                Util.getImplementation().disconnectSocket(connection);</span>
+                            }
+                            break;
+                        }
+<span class="pc bpc" id="L259" title="3 of 4 branches missed.">                        if (connection == null &amp;&amp; stopped.get()) {</span>
+                            // Closing the listening socket is how a stop is delivered, and
+                            // it surfaces here as a failed accept. Reporting that through
+                            // connectionError would announce a fault that never happened.
+<span class="nc" id="L263">                            break;</span>
+                        }
+<span class="fc" id="L265">                        final SocketConnection sc = (SocketConnection) scClass.newInstance();</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                        if (connection != null) {</span>
+<span class="fc" id="L267">                            backoffMs = BACKOFF_MIN_MS;   // healthy again</span>
+<span class="fc" id="L268">                            sc.setConnected(true);</span>
+<span class="fc" id="L269">                            Display.getInstance().startThread(new Runnable() {</span>
+                                @Override
+                                public void run() {
+<span class="fc" id="L272">                                    sc.input = new SocketInputStream(connection, sc);</span>
+<span class="fc" id="L273">                                    sc.output = new SocketOutputStream(connection, sc);</span>
+<span class="fc" id="L274">                                    sc.connectionEstablished(sc.input, sc.output);</span>
+<span class="fc" id="L275">                                    sc.setConnected(false);</span>
+<span class="fc" id="L276">                                }</span>
+<span class="fc" id="L277">                            }, &quot;Connection &quot; + port).start();</span>
+                        } else {
+<span class="nc" id="L279">                            sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));</span>
+                            // A listener whose accept fails immediately and keeps failing --
+                            // a port that cannot be bound, say -- would otherwise spin at
+                            // full speed, burning a core and filling the log. Pause so a
+                            // persistent failure is slow and visible instead of hot. Only
+                            // the failure path waits; a served connection never gets here.
+                            //
+                            // Slept in slices, re-testing the flag between them, so a stop
+                            // arriving during the pause is acted on within a slice rather
+                            // than after the whole backoff.
+<span class="nc" id="L289">                            int waited = 0;</span>
+<span class="nc bnc" id="L290" title="All 4 branches missed.">                            while (waited &lt; backoffMs &amp;&amp; !stopped.get()) {</span>
+<span class="nc" id="L291">                                int slice = Math.min(BACKOFF_SLICE_MS, backoffMs - waited);</span>
+                                try {
+<span class="nc" id="L293">                                    Thread.sleep(slice);</span>
+<span class="nc" id="L294">                                } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L295">                                    break;   // the loop re-tests stopped straight away</span>
+<span class="nc" id="L296">                                }</span>
+<span class="nc" id="L297">                                waited += slice;</span>
+<span class="nc" id="L298">                            }</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                            if (backoffMs &lt; BACKOFF_MAX_MS) {</span>
+<span class="nc" id="L300">                                backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);</span>
+                            }
+                        }
+<span class="fc" id="L303">                    }</span>
+<span class="nc" id="L304">                } catch (InstantiationException err) {</span>
+                    // instansiating the class has caused a problem
+<span class="nc" id="L306">                    Log.e(err);</span>
+<span class="nc" id="L307">                } catch (IllegalAccessException err) {</span>
+                    // instansiating the class has caused a problem
+<span class="nc" id="L309">                    Log.e(err);</span>
+<span class="nc" id="L310">                } catch (RuntimeException err) {</span>
+                    // instansiating the class has caused a problem
+<span class="nc" id="L312">                    Log.e(err);</span>
+<span class="pc" id="L313">                }</span>
+<span class="fc" id="L314">            }</span>
+
+            @Override
+            public void stop() {
+<span class="fc" id="L318">                stopped.set(true);</span>
+                // Closing the listening socket is what brings the thread back out of
+                // accept. Without it the flag is only noticed the next time a client
+                // connects, so the thread lingers, and a listener restarted on the same
+                // port shares the cached socket -- letting this abandoned thread win the
+                // race for the first connection and drop it.
+<span class="fc" id="L324">                Util.getImplementation().stopListeningSocket(port, loopbackOnly);</span>
+<span class="fc" id="L325">            }</span>
+
+        }
+<span class="fc" id="L328">        Listener l = new Listener();</span>
+<span class="fc" id="L329">        Display.getInstance().startThread(l, &quot;Listening on &quot; + port).start();</span>
+<span class="fc" id="L330">        return l;</span>
+    }
+
+    /// Returns the hostname or ip address of the device if available/applicable
+    ///
+    /// #### Returns
+    ///
+    /// the hostname or ip address of the device if available/applicable
+    public static String getHostOrIP() {
+<span class="fc" id="L339">        return Util.getImplementation().getHostOrIP();</span>
+    }
+
+    interface Close {
+        void close() throws IOException;
+    }
+
+    /// This interface can be invoked to stop listening on a server socket
+    public interface StopListening {
+        /// Stop listening
+        void stop();
+    }
+
+    static class SocketInputStream extends InputStream {
+        private final Object impl;
+        private final SocketConnection con;
+        private byte[] buffer;
+        private int bufferOffset;
+        private boolean closed;
+
+<span class="fc" id="L359">        SocketInputStream(Object impl, SocketConnection con) {</span>
+<span class="fc" id="L360">            this.impl = impl;</span>
+<span class="fc" id="L361">            this.con = con;</span>
+<span class="fc" id="L362">        }</span>
+
+        @Override
+        public boolean markSupported() {
+<span class="nc" id="L366">            return false;</span>
+        }
+
+        @Override
+        public synchronized void reset() throws IOException {
+<span class="nc" id="L371">        }</span>
+
+        @Override
+        public synchronized void close() throws IOException {
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (!closed) {</span>
+<span class="fc" id="L376">                closed = true;</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                if (Util.getImplementation().isSocketConnected(impl)) {</span>
+<span class="fc" id="L378">                    Util.getImplementation().disconnectSocket(impl);</span>
+<span class="fc" id="L379">                    con.setConnected(false);</span>
+                }
+            }
+<span class="fc" id="L382">        }</span>
+
+        @Override
+        public int available() throws IOException {
+<span class="fc" id="L386">            return Util.getImplementation().getSocketAvailableInput(impl);</span>
+        }
+
+        private void throwEOF() throws IOException {
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (closed) {</span>
+<span class="nc" id="L391">                throw new EOFException();</span>
+            }
+<span class="fc" id="L393">        }</span>
+
+        // try to read some data into the buffer if we think there is some
+        // available, but don't wait if there is not.  This is used to get
+        // additional data for a read that has more room in it's buffer.
+        @SuppressWarnings(&quot;PMD.EmptyCatchBlock&quot;)
+        private boolean getDataIfAvailable() {
+            try {
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                if (available() &gt; 0) {</span>
+<span class="nc" id="L402">                    buffer = Util.getImplementation().readFromSocketStream(impl);</span>
+<span class="nc" id="L403">                    bufferOffset = 0;</span>
+<span class="nc bnc" id="L404" title="All 4 branches missed.">                    return ((buffer != null) &amp;&amp; (buffer.length &gt; 0));</span>
+                }
+<span class="nc" id="L406">            } catch (IOException e) {</span>
+                // we don't really expect an IOException here, but if one
+                // does occur, leave peacefully so the caller can return the
+                // data he has.
+<span class="fc" id="L410">            }</span>
+            // we got nothing.
+<span class="fc" id="L412">            return (false);</span>
+        }
+
+        // get some data in the input buffer.  Return true if we did
+        // and false if we can't and never can.  This does not return
+        // until either data is available or it never will be.
+        //
+        // ddyer 12/2015.
+        // Observed on IOS, isSocketConnected returned true even though
+        // closing it has been tried.  Add closed to the set of conditions
+        // ddyer 4/2017
+        private boolean getSomeData() {    // upon entry, there may be data leftover from the previous call to read
+<span class="pc bpc" id="L424" title="1 of 6 branches missed.">            while (!closed</span>
+                    &amp;&amp; ((buffer == null)
+                    || (bufferOffset &gt;= buffer.length))) {    // we want new data, but if the socket is closed we won't get it.
+<span class="fc bfc" id="L427" title="All 2 branches covered.">                if (!Util.getImplementation().isSocketConnected(impl)) {</span>
+<span class="fc" id="L428">                    return (false);    // we'll never get data</span>
+                }
+<span class="fc" id="L430">                buffer = Util.getImplementation().readFromSocketStream(impl);</span>
+<span class="fc" id="L431">                bufferOffset = 0;</span>
+
+<span class="pc bpc" id="L433" title="4 of 6 branches missed.">                if (((buffer == null) || (buffer.length == 0))</span>
+                        &amp;&amp; !closed
+<span class="nc bnc" id="L435" title="All 2 branches missed.">                        &amp;&amp; Util.getImplementation().isSocketConnected(impl)) {    // wait a while if there's still hope</span>
+                    try {
+<span class="nc" id="L437">                        Thread.sleep(10);</span>
+<span class="nc" id="L438">                    } catch (InterruptedException err) {</span>
+<span class="nc" id="L439">                    }</span>
+                }
+            }
+<span class="pc bpc" id="L442" title="2 of 4 branches missed.">            return ((buffer != null) &amp;&amp; (buffer.length &gt; 0));</span>
+        }
+
+        // [ddyer 12/2015]
+        // rewritten to fix a bug that caused data loss if the the output
+        // and input buffer both ran out at the same time, then rewritten
+        // again for clarity and to avoid waiting forever when the data stream
+        // is closed while waiting for the first batch of data.  The old version
+        // used a recursive call to read which might have gone an indefinite
+        // number of levels deep, but this version does not.
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+<span class="fc" id="L454">            throwEOF();</span>
+            // eventually a read should timeout and return what it has
+<span class="fc bfc" id="L456" title="All 2 branches covered.">            if (!getSomeData()) {</span>
+<span class="fc" id="L457">                return (-1);    // nothing available ever</span>
+            }
+<span class="fc" id="L459">            int bytesRead = 0;</span>
+
+            // copy the available data, limited by whichever buffer is smaller
+            do {
+<span class="pc bpc" id="L463" title="1 of 4 branches missed.">                while ((bytesRead &lt; len) &amp;&amp; (bufferOffset &lt; buffer.length)) {</span>
+<span class="fc" id="L464">                    b[off + bytesRead++] = buffer[bufferOffset++];</span>
+                }
+            }
+            // if there's more room and data is already available, go for it.
+<span class="pc bpc" id="L468" title="2 of 4 branches missed.">            while ((bytesRead &lt; len) &amp;&amp; getDataIfAvailable());</span>
+
+            // otherwise return with what we have
+<span class="fc" id="L471">            return (bytesRead);</span>
+        }
+
+        @Override
+        public int read(byte[] b) throws IOException {
+<span class="fc" id="L476">            throwEOF();</span>
+<span class="fc" id="L477">            return read(b, 0, b.length);</span>
+        }
+
+        @Override
+        public int read() throws IOException {
+<span class="nc" id="L482">            throwEOF();</span>
+<span class="nc" id="L483">            byte[] b = new byte[1];</span>
+<span class="nc" id="L484">            int v = read(b);</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">            if (v == -1) {</span>
+<span class="nc" id="L486">                return -1;</span>
+            }
+<span class="nc" id="L488">            return b[0] &amp; 0xff;</span>
+        }
+
+        // PMD thinks we need to override finalize. Ugh.
+        @SuppressWarnings(&quot;PMD.MissingOverride&quot;)
+        protected void finalize() throws Throwable {
+            try {
+<span class="fc" id="L495">                close();</span>
+<span class="nc" id="L496">            } catch (Throwable err) {</span>
+<span class="nc" id="L497">                Log.e(err);</span>
+<span class="fc" id="L498">            }</span>
+<span class="fc" id="L499">        }</span>
+    }
+
+    static class SocketOutputStream extends OutputStream {
+        private final Object impl;
+        private final SocketConnection con;
+
+<span class="fc" id="L506">        SocketOutputStream(Object impl, SocketConnection con) {</span>
+<span class="fc" id="L507">            this.impl = impl;</span>
+<span class="fc" id="L508">            this.con = con;</span>
+<span class="fc" id="L509">        }</span>
+
+        @Override
+        public synchronized void close() throws IOException {
+<span class="fc bfc" id="L513" title="All 4 branches covered.">            if (con.isConnected() &amp;&amp; Util.getImplementation().isSocketConnected(impl)) {</span>
+<span class="fc" id="L514">                Util.getImplementation().disconnectSocket(impl);</span>
+<span class="fc" id="L515">                con.setConnected(false);</span>
+            }
+<span class="fc" id="L517">        }</span>
+
+        @Override
+        public void flush() throws IOException {
+<span class="fc" id="L521">        }</span>
+
+        private void handleSocketError() {
+<span class="fc" id="L524">            int code = Util.getImplementation().getSocketErrorCode(impl);</span>
+<span class="fc" id="L525">            String msg = Util.getImplementation().getSocketErrorMessage(impl);</span>
+<span class="pc bpc" id="L526" title="2 of 4 branches missed.">            if (code &gt; 0 || msg != null) {</span>
+<span class="nc" id="L527">                con.connectionError(code, msg);</span>
+            }
+<span class="fc" id="L529">        }</span>
+
+        // Routes all the write overloads through a single guarded path. The native
+        // socket handle can be torn down (e.g. the connection dropped) while a writer
+        // thread is still pushing data; before this guard that surfaced as an opaque
+        // NullPointerException deep in the platform implementation rather than an
+        // IOException the caller can handle. See issue #5139.
+        private void writeImpl(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            if (impl == null) {</span>
+<span class="nc" id="L538">                throw new IOException(&quot;Socket is not connected&quot;);</span>
+            }
+<span class="fc" id="L540">            Util.getImplementation().writeToSocketStream(impl, b, off, len);</span>
+<span class="fc" id="L541">            handleSocketError();</span>
+<span class="fc" id="L542">        }</span>
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            if (b == null) {</span>
+<span class="nc" id="L547">                throw new NullPointerException();</span>
+            }
+<span class="pc bpc" id="L549" title="3 of 6 branches missed.">            if (off &lt; 0 || len &lt; 0 || off &gt; b.length - len) {</span>
+<span class="nc" id="L550">                throw new IndexOutOfBoundsException();</span>
+            }
+<span class="fc" id="L552">            writeImpl(b, off, len);</span>
+<span class="fc" id="L553">        }</span>
+
+        @Override
+        public void write(byte[] b) throws IOException {
+<span class="fc" id="L557">            writeImpl(b, 0, b.length);</span>
+<span class="fc" id="L558">        }</span>
+
+        @Override
+        public void write(int b) throws IOException {
+<span class="fc" id="L562">            writeImpl(new byte[]{(byte) b}, 0, 1);</span>
+<span class="fc" id="L563">        }</span>
+
+        // PMD thinks we need to override finalize. Ugh.
+        @SuppressWarnings(&quot;PMD.MissingOverride&quot;)
+        protected void finalize() throws Throwable {
+            try {
+<span class="fc" id="L569">                close();</span>
+<span class="nc" id="L570">            } catch (Throwable err) {</span>
+<span class="nc" id="L571">                Log.e(err);</span>
+<span class="fc" id="L572">            }</span>
+<span class="fc" id="L573">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

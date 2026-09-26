@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Protection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">Protection.java</span></div><h1>Protection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+/// One protection a store or a key either has or does not have.
+///
+/// These are deliberately independent flags rather than points on a scale. A single number --
+/// &quot;security level 3&quot; -- reads as though every property below it is implied, and on the browser
+/// that is exactly the misreading this package exists to prevent: an entry can be encrypted at
+/// rest under a key that cannot be exported, and still be readable by any script the page runs.
+/// Encryption and isolation from the page are different questions, so they are different flags.
+///
+/// Every flag is reported through [ProtectionReport], which answers `YES`, `NO` or `UNKNOWN` for
+/// each one. `UNKNOWN` is a real answer and not a polite `NO`: a browser cannot tell an
+/// application whether its key ended up in a secure element, and a report that guessed would be
+/// the same lie in a different place.
+<span class="fc" id="L37">public enum Protection {</span>
+
+    /// The value survives the process. On a native port that means an application restart; in a
+    /// browser it means a page reload, and only for as long as the browser keeps the origin's
+    /// storage -- see [VaultError#QUOTA_EXCEEDED] and the eviction discussion in [Vault].
+<span class="fc" id="L42">    PERSISTENT,</span>
+
+    /// What is written to disk is ciphertext under a key held somewhere else. Someone who reads
+    /// the storage pool, the profile directory or a backup finds no plaintext.
+    ///
+    /// This says nothing about who can ask for a decryption. See [#ISOLATED_FROM_APPLICATION_CODE].
+<span class="fc" id="L48">    ENCRYPTED_AT_REST,</span>
+
+    /// The key that protects the data cannot be exported through the platform's normal API. A
+    /// browser `CryptoKey` created with `extractable: false` has this; a raw 32 byte string in
+    /// local storage does not.
+    ///
+    /// Non-extractability is not hardware backing and not isolation. The key still performs
+    /// operations for whatever code asks.
+<span class="fc" id="L56">    NON_EXTRACTABLE_KEY,</span>
+
+    /// The key lives in an operating system secret store -- the iOS keychain, the Android
+    /// keystore, the desktop credential store -- rather than in storage the application itself
+    /// can enumerate.
+    ///
+    /// No browser reports this. IndexedDB is application-visible storage no matter what it holds.
+<span class="fc" id="L63">    OS_PROTECTED,</span>
+
+    /// The key is held by a secure element, a TEE or a StrongBox, and the platform said so in a
+    /// way that can be checked. Inferring this from a platform name, from non-extractability or
+    /// from the fact that a biometric prompt appeared is how an application ends up claiming a
+    /// guarantee it does not have, so a port that cannot verify reports `UNKNOWN`.
+<span class="fc" id="L69">    HARDWARE_BACKED,</span>
+
+    /// Access is gated on the user proving they are present -- a biometric, a device passcode, a
+    /// passkey with user verification. Distinct from [#OS_PROTECTED]: a keychain item with no
+    /// access control is protected by the OS and asks nothing of the user.
+<span class="fc" id="L74">    USER_VERIFICATION,</span>
+
+    /// Code running in the application's own origin or process cannot read the protected value
+    /// while the vault is unlocked.
+    ///
+    /// **No Codename One port reports `YES` for this, and the browser cannot.** It is listed
+    /// because the question gets asked, and because an application that needs it needs to be told
+    /// `NO` rather than left to infer an answer from the flags above. Web Workers do not provide
+    /// it; neither does non-extractability, which stops a key being copied and not a key being
+    /// used. Once hostile script runs in an unlocked application's origin it can call the same
+    /// decrypt the application calls.
+<span class="fc" id="L85">    ISOLATED_FROM_APPLICATION_CODE</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

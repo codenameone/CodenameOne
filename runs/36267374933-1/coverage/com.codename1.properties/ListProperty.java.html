@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ListProperty.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">ListProperty.java</span></div><h1>ListProperty.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+
+/// Base class for a property as a list which can contain multiple elements within
+///
+/// @author Shai Almog
+public class ListProperty&lt;T, K&gt; extends CollectionProperty&lt;T, K&gt; {
+<span class="fc" id="L36">    private final ArrayList&lt;T&gt; value = new ArrayList&lt;T&gt;();</span>
+
+    /// Constructs a property with the given name and value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `values`: default values for the property
+    public ListProperty(String name, T... values) {
+<span class="nc" id="L46">        this(name, null, values);</span>
+<span class="nc" id="L47">    }</span>
+
+    /// Constructs a property with the given name and values by specifying the
+    /// type of the elements explicitly. The element type needs to be specified
+    /// if the list should contain `PropertyBusinessObject`s and needs
+    /// to get deserialized properly!
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `elementType`: subclass of `PropertyBusinessObject`
+    ///
+    /// - `values`: default values for the property
+    public ListProperty(String name, Class&lt;T&gt; elementType, T... values) {
+<span class="fc" id="L62">        super(name, elementType);</span>
+<span class="fc" id="L63">        Collections.addAll(value, values);</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Constructs a property with null value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    public ListProperty(String name) {
+<span class="fc" id="L72">        super(name);</span>
+<span class="fc" id="L73">    }</span>
+
+    /// Gets the property value
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset within the list
+    ///
+    /// #### Returns
+    ///
+    /// the property value
+    public T get(int offset) {
+<span class="fc" id="L85">        internalGet();</span>
+<span class="fc" id="L86">        return value.get(offset);</span>
+    }
+
+    /// The size of the property list
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements
+    @Override
+    public int size() {
+<span class="fc" id="L96">        internalGet();</span>
+<span class="fc" id="L97">        return value.size();</span>
+    }
+
+    /// Sets the property value and potentially fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the position for the new value
+    ///
+    /// - `v`: the new value
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
+    public K set(int offset, T v) {
+<span class="fc" id="L112">        value.set(offset, v);</span>
+<span class="fc" id="L113">        firePropertyChanged();</span>
+<span class="fc" id="L114">        internalSet();</span>
+<span class="fc" id="L115">        return (K) parent.parent;</span>
+    }
+
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
+    @Override
+    public K set(Collection&lt;T&gt; t) {
+<span class="fc" id="L129">        value.clear();</span>
+<span class="fc" id="L130">        value.addAll(t);</span>
+<span class="fc" id="L131">        firePropertyChanged();</span>
+<span class="fc" id="L132">        internalSet();</span>
+<span class="fc" id="L133">        return (K) parent.parent;</span>
+    }
+
+    /// Historical alias of set(Collection t)
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
+    public K setList(Collection&lt;T&gt; t) {
+<span class="nc" id="L147">        return set(t);</span>
+    }
+
+    /// Adds a property value and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the position for the new value
+    ///
+    /// - `v`: the new value
+    public K add(int offset, T v) {
+<span class="nc" id="L158">        value.add(offset, v);</span>
+<span class="nc" id="L159">        firePropertyChanged();</span>
+<span class="nc" id="L160">        internalSet();</span>
+<span class="nc" id="L161">        return (K) parent.parent;</span>
+    }
+
+    /// Adds a property value to the end of the list and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the new value
+    @Override
+    public K add(T v) {
+<span class="fc" id="L171">        value.add(v);</span>
+<span class="fc" id="L172">        firePropertyChanged();</span>
+<span class="fc" id="L173">        internalSet();</span>
+<span class="fc" id="L174">        return (K) parent.parent;</span>
+    }
+
+    /// Adds a all properties value to the list and fires a change event
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the collection of values to add
+    @Override
+    public K addAll(Collection&lt;? extends T&gt; v) {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (value.addAll(v)) {</span>
+<span class="fc" id="L185">            firePropertyChanged();</span>
+<span class="fc" id="L186">            internalSet();</span>
+        }
+<span class="fc" id="L188">        return (K) parent.parent;</span>
+    }
+
+    /// Removes the item at the given offset
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset
+    @Override
+    public K remove(int offset) {
+<span class="nc" id="L198">        value.remove(offset);</span>
+<span class="nc" id="L199">        firePropertyChanged();</span>
+<span class="nc" id="L200">        internalSet();</span>
+<span class="nc" id="L201">        return (K) parent.parent;</span>
+    }
+
+    /// Removes the item with this value
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the value object
+    @Override
+    public K remove(T v) {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (value.remove(v)) {</span>
+<span class="fc" id="L212">            firePropertyChanged();</span>
+<span class="fc" id="L213">            internalSet();</span>
+        }
+<span class="fc" id="L215">        return (K) parent.parent;</span>
+    }
+
+    /// Removes from the list all values from the given collection and fires a change event if the list has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: item to remove
+    @Override
+    public K removeAll(Collection&lt;? extends T&gt; v) {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (value.removeAll(v)) {</span>
+<span class="nc" id="L226">            firePropertyChanged();</span>
+<span class="nc" id="L227">            internalSet();</span>
+        }
+<span class="nc" id="L229">        return (K) parent.parent;</span>
+    }
+
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (!super.equals(obj)) {</span>
+<span class="nc" id="L244">            return false;</span>
+        }
+<span class="nc" id="L246">        ListProperty other = (ListProperty) obj;</span>
+<span class="nc" id="L247">        return other.value.equals(value);</span>
+    }
+
+    /// Returns the internal hashcode or 0 for null property
+    ///
+    /// #### Returns
+    ///
+    /// the hashcode value
+    @Override
+    public int hashCode() {
+<span class="nc" id="L257">        return value.hashCode();</span>
+    }
+
+    /// Iterate over the elements of the property
+    ///
+    /// #### Returns
+    ///
+    /// an iterator
+    @Override
+    public Iterator&lt;T&gt; iterator() {
+<span class="nc" id="L267">        internalGet();</span>
+<span class="nc" id="L268">        return value.iterator();</span>
+    }
+
+    /// Returns a copy of the content as a new list
+    ///
+    /// #### Returns
+    ///
+    /// a list
+    @Override
+    public List&lt;T&gt; asList() {
+<span class="fc" id="L278">        internalGet();</span>
+<span class="fc" id="L279">        return new ArrayList&lt;T&gt;(value);</span>
+    }
+
+    /// Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a list
+    @Override
+    public List&lt;Object&gt; asExplodedList() {
+<span class="fc" id="L290">        return asExplodedList(value);</span>
+    }
+
+    /// Remove all the elements from the list
+    @Override
+    public void clear() {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (!value.isEmpty()) {</span>
+<span class="nc" id="L297">            value.clear();</span>
+<span class="nc" id="L298">            firePropertyChanged();</span>
+<span class="nc" id="L299">            internalSet();</span>
+        }
+<span class="fc" id="L301">    }</span>
+
+    /// Returns true if the given element is contained in the list property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the given element is contained in the list property
+    @Override
+    public boolean contains(T element) {
+<span class="fc" id="L314">        return value.contains(element);</span>
+    }
+
+
+    /// Returns the index of the given element in the list property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// the index of the given element in the list property
+    public int indexOf(T element) {
+<span class="nc" id="L328">        return value.indexOf(element);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

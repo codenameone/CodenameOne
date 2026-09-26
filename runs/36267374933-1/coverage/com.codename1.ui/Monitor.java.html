@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Monitor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Monitor.java</span></div><h1>Monitor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.geom.Rectangle;
+
+/// One physical display attached to the desktop.
+///
+/// A `Window` sits on exactly one monitor at a time and takes its scale and density
+/// from that monitor, so two windows of the same application can legitimately render
+/// at different scales. Obtain instances through `Desktop#getMonitors()`.
+///
+/// Instances are snapshots. A monitor that is unplugged, moved or has its resolution
+/// changed produces a fresh set, announced through
+/// `Desktop#addMonitorListener(com.codename1.ui.events.ActionListener)`.
+///
+/// @author Shai Almog
+public final class Monitor {
+
+    private final int index;
+    private final Rectangle bounds;
+    private final Rectangle workArea;
+    private final int density;
+    private final double scale;
+    private final int dotsPerInch;
+    private final String name;
+    private final boolean primary;
+
+    Monitor(int index, Rectangle bounds, Rectangle workArea, int density, double scale,
+<span class="fc" id="L50">            int dotsPerInch, String name, boolean primary) {</span>
+<span class="fc" id="L51">        this.index = index;</span>
+<span class="fc" id="L52">        this.bounds = bounds;</span>
+<span class="fc" id="L53">        this.workArea = workArea;</span>
+<span class="fc" id="L54">        this.density = density;</span>
+<span class="fc" id="L55">        this.scale = scale;</span>
+<span class="fc" id="L56">        this.dotsPerInch = dotsPerInch;</span>
+<span class="fc" id="L57">        this.name = name;</span>
+<span class="fc" id="L58">        this.primary = primary;</span>
+<span class="fc" id="L59">    }</span>
+
+    int getIndex() {
+<span class="fc" id="L62">        return index;</span>
+    }
+
+    /// Returns the monitor's full area in desktop coordinates.
+    ///
+    /// Desktop coordinates span every monitor, so a secondary display placed left of
+    /// or above the primary one legitimately has a negative origin.
+    ///
+    /// #### Returns
+    ///
+    /// a copy of the monitor bounds
+    public Rectangle getBounds() {
+<span class="fc" id="L74">        return new Rectangle(bounds);</span>
+    }
+
+    /// Returns the part of the monitor that is actually usable by a window, with the
+    /// task bar, dock and any reserved panels excluded.
+    ///
+    /// Prefer this over `#getBounds()` when placing or maximising a window.
+    ///
+    /// #### Returns
+    ///
+    /// a copy of the usable area
+    public Rectangle getWorkArea() {
+<span class="fc" id="L86">        return new Rectangle(workArea);</span>
+    }
+
+    /// Returns the density bucket of this monitor, as one of the `Display` density
+    /// constants.
+    ///
+    /// #### Returns
+    ///
+    /// the density constant
+    public int getDensity() {
+<span class="fc" id="L96">        return density;</span>
+    }
+
+    /// Returns the backing scale of this monitor: one for a conventional display, two
+    /// for a high resolution one, and fractional values on platforms that allow them.
+    ///
+    /// #### Returns
+    ///
+    /// the scale factor
+    public double getScale() {
+<span class="fc" id="L106">        return scale;</span>
+    }
+
+    /// Returns the resolution of this monitor in dots per inch.
+    ///
+    /// #### Returns
+    ///
+    /// the dots per inch
+    public int getDotsPerInch() {
+<span class="fc" id="L115">        return dotsPerInch;</span>
+    }
+
+    /// Returns a name for this monitor suitable for showing to a person.
+    ///
+    /// #### Returns
+    ///
+    /// the monitor name
+    public String getName() {
+<span class="fc" id="L124">        return name;</span>
+    }
+
+    /// Indicates whether this is the primary monitor, the one the platform treats as
+    /// the origin of the desktop.
+    ///
+    /// #### Returns
+    ///
+    /// true if this is the primary monitor
+    public boolean isPrimary() {
+<span class="fc" id="L134">        return primary;</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Every property counts, not just the index and the bounds. A monitor can be
+    /// reconfigured without either changing -- display scaling adjusted, a taskbar
+    /// switched to auto-hide, a monitor promoted to primary -- and `Desktop` reports
+    /// that and hands out fresh snapshots. Comparing only index and bounds made the
+    /// new snapshot equal to the old one, so anything that caches `getMonitors()` and
+    /// uses equality to spot what changed kept the stale scale or work area.
+    @Override
+    public boolean equals(Object other) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (this == other) {</span>
+<span class="nc" id="L148">            return true;</span>
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!(other instanceof Monitor)) {</span>
+<span class="nc" id="L151">            return false;</span>
+        }
+<span class="fc" id="L153">        Monitor o = (Monitor) other;</span>
+<span class="pc bpc" id="L154" title="3 of 8 branches missed.">        return index == o.index</span>
+                &amp;&amp; density == o.density
+                &amp;&amp; dotsPerInch == o.dotsPerInch
+                &amp;&amp; primary == o.primary
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                &amp;&amp; Double.compare(scale, o.scale) == 0</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                &amp;&amp; bounds.equals(o.bounds)</span>
+<span class="pc bpc" id="L160" title="3 of 6 branches missed.">                &amp;&amp; workArea.equals(o.workArea)</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                &amp;&amp; (name == null ? o.name == null : name.equals(o.name));</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+<span class="fc" id="L167">        int result = index;</span>
+<span class="fc" id="L168">        result = result * 31 + bounds.hashCode();</span>
+<span class="fc" id="L169">        result = result * 31 + workArea.hashCode();</span>
+<span class="fc" id="L170">        result = result * 31 + density;</span>
+<span class="fc" id="L171">        result = result * 31 + dotsPerInch;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        result = result * 31 + (name == null ? 0 : name.hashCode());</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        result = result * 31 + (primary ? 1 : 0);</span>
+<span class="fc" id="L174">        long scaleBits = Double.doubleToLongBits(scale);</span>
+<span class="fc" id="L175">        result = result * 31 + (int) (scaleBits ^ (scaleBits &gt;&gt;&gt; 32));</span>
+<span class="fc" id="L176">        return result;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String toString() {
+<span class="nc" id="L182">        return &quot;Monitor[&quot; + index + &quot; &quot; + name + &quot; &quot; + bounds + &quot; scale=&quot; + scale + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

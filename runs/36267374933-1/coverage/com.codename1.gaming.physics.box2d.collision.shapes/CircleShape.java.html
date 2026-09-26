@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CircleShape.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision.shapes</a> &gt; <span class="el_source">CircleShape.java</span></div><h1>CircleShape.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.collision.shapes;
+
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
+
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+
+/// A circle shape.
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">public class CircleShape extends Shape {</span>
+
+  public final Vec2 m_p;
+
+  public CircleShape() {
+<span class="fc" id="L42">    super(ShapeType.CIRCLE);</span>
+<span class="fc" id="L43">    m_p = new Vec2();</span>
+<span class="fc" id="L44">    m_radius = 0;</span>
+<span class="fc" id="L45">  }</span>
+
+  public final Shape clone() {
+<span class="fc" id="L48">    CircleShape shape = new CircleShape();</span>
+<span class="fc" id="L49">    shape.m_p.x = m_p.x;</span>
+<span class="fc" id="L50">    shape.m_p.y = m_p.y;</span>
+<span class="fc" id="L51">    shape.m_radius = m_radius;</span>
+<span class="fc" id="L52">    return shape;</span>
+  }
+
+  public final int getChildCount() {
+<span class="fc" id="L56">    return 1;</span>
+  }
+
+  /// Get the supporting vertex index in the given direction.
+  ///
+  /// @param d
+  /// @return
+  public final int getSupport(final Vec2 d) {
+<span class="nc" id="L64">    return 0;</span>
+  }
+
+  /// Get the supporting vertex in the given direction.
+  ///
+  /// @param d
+  /// @return
+  public final Vec2 getSupportVertex(final Vec2 d) {
+<span class="nc" id="L72">    return m_p;</span>
+  }
+
+  /// Get the vertex count.
+  ///
+  /// @return
+  public final int getVertexCount() {
+<span class="fc" id="L79">    return 1;</span>
+  }
+
+  /// Get a vertex by index.
+  ///
+  /// @param index
+  /// @return
+  public final Vec2 getVertex(final int index) {
+<span class="nc bnc" id="L87" title="All 4 branches missed.">    assert (index == 0);</span>
+<span class="nc" id="L88">    return m_p;</span>
+  }
+
+  public final boolean testPoint(final Transform transform, final Vec2 p) {
+    // Rot.mulToOutUnsafe(transform.q, m_p, center);
+    // center.addLocal(transform.p);
+    //
+    // final Vec2 d = center.subLocal(p).negateLocal();
+    // return Vec2.dot(d, d) &lt;= m_radius * m_radius;
+<span class="fc" id="L97">    final Rot q = transform.q;</span>
+<span class="fc" id="L98">    final Vec2 tp = transform.p;</span>
+<span class="fc" id="L99">    float centerx = -(q.c * m_p.x - q.s * m_p.y + tp.x - p.x);</span>
+<span class="fc" id="L100">    float centery = -(q.s * m_p.x + q.c * m_p.y + tp.y - p.y);</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">    return centerx * centerx + centery * centery &lt;= m_radius * m_radius;</span>
+  }
+
+  // Collision Detection in Interactive 3D Environments by Gino van den Bergen
+  // From Section 3.1.2
+  // x = s + a * r
+  // norm(x) = radius
+
+  public final boolean raycast(RayCastOutput output, RayCastInput input, Transform transform,
+      int childIndex) {
+<span class="nc" id="L112">    final Vec2 inputp1 = input.p1;</span>
+<span class="nc" id="L113">    final Vec2 inputp2 = input.p2;</span>
+<span class="nc" id="L114">    final Rot tq = transform.q;</span>
+<span class="nc" id="L115">    final Vec2 tp = transform.p;</span>
+
+    // Rot.mulToOutUnsafe(transform.q, m_p, position);
+    // position.addLocal(transform.p);
+<span class="nc" id="L119">    final float positionx = tq.c * m_p.x - tq.s * m_p.y + tp.x;</span>
+<span class="nc" id="L120">    final float positiony = tq.s * m_p.x + tq.c * m_p.y + tp.y;</span>
+
+<span class="nc" id="L122">    final float sx = inputp1.x - positionx;</span>
+<span class="nc" id="L123">    final float sy = inputp1.y - positiony;</span>
+    // final float b = Vec2.dot(s, s) - m_radius * m_radius;
+<span class="nc" id="L125">    final float b = sx * sx + sy * sy - m_radius * m_radius;</span>
+
+    // Solve quadratic equation.
+<span class="nc" id="L128">    final float rx = inputp2.x - inputp1.x;</span>
+<span class="nc" id="L129">    final float ry = inputp2.y - inputp1.y;</span>
+    // final float c = Vec2.dot(s, r);
+    // final float rr = Vec2.dot(r, r);
+<span class="nc" id="L132">    final float c = sx * rx + sy * ry;</span>
+<span class="nc" id="L133">    final float rr = rx * rx + ry * ry;</span>
+<span class="nc" id="L134">    final float sigma = c * c - rr * b;</span>
+
+    // Check for negative discriminant and short segment.
+<span class="nc bnc" id="L137" title="All 4 branches missed.">    if (sigma &lt; 0.0f || rr &lt; Settings.EPSILON) {</span>
+<span class="nc" id="L138">      return false;</span>
+    }
+
+    // Find the point of intersection of the line with the circle.
+<span class="nc" id="L142">    float a = -(c + MathUtils.sqrt(sigma));</span>
+
+    // Is the intersection point on the segment?
+<span class="nc bnc" id="L145" title="All 4 branches missed.">    if (0.0f &lt;= a &amp;&amp; a &lt;= input.maxFraction * rr) {</span>
+<span class="nc" id="L146">      a /= rr;</span>
+<span class="nc" id="L147">      output.fraction = a;</span>
+<span class="nc" id="L148">      output.normal.x = rx * a + sx;</span>
+<span class="nc" id="L149">      output.normal.y = ry * a + sy;</span>
+<span class="nc" id="L150">      output.normal.normalize();</span>
+<span class="nc" id="L151">      return true;</span>
+    }
+
+<span class="nc" id="L154">    return false;</span>
+  }
+
+  public final void computeAABB(final AABB aabb, final Transform transform, int childIndex) {
+<span class="fc" id="L158">    final Rot tq = transform.q;</span>
+<span class="fc" id="L159">    final Vec2 tp = transform.p;</span>
+<span class="fc" id="L160">    final float px = tq.c * m_p.x - tq.s * m_p.y + tp.x;</span>
+<span class="fc" id="L161">    final float py = tq.s * m_p.x + tq.c * m_p.y + tp.y;</span>
+
+<span class="fc" id="L163">    aabb.lowerBound.x = px - m_radius;</span>
+<span class="fc" id="L164">    aabb.lowerBound.y = py - m_radius;</span>
+<span class="fc" id="L165">    aabb.upperBound.x = px + m_radius;</span>
+<span class="fc" id="L166">    aabb.upperBound.y = py + m_radius;</span>
+<span class="fc" id="L167">  }</span>
+
+  public final void computeMass(final MassData massData, final float density) {
+<span class="fc" id="L170">    massData.mass = density * Settings.PI * m_radius * m_radius;</span>
+<span class="fc" id="L171">    massData.center.x = m_p.x;</span>
+<span class="fc" id="L172">    massData.center.y = m_p.y;</span>
+
+    // inertia about the local origin
+    // massData.I = massData.mass * (0.5f * m_radius * m_radius + Vec2.dot(m_p, m_p));
+<span class="fc" id="L176">    massData.I = massData.mass * (0.5f * m_radius * m_radius + (m_p.x * m_p.x + m_p.y * m_p.y));</span>
+<span class="fc" id="L177">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

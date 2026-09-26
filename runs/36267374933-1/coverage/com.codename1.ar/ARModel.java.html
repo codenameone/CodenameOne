@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ar</a> &gt; <span class="el_source">ARModel.java</span></div><h1>ARModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ar;
+
+import com.codename1.gpu.GltfLoader;
+import com.codename1.gpu.Mesh;
+import com.codename1.ui.Image;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/// The renderable content of an `ARNode`: geometry plus an optional base-color
+/// texture or solid color. Models are immutable descriptors - the platform
+/// backend uploads them into its native renderer when the node is attached to
+/// an anchor.
+///
+/// Create a model either from a glTF 2.0 asset (`.glb` or `.gltf` bytes,
+/// parsed with `com.codename1.gpu.GltfLoader`) or directly from a
+/// `com.codename1.gpu.Mesh` such as one built by
+/// `com.codename1.gpu.Primitives`. Geometry units are meters in the anchor's
+/// local frame.
+public final class ARModel {
+    private final byte[] gltfBytes;
+    private Mesh mesh;
+    private Image baseColorImage;
+    private final int color;
+    private boolean parsed;
+
+<span class="fc" id="L49">    private ARModel(byte[] gltfBytes, Mesh mesh, Image baseColorImage, int color) {</span>
+<span class="fc" id="L50">        this.gltfBytes = gltfBytes;</span>
+<span class="fc" id="L51">        this.mesh = mesh;</span>
+<span class="fc" id="L52">        this.baseColorImage = baseColorImage;</span>
+<span class="fc" id="L53">        this.color = color;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        this.parsed = gltfBytes == null;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Creates a model from in-memory glTF 2.0 bytes (binary `.glb` or JSON
+    /// `.gltf`). The geometry and base-color texture are parsed lazily on
+    /// first access.
+    ///
+    /// #### Parameters
+    ///
+    /// - `glbOrGltf`: the raw model bytes
+    ///
+    /// #### Returns
+    ///
+    /// the model descriptor
+    public static ARModel fromGltf(byte[] glbOrGltf) {
+<span class="fc bfc" id="L69" title="All 4 branches covered.">        if (glbOrGltf == null || glbOrGltf.length == 0) {</span>
+<span class="fc" id="L70">            throw new IllegalArgumentException(&quot;model bytes are required&quot;);</span>
+        }
+<span class="fc" id="L72">        byte[] copy = new byte[glbOrGltf.length];</span>
+<span class="fc" id="L73">        System.arraycopy(glbOrGltf, 0, copy, 0, glbOrGltf.length);</span>
+<span class="fc" id="L74">        return new ARModel(copy, null, null, 0xffffffff);</span>
+    }
+
+    /// Reads all bytes from the stream and creates a glTF model. The stream is
+    /// closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: a stream over `.glb` or `.gltf` bytes
+    ///
+    /// #### Returns
+    ///
+    /// the model descriptor
+    public static ARModel fromGltf(InputStream in) throws IOException {
+<span class="fc" id="L88">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+        try {
+<span class="fc" id="L90">            byte[] buf = new byte[8192];</span>
+            int r;
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            while ((r = in.read(buf)) &gt;= 0) {</span>
+<span class="fc" id="L93">                out.write(buf, 0, r);</span>
+            }
+        } finally {
+<span class="fc" id="L96">            com.codename1.io.Util.cleanup(in);</span>
+        }
+<span class="fc" id="L98">        return fromGltf(out.toByteArray());</span>
+    }
+
+    /// Creates a model from a mesh rendered in a single solid color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the geometry, in meters
+    ///
+    /// - `argbColor`: the solid base color as `0xAARRGGBB`
+    ///
+    /// #### Returns
+    ///
+    /// the model descriptor
+    public static ARModel fromMesh(Mesh mesh, int argbColor) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (mesh == null) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(&quot;mesh is required&quot;);</span>
+        }
+<span class="fc" id="L116">        return new ARModel(null, mesh, null, argbColor);</span>
+    }
+
+    /// Creates a model from a mesh with a base-color texture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the geometry, in meters, with texture coordinates
+    ///
+    /// - `texture`: the base-color image
+    ///
+    /// #### Returns
+    ///
+    /// the model descriptor
+    public static ARModel fromMesh(Mesh mesh, Image texture) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (mesh == null) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(&quot;mesh is required&quot;);</span>
+        }
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (texture == null) {</span>
+<span class="fc" id="L135">            throw new IllegalArgumentException(&quot;texture is required&quot;);</span>
+        }
+<span class="nc" id="L137">        return new ARModel(null, mesh, texture, 0xffffffff);</span>
+    }
+
+    /// The raw glTF bytes as a newly allocated array, or null for mesh-based
+    /// models.
+    public byte[] getGltfBytes() {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (gltfBytes == null) {</span>
+<span class="fc" id="L144">            return null;</span>
+        }
+<span class="fc" id="L146">        byte[] copy = new byte[gltfBytes.length];</span>
+<span class="fc" id="L147">        System.arraycopy(gltfBytes, 0, copy, 0, gltfBytes.length);</span>
+<span class="fc" id="L148">        return copy;</span>
+    }
+
+    /// The model geometry. For glTF models the geometry is parsed on first
+    /// access.
+    public synchronized Mesh getMesh() {
+<span class="fc" id="L154">        parseIfNeeded();</span>
+<span class="fc" id="L155">        return mesh;</span>
+    }
+
+    /// The decoded base-color image, or null when the model has none. For
+    /// glTF models the image is extracted on first access.
+    public synchronized Image getBaseColorImage() {
+<span class="fc" id="L161">        parseIfNeeded();</span>
+<span class="fc" id="L162">        return baseColorImage;</span>
+    }
+
+    /// The solid base color as `0xAARRGGBB`, used when the model carries no
+    /// texture. Defaults to opaque white.
+    public int getColor() {
+<span class="fc" id="L168">        return color;</span>
+    }
+
+    private void parseIfNeeded() {
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (!parsed) {</span>
+<span class="fc" id="L173">            GltfLoader.GltfImageModel m = GltfLoader.loadImageModel(gltfBytes);</span>
+<span class="fc" id="L174">            mesh = m.getMesh();</span>
+<span class="fc" id="L175">            baseColorImage = m.getBaseColorImage();</span>
+<span class="fc" id="L176">            parsed = true;</span>
+        }
+<span class="fc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

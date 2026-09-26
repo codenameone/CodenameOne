@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangingCapabilities.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nearby.ranging</a> &gt; <span class="el_source">RangingCapabilities.java</span></div><h1>RangingCapabilities.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nearby.ranging;
+
+/// What the current device can actually measure. Ask this before building a
+/// UI: a device may support distance but not direction, which is the common
+/// case on Android hardware and on any iPhone whose peer is behind it.
+///
+/// [#UNSUPPORTED] is an all-false instance returned where ranging is absent,
+/// so calling code needs no null check.
+public final class RangingCapabilities {
+
+    /// All-false capabilities, returned by [Ranging#getCapabilities()] on a
+    /// platform or device with no UWB at all.
+<span class="fc" id="L35">    public static final RangingCapabilities UNSUPPORTED =</span>
+            new RangingCapabilities(false, false, false, false, false, false);
+
+    private final boolean distance;
+    private final boolean direction;
+    private final boolean elevation;
+    private final boolean cameraAssistance;
+    private final boolean accessoryRanging;
+    private final boolean backgroundRanging;
+
+    /// Ports construct this; application code reads it from
+    /// [Ranging#getCapabilities()].
+    ///
+    /// #### Parameters
+    ///
+    /// - `distance`: precise distance measurement is available
+    /// - `direction`: horizontal direction (azimuth) is available
+    /// - `elevation`: vertical direction (elevation) is available
+    /// - `cameraAssistance`: camera assistance can sharpen direction
+    /// - `accessoryRanging`: third-party UWB accessories can be ranged
+    /// - `backgroundRanging`: a session may keep running in the background
+    public RangingCapabilities(boolean distance, boolean direction,
+            boolean elevation, boolean cameraAssistance,
+<span class="fc" id="L58">            boolean accessoryRanging, boolean backgroundRanging) {</span>
+<span class="fc" id="L59">        this.distance = distance;</span>
+<span class="fc" id="L60">        this.direction = direction;</span>
+<span class="fc" id="L61">        this.elevation = elevation;</span>
+<span class="fc" id="L62">        this.cameraAssistance = cameraAssistance;</span>
+<span class="fc" id="L63">        this.accessoryRanging = accessoryRanging;</span>
+<span class="fc" id="L64">        this.backgroundRanging = backgroundRanging;</span>
+<span class="fc" id="L65">    }</span>
+
+    /// `true` when the device can measure distance to a peer. This is the
+    /// baseline capability: a device that answers `false` here has no usable
+    /// UWB radio and [Ranging#isSupported()] will also be `false`.
+    public boolean isDistanceSupported() {
+<span class="fc" id="L71">        return distance;</span>
+    }
+
+    /// `true` when the device can report the horizontal direction to a peer.
+    /// Both platforms only produce a direction while the peer is roughly in
+    /// front of the device, so an update may still omit it -- always check
+    /// [RangingUpdate#hasDirection()] as well.
+    public boolean isDirectionSupported() {
+<span class="fc" id="L79">        return direction;</span>
+    }
+
+    /// `true` when the device can report elevation as well as azimuth.
+    public boolean isElevationSupported() {
+<span class="fc" id="L84">        return elevation;</span>
+    }
+
+    /// `true` when the platform can use the camera to converge on a sharper
+    /// direction. iOS only, and only while an AR session is running; the
+    /// Codename One API does not turn it on by itself.
+    public boolean isCameraAssistanceSupported() {
+<span class="fc" id="L91">        return cameraAssistance;</span>
+    }
+
+    /// `true` when third-party UWB accessories can be ranged, as opposed to
+    /// only other phones. See [RangingSession#startAccessory].
+    public boolean isAccessoryRangingSupported() {
+<span class="fc" id="L97">        return accessoryRanging;</span>
+    }
+
+    /// `true` when a session may keep delivering updates while the app is in
+    /// the background. On iOS this additionally requires the
+    /// `com.apple.developer.nearby-interaction` entitlement, which Codename
+    /// One never injects on its own -- see the developer guide.
+    public boolean isBackgroundRangingSupported() {
+<span class="fc" id="L105">        return backgroundRanging;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L110">        return &quot;RangingCapabilities[distance=&quot; + distance</span>
+                + &quot;, direction=&quot; + direction
+                + &quot;, elevation=&quot; + elevation
+                + &quot;, cameraAssistance=&quot; + cameraAssistance
+                + &quot;, accessoryRanging=&quot; + accessoryRanging
+                + &quot;, backgroundRanging=&quot; + backgroundRanging + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

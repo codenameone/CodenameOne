@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Bluetooth.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth</a> &gt; <span class="el_source">Bluetooth.java</span></div><h1>Bluetooth.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+
+/// Entry point for the Codename One Bluetooth API -- adapter state, runtime
+/// permissions and the capability queries that let cross-platform code
+/// branch cleanly. Obtain the platform implementation via [#getInstance()];
+/// the returned subclass is owned by the active port and never `null`.
+///
+/// The API is split by role:
+/// - `com.codename1.bluetooth.le` -- BLE central: scanning, connections and
+///   the GATT client, plus L2CAP channels.
+/// - `com.codename1.bluetooth.le.server` -- BLE peripheral: advertising and
+///   the local GATT server.
+/// - `com.codename1.bluetooth.classic` -- classic Bluetooth: discovery and
+///   RFCOMM stream connections (Android and the simulator only).
+///
+/// #### Quick start: check support and permissions
+///
+/// ```java
+/// Bluetooth bt = Bluetooth.getInstance();
+/// if (!bt.isLeSupported()) {
+///     // hide the feature
+///     return;
+/// }
+/// bt.requestPermissions(BluetoothPermission.SCAN, BluetoothPermission.CONNECT)
+///   .onResult((granted, err) -&gt; {
+///        if (err == null &amp;&amp; granted) {
+///            // start scanning...
+///        }
+///   });
+/// ```
+///
+/// #### Threading
+///
+/// Every callback of the Bluetooth API -- `AsyncResource` results, scan
+/// results, connection events, notifications, adapter state changes -- is
+/// delivered on the EDT. The only exceptions are the blocking
+/// `InputStream`/`OutputStream` pairs of RFCOMM and L2CAP connections,
+/// which must be consumed off the EDT.
+///
+/// #### Platform support
+///
+/// - **Android** -- full stack: BLE central + peripheral, L2CAP (API 29+),
+///   classic RFCOMM. Permissions and manifest entries are auto-injected at
+///   build time when these packages are referenced.
+/// - **iOS / Mac Catalyst** -- CoreBluetooth: BLE central + peripheral and
+///   L2CAP. Classic RFCOMM is not exposed by iOS. The `NSBluetooth*` plist
+///   entries and CoreBluetooth framework are auto-injected at build time.
+/// - **JavaSE simulator** -- a scriptable virtual Bluetooth stack with a
+///   full feature matrix (Simulate -&gt; Bluetooth Simulation), plus an
+///   optional native backend that talks to the host machine's real
+///   Bluetooth hardware (BLE central only).
+/// - **JavaScript** -- Web Bluetooth where the browser supports it: central
+///   role via the browser's device chooser, GATT client and notifications.
+/// - **All other ports** -- this base class is returned as-is and reports
+///   Bluetooth as unsupported; every operation fails fast with
+///   [BluetoothError#NOT_SUPPORTED].
+public class Bluetooth {
+
+    private ArrayList&lt;AdapterStateListener&gt; adapterListeners;
+
+    /// Ports construct subclasses. Application code obtains the active
+    /// instance via [#getInstance()].
+<span class="fc" id="L90">    protected Bluetooth() {</span>
+<span class="fc" id="L91">    }</span>
+
+    /// Returns the platform-specific singleton owned by the current port.
+    /// On ports that do not implement Bluetooth this returns a base
+    /// [Bluetooth] instance that reports the feature as unsupported;
+    /// calling code never needs a `null` check or a platform-specific
+    /// `if`.
+    public static Bluetooth getInstance() {
+<span class="fc" id="L99">        Bluetooth b = Display.getInstance().getBluetooth();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        return b != null ? b : DEFAULT;</span>
+    }
+
+<span class="fc" id="L103">    private static final Bluetooth DEFAULT = new Bluetooth();</span>
+
+    /// `true` when this port/device exposes any Bluetooth functionality at
+    /// all. Returns `false` on the fallback base class.
+    public boolean isSupported() {
+<span class="fc" id="L108">        return false;</span>
+    }
+
+    /// `true` when the BLE central role (scanning, connections, GATT
+    /// client) is available. Defaults to `false`.
+    public boolean isLeSupported() {
+<span class="fc" id="L114">        return false;</span>
+    }
+
+    /// `true` when classic Bluetooth (discovery, RFCOMM) is available.
+    /// Always `false` on iOS, which does not expose classic Bluetooth to
+    /// apps. Defaults to `false`.
+    public boolean isClassicSupported() {
+<span class="fc" id="L121">        return false;</span>
+    }
+
+    /// `true` when the BLE peripheral role (advertising and a local GATT
+    /// server) is available. `false` on tvOS/watchOS and on the JavaScript
+    /// port. Defaults to `false`.
+    public boolean isPeripheralModeSupported() {
+<span class="fc" id="L128">        return false;</span>
+    }
+
+    /// `true` when L2CAP connection-oriented channels are available
+    /// (Android 10+, iOS 11+). Defaults to `false`.
+    public boolean isL2capSupported() {
+<span class="fc" id="L134">        return false;</span>
+    }
+
+    /// The current state of the local adapter. The fallback base class
+    /// reports [AdapterState#UNSUPPORTED].
+    public AdapterState getAdapterState() {
+<span class="fc" id="L140">        return AdapterState.UNSUPPORTED;</span>
+    }
+
+    /// Convenience for `getAdapterState() == AdapterState.POWERED_ON`.
+    public boolean isEnabled() {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        return getAdapterState() == AdapterState.POWERED_ON;</span>
+    }
+
+    /// Registers a listener notified on the EDT whenever the adapter state
+    /// changes. Listeners stay registered until removed via
+    /// [#removeAdapterStateListener(AdapterStateListener)].
+    public void addAdapterStateListener(AdapterStateListener l) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (l == null) {</span>
+<span class="fc" id="L153">            return;</span>
+        }
+<span class="fc" id="L155">        synchronized (this) {</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (adapterListeners == null) {</span>
+<span class="fc" id="L157">                adapterListeners = new ArrayList&lt;AdapterStateListener&gt;();</span>
+            }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (!adapterListeners.contains(l)) {</span>
+<span class="fc" id="L160">                adapterListeners.add(l);</span>
+            }
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">    }</span>
+
+    /// Removes a listener previously added via
+    /// [#addAdapterStateListener(AdapterStateListener)].
+    public void removeAdapterStateListener(AdapterStateListener l) {
+<span class="fc" id="L168">        synchronized (this) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (adapterListeners != null) {</span>
+<span class="fc" id="L170">                adapterListeners.remove(l);</span>
+            }
+<span class="fc" id="L172">        }</span>
+<span class="fc" id="L173">    }</span>
+
+    /// Called by ports (from any thread) when the adapter transitions to a
+    /// new state; dispatches to the registered listeners on the EDT.
+    protected final void fireAdapterStateChanged(AdapterState newState) {
+        Object[] snapshot;
+<span class="fc" id="L179">        synchronized (this) {</span>
+<span class="pc bpc" id="L180" title="1 of 4 branches missed.">            if (adapterListeners == null || adapterListeners.isEmpty()) {</span>
+<span class="fc" id="L181">                return;</span>
+            }
+<span class="fc" id="L183">            snapshot = adapterListeners.toArray();</span>
+<span class="fc" id="L184">        }</span>
+<span class="fc" id="L185">        dispatchAdapterState(snapshot, newState);</span>
+<span class="fc" id="L186">    }</span>
+
+    // The dispatch lives in a static method so the Runnable doesn't carry a
+    // synthetic outer-Bluetooth reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchAdapterState(final Object[] snapshot,
+            final AdapterState newState) {
+<span class="fc" id="L193">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                for (Object listener : snapshot) {</span>
+<span class="fc" id="L197">                    ((AdapterStateListener) listener)</span>
+<span class="fc" id="L198">                            .adapterStateChanged(newState);</span>
+                }
+<span class="fc" id="L200">            }</span>
+        });
+<span class="fc" id="L202">    }</span>
+
+    /// Asks the user to enable the Bluetooth adapter where the platform
+    /// supports it (the Android system dialog). Resolves `true` when the
+    /// adapter was enabled, `false` when the user declined or the platform
+    /// offers no programmatic enable flow (iOS, and this fallback base
+    /// class). Never fails just because the feature is unsupported.
+    public AsyncResource&lt;Boolean&gt; requestEnable() {
+<span class="fc" id="L210">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L211">        r.complete(Boolean.FALSE);</span>
+<span class="fc" id="L212">        return r;</span>
+    }
+
+    /// The BLE central role entry point -- scanning, connections, GATT
+    /// client. Never `null`: on ports without BLE a no-op instance is
+    /// returned whose operations fail fast with
+    /// [BluetoothError#NOT_SUPPORTED]; branch via [#isLeSupported()].
+    public com.codename1.bluetooth.le.BluetoothLE getLE() {
+<span class="fc" id="L220">        return DefaultLE.INSTANCE;</span>
+    }
+
+    /// Lazy holder so the fallback LE instance is only created when a
+    /// port without BLE support is actually asked for it.
+    private static final class DefaultLE {
+<span class="fc" id="L226">        static final com.codename1.bluetooth.le.BluetoothLE INSTANCE =</span>
+<span class="fc" id="L227">                new com.codename1.bluetooth.le.BluetoothLE() {</span>
+                };
+    }
+
+    /// The classic Bluetooth role entry point -- discovery, bonding and
+    /// RFCOMM streams. Never `null`: on ports without classic Bluetooth
+    /// (iOS among them) a no-op instance is returned whose operations fail
+    /// fast with [BluetoothError#NOT_SUPPORTED]; branch via
+    /// [#isClassicSupported()].
+    public com.codename1.bluetooth.classic.BluetoothClassic getClassic() {
+<span class="fc" id="L237">        return DefaultClassic.INSTANCE;</span>
+    }
+
+    /// Lazy holder so the fallback classic instance is only created when
+    /// a port without classic support is actually asked for it.
+    private static final class DefaultClassic {
+        static final com.codename1.bluetooth.classic.BluetoothClassic
+<span class="fc" id="L244">                INSTANCE = new com.codename1.bluetooth.classic.BluetoothClassic() {</span>
+                };
+    }
+
+    /// `true` when the given runtime permission is currently granted. See
+    /// [BluetoothPermission] for the per-platform mapping. Defaults to
+    /// `false`.
+    public boolean hasPermission(BluetoothPermission permission) {
+<span class="fc" id="L252">        return false;</span>
+    }
+
+    /// Requests the given runtime permissions, prompting the user where
+    /// needed. Resolves `true` when every requested permission is granted.
+    /// Resolves `false` (rather than failing) when denied or when the
+    /// platform has no Bluetooth support at all.
+    public AsyncResource&lt;Boolean&gt; requestPermissions(
+            BluetoothPermission... permissions) {
+<span class="fc" id="L261">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L262">        r.complete(Boolean.FALSE);</span>
+<span class="fc" id="L263">        return r;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

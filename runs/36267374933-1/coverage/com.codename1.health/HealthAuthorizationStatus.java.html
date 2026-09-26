@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthAuthorizationStatus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthAuthorizationStatus.java</span></div><h1>HealthAuthorizationStatus.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// The app's authorization for one data type and one direction.
+///
+/// #### The asymmetry you must handle
+///
+/// Write authorization is truthfully reportable on both platforms. **Read
+/// authorization is not.** HealthKit deliberately refuses to disclose it,
+/// because telling an app &quot;the user denied you access to pregnancy data&quot;
+/// leaks the very thing the user was hiding. So
+/// [HealthStore#getReadAuthorizationStatus(HealthDataType)] returns
+/// [#UNKNOWN] on iOS regardless of what the user actually chose, and any
+/// code that branches on it must handle that value.
+<span class="fc" id="L36">public enum HealthAuthorizationStatus {</span>
+
+    /// The user has not been asked yet.
+<span class="fc" id="L39">    NOT_DETERMINED,</span>
+
+    /// The app holds the access.
+<span class="fc" id="L42">    AUTHORIZED,</span>
+
+    /// The user explicitly refused the access.
+<span class="fc" id="L45">    DENIED,</span>
+
+    /// Access is blocked by something outside the user's control at this
+    /// moment -- a device management policy, or a data type the platform
+    /// does not permit this app to touch.
+<span class="fc" id="L50">    RESTRICTED,</span>
+
+    /// The platform will not say. Returned for **read** access on iOS in
+    /// every case, by design; it means neither &quot;granted&quot; nor &quot;denied&quot; and
+    /// must not be rendered to the user as either.
+    ///
+    /// The only honest way to find out whether reads work is to run a
+    /// query -- see [HealthStore#hasAnyData(HealthDataType,HealthTimeRange)].
+<span class="fc" id="L58">    UNKNOWN,</span>
+
+    /// This platform has no health store, so the question does not apply.
+<span class="fc" id="L61">    NOT_SUPPORTED</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichRunPainter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">RichRunPainter.java</span></div><h1>RichRunPainter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.editor;
+
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// Shared inline-run styling primitive for the rich text subsystem: it turns a
+/// {@link TextStyle} plus a paragraph block type into a concrete pixel size and
+/// derived {@link Font}, and paints one styled run (foreground color, highlight
+/// background, inline-code tint, underline and strike-through decorations).
+///
+/// &lt;p&gt;The same style semantics power both the editable {@link RichView} and the
+/// read-only rich text renderer, so a run built for one draws identically in the
+/// other. Font size honors an absolute {@link TextStyle#getFontSizePx()} when set,
+/// otherwise the relative {@link TextStyle#getFontSizeLevel()}, with heading scale
+/// applied on top in both cases.&lt;/p&gt;
+///
+/// @author Codename One
+<span class="fc" id="L44">public final class RichRunPainter {</span>
+
+    private Font baseFont;
+    private int baseSizePx;
+<span class="fc" id="L48">    private int textColor = 0x000000;</span>
+<span class="fc" id="L49">    private final Map&lt;Long, Font&gt; fontCache = new HashMap&lt;Long, Font&gt;();</span>
+
+    /// Sets the base font from which sized/weighted run fonts are derived. The
+    /// base size defaults to the font height.
+    ///
+    /// @param f the base font
+    public void setBaseFont(Font f) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (f != baseFont) { // NOPMD - intentional identity comparison; drop stale derived fonts</span>
+<span class="fc" id="L57">            baseFont = f;</span>
+<span class="fc" id="L58">            fontCache.clear();</span>
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">            if (f != null &amp;&amp; baseSizePx &lt;= 0) {</span>
+<span class="fc" id="L60">                baseSizePx = f.getHeight();</span>
+            }
+        }
+<span class="fc" id="L63">    }</span>
+
+    /// Overrides the base (unscaled) run size in pixels; defaults to the base
+    /// font height.
+    ///
+    /// @param px the base size in pixels
+    public void setBaseSizePx(int px) {
+<span class="fc" id="L70">        baseSizePx = px;</span>
+<span class="fc" id="L71">    }</span>
+
+    /// The base (unscaled) run size in pixels.
+    /// @return base size in pixels
+    public int getBaseSizePx() {
+<span class="fc" id="L76">        return baseSizePx;</span>
+    }
+
+    /// The default foreground color (0xRRGGBB) used when a run does not set one.
+    /// @param rgb the color
+    public void setTextColor(int rgb) {
+<span class="fc" id="L82">        textColor = rgb;</span>
+<span class="fc" id="L83">    }</span>
+
+    // ------------------------------------------------------------------
+    // Size / font
+    // ------------------------------------------------------------------
+
+    /// The heading scale factor for a paragraph block type ({@code RichBlocks.H1}..H6).
+    /// @param blockType the block type
+    /// @return the scale multiplier
+    public static float headingScale(int blockType) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (blockType == RichBlocks.H1) {</span>
+<span class="fc" id="L94">            return 2.0f;</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (blockType == RichBlocks.H1 + 1) {</span>
+<span class="nc" id="L97">            return 1.5f;</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (blockType == RichBlocks.H1 + 2) {</span>
+<span class="nc" id="L100">            return 1.25f;</span>
+        }
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (blockType == RichBlocks.H1 + 3) {</span>
+<span class="nc" id="L103">            return 1.1f;</span>
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (blockType == RichBlocks.H1 + 4) {</span>
+<span class="nc" id="L106">            return 0.9f;</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (blockType == RichBlocks.H1 + 5) {</span>
+<span class="nc" id="L109">            return 0.8f;</span>
+        }
+<span class="fc" id="L111">        return 1.0f;</span>
+    }
+
+    /// Whether a block type is a heading (h1..h6).
+    /// @param blockType the block type
+    /// @return true for headings
+    public static boolean isHeading(int blockType) {
+<span class="fc bfc" id="L118" title="All 4 branches covered.">        return blockType &gt;= RichBlocks.H1 &amp;&amp; blockType &lt;= RichBlocks.H1 + 5;</span>
+    }
+
+    /// The relative-level scale factor (levels 1..7; 0/3 = 1.0).
+    /// @param level the size level
+    /// @return the scale multiplier
+    public static float sizeLevelScale(int level) {
+<span class="pc bpc" id="L125" title="6 of 7 branches missed.">        switch (level) {</span>
+            case 1:
+<span class="nc" id="L127">                return 0.7f;</span>
+            case 2:
+<span class="nc" id="L129">                return 0.85f;</span>
+            case 4:
+<span class="nc" id="L131">                return 1.15f;</span>
+            case 5:
+<span class="nc" id="L133">                return 1.5f;</span>
+            case 6:
+<span class="nc" id="L135">                return 2.0f;</span>
+            case 7:
+<span class="nc" id="L137">                return 2.5f;</span>
+            default:
+<span class="fc" id="L139">                return 1.0f;</span>
+        }
+    }
+
+    /// The pixel size for a run: an absolute {@link TextStyle#getFontSizePx()}
+    /// (&amp;gt; 0) wins over the relative level, and the paragraph heading scale is
+    /// applied on top of either.
+    ///
+    /// @param blockType the paragraph block type
+    /// @param st the run style
+    /// @return the run size in pixels
+    public int runPx(int blockType, TextStyle st) {
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (st != null &amp;&amp; st.getFontSizePx() &gt; 0) {</span>
+<span class="fc" id="L152">            return Math.round(st.getFontSizePx() * headingScale(blockType));</span>
+        }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        int level = st == null ? 0 : st.getFontSizeLevel();</span>
+<span class="fc" id="L155">        return Math.round(baseSizePx * headingScale(blockType) * sizeLevelScale(level));</span>
+    }
+
+    /// Derives a cached font at the given pixel size and weight/slant from the
+    /// base font. A non-TTF base font cannot be resized and is returned as-is.
+    ///
+    /// @param px the pixel size
+    /// @param bold bold weight
+    /// @param italic italic slant
+    /// @return the derived font
+    public Font fontFor(int px, boolean bold, boolean italic) {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (baseFont == null) {</span>
+<span class="nc" id="L167">            return Font.getDefaultFont();</span>
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (!baseFont.isTTFNativeFont()) {</span>
+<span class="fc" id="L170">            return baseFont;</span>
+        }
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (px &lt; 6) {</span>
+<span class="nc" id="L173">            px = 6;</span>
+        }
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        long key = ((long) px &lt;&lt; 2) | (bold ? 2 : 0) | (italic ? 1 : 0);</span>
+<span class="nc" id="L176">        Font f = fontCache.get(Long.valueOf(key));</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L178">            return f;</span>
+        }
+<span class="nc bnc" id="L180" title="All 4 branches missed.">        int style = (bold ? Font.STYLE_BOLD : 0) | (italic ? Font.STYLE_ITALIC : 0);</span>
+        try {
+<span class="nc" id="L182">            f = baseFont.derive(px, style);</span>
+<span class="nc" id="L183">        } catch (Throwable t) {</span>
+<span class="nc" id="L184">            f = baseFont;</span>
+<span class="nc" id="L185">        }</span>
+<span class="nc" id="L186">        fontCache.put(Long.valueOf(key), f);</span>
+<span class="nc" id="L187">        return f;</span>
+    }
+
+    /// The concrete font a run resolves to (size from {@link #runPx}, bold from
+    /// the style or a heading block, italic from the style).
+    ///
+    /// @param blockType the paragraph block type
+    /// @param st the run style
+    /// @return the run font
+    public Font runFont(int blockType, TextStyle st) {
+<span class="pc bpc" id="L197" title="1 of 6 branches missed.">        boolean bold = (st != null &amp;&amp; st.isBold()) || isHeading(blockType);</span>
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">        boolean italic = st != null &amp;&amp; st.isItalic();</span>
+<span class="fc" id="L199">        return fontFor(runPx(blockType, st), bold, italic);</span>
+    }
+
+    // ------------------------------------------------------------------
+    // Paint
+    // ------------------------------------------------------------------
+
+    /// Paints one styled run at {@code (x, y)} within a row of {@code lineHeight},
+    /// drawing highlight/inline-code background, then the glyphs with color and
+    /// underline/strike decorations. The caller supplies the already-resolved run
+    /// font (from {@link #runFont}).
+    ///
+    /// @param g graphics
+    /// @param run the run text
+    /// @param st the run style
+    /// @param rf the resolved run font
+    /// @param x left pixel
+    /// @param y top pixel of the row
+    /// @param lineHeight the row height
+    /// @return the painted advance width
+    public int paintRun(Graphics g, String run, TextStyle st, Font rf, int x, int y, int lineHeight) {
+<span class="fc" id="L220">        int w = rf.stringWidth(run);</span>
+<span class="fc" id="L221">        int ry = y + Math.max(0, lineHeight - rf.getHeight());</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">        if (st != null &amp;&amp; st.getHighlight() &gt;= 0) {</span>
+<span class="nc" id="L223">            g.setColor(st.getHighlight());</span>
+<span class="nc" id="L224">            g.fillRect(x, y, w, lineHeight);</span>
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">        } else if (st != null &amp;&amp; st.isMonospace()) {</span>
+            // no monospace family ships with the framework fonts; give inline code a subtle tint
+<span class="fc" id="L227">            int alpha = g.getAlpha();</span>
+<span class="fc" id="L228">            g.setColor(textColor);</span>
+<span class="fc" id="L229">            g.setAlpha(24);</span>
+<span class="fc" id="L230">            g.fillRect(x, y, w, lineHeight);</span>
+<span class="fc" id="L231">            g.setAlpha(alpha);</span>
+        }
+<span class="fc" id="L233">        int decoration = 0;</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">        if (st != null &amp;&amp; st.isUnderline()) {</span>
+<span class="fc" id="L235">            decoration |= Style.TEXT_DECORATION_UNDERLINE;</span>
+        }
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">        if (st != null &amp;&amp; st.isStrike()) {</span>
+<span class="nc" id="L238">            decoration |= Style.TEXT_DECORATION_STRIKETHRU;</span>
+        }
+<span class="pc bpc" id="L240" title="1 of 4 branches missed.">        g.setColor(st != null &amp;&amp; st.getForeColor() &gt;= 0 ? st.getForeColor() : textColor);</span>
+<span class="fc" id="L241">        g.setFont(rf);</span>
+<span class="fc" id="L242">        g.drawString(run, x, ry, decoration);</span>
+<span class="fc" id="L243">        return w;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

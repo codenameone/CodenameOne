@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HashtableContent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">HashtableContent.java</span></div><h1>HashtableContent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import com.codename1.io.JSONParser;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+/// Internal class do not use.
+///
+/// A DOM accessor implementation for working with Map data.
+///
+/// @author Eric Coolman
+class MapContent implements StructuredContent {
+
+    private final Object root;
+    private StructuredContent parent;
+
+    /// Construct from parsed Map content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: parsed Map content
+<span class="fc" id="L53">    public MapContent(Map&lt;?, ?&gt; content) {</span>
+<span class="fc" id="L54">        this.root = content;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Construct from a JSON string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON string.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the string
+    public MapContent(String content) throws IOException {
+<span class="nc" id="L67">        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));</span>
+<span class="nc" id="L68">    }</span>
+
+    /// Construct from a JSON input stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON input stream.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
+    public MapContent(InputStream content) throws IOException {
+<span class="nc" id="L80">        this(new JSONParser().parse(com.codename1.io.Util.getReader(content)));</span>
+<span class="nc" id="L81">    }</span>
+
+    /// Construct from a JSON input stream.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a JSON reader.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: on error reading/parsing the stream
+    public MapContent(Reader content) throws IOException {
+<span class="nc" id="L93">        this(new JSONParser().parse(content));</span>
+<span class="nc" id="L94">    }</span>
+
+    /// INTERNAL - link a node to it's parent so we can traverse backwards when
+    /// required.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: a Map, List, or String node.
+    ///
+    /// - `parent`: the parent element of content.
+<span class="fc" id="L104">    MapContent(Object content, StructuredContent parent) {</span>
+<span class="fc" id="L105">        this.root = content;</span>
+<span class="fc" id="L106">        this.parent = parent;</span>
+<span class="fc" id="L107">    }</span>
+
+    /// Convert the object back to a JSON string.
+    ///
+    /// #### Returns
+    ///
+    /// the object as a string
+    @Override
+    public String toString() {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (root instanceof Map) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (((Map) root).containsKey(&quot;ROOT&quot;)) {</span>
+<span class="nc" id="L118">                return PrettyPrinter.print((Map) ((Map) root).get(&quot;ROOT&quot;));</span>
+            } else {
+<span class="fc" id="L120">                return PrettyPrinter.print((Map) root);</span>
+            }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        } else if (root instanceof List) {</span>
+<span class="nc" id="L123">            return PrettyPrinter.print((List) root);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        } else if (root == null) {</span>
+            // A null entry of an array is wrapped like any other, and this
+            // used to dereference it: [[null]] threw from here. Empty rather
+            // than null, because toString must not answer null -- getText is
+            // where &quot;there is no text&quot; is said.
+<span class="nc" id="L129">            return &quot;&quot;;</span>
+        } else {
+<span class="nc" id="L131">            return root.toString();</span>
+        }
+    }
+
+    /// #### See also
+    ///
+    /// - java.lang.Object#hashCode()
+    @Override
+    public int hashCode() {
+<span class="nc" id="L140">        return root.hashCode();</span>
+    }
+
+    /// #### See also
+    ///
+    /// - java.lang.Object#equals(Object)
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L148" title="All 6 branches missed.">        return o instanceof MapContent &amp;&amp;</span>
+                (root == ((MapContent) o).root || //NOPMD CompareObjectsWithEquals
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                        (root != null &amp;&amp; root.equals(((MapContent) o).root)));</span>
+    }
+
+    /// Copy an array of Map elements to an array of StructuredContent nodes,
+    /// also linking the parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`
+    private List asStructuredContentArray(List array) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (array == null) {</span>
+<span class="nc" id="L161">            return null;</span>
+        }
+        List children;
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (array instanceof Vector) {</span>
+<span class="fc" id="L165">            children = new Vector();</span>
+        } else {
+<span class="fc" id="L167">            children = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (Object o : array) {</span>
+            // Maps and strings were the only shapes kept, so an array of
+            // numbers or booleans -- &quot;scores&quot;:[1,2] -- came back EMPTY, from
+            // the child form of a path as well as the attribute form. The
+            // JSON parser hands those back as Double, Long and Boolean, and a
+            // value is a value whatever its type; MapContent reads it through
+            // getText() either way.
+            //
+            // null is still dropped: there is no value to read from it, and
+            // the absence tests are what ask about that.
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (o != null) {</span>
+<span class="fc" id="L181">                children.add(new MapContent(o, this));</span>
+            }
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        return children;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
+     */
+    @Override
+    public List getChildren(String name) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (root instanceof String) {</span>
+<span class="nc" id="L195">            return new Vector();</span>
+        }
+        // Nor has any other scalar. An array of numbers now keeps its values,
+        // so a path can walk into one -- &quot;/items/scores/value&quot; -- and the cast
+        // to Map further down threw. ParparVM does not throw for a failed
+        // cast, so on a device it would have read the Double as a Map.
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (!(root instanceof Map) &amp;&amp; !(root instanceof List)) {</span>
+<span class="fc" id="L202">            return new Vector();</span>
+        }
+        // on arrays, auto select first element that contains 'name'.
+        //
+        // Past the guard above, root is a Map or a List and cannot be null, so
+        // the two null checks this method used to make on it are gone: one
+        // decided oldList and the other guarded the cast below. The cast is
+        // safe for the same reason -- a List only gets here through an entry
+        // the loop kept, and it keeps one only when it is a Map.
+<span class="fc" id="L211">        Object node = root;</span>
+<span class="fc" id="L212">        boolean oldList = node instanceof Vector;</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (node instanceof List) {</span>
+<span class="nc" id="L214">            Object tmp = null;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            for (Object entry : (List) node) {</span>
+<span class="nc" id="L216">                tmp = entry;</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if ((tmp instanceof Map)) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                    if (((Map) tmp).containsKey(name)) {</span>
+<span class="nc" id="L219">                        break;</span>
+                    }
+                }
+<span class="nc" id="L222">                tmp = null;</span>
+<span class="nc" id="L223">            }</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (tmp == null) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                if (oldList) {</span>
+<span class="nc" id="L226">                    return new Vector();</span>
+                } else {
+<span class="nc" id="L228">                    return new ArrayList();</span>
+                }
+            }
+<span class="nc" id="L231">            node = tmp;</span>
+        }
+<span class="fc" id="L233">        node = ((Map) node).get(name);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (node == null) {</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (oldList) {</span>
+<span class="nc" id="L236">                return new Vector();</span>
+            }
+<span class="fc" id="L238">            return new ArrayList();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        } else if (node instanceof List) {</span>
+<span class="fc" id="L240">            return asStructuredContentArray((List) node);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        } else if (node instanceof Map) {</span>
+            List array;
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            if (node instanceof Hashtable) {</span>
+<span class="fc" id="L244">                array = new Vector();</span>
+            } else {
+<span class="nc" id="L246">                array = new ArrayList();</span>
+            }
+<span class="fc" id="L248">            array.add(new MapContent(node, this));</span>
+<span class="fc" id="L249">            return array;</span>
+        } else {
+            List array;
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (oldList) {</span>
+<span class="nc" id="L253">                array = new Vector();</span>
+            } else {
+<span class="fc" id="L255">                array = new ArrayList();</span>
+            }
+<span class="fc" id="L257">            array.add(new MapContent(node.toString(), this));</span>
+<span class="fc" id="L258">            return array;</span>
+        }
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getChild(int)
+     */
+    @Override
+    public StructuredContent getChild(int index) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (root instanceof List) {</span>
+<span class="fc" id="L270">            List entries = (List) root;</span>
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">            if (index &lt; 0 || index &gt;= entries.size()) {</span>
+                // An empty list has no first child, and getText() asks for
+                // one: a nested [[]] threw from there rather than reading as
+                // the nothing it is.
+<span class="fc" id="L275">                return null;</span>
+            }
+<span class="fc" id="L277">            return new MapContent(entries.get(index), this);</span>
+        }
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (!(root instanceof Map)) {</span>
+            // A scalar has no children. The cast below used to be reached for
+            // one and throw -- and ParparVM does not throw for a failed cast,
+            // so on a device it would have read a Double as a Map instead.
+<span class="nc" id="L283">            return null;</span>
+        }
+<span class="fc" id="L285">        Map h = (Map) root;</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= h.size()) {</span>
+<span class="nc" id="L287">            return null;</span>
+        }
+<span class="fc" id="L289">        Iterator elements = h.keySet().iterator();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        for (int i = 0; i &lt; index; i++) {</span>
+<span class="nc" id="L291">            elements.next();</span>
+        }
+<span class="fc" id="L293">        Object node = elements.next();</span>
+<span class="fc" id="L294">        return new MapContent(node, this);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String )
+     */
+    @Override
+    public List getDescendants(String name) {
+        List decendants;
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        if (root instanceof Vector || root instanceof Hashtable) {</span>
+<span class="fc" id="L306">            decendants = new Vector();</span>
+        } else {
+<span class="fc" id="L308">            decendants = new ArrayList();</span>
+        }
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (root instanceof List) {</span>
+<span class="nc" id="L311">            findByName(decendants, (List) root, name);</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        } else if (root instanceof Map) {</span>
+<span class="fc" id="L313">            findByName(decendants, (Map) root, name);</span>
+        }
+<span class="fc" id="L315">        return decendants;</span>
+    }
+
+    /// Internal method for finding decendant nodes
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: List for collecting results
+    ///
+    /// - `source`: source array to search
+    ///
+    /// - `name`: node name we are searching for
+    private void findByName(List target, List source, String name) {
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (Object o : source) {</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (o instanceof Map) {</span>
+<span class="fc" id="L330">                findByName(target, (Map) o, name);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            } else if (o instanceof List) {</span>
+<span class="nc" id="L332">                findByName(target, (List) o, name);</span>
+            }
+<span class="fc" id="L334">        }</span>
+<span class="fc" id="L335">    }</span>
+
+    /// Internal method for finding decendant nodes
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: List for collecting results
+    ///
+    /// - `source`: source element to search
+    ///
+    /// - `name`: node name we are searching for
+    private void findByName(List target, Map source, String name) {
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (source.containsKey(name)) {</span>
+<span class="fc" id="L348">            Object o = source.get(name);</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="nc" id="L350">                target.add(o);</span>
+            } else {
+                // TODO: there will be a bug here with parent node, won't be able to walk up more than one node
+<span class="fc" id="L353">                target.add(new MapContent(o, new MapContent(source)));</span>
+            }
+        }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        for (Object o : source.values()) {</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (o instanceof List) {</span>
+<span class="fc" id="L358">                findByName(target, (List) o, name);</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">            } else if (o instanceof Map) {</span>
+<span class="fc" id="L360">                findByName(target, (Map) o, name);</span>
+            }
+<span class="fc" id="L362">        }</span>
+<span class="fc" id="L363">    }</span>
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
+     */
+    @Override
+    public String getAttribute(String name) {
+<span class="fc" id="L372">        return null;</span>
+    }
+
+    /// The values an `@name` expression asks for, whatever the format holds.
+    ///
+    /// XML keeps one in an attribute. JSON has no attributes at all -- the
+    /// method above answers null for every name -- and the field the
+    /// expression names is a child there, which is what the developer guide
+    /// has always said an attribute expression does on a JSON document.
+    ///
+    /// A list rather than one value, because a JSON field can be an array:
+    /// `{&quot;tags&quot;:[&quot;first&quot;,&quot;target&quot;]}` has two, and answering with the first
+    /// hid the second from a predicate and dropped it from a path that read
+    /// the field. Child evaluation has always walked all of them.
+    ///
+    /// One place, because everything that reads an attribute has to agree:
+    /// the predicates that compare one, the predicate that tests for one, and
+    /// the step that reads one at the end of a path. They did not -- only the
+    /// existence test looked at the child -- so `/players[@rank]/name` found
+    /// both players while `/players[@rank='1']/name` and `/players/@id` found
+    /// none.
+    ///
+    /// - `element`: the element to read
+    ///
+    /// - `name`: the name, already stripped of its '@'
+    ///
+    /// Nodes rather than strings, because a JSON field can be an object and
+    /// the step that reads one at the end of a path has to hand back the
+    /// object. Answering with its text gave `getAsArray(&quot;/items/@profile&quot;)`
+    /// the first key of the map instead of the map, while the child form of
+    /// the same path returned the map. A predicate reads the text off each.
+    ///
+    /// #### Returns
+    ///
+    /// the value nodes, empty when this element has none
+    static List attributeOrFields(StructuredContent element, String name) {
+<span class="fc" id="L408">        List values = new ArrayList();</span>
+<span class="fc" id="L409">        String attribute = element.getAttribute(name);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (attribute != null) {</span>
+<span class="fc" id="L411">            values.add(new MapContent(attribute, element));</span>
+<span class="fc" id="L412">            return values;</span>
+        }
+        // XML draws the distinction the expression language draws: &quot;[@rank]&quot;
+        // asks about an attribute and &quot;[rank]&quot; about a child element, so the
+        // child is only the answer where there are no attributes to be had.
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (!(element instanceof MapContent)) {</span>
+<span class="fc" id="L418">            return values;</span>
+        }
+<span class="fc" id="L420">        List children = element.getChildren(name);</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L422">            return values;</span>
+        }
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        for (Object child : children) {</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            if (child instanceof StructuredContent) {</span>
+<span class="fc" id="L426">                values.add(child);</span>
+            }
+<span class="fc" id="L428">        }</span>
+<span class="fc" id="L429">        return values;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getAttributes()
+     */
+    @Override
+    public Map getAttributes() {
+<span class="nc" id="L439">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getParent()
+     */
+    @Override
+    public StructuredContent getParent() {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (parent == null) {</span>
+<span class="fc" id="L450">            return null;</span>
+        }
+<span class="fc" id="L452">        return parent;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getText()
+     */
+    @Override
+    public String getText() {
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (root instanceof String) {</span>
+<span class="fc" id="L463">            return (String) root;</span>
+        }
+        // A scalar is its own text. The parser hands numbers back as Double
+        // or Long and booleans as Boolean, and every one of those is a value
+        // a path can read or a predicate can compare.
+<span class="pc bpc" id="L468" title="2 of 6 branches missed.">        if (root != null &amp;&amp; !(root instanceof Map) &amp;&amp; !(root instanceof List)) {</span>
+<span class="fc" id="L469">            return root.toString();</span>
+        }
+<span class="fc" id="L471">        StructuredContent sc = getChild(0);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        if (sc == null) {</span>
+<span class="fc" id="L473">            return null;</span>
+        }
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (sc.getNativeRoot() instanceof String) {</span>
+<span class="nc" id="L476">            return (String) sc.getNativeRoot();</span>
+        }
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        if (sc.getNativeRoot() == null) {</span>
+            // A null entry has no text, which is not the same as the empty
+            // string toString has to answer with.
+<span class="fc" id="L481">            return null;</span>
+        }
+<span class="nc" id="L483">        return sc.toString();</span>
+    }
+
+    @Override
+    public Object getNativeRoot() {
+<span class="fc" id="L488">        return root;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

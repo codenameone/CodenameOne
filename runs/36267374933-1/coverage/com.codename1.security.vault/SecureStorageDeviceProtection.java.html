@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecureStorageDeviceProtection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">SecureStorageDeviceProtection.java</span></div><h1>SecureStorageDeviceProtection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.security.CryptoException;
+import com.codename1.security.SecureRandom;
+import com.codename1.security.SecureStorage;
+import com.codename1.security.vault.spi.DeviceProtection;
+import com.codename1.util.AsyncResource;
+
+/// The [DeviceProtection] every port gets when it does not supply one of its own: a random
+/// wrapping key in [SecureStorage], and AES-GCM performed in shared code.
+///
+/// This is the right implementation wherever `SecureStorage` is the operating system's secret
+/// store -- the iOS keychain, the Android keystore, the desktop credential store. The wrapping
+/// key is bytes, and it is bytes in the one place on the device that is built to hold bytes
+/// nobody else should reach.
+///
+/// It is the **wrong** implementation in a browser, where `SecureStorage` is ordinary
+/// origin-private storage: the wrapping key would sit beside the ciphertext it protects, which is
+/// no protection at all. The JavaScript port therefore overrides
+/// [com.codename1.impl.CodenameOneImplementation#getDeviceProtection] with one built on a
+/// non-extractable `CryptoKey`, and this class never runs there.
+///
+/// #### Racing callers
+///
+/// Key creation goes through [SecureStorage#setIfAbsent(String, String)], which returns what the
+/// store ended up holding rather than what this call wrote. Two processes that both find nothing
+/// therefore agree on one key instead of each overwriting the other -- which matters more here
+/// than almost anywhere, because the loser's key is what a device's remembered vault was wrapped
+/// under.
+<span class="fc" id="L52">public class SecureStorageDeviceProtection extends DeviceProtection {</span>
+
+    /// Namespace for the wrapping keys, kept away from whatever else an application stores.
+    private static final String ACCOUNT_PREFIX = &quot;cn1.vault.dk.&quot;;
+
+    private static final int KEY_LENGTH = 32;
+
+    /// The store backing this. Overridable so a port can supply a store other than the one
+    /// [SecureStorage#getInstance()] returns, which the simulator's test harness uses.
+    protected SecureStorage storage() {
+<span class="nc" id="L62">        return SecureStorage.getInstance();</span>
+    }
+
+    private static String account(String keyId) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return ACCOUNT_PREFIX + (keyId == null ? &quot;&quot; : keyId);</span>
+    }
+
+    @Override
+    public ProtectionReport protection() {
+<span class="nc" id="L71">        SecureStorage store = storage();</span>
+<span class="nc" id="L72">        ProtectionReport.Builder b = ProtectionReport.builder();</span>
+        // Asked of the store rather than assumed: the base SecureStorage returns ENTRY_UNKNOWN
+        // for everything, which is exactly the platform that must not be described as protected.
+        // Two questions, and entryState answers only the first: whether this store can be
+        // consulted at all. Whether it can KEEP anything is what PERSISTENT means, and a store
+        // can answer the first and say no to the second -- Linux without a reachable Secret
+        // Service reports PERSISTENT=NO from protection() while entryState still answers
+        // ENTRY_ABSENT by looking at ordinary token storage. Taking hasStore for the answer made
+        // VaultCapabilities offer REMEMBER_DEVICE on a headless or keyring-less session where
+        // every attempt to create the device key fails.
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        boolean hasStore = store.entryState(account(&quot;cn1.probe&quot;)) != SecureStorage.ENTRY_UNKNOWN;</span>
+        // YES, not &quot;not NO&quot;. The report has three states and UNKNOWN is explicitly not a
+        // guarantee -- rounding it up here let VaultCapabilities accept a store that had never
+        // said it could keep anything, which is the same mistake as reading PERSISTENT off
+        // entryState, one step further in.
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        boolean persists = hasStore</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                &amp;&amp; store.protection().answer(Protection.PERSISTENT) == ProtectionReport.YES;</span>
+<span class="nc" id="L89">        b.set(Protection.PERSISTENT, persists);</span>
+        // Asked of the store, not inferred from the fact that one exists. &quot;A store answered&quot;
+        // and &quot;that store encrypts&quot; are different questions, and two ports answer NO to the
+        // second on purpose: the JavaSE simulator, where this is reproducible obfuscation, and
+        // Android below API 23, which has no keystore to wrap with. Inferring YES from
+        // hasStore let a remembered vault that required ENCRYPTED_AT_REST pass policy
+        // enforcement on exactly those two. A store that says nothing still answers NO here,
+        // which is the right default: an unproven store must not be described as protected.
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        b.set(Protection.ENCRYPTED_AT_REST, persists</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                &amp;&amp; store.protection().answer(Protection.ENCRYPTED_AT_REST) == ProtectionReport.YES);</span>
+        // The key is bytes this class can read back, by construction. Saying otherwise would be
+        // the single most misleading thing this file could do.
+<span class="nc" id="L101">        b.set(Protection.NON_EXTRACTABLE_KEY, false);</span>
+        // Propagated, for the same reason as encryption above. This used to answer UNKNOWN on
+        // the grounds that the port is what knows -- which was true when nothing here could ask,
+        // and stopped being true once every native store gained protection(). iOS says YES for
+        // the keychain and Windows for DPAPI, and every non-browser port reaches this shared
+        // fallback, so overriding their verified answer with UNKNOWN made
+        // VaultOptions.require(OS_PROTECTED) refuse a remembered vault on exactly the platforms
+        // that do provide it.
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        b.set(Protection.OS_PROTECTED, hasStore</span>
+<span class="nc" id="L110">                ? store.protection().answer(Protection.OS_PROTECTED) : ProtectionReport.NO);</span>
+<span class="nc" id="L111">        b.set(Protection.HARDWARE_BACKED, ProtectionReport.UNKNOWN);</span>
+<span class="nc" id="L112">        b.set(Protection.USER_VERIFICATION, false);</span>
+<span class="nc" id="L113">        b.set(Protection.ISOLATED_FROM_APPLICATION_CODE, false);</span>
+<span class="nc" id="L114">        return b.build();</span>
+    }
+
+    @Override
+    public int keyState(String keyId) {
+<span class="fc bfc" id="L119" title="All 3 branches covered.">        switch (storage().entryState(account(keyId))) {</span>
+            case SecureStorage.ENTRY_PRESENT:
+<span class="fc" id="L121">                return KEY_PRESENT;</span>
+            case SecureStorage.ENTRY_ABSENT:
+<span class="fc" id="L123">                return KEY_ABSENT;</span>
+            default:
+<span class="fc" id="L125">                return KEY_UNKNOWN;</span>
+        }
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; ensureKey(String keyId) {
+<span class="fc" id="L131">        AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+        try {
+<span class="fc" id="L133">            byte[] key = loadOrCreate(keyId);</span>
+<span class="fc" id="L134">            Bytes.zero(key);</span>
+<span class="fc" id="L135">            out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L136">        } catch (VaultException failed) {</span>
+<span class="fc" id="L137">            out.error(failed);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;byte[]&gt; wrap(String keyId, byte[] plaintext, byte[] aad) {
+<span class="fc" id="L144">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc" id="L145">        byte[] key = null;</span>
+        try {
+<span class="fc" id="L147">            key = loadOrCreate(keyId);</span>
+<span class="fc" id="L148">            out.complete(SecureEnvelope.seal(key, keyId, 1, aad, plaintext));</span>
+<span class="nc" id="L149">        } catch (VaultException failed) {</span>
+<span class="nc" id="L150">            out.error(failed);</span>
+<span class="nc" id="L151">        } catch (CryptoException failed) {</span>
+<span class="nc" id="L152">            out.error(new VaultException(VaultError.CRYPTO_UNAVAILABLE,</span>
+                    &quot;the platform could not wrap under the device key&quot;, failed));
+        } finally {
+<span class="fc" id="L155">            Bytes.zero(key);</span>
+        }
+<span class="fc" id="L157">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;byte[]&gt; unwrap(String keyId, byte[] wrapped, byte[] aad) {
+<span class="nc" id="L162">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="nc" id="L163">        byte[] key = null;</span>
+        try {
+<span class="nc" id="L165">            key = load(keyId);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (key == null) {</span>
+                // Absence and unreadability are answered differently, because the caller is about
+                // to decide whether to create a replacement.
+<span class="nc" id="L169">                out.error(new VaultException(</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                        keyState(keyId) == KEY_ABSENT ? VaultError.KEY_MISSING</span>
+                                : VaultError.TEMPORARILY_UNREADABLE,
+                        &quot;no device key is available for this vault&quot;));
+<span class="nc" id="L173">                return out;</span>
+            }
+<span class="nc" id="L175">            out.complete(SecureEnvelope.parse(wrapped).open(key, aad));</span>
+<span class="nc" id="L176">        } catch (VaultException failed) {</span>
+<span class="nc" id="L177">            out.error(failed);</span>
+<span class="nc" id="L178">        } catch (CryptoException failed) {</span>
+<span class="nc" id="L179">            out.error(new VaultException(VaultError.CRYPTO_UNAVAILABLE,</span>
+                    &quot;the platform could not unwrap under the device key&quot;, failed));
+        } finally {
+<span class="nc" id="L182">            Bytes.zero(key);</span>
+        }
+<span class="nc" id="L184">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteKey(String keyId) {
+<span class="nc" id="L189">        AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L190">        out.complete(Boolean.valueOf(storage().remove(account(keyId))));</span>
+<span class="nc" id="L191">        return out;</span>
+    }
+
+    private byte[] load(String keyId) {
+<span class="fc" id="L195">        String stored = storage().get(account(keyId));</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (stored == null) {</span>
+<span class="fc" id="L197">            return null;</span>
+        }
+<span class="fc" id="L199">        byte[] key = Bytes.fromHex(stored);</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        if (key == null || key.length != KEY_LENGTH) {</span>
+<span class="fc" id="L201">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;the stored device key is not a key this build wrote; refusing to replace it, &quot;
+                    + &quot;because a replacement would orphan everything the original protected&quot;);
+        }
+<span class="fc" id="L205">        return key;</span>
+    }
+
+    private byte[] loadOrCreate(String keyId) {
+<span class="fc" id="L209">        byte[] existing = load(keyId);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L211">            return existing;</span>
+        }
+<span class="fc" id="L213">        int state = keyState(keyId);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (state == KEY_PRESENT) {</span>
+            // Another process can create the key after load() saw absence. Adopt its value
+            // rather than treating a readable winner as an unavailable store.
+<span class="fc" id="L217">            existing = load(keyId);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L219">                return existing;</span>
+            }
+        }
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (state != KEY_ABSENT) {</span>
+            // The store has no key it can hand over and will not say the entry is absent. Writing
+            // here is how a device key that was there all along gets overwritten.
+<span class="fc" id="L225">            throw new VaultException(VaultError.TEMPORARILY_UNREADABLE,</span>
+                    &quot;the device key could not be read and the store cannot say whether one &quot;
+                    + &quot;exists; refusing to create a replacement&quot;);
+        }
+        byte[] generated;
+        try {
+<span class="fc" id="L231">            generated = SecureRandom.bytes(KEY_LENGTH);</span>
+<span class="nc" id="L232">        } catch (CryptoException noRandomness) {</span>
+<span class="nc" id="L233">            throw new VaultException(VaultError.CRYPTO_UNAVAILABLE,</span>
+                    &quot;this platform could not produce the randomness a device key needs&quot;,
+                    noRandomness);
+<span class="fc" id="L236">        }</span>
+<span class="fc" id="L237">        String hex = Bytes.toHex(generated);</span>
+<span class="fc" id="L238">        Bytes.zero(generated);</span>
+<span class="fc" id="L239">        String settled = storage().setIfAbsent(account(keyId), hex);</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (settled == null) {</span>
+<span class="nc" id="L241">            throw new VaultException(VaultError.STORAGE_UNAVAILABLE,</span>
+                    &quot;this platform cannot store a device key, so a vault cannot be remembered &quot;
+                    + &quot;across restarts here&quot;);
+        }
+<span class="fc" id="L245">        byte[] key = Bytes.fromHex(settled);</span>
+<span class="pc bpc" id="L246" title="2 of 4 branches missed.">        if (key == null || key.length != KEY_LENGTH) {</span>
+<span class="nc" id="L247">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;the device key entry was written by something else; refusing to overwrite it&quot;);
+        }
+<span class="fc" id="L250">        return key;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

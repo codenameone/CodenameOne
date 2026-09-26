@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthUnit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthUnit.java</span></div><h1>HealthUnit.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A unit of measure for health data. Instances are interned constants, so
+/// `==` is a valid identity test and is used throughout the API.
+///
+/// #### The symbol is the wire format
+///
+/// [#getSymbol()] is public API rather than an internal detail because the
+/// string genuinely has to cross the platform boundary: Apple's
+/// `HKUnit(from:)` parses exactly this syntax (`&quot;count/min&quot;`, `&quot;kg&quot;`,
+/// `&quot;kcal&quot;`, `&quot;mmHg&quot;`, `&quot;degC&quot;`, `&quot;mg/dL&quot;`, `&quot;mL/(kg*min)&quot;`), so the iOS
+/// port passes it straight through with no mapping table. The Android port
+/// maps it to the matching `androidx.health.connect.client.units` type.
+/// Making that contract visible and documented is better than smuggling it
+/// through an implementation class.
+///
+/// #### Conversion
+///
+/// Conversion is affine (`canonical = value * scale + offset`) rather than
+/// a simple ratio, because temperature needs the offset. Converting between
+/// units of different dimensions throws [IllegalArgumentException]: that is
+/// a bug in the calling code, not a condition to be reported through an
+/// `AsyncResource`.
+///
+/// ```java
+/// double lb = HealthUnit.convert(80, HealthUnit.KILOGRAM, HealthUnit.POUND);
+/// ```
+public final class HealthUnit {
+
+<span class="fc" id="L58">    private static final Map&lt;String, HealthUnit&gt; BY_SYMBOL =</span>
+            new HashMap&lt;String, HealthUnit&gt;();
+<span class="fc" id="L60">    private static final List&lt;HealthUnit&gt; ALL = new ArrayList&lt;HealthUnit&gt;();</span>
+
+    private final String symbol;
+    private final HealthUnitDimension dimension;
+    private final double scale;
+    private final double offset;
+
+    private HealthUnit(String symbol, HealthUnitDimension dimension,
+<span class="fc" id="L68">            double scale, double offset) {</span>
+<span class="fc" id="L69">        this.symbol = symbol;</span>
+<span class="fc" id="L70">        this.dimension = dimension;</span>
+<span class="fc" id="L71">        this.scale = scale;</span>
+<span class="fc" id="L72">        this.offset = offset;</span>
+<span class="fc" id="L73">    }</span>
+
+    private static HealthUnit define(String symbol,
+            HealthUnitDimension dimension, double scale, double offset) {
+<span class="fc" id="L77">        HealthUnit u = new HealthUnit(symbol, dimension, scale, offset);</span>
+<span class="fc" id="L78">        BY_SYMBOL.put(symbol, u);</span>
+<span class="fc" id="L79">        ALL.add(u);</span>
+<span class="fc" id="L80">        return u;</span>
+    }
+
+    private static HealthUnit define(String symbol,
+            HealthUnitDimension dimension, double scale) {
+<span class="fc" id="L85">        return define(symbol, dimension, scale, 0);</span>
+    }
+
+    // ------------------------------------------------------------------
+    // count / frequency
+    // ------------------------------------------------------------------
+
+    /// A plain tally. Canonical unit of [HealthUnitDimension#COUNT].
+<span class="fc" id="L93">    public static final HealthUnit COUNT =</span>
+<span class="fc" id="L94">            define(&quot;count&quot;, HealthUnitDimension.COUNT, 1);</span>
+
+    /// Beats, breaths or steps per minute. Canonical unit of
+    /// [HealthUnitDimension#FREQUENCY].
+<span class="fc" id="L98">    public static final HealthUnit COUNT_PER_MINUTE =</span>
+<span class="fc" id="L99">            define(&quot;count/min&quot;, HealthUnitDimension.FREQUENCY, 1);</span>
+
+    /// Counts per second.
+<span class="fc" id="L102">    public static final HealthUnit COUNT_PER_SECOND =</span>
+<span class="fc" id="L103">            define(&quot;count/s&quot;, HealthUnitDimension.FREQUENCY, 60);</span>
+
+    /// A ratio expressed as a percentage. Canonical unit of
+    /// [HealthUnitDimension#PERCENT]. Note that HealthKit represents
+    /// oxygen saturation and body-fat percentage as 0..1 fractions
+    /// natively; the iOS port scales them into this unit.
+<span class="fc" id="L109">    public static final HealthUnit PERCENT =</span>
+<span class="fc" id="L110">            define(&quot;%&quot;, HealthUnitDimension.PERCENT, 1);</span>
+
+    // ------------------------------------------------------------------
+    // mass
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#MASS].
+<span class="fc" id="L117">    public static final HealthUnit KILOGRAM =</span>
+<span class="fc" id="L118">            define(&quot;kg&quot;, HealthUnitDimension.MASS, 1);</span>
+<span class="fc" id="L119">    public static final HealthUnit GRAM =</span>
+<span class="fc" id="L120">            define(&quot;g&quot;, HealthUnitDimension.MASS, 0.001);</span>
+<span class="fc" id="L121">    public static final HealthUnit MILLIGRAM =</span>
+<span class="fc" id="L122">            define(&quot;mg&quot;, HealthUnitDimension.MASS, 0.000001);</span>
+<span class="fc" id="L123">    public static final HealthUnit MICROGRAM =</span>
+<span class="fc" id="L124">            define(&quot;mcg&quot;, HealthUnitDimension.MASS, 0.000000001);</span>
+<span class="fc" id="L125">    public static final HealthUnit POUND =</span>
+<span class="fc" id="L126">            define(&quot;lb&quot;, HealthUnitDimension.MASS, 0.45359237);</span>
+<span class="fc" id="L127">    public static final HealthUnit OUNCE =</span>
+<span class="fc" id="L128">            define(&quot;oz&quot;, HealthUnitDimension.MASS, 0.028349523125);</span>
+<span class="fc" id="L129">    public static final HealthUnit STONE =</span>
+<span class="fc" id="L130">            define(&quot;st&quot;, HealthUnitDimension.MASS, 6.35029318);</span>
+
+    // ------------------------------------------------------------------
+    // length
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#LENGTH].
+<span class="fc" id="L137">    public static final HealthUnit METER =</span>
+<span class="fc" id="L138">            define(&quot;m&quot;, HealthUnitDimension.LENGTH, 1);</span>
+<span class="fc" id="L139">    public static final HealthUnit KILOMETER =</span>
+<span class="fc" id="L140">            define(&quot;km&quot;, HealthUnitDimension.LENGTH, 1000);</span>
+<span class="fc" id="L141">    public static final HealthUnit CENTIMETER =</span>
+<span class="fc" id="L142">            define(&quot;cm&quot;, HealthUnitDimension.LENGTH, 0.01);</span>
+<span class="fc" id="L143">    public static final HealthUnit MILE =</span>
+<span class="fc" id="L144">            define(&quot;mi&quot;, HealthUnitDimension.LENGTH, 1609.344);</span>
+<span class="fc" id="L145">    public static final HealthUnit FOOT =</span>
+<span class="fc" id="L146">            define(&quot;ft&quot;, HealthUnitDimension.LENGTH, 0.3048);</span>
+<span class="fc" id="L147">    public static final HealthUnit INCH =</span>
+<span class="fc" id="L148">            define(&quot;in&quot;, HealthUnitDimension.LENGTH, 0.0254);</span>
+<span class="fc" id="L149">    public static final HealthUnit YARD =</span>
+<span class="fc" id="L150">            define(&quot;yd&quot;, HealthUnitDimension.LENGTH, 0.9144);</span>
+
+    // ------------------------------------------------------------------
+    // energy
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#ENERGY]. Kilocalories rather
+    /// than joules because it is the idiomatic unit on both platforms and
+    /// in every consumer health UI.
+<span class="fc" id="L159">    public static final HealthUnit KILOCALORIE =</span>
+<span class="fc" id="L160">            define(&quot;kcal&quot;, HealthUnitDimension.ENERGY, 1);</span>
+<span class="fc" id="L161">    public static final HealthUnit KILOJOULE =</span>
+<span class="fc" id="L162">            define(&quot;kJ&quot;, HealthUnitDimension.ENERGY, 0.2390057361);</span>
+<span class="fc" id="L163">    public static final HealthUnit JOULE =</span>
+<span class="fc" id="L164">            define(&quot;J&quot;, HealthUnitDimension.ENERGY, 0.0002390057361);</span>
+
+    // ------------------------------------------------------------------
+    // time
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#TIME]. Milliseconds because
+    /// heart-rate variability is reported in them and the rest of the API
+    /// speaks epoch millis.
+<span class="fc" id="L173">    public static final HealthUnit MILLISECOND =</span>
+<span class="fc" id="L174">            define(&quot;ms&quot;, HealthUnitDimension.TIME, 1);</span>
+<span class="fc" id="L175">    public static final HealthUnit SECOND =</span>
+<span class="fc" id="L176">            define(&quot;s&quot;, HealthUnitDimension.TIME, 1000);</span>
+<span class="fc" id="L177">    public static final HealthUnit MINUTE =</span>
+<span class="fc" id="L178">            define(&quot;min&quot;, HealthUnitDimension.TIME, 60000);</span>
+<span class="fc" id="L179">    public static final HealthUnit HOUR =</span>
+<span class="fc" id="L180">            define(&quot;hr&quot;, HealthUnitDimension.TIME, 3600000);</span>
+
+    // ------------------------------------------------------------------
+    // pressure
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#PRESSURE].
+<span class="fc" id="L187">    public static final HealthUnit MILLIMETER_OF_MERCURY =</span>
+<span class="fc" id="L188">            define(&quot;mmHg&quot;, HealthUnitDimension.PRESSURE, 1);</span>
+<span class="fc" id="L189">    public static final HealthUnit KILOPASCAL =</span>
+<span class="fc" id="L190">            define(&quot;kPa&quot;, HealthUnitDimension.PRESSURE, 7.50061683);</span>
+
+    // ------------------------------------------------------------------
+    // temperature -- the reason conversion is affine
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#TEMPERATURE].
+<span class="fc" id="L197">    public static final HealthUnit DEGREE_CELSIUS =</span>
+<span class="fc" id="L198">            define(&quot;degC&quot;, HealthUnitDimension.TEMPERATURE, 1, 0);</span>
+
+    /// Fahrenheit. `C = F * 5/9 - 160/9`, which is why [HealthUnit]
+    /// conversion carries an offset rather than being a plain ratio.
+<span class="fc" id="L202">    public static final HealthUnit DEGREE_FAHRENHEIT =</span>
+<span class="fc" id="L203">            define(&quot;degF&quot;, HealthUnitDimension.TEMPERATURE,</span>
+                    5.0 / 9.0, -160.0 / 9.0);
+
+    // ------------------------------------------------------------------
+    // volume
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#VOLUME].
+<span class="fc" id="L211">    public static final HealthUnit LITER =</span>
+<span class="fc" id="L212">            define(&quot;L&quot;, HealthUnitDimension.VOLUME, 1);</span>
+<span class="fc" id="L213">    public static final HealthUnit MILLILITER =</span>
+<span class="fc" id="L214">            define(&quot;mL&quot;, HealthUnitDimension.VOLUME, 0.001);</span>
+<span class="fc" id="L215">    public static final HealthUnit FLUID_OUNCE_US =</span>
+<span class="fc" id="L216">            define(&quot;fl_oz_us&quot;, HealthUnitDimension.VOLUME, 0.0295735295625);</span>
+<span class="fc" id="L217">    public static final HealthUnit CUP_US =</span>
+<span class="fc" id="L218">            define(&quot;cup_us&quot;, HealthUnitDimension.VOLUME, 0.2365882365);</span>
+
+    // ------------------------------------------------------------------
+    // power / velocity / oxygen uptake
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#POWER].
+<span class="fc" id="L225">    public static final HealthUnit WATT =</span>
+<span class="fc" id="L226">            define(&quot;W&quot;, HealthUnitDimension.POWER, 1);</span>
+
+    /// Canonical unit of [HealthUnitDimension#VELOCITY].
+<span class="fc" id="L229">    public static final HealthUnit METER_PER_SECOND =</span>
+<span class="fc" id="L230">            define(&quot;m/s&quot;, HealthUnitDimension.VELOCITY, 1);</span>
+<span class="fc" id="L231">    public static final HealthUnit KILOMETER_PER_HOUR =</span>
+<span class="fc" id="L232">            define(&quot;km/hr&quot;, HealthUnitDimension.VELOCITY, 1.0 / 3.6);</span>
+<span class="fc" id="L233">    public static final HealthUnit MILE_PER_HOUR =</span>
+<span class="fc" id="L234">            define(&quot;mi/hr&quot;, HealthUnitDimension.VELOCITY, 0.44704);</span>
+
+    /// Canonical unit of [HealthUnitDimension#OXYGEN_UPTAKE]; the standard
+    /// VO2-max unit. The symbol is the exact `HKUnit` spelling.
+<span class="fc" id="L238">    public static final HealthUnit ML_PER_KG_PER_MINUTE =</span>
+<span class="fc" id="L239">            define(&quot;mL/(kg*min)&quot;, HealthUnitDimension.OXYGEN_UPTAKE, 1);</span>
+
+    // ------------------------------------------------------------------
+    // glucose -- see HealthUnitDimension.GLUCOSE_CONCENTRATION
+    // ------------------------------------------------------------------
+
+    /// Canonical unit of [HealthUnitDimension#GLUCOSE_CONCENTRATION]; the
+    /// SI unit, used across most of the world.
+<span class="fc" id="L247">    public static final HealthUnit MILLIMOLE_PER_LITER =</span>
+<span class="fc" id="L248">            define(&quot;mmol/L&quot;, HealthUnitDimension.GLUCOSE_CONCENTRATION, 1);</span>
+
+    /// The unit used clinically in the United States. The 18.0182 factor is
+    /// the molar mass of **glucose** -- it is not a general mg/dL to mmol/L
+    /// conversion and must not be reused for another analyte.
+<span class="fc" id="L253">    public static final HealthUnit MILLIGRAM_PER_DECILITER =</span>
+<span class="fc" id="L254">            define(&quot;mg/dL&quot;, HealthUnitDimension.GLUCOSE_CONCENTRATION,</span>
+                    1.0 / 18.0182);
+
+    // ------------------------------------------------------------------
+
+    /// The unit symbol, in the exact syntax Apple's `HKUnit(from:)`
+    /// accepts. See the class documentation for why this is public API.
+    public String getSymbol() {
+<span class="fc" id="L262">        return symbol;</span>
+    }
+
+    /// The physical dimension this unit measures.
+    public HealthUnitDimension getDimension() {
+<span class="fc" id="L267">        return dimension;</span>
+    }
+
+    /// `true` when `other` measures the same dimension and a conversion
+    /// between the two is therefore meaningful.
+    public boolean isCompatibleWith(HealthUnit other) {
+<span class="pc bpc" id="L273" title="1 of 4 branches missed.">        return other != null &amp;&amp; other.dimension == dimension;</span>
+    }
+
+    /// Converts `value`, expressed in this unit, into the canonical unit of
+    /// this unit's dimension.
+    public double toCanonical(double value) {
+<span class="fc" id="L279">        return value * scale + offset;</span>
+    }
+
+    /// Converts `value`, expressed in the canonical unit of this unit's
+    /// dimension, into this unit.
+    public double fromCanonical(double value) {
+<span class="fc" id="L285">        return (value - offset) / scale;</span>
+    }
+
+    /// Converts a value between two units of the same dimension.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if either unit is null or the two
+    ///   measure different dimensions. Crossing dimensions is a coding
+    ///   error and is surfaced as one.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public static double convert(double value, HealthUnit from, HealthUnit to) {
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        if (from == null || to == null) {</span>
+<span class="fc" id="L298">            throw new IllegalArgumentException(&quot;null unit in conversion&quot;);</span>
+        }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (from == to) {</span>
+<span class="fc" id="L301">            return value;</span>
+        }
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (from.dimension != to.dimension) {</span>
+<span class="fc" id="L304">            throw new IllegalArgumentException(&quot;cannot convert &quot;</span>
+                    + from.symbol + &quot; to &quot; + to.symbol
+                    + &quot;: &quot; + from.dimension + &quot; is not &quot; + to.dimension);
+        }
+<span class="fc" id="L308">        return to.fromCanonical(from.toCanonical(value));</span>
+    }
+
+    /// Looks a unit up by its symbol, or `null` when the symbol is unknown
+    /// to this version of the framework. Total by design: a persisted
+    /// symbol read back by an older runtime yields `null` rather than an
+    /// exception.
+    public static HealthUnit forSymbol(String symbol) {
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (symbol == null) {</span>
+<span class="fc" id="L317">            return null;</span>
+        }
+<span class="fc" id="L319">        return BY_SYMBOL.get(symbol);</span>
+    }
+
+    /// Every unit known to this version of the framework.
+    public static List&lt;HealthUnit&gt; values() {
+<span class="fc" id="L324">        return Collections.unmodifiableList(ALL);</span>
+    }
+
+    /// Returns [#getSymbol()], so string concatenation in log statements
+    /// and error messages reads naturally.
+    @Override
+    public String toString() {
+<span class="nc" id="L331">        return symbol;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

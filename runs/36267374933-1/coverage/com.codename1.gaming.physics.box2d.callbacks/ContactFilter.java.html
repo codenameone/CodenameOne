@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContactFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.callbacks</a> &gt; <span class="el_source">ContactFilter.java</span></div><h1>ContactFilter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+/// Created at 4:25:42 AM Jul 15, 2010
+package com.codename1.gaming.physics.box2d.callbacks;
+
+import com.codename1.gaming.physics.box2d.dynamics.Filter;
+import com.codename1.gaming.physics.box2d.dynamics.Fixture;
+
+// updated to rev 100
+/// Implement this class to provide collision filtering. In other words, you can implement
+/// this class if you want finer control over contact creation.
+/// @author Daniel Murphy
+<span class="fc" id="L34">public class ContactFilter {</span>
+
+	/// Return true if contact calculations should be performed between these two shapes.
+	/// @warning for performance reasons this is only called when the AABBs begin to overlap.
+	/// @param fixtureA
+	/// @param fixtureB
+	/// @return
+	public boolean shouldCollide(Fixture fixtureA, Fixture fixtureB){
+<span class="fc" id="L42">		Filter filterA = fixtureA.getFilterData();</span>
+<span class="fc" id="L43">		Filter filterB = fixtureB.getFilterData();</span>
+
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">		if (filterA.groupIndex == filterB.groupIndex &amp;&amp; filterA.groupIndex != 0){</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">			return filterA.groupIndex &gt; 0;</span>
+		}
+
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">		boolean collide = (filterA.maskBits &amp; filterB.categoryBits) != 0 &amp;&amp;</span>
+						  (filterA.categoryBits &amp; filterB.maskBits) != 0;
+<span class="fc" id="L51">		return collide;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

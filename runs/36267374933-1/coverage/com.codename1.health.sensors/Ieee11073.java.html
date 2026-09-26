@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Ieee11073.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">Ieee11073.java</span></div><h1>Ieee11073.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.util.MathUtil;
+
+/// Decoders for the two IEEE 11073-20601 floating-point formats used by
+/// Bluetooth SIG medical characteristics.
+///
+/// The two formats are **not** interchangeable and appear on different
+/// characteristics: blood pressure (0x2A35) and glucose (0x2A18) use the
+/// 16-bit SFLOAT, while the health thermometer (0x2A1C) uses the 32-bit
+/// FLOAT. Decoding one as the other yields plausible-looking nonsense
+/// rather than an obvious failure, which is why they live here together
+/// and are named for exactly what they are.
+///
+/// Both formats reserve values for &quot;not a number&quot;, &quot;not at this
+/// resolution&quot; and the infinities. A device that cannot obtain a reading
+/// sends one of them, and a decoder that ignores that returns a blood
+/// pressure of 2047 mmHg. Both methods here map every reserved value to
+/// `Double.NaN`, so a caller that checks `isNaN` -- as the parsers in this
+/// package do -- cannot propagate one.
+final class Ieee11073 {
+
+    private Ieee11073() {
+    }
+
+    /// Decodes a 16-bit SFLOAT: a signed 4-bit exponent in the top nibble
+    /// and a signed 12-bit mantissa in the remainder.
+    ///
+    /// Returns `Double.NaN` for the five reserved mantissa values
+    /// (0x07FF NaN, 0x0800 NRes, 0x07FE +INFINITY, 0x0802 -INFINITY,
+    /// 0x0801 reserved).
+    static double sfloat(int raw) {
+<span class="fc" id="L55">        int mantissa = raw &amp; 0x0FFF;</span>
+<span class="fc" id="L56">        int exponent = (raw &gt;&gt; 12) &amp; 0x0F;</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (mantissa &gt;= 0x07FE &amp;&amp; mantissa &lt;= 0x0802) {</span>
+<span class="fc" id="L58">            return Double.NaN;</span>
+        }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (exponent &gt; 7) {</span>
+<span class="fc" id="L61">            exponent -= 16;</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (mantissa &gt; 0x07FF) {</span>
+<span class="nc" id="L64">            mantissa -= 0x1000;</span>
+        }
+<span class="fc" id="L66">        return mantissa * MathUtil.pow(10, exponent);</span>
+    }
+
+    /// Decodes a 32-bit FLOAT: a signed 8-bit exponent in the top byte and
+    /// a signed 24-bit mantissa in the remainder.
+    ///
+    /// Returns `Double.NaN` for the reserved mantissa values
+    /// (0x007FFFFF NaN, 0x00800000 NRes, 0x007FFFFE +INFINITY,
+    /// 0x00800002 -INFINITY, 0x00800001 reserved).
+    static double float32(long raw) {
+<span class="fc" id="L76">        int mantissa = (int) (raw &amp; 0x00FFFFFFL);</span>
+<span class="fc" id="L77">        int exponent = (int) ((raw &gt;&gt; 24) &amp; 0xFF);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (mantissa &gt;= 0x007FFFFE &amp;&amp; mantissa &lt;= 0x00800002) {</span>
+<span class="fc" id="L79">            return Double.NaN;</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (exponent &gt; 127) {</span>
+<span class="fc" id="L82">            exponent -= 256;</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (mantissa &gt; 0x007FFFFF) {</span>
+<span class="nc" id="L85">            mantissa -= 0x01000000;</span>
+        }
+<span class="fc" id="L87">        return mantissa * MathUtil.pow(10, exponent);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComponentImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ComponentImage.java</span></div><h1>ComponentImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+
+/// A utility wrapper that allows a Component to be used as an Image so that it can
+/// be set as the icon for a Label or button.
+///
+/// @author shannah
+///
+public class ComponentImage extends Image {
+
+    private final Component cmp;
+    private int w;
+    private int h;
+    private boolean pulsingAnimation;
+<span class="pc" id="L37">    private double minPulsingAlpha = 0.2;</span>
+<span class="pc" id="L38">    private double maxPulsingAlpha = 1.0;</span>
+<span class="pc" id="L39">    private double pulsingStepSize = 1;</span>
+<span class="pc" id="L40">    private double pulsingCurrStep = 0;</span>
+    private boolean animation;
+
+    /// Creates a new image that renders the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to render.
+    ///
+    /// - `w`: The width of the image.
+    ///
+    /// - `h`: The height of the image.
+    public ComponentImage(Component cmp, int w, int h) {
+<span class="fc" id="L53">        super(null);</span>
+<span class="fc" id="L54">        this.cmp = cmp;</span>
+<span class="fc" id="L55">        this.w = w;</span>
+<span class="fc" id="L56">        this.h = h;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// Creates a new image that renders the given component.  Uses the components current
+    /// dimensions as the image width and height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component to render.
+    ComponentImage(Component cmp) {
+<span class="fc" id="L66">        super(null);</span>
+<span class="fc" id="L67">        this.cmp = cmp;</span>
+<span class="fc" id="L68">        w = cmp.getWidth();</span>
+<span class="fc" id="L69">        h = cmp.getHeight();</span>
+<span class="fc" id="L70">    }</span>
+
+    /// Creates a new image that renders an empty component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: The width of the image
+    ///
+    /// - `h`: The height of the image.
+    ComponentImage(int w, int h) {
+<span class="nc" id="L80">        super(null);</span>
+<span class="nc" id="L81">        cmp = new Label();</span>
+<span class="nc" id="L82">        this.w = w;</span>
+<span class="nc" id="L83">        this.h = h;</span>
+<span class="nc" id="L84">    }</span>
+
+    /// Gets the wrapped component that is rendered by this image.
+    public Component getComponent() {
+<span class="nc" id="L88">        return cmp;</span>
+    }
+
+    /// Enables a pulsing animation on the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currStep`: The current step.
+    ///
+    /// - `stepSize`: The step size.
+    ///
+    /// - `minAlpha`: The min alpha
+    ///
+    /// - `maxAlpha`: The max alpha
+    public void enablePulsingAnimation(double currStep, double stepSize, double minAlpha, double maxAlpha) {
+<span class="fc" id="L103">        minAlpha = Math.min(1, Math.max(0, minAlpha));</span>
+<span class="fc" id="L104">        maxAlpha = Math.min(1, Math.max(0, maxAlpha));</span>
+<span class="fc" id="L105">        this.pulsingAnimation = true;</span>
+<span class="fc" id="L106">        this.pulsingCurrStep = currStep;</span>
+<span class="fc" id="L107">        this.pulsingStepSize = stepSize;</span>
+<span class="fc" id="L108">        this.minPulsingAlpha = minAlpha;</span>
+<span class="fc" id="L109">        this.maxPulsingAlpha = maxAlpha;</span>
+<span class="fc" id="L110">    }</span>
+
+    /// Disables the pulsing animation.
+    public void disablePulsingAnimation() {
+<span class="fc" id="L114">        pulsingAnimation = false;</span>
+
+<span class="fc" id="L116">    }</span>
+
+    /// Checks if pulsing animation is enabled.
+    public boolean isPulsingAnimationEnabled() {
+<span class="fc" id="L120">        return pulsingAnimation;</span>
+    }
+
+    /// {@inheritDoc }
+    @Override
+    public int getWidth() {
+<span class="fc" id="L126">        return w;</span>
+    }
+
+    /// {@inheritDoc }
+    @Override
+    public int getHeight() {
+<span class="fc" id="L132">        return h;</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`
+    ///
+    /// - `height`
+    @Override
+    public void scale(int width, int height) {
+<span class="fc" id="L144">        w = width;</span>
+<span class="fc" id="L145">        h = height;</span>
+<span class="fc" id="L146">    }</span>
+
+    @Override
+    public Image fill(int width, int height) {
+<span class="fc" id="L150">        ComponentImage out = new ComponentImage(cmp);</span>
+<span class="fc" id="L151">        out.w = width;</span>
+<span class="fc" id="L152">        out.h = height;</span>
+<span class="fc" id="L153">        return out;</span>
+    }
+
+    /// {@inheritDoc }
+    ///
+    /// #### Parameters
+    ///
+    /// - `mask`
+    @Override
+    public Image applyMask(Object mask) {
+<span class="fc" id="L163">        return new ComponentImage(cmp, w, h);</span>
+    }
+
+    /// Checks if this is an animation.
+    @Override
+    public boolean isAnimation() {
+<span class="pc bpc" id="L169" title="3 of 4 branches missed.">        return animation || pulsingAnimation;</span>
+    }
+
+    /// Sets whether this in an animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `anim`: True to make this an animated image
+    public void setAnimation(boolean anim) {
+<span class="fc" id="L178">        this.animation = anim;</span>
+<span class="fc" id="L179">    }</span>
+
+    /// Overridden to always return true so that the paint() method is called
+    /// on this image.
+    @Override
+    public boolean requiresDrawImage() {
+<span class="nc" id="L185">        return true;</span>
+    }
+
+    /// Draws the image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: The graphics context
+    ///
+    /// - `nativeGraphics`: The native graphics context
+    ///
+    /// - `x`: The x coordinate at which to draw the image.
+    ///
+    /// - `y`: The y coordinate at which to draw the image.
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="fc" id="L201">        int oldX = cmp.getX();</span>
+<span class="fc" id="L202">        int oldY = cmp.getY();</span>
+<span class="fc" id="L203">        int oldW = cmp.getWidth();</span>
+<span class="fc" id="L204">        int oldH = cmp.getHeight();</span>
+<span class="fc" id="L205">        cmp.setX(x);</span>
+<span class="fc" id="L206">        cmp.setY(y);</span>
+<span class="fc" id="L207">        cmp.setWidth(w);</span>
+<span class="fc" id="L208">        cmp.setHeight(h);</span>
+<span class="fc" id="L209">        int col = g.getColor();</span>
+<span class="fc" id="L210">        g.setColor(0x00ff00);</span>
+
+<span class="fc" id="L212">        g.setColor(col);</span>
+
+<span class="fc" id="L214">        boolean antialias = g.isAntiAliased();</span>
+<span class="fc" id="L215">        g.setAntiAliased(true);</span>
+
+<span class="fc" id="L217">        int alpha = g.getAlpha();</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (pulsingAnimation) {</span>
+<span class="nc" id="L219">            double sinVal = (Math.sin(pulsingCurrStep) + 1) / 2;</span>
+<span class="nc" id="L220">            sinVal = minPulsingAlpha + (maxPulsingAlpha - minPulsingAlpha) * sinVal;</span>
+<span class="nc" id="L221">            g.setAlpha((int) Math.round(sinVal * alpha));</span>
+        }
+<span class="fc" id="L223">        Font font = g.getFont();</span>
+<span class="fc" id="L224">        int color = g.getColor();</span>
+<span class="fc" id="L225">        int clipX = g.getClipX();</span>
+<span class="fc" id="L226">        int clipY = g.getClipY();</span>
+<span class="fc" id="L227">        int clipW = g.getClipWidth();</span>
+<span class="fc" id="L228">        int clipH = g.getClipHeight();</span>
+
+<span class="fc" id="L230">        cmp.paintComponent(g, true);</span>
+<span class="fc" id="L231">        g.setFont(font);</span>
+<span class="fc" id="L232">        g.setColor(color);</span>
+<span class="fc" id="L233">        g.setClip(clipX, clipY, clipW, clipH);</span>
+
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (pulsingAnimation) {</span>
+<span class="nc" id="L236">            g.setAlpha(alpha);</span>
+        }
+<span class="fc" id="L238">        g.setAntiAliased(antialias);</span>
+<span class="fc" id="L239">        cmp.setX(oldX);</span>
+<span class="fc" id="L240">        cmp.setY(oldY);</span>
+<span class="fc" id="L241">        cmp.setWidth(oldW);</span>
+<span class="fc" id="L242">        cmp.setHeight(oldH);</span>
+
+<span class="fc" id="L244">    }</span>
+
+    /// {@inheritDoc }
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc" id="L249">        int oldW = this.w;</span>
+<span class="nc" id="L250">        int oldH = this.h;</span>
+<span class="nc" id="L251">        drawImage(g, nativeGraphics, x, y);</span>
+<span class="nc" id="L252">        this.w = oldW;</span>
+<span class="nc" id="L253">        this.h = oldH;</span>
+<span class="nc" id="L254">    }</span>
+
+    /// {@inheritDoc }
+    @Override
+    public Image scaled(int width, int height) {
+<span class="nc" id="L259">        return new ComponentImage(cmp, width, height);</span>
+    }
+
+
+    /// {@inheritDoc }
+    @Override
+    public boolean animate() {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (pulsingAnimation) {</span>
+<span class="fc" id="L267">            pulsingCurrStep += pulsingStepSize;</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (pulsingCurrStep &gt;= Math.PI * 2) {</span>
+<span class="nc" id="L269">                pulsingCurrStep -= Math.PI * 2;</span>
+            }
+        }
+<span class="fc" id="L272">        cmp.animate();</span>
+<span class="pc bpc" id="L273" title="3 of 4 branches missed.">        return pulsingAnimation || animation;</span>
+    }
+
+    /// Converts to an encoded image.
+    public EncodedImage toEncodedImage() {
+<span class="fc" id="L278">        return new EncodedWrapper();</span>
+    }
+
+
+    /// A wrapper for ComponentImage to convert it to an EncodedImage.
+    public class EncodedWrapper extends EncodedImage {
+
+<span class="fc" id="L285">        EncodedWrapper() {</span>
+<span class="fc" id="L286">            super(ComponentImage.this.getWidth(), ComponentImage.this.getHeight());</span>
+<span class="fc" id="L287">        }</span>
+
+        /// {@inheritDoc }
+        @Override
+        public EncodedImage scaledEncoded(int width, int height) {
+<span class="fc" id="L292">            return new ComponentImage(cmp, width, height).toEncodedImage();</span>
+
+        }
+
+        /// {@inheritDoc }
+        @Override
+        public Image scaled(int width, int height) {
+<span class="nc" id="L299">            return new ComponentImage(cmp, width, height).toEncodedImage();</span>
+        }
+
+
+        /// {@inheritDoc }
+        @Override
+        protected Image getInternal() {
+<span class="nc" id="L306">            return ComponentImage.this;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

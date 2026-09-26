@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecureEnvelope.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">SecureEnvelope.java</span></div><h1>SecureEnvelope.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.security.Cipher;
+import com.codename1.security.CryptoException;
+import com.codename1.security.SecretKey;
+import com.codename1.security.SecureRandom;
+
+/// The one encrypted-blob format this package writes, and the only one it reads.
+///
+/// An envelope is self-describing: it carries the format version, the cipher suite, the key
+/// derivation parameters, the salt, the nonce, the identity and version of the key that sealed
+/// it, and the ciphertext with its tag. Everything except the ciphertext is authenticated but not
+/// encrypted, so a reader can decide what to do before it has a key, and an attacker who edits
+/// any of it fails the tag rather than steering the decryption.
+///
+/// #### Wire format, version 1
+///
+/// ```text
+/// offset size  field
+/// 0      4     magic, the ASCII bytes CN1V
+/// 4      1     format version, 1
+/// 5      1     cipher suite, 1 = AES-256-GCM with a 12 byte nonce and a 128 bit tag
+/// 6      1     KDF id, 0 = none, 1 = PBKDF2-HMAC-SHA256
+/// 7      4     KDF iterations, 0 when the KDF id is 0
+/// 11     1     salt length, 0 to 64
+/// 12     n     salt
+///        1     nonce length, exactly 12 for suite 1
+///        n     nonce
+///        1     key id length, 0 to 64
+///        n     key id, UTF-8
+///        4     key version
+///        4     ciphertext length
+///        n     ciphertext, with the 16 byte GCM tag appended
+/// ```
+///
+/// All integers are big-endian. The associated data fed to AES-GCM is **the whole header above,
+/// followed by the caller's [AssociatedData] bytes** -- so the version, the suite, the iteration
+/// count and the key id are covered by the tag. That is what makes a downgrade attempt fail
+/// rather than succeed: an attacker who rewrites the iteration count to 1000 has changed the
+/// authenticated bytes, and the decrypt returns [VaultError#AUTHENTICATION_FAILED].
+///
+/// #### What parsing rejects
+///
+/// A blob that is not this format, is truncated, declares a length that does not fit in the
+/// bytes present, declares a suite or version this build does not implement, or exceeds
+/// [#MAX_CIPHERTEXT] is refused before any key is touched. No field is clamped into range on
+/// read, and there is no fallback to an earlier format: an envelope from the future is
+/// [VaultError#UNSUPPORTED_FORMAT] and not something to guess at.
+public final class SecureEnvelope {
+
+    /// The four leading bytes of every envelope.
+<span class="fc" id="L74">    static final byte[] MAGIC = {'C', 'N', '1', 'V'};</span>
+
+    /// The only format version this build writes.
+    public static final int VERSION_1 = 1;
+
+    /// AES-256-GCM, 12 byte nonce, 128 bit tag. The only suite version 1 defines.
+    public static final int SUITE_AES_256_GCM = 1;
+
+    /// GCM nonce length in bytes. Twelve, which is the size AES-GCM is defined for; any other
+    /// length goes through an extra derivation step that not every platform implements alike.
+    public static final int NONCE_LENGTH = 12;
+
+    /// The GCM authentication tag length in bytes, appended to the ciphertext.
+    public static final int TAG_LENGTH = 16;
+
+    /// Ciphertext larger than this is refused on parse. Sixty-four megabytes is far past what a
+    /// vault record should be, and the bound exists so a corrupt or hostile length field cannot
+    /// make a reader allocate until it dies.
+    public static final int MAX_CIPHERTEXT = 64 * 1024 * 1024;
+
+    private static final int MAX_SALT = 64;
+    private static final int MAX_KEY_ID = 64;
+
+    private final int version;
+    private final int suite;
+    private final KdfProfile kdf;
+    private final byte[] salt;
+    private final byte[] nonce;
+    private final String keyId;
+    private final int keyVersion;
+    private final byte[] ciphertext;
+    private final byte[] header;
+
+    private SecureEnvelope(int version, int suite, KdfProfile kdf, byte[] salt, byte[] nonce,
+<span class="fc" id="L108">                           String keyId, int keyVersion, byte[] ciphertext, byte[] header) {</span>
+<span class="fc" id="L109">        this.version = version;</span>
+<span class="fc" id="L110">        this.suite = suite;</span>
+<span class="fc" id="L111">        this.kdf = kdf;</span>
+<span class="fc" id="L112">        this.salt = salt;</span>
+<span class="fc" id="L113">        this.nonce = nonce;</span>
+<span class="fc" id="L114">        this.keyId = keyId;</span>
+<span class="fc" id="L115">        this.keyVersion = keyVersion;</span>
+<span class="fc" id="L116">        this.ciphertext = ciphertext;</span>
+<span class="fc" id="L117">        this.header = header;</span>
+<span class="fc" id="L118">    }</span>
+
+    /// Seals plaintext under a key the caller already has.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: 32 bytes of AES-256 key material
+    ///
+    /// - `keyId`: which key this is, so a reader with several can pick. At most 64 UTF-8 bytes
+    ///
+    /// - `keyVersion`: the key's rotation counter
+    ///
+    /// - `aad`: the binding this envelope may only be opened against
+    ///
+    /// - `plaintext`: the bytes to protect
+    ///
+    /// #### Returns
+    ///
+    /// the envelope bytes, safe to store or to send to a server that must not read them
+    public static byte[] seal(byte[] key, String keyId, int keyVersion,
+                              AssociatedData aad, byte[] plaintext) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        return seal(key, keyId, keyVersion, aad == null ? null : aad.serialize(), plaintext);</span>
+    }
+
+    /// The same, against associated data the caller has already serialized.
+    ///
+    /// [AssociatedData] is the spelling application code should use; this overload exists for the
+    /// two callers that hold bytes rather than fields -- the device-protection SPI, whose
+    /// associated data is the port's own, and an implementation of this format in another
+    /// language checking itself against test vectors.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: 32 bytes of AES-256 key material
+    ///
+    /// - `keyId`: which key this is, at most 64 UTF-8 bytes
+    ///
+    /// - `keyVersion`: the key's rotation counter
+    ///
+    /// - `associatedData`: authenticated, not encrypted; may be null for none
+    ///
+    /// - `plaintext`: the bytes to protect
+    ///
+    /// #### Returns
+    ///
+    /// the envelope bytes
+    public static byte[] seal(byte[] key, String keyId, int keyVersion,
+                              byte[] associatedData, byte[] plaintext) {
+<span class="fc" id="L166">        return sealInternal(key, KdfProfile.forStored(KdfProfile.DIRECT, 0), new byte[0],</span>
+                keyId, keyVersion, associatedData, plaintext);
+    }
+
+    /// Seals plaintext under a key derived from a password.
+    ///
+    /// A fresh salt and nonce are generated for every call. Reusing either is the classic way to
+    /// destroy AES-GCM, and there is no overload that lets a caller supply them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `password`: the password, cleared by the caller afterwards
+    ///
+    /// - `profile`: the derivation profile, normally [KdfProfile#current()]
+    ///
+    /// - `keyId`: which key this is
+    ///
+    /// - `keyVersion`: the key's rotation counter
+    ///
+    /// - `aad`: the binding this envelope may only be opened against
+    ///
+    /// - `plaintext`: the bytes to protect
+    ///
+    /// #### Returns
+    ///
+    /// the envelope bytes
+    public static byte[] sealWithPassword(char[] password, KdfProfile profile, String keyId,
+                                          int keyVersion, AssociatedData aad, byte[] plaintext) {
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">        if (profile == null || profile.getKdfId() == KdfProfile.DIRECT) {</span>
+<span class="nc" id="L195">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;sealing with a password needs a derivation profile&quot;);
+        }
+<span class="fc" id="L198">        byte[] salt = SecureRandom.bytes(KdfProfile.SALT_LENGTH);</span>
+<span class="fc" id="L199">        byte[] key = profile.derive(password, salt, 32);</span>
+        try {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            return sealInternal(key, profile, salt, keyId, keyVersion,</span>
+<span class="fc" id="L202">                    aad == null ? null : aad.serialize(), plaintext);</span>
+        } finally {
+<span class="fc" id="L204">            Bytes.zero(key);</span>
+        }
+    }
+
+    private static byte[] sealInternal(byte[] key, KdfProfile profile, byte[] salt, String keyId,
+                                       int keyVersion, byte[] associatedData, byte[] plaintext) {
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        if (key == null || key.length != 32) {</span>
+<span class="fc" id="L211">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;suite 1 requires a 32 byte key&quot;);
+        }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        byte[] keyIdBytes = Bytes.utf8(keyId == null ? &quot;&quot; : keyId);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (keyIdBytes.length &gt; MAX_KEY_ID) {</span>
+<span class="nc" id="L216">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;key id is longer than &quot; + MAX_KEY_ID + &quot; bytes&quot;);
+        }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (salt.length &gt; MAX_SALT) {</span>
+<span class="nc" id="L220">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;salt is longer than &quot; + MAX_SALT + &quot; bytes&quot;);
+        }
+<span class="fc" id="L223">        byte[] nonce = SecureRandom.bytes(NONCE_LENGTH);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        byte[] body = plaintext == null ? new byte[0] : plaintext;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (body.length &gt; MAX_CIPHERTEXT - TAG_LENGTH) {</span>
+            // Checked here and not only in the parser. Without this, sealing a body this large
+            // succeeds and produces an envelope whose declared ciphertext length is past the
+            // parser's bound -- so this class could emit bytes it then refuses to read, and the
+            // failure would surface at the open rather than at the write that caused it.
+<span class="fc" id="L230">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;the plaintext is larger than an envelope can carry; the limit is &quot;
+                    + (MAX_CIPHERTEXT - TAG_LENGTH) + &quot; bytes&quot;);
+        }
+
+        // Built before the encryption because the header is what the tag covers. The ciphertext
+        // length is known in advance: GCM adds exactly the tag.
+<span class="fc" id="L237">        byte[] header = header(VERSION_1, SUITE_AES_256_GCM, profile, salt, nonce, keyIdBytes,</span>
+                keyVersion, body.length + TAG_LENGTH);
+<span class="fc" id="L239">        byte[] associated = Bytes.concat(header, associatedData);</span>
+        byte[] ciphertext;
+        // Unconditional, and that is correct on every port this ships to, Android included.
+        //
+        // A review round read this as a crash on Android API 19-20 -- the builder's default
+        // minimum SDK -- on the grounds that AndroidImplementation.androidAes constructs
+        // javax.crypto.spec.GCMParameterSpec, &quot;a class introduced in API 21&quot;, giving a
+        // NoClassDefFoundError that no catch here or in the worker would see because an Error is
+        // not a RuntimeException. The last part is true and the premise is not: the platform's
+        // own data/api-versions.xml, which is the authority this repo already uses for questions
+        // of when an Android API appeared, records
+        //
+        //     &lt;class name=&quot;javax/crypto/spec/GCMParameterSpec&quot; since=&quot;19&quot;&gt;
+        //     &lt;method name=&quot;updateAAD([B)V&quot; since=&quot;19&quot;&gt;     (inside javax/crypto/Cipher)
+        //
+        // identically in every installed platform from android-30 through android-37.2. The whole
+        // GCM surface this path touches arrived in API 19, which is the floor rather than above
+        // it, so there is no missing class to fail on.
+        //
+        // And if a device ever did lack the ALGORITHM rather than the class, the failure is not
+        // the one described either: Cipher.getInstance throws NoSuchAlgorithmException, a checked
+        // GeneralSecurityException, which androidAes wraps in a RuntimeException -- caught here as
+        // a CryptoException or by the worker's terminal handler, reported as a vault error with
+        // the AsyncResource completed. No hard crash, and no caller left waiting forever.
+        try {
+<span class="fc" id="L264">            ciphertext = Cipher.aesEncrypt(Cipher.AES_GCM, new SecretKey(&quot;AES&quot;, key),</span>
+                    nonce, associated, body);
+<span class="nc" id="L266">        } catch (CryptoException failed) {</span>
+<span class="nc" id="L267">            throw new VaultException(VaultError.CRYPTO_UNAVAILABLE,</span>
+                    &quot;the platform could not perform AES-GCM encryption&quot;, failed);
+<span class="fc" id="L269">        }</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (ciphertext.length != body.length + TAG_LENGTH) {</span>
+            // The header already committed to a length; a provider that appended a different
+            // amount would produce an envelope whose own tag does not cover its real size.
+<span class="nc" id="L273">            throw new VaultException(VaultError.CRYPTO_UNAVAILABLE,</span>
+                    &quot;the platform's AES-GCM produced an unexpected ciphertext length&quot;);
+        }
+<span class="fc" id="L276">        byte[] out = new byte[header.length + ciphertext.length];</span>
+<span class="fc" id="L277">        System.arraycopy(header, 0, out, 0, header.length);</span>
+<span class="fc" id="L278">        System.arraycopy(ciphertext, 0, out, header.length, ciphertext.length);</span>
+<span class="fc" id="L279">        return out;</span>
+    }
+
+    private static byte[] header(int version, int suite, KdfProfile profile, byte[] salt,
+                                 byte[] nonce, byte[] keyIdBytes, int keyVersion, int cipherLength) {
+<span class="fc" id="L284">        byte[] out = new byte[12 + salt.length + 1 + nonce.length + 1 + keyIdBytes.length + 8];</span>
+<span class="fc" id="L285">        int at = 0;</span>
+<span class="fc" id="L286">        System.arraycopy(MAGIC, 0, out, at, 4);</span>
+<span class="fc" id="L287">        at += 4;</span>
+<span class="fc" id="L288">        out[at++] = (byte) version;</span>
+<span class="fc" id="L289">        out[at++] = (byte) suite;</span>
+<span class="fc" id="L290">        out[at++] = (byte) profile.getKdfId();</span>
+<span class="fc" id="L291">        Bytes.putInt(out, at, profile.getIterations());</span>
+<span class="fc" id="L292">        at += 4;</span>
+<span class="fc" id="L293">        out[at++] = (byte) salt.length;</span>
+<span class="fc" id="L294">        System.arraycopy(salt, 0, out, at, salt.length);</span>
+<span class="fc" id="L295">        at += salt.length;</span>
+<span class="fc" id="L296">        out[at++] = (byte) nonce.length;</span>
+<span class="fc" id="L297">        System.arraycopy(nonce, 0, out, at, nonce.length);</span>
+<span class="fc" id="L298">        at += nonce.length;</span>
+<span class="fc" id="L299">        out[at++] = (byte) keyIdBytes.length;</span>
+<span class="fc" id="L300">        System.arraycopy(keyIdBytes, 0, out, at, keyIdBytes.length);</span>
+<span class="fc" id="L301">        at += keyIdBytes.length;</span>
+<span class="fc" id="L302">        Bytes.putInt(out, at, keyVersion);</span>
+<span class="fc" id="L303">        at += 4;</span>
+<span class="fc" id="L304">        Bytes.putInt(out, at, cipherLength);</span>
+<span class="fc" id="L305">        return out;</span>
+    }
+
+    /// Parses an envelope without opening it.
+    ///
+    /// Useful before a key is available: the key id and version say which key is needed, and
+    /// [#getKdf()] says how long deriving one will take, which is worth showing a user before a
+    /// six hundred thousand iteration derivation begins.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sealed`: the envelope bytes
+    ///
+    /// #### Returns
+    ///
+    /// the parsed envelope
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: [VaultError#CORRUPT] for a malformed blob,
+    ///   [VaultError#UNSUPPORTED_FORMAT] for a version, suite or KDF this build does not
+    ///   implement
+    public static SecureEnvelope parse(byte[] sealed) {
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">        if (sealed == null || sealed.length &lt; 12) {</span>
+<span class="nc" id="L329">            throw new VaultException(VaultError.CORRUPT, &quot;not an envelope: too short&quot;);</span>
+        }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        for (int iter = 0; iter &lt; 4; iter++) {</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (sealed[iter] != MAGIC[iter]) {</span>
+<span class="fc" id="L333">                throw new VaultException(VaultError.CORRUPT, &quot;not an envelope: bad magic&quot;);</span>
+            }
+        }
+<span class="fc" id="L336">        int version = sealed[4] &amp; 0xff;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (version != VERSION_1) {</span>
+<span class="fc" id="L338">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;envelope format version &quot; + version + &quot; is not supported by this build&quot;);
+        }
+<span class="fc" id="L341">        int suite = sealed[5] &amp; 0xff;</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (suite != SUITE_AES_256_GCM) {</span>
+<span class="fc" id="L343">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;envelope cipher suite &quot; + suite + &quot; is not supported by this build&quot;);
+        }
+<span class="fc" id="L346">        int kdfId = sealed[6] &amp; 0xff;</span>
+<span class="fc" id="L347">        int iterations = Bytes.getInt(sealed, 7);</span>
+<span class="fc" id="L348">        KdfProfile profile = KdfProfile.forStored(kdfId, iterations);</span>
+
+<span class="fc" id="L350">        int at = 11;</span>
+<span class="fc" id="L351">        int saltLength = sealed[at++] &amp; 0xff;</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (saltLength &gt; MAX_SALT) {</span>
+<span class="nc" id="L353">            throw new VaultException(VaultError.CORRUPT, &quot;envelope salt is implausibly long&quot;);</span>
+        }
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (at + saltLength &gt; sealed.length) {</span>
+<span class="nc" id="L356">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated in the salt&quot;);</span>
+        }
+<span class="fc" id="L358">        byte[] salt = Bytes.slice(sealed, at, saltLength);</span>
+<span class="fc" id="L359">        at += saltLength;</span>
+
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (at &gt;= sealed.length) {</span>
+<span class="nc" id="L362">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated before the nonce&quot;);</span>
+        }
+<span class="fc" id="L364">        int nonceLength = sealed[at++] &amp; 0xff;</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (nonceLength != NONCE_LENGTH) {</span>
+<span class="nc" id="L366">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;suite 1 requires a &quot; + NONCE_LENGTH + &quot; byte nonce, found &quot; + nonceLength);
+        }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (at + nonceLength &gt; sealed.length) {</span>
+<span class="nc" id="L370">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated in the nonce&quot;);</span>
+        }
+<span class="fc" id="L372">        byte[] nonce = Bytes.slice(sealed, at, nonceLength);</span>
+<span class="fc" id="L373">        at += nonceLength;</span>
+
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (at &gt;= sealed.length) {</span>
+<span class="nc" id="L376">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated before the key id&quot;);</span>
+        }
+<span class="fc" id="L378">        int keyIdLength = sealed[at++] &amp; 0xff;</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (keyIdLength &gt; MAX_KEY_ID) {</span>
+<span class="nc" id="L380">            throw new VaultException(VaultError.CORRUPT, &quot;envelope key id is implausibly long&quot;);</span>
+        }
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (at + keyIdLength &gt; sealed.length) {</span>
+<span class="nc" id="L383">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated in the key id&quot;);</span>
+        }
+<span class="fc" id="L385">        String keyId = Bytes.fromUtf8(sealed, at, keyIdLength);</span>
+<span class="fc" id="L386">        at += keyIdLength;</span>
+
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (at + 8 &gt; sealed.length) {</span>
+<span class="nc" id="L389">            throw new VaultException(VaultError.CORRUPT, &quot;envelope truncated in the key version&quot;);</span>
+        }
+<span class="fc" id="L391">        int keyVersion = Bytes.getInt(sealed, at);</span>
+<span class="fc" id="L392">        at += 4;</span>
+<span class="fc" id="L393">        int cipherLength = Bytes.getInt(sealed, at);</span>
+<span class="fc" id="L394">        at += 4;</span>
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">        if (cipherLength &lt; TAG_LENGTH || cipherLength &gt; MAX_CIPHERTEXT) {</span>
+            // Checked against the declared length before the buffer, so an implausible value is
+            // rejected rather than used to size an allocation.
+<span class="fc" id="L398">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;envelope declares an implausible ciphertext length&quot;);
+        }
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (at + cipherLength != sealed.length) {</span>
+            // Exactly, not at least. Trailing bytes are not covered by the tag, so accepting them
+            // would leave room to smuggle data past every check in this class.
+<span class="fc" id="L404">            throw new VaultException(VaultError.CORRUPT,</span>
+                    &quot;envelope length does not match its declared ciphertext length&quot;);
+        }
+<span class="fc" id="L407">        byte[] header = Bytes.slice(sealed, 0, at);</span>
+<span class="fc" id="L408">        byte[] ciphertext = Bytes.slice(sealed, at, cipherLength);</span>
+<span class="fc" id="L409">        return new SecureEnvelope(version, suite, profile, salt, nonce, keyId, keyVersion,</span>
+                ciphertext, header);
+    }
+
+    /// Opens an envelope with a key the caller already has.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: 32 bytes of AES-256 key material
+    ///
+    /// - `aad`: the binding the envelope was sealed against. A different binding fails the tag,
+    ///   which is the point of it
+    ///
+    /// #### Returns
+    ///
+    /// the plaintext
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: [VaultError#AUTHENTICATION_FAILED] when the tag does not verify --
+    ///   wrong key, altered ciphertext, or the wrong binding. No plaintext is returned in that
+    ///   case, not even a partial one
+    public byte[] open(byte[] key, AssociatedData aad) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        return open(key, aad == null ? null : aad.serialize());</span>
+    }
+
+    /// The same, against associated data the caller has already serialized. See
+    /// [#seal(byte[], String, int, byte[], byte[])] for why this overload exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: 32 bytes of AES-256 key material
+    ///
+    /// - `associatedData`: the exact bytes the envelope was sealed against
+    ///
+    /// #### Returns
+    ///
+    /// the plaintext
+    public byte[] open(byte[] key, byte[] associatedData) {
+<span class="pc bpc" id="L448" title="2 of 4 branches missed.">        if (key == null || key.length != 32) {</span>
+<span class="nc" id="L449">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;suite 1 requires a 32 byte key&quot;);
+        }
+<span class="fc" id="L452">        byte[] associated = Bytes.concat(header, associatedData);</span>
+        try {
+<span class="fc" id="L454">            return Cipher.aesDecrypt(Cipher.AES_GCM, new SecretKey(&quot;AES&quot;, key),</span>
+                    nonce, associated, ciphertext);
+<span class="fc" id="L456">        } catch (CryptoException failed) {</span>
+            // Everything a provider can report for a failed GCM open arrives as one exception, and
+            // the reasons are not distinguishable from here: a wrong key, a flipped bit and a
+            // mismatched binding all look the same. They are reported as one code on purpose --
+            // telling a caller which of the three it was is telling an attacker too.
+<span class="fc" id="L461">            throw new VaultException(VaultError.AUTHENTICATION_FAILED,</span>
+                    &quot;the envelope did not authenticate: wrong key, altered data, or a binding &quot;
+                    + &quot;that does not match the one it was sealed with&quot;, failed);
+        }
+    }
+
+    /// Opens an envelope sealed with [#sealWithPassword].
+    ///
+    /// #### Parameters
+    ///
+    /// - `password`: the password, cleared by the caller afterwards
+    ///
+    /// - `aad`: the binding the envelope was sealed against
+    ///
+    /// #### Returns
+    ///
+    /// the plaintext
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: [VaultError#AUTHENTICATION_FAILED] for a wrong password
+    public byte[] openWithPassword(char[] password, AssociatedData aad) {
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (kdf.getKdfId() == KdfProfile.DIRECT) {</span>
+<span class="fc" id="L484">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;this envelope was not sealed with a password&quot;);
+        }
+<span class="fc" id="L487">        byte[] key = kdf.derive(password, salt, 32);</span>
+        try {
+<span class="fc" id="L489">            return open(key, aad);</span>
+        } finally {
+<span class="fc" id="L491">            Bytes.zero(key);</span>
+        }
+    }
+
+    /// The format version, always [#VERSION_1] for anything this build parses.
+    public int getVersion() {
+<span class="fc" id="L497">        return version;</span>
+    }
+
+    /// The cipher suite, always [#SUITE_AES_256_GCM] for anything this build parses.
+    public int getSuite() {
+<span class="fc" id="L502">        return suite;</span>
+    }
+
+    /// The derivation profile the envelope declares. [KdfProfile#needsUpgrade()] on the result
+    /// says whether it is worth rewrapping.
+    public KdfProfile getKdf() {
+<span class="fc" id="L508">        return kdf;</span>
+    }
+
+    /// Which key sealed this, so a reader holding several can pick without trying each.
+    public String getKeyId() {
+<span class="fc" id="L513">        return keyId;</span>
+    }
+
+    /// The key's rotation counter at the time of sealing.
+    public int getKeyVersion() {
+<span class="fc" id="L518">        return keyVersion;</span>
+    }
+
+    /// The salt, for a caller that derives the key itself rather than through
+    /// [#openWithPassword].
+    public byte[] getSalt() {
+<span class="nc" id="L524">        return Bytes.slice(salt, 0, salt.length);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

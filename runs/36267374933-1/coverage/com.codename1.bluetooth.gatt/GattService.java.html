@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GattService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.gatt</a> &gt; <span class="el_source">GattService.java</span></div><h1>GattService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.gatt;
+
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.le.BlePeripheral;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A service discovered on a remote GATT server via
+/// [BlePeripheral#discoverServices()]. Groups the
+/// [GattCharacteristic]s the peripheral exposes.
+///
+/// Instances are constructed by the port during service discovery;
+/// application code never creates them.
+public class GattService {
+
+    private final BlePeripheral peripheral;
+    private final BluetoothUuid uuid;
+    private final boolean primary;
+    private final int instanceId;
+<span class="fc" id="L43">    private final ArrayList&lt;GattCharacteristic&gt; characteristics =</span>
+            new ArrayList&lt;GattCharacteristic&gt;();
+<span class="fc" id="L45">    private final ArrayList&lt;GattService&gt; includedServices =</span>
+            new ArrayList&lt;GattService&gt;();
+
+    /// Constructed by ports during service discovery; not application API.
+    public GattService(BlePeripheral peripheral, BluetoothUuid uuid,
+<span class="fc" id="L50">            boolean primary, int instanceId) {</span>
+<span class="fc" id="L51">        this.peripheral = peripheral;</span>
+<span class="fc" id="L52">        this.uuid = uuid;</span>
+<span class="fc" id="L53">        this.primary = primary;</span>
+<span class="fc" id="L54">        this.instanceId = instanceId;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// The UUID identifying this service.
+    public BluetoothUuid getUuid() {
+<span class="fc" id="L59">        return uuid;</span>
+    }
+
+    /// `true` for a primary service, `false` for a secondary one.
+    public boolean isPrimary() {
+<span class="nc" id="L64">        return primary;</span>
+    }
+
+    /// Disambiguates multiple instances of the same service UUID on one
+    /// peripheral.
+    public int getInstanceId() {
+<span class="nc" id="L70">        return instanceId;</span>
+    }
+
+    /// The peripheral this service belongs to.
+    public BlePeripheral getPeripheral() {
+<span class="fc" id="L75">        return peripheral;</span>
+    }
+
+    /// The characteristics of this service, in discovery order.
+    public List&lt;GattCharacteristic&gt; getCharacteristics() {
+<span class="nc" id="L80">        return new ArrayList&lt;GattCharacteristic&gt;(characteristics);</span>
+    }
+
+    /// The first characteristic with the given UUID, or `null` when the
+    /// service has none.
+    public GattCharacteristic getCharacteristic(BluetoothUuid uuid) {
+<span class="fc" id="L86">        int size = characteristics.size();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L88">            GattCharacteristic c = characteristics.get(i);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (c.getUuid().equals(uuid)) {</span>
+<span class="fc" id="L90">                return c;</span>
+            }
+        }
+<span class="fc" id="L93">        return null;</span>
+    }
+
+    /// Secondary services included by this service; usually empty.
+    public List&lt;GattService&gt; getIncludedServices() {
+<span class="nc" id="L98">        return new ArrayList&lt;GattService&gt;(includedServices);</span>
+    }
+
+    /// Called by ports while building the discovered GATT database; not
+    /// application API.
+    public void addCharacteristic(GattCharacteristic characteristic) {
+<span class="fc" id="L104">        characteristics.add(characteristic);</span>
+<span class="fc" id="L105">    }</span>
+
+    /// Called by ports while building the discovered GATT database; not
+    /// application API.
+    public void addIncludedService(GattService service) {
+<span class="nc" id="L110">        includedServices.add(service);</span>
+<span class="nc" id="L111">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L115">        return &quot;GattService(&quot; + uuid + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

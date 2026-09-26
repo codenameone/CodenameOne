@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionCameraView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionCameraView.java</span></div><h1>VisionCameraView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.camera.Camera;
+import com.codename1.camera.CameraFacing;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSession;
+import com.codename1.camera.CameraSessionOptions;
+import com.codename1.camera.CameraView;
+import com.codename1.camera.FlashMode;
+import com.codename1.camera.FrameFormat;
+import com.codename1.camera.ScaleType;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.layouts.BorderLayout;
+
+/// A live camera preview that runs an analyzer over its frames.
+///
+/// This is the whole camera-to-analyzer pipeline as one component: it opens
+/// the camera when it is shown, streams frames into the analyzer with
+/// keep-only-the-newest backpressure, delivers results on the EDT, and
+/// releases the camera when the form is left. Add it to a form and implement
+/// the listener; there is no session, frame listener, or
+/// {@link VisionImage} conversion to write.
+///
+/// ```java
+/// FaceDetector detector = new FaceDetector();
+/// VisionCameraView&lt;Face[]&gt; view = new VisionCameraView&lt;Face[]&gt;(detector);
+/// view.setFacing(CameraFacing.FRONT);
+/// view.setListener(new VisionPipelineListener&lt;Face[]&gt;() {
+///     public void result(Face[] faces, VisionImage source) {
+///         countLabel.setText(faces.length + &quot; face(s)&quot;);
+///     }
+///     public void error(Throwable error) {
+///         Log.e(error);
+///     }
+/// });
+///
+/// Form form = new Form(&quot;Faces&quot;, new BorderLayout());
+/// form.add(BorderLayout.CENTER, view);
+/// form.add(BorderLayout.SOUTH, countLabel);
+/// form.show();
+/// ```
+///
+/// The analyzer is supplied by the caller rather than named by a feature
+/// constant, which is deliberate: the build pipeline decides which native
+/// vision dependency to package from the analyzer classes an application
+/// references, so constructing the analyzer in application code is what keeps
+/// a face-detection app from also carrying the barcode and pose models.
+///
+/// **The preview is a native view.** Codename One components cannot be painted
+/// over it on every platform -- iOS renders native peers behind the Codename
+/// One layer, Android renders them in front -- so put a scanner's reticle,
+/// hints, and buttons around the preview rather than on top of it. Result
+/// geometry such as {@link Face#getBounds()} can still be drawn in a component
+/// beside the preview using {@link VisionRect#toBounds(com.codename1.ui.Component)}.
+///
+/// One camera session may be open at a time, so a second view (or a
+/// {@link com.codename1.capture.Capture} call) while this one is showing
+/// reports an error to the listener instead of stealing the hardware.
+///
+/// @param &lt;T&gt; the analyzer's result type
+public class VisionCameraView&lt;T&gt; extends Container implements AutoCloseable {
+    private final VisionAnalyzer&lt;T&gt; analyzer;
+    private final NonClosingAnalyzer&lt;T&gt; shared;
+<span class="fc" id="L87">    private CameraFacing facing = CameraFacing.BACK;</span>
+<span class="fc" id="L88">    private ScaleType scaleType = ScaleType.CROP;</span>
+<span class="fc" id="L89">    private int maxFps = 10;</span>
+    private VisionPipelineListener&lt;T&gt; listener;
+    private CameraSession session;
+    private VisionPipeline&lt;T&gt; pipeline;
+    private CameraView cameraView;
+    private boolean closed;
+
+    /// Creates a view that runs {@code analyzer} over the back camera.
+    ///
+    /// The view borrows the analyzer: leaving the form releases the camera but
+    /// keeps the analyzer usable, and {@link #close()} releases it for good.
+    ///
+    /// @param analyzer the reusable analyzer to run over each frame
+    /// @throws NullPointerException if {@code analyzer} is {@code null}
+    public VisionCameraView(VisionAnalyzer&lt;T&gt; analyzer) {
+<span class="fc" id="L104">        super(new BorderLayout());</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (analyzer == null) {</span>
+<span class="fc" id="L106">            throw new NullPointerException(&quot;analyzer&quot;);</span>
+        }
+<span class="fc" id="L108">        this.analyzer = analyzer;</span>
+<span class="fc" id="L109">        this.shared = new NonClosingAnalyzer&lt;T&gt;(analyzer);</span>
+<span class="fc" id="L110">    }</span>
+
+    /// Whether the current platform can open a camera and run this view's
+    /// analyzer. Check this before showing the view: a target without either
+    /// piece reports failures through the listener rather than throwing.
+    ///
+    /// @return {@code true} when both the camera and the analyzer are available
+    public boolean isSupported() {
+        // Camera.isSupported() only says the port has a backend. A device with
+        // no capture hardware still enumerates nothing, and start() would fail
+        // on a screen this method said was fine to show.
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        return Camera.isSupported() &amp;&amp; Camera.getCameras().length &gt; 0</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                &amp;&amp; analyzer.isSupported();</span>
+    }
+
+    /// Selects which camera to open. Takes effect the next time the view is
+    /// shown; the default is {@link CameraFacing#BACK}.
+    ///
+    /// A front camera's preview is requested mirrored, the way a selfie view
+    /// behaves. The simulator honors that; the iOS and Android previews do not
+    /// mirror yet. Note also that a device without the requested camera falls
+    /// back to whatever it has, and the mirroring follows the camera that
+    /// actually opened rather than the one asked for.
+    ///
+    /// @param value the camera to prefer, or {@code null} for the back camera
+    public void setFacing(CameraFacing value) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        facing = value == null ? CameraFacing.BACK : value;</span>
+<span class="fc" id="L137">    }</span>
+
+    /// @return the camera this view opens
+    public CameraFacing getFacing() {
+<span class="fc" id="L141">        return facing;</span>
+    }
+
+    /// Caps how many frames per second reach the analyzer. Frames arriving
+    /// while an analysis is in flight are dropped in favor of the newest one
+    /// regardless of this value, so the cap mainly saves the camera the work
+    /// of producing frames nothing will read. The default is 10.
+    ///
+    /// @param value frames per second, or {@code 0} for uncapped
+    public void setMaxFps(int value) {
+<span class="nc" id="L151">        maxFps = Math.max(0, value);</span>
+<span class="nc" id="L152">    }</span>
+
+    /// @return the frame rate cap, or {@code 0} when uncapped
+    public int getMaxFps() {
+<span class="nc" id="L156">        return maxFps;</span>
+    }
+
+    /// How the preview is fitted into this component's bounds. The default is
+    /// {@link ScaleType#CROP}, which fills the view the way a camera app does.
+    ///
+    /// The simulator honors every mode. The iOS and Android previews render
+    /// fixed at fill-and-crop today, because neither port implements the
+    /// scaling hook yet, so a non-default mode is a request those targets
+    /// currently ignore rather than a promise.
+    ///
+    /// @param value the scaling to apply, or {@code null} for the default
+    public void setScaleType(ScaleType value) {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        scaleType = value == null ? ScaleType.CROP : value;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (cameraView != null) {</span>
+<span class="fc" id="L171">            cameraView.setScaleType(scaleType);</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    /// @return how the preview is fitted into this component's bounds
+    public ScaleType getScaleType() {
+<span class="nc" id="L177">        return scaleType;</span>
+    }
+
+    /// Installs the callback for analysis results and recoverable failures.
+    /// Both are delivered on the EDT.
+    ///
+    /// @param value the listener, or {@code null} to stop receiving results
+    public void setListener(VisionPipelineListener&lt;T&gt; value) {
+<span class="fc" id="L185">        listener = value;</span>
+<span class="fc" id="L186">    }</span>
+
+    /// @return the installed result listener, or {@code null}
+    public VisionPipelineListener&lt;T&gt; getListener() {
+<span class="nc" id="L190">        return listener;</span>
+    }
+
+    /// The open camera session, for torch, zoom, focus, or a still capture.
+    ///
+    /// @return the session while the view is showing, or {@code null}
+    public CameraSession getSession() {
+<span class="fc" id="L197">        return session;</span>
+    }
+
+    /// Turns the torch on or off, when the open camera has one. A camera
+    /// without a flash ignores this.
+    ///
+    /// @param on whether the torch should be lit
+    public void setTorchEnabled(boolean on) {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (session != null) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            session.setFlashMode(on ? FlashMode.TORCH : FlashMode.OFF);</span>
+        }
+<span class="nc" id="L208">    }</span>
+
+    /// @return {@code true} while the camera is open and frames are flowing
+    public boolean isRunning() {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return pipeline != null;</span>
+    }
+
+    /// Opens the camera and starts analyzing. Called automatically when the
+    /// view is shown; calling it again while running does nothing.
+    // The session this opens is retained in the `session` field and closed by
+    // stop(); PMD cannot follow ownership across that hand-off.
+    @SuppressWarnings(&quot;PMD.CloseResource&quot;)
+    public void start() {
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">        if (closed || pipeline != null) {</span>
+<span class="fc" id="L222">            return;</span>
+        }
+        CameraSession opened;
+        CameraInfo info;
+        try {
+<span class="fc" id="L227">            info = Camera.getDefault(facing);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (info == null) {</span>
+<span class="nc" id="L229">                throw new IllegalStateException(</span>
+                        &quot;No camera is available on this device&quot;);
+            }
+<span class="fc" id="L232">            opened = Camera.open(info, new CameraSessionOptions()</span>
+<span class="fc" id="L233">                    .frameFormat(FrameFormat.JPEG)</span>
+<span class="fc" id="L234">                    .frameMaxFps(maxFps)</span>
+<span class="fc" id="L235">                    .captureAudio(false));</span>
+<span class="fc" id="L236">        } catch (Throwable error) {</span>
+<span class="fc" id="L237">            notifyError(error);</span>
+<span class="fc" id="L238">            return;</span>
+<span class="fc" id="L239">        }</span>
+<span class="fc" id="L240">        CameraView preview = opened.createView();</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (preview.getPreviewPeer() == null) {</span>
+            // A port returns no peer when native preview creation failed, or
+            // when it has no live preview at all. Carrying on would install an
+            // empty view, report isRunning() true, and leave a scanner sitting
+            // on a blank screen with no error ever delivered.
+<span class="fc" id="L246">            opened.close();</span>
+<span class="fc" id="L247">            notifyError(new IllegalStateException(</span>
+                    &quot;The camera opened but this platform could not create a&quot;
+                    + &quot; live preview&quot;));
+<span class="fc" id="L250">            return;</span>
+        }
+<span class="fc" id="L252">        session = opened;</span>
+<span class="fc" id="L253">        cameraView = preview;</span>
+<span class="fc" id="L254">        cameraView.setScaleType(scaleType);</span>
+        // Mirror on the camera that opened, not the one asked for.
+        // Camera.getDefault falls back to the first available camera when the
+        // requested facing does not exist, and mirroring a rear preview shows
+        // the world reversed.
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        cameraView.setMirrored(info.getFacing() == CameraFacing.FRONT);</span>
+<span class="fc" id="L260">        addComponent(BorderLayout.CENTER, cameraView);</span>
+<span class="fc" id="L261">        pipeline = new VisionPipeline&lt;T&gt;(opened, shared,</span>
+<span class="fc" id="L262">                new VisionPipelineListener&lt;T&gt;() {</span>
+                    @Override
+                    public void result(T value, VisionImage source) {
+<span class="fc" id="L265">                        VisionPipelineListener&lt;T&gt; target = listener;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                        if (target != null) {</span>
+<span class="fc" id="L267">                            target.result(value, source);</span>
+                        }
+<span class="fc" id="L269">                    }</span>
+
+                    @Override
+                    public void error(Throwable error) {
+<span class="nc" id="L273">                        VisionPipelineListener&lt;T&gt; target = listener;</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                        if (target != null) {</span>
+<span class="nc" id="L275">                            target.error(error);</span>
+                        }
+<span class="nc" id="L277">                    }</span>
+                });
+<span class="fc" id="L279">    }</span>
+
+    /// Stops analyzing and releases the camera, leaving the analyzer usable.
+    /// Called automatically when the view stops being shown.
+    public void stop() {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (pipeline != null) {</span>
+<span class="fc" id="L285">            pipeline.close();</span>
+<span class="fc" id="L286">            pipeline = null;</span>
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (cameraView != null) {</span>
+<span class="fc" id="L289">            removeComponent(cameraView);</span>
+<span class="fc" id="L290">            cameraView = null;</span>
+        }
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (session != null) {</span>
+<span class="fc" id="L293">            session.close();</span>
+<span class="fc" id="L294">            session = null;</span>
+        }
+<span class="fc" id="L296">    }</span>
+
+    /// Releases the camera and the analyzer. Use this when the view will not
+    /// be shown again; simply navigating to another form already releases the
+    /// camera. Calling it more than once has no effect.
+    @Override
+    public void close() {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L304">            return;</span>
+        }
+<span class="fc" id="L306">        closed = true;</span>
+<span class="fc" id="L307">        stop();</span>
+<span class="fc" id="L308">        analyzer.close();</span>
+<span class="fc" id="L309">    }</span>
+
+    /// Opens the camera when the view becomes part of a shown form.
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L314">        super.initComponent();</span>
+<span class="fc" id="L315">        start();</span>
+<span class="fc" id="L316">    }</span>
+
+    /// Releases the camera when the view stops being shown.
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L321">        stop();</span>
+<span class="fc" id="L322">        super.deinitialize();</span>
+<span class="fc" id="L323">    }</span>
+
+    private void notifyError(final Throwable error) {
+<span class="fc" id="L326">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L329">                VisionPipelineListener&lt;T&gt; target = listener;</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                if (target != null) {</span>
+<span class="fc" id="L331">                    target.error(error);</span>
+                }
+<span class="fc" id="L333">            }</span>
+        });
+<span class="fc" id="L335">    }</span>
+
+    /// Hands the pipeline an analyzer it cannot close. The pipeline closes the
+    /// analyzer it owns, and this view is shown and hidden repeatedly with the
+    /// same caller-supplied analyzer, so the real one is released only by
+    /// {@link VisionCameraView#close()}.
+    private static final class NonClosingAnalyzer&lt;T&gt;
+            implements VisionAnalyzer&lt;T&gt; {
+        private final VisionAnalyzer&lt;T&gt; delegate;
+
+<span class="fc" id="L345">        NonClosingAnalyzer(VisionAnalyzer&lt;T&gt; delegate) {</span>
+<span class="fc" id="L346">            this.delegate = delegate;</span>
+<span class="fc" id="L347">        }</span>
+
+        @Override
+        public boolean isSupported() {
+<span class="nc" id="L351">            return delegate.isSupported();</span>
+        }
+
+        @Override
+        public com.codename1.util.AsyncResource&lt;T&gt; process(VisionImage image) {
+<span class="fc" id="L356">            return delegate.process(image);</span>
+        }
+
+        @Override
+        public void close() {
+<span class="fc" id="L361">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

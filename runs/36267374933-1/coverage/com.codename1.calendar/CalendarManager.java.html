@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarManager.java</span></div><h1>CalendarManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Registry and entry point for device and online calendar sources.
+public final class CalendarManager {
+
+<span class="nc" id="L34">    private static final CalendarManager INSTANCE = new CalendarManager();</span>
+
+<span class="nc" id="L36">    private final Map&lt;String, CalendarSource&gt; sources = new LinkedHashMap&lt;String, CalendarSource&gt;();</span>
+
+<span class="nc" id="L38">    private CalendarManager() {</span>
+<span class="nc" id="L39">    }</span>
+
+    public static CalendarManager getInstance() {
+<span class="nc" id="L42">        return INSTANCE;</span>
+    }
+
+    public synchronized CalendarManager registerSource(CalendarSource source) {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;source required&quot;);</span>
+        }
+<span class="nc" id="L49">        CalendarSource existing = sources.get(source.getId());</span>
+<span class="nc bnc" id="L50" title="All 4 branches missed.">        if (existing != null &amp;&amp; existing != source) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(&quot;A calendar source with id '&quot; + source.getId() + &quot;' is already registered&quot;);</span>
+        }
+<span class="nc" id="L53">        sources.put(source.getId(), source);</span>
+<span class="nc" id="L54">        return this;</span>
+    }
+
+    public synchronized CalendarSource removeSource(String id) {
+<span class="nc" id="L58">        return sources.remove(id);</span>
+    }
+
+    public synchronized CalendarSource getSource(String id) {
+<span class="nc" id="L62">        return sources.get(id);</span>
+    }
+
+    public synchronized List&lt;CalendarSource&gt; getSources() {
+<span class="nc" id="L66">        return Collections.unmodifiableList(new ArrayList&lt;CalendarSource&gt;(sources.values()));</span>
+    }
+
+    public synchronized LocalCalendarSource getLocalSource() {
+<span class="nc" id="L70">        LocalCalendarSource local = LocalCalendarSource.getInstance();</span>
+<span class="nc" id="L71">        CalendarSource existing = sources.get(local.getId());</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">        if (existing != null &amp;&amp; existing != local) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L73">            throw new IllegalStateException(&quot;A calendar source with id '&quot; + local.getId() + &quot;' is already registered&quot;);</span>
+        }
+<span class="nc" id="L75">        sources.put(local.getId(), local);</span>
+<span class="nc" id="L76">        return local;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

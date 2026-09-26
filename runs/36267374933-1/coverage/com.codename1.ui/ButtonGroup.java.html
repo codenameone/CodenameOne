@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ButtonGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ButtonGroup.java</span></div><h1>ButtonGroup.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+
+import java.util.ArrayList;
+
+/// This class is used to create a multiple-exclusion scope for
+/// `com.codename1.ui.RadioButton`.
+/// Creating a set of `com.codename1.ui.RadioButton` components with the same `ButtonGroup` object
+/// means that only one `com.codename1.ui.RadioButton` can be selected among those within
+/// the specific `ButtonGroup`.
+///
+/// ```java
+/// Form hi = new Form(&quot;Test ButtonGroup&quot;, BoxLayout.y());
+///
+/// Image icon = FontImage.createMaterial(FontImage.MATERIAL_INFO, &quot;CheckBox&quot;, 3.0f);
+///
+/// CheckBox cb1 = new CheckBox(&quot;CheckBox No Icon&quot;);
+/// cb1.setSelected(true);
+/// CheckBox cb2 = new CheckBox(&quot;CheckBox With Icon&quot;, icon);
+/// CheckBox cb3 = new CheckBox(&quot;CheckBox Opposite True&quot;, icon);
+/// CheckBox cb4 = new CheckBox(&quot;CheckBox Opposite False&quot;, icon);
+/// cb3.setOppositeSide(true);
+/// cb4.setOppositeSide(false);
+/// RadioButton rb1 = new RadioButton(&quot;Radio 1&quot;);
+/// RadioButton rb2 = new RadioButton(&quot;Radio 2&quot;);
+/// RadioButton rb3 = new RadioButton(&quot;Radio 3&quot;, icon);
+/// new ButtonGroup(rb1, rb2, rb3);
+/// rb2.setSelected(true);
+/// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
+/// hi.show();
+/// ```
+///
+/// @author Nir Shabi
+public class ButtonGroup implements ActionSource&lt;ActionEvent&gt; {
+
+
+<span class="pc" id="L63">    private final ArrayList&lt;RadioButton&gt; buttons = new ArrayList&lt;RadioButton&gt;();</span>
+<span class="pc" id="L64">    private int selectedIndex = -1;</span>
+
+    /// Creates a new instance of ButtonsGroup
+<span class="fc" id="L67">    public ButtonGroup() {</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Adds all the radio buttons to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`
+<span class="nc" id="L75">    public ButtonGroup(RadioButton... rb) {</span>
+<span class="nc" id="L76">        addAll(rb);</span>
+<span class="nc" id="L77">    }</span>
+
+    /// Adds the RadioButtons to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButtons to add
+    public void addAll(RadioButton... rb) {
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (RadioButton r : rb) {</span>
+<span class="nc" id="L86">            add(r);</span>
+        }
+<span class="nc" id="L88">    }</span>
+
+    /// Adds a RadioButton to the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButton to add
+    public void add(RadioButton rb) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (rb == null) {</span>
+<span class="fc" id="L97">            return;</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (!buttons.contains(rb)) {</span>
+<span class="fc" id="L100">            buttons.add(rb);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (rb.isSelected()) {</span>
+<span class="nc" id="L102">                setSelected(buttons.indexOf(rb));</span>
+            }
+<span class="fc" id="L104">            rb.setButtonGroup(this);</span>
+        }
+<span class="fc" id="L106">    }</span>
+
+    /// removes a RadioButton from the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: a RadioButton to remove
+    public void remove(RadioButton rb) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (rb == null) {</span>
+<span class="nc" id="L115">            return;</span>
+        }
+<span class="fc" id="L117">        buttons.remove(rb);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (rb.isSelected()) {</span>
+<span class="nc" id="L119">            clearSelection();</span>
+        }
+<span class="fc" id="L121">        rb.setButtonGroup(null);</span>
+<span class="fc" id="L122">    }</span>
+
+    /// Clears the selection such that none of the buttons in the ButtonGroup are selected.
+    public void clearSelection() {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (selectedIndex != -1) {</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (selectedIndex &lt; buttons.size()) {</span>
+<span class="fc" id="L128">                buttons.get(selectedIndex).setSelected(false);</span>
+            }
+<span class="fc" id="L130">            selectedIndex = -1;</span>
+        }
+
+<span class="fc" id="L133">    }</span>
+
+    /// Returns the number of buttons in the group.
+    ///
+    /// #### Returns
+    ///
+    /// number of radio buttons in the group
+    public int getButtonCount() {
+<span class="fc" id="L141">        return buttons.size();</span>
+    }
+
+    /// Returns whether a radio button in the group is selected.
+    ///
+    /// #### Returns
+    ///
+    /// true if a selection was made in the radio button group
+    public boolean isSelected() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        return selectedIndex != -1;</span>
+    }
+
+    /// Return the index of the selected button within the group
+    ///
+    /// #### Returns
+    ///
+    /// the index of the selected button within the group
+    public int getSelectedIndex() {
+<span class="fc" id="L159">        return selectedIndex;</span>
+    }
+
+    /// Return the selected radio button within the group
+    ///
+    /// #### Returns
+    ///
+    /// the selected radio button within the group
+    public RadioButton getSelected() {
+<span class="nc" id="L168">        return getRadioButton(selectedIndex);</span>
+    }
+
+    /// Selects the given radio button
+    ///
+    /// #### Parameters
+    ///
+    /// - `rb`: the radio button to set as selected
+    public void setSelected(RadioButton rb) {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (rb != null) {</span>
+<span class="fc" id="L178">            int index = buttons.indexOf(rb);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (index &lt; 0) {</span>
+<span class="nc" id="L180">                add(rb);</span>
+<span class="nc" id="L181">                index = buttons.indexOf(rb);</span>
+            }
+<span class="fc" id="L183">            setSelected(index);</span>
+<span class="fc" id="L184">        } else {</span>
+<span class="nc" id="L185">            clearSelection();</span>
+        }
+<span class="fc" id="L187">    }</span>
+
+    /// Sets the selected Radio button by index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the index of the radio button to mark as selected
+    public void setSelected(int index) {
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= getButtonCount()) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(&quot;Index out of bounds&quot;);</span>
+        }
+
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (selectedIndex == index) {</span>
+<span class="fc" id="L200">            return;</span>
+        }
+
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (selectedIndex != -1) {</span>
+            //unselect last selected Radio button
+<span class="fc" id="L205">            buttons.get(selectedIndex).setSelectedImpl(false);</span>
+        }
+<span class="fc" id="L207">        buttons.get(index).setSelectedImpl(true);</span>
+<span class="fc" id="L208">        selectedIndex = index;</span>
+<span class="fc" id="L209">    }</span>
+
+    /// Returns the radio button at the given group index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: offset within the group starting with 0 and no larger than getButtonCount()
+    ///
+    /// #### Returns
+    ///
+    /// the radio button instance
+    public RadioButton getRadioButton(int index) {
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (index &gt;= 0 &amp;&amp; index &lt; getButtonCount()) {</span>
+<span class="fc" id="L222">            return buttons.get(index);</span>
+        }
+<span class="nc" id="L224">        return null;</span>
+    }
+
+    /// Adds an action listener to all the buttons in the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the listener
+    @Override
+    public void addActionListener(ActionListener&lt;ActionEvent&gt; al) {
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        for (RadioButton rb : buttons) {</span>
+<span class="nc" id="L235">            rb.addActionListener(al);</span>
+<span class="nc" id="L236">        }</span>
+<span class="nc" id="L237">    }</span>
+
+    /// Removes an action listener from all the buttons in the group
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: the listener
+    @Override
+    public void removeActionListener(ActionListener&lt;ActionEvent&gt; al) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        for (RadioButton rb : buttons) {</span>
+<span class="nc" id="L247">            rb.removeActionListener(al);</span>
+<span class="nc" id="L248">        }</span>
+<span class="nc" id="L249">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

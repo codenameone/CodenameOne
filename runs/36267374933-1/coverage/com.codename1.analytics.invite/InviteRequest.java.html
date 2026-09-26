@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InviteRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics.invite</a> &gt; <span class="el_source">InviteRequest.java</span></div><h1>InviteRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics.invite;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// Describes the invite to mint. Immutable; build one with [#create].
+///
+/// ```java
+/// InviteRequest request = InviteRequest.create()
+///         .campaign(&quot;spring&quot;)
+///         .channel(&quot;whatsapp&quot;)
+///         .title(&quot;Join me&quot;)
+///         .description(&quot;I am using this and thought of you.&quot;)
+///         .payload(&quot;room-42&quot;)
+///         .build();
+/// ```
+///
+/// `title`, `description` and `imageUrl` drive the preview card the link
+/// service renders, which is what makes a shared link look like an invitation
+/// in a messaging application rather than a bare address.
+///
+/// [Builder#build] validates and throws `IllegalArgumentException` naming the
+/// offending field, so a mistake surfaces at the call you can see rather than
+/// as a silently dropped value later.
+public final class InviteRequest {
+    /// The longest accepted [Builder#payload].
+    public static final int MAX_PAYLOAD_LENGTH = 512;
+
+    /// The longest accepted [Builder#title].
+    public static final int MAX_TITLE_LENGTH = 128;
+
+    /// The longest accepted [Builder#description].
+    public static final int MAX_DESCRIPTION_LENGTH = 256;
+
+    /// The longest accepted [Builder#campaign] or [Builder#channel].
+    public static final int MAX_TOKEN_LENGTH = 64;
+
+    /// The longest accepted preview image address.
+    public static final int MAX_IMAGE_URL_LENGTH = 512;
+
+    /// The longest accepted custom parameter name.
+    public static final int MAX_PARAM_KEY_LENGTH = 64;
+
+    /// The longest accepted custom parameter value.
+    public static final int MAX_PARAM_VALUE_LENGTH = 256;
+
+    /// The most custom parameters an invite may carry.
+    public static final int MAX_PARAMETERS = 16;
+
+    private final String campaign;
+    private final String channel;
+    private final String payload;
+    private final String title;
+    private final String description;
+    private final String imageUrl;
+    private final Map&lt;String, String&gt; parameters;
+
+<span class="fc" id="L81">    private InviteRequest(Builder b) {</span>
+<span class="fc" id="L82">        this.campaign = b.campaign;</span>
+<span class="fc" id="L83">        this.channel = b.channel;</span>
+<span class="fc" id="L84">        this.payload = b.payload;</span>
+<span class="fc" id="L85">        this.title = b.title;</span>
+<span class="fc" id="L86">        this.description = b.description;</span>
+<span class="fc" id="L87">        this.imageUrl = b.imageUrl;</span>
+<span class="fc" id="L88">        this.parameters = Collections.unmodifiableMap(</span>
+<span class="fc" id="L89">                new LinkedHashMap&lt;String, String&gt;(b.parameters));</span>
+<span class="fc" id="L90">    }</span>
+
+    /// Starts building a request.
+    ///
+    /// #### Returns
+    ///
+    /// a new builder
+    public static Builder create() {
+<span class="fc" id="L98">        return new Builder();</span>
+    }
+
+    /// The campaign, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the campaign
+    public String getCampaign() {
+<span class="fc" id="L107">        return campaign;</span>
+    }
+
+    /// The channel, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the channel
+    public String getChannel() {
+<span class="fc" id="L116">        return channel;</span>
+    }
+
+    /// The application defined payload, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the payload
+    public String getPayload() {
+<span class="fc" id="L125">        return payload;</span>
+    }
+
+    /// The preview card title, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the title
+    public String getTitle() {
+<span class="fc" id="L134">        return title;</span>
+    }
+
+    /// The preview card description, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the description
+    public String getDescription() {
+<span class="fc" id="L143">        return description;</span>
+    }
+
+    /// The preview card image address, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the image address
+    public String getImageUrl() {
+<span class="fc" id="L152">        return imageUrl;</span>
+    }
+
+    /// The custom parameters carried to the invited device.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable, insertion ordered map, never null
+    public Map&lt;String, String&gt; getParameters() {
+<span class="fc" id="L161">        return parameters;</span>
+    }
+
+    /// Builds an [InviteRequest].
+    public static final class Builder {
+        private String campaign;
+        private String channel;
+        private String payload;
+        private String title;
+        private String description;
+        private String imageUrl;
+<span class="fc" id="L172">        private final Map&lt;String, String&gt; parameters = new LinkedHashMap&lt;String, String&gt;();</span>
+
+<span class="fc" id="L174">        Builder() {</span>
+<span class="fc" id="L175">        }</span>
+
+        /// Groups this invite with others for reporting, for example a
+        /// seasonal push. Letters, digits, `.`, `_` and `-` only.
+        ///
+        /// #### Parameters
+        ///
+        /// - `campaign`: the campaign name
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder campaign(String campaign) {
+<span class="fc" id="L188">            this.campaign = campaign;</span>
+<span class="fc" id="L189">            return this;</span>
+        }
+
+        /// How the invite is being sent, for example `sms` or `whatsapp`.
+        /// Letters, digits, `.`, `_` and `-` only.
+        ///
+        /// #### Parameters
+        ///
+        /// - `channel`: the channel name
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder channel(String channel) {
+<span class="fc" id="L203">            this.channel = channel;</span>
+<span class="fc" id="L204">            return this;</span>
+        }
+
+        /// An application defined string handed back to the invited device,
+        /// for example the room or team the friend is being invited to.
+        ///
+        /// #### Parameters
+        ///
+        /// - `payload`: the payload
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder payload(String payload) {
+<span class="fc" id="L218">            this.payload = payload;</span>
+<span class="fc" id="L219">            return this;</span>
+        }
+
+        /// The headline on the preview card the link shows in a messaging
+        /// application.
+        ///
+        /// #### Parameters
+        ///
+        /// - `title`: the title
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder title(String title) {
+<span class="nc" id="L233">            this.title = title;</span>
+<span class="nc" id="L234">            return this;</span>
+        }
+
+        /// The body text on the preview card.
+        ///
+        /// #### Parameters
+        ///
+        /// - `description`: the description
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder description(String description) {
+<span class="nc" id="L247">            this.description = description;</span>
+<span class="nc" id="L248">            return this;</span>
+        }
+
+        /// The image on the preview card, as an absolute address.
+        ///
+        /// #### Parameters
+        ///
+        /// - `url`: the image address
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder imageUrl(String url) {
+<span class="fc" id="L261">            this.imageUrl = url;</span>
+<span class="fc" id="L262">            return this;</span>
+        }
+
+        /// Adds a custom parameter carried to the invited device. A null
+        /// value removes the key.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: the parameter name
+        ///
+        /// - `value`: the parameter value, or null to remove it
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder param(String key, String value) {
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">            if (key == null || key.length() == 0) {</span>
+<span class="nc" id="L279">                return this;</span>
+            }
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L282">                parameters.remove(key);</span>
+            } else {
+<span class="fc" id="L284">                parameters.put(key, value);</span>
+            }
+<span class="fc" id="L286">            return this;</span>
+        }
+
+        /// Validates and builds the request.
+        ///
+        /// #### Returns
+        ///
+        /// the immutable request
+        public InviteRequest build() {
+<span class="fc" id="L295">            checkToken(&quot;campaign&quot;, campaign);</span>
+<span class="fc" id="L296">            checkToken(&quot;channel&quot;, channel);</span>
+<span class="fc" id="L297">            checkLength(&quot;payload&quot;, payload, MAX_PAYLOAD_LENGTH);</span>
+<span class="fc" id="L298">            checkLength(&quot;title&quot;, title, MAX_TITLE_LENGTH);</span>
+<span class="fc" id="L299">            checkLength(&quot;description&quot;, description, MAX_DESCRIPTION_LENGTH);</span>
+            // Bounded HERE, with everything else, because these two were the
+            // way past every other bound.
+            //
+            // The request is serialized into the registration json and that
+            // json is persisted in the outbox, before anything has been sent
+            // and before any server has seen it. The outbox caps its ENTRY
+            // COUNT, which bounds nothing if one entry can be any size: an
+            // unbounded image address, or a parameter map an application
+            // filled in a loop, is written straight to storage. Refusing is
+            // the same answer the payload, title and description already give,
+            // and it arrives at the call that built the request rather than as
+            // a storage failure days later.
+<span class="fc" id="L312">            checkLength(&quot;imageUrl&quot;, imageUrl, MAX_IMAGE_URL_LENGTH);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (parameters.size() &gt; MAX_PARAMETERS) {</span>
+<span class="fc" id="L314">                throw new IllegalArgumentException(</span>
+                        &quot;an invite carries at most &quot; + MAX_PARAMETERS + &quot; parameters&quot;);
+            }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; e : parameters.entrySet()) {</span>
+<span class="fc" id="L318">                checkLength(&quot;parameter name&quot;, e.getKey(), MAX_PARAM_KEY_LENGTH);</span>
+<span class="fc" id="L319">                checkLength(&quot;parameter &quot; + e.getKey(), e.getValue(), MAX_PARAM_VALUE_LENGTH);</span>
+<span class="fc" id="L320">            }</span>
+<span class="fc" id="L321">            return new InviteRequest(this);</span>
+        }
+
+        private static void checkLength(String field, String value, int max) {
+<span class="fc bfc" id="L325" title="All 4 branches covered.">            if (value != null &amp;&amp; value.length() &gt; max) {</span>
+<span class="fc" id="L326">                throw new IllegalArgumentException(</span>
+                        field + &quot; is longer than &quot; + max + &quot; characters&quot;);
+            }
+<span class="fc" id="L329">        }</span>
+
+        // Campaign and channel end up both in a url and as an analytics
+        // dimension value, so they are restricted to characters that are safe
+        // unescaped in either. Checked here rather than silently rewritten,
+        // because a rewritten campaign name stops matching the one in the
+        // report.
+        private static void checkToken(String field, String value) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            if (value == null) {</span>
+<span class="fc" id="L338">                return;</span>
+            }
+<span class="pc bpc" id="L340" title="2 of 4 branches missed.">            if (value.length() == 0 || value.length() &gt; MAX_TOKEN_LENGTH) {</span>
+<span class="nc" id="L341">                throw new IllegalArgumentException(</span>
+                        field + &quot; must be 1 to &quot; + MAX_TOKEN_LENGTH + &quot; characters&quot;);
+            }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L345">                char c = value.charAt(i);</span>
+<span class="pc bpc" id="L346" title="8 of 18 branches missed.">                boolean ok = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                        || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '.' || c == '_' || c == '-';
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                if (!ok) {</span>
+<span class="fc" id="L349">                    throw new IllegalArgumentException(</span>
+                            field + &quot; may only contain letters, digits, '.', '_' and '-'&quot;);
+                }
+            }
+<span class="fc" id="L353">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

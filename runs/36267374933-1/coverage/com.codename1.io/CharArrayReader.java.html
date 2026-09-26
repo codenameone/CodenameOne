@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharArrayReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">CharArrayReader.java</span></div><h1>CharArrayReader.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.Reader;
+
+
+/// A specialized `Reader` for reading the contents of a char array.
+///
+/// #### See also
+///
+/// - CharArrayWriter
+public class CharArrayReader extends Reader {
+    /// The buffer for characters.
+    protected char[] buf;
+
+    /// The current buffer position.
+    protected int pos;
+
+    /// The current mark position.
+<span class="fc" id="L37">    protected int markedPos = -1;</span>
+
+    /// The ending index of the buffer.
+    protected int count;
+
+    /// Constructs a CharArrayReader on the char array `buf`. The size of
+    /// the reader is set to the length of the buffer and the object to read
+    /// from is set to `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: the char array from which to read.
+<span class="fc" id="L49">    public CharArrayReader(char[] buf) {</span>
+<span class="fc" id="L50">        this.buf = buf;</span>
+<span class="fc" id="L51">        this.count = buf.length;</span>
+<span class="fc" id="L52">    }</span>
+
+    /// Constructs a CharArrayReader on the char array `buf`. The size of
+    /// the reader is set to `length` and the start position from which to
+    /// read the buffer is set to `offset`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buf`: the char array from which to read.
+    ///
+    /// - `offset`: the index of the first character in `buf` to read.
+    ///
+    /// - `length`: the number of characters that can be read from `buf`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException if `offset &lt; 0` or `length &lt; 0`, or if
+    /// `offset` is greater than the size of `buf` .
+<span class="fc" id="L70">    public CharArrayReader(char[] buf, int offset, int length) {</span>
+        /*
+         * The spec of this constructor is broken. In defining the legal values
+         * of offset and length, it doesn't consider buffer's length. And to be
+         * compatible with the broken spec, we must also test whether
+         * (offset + length) overflows.
+         */
+<span class="pc bpc" id="L77" title="1 of 8 branches missed.">        if (offset &lt; 0 || offset &gt; buf.length || length &lt; 0 || offset + length &lt; 0) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException();</span>
+        }
+<span class="fc" id="L80">        this.buf = buf;</span>
+<span class="fc" id="L81">        this.pos = offset;</span>
+<span class="fc" id="L82">        this.markedPos = offset;</span>
+
+        /* This is according to spec */
+<span class="fc" id="L85">        int bufferLength = buf.length;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        this.count = offset + length &lt; bufferLength ? length : bufferLength;</span>
+<span class="fc" id="L87">    }</span>
+
+    /// This method closes this CharArrayReader. Once it is closed, you can no
+    /// longer read from it. Only the first invocation of this method has any
+    /// effect.
+    @Override
+    public void close() {
+<span class="fc" id="L94">        synchronized (lock) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (isOpen()) {</span>
+<span class="fc" id="L96">                buf = null;</span>
+            }
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Indicates whether this reader is open.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the reader is open, `false` otherwise.
+    private boolean isOpen() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return buf != null;</span>
+    }
+
+    /// Indicates whether this reader is closed.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the reader is closed, `false` otherwise.
+    private boolean isClosed() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        return buf == null;</span>
+    }
+
+    /// Sets a mark position in this reader. The parameter `readLimit` is
+    /// ignored for CharArrayReaders. Calling `reset()` will reposition the
+    /// reader back to the marked position provided the mark has not been
+    /// invalidated.
+    ///
+    /// #### Parameters
+    ///
+    /// - `readLimit`: ignored for CharArrayReaders.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public void mark(int readLimit) throws IOException {
+<span class="fc" id="L133">        synchronized (lock) {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L135">                throw new IOException(&quot;Stream closed&quot;);</span>
+            }
+<span class="fc" id="L137">            markedPos = pos;</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">    }</span>
+
+    /// Indicates whether this reader supports the `mark()` and
+    /// `reset()` methods.
+    ///
+    /// #### Returns
+    ///
+    /// `true` for CharArrayReader.
+    ///
+    /// #### See also
+    ///
+    /// - #mark(int)
+    ///
+    /// - #reset()
+    @Override
+    public boolean markSupported() {
+<span class="fc" id="L155">        return true;</span>
+    }
+
+    /// Reads a single character from this reader and returns it as an integer
+    /// with the two higher-order bytes set to 0. Returns -1 if no more
+    /// characters are available from this reader.
+    ///
+    /// #### Returns
+    ///
+    /// @return the character read as an int or -1 if the end of the reader has
+    /// been reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public int read() throws IOException {
+<span class="fc" id="L172">        synchronized (lock) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L174">                throw new IOException(&quot;Stream closed&quot;);</span>
+            }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (pos == count) {</span>
+<span class="fc" id="L177">                return -1;</span>
+            }
+<span class="fc" id="L179">            return buf[pos++];</span>
+        }
+    }
+
+    /// Reads at most `count` characters from this CharArrayReader and
+    /// stores them at `offset` in the character array `buf`.
+    /// Returns the number of characters actually read or -1 if the end of reader
+    /// was encountered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buffer`: the character array to store the characters read.
+    ///
+    /// - `offset`: @param offset the initial position in `buffer` to store the characters
+    /// read from this reader.
+    ///
+    /// - `len`: the maximum number of characters to read.
+    ///
+    /// #### Returns
+    ///
+    /// @return number of characters read or -1 if the end of the reader has been
+    /// reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `offset &lt; 0` or `len &lt; 0`, or if
+    /// `offset + len` is bigger than the size of
+    /// `buffer`.
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public int read(char[] buffer, int offset, int len) throws IOException {
+<span class="fc bfc" id="L211" title="All 4 branches covered.">        if (offset &lt; 0 || offset &gt; buffer.length) {</span>
+            // luni.12=Offset out of bounds \: {0}
+<span class="fc" id="L213">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (len &lt; 0 || len &gt; buffer.length - offset) {</span>
+            // luni.18=Length out of bounds \: {0}
+<span class="fc" id="L217">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L219">        synchronized (lock) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L221">                throw new IOException();</span>
+            }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (pos &lt; this.count) {</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                int bytesRead = pos + len &gt; this.count ? this.count - pos : len;</span>
+<span class="fc" id="L225">                System.arraycopy(this.buf, pos, buffer, offset, bytesRead);</span>
+<span class="fc" id="L226">                pos += bytesRead;</span>
+<span class="fc" id="L227">                return bytesRead;</span>
+            }
+<span class="fc" id="L229">            return -1;</span>
+        }
+    }
+
+    /// Indicates whether this reader is ready to be read without blocking.
+    /// Returns `true` if the next `read` will not block. Returns
+    /// `false` if this reader may or may not block when `read` is
+    /// called. The implementation in CharArrayReader always returns `true`
+    /// even when it has been closed.
+    ///
+    /// #### Returns
+    ///
+    /// @return `true` if this reader will not block when `read` is
+    /// called, `false` if unknown or blocking will occur.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public boolean ready() throws IOException {
+<span class="fc" id="L249">        synchronized (lock) {</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L251">                throw new IOException();</span>
+            }
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            return pos != count;</span>
+        }
+    }
+
+    /// Resets this reader's position to the last `mark()` location.
+    /// Invocations of `read()` and `skip()` will occur from this new
+    /// location. If this reader has not been marked, it is reset to the
+    /// beginning of the string.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public void reset() throws IOException {
+<span class="fc" id="L267">        synchronized (lock) {</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L269">                throw new IOException();</span>
+            }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            pos = markedPos != -1 ? markedPos : 0;</span>
+<span class="fc" id="L272">        }</span>
+<span class="fc" id="L273">    }</span>
+
+    /// Skips `count` number of characters in this reader. Subsequent
+    /// `read()`s will not return these characters unless `reset()`
+    /// is used. This method does nothing and returns 0 if `n` is negative.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: the number of characters to skip.
+    ///
+    /// #### Returns
+    ///
+    /// the number of characters actually skipped.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if this reader is closed.
+    @Override
+    public long skip(long n) throws IOException {
+<span class="fc" id="L292">        synchronized (lock) {</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (isClosed()) {</span>
+<span class="fc" id="L294">                throw new IOException();</span>
+            }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (n &lt;= 0) {</span>
+<span class="fc" id="L297">                return 0;</span>
+            }
+<span class="fc" id="L299">            long skipped = 0;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (n &lt; this.count - pos) {</span>
+<span class="fc" id="L301">                pos = pos + (int) n;</span>
+<span class="fc" id="L302">                skipped = n;</span>
+            } else {
+<span class="fc" id="L304">                skipped = this.count - pos;</span>
+<span class="fc" id="L305">                pos = this.count;</span>
+            }
+<span class="fc" id="L307">            return skipped;</span>
+        }
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

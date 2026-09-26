@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarRecurrenceRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarRecurrenceRule.java</span></div><h1>CalendarRecurrenceRule.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Portable RFC-5545-style recurrence rule.
+<span class="fc" id="L30">public class CalendarRecurrenceRule {</span>
+
+<span class="fc" id="L32">    public enum Frequency {</span>
+
+<span class="fc" id="L34">        DAILY, WEEKLY, MONTHLY, YEARLY</span>
+    }
+
+    private Frequency frequency;
+
+<span class="fc" id="L39">    private int interval = 1;</span>
+
+    private Integer count;
+
+    private CalendarDateTime until;
+
+<span class="fc" id="L45">    private final List&lt;Integer&gt; daysOfWeek = new ArrayList&lt;Integer&gt;();</span>
+
+<span class="fc" id="L47">    private final List&lt;Integer&gt; daysOfMonth = new ArrayList&lt;Integer&gt;();</span>
+
+<span class="fc" id="L49">    private final List&lt;Integer&gt; months = new ArrayList&lt;Integer&gt;();</span>
+
+    public Frequency getFrequency() {
+<span class="fc" id="L52">        return frequency;</span>
+    }
+
+    public CalendarRecurrenceRule setFrequency(Frequency v) {
+<span class="fc" id="L56">        frequency = v;</span>
+<span class="fc" id="L57">        return this;</span>
+    }
+
+    public int getInterval() {
+<span class="fc" id="L61">        return interval;</span>
+    }
+
+    public CalendarRecurrenceRule setInterval(int v) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (v &lt; 1) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;interval&quot;);</span>
+        }
+<span class="fc" id="L68">        interval = v;</span>
+<span class="fc" id="L69">        return this;</span>
+    }
+
+    public Integer getCount() {
+<span class="fc" id="L73">        return count;</span>
+    }
+
+    public CalendarRecurrenceRule setCount(Integer v) {
+<span class="fc" id="L77">        count = v;</span>
+<span class="fc" id="L78">        return this;</span>
+    }
+
+    public CalendarDateTime getUntil() {
+<span class="fc" id="L82">        return until;</span>
+    }
+
+    public CalendarRecurrenceRule setUntil(CalendarDateTime v) {
+<span class="nc" id="L86">        until = v;</span>
+<span class="nc" id="L87">        return this;</span>
+    }
+
+    public CalendarRecurrenceRule addDayOfWeek(int v) {
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        if (v &lt; 1 || v &gt; 7) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(&quot;dayOfWeek&quot;);</span>
+        }
+<span class="fc" id="L94">        daysOfWeek.add(v);</span>
+<span class="fc" id="L95">        return this;</span>
+    }
+
+    public CalendarRecurrenceRule addDayOfMonth(int v) {
+<span class="nc bnc" id="L99" title="All 6 branches missed.">        if (v == 0 || v &lt; -31 || v &gt; 31) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;dayOfMonth&quot;);</span>
+        }
+<span class="nc" id="L102">        daysOfMonth.add(v);</span>
+<span class="nc" id="L103">        return this;</span>
+    }
+
+    public CalendarRecurrenceRule addMonth(int v) {
+<span class="nc bnc" id="L107" title="All 4 branches missed.">        if (v &lt; 1 || v &gt; 12) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;month&quot;);</span>
+        }
+<span class="nc" id="L110">        months.add(v);</span>
+<span class="nc" id="L111">        return this;</span>
+    }
+
+    public List&lt;Integer&gt; getDaysOfWeek() {
+<span class="fc" id="L115">        return Collections.unmodifiableList(daysOfWeek);</span>
+    }
+
+    public List&lt;Integer&gt; getDaysOfMonth() {
+<span class="fc" id="L119">        return Collections.unmodifiableList(daysOfMonth);</span>
+    }
+
+    public List&lt;Integer&gt; getMonths() {
+<span class="fc" id="L123">        return Collections.unmodifiableList(months);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyHandle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">KeyHandle.java</span></div><h1>KeyHandle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.util.AsyncResource;
+
+/// A key you can use and cannot read.
+///
+/// #### Why this is not a [com.codename1.security.Key]
+///
+/// [com.codename1.security.Key] is built around encoded bytes: the constructor requires them,
+/// `getEncoded()` is `final`, and [com.codename1.security.SecretKey] is `final` on top of that.
+/// Every one of those is correct for what that class is -- a value object wrapping key material --
+/// and every one of them makes it impossible to represent a key whose material does not exist as
+/// bytes the application can reach. A browser `CryptoKey` created with `extractable: false` is
+/// exactly that key, and so is an Android keystore key and an iOS Secure Enclave key. Subclassing
+/// would have produced a `getEncoded()` that either lies or throws, and code that takes a `Key`
+/// would keep compiling while silently getting neither.
+///
+/// So this is a separate type with no byte accessor at all. There is no `getEncoded`, no
+/// `export`, and no flag that turns one on. [#isExportable()] reports whether the underlying
+/// material *could* be exported by some other means -- it never provides the means.
+///
+/// #### What it does not protect against
+///
+/// A handle stops the key material being copied. It does not stop the key being **used**: while
+/// the vault is unlocked, any code running in the application -- including script an XSS
+/// injected into the page -- can call [#seal] and [#open] on a handle it can reach, exactly as
+/// the application does. Non-extractability limits what an attacker can carry away, not what they
+/// can do while they are there. [#destroy()] and [Vault#lock()] cut that off for future calls and
+/// cannot reach a plaintext already handed out.
+///
+/// #### Lifecycle
+///
+/// A handle obtained from a vault is invalidated when that vault locks. Calls afterwards fail
+/// with [VaultError#LOCKED] rather than returning stale results, and an operation already in
+/// flight when the lock happens does not deliver its result -- see [Vault#lock()].
+public abstract class KeyHandle {
+
+    /// Subclasses are created by the vault or by a port.
+<span class="fc" id="L61">    protected KeyHandle() {</span>
+<span class="fc" id="L62">    }</span>
+
+    /// The algorithm this key is for, e.g. `&quot;AES-GCM&quot;`.
+    public abstract String getAlgorithm();
+
+    /// A stable identifier for this key, carried in the envelopes it seals so a reader holding
+    /// several keys can pick the right one without trying each.
+    public abstract String getKeyId();
+
+    /// The rotation counter. Incremented by [Vault#rotateDataKey()]; envelopes record the version
+    /// that sealed them, so an old envelope can still be opened after a rotation and can be
+    /// identified as needing a rewrite.
+    public abstract int getVersion();
+
+    /// Whether the key material could be exported through some other path.
+    ///
+    /// `false` is the interesting answer and means the platform holds the key in a form it will
+    /// not hand back -- a non-extractable `CryptoKey`, a keystore alias, a Secure Enclave
+    /// reference. `true` means the material exists as bytes somewhere in the process; the handle
+    /// still will not give them to you, but it is not claiming the platform could not.
+    ///
+    /// This method never enables an export. There is no method on this class that does.
+    public abstract boolean isExportable();
+
+    /// The operations this handle permits, fixed at creation.
+    public abstract KeyUsage[] getUsages();
+
+    /// Whether this handle permits an operation.
+    public boolean permits(KeyUsage usage) {
+<span class="nc" id="L91">        KeyUsage[] usages = getUsages();</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        if (usages == null || usage == null) {</span>
+<span class="nc" id="L93">            return false;</span>
+        }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        for (KeyUsage permitted : usages) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (permitted == usage) {</span>
+<span class="nc" id="L97">                return true;</span>
+            }
+        }
+<span class="nc" id="L100">        return false;</span>
+    }
+
+    /// What actually protects this key, as observed. See [ProtectionReport].
+    public abstract ProtectionReport getProtection();
+
+    /// Authenticated encryption. The result is a [SecureEnvelope]: the nonce, the key id and the
+    /// version are managed here and are not the caller's to choose, because a reused nonce
+    /// destroys AES-GCM and an API that let one be passed in would eventually see one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plaintext`: the bytes to protect
+    ///
+    /// - `aad`: the binding the result may only be opened against, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a resource completing with the sealed bytes, or erroring with a [VaultException]
+    public abstract AsyncResource&lt;byte[]&gt; seal(byte[] plaintext, AssociatedData aad);
+
+    /// Authenticated decryption of what [#seal] produced.
+    ///
+    /// On a tag mismatch the resource errors with [VaultError#AUTHENTICATION_FAILED] and no
+    /// plaintext is delivered -- not a truncated one, not an unverified one. A caller that wants
+    /// the bytes anyway cannot have them from here.
+    public abstract AsyncResource&lt;byte[]&gt; open(byte[] sealed, AssociatedData aad);
+
+    /// A message authentication tag over `data`, for a handle that permits [KeyUsage#MAC].
+    ///
+    /// The default reports [VaultError#NOT_SUPPORTED]; a handle whose platform provides HMAC
+    /// overrides it.
+    public AsyncResource&lt;byte[]&gt; mac(byte[] data) {
+<span class="nc" id="L133">        AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="nc" id="L134">        out.error(new VaultException(VaultError.NOT_SUPPORTED,</span>
+                &quot;this key handle does not perform message authentication&quot;));
+<span class="nc" id="L136">        return out;</span>
+    }
+
+    /// Verifies a tag from [#mac(byte[])], in constant time.
+    public AsyncResource&lt;Boolean&gt; verifyMac(byte[] data, byte[] tag) {
+<span class="nc" id="L141">        AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L142">        out.error(new VaultException(VaultError.NOT_SUPPORTED,</span>
+                &quot;this key handle does not perform message authentication&quot;));
+<span class="nc" id="L144">        return out;</span>
+    }
+
+    /// Releases the handle and, where the material is held in this process, overwrites it.
+    ///
+    /// Best effort, and said so plainly: a managed runtime may have copied the buffer during a
+    /// collection, the browser's heap is not ours to scrub, and a JIT may hold a register copy.
+    /// What this does guarantee is that the handle stops working -- subsequent calls fail with
+    /// [VaultError#LOCKED] -- and that the application's own reference is cleared.
+    public abstract void destroy();
+
+    /// Whether [#destroy()] has been called, or the owning vault has locked.
+    public abstract boolean isDestroyed();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

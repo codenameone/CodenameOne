@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsCrashReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.analytics</a> &gt; <span class="el_source">AnalyticsCrashReport.java</span></div><h1>AnalyticsCrashReport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.analytics;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// A crash / exception report routed to providers that advertise
+/// {@link AnalyticsCapability#CRASH_REPORTING}. This is the analytics
+/// abstraction for exception telemetry; it is distinct from the dedicated
+/// on-device crash-protection client in {@code com.codename1.crash}.
+public final class AnalyticsCrashReport {
+    private final Throwable throwable;
+    private final String message;
+    private final boolean fatal;
+    private final Map&lt;String, String&gt; customKeys;
+
+    AnalyticsCrashReport(Throwable throwable, String message, boolean fatal,
+<span class="fc" id="L40">            Map&lt;String, String&gt; customKeys) {</span>
+<span class="fc" id="L41">        this.throwable = throwable;</span>
+<span class="fc" id="L42">        this.message = message;</span>
+<span class="fc" id="L43">        this.fatal = fatal;</span>
+<span class="fc" id="L44">        this.customKeys = Collections.unmodifiableMap(customKeys);</span>
+<span class="fc" id="L45">    }</span>
+
+    /// Creates a crash report.
+    ///
+    /// #### Parameters
+    ///
+    /// - `throwable`: the captured exception, may be null
+    ///
+    /// - `message`: a human readable description, may be null
+    ///
+    /// - `fatal`: true if the exception terminated the application
+    ///
+    /// #### Returns
+    ///
+    /// a new crash report
+    public static AnalyticsCrashReport create(Throwable throwable, String message, boolean fatal) {
+<span class="fc" id="L61">        return new AnalyticsCrashReport(throwable, message, fatal, new LinkedHashMap&lt;String, String&gt;());</span>
+    }
+
+    /// The captured throwable.
+    ///
+    /// #### Returns
+    ///
+    /// the throwable or null
+    public Throwable getThrowable() {
+<span class="fc" id="L70">        return throwable;</span>
+    }
+
+    /// The descriptive message.
+    ///
+    /// #### Returns
+    ///
+    /// the message or null
+    public String getMessage() {
+<span class="fc" id="L79">        return message;</span>
+    }
+
+    /// Whether the exception was fatal.
+    ///
+    /// #### Returns
+    ///
+    /// true if fatal
+    public boolean isFatal() {
+<span class="fc" id="L88">        return fatal;</span>
+    }
+
+    /// Optional custom key/value context attached to the report.
+    ///
+    /// #### Returns
+    ///
+    /// an unmodifiable map of custom keys
+    public Map&lt;String, String&gt; getCustomKeys() {
+<span class="fc" id="L97">        return customKeys;</span>
+    }
+
+    /// Returns a builder for adding custom keys to a base report.
+    ///
+    /// #### Returns
+    ///
+    /// a builder seeded from this report
+    public Builder asBuilder() {
+<span class="fc" id="L106">        Builder b = new Builder(throwable, message, fatal);</span>
+<span class="fc" id="L107">        b.customKeys.putAll(customKeys);</span>
+<span class="fc" id="L108">        return b;</span>
+    }
+
+    /// Mutable builder for {@link AnalyticsCrashReport}.
+    public static final class Builder {
+        private final Throwable throwable;
+        private final String message;
+        private final boolean fatal;
+<span class="fc" id="L116">        private final Map&lt;String, String&gt; customKeys = new LinkedHashMap&lt;String, String&gt;();</span>
+
+<span class="fc" id="L118">        Builder(Throwable throwable, String message, boolean fatal) {</span>
+<span class="fc" id="L119">            this.throwable = throwable;</span>
+<span class="fc" id="L120">            this.message = message;</span>
+<span class="fc" id="L121">            this.fatal = fatal;</span>
+<span class="fc" id="L122">        }</span>
+
+        /// Attaches a custom key/value pair to the report.
+        ///
+        /// #### Parameters
+        ///
+        /// - `key`: the key
+        ///
+        /// - `value`: the value
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder customKey(String key, String value) {
+<span class="fc" id="L136">            customKeys.put(key, value);</span>
+<span class="fc" id="L137">            return this;</span>
+        }
+
+        /// Builds the immutable report.
+        ///
+        /// #### Returns
+        ///
+        /// a new {@link AnalyticsCrashReport}
+        public AnalyticsCrashReport build() {
+<span class="fc" id="L146">            return new AnalyticsCrashReport(throwable, message, fatal, customKeys);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

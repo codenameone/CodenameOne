@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Model.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">Model.java</span></div><h1>Model.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Matrix4;
+import com.codename1.gpu.Mesh;
+
+/// A 3D mesh placed in the world: a `com.codename1.gpu.Mesh` plus a
+/// `com.codename1.gpu.Material` and a position / rotation / scale transform. Add one
+/// to a `GameView` (`GameView#addModel(Model)`) to draw it in the perspective camera
+/// alongside the billboarded sprites.
+///
+/// Because GPU meshes need the `com.codename1.gpu.GraphicsDevice` to be created, build
+/// your models from inside `GameView#onSetup(com.codename1.gpu.GraphicsDevice)`:
+///
+/// ```java
+/// protected void onSetup(GraphicsDevice device) {
+///     Mesh cubeMesh = Primitives.cube(device, 1f);
+///     Material gold = new Material(Material.Type.PHONG).setColor(0xffffcc33).setShininess(32);
+///     Model crate = new Model(cubeMesh, gold);
+///     crate.setPosition(0, 0.5f, 0);
+///     addModel(crate);
+/// }
+/// ```
+///
+/// Rotation is applied in Z, then Y, then X (extrinsic), in degrees. The model is
+/// drawn with the `GameView`'s shared `com.codename1.gpu.Light`, so lit material
+/// types (`com.codename1.gpu.Material.Type#LAMBERT`/`#PHONG`) are shaded by it.
+public class Model {
+    private Mesh mesh;
+    private Material material;
+
+    private float x;
+    private float y;
+    private float z;
+    private float rotX;
+    private float rotY;
+    private float rotZ;
+<span class="fc" id="L60">    private float scaleX = 1f;</span>
+<span class="fc" id="L61">    private float scaleY = 1f;</span>
+<span class="fc" id="L62">    private float scaleZ = 1f;</span>
+<span class="fc" id="L63">    private boolean visible = true;</span>
+    private Object userData;
+
+<span class="fc" id="L66">    private final float[] scratchA = new float[16];</span>
+<span class="fc" id="L67">    private final float[] scratchB = new float[16];</span>
+<span class="fc" id="L68">    private final float[] matrix = new float[16];</span>
+
+    /// Creates a model for the given mesh with a default unlit white material.
+    public Model(Mesh mesh) {
+<span class="fc" id="L72">        this(mesh, new Material());</span>
+<span class="fc" id="L73">    }</span>
+
+    /// Creates a model for the given mesh and material.
+<span class="fc" id="L76">    public Model(Mesh mesh, Material material) {</span>
+<span class="fc" id="L77">        this.mesh = mesh;</span>
+<span class="fc" id="L78">        this.material = material;</span>
+<span class="fc" id="L79">    }</span>
+
+    /// Builds the world transform `T * Rz * Ry * Rx * S` for this model. The returned
+    /// array is reused each call -- copy it if you need to keep it. The three
+    /// rotations are always applied (an identity rotation is cheap) and the
+    /// multiplications alternate between two scratch buffers so no `Matrix4#multiply`
+    /// ever aliases its source and destination.
+    float[] modelMatrix() {
+<span class="fc" id="L87">        float[] scale = Matrix4.scaling(scaleX, scaleY, scaleZ);</span>
+<span class="fc" id="L88">        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotX), 1f, 0f, 0f), scale, scratchA);</span>
+<span class="fc" id="L89">        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotY), 0f, 1f, 0f), scratchA, scratchB);</span>
+<span class="fc" id="L90">        Matrix4.multiply(Matrix4.rotation((float) Math.toRadians(rotZ), 0f, 0f, 1f), scratchB, scratchA);</span>
+<span class="fc" id="L91">        Matrix4.multiply(Matrix4.translation(x, y, z), scratchA, matrix);</span>
+<span class="fc" id="L92">        return matrix;</span>
+    }
+
+    public Mesh getMesh() {
+<span class="fc" id="L96">        return mesh;</span>
+    }
+
+    public void setMesh(Mesh mesh) {
+<span class="nc" id="L100">        this.mesh = mesh;</span>
+<span class="nc" id="L101">    }</span>
+
+    public Material getMaterial() {
+<span class="fc" id="L104">        return material;</span>
+    }
+
+    public void setMaterial(Material material) {
+<span class="fc" id="L108">        this.material = material;</span>
+<span class="fc" id="L109">    }</span>
+
+    public float getX() {
+<span class="fc" id="L112">        return x;</span>
+    }
+
+    public float getY() {
+<span class="fc" id="L116">        return y;</span>
+    }
+
+    public float getZ() {
+<span class="fc" id="L120">        return z;</span>
+    }
+
+    public Model setPosition(float x, float y, float z) {
+<span class="fc" id="L124">        this.x = x;</span>
+<span class="fc" id="L125">        this.y = y;</span>
+<span class="fc" id="L126">        this.z = z;</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    /// Sets the Euler rotation in degrees (applied Z, then Y, then X).
+    public Model setRotation(float degX, float degY, float degZ) {
+<span class="fc" id="L132">        this.rotX = degX;</span>
+<span class="fc" id="L133">        this.rotY = degY;</span>
+<span class="fc" id="L134">        this.rotZ = degZ;</span>
+<span class="fc" id="L135">        return this;</span>
+    }
+
+    public float getRotationX() {
+<span class="fc" id="L139">        return rotX;</span>
+    }
+
+    public float getRotationY() {
+<span class="fc" id="L143">        return rotY;</span>
+    }
+
+    public float getRotationZ() {
+<span class="fc" id="L147">        return rotZ;</span>
+    }
+
+    public Model setScale(float scale) {
+<span class="fc" id="L151">        this.scaleX = scale;</span>
+<span class="fc" id="L152">        this.scaleY = scale;</span>
+<span class="fc" id="L153">        this.scaleZ = scale;</span>
+<span class="fc" id="L154">        return this;</span>
+    }
+
+    public Model setScale(float scaleX, float scaleY, float scaleZ) {
+<span class="fc" id="L158">        this.scaleX = scaleX;</span>
+<span class="fc" id="L159">        this.scaleY = scaleY;</span>
+<span class="fc" id="L160">        this.scaleZ = scaleZ;</span>
+<span class="fc" id="L161">        return this;</span>
+    }
+
+    public boolean isVisible() {
+<span class="fc" id="L165">        return visible;</span>
+    }
+
+    public void setVisible(boolean visible) {
+<span class="fc" id="L169">        this.visible = visible;</span>
+<span class="fc" id="L170">    }</span>
+
+    public Object getUserData() {
+<span class="fc" id="L173">        return userData;</span>
+    }
+
+    public void setUserData(Object userData) {
+<span class="fc" id="L177">        this.userData = userData;</span>
+<span class="fc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

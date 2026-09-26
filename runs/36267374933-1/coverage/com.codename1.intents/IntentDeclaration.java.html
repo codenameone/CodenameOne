@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntentDeclaration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">IntentDeclaration.java</span></div><h1>IntentDeclaration.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Everything the framework knows about one declared intent.
+///
+/// The build-time processor turns each `AppIntent` method into one of these and
+/// bakes it into the generated registry, so the list is fixed by the time the
+/// app runs -- which is exactly what the platforms require, since their intent
+/// catalogues are compiled into the native binary.
+///
+/// Applications read declarations through [Intents#getDeclarations()]; the
+/// simulator's Intents window is built entirely from them, so what a developer
+/// sees there is what actually shipped.
+public final class IntentDeclaration {
+
+    private final String id;
+    private final String title;
+    private final String description;
+    private final boolean headless;
+    private final boolean discoverable;
+    private final boolean destructive;
+    private final String opensRoute;
+    private final int timeoutSeconds;
+    private final List&lt;String&gt; phrases;
+    private final List&lt;IntentParameterInfo&gt; parameters;
+    private final List&lt;Exposure&gt; exposure;
+
+    /// Framework entry point: builds a declaration. Called by generated code and
+    /// for a [DynamicIntent]; applications do not construct these.
+    public IntentDeclaration(String id, String title, String description,
+                             boolean headless, boolean discoverable, boolean destructive,
+                             String opensRoute, int timeoutSeconds,
+                             List&lt;String&gt; phrases,
+                             List&lt;IntentParameterInfo&gt; parameters,
+<span class="fc" id="L60">                             List&lt;Exposure&gt; exposure) {</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;id is required&quot;);</span>
+        }
+<span class="fc" id="L64">        this.id = id;</span>
+<span class="fc" id="L65">        this.title = IntentText.orFallback(title, id);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        this.description = description == null ? &quot;&quot; : description;</span>
+<span class="fc" id="L67">        this.headless = headless;</span>
+<span class="fc" id="L68">        this.discoverable = discoverable;</span>
+<span class="fc" id="L69">        this.destructive = destructive;</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.opensRoute = opensRoute == null ? &quot;&quot; : opensRoute;</span>
+<span class="fc" id="L71">        this.timeoutSeconds = timeoutSeconds;</span>
+<span class="fc" id="L72">        this.phrases = unmodifiable(phrases);</span>
+<span class="fc" id="L73">        this.parameters = unmodifiable(parameters);</span>
+<span class="fc" id="L74">        this.exposure = unmodifiable(exposure);</span>
+<span class="fc" id="L75">    }</span>
+
+    private static &lt;T&gt; List&lt;T&gt; unmodifiable(List&lt;T&gt; in) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        return in == null</span>
+<span class="pc" id="L79">                ? Collections.&lt;T&gt;emptyList()</span>
+<span class="fc" id="L80">                : Collections.unmodifiableList(new ArrayList&lt;T&gt;(in));</span>
+    }
+
+    /// The stable id the platform and the wire format use.
+    public String getId() {
+<span class="fc" id="L85">        return id;</span>
+    }
+
+    /// The human-readable name shown in the Shortcuts app and the simulator.
+    public String getTitle() {
+<span class="fc" id="L90">        return title;</span>
+    }
+
+    /// The longer explanation shown alongside the title, or an empty string.
+    public String getDescription() {
+<span class="fc" id="L95">        return description;</span>
+    }
+
+    /// True when this intent is allowed to run without bringing the app to the
+    /// foreground. See the package documentation for what a headless handler may
+    /// and may not touch.
+    public boolean isHeadless() {
+<span class="fc" id="L102">        return headless;</span>
+    }
+
+    /// True when an invocation of this intent actually runs with no window.
+    ///
+    /// Not the same question as [#isHeadless()], which reports what the declaration *said*. An
+    /// intent that names a route is foregrounded however it was declared, because the route has
+    /// to open somewhere a person can see -- iOS decides that statically through
+    /// `openAppWhenRun`, and every Java caller has to reach the same answer.
+    ///
+    /// It exists because that combination was resolved separately in four places -- the Android
+    /// trampoline, the service's post-bootstrap recheck, the parked-request path and the
+    /// shortcut generator -- and each was fixed as its own bug. One definition, one answer.
+    public boolean runsHeadless() {
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        return headless &amp;&amp; opensRoute.length() == 0;</span>
+    }
+
+    /// True when the platform may offer this intent before the user has ever run
+    /// it. A false value means the intent only appears after a donation.
+    public boolean isDiscoverable() {
+<span class="fc" id="L122">        return discoverable;</span>
+    }
+
+    /// True when the platform should confirm with the user before running this.
+    public boolean isDestructive() {
+<span class="fc" id="L127">        return destructive;</span>
+    }
+
+    /// The route template this intent navigates to, or an empty string. A
+    /// non-empty value is what makes the platform open the app when the intent
+    /// runs.
+    public String getOpensRoute() {
+<span class="fc" id="L134">        return opensRoute;</span>
+    }
+
+    /// The handler's own time budget in seconds, before the framework gives up
+    /// and reports a failure to the platform.
+    public int getTimeoutSeconds() {
+<span class="fc" id="L140">        return timeoutSeconds;</span>
+    }
+
+    /// The spoken phrases that invoke this intent. Empty on platforms that have
+    /// no voice invocation, and empty for intents that never declared any.
+    public List&lt;String&gt; getPhrases() {
+<span class="fc" id="L146">        return phrases;</span>
+    }
+
+    /// The declared parameters, in the order the handler takes them.
+    public List&lt;IntentParameterInfo&gt; getParameters() {
+<span class="fc" id="L151">        return parameters;</span>
+    }
+
+    /// The consumers this intent is offered to.
+    public List&lt;Exposure&gt; getExposure() {
+<span class="fc" id="L156">        return exposure;</span>
+    }
+
+    /// True when this intent is offered to the given consumer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the consumer to test
+    public boolean isExposedTo(Exposure e) {
+<span class="fc" id="L165">        return exposure.contains(e);</span>
+    }
+
+    /// The parameter with this name, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the parameter name
+    public IntentParameterInfo getParameter(String name) {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (IntentParameterInfo p : parameters) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (p.getName().equals(name)) {</span>
+<span class="fc" id="L176">                return p;</span>
+            }
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">        return null;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L184">        return id;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

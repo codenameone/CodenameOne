@@ -1,0 +1,792 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BufferedInputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">BufferedInputStream.java</span></div><h1>BufferedInputStream.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io;
+
+import com.codename1.ui.Display;
+import com.codename1.util.StringUtil;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/// Based on the buffered input stream from the JDK with some minor tweaks to allow
+/// external classes to monitor stream status and progress.
+public class BufferedInputStream extends InputStream {
+<span class="fc" id="L35">    private static int streamCount = 0;</span>
+
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+<span class="fc" id="L38">    private static volatile int defaultBufferSize = 8192;</span>
+    private final String name;
+<span class="fc" id="L40">    private int actualAvailable = defaultBufferSize;</span>
+    private Object connection;
+    private InputStream in;
+    private byte[] buf;
+    private IOProgressListener progressListener;
+    private boolean disableBuffering;
+    private boolean closed;
+    private boolean stopped;
+    /// The index one greater than the index of the last valid byte in
+    /// the buffer.
+    /// This value is always
+    /// in the range `0` through `buf.length`;
+    /// elements `buf[0]`  through `buf[count-1]`contain buffered input data obtained
+    /// from the underlying  input stream.
+    private int count;
+    private long lastActivityTime;
+    private int totalBytesRead;
+    private boolean printInput;
+<span class="fc" id="L58">    private int yield = -1;</span>
+    private long elapsedSinceLastYield;
+    /// The current position in the buffer. This is the index of the next
+    /// character to be read from the `buf` array.
+    ///
+    /// This value is always in the range `0`
+    /// through `count`. If it is less
+    /// than `count`, then  `buf[pos]`
+    /// is the next byte to be supplied as input;
+    /// if it is equal to `count`, then
+    /// the  next `read` or `skip`
+    /// operation will require more bytes to be
+    /// read from the contained  input stream.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#buf
+    private int pos;
+    /// The value of the `pos` field at the time the last
+    /// `mark` method was called.
+    ///
+    /// This value is always
+    /// in the range `-1` through `pos`.
+    /// If there is no marked position in  the input
+    /// stream, this field is `-1`. If
+    /// there is a marked position in the input
+    /// stream,  then `buf[markpos]`
+    /// is the first byte to be supplied as input
+    /// after a `reset` operation. If
+    /// `markpos` is not `-1`,
+    /// then all bytes from positions `buf[markpos]`
+    /// through  `buf[pos-1]` must remain
+    /// in the buffer array (though they may be
+    /// moved to  another place in the buffer array,
+    /// with suitable adjustments to the values
+    /// of `count`,  `pos`,
+    /// and `markpos`); they may not
+    /// be discarded unless and until the difference
+    /// between `pos` and `markpos`
+    /// exceeds `marklimit`.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#mark(int)
+    ///
+    /// - java.io.BufferedInputStream#pos
+<span class="fc" id="L104">    private int markpos = -1;</span>
+    /// The maximum read ahead allowed after a call to the
+    /// `mark` method before subsequent calls to the
+    /// `reset` method fail.
+    /// Whenever the difference between `pos`
+    /// and `markpos` exceeds `marklimit`,
+    /// then the  mark may be dropped by setting
+    /// `markpos` to `-1`.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.BufferedInputStream#mark(int)
+    ///
+    /// - java.io.BufferedInputStream#reset()
+    private int marklimit;
+
+    /// Creates a `BufferedInputStream`
+    /// and saves its  argument, the input stream
+    /// `in`, for later use. An internal
+    /// buffer array is created and  stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    public BufferedInputStream(InputStream in) {
+<span class="fc" id="L129">        this(in, defaultBufferSize);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Creates a `BufferedInputStream`
+    /// and saves its  argument, the input stream
+    /// `in`, for later use. An internal
+    /// buffer array is created and  stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `name`: the name of the stream
+    public BufferedInputStream(InputStream in, String name) {
+<span class="fc" id="L143">        this(in, defaultBufferSize, name);</span>
+<span class="fc" id="L144">    }</span>
+
+    /// Creates a `BufferedInputStream`
+    /// with the specified buffer size,
+    /// and saves its  argument, the input stream
+    /// `in`, for later use.  An internal
+    /// buffer array of length  `size`
+    /// is created and stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size &lt;= 0.
+    public BufferedInputStream(InputStream in, int size) {
+<span class="fc" id="L163">        this(in, size, &quot;unnamed&quot;);</span>
+<span class="fc" id="L164">    }</span>
+
+    /// Creates a `BufferedInputStream`
+    /// with the specified buffer size,
+    /// and saves its  argument, the input stream
+    /// `in`, for later use.  An internal
+    /// buffer array of length  `size`
+    /// is created and stored in `buf`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the underlying input stream.
+    ///
+    /// - `size`: the buffer size.
+    ///
+    /// - `name`: the name of the stream
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if size &lt;= 0.
+<span class="fc" id="L184">    public BufferedInputStream(InputStream in, int size, String name) {</span>
+<span class="fc" id="L185">        this.in = in;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (size &lt;= 0) {</span>
+<span class="fc" id="L187">            throw new IllegalArgumentException(&quot;Buffer size &lt;= 0&quot;);</span>
+        }
+<span class="fc" id="L189">        buf = new byte[size];</span>
+<span class="fc" id="L190">        streamCount++;</span>
+<span class="fc" id="L191">        this.name = name;</span>
+<span class="fc" id="L192">        Util.getImplementation().logStreamCreate(name, true, streamCount);</span>
+<span class="fc" id="L193">    }</span>
+
+    /// The default size for a stream buffer
+    ///
+    /// #### Returns
+    ///
+    /// the defaultBufferSize
+    public static int getDefaultBufferSize() {
+<span class="fc" id="L201">        return defaultBufferSize;</span>
+    }
+
+    /// The default size for a stream buffer
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultBufferSize`: the defaultBufferSize to set
+    public static void setDefaultBufferSize(int aDefaultBufferSize) {
+<span class="fc" id="L210">        defaultBufferSize = aDefaultBufferSize;</span>
+<span class="fc" id="L211">    }</span>
+
+    /// Indicates the name of the stream for debugging purposes
+    ///
+    /// #### Returns
+    ///
+    /// the name of the stream
+    public String getName() {
+<span class="fc" id="L219">        return name;</span>
+    }
+
+    /// Check to make sure that the underlying input stream has not been
+    /// nulled out due to close; if not return it;
+    private synchronized InputStream getInIfOpen() throws IOException {
+<span class="fc" id="L225">        InputStream input = in;</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (input == null) {</span>
+<span class="nc" id="L227">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="fc" id="L229">        return input;</span>
+    }
+
+    /// Check to make sure that buffer has not been nulled out due to
+    /// close; if not return it;
+    private synchronized byte[] getBufIfOpen() throws IOException {
+<span class="fc" id="L235">        byte[] buffer = buf;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (buffer == null) {</span>
+<span class="fc" id="L237">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="fc" id="L239">        return buffer;</span>
+    }
+
+    /// Fills the buffer with more data, taking into account
+    /// shuffling and other tricks for dealing with marks.
+    /// Assumes that it is being called by a synchronized method.
+    /// This method also assumes that all data has already been read in,
+    /// hence pos &gt; count.
+    private void fill() throws IOException {
+<span class="fc" id="L248">        byte[] buffer = getBufIfOpen();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (markpos &lt; 0) {</span>
+<span class="fc" id="L250">            pos = 0;        /* no mark: throw away the buffer */</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        } else if (pos &gt;= buffer.length) /* no room left in buffer */ {</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (markpos &gt; 0) {    /* can throw away early part of the buffer */</span>
+<span class="nc" id="L253">                int sz = pos - markpos;</span>
+<span class="nc" id="L254">                System.arraycopy(buffer, markpos, buffer, 0, sz);</span>
+<span class="nc" id="L255">                pos = sz;</span>
+<span class="nc" id="L256">                markpos = 0;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            } else if (buffer.length &gt;= marklimit) {</span>
+<span class="fc" id="L258">                markpos = -1;    /* buffer got too big, invalidate mark */</span>
+<span class="fc" id="L259">                pos = 0;    /* drop buffer contents */</span>
+            } else {        /* grow buffer */
+<span class="nc" id="L261">                int nsz = pos * 2;</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (nsz &gt; marklimit) {</span>
+<span class="nc" id="L263">                    nsz = marklimit;</span>
+                }
+<span class="nc" id="L265">                byte[] nbuf = new byte[nsz];</span>
+<span class="nc" id="L266">                System.arraycopy(buffer, 0, nbuf, 0, pos);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                if (buffer != buf) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L268">                    throw new IOException(&quot;Stream closed&quot;);</span>
+                }
+<span class="nc" id="L270">                buf = nbuf;</span>
+<span class="nc" id="L271">                buffer = nbuf;</span>
+            }
+        }
+<span class="fc" id="L274">        count = pos;</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (actualAvailable &lt; 0) {</span>
+<span class="nc" id="L276">            return;</span>
+        }
+<span class="fc" id="L278">        int sizeOfBuffer = (buffer.length - pos);</span>
+<span class="fc" id="L279">        int n = getInIfOpen().read(buffer, pos, sizeOfBuffer);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (n &gt; 0) {</span>
+<span class="fc" id="L281">            count = n + pos;</span>
+        } else {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            if (n &lt; 0) {</span>
+<span class="fc" id="L284">                actualAvailable = -1;</span>
+            }
+        }
+<span class="fc" id="L287">    }</span>
+
+    /// Allows access to the underlying input stream if desired
+    ///
+    /// #### Returns
+    ///
+    /// the internal input stream
+    public InputStream getInternal() {
+<span class="fc" id="L295">        return in;</span>
+    }
+
+    /// See
+    /// the general contract of the `read`
+    /// method of `InputStream`.
+    ///
+    /// #### Returns
+    ///
+    /// @return the next byte of data, or `-1` if the end of the
+    /// stream is reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    /// invoking its `#close()` method,
+    /// or an I/O error occurs.
+    @Override
+    public synchronized int read() throws IOException {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (stopped) {</span>
+<span class="fc" id="L315">            return -1;</span>
+        }
+<span class="fc" id="L317">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (disableBuffering) {</span>
+<span class="fc" id="L319">            int v = getInIfOpen().read();</span>
+<span class="pc bpc" id="L320" title="3 of 4 branches missed.">            if (printInput &amp;&amp; v &gt; -1) {</span>
+<span class="nc" id="L321">                System.out.print((char) v);</span>
+            }
+<span class="fc" id="L323">            totalBytesRead++;</span>
+<span class="fc" id="L324">            fireProgress();</span>
+<span class="fc" id="L325">            return v;</span>
+        }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (pos &gt;= count) {</span>
+<span class="fc" id="L328">            fill();</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (pos &gt;= count) {</span>
+<span class="fc" id="L330">                return -1;</span>
+            }
+        }
+<span class="fc" id="L333">        totalBytesRead++;</span>
+<span class="fc" id="L334">        fireProgress();</span>
+<span class="fc" id="L335">        int v = getBufIfOpen()[pos++] &amp; 0xff;</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (printInput) {</span>
+<span class="nc" id="L337">            System.out.print((char) v);</span>
+        }
+<span class="fc" id="L339">        return v;</span>
+
+    }
+
+    private void fireProgress() {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (progressListener != null) {</span>
+<span class="fc" id="L345">            progressListener.ioStreamUpdate(this, totalBytesRead);</span>
+        }
+<span class="fc" id="L347">    }</span>
+
+    /// Read characters into a portion of an array, reading from the underlying
+    /// stream at most once if necessary.
+    private int read1(byte[] b, int off, int len) throws IOException {
+<span class="fc" id="L352">        int avail = count - pos;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (avail &lt;= 0) {</span>
+            /* If the requested length is at least as large as the buffer, and
+            if there is no mark/reset activity, do not bother to copy the
+            bytes into the local buffer.  In this way buffered streams will
+            cascade harmlessly. */
+<span class="pc bpc" id="L358" title="3 of 4 branches missed.">            if (len &gt;= getBufIfOpen().length &amp;&amp; markpos &lt; 0) {</span>
+<span class="nc" id="L359">                int val = getInIfOpen().read(b, off, len);</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                if (val &lt; 0) {</span>
+<span class="nc" id="L361">                    actualAvailable = -1;</span>
+                } else {
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                    if (printInput) {</span>
+<span class="nc" id="L364">                        System.out.print(StringUtil.newString(b, off, val));</span>
+                    }
+                }
+<span class="nc" id="L367">                return val;</span>
+            }
+<span class="fc" id="L369">            fill();</span>
+<span class="fc" id="L370">            avail = count - pos;</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            if (avail &lt;= 0) {</span>
+<span class="nc" id="L372">                return -1;</span>
+            }
+        }
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        int cnt = (avail &lt; len) ? avail : len;</span>
+<span class="fc" id="L376">        System.arraycopy(getBufIfOpen(), pos, b, off, cnt);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (printInput) {</span>
+<span class="nc" id="L378">            System.out.print(StringUtil.newString(b, off, cnt));</span>
+        }
+<span class="fc" id="L380">        pos += cnt;</span>
+<span class="fc" id="L381">        return cnt;</span>
+    }
+
+    private void yieldTime() {
+<span class="nc" id="L385">        long time = System.currentTimeMillis();</span>
+<span class="nc" id="L386">        long sleepDuration = 0;</span>
+<span class="nc" id="L387">        synchronized (this) {</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            if (time - elapsedSinceLastYield &gt; 300) {</span>
+<span class="nc" id="L389">                elapsedSinceLastYield = time;</span>
+<span class="nc" id="L390">                sleepDuration = yield;</span>
+            }
+<span class="nc" id="L392">        }</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (sleepDuration &gt; 0) {</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">            int sleepMs = sleepDuration &gt; Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sleepDuration;</span>
+<span class="nc" id="L395">            Util.sleep(sleepMs);</span>
+        }
+<span class="nc" id="L397">    }</span>
+
+    /// Reads bytes from this byte-input stream into the specified byte array,
+    /// starting at the given offset.
+    ///
+    ///  This method implements the general contract of the corresponding
+    /// ```int, int) read``` method of
+    /// the ```InputStream``` class.  As an additional
+    /// convenience, it attempts to read as many bytes as possible by repeatedly
+    /// invoking the `read` method of the underlying stream.  This
+    /// iterated `read` continues until one of the following
+    /// conditions becomes true:
+    ///
+    /// -  The specified number of bytes have been read,
+    ///
+    /// -  The `read` method of the underlying stream returns
+    /// `-1`, indicating end-of-file, or
+    ///
+    /// -  The `available` method of the underlying stream
+    /// returns zero, indicating that further input requests would block.
+    ///
+    ///  If the first `read` on the underlying stream returns
+    /// `-1` to indicate end-of-file then this method returns
+    /// `-1`.  Otherwise this method returns the number of bytes
+    /// actually read.
+    ///
+    ///  Subclasses of this class are encouraged, but not required, to
+    /// attempt to read as many bytes as possible in the same fashion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: destination buffer.
+    ///
+    /// - `off`: offset at which to start storing bytes.
+    ///
+    /// - `len`: maximum number of bytes to read.
+    ///
+    /// #### Returns
+    ///
+    /// @return the number of bytes read, or `-1` if the end of
+    /// the stream has been reached.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    ///                     invoking its `#close()` method,
+    ///                     or an I/O error occurs.
+    @Override
+    public synchronized int read(byte[] b, int off, int len)
+            throws IOException {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (stopped) {</span>
+<span class="nc" id="L448">            return -1;</span>
+        }
+<span class="pc bpc" id="L450" title="3 of 4 branches missed.">        if (yield &gt; -1 &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L451">            yieldTime();</span>
+        }
+<span class="fc" id="L453">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (disableBuffering) {</span>
+<span class="nc" id="L455">            int v = getInIfOpen().read(b, off, len);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            if (v &gt; -1) {</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">                if (printInput) {</span>
+<span class="nc" id="L458">                    System.out.print(StringUtil.newString(b, off, v));</span>
+                }
+
+<span class="nc" id="L461">                totalBytesRead += v;</span>
+<span class="nc" id="L462">                fireProgress();</span>
+            }
+<span class="nc" id="L464">            return v;</span>
+        }
+<span class="fc" id="L466">        getBufIfOpen(); // Check for closed stream</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        if ((off | len | (off + len) | (b.length - (off + len))) &lt; 0) {</span>
+<span class="nc" id="L468">            throw new IndexOutOfBoundsException();</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        } else if (len == 0) {</span>
+<span class="fc" id="L470">            return 0;</span>
+        }
+
+<span class="fc" id="L473">        int n = 0;</span>
+        for (; ; ) {
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            if (stopped) {</span>
+<span class="nc" id="L476">                return -1;</span>
+            }
+<span class="fc" id="L478">            lastActivityTime = System.currentTimeMillis();</span>
+<span class="fc" id="L479">            int nread = read1(b, off + n, len - n);</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (nread &lt;= 0) {</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                n = (n == 0) ? nread : n;</span>
+<span class="nc" id="L482">                break;</span>
+            }
+<span class="fc" id="L484">            n += nread;</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">            if (n &gt;= len) {</span>
+<span class="fc" id="L486">                break;</span>
+            }
+            // if not closed but no bytes available, return
+<span class="nc" id="L489">            InputStream input = in; //NOPMD CloseResource - stream managed by BufferedInputStream#close</span>
+<span class="nc bnc" id="L490" title="All 4 branches missed.">            if (input != null &amp;&amp; superAvailable() &lt;= 0) {</span>
+<span class="nc" id="L491">                break;</span>
+            }
+<span class="nc bnc" id="L493" title="All 4 branches missed.">            if (yield &gt; -1 &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L494">                yieldTime();</span>
+            }
+<span class="nc" id="L496">        }</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">        if (n &gt; 0) {</span>
+<span class="fc" id="L498">            totalBytesRead += n;</span>
+<span class="fc" id="L499">            fireProgress();</span>
+        }
+<span class="fc" id="L501">        lastActivityTime = System.currentTimeMillis();</span>
+
+<span class="fc" id="L503">        return n;</span>
+    }
+
+    /// See the general contract of the `skip`
+    /// method of `InputStream`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if the stream does not support seek,
+    ///                     or if this input stream has been closed by
+    ///                     invoking its `#close()` method, or an
+    ///                     I/O error occurs.
+    @Override
+    public synchronized long skip(long n) throws IOException {
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">        if (disableBuffering) {</span>
+<span class="nc" id="L518">            long v = getInIfOpen().skip(n);</span>
+<span class="nc" id="L519">            totalBytesRead += v;</span>
+<span class="nc" id="L520">            fireProgress();</span>
+<span class="nc" id="L521">            return v;</span>
+        }
+<span class="fc" id="L523">        getBufIfOpen(); // Check for closed stream</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">        if (n &lt;= 0) {</span>
+<span class="fc" id="L525">            return 0;</span>
+        }
+<span class="fc" id="L527">        long avail = count - pos;</span>
+
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (avail &lt;= 0) {</span>
+            // If no mark position set then don't keep in buffer
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            if (markpos &lt; 0) {</span>
+<span class="fc" id="L532">                return getInIfOpen().skip(n);</span>
+            }
+
+            // Fill in buffer to save bytes for reset
+<span class="nc" id="L536">            fill();</span>
+<span class="nc" id="L537">            avail = count - pos;</span>
+<span class="nc bnc" id="L538" title="All 2 branches missed.">            if (avail &lt;= 0) {</span>
+<span class="nc" id="L539">                return 0;</span>
+            }
+        }
+
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        long skipped = (avail &lt; n) ? avail : n;</span>
+<span class="nc" id="L544">        pos += skipped;</span>
+<span class="nc" id="L545">        totalBytesRead += (int) skipped;</span>
+<span class="nc" id="L546">        fireProgress();</span>
+<span class="nc" id="L547">        lastActivityTime = System.currentTimeMillis();</span>
+<span class="nc" id="L548">        return skipped;</span>
+    }
+
+    /// Returns an estimate of the number of bytes that can be read (or
+    /// skipped over) from this input stream without blocking by the next
+    /// invocation of a method for this input stream. The next invocation might be
+    /// the same thread or another thread.  A single read or skip of this
+    /// many bytes will not block, but may read or skip fewer bytes.
+    ///
+    /// This method returns the sum of the number of bytes remaining to be read in
+    /// the buffer (`count - pos`) and the result of calling the
+    /// `in`.available().
+    ///
+    /// #### Returns
+    ///
+    /// @return an estimate of the number of bytes that can be read (or skipped
+    /// over) from this input stream without blocking.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this input stream has been closed by
+    ///                     invoking its close() method,
+    ///                     or an I/O error occurs.
+    @Override
+    public synchronized int available() throws IOException {
+<span class="nc bnc" id="L573" title="All 2 branches missed.">        if (disableBuffering) {</span>
+<span class="nc" id="L574">            return in.available();</span>
+        }
+<span class="nc" id="L576">        return superAvailable() + (count - pos);</span>
+    }
+
+    /// See the general contract of the `mark`
+    /// method of `InputStream`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `readlimit`: @param readlimit the maximum limit of bytes that can be read before
+    ///                  the mark position becomes invalid.
+    @Override
+    public synchronized void mark(int readlimit) {
+<span class="fc" id="L588">        marklimit = readlimit;</span>
+<span class="fc" id="L589">        markpos = pos;</span>
+<span class="fc" id="L590">    }</span>
+
+    /// See the general contract of the `reset`
+    /// method of `InputStream`.
+    ///
+    /// If `markpos` is `-1`
+    /// (no mark has been set or the mark has been
+    /// invalidated), an `IOException`
+    /// is thrown. Otherwise, `pos` is
+    /// set equal to `markpos`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException if this stream has not been marked or,
+    ///                     if the mark has been invalidated, or the stream
+    ///                     has been closed by invoking its `#close()`
+    ///                     method, or an I/O error occurs.
+    @Override
+    public synchronized void reset() throws IOException {
+<span class="fc" id="L609">        getBufIfOpen(); // Cause exception if closed</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (markpos &lt; 0) {</span>
+<span class="fc" id="L611">            throw new IOException(&quot;Resetting to invalid mark&quot;);</span>
+        }
+<span class="fc" id="L613">        pos = markpos;</span>
+<span class="fc" id="L614">    }</span>
+
+    /// Tests if this input stream supports the `mark`
+    /// and `reset` methods. The `markSupported`
+    /// method of `BufferedInputStream` returns
+    /// `true`.
+    ///
+    /// #### Returns
+    ///
+    /// @return a `boolean` indicating if this stream type supports
+    /// the `mark` and `reset` methods.
+    ///
+    /// #### See also
+    ///
+    /// - java.io.InputStream#mark(int)
+    ///
+    /// - java.io.InputStream#reset()
+    @Override
+    public boolean markSupported() {
+<span class="fc" id="L633">        return in.markSupported();</span>
+    }
+
+    private int superAvailable() {
+        try {
+<span class="nc bnc" id="L638" title="All 2 branches missed.">            if (actualAvailable &lt; 0) {</span>
+<span class="nc" id="L639">                return -1;</span>
+            }
+<span class="nc" id="L641">            return in.available();</span>
+<span class="nc" id="L642">        } catch (IOException err) {</span>
+            // Available sometimes fails on MIDP devices and shouldn't be used
+<span class="nc" id="L644">            return actualAvailable;</span>
+        }
+    }
+
+    /// Closes this input stream and releases any system resources
+    /// associated with the stream.
+    /// Once the stream has been closed, further read(), available(), reset(),
+    /// or skip() invocations will throw an IOException.
+    /// Closing a previously closed stream has no effect.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if an I/O error occurs.
+    @Override
+    public void close() throws IOException {
+<span class="fc bfc" id="L659" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L660">            Util.getImplementation().logStreamDoubleClose(name, true);</span>
+<span class="fc" id="L661">            return;</span>
+        }
+<span class="fc" id="L663">        closed = true;</span>
+<span class="fc" id="L664">        streamCount--;</span>
+<span class="fc" id="L665">        Util.getImplementation().logStreamClose(name, true, streamCount);</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">        if (connection != null) {</span>
+<span class="nc" id="L667">            Util.getImplementation().cleanup(connection);</span>
+        }
+<span class="fc" id="L669">        byte[] buffer = buf;</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">        if (buffer != null) {</span>
+<span class="fc" id="L671">            buf = null;</span>
+<span class="fc" id="L672">            InputStream input = in; //NOPMD CloseResource</span>
+<span class="fc" id="L673">            in = null;</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">            if (input != null) {</span>
+<span class="fc" id="L675">                Util.cleanup(input);</span>
+            }
+        }
+<span class="fc" id="L678">    }</span>
+
+    /// Returns the time of the last activity
+    ///
+    /// #### Returns
+    ///
+    /// time of the last activity on this stream
+    public synchronized long getLastActivityTime() {
+<span class="fc" id="L686">        return lastActivityTime;</span>
+    }
+
+    /// Returns the total number of bytes read from this stream so far
+    ///
+    /// #### Returns
+    ///
+    /// the total number of bytes read from this stream so far
+    public synchronized int getTotalBytesRead() {
+<span class="fc" id="L695">        return totalBytesRead;</span>
+    }
+
+    /// Sets the callback for IO updates from a buffered stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `progressListener`: the progressListener to set
+    public void setProgressListener(IOProgressListener progressListener) {
+<span class="fc" id="L704">        this.progressListener = progressListener;</span>
+<span class="fc" id="L705">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int read(byte[] b) throws IOException {
+<span class="fc" id="L710">        return read(b, 0, b.length);</span>
+    }
+
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Returns
+    ///
+    /// the connection
+    public Object getConnection() {
+<span class="fc" id="L719">        return connection;</span>
+    }
+
+    /// If applicable this member represents the connection object for the stream
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection to set
+    public void setConnection(Object connection) {
+<span class="fc" id="L728">        this.connection = connection;</span>
+<span class="fc" id="L729">    }</span>
+
+    /// #### Returns
+    ///
+    /// the disableBuffering
+    public synchronized boolean isDisableBuffering() {
+<span class="fc" id="L735">        return disableBuffering;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `disableBuffering`: the disableBuffering to set
+    public synchronized void setDisableBuffering(boolean disableBuffering) {
+<span class="fc" id="L742">        this.disableBuffering = disableBuffering;</span>
+<span class="fc" id="L743">    }</span>
+
+    /// Prints out all the data that passes through this stream to the console.
+    /// This is a very useful debugging tool.
+    ///
+    /// #### Returns
+    ///
+    /// the printInput
+    public synchronized boolean isPrintInput() {
+<span class="fc" id="L752">        return printInput;</span>
+    }
+
+    /// Prints out all the data that passes through this stream to the console.
+    /// This is a very useful debugging tool.
+    ///
+    /// #### Parameters
+    ///
+    /// - `printInput`: the printInput to set
+    public synchronized void setPrintInput(boolean printInput) {
+<span class="fc" id="L762">        this.printInput = printInput;</span>
+<span class="fc" id="L763">    }</span>
+
+    /// Allows setting a yield duration for this stream which is useful for background
+    /// operations to release CPU
+    ///
+    /// #### Returns
+    ///
+    /// the yield
+    public synchronized int getYield() {
+<span class="fc" id="L772">        return yield;</span>
+    }
+
+    /// Allows setting a yield duration for this stream which is useful for background
+    /// operations to release CPU
+    ///
+    /// #### Parameters
+    ///
+    /// - `yield`: the yield to set
+    public synchronized void setYield(int yield) {
+<span class="fc" id="L782">        this.yield = yield;</span>
+<span class="fc" id="L783">    }</span>
+
+    /// Stop reading from the stream, invoking this will cause the read() to
+    /// return -1
+    public synchronized void stop() {
+<span class="fc" id="L788">        stopped = true;</span>
+<span class="fc" id="L789">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

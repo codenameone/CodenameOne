@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModelSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.inference</a> &gt; <span class="el_source">ModelSource.java</span></div><h1>ModelSource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+/// Describes where an {@link InferenceSession} should obtain a `.tflite`
+/// model. Byte sources are defensively copied. File sources are especially
+/// useful with {@link ModelCache} because native ports can open the cached
+/// path without loading the full model into the Java heap.
+public final class ModelSource {
+    public static final int BYTES = 1;
+    public static final int FILE = 2;
+    public static final int RESOURCE = 3;
+
+    private final int kind;
+    private final byte[] bytes;
+    private final String path;
+
+<span class="fc" id="L38">    private ModelSource(int kind, byte[] bytes, String path) {</span>
+<span class="fc" id="L39">        this.kind = kind;</span>
+<span class="fc" id="L40">        this.bytes = bytes;</span>
+<span class="fc" id="L41">        this.path = path;</span>
+<span class="fc" id="L42">    }</span>
+
+    /// Creates an in-memory model source.
+    /// @param value complete model bytes, copied by this method
+    /// @return a byte-backed source
+    public static ModelSource bytes(byte[] value) {
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        if (value == null || value.length == 0) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;Model bytes must not be empty&quot;);</span>
+        }
+<span class="fc" id="L51">        byte[] copy = new byte[value.length];</span>
+<span class="fc" id="L52">        System.arraycopy(value, 0, copy, 0, value.length);</span>
+<span class="fc" id="L53">        return new ModelSource(BYTES, copy, null);</span>
+    }
+
+    /// Creates a source for an existing private filesystem path.
+    /// @param path path understood by {@code FileSystemStorage}
+    /// @return a file-backed source; the session never owns or deletes the file
+    public static ModelSource file(String path) {
+<span class="fc" id="L60">        return named(FILE, path);</span>
+    }
+
+    /// Creates a source for a model packaged in application resources.
+    /// @param path absolute classpath-style resource path
+    /// @return a resource-backed source
+    public static ModelSource resource(String path) {
+<span class="nc" id="L67">        return named(RESOURCE, path);</span>
+    }
+
+    private static ModelSource named(int kind, String path) {
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (path == null || path.length() == 0) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;Model path must not be empty&quot;);</span>
+        }
+<span class="fc" id="L74">        return new ModelSource(kind, null, path);</span>
+    }
+
+    /// @return {@link #BYTES}, {@link #FILE}, or {@link #RESOURCE}
+    public int getKind() {
+<span class="nc" id="L79">        return kind;</span>
+    }
+
+    /// @return a defensive copy of model bytes, or {@code null} for non-byte sources
+    public byte[] getBytes() {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (bytes == null) {</span>
+<span class="nc" id="L85">            return null;</span>
+        }
+<span class="fc" id="L87">        byte[] out = new byte[bytes.length];</span>
+<span class="fc" id="L88">        System.arraycopy(bytes, 0, out, 0, bytes.length);</span>
+<span class="fc" id="L89">        return out;</span>
+    }
+
+    /// Returns the internal model byte array without copying it.
+    ///
+    /// This escape hatch is intended for native backend handoff and
+    /// memory-sensitive applications. The returned array must be treated as
+    /// read-only: modifying it changes the model source and violates this
+    /// class's immutability contract. Prefer {@link #getBytes()} unless the
+    /// additional full-model copy is known to be unacceptable.
+    ///
+    /// @return internal model bytes, or {@code null} for non-byte sources
+    public byte[] getBytesUnsafe() {
+<span class="fc" id="L102">        return bytes;</span>
+    }
+
+    /// @return the file/resource path, or {@code null} for a byte source
+    public String getPath() {
+<span class="fc" id="L107">        return path;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

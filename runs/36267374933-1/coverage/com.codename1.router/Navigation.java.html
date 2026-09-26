@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Navigation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.router</a> &gt; <span class="el_source">Navigation.java</span></div><h1>Navigation.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.router;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// In-app navigation API on top of the declarative `@Route` table.
+///
+/// `Navigation` is the imperative counterpart to the `Route` annotation:
+/// declare your forms with `@Route(&quot;/users/:id&quot;)` once, then trigger
+/// navigation from anywhere with `Navigation.navigate(&quot;/users/42&quot;)`. The same
+/// route table that handles deep links is reused, so there is exactly one
+/// place that knows how `/users/:id` maps to a form.
+///
+/// The class also exposes the navigation stack so applications can render
+/// breadcrumb UIs without maintaining a parallel history:
+///
+/// ```java
+/// Container breadcrumbs = new Container(BoxLayout.x());
+/// for (final NavigationEntry e : Navigation.getStack()) {
+///     Button crumb = new Button(e.getTitle());
+///     crumb.addActionListener(evt -&gt; Navigation.popTo(e));
+///     breadcrumbs.add(crumb);
+/// }
+/// ```
+///
+/// The surface is intentionally tiny -- five static methods and one value
+/// type. Applications that prefer raw `Form#show` / `Form#showBack` keep
+/// working unchanged; the `Navigation` stack only records URL-driven
+/// navigations.
+///
+/// All methods must be called on the EDT.
+public final class Navigation {
+
+    private static RouteDispatcher dispatcher;
+<span class="fc" id="L61">    private static final List&lt;NavigationEntry&gt; stack = new ArrayList&lt;NavigationEntry&gt;();</span>
+
+    private Navigation() {
+    }
+
+    // ------------------------------------------------------------------------
+    // Internal: dispatcher installation
+    // ------------------------------------------------------------------------
+
+    /// Installs the build-time-generated route dispatcher. Invoked once by
+    /// `com.codename1.router.generated.Routes#bootstrap` during framework
+    /// initialization. Application code should not call this.
+    public static void setDispatcher(RouteDispatcher d) {
+<span class="fc" id="L74">        dispatcher = d;</span>
+<span class="fc" id="L75">    }</span>
+
+    // ------------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------------
+
+    /// Navigate to a path. Looks the URL up in the route table generated from
+    /// `@Route` annotations, builds the matching `Form`, pushes it onto the
+    /// navigation stack, and shows it.
+    ///
+    /// Accepts either a bare path (`/users/42`), a full URL with scheme +
+    /// host (`https://example.com/users/42`), or a custom-scheme URL. Scheme
+    /// and host are ignored -- only the path + query are matched.
+    ///
+    /// Returns `true` when a route matched and the form was shown, `false`
+    /// when no route matched.
+    public static boolean navigate(String path) {
+<span class="fc" id="L92">        RouteDispatcher d = dispatcher;</span>
+<span class="fc bfc" id="L93" title="All 4 branches covered.">        if (d == null || path == null) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+        Form f;
+        try {
+<span class="fc" id="L98">            f = d.dispatch(path);</span>
+<span class="fc" id="L99">        } catch (Throwable t) {</span>
+<span class="fc" id="L100">            com.codename1.io.Log.e(t);</span>
+<span class="fc" id="L101">            return false;</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (f == null) {</span>
+<span class="fc" id="L104">            return false;</span>
+        }
+<span class="fc" id="L106">        List&lt;NavigationEntry&gt; before = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+<span class="fc" id="L107">        stack.add(new NavigationEntry(path, f));</span>
+        // BEFORE show(), which runs application code. The stack has already changed here, and
+        // that is what continuity records -- so notifying now means a show callback that ends the
+        // session (an expired login discovered on screen) is answered by clear() clearing the
+        // pending flag, and the flush queued a moment ago then finds nothing owed. Notifying
+        // afterwards described a session the callback had already ended, and checkpointed the
+        // signed-out account's payload.
+<span class="fc" id="L114">        stackChanged();</span>
+<span class="fc" id="L115">        List&lt;NavigationEntry&gt; expected = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+        try {
+<span class="fc" id="L117">            f.show();</span>
+<span class="fc" id="L118">        } catch (RuntimeException e) {</span>
+            // The entry goes back. show() can throw before the form is ever installed, and the
+            // entry left behind was a screen the user never saw -- persisted by the checkpoint
+            // this method has already queued, and restored after a process death. The flush reads
+            // the stack when it runs, so putting it back is what makes that checkpoint describe
+            // the truth.
+<span class="fc" id="L124">            rollBack(before, expected, f);</span>
+<span class="fc" id="L125">            throw e;</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc" id="L127">        return true;</span>
+    }
+
+    /// Pop the top entry off the navigation stack and return to the previous
+    /// one. Uses `Form#showBack` so the transition runs in reverse. Returns
+    /// `true` when a frame was popped, `false` when the stack had at most one
+    /// entry (already at the root, nothing to go back to).
+    public static boolean back() {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (stack.size() &lt;= 1) {</span>
+<span class="fc" id="L136">            return false;</span>
+        }
+<span class="fc" id="L138">        List&lt;NavigationEntry&gt; before = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+<span class="fc" id="L139">        stack.remove(stack.size() - 1);</span>
+<span class="fc" id="L140">        NavigationEntry now = stack.get(stack.size() - 1);</span>
+<span class="fc" id="L141">        Form back = now.getForm();</span>
+        // Before showBack(), for the reason navigate() gives.
+<span class="fc" id="L143">        stackChanged();</span>
+<span class="fc" id="L144">        List&lt;NavigationEntry&gt; expected = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+        try {
+<span class="fc" id="L146">            back.showBack();</span>
+<span class="fc" id="L147">        } catch (RuntimeException e) {</span>
+<span class="fc" id="L148">            rollBack(before, expected, back);</span>
+<span class="fc" id="L149">            throw e;</span>
+<span class="fc" id="L150">        }</span>
+<span class="fc" id="L151">        return true;</span>
+    }
+
+    /// The current entry (top of stack), or null when the stack is empty.
+    public static NavigationEntry getCurrent() {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        return stack.isEmpty() ? null : stack.get(stack.size() - 1);</span>
+    }
+
+    /// Unmodifiable snapshot of the navigation stack, oldest entry first
+    /// (breadcrumb order). The list is a copy: mutating navigations after
+    /// the call do not affect it.
+    public static List&lt;NavigationEntry&gt; getStack() {
+<span class="fc" id="L163">        return Collections.unmodifiableList(new ArrayList&lt;NavigationEntry&gt;(stack));</span>
+    }
+
+    /// Undoes a navigation whose show() threw -- but only if nothing else touched the stack
+    /// while it ran.
+    ///
+    /// `show()` runs application code, and that code can navigate. The case that matters is
+    /// `Continuity.clear()`: a show listener discovers the session has expired, logs out --
+    /// which empties this stack on purpose -- and then throws on the way out. Restoring
+    /// unconditionally handed the signed-out account's forms straight back, reachable through
+    /// `getStack()` and `back()` and persisted by the next checkpoint. That is the one thing the
+    /// logout existed to prevent, undone by the rollback meant to help it.
+    ///
+    /// So the rollback applies only when the stack is still exactly what this method left it as.
+    /// Anything else -- a logout, or a show listener that navigated somewhere of its own -- is a
+    /// deliberate change by code that ran later, and it wins. `NavigationEntry` does not override
+    /// equals, so comparing the lists compares entry IDENTITY, which is what makes &quot;still exactly
+    /// what I left&quot; mean what it says.
+    private static void rollBack(List&lt;NavigationEntry&gt; before, List&lt;NavigationEntry&gt; expected,
+            Form intended) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (!expected.equals(stack)) {</span>
+<span class="fc" id="L184">            return;</span>
+        }
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (Display.getInstance().getCurrent() == intended) { //NOPMD CompareObjectsWithEquals</span>
+            // The form IS on screen. show() installs the form and only then runs onShowCompleted
+            // and the show listeners, so a throw from one of those is a failure that happened
+            // AFTER the navigation succeeded -- the entry describes the screen the user is
+            // looking at, and rolling it back would leave Navigation.getCurrent() disagreeing
+            // with Display.getCurrent(): back() would work on a stack whose top is not the
+            // visible form, and a checkpoint would persist a screen the user is not on.
+            //
+            // The rollback is for the other case, which is the one it was written for: show()
+            // threw BEFORE installing anything, so the entry is a screen nobody ever saw.
+            //
+            // Re-showing the previous form instead was the alternative, and it is worse: it runs
+            // a second full show cycle -- transitions, listeners, whatever they do -- as error
+            // handling, on a form the application has not asked to see again, and that cycle can
+            // throw in its turn. Leaving the stack agreeing with the display costs nothing and
+            // needs no application code to run.
+<span class="fc" id="L202">            return;</span>
+        }
+<span class="fc" id="L204">        stack.clear();</span>
+<span class="fc" id="L205">        stack.addAll(before);</span>
+<span class="fc" id="L206">    }</span>
+
+    /// Forgets the navigation history, leaving nothing to go back to.
+    ///
+    /// For a logout, which is the case that needs it: `Continuity.clear()` calls this, because a
+    /// route stack is the previous account's work as surely as a stored checkpoint is. Left in
+    /// place it kept two promises broken -- `Navigation#back()` reopened the signed-out account's
+    /// forms, and the next navigation checkpointed and republished a stack that still began with
+    /// their routes.
+    ///
+    /// The forms themselves are not touched: whatever is on screen stays there, and the caller
+    /// navigates wherever it means to go next.
+    ///
+    /// Continuity IS notified, because for every caller except a logout this is a real change to
+    /// where the user has been. It used to stay silent so that `Continuity.clear()` could call it
+    /// without checkpointing the emptied stack back over what it was deleting -- but that made
+    /// every other caller silent too: an application forgetting its back history and then not
+    /// navigating left the previous routes in the stored checkpoint, so a process death restored
+    /// exactly what it had just cleared. The logout path suppresses this at its own end, where
+    /// the reason to suppress it lives.
+    public static void clearStack() {
+<span class="fc" id="L227">        stack.clear();</span>
+<span class="fc" id="L228">        stackChanged();</span>
+<span class="fc" id="L229">    }</span>
+
+    /// Pop entries until `entry` is on top, then show its form via
+    /// `Form#showBack`. Returns `true` when the entry was on the stack and
+    /// we navigated back to it, `false` when the entry is not on the stack.
+    /// Calling with the current entry is a no-op that returns `true`.
+    public static boolean popTo(NavigationEntry entry) {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (entry == null) {</span>
+<span class="fc" id="L237">            return false;</span>
+        }
+        // NavigationEntry doesn't override equals, so entry.equals(other) is
+        // reference equality -- which is what we want here. Two navigations to
+        // the same path are independent stack frames.
+<span class="fc" id="L242">        int idx = -1;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (int i = 0; i &lt; stack.size(); i++) {</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (entry.equals(stack.get(i))) {</span>
+<span class="fc" id="L245">                idx = i;</span>
+<span class="fc" id="L246">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (idx &lt; 0) {</span>
+<span class="fc" id="L250">            return false;</span>
+        }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (idx == stack.size() - 1) {</span>
+<span class="fc" id="L253">            return true;</span>
+        }
+<span class="fc" id="L255">        List&lt;NavigationEntry&gt; before = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        while (stack.size() &gt; idx + 1) {</span>
+<span class="fc" id="L257">            stack.remove(stack.size() - 1);</span>
+        }
+<span class="fc" id="L259">        Form target = entry.getForm();</span>
+        // Before showBack(), for the reason navigate() gives.
+<span class="fc" id="L261">        stackChanged();</span>
+<span class="fc" id="L262">        List&lt;NavigationEntry&gt; expected = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+        try {
+<span class="fc" id="L264">            target.showBack();</span>
+<span class="fc" id="L265">        } catch (RuntimeException e) {</span>
+<span class="fc" id="L266">            rollBack(before, expected, target);</span>
+<span class="fc" id="L267">            throw e;</span>
+<span class="fc" id="L268">        }</span>
+<span class="fc" id="L269">        return true;</span>
+    }
+
+    /// Rebuilds the stack from a list of paths, showing only the last one.
+    ///
+    /// This is how `com.codename1.continuity.Continuity` puts the user back where they were: the
+    /// saved state is a list of paths, and every one of them has to become a stack frame or
+    /// `back()` would land on a screen that was never built. Replaying them with `navigate` would
+    /// work and would also flash every intermediate screen past the user with a transition each,
+    /// so the frames are built silently and only the top one is shown.
+    ///
+    /// Paths that no longer match a route are skipped rather than failing the restore. A rebuilt
+    /// app legitimately drops routes, and refusing to restore anything because one deep frame went
+    /// away would lose the whole session over a screen the user was not on.
+    ///
+    /// Replaces whatever was on the stack. Must be called on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: the paths, oldest first
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one frame was rebuilt and shown
+    /// A route factory that THROWS propagates, rather than being skipped: it is a failure the
+    /// caller can retry, not a route this build has stopped registering. A factory that answers
+    /// null is still skipped.
+    public static boolean restoreStack(List&lt;String&gt; paths) {
+<span class="fc" id="L297">        RouteDispatcher d = dispatcher;</span>
+<span class="fc bfc" id="L298" title="All 6 branches covered.">        if (d == null || paths == null || paths.isEmpty()) {</span>
+<span class="fc" id="L299">            return false;</span>
+        }
+        // The stack as it stands BEFORE any factory runs, so a factory that navigates can be
+        // told apart from one that does not. See the check after the loop.
+<span class="fc" id="L303">        List&lt;NavigationEntry&gt; beforeDispatch = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+<span class="fc" id="L304">        List&lt;NavigationEntry&gt; rebuilt = new ArrayList&lt;NavigationEntry&gt;();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (String path : paths) {</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            if (!beforeDispatch.equals(stack)) {</span>
+                // A FACTORY navigated, and the rebuild stops here rather than at the end. Every
+                // later factory would still construct its screen and read or write whatever the
+                // application keeps behind it -- an unavailable parent redirecting to a safe list
+                // while its child factories go on touching the record that is unavailable -- and
+                // all of it would then be discarded in favour of the redirect. Asked per
+                // iteration for the same reason the session check beside it is.
+<span class="fc" id="L313">                return false;</span>
+            }
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (sessionEnded()) {</span>
+                // A factory ended the continuity session -- it found the account signed out,
+                // which is exactly the decision a route factory is entitled to make. Every later
+                // factory would run for that account: constructing forms, and whatever they query
+                // or write on the way. The lifecycle check in Continuity.restore() happens after
+                // this method returns and can only empty the stack afterwards, which undoes none
+                // of it.
+<span class="fc" id="L322">                return false;</span>
+            }
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">            if (path == null || path.length() == 0) {</span>
+<span class="nc" id="L325">                continue;</span>
+            }
+            // NOT caught. A factory that THROWS is a different thing from a route this build no
+            // longer registers, and swallowing it made them the same: the failed screen was
+            // skipped, an earlier one was shown, and this method returned success -- so
+            // Continuity.restore() persisted and acknowledged a partial state, the relay stopped
+            // offering it, and the user was left on the wrong screen with no copy to retry from.
+            //
+            // An unregistered route answers null and is still skipped, which is the tolerance
+            // that was wanted: it will not start working on the next launch either. A throw is
+            // the transient breakage -- a dependency not up yet on a cold launch -- and letting
+            // it out is what makes the restore retryable. The method already propagates a throw
+            // from show() for the same reason.
+<span class="fc" id="L338">            Form f = d.dispatch(path);</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (f != null) {</span>
+<span class="fc" id="L340">                rebuilt.add(new NavigationEntry(path, f));</span>
+            }
+<span class="fc" id="L342">        }</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (!beforeDispatch.equals(stack)) {</span>
+            // Asked again, because the loop tests before each factory and the LAST one has no
+            // next iteration to be stopped by -- the same pairing the session check uses.
+            //
+            // A route factory is application code and may redirect: an expired detail page
+            // sending the user to a list, a screen that has moved. It does so before this method
+            // has installed anything, so the rebuild would replace both its stack entry and its
+            // screen. Its choice wins, which is the rule the rollback below and the ordinary
+            // navigations already use.
+            //
+            // Continuity notices the stack moved and settles the arrival rather than treating it
+            // as one that failed -- see the note there. It also checkpoints what the factory left
+            // behind, so the redirect survives a process death.
+<span class="fc" id="L356">            return false;</span>
+        }
+<span class="fc bfc" id="L358" title="All 4 branches covered.">        if (rebuilt.isEmpty() || sessionEnded()) {</span>
+            // Asked again, because the loop tests before each factory and the LAST one has no
+            // &quot;next&quot; iteration to be stopped by. Showing here would put the signed-out account's
+            // screen in front of the user.
+<span class="fc" id="L362">            return false;</span>
+        }
+        // The PREVIOUS stack is kept until the new one is really on screen. show() runs
+        // application code -- the form's own show handling, and whatever listens to it -- and if
+        // that throws, the old form is still displayed while getCurrent(), back() and the next
+        // checkpoint would all be describing a stack the user never saw. A later navigation then
+        // persists a restoration that failed.
+<span class="fc" id="L369">        List&lt;NavigationEntry&gt; previous = new ArrayList&lt;NavigationEntry&gt;(stack);</span>
+<span class="fc" id="L370">        stack.clear();</span>
+<span class="fc" id="L371">        stack.addAll(rebuilt);</span>
+        // Resolved BEFORE the try, and that is not tidying. Reading from a generic list compiles
+        // to a checkcast, and this virtual machine's CHECKCAST expands to nothing -- so a failed
+        // cast hands the wrong object to the next instruction instead of throwing, and a handler
+        // that catches RuntimeException around it is a handler that can never run. The guarded
+        // region has to contain only the call being guarded. check-cast-semantics.sh refuses the
+        // other shape, correctly, and caught this exact line.
+<span class="fc" id="L378">        Form top = rebuilt.get(rebuilt.size() - 1).getForm();</span>
+        // What is DISPLAYED before the attempt, which is not the same thing as the stack.
+        // Display.setCurrentForm() installs the new form and only then runs onShowCompleted and
+        // the Show listeners, so a listener that throws leaves the failed form current -- and
+        // restoring the list alone left getCurrent() and Navigation.getCurrent() describing
+        // different screens.
+<span class="fc" id="L384">        Form displayed = Display.getInstance().getCurrent();</span>
+        try {
+            // show(), not showBack(): the user is arriving, not going back, and showBack would
+            // run the reverse transition into a screen they have not seen yet.
+<span class="fc" id="L388">            top.show();</span>
+<span class="fc" id="L389">        } catch (RuntimeException e) {</span>
+            // The STACK, and only while it is still exactly what this method installed. The
+            // display test below was added first and left this one unconditional, which made the
+            // two disagree: a show callback that navigates somewhere of its own and then throws
+            // -- or that navigates and a later listener throws -- has already changed both, so
+            // erasing the stack while leaving its screen up describes a place the user is not.
+            //
+            // Same rule as the ordinary navigations use, for the same reason: whatever ran later
+            // and changed the stack meant to, and it wins.
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            if (rebuilt.equals(stack)) {</span>
+<span class="fc" id="L399">                stack.clear();</span>
+<span class="fc" id="L400">                stack.addAll(previous);</span>
+            }
+            // And the screen with it -- but ONLY when the screen still showing is the one this
+            // method put up. show() rather than showBack(): the user is not going back, an
+            // attempt that failed is being undone.
+            //
+            // The test used to be &quot;the display changed&quot;, which is true of two different things.
+            // show() installs the form and only THEN runs onShowCompleted and the show listeners,
+            // so a listener that finds the session expired, calls Continuity.clear(), opens a
+            // login form and then throws has already replaced the screen with its own choice --
+            // and re-showing the pre-restore form put the signed-out account's screen back in
+            // front of the user, which is the one thing that callback ran to prevent.
+            //
+            // Asking whether `top` is still current separates them: if it is, nothing has been
+            // chosen since and the restore's own screen comes down; if it is not, application
+            // code put something else there and it stays. Continuity.restore() cannot make this
+            // distinction on its own -- by the time it runs, this rollback has already happened.
+            try {
+<span class="fc" id="L418">                Form now = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L419" title="1 of 4 branches missed.">                if (displayed != null &amp;&amp; now == top) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L420">                    displayed.show();</span>
+                }
+<span class="nc" id="L422">            } catch (RuntimeException ignored) {</span>
+                // The original failure is the one worth reporting; losing it to a second one
+                // while cleaning up would hide what actually went wrong.
+<span class="nc" id="L425">                com.codename1.io.Log.e(ignored);</span>
+<span class="fc" id="L426">            }</span>
+<span class="fc" id="L427">            throw e;</span>
+<span class="fc" id="L428">        }</span>
+<span class="fc" id="L429">        stackChanged();</span>
+<span class="fc" id="L430">        return true;</span>
+    }
+
+    /// Whether a continuity restore in progress has had its session ended underneath it.
+    ///
+    /// Answers false for every application that does not use continuity, and for every navigation
+    /// that is not a restore, which is why it can sit in this loop.
+    private static boolean sessionEnded() {
+        try {
+<span class="fc" id="L439">            return com.codename1.continuity.Continuity.restoreSessionEnded();</span>
+<span class="nc" id="L440">        } catch (Throwable t) {</span>
+            // Carrying on is the answer that keeps ordinary navigation working; this guard exists
+            // for the signed-out case, not to gate the routing API on the continuity framework
+            // being answerable.
+<span class="nc" id="L444">            com.codename1.io.Log.e(t);</span>
+<span class="nc" id="L445">            return false;</span>
+        }
+    }
+
+    /// Tells the continuity framework that the stack moved, so it can checkpoint.
+    ///
+    /// A direct call rather than a listener: `Continuity.routeStackChanged()` returns immediately
+    /// unless an application actually enabled continuity, and a listener registry here would be
+    /// public API earned by one internal caller.
+    private static void stackChanged() {
+        try {
+<span class="fc" id="L456">            com.codename1.continuity.Continuity.routeStackChanged();</span>
+<span class="nc" id="L457">        } catch (Throwable t) {</span>
+<span class="nc" id="L458">            com.codename1.io.Log.e(t);</span>
+<span class="fc" id="L459">        }</span>
+<span class="fc" id="L460">    }</span>
+
+    // ------------------------------------------------------------------------
+    // Internal: framework-side entry point invoked by Display when the
+    // platform delivers a deep link through `AppArg`.
+    // ------------------------------------------------------------------------
+
+    /// Dispatch a URL delivered by the platform. Invoked by
+    /// `com.codename1.ui.Display#setProperty(String, String)` for URL-shaped
+    /// `AppArg` values; applications should call `#navigate(String)` instead.
+    public static boolean dispatchExternalUrl(String url) {
+<span class="fc bfc" id="L471" title="All 4 branches covered.">        if (url == null || url.length() == 0) {</span>
+<span class="fc" id="L472">            return false;</span>
+        }
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L475">            return navigate(url);</span>
+        }
+<span class="fc" id="L477">        final String captured = url;</span>
+<span class="fc" id="L478">        final boolean[] holder = new boolean[1];</span>
+<span class="fc" id="L479">        Display.getInstance().callSeriallyAndWait(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L482">                holder[0] = navigate(captured);</span>
+<span class="fc" id="L483">            }</span>
+        });
+<span class="fc" id="L485">        return holder[0];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

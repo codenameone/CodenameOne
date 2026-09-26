@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RenderState.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">RenderState.java</span></div><h1>RenderState.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+/// Fixed function pipeline state attached to a `Material`: depth testing, alpha
+/// blending and face culling. Sensible defaults are provided for opaque 3D
+/// geometry (depth test and write on, no blending, back faces culled).
+<span class="fc" id="L15">public final class RenderState {</span>
+    /// The alpha blending mode applied when a fragment is written.
+<span class="fc" id="L17">    public enum BlendMode {</span>
+        /// No blending; the fragment overwrites the destination.
+<span class="fc" id="L19">        NONE,</span>
+        /// Standard source-over alpha blending.
+<span class="fc" id="L21">        ALPHA,</span>
+        /// Additive blending, useful for particles and glows.
+<span class="fc" id="L23">        ADDITIVE</span>
+    }
+
+    /// Which triangle faces are discarded before rasterization.
+<span class="fc" id="L27">    public enum CullMode {</span>
+        /// Render both faces.
+<span class="fc" id="L29">        NONE,</span>
+        /// Discard back faces (counter clockwise winding is front).
+<span class="fc" id="L31">        BACK,</span>
+        /// Discard front faces.
+<span class="fc" id="L33">        FRONT</span>
+    }
+
+<span class="fc" id="L36">    private boolean depthTest = true;</span>
+<span class="fc" id="L37">    private boolean depthWrite = true;</span>
+<span class="fc" id="L38">    private BlendMode blendMode = BlendMode.NONE;</span>
+<span class="fc" id="L39">    private CullMode cullMode = CullMode.BACK;</span>
+
+    /// Returns a render state suitable for opaque geometry.
+    public static RenderState opaque() {
+<span class="fc" id="L43">        return new RenderState();</span>
+    }
+
+    /// Returns a render state suitable for alpha blended, non depth writing
+    /// transparent geometry.
+    public static RenderState transparent() {
+<span class="nc" id="L49">        return new RenderState()</span>
+<span class="nc" id="L50">                .setBlendMode(BlendMode.ALPHA)</span>
+<span class="nc" id="L51">                .setDepthWrite(false);</span>
+    }
+
+    /// Returns true if depth testing is enabled.
+    public boolean isDepthTest() {
+<span class="nc" id="L56">        return depthTest;</span>
+    }
+
+    /// Enables or disables depth testing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `depthTest`: true to enable depth testing
+    ///
+    /// #### Returns
+    ///
+    /// this state for chaining
+    public RenderState setDepthTest(boolean depthTest) {
+<span class="nc" id="L69">        this.depthTest = depthTest;</span>
+<span class="nc" id="L70">        return this;</span>
+    }
+
+    /// Returns true if writing to the depth buffer is enabled.
+    public boolean isDepthWrite() {
+<span class="nc" id="L75">        return depthWrite;</span>
+    }
+
+    /// Enables or disables writing to the depth buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `depthWrite`: true to write depth values
+    ///
+    /// #### Returns
+    ///
+    /// this state for chaining
+    public RenderState setDepthWrite(boolean depthWrite) {
+<span class="nc" id="L88">        this.depthWrite = depthWrite;</span>
+<span class="nc" id="L89">        return this;</span>
+    }
+
+    /// Returns the configured blend mode.
+    public BlendMode getBlendMode() {
+<span class="nc" id="L94">        return blendMode;</span>
+    }
+
+    /// Sets the blend mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `blendMode`: the blend mode
+    ///
+    /// #### Returns
+    ///
+    /// this state for chaining
+    public RenderState setBlendMode(BlendMode blendMode) {
+<span class="nc" id="L107">        this.blendMode = blendMode;</span>
+<span class="nc" id="L108">        return this;</span>
+    }
+
+    /// Returns the configured cull mode.
+    public CullMode getCullMode() {
+<span class="nc" id="L113">        return cullMode;</span>
+    }
+
+    /// Sets the face culling mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cullMode`: the cull mode
+    ///
+    /// #### Returns
+    ///
+    /// this state for chaining
+    public RenderState setCullMode(CullMode cullMode) {
+<span class="nc" id="L126">        this.cullMode = cullMode;</span>
+<span class="nc" id="L127">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

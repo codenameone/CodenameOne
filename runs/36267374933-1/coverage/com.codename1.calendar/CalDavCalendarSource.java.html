@@ -1,0 +1,620 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalDavCalendarSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalDavCalendarSource.java</span></div><h1>CalDavCalendarSource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.io.Util;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Standards-based CalDAV source. Pass the account's calendar-home URL; the
+/// source discovers collections below it and uses RFC 6578 sync tokens when
+/// the server advertises them.
+public class CalDavCalendarSource extends CalendarSource {
+
+    private final String homeUrl;
+
+    private final CalDavAuthentication authentication;
+
+    private final CalendarHttpTransport transport;
+
+    public CalDavCalendarSource(String id, String displayName, String calendarHomeUrl, CalDavAuthentication authentication) {
+<span class="nc" id="L47">        this(id, displayName, calendarHomeUrl, authentication, null);</span>
+<span class="nc" id="L48">    }</span>
+
+    public CalDavCalendarSource(String id, String displayName, String calendarHomeUrl, CalDavAuthentication authentication, CalendarHttpTransport transport) {
+<span class="fc" id="L51">        super(id, displayName);</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (calendarHomeUrl == null || authentication == null) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;calendar home URL and authentication required&quot;);</span>
+        }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        this.homeUrl = calendarHomeUrl.endsWith(&quot;/&quot;) ? calendarHomeUrl : calendarHomeUrl + &quot;/&quot;;</span>
+<span class="fc" id="L56">        this.authentication = authentication;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        this.transport = transport == null ? new DefaultCalendarHttpTransport() : transport;</span>
+<span class="fc" id="L58">    }</span>
+
+    @Override
+    public CalendarCapabilities getCapabilities() {
+<span class="fc" id="L62">        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.ALARMS, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.DELTA_SYNC, CalendarCapability.OFFLINE_MUTATIONS);</span>
+    }
+
+    @Override
+    public CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access) {
+<span class="nc" id="L67">        return CalendarAuthorizationStatus.NOT_DETERMINED;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarAuthorizationStatus&gt; requestAuthorization(CalendarAccess access) {
+<span class="nc" id="L72">        final AsyncResource&lt;CalendarAuthorizationStatus&gt; out = new AsyncResource&lt;CalendarAuthorizationStatus&gt;();</span>
+<span class="nc" id="L73">        request(&quot;PROPFIND&quot;, homeUrl, &quot;&lt;?xml version=\&quot;1.0\&quot;?&gt;&lt;propfind xmlns=\&quot;DAV:\&quot;&gt;&lt;prop&gt;&lt;current-user-principal/&gt;&lt;/prop&gt;&lt;/propfind&gt;&quot;, &quot;application/xml&quot;, headers(&quot;Depth&quot;, &quot;0&quot;)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L77">                out.complete(CalendarAuthorizationStatus.FULL);</span>
+<span class="nc" id="L78">            }</span>
+<span class="nc" id="L79">        }).except(error(out));</span>
+<span class="nc" id="L80">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt; listCalendars(final CalendarInfo.ContentType type, String pageToken) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        final CalendarInfo.ContentType requestedType = type == null ? CalendarInfo.ContentType.EVENTS : type;</span>
+<span class="fc" id="L86">        final AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt;();</span>
+<span class="fc" id="L87">        String body = &quot;&lt;?xml version=\&quot;1.0\&quot;?&gt;&lt;propfind xmlns=\&quot;DAV:\&quot; xmlns:c=\&quot;urn:ietf:params:xml:ns:caldav\&quot; &quot; + &quot;xmlns:cs=\&quot;http://calendarserver.org/ns/\&quot;&gt;&lt;prop&gt;&lt;displayname/&gt;&lt;resourcetype/&quot; + &quot;&gt;&lt;c:supported-calendar-component-set/&gt;&lt;cs:getctag/&gt;&lt;sync-token/&gt;&lt;/prop&gt;&lt;/propfind&gt;&quot;;</span>
+<span class="fc" id="L88">        request(&quot;PROPFIND&quot;, homeUrl, body, &quot;application/xml&quot;, headers(&quot;Depth&quot;, &quot;1&quot;)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="fc" id="L92">                List&lt;CalendarInfo&gt; items = new ArrayList&lt;CalendarInfo&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                for (String response : elements(r.getBody(), &quot;response&quot;)) {</span>
+<span class="fc" id="L94">                    String href = xmlValue(response, &quot;href&quot;);</span>
+<span class="fc" id="L95">                    String components = xmlElement(response, &quot;supported-calendar-component-set&quot;);</span>
+<span class="pc bpc" id="L96" title="2 of 4 branches missed.">                    if (href == null || xmlElement(response, &quot;calendar&quot;) == null) {</span>
+<span class="nc" id="L97">                        continue;</span>
+                    }
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                    boolean events = components == null || containsIgnoreCase(components, &quot;VEVENT&quot;);</span>
+<span class="fc" id="L100">                    boolean tasks = containsIgnoreCase(components, &quot;VTODO&quot;);</span>
+<span class="pc bpc" id="L101" title="4 of 8 branches missed.">                    if ((requestedType == CalendarInfo.ContentType.EVENTS &amp;&amp; !events) || (requestedType == CalendarInfo.ContentType.TASKS &amp;&amp; !tasks)) {</span>
+<span class="nc" id="L102">                        continue;</span>
+                    }
+<span class="fc" id="L104">                    items.add(new CalendarInfo().setId(resolve(href)).setSourceId(getId()).setName(xmlValue(response, &quot;displayname&quot;)).setContentType(requestedType).setCapabilities(getCapabilities()).putProviderData(&quot;ctag&quot;, xmlValue(response, &quot;getctag&quot;)).putProviderData(&quot;syncToken&quot;, xmlValue(response, &quot;sync-token&quot;)));</span>
+<span class="fc" id="L105">                }</span>
+<span class="fc" id="L106">                out.complete(new CalendarPage&lt;CalendarInfo&gt;(items, null, null));</span>
+<span class="fc" id="L107">            }</span>
+<span class="fc" id="L108">        }).except(error(out));</span>
+<span class="fc" id="L109">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt; queryEvents(final CalendarQuery query) {
+<span class="fc" id="L114">        final AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt;();</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (query == null || query.getCalendarId() == null) {</span>
+<span class="nc" id="L116">            return fail(out, &quot;calendarId required&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        String body = query.getSyncToken() == null ? calendarQuery(&quot;VEVENT&quot;, query) : syncQuery(query.getSyncToken());</span>
+<span class="fc" id="L119">        request(&quot;REPORT&quot;, query.getCalendarId(), body, &quot;application/xml&quot;, headers(&quot;Depth&quot;, &quot;1&quot;)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="fc" id="L123">                List&lt;CalendarEvent&gt; items = new ArrayList&lt;CalendarEvent&gt;();</span>
+                try {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                    for (String response : elements(r.getBody(), &quot;response&quot;)) {</span>
+<span class="fc" id="L126">                        String data = xmlValue(response, &quot;calendar-data&quot;);</span>
+<span class="fc" id="L127">                        String href = xmlValue(response, &quot;href&quot;);</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">                        if (data == null || href == null) {</span>
+<span class="nc" id="L129">                            continue;</span>
+                        }
+<span class="fc" id="L131">                        CalendarEvent event = ICalendarCodec.readEvent(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, &quot;getetag&quot;));</span>
+<span class="fc" id="L132">                        String uid = event.getId();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                        if (uid != null) {</span>
+<span class="fc" id="L134">                            event.putProviderData(&quot;caldav.uid&quot;, uid);</span>
+                        }
+<span class="fc" id="L136">                        event.setId(resolve(href));</span>
+<span class="fc" id="L137">                        items.add(event);</span>
+<span class="fc" id="L138">                    }</span>
+<span class="nc" id="L139">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L140">                    out.error(ex);</span>
+<span class="nc" id="L141">                    return;</span>
+<span class="fc" id="L142">                }</span>
+<span class="fc" id="L143">                out.complete(new CalendarPage&lt;CalendarEvent&gt;(items, null, xmlValue(r.getBody(), &quot;sync-token&quot;)));</span>
+<span class="fc" id="L144">            }</span>
+<span class="fc" id="L145">        }).except(error(out));</span>
+<span class="fc" id="L146">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarEvent&gt; getEvent(final String calendarId, final String eventId) {
+<span class="nc" id="L151">        final AsyncResource&lt;CalendarEvent&gt; out = new AsyncResource&lt;CalendarEvent&gt;();</span>
+<span class="nc" id="L152">        request(&quot;GET&quot;, resource(calendarId, eventId), null, null, null).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                try {
+<span class="nc" id="L157">                    CalendarEvent event = ICalendarCodec.readEvent(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader(&quot;ETag&quot;));</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                    if (event.getId() != null) {</span>
+<span class="nc" id="L159">                        event.putProviderData(&quot;caldav.uid&quot;, event.getId());</span>
+                    }
+<span class="nc" id="L161">                    event.setId(resource(calendarId, eventId));</span>
+<span class="nc" id="L162">                    out.complete(event);</span>
+<span class="nc" id="L163">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L164">                    out.error(ex);</span>
+<span class="nc" id="L165">                }</span>
+<span class="nc" id="L166">            }</span>
+<span class="nc" id="L167">        }).except(error(out));</span>
+<span class="nc" id="L168">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarEvent&gt; saveEvent(final CalendarEvent event, CalendarMutationScope scope) {
+<span class="nc" id="L173">        final AsyncResource&lt;CalendarEvent&gt; out = new AsyncResource&lt;CalendarEvent&gt;();</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">        if (event == null || event.getCalendarId() == null) {</span>
+<span class="nc" id="L175">            return fail(out, &quot;event and calendarId required&quot;);</span>
+        }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        final boolean create = event.getId() == null;</span>
+<span class="nc" id="L178">        final String uid = createUid(event.getProviderData());</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        final String resourceUrl = create ? resource(event.getCalendarId(), uid) : resource(event.getCalendarId(), event.getId());</span>
+<span class="nc" id="L180">        Map&lt;String, String&gt; h = version(event.getVersion(), create);</span>
+<span class="nc" id="L181">        String resourceId = event.getId();</span>
+<span class="nc" id="L182">        event.setId(uid);</span>
+<span class="nc" id="L183">        String data = ICalendarCodec.writeEvent(event);</span>
+<span class="nc" id="L184">        event.setId(resourceId);</span>
+<span class="nc" id="L185">        request(&quot;PUT&quot;, resourceUrl, data, &quot;text/calendar; charset=utf-8&quot;, h).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L189">                event.setId(resourceUrl).setVersion(r.getHeader(&quot;ETag&quot;)).putProviderData(&quot;caldav.uid&quot;, uid);</span>
+<span class="nc" id="L190">                out.complete(event);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                fireChange(new CalendarChange(getId(), event.getCalendarId(), event.getId(), CalendarChange.EntityType.EVENT, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));</span>
+<span class="nc" id="L192">            }</span>
+<span class="nc" id="L193">        }).except(error(out));</span>
+<span class="nc" id="L194">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteEvent(final String calendarId, final String eventId, CalendarMutationScope scope, String version) {
+<span class="nc" id="L199">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L200">        request(&quot;DELETE&quot;, resource(calendarId, eventId), null, null, version(version, false)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L204">                out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L205">                fireChange(new CalendarChange(getId(), calendarId, eventId, CalendarChange.EntityType.EVENT, CalendarChange.ChangeType.DELETED));</span>
+<span class="nc" id="L206">            }</span>
+<span class="nc" id="L207">        }).except(error(out));</span>
+<span class="nc" id="L208">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt; queryTasks(final CalendarQuery query) {
+<span class="nc" id="L213">        final AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt; out = new AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt;();</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">        if (query == null || query.getCalendarId() == null) {</span>
+<span class="nc" id="L215">            return fail(out, &quot;calendarId required&quot;);</span>
+        }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        String body = query.getSyncToken() == null ? calendarQuery(&quot;VTODO&quot;, query) : syncQuery(query.getSyncToken());</span>
+<span class="nc" id="L218">        request(&quot;REPORT&quot;, query.getCalendarId(), body, &quot;application/xml&quot;, headers(&quot;Depth&quot;, &quot;1&quot;)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L222">                List&lt;CalendarTask&gt; items = new ArrayList&lt;CalendarTask&gt;();</span>
+                try {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    for (String response : elements(r.getBody(), &quot;response&quot;)) {</span>
+<span class="nc" id="L225">                        String data = xmlValue(response, &quot;calendar-data&quot;);</span>
+<span class="nc" id="L226">                        String href = xmlValue(response, &quot;href&quot;);</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">                        if (data == null || href == null) {</span>
+<span class="nc" id="L228">                            continue;</span>
+                        }
+<span class="nc" id="L230">                        CalendarTask task = ICalendarCodec.readTask(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, &quot;getetag&quot;));</span>
+<span class="nc" id="L231">                        String uid = task.getId();</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                        if (uid != null) {</span>
+<span class="nc" id="L233">                            task.putProviderData(&quot;caldav.uid&quot;, uid);</span>
+                        }
+<span class="nc" id="L235">                        task.setId(resolve(href));</span>
+<span class="nc" id="L236">                        items.add(task);</span>
+<span class="nc" id="L237">                    }</span>
+<span class="nc" id="L238">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L239">                    out.error(ex);</span>
+<span class="nc" id="L240">                    return;</span>
+<span class="nc" id="L241">                }</span>
+<span class="nc" id="L242">                out.complete(new CalendarPage&lt;CalendarTask&gt;(items, null, xmlValue(r.getBody(), &quot;sync-token&quot;)));</span>
+<span class="nc" id="L243">            }</span>
+<span class="nc" id="L244">        }).except(error(out));</span>
+<span class="nc" id="L245">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarTask&gt; getTask(final String calendarId, final String taskId) {
+<span class="nc" id="L250">        final AsyncResource&lt;CalendarTask&gt; out = new AsyncResource&lt;CalendarTask&gt;();</span>
+<span class="nc" id="L251">        request(&quot;GET&quot;, resource(calendarId, taskId), null, null, null).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                try {
+<span class="nc" id="L256">                    CalendarTask task = ICalendarCodec.readTask(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader(&quot;ETag&quot;));</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                    if (task.getId() != null) {</span>
+<span class="nc" id="L258">                        task.putProviderData(&quot;caldav.uid&quot;, task.getId());</span>
+                    }
+<span class="nc" id="L260">                    out.complete(task.setId(resource(calendarId, taskId)));</span>
+<span class="nc" id="L261">                } catch (CalendarException ex) {</span>
+<span class="nc" id="L262">                    out.error(ex);</span>
+<span class="nc" id="L263">                }</span>
+<span class="nc" id="L264">            }</span>
+<span class="nc" id="L265">        }).except(error(out));</span>
+<span class="nc" id="L266">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;CalendarTask&gt; saveTask(final CalendarTask task, CalendarMutationScope scope) {
+<span class="nc" id="L271">        final AsyncResource&lt;CalendarTask&gt; out = new AsyncResource&lt;CalendarTask&gt;();</span>
+<span class="nc bnc" id="L272" title="All 4 branches missed.">        if (task == null || task.getCalendarId() == null) {</span>
+<span class="nc" id="L273">            return fail(out, &quot;task and calendarId required&quot;);</span>
+        }
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        final boolean create = task.getId() == null;</span>
+<span class="nc" id="L276">        final String uid = createUid(task.getProviderData());</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        final String resourceUrl = create ? resource(task.getCalendarId(), uid) : resource(task.getCalendarId(), task.getId());</span>
+<span class="nc" id="L278">        String resourceId = task.getId();</span>
+<span class="nc" id="L279">        task.setId(uid);</span>
+<span class="nc" id="L280">        String data = ICalendarCodec.writeTask(task);</span>
+<span class="nc" id="L281">        task.setId(resourceId);</span>
+<span class="nc" id="L282">        request(&quot;PUT&quot;, resourceUrl, data, &quot;text/calendar; charset=utf-8&quot;, version(task.getVersion(), create)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L286">                task.setId(resourceUrl).setVersion(r.getHeader(&quot;ETag&quot;)).putProviderData(&quot;caldav.uid&quot;, uid);</span>
+<span class="nc" id="L287">                out.complete(task);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                fireChange(new CalendarChange(getId(), task.getCalendarId(), task.getId(), CalendarChange.EntityType.TASK, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));</span>
+<span class="nc" id="L289">            }</span>
+<span class="nc" id="L290">        }).except(error(out));</span>
+<span class="nc" id="L291">        return out;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; deleteTask(final String calendarId, final String taskId, CalendarMutationScope scope, String version) {
+<span class="nc" id="L296">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L297">        request(&quot;DELETE&quot;, resource(calendarId, taskId), null, null, version(version, false)).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+<span class="nc" id="L301">                out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L302">                fireChange(new CalendarChange(getId(), calendarId, taskId, CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));</span>
+<span class="nc" id="L303">            }</span>
+<span class="nc" id="L304">        }).except(error(out));</span>
+<span class="nc" id="L305">        return out;</span>
+    }
+
+    private AsyncResource&lt;CalendarHttpResponse&gt; request(final String method, final String url, final String body, final String contentType, final Map&lt;String, String&gt; headers) {
+<span class="fc" id="L309">        final AsyncResource&lt;CalendarHttpResponse&gt; out = new AsyncResource&lt;CalendarHttpResponse&gt;();</span>
+<span class="fc" id="L310">        authorizeAndSend(method, url, body, contentType, headers, null, false, out);</span>
+<span class="fc" id="L311">        return out;</span>
+    }
+
+    private void authorizeAndSend(final String method, final String url, final String body, final String contentType, final Map&lt;String, String&gt; headers, final String challenge, final boolean retried, final AsyncResource&lt;CalendarHttpResponse&gt; out) {
+<span class="fc" id="L315">        authentication.authorization(method, url, challenge, retried).ready(new SuccessCallback&lt;String&gt;() {</span>
+
+            @Override
+            public void onSucess(String authorization) {
+<span class="fc" id="L319">                CalendarHttpRequest request = new CalendarHttpRequest(method, url).setBody(body).header(&quot;Accept&quot;, &quot;application/xml, text/calendar&quot;);</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">                if (authorization != null) {</span>
+<span class="fc" id="L321">                    request.header(&quot;Authorization&quot;, authorization);</span>
+                }
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                if (contentType != null) {</span>
+<span class="fc" id="L324">                    request.header(&quot;Content-Type&quot;, contentType);</span>
+                }
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                if (headers != null) {</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                    for (Map.Entry&lt;String, String&gt; h : headers.entrySet()) {</span>
+<span class="fc" id="L328">                        request.header(h.getKey(), h.getValue());</span>
+<span class="fc" id="L329">                    }</span>
+                }
+<span class="fc" id="L331">                transport.execute(request).ready(new SuccessCallback&lt;CalendarHttpResponse&gt;() {</span>
+
+                    @Override
+                    public void onSucess(CalendarHttpResponse response) {
+<span class="pc bpc" id="L335" title="1 of 4 branches missed.">                        if (response.getStatusCode() == 401 &amp;&amp; !retried) {</span>
+<span class="fc" id="L336">                            authorizeAndSend(method, url, body, contentType, headers, response.getHeader(&quot;WWW-Authenticate&quot;), true, out);</span>
+<span class="fc" id="L337">                            return;</span>
+                        }
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">                        if (response.getStatusCode() &gt;= 200 &amp;&amp; response.getStatusCode() &lt; 300) {</span>
+<span class="fc" id="L340">                            out.complete(response);</span>
+                        } else {
+<span class="nc" id="L342">                            out.error(httpError(response));</span>
+                        }
+<span class="fc" id="L344">                    }</span>
+<span class="fc" id="L345">                }).except(error(out));</span>
+<span class="fc" id="L346">            }</span>
+<span class="fc" id="L347">        }).except(error(out));</span>
+<span class="fc" id="L348">    }</span>
+
+    private static CalendarException httpError(CalendarHttpResponse r) {
+<span class="nc" id="L351">        int code = r.getStatusCode();</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">        boolean invalidSyncToken = code == 410 || code == 403</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                &amp;&amp; containsIgnoreCase(r.getBody(), &quot;valid-sync-token&quot;);</span>
+<span class="nc bnc" id="L354" title="All 16 branches missed.">        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED</span>
+                : invalidSyncToken ? CalendarError.SYNC_TOKEN_EXPIRED
+                : code == 403 ? CalendarError.PERMISSION_DENIED
+                : code == 404 ? CalendarError.NOT_FOUND
+                : code == 409 || code == 412 ? CalendarError.CONFLICT
+                : code == 429 ? CalendarError.RATE_LIMITED
+                : code &gt;= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
+<span class="nc" id="L361">        return new CalendarException(type, &quot;CalDAV server returned HTTP &quot; + code,</span>
+<span class="nc" id="L362">                code, r.getBody(), null);</span>
+    }
+
+    private static String createUid(Map&lt;String, String&gt; providerData) {
+<span class="nc" id="L366">        String uid = providerData.get(&quot;caldav.uid&quot;);</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (uid != null) {</span>
+<span class="nc" id="L368">            return uid;</span>
+        }
+<span class="nc" id="L370">        String mutationId = providerData.get(&quot;cn1.mutationId&quot;);</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        return mutationId == null ? String.valueOf(System.currentTimeMillis()) + &quot;@codenameone&quot;</span>
+                : mutationId + &quot;@codenameone&quot;;
+    }
+
+    private static boolean containsIgnoreCase(String value, String target) {
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L377">            return false;</span>
+        }
+<span class="fc" id="L379">        int limit = value.length() - target.length();</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (int i = 0; i &lt;= limit; i++) {</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            if (value.regionMatches(true, i, target, 0, target.length())) {</span>
+<span class="fc" id="L382">                return true;</span>
+            }
+        }
+<span class="fc" id="L385">        return false;</span>
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+<span class="nc bnc" id="L389" title="All 4 branches missed.">        return value != null &amp;&amp; value.length() &gt;= suffix.length()</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                &amp;&amp; value.regionMatches(true, value.length() - suffix.length(),</span>
+<span class="nc" id="L391">                suffix, 0, suffix.length());</span>
+    }
+
+    private static String asciiLower(String value) {
+<span class="fc" id="L395">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L397">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L398" title="All 4 branches covered.">            out.append(c &gt;= 'A' &amp;&amp; c &lt;= 'Z' ? (char) (c + ('a' - 'A')) : c);</span>
+        }
+<span class="fc" id="L400">        return out.toString();</span>
+    }
+
+    private String resolve(String href) {
+<span class="pc bpc" id="L404" title="2 of 4 branches missed.">        if (href.startsWith(&quot;http://&quot;) || href.startsWith(&quot;https://&quot;)) {</span>
+<span class="nc" id="L405">            return href;</span>
+        }
+<span class="fc" id="L407">        int scheme = homeUrl.indexOf(&quot;://&quot;);</span>
+<span class="fc" id="L408">        int slash = homeUrl.indexOf('/', scheme + 3);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        String origin = slash &lt; 0 ? homeUrl : homeUrl.substring(0, slash);</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        return href.startsWith(&quot;/&quot;) ? origin + href : homeUrl + href;</span>
+    }
+
+    private static String resource(String calendarId, String id) {
+<span class="nc bnc" id="L414" title="All 4 branches missed.">        if (id.startsWith(&quot;http://&quot;) || id.startsWith(&quot;https://&quot;)) {</span>
+<span class="nc" id="L415">            return id;</span>
+        }
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        String base = calendarId.endsWith(&quot;/&quot;) ? calendarId : calendarId + &quot;/&quot;;</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        return base + safe(id) + (endsWithIgnoreCase(id, &quot;.ics&quot;) ? &quot;&quot; : &quot;.ics&quot;);</span>
+    }
+
+    private static String safe(String value) {
+        // Percent-encode the id as a single path segment so ids containing
+        // '?', '#', '%', '/' or non-ASCII cannot address a different resource.
+<span class="nc" id="L424">        return Util.encodeUrl(value);</span>
+    }
+
+    private static String calendarQuery(String component, CalendarQuery q) {
+<span class="fc" id="L428">        StringBuilder filter = new StringBuilder(&quot;&lt;c:comp-filter name=\&quot;VCALENDAR\&quot;&gt;&lt;c:comp-filter name=\&quot;&quot;).append(component).append(&quot;\&quot;&quot;);</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">        if (q.getStartTime() == null &amp;&amp; q.getEndTime() == null) {</span>
+<span class="fc" id="L430">            filter.append(&quot;/&gt;&quot;);</span>
+        } else {
+<span class="nc" id="L432">            filter.append('&gt;');</span>
+<span class="nc" id="L433">            filter.append(&quot;&lt;c:time-range&quot;);</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">            if (q.getStartTime() != null) {</span>
+<span class="nc" id="L435">                filter.append(&quot; start=\&quot;&quot;).append(icalTime(q.getStartTime())).append(&quot;\&quot;&quot;);</span>
+            }
+<span class="nc bnc" id="L437" title="All 2 branches missed.">            if (q.getEndTime() != null) {</span>
+<span class="nc" id="L438">                filter.append(&quot; end=\&quot;&quot;).append(icalTime(q.getEndTime())).append(&quot;\&quot;&quot;);</span>
+            }
+<span class="nc" id="L440">            filter.append(&quot;/&gt;&lt;/c:comp-filter&gt;&quot;);</span>
+        }
+<span class="fc" id="L442">        filter.append(&quot;&lt;/c:comp-filter&gt;&quot;);</span>
+<span class="fc" id="L443">        return &quot;&lt;?xml version=\&quot;1.0\&quot;?&gt;&lt;c:calendar-query xmlns:d=\&quot;DAV:\&quot; &quot; + &quot;xmlns:c=\&quot;urn:ietf:params:xml:ns:caldav\&quot;&gt;&lt;d:prop&gt;&lt;d:getetag/&gt;&lt;c:calendar-data/&gt;&lt;/d:prop&gt;&lt;c:filter&gt;&quot; + filter + &quot;&lt;/c:filter&gt;&lt;/c:calendar-query&gt;&quot;;</span>
+    }
+
+    private static String syncQuery(String token) {
+<span class="nc" id="L447">        return &quot;&lt;?xml version=\&quot;1.0\&quot;?&gt;&lt;d:sync-collection xmlns:d=\&quot;DAV:\&quot; &quot; + &quot;xmlns:c=\&quot;urn:ietf:params:xml:ns:caldav\&quot;&gt;&lt;d:sync-token&gt;&quot; + xml(token) + (&quot;&lt;/d:sync-token&gt;&lt;d:sync-level&gt;1&lt;/d:sync-level&gt;&lt;d:prop&gt;&lt;d:getetag/&gt;&lt;c:calendar-data/&gt;&lt;/d:prop&gt;&lt;/&quot; + &quot;d:sync-collection&gt;&quot;);</span>
+    }
+
+    private static String icalTime(Instant value) {
+<span class="nc" id="L451">        return CalendarDateUtil.formatBasic(value, ZoneId.of(&quot;UTC&quot;)) + &quot;Z&quot;;</span>
+    }
+
+    private static Map&lt;String, String&gt; headers(String name, String value) {
+<span class="fc" id="L455">        Map&lt;String, String&gt; out = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L456">        out.put(name, value);</span>
+<span class="fc" id="L457">        return out;</span>
+    }
+
+    private static Map&lt;String, String&gt; version(String value, boolean create) {
+<span class="nc" id="L461">        Map&lt;String, String&gt; out = new HashMap&lt;String, String&gt;();</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        if (create) {</span>
+<span class="nc" id="L463">            out.put(&quot;If-None-Match&quot;, &quot;*&quot;);</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        } else if (value != null) {</span>
+<span class="nc" id="L465">            out.put(&quot;If-Match&quot;, value);</span>
+        }
+<span class="nc" id="L467">        return out;</span>
+    }
+
+    private static String xmlValue(String source, String local) {
+<span class="fc" id="L471">        String element = xmlElement(source, local);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        return element == null ? null : unxml(stripTags(element).trim());</span>
+    }
+
+    private static String xmlElement(String source, String local) {
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L477">            return null;</span>
+        }
+<span class="fc" id="L479">        String lower = asciiLower(source);</span>
+<span class="fc" id="L480">        int open = findElement(lower, asciiLower(local), 0);</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (open &lt; 0) {</span>
+<span class="fc" id="L482">            return null;</span>
+        }
+<span class="fc" id="L484">        int gt = source.indexOf('&gt;', open);</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">        if (gt &lt; 0) {</span>
+<span class="nc" id="L486">            return null;</span>
+        }
+<span class="fc" id="L488">        String tag = source.substring(open + 1, gt).trim();</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        if (tag.endsWith(&quot;/&quot;)) {</span>
+<span class="fc" id="L490">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L492">        int space = tag.indexOf(' ');</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">        if (space &gt;= 0) {</span>
+<span class="nc" id="L494">            tag = tag.substring(0, space);</span>
+        }
+<span class="fc" id="L496">        String close = &quot;&lt;/&quot; + tag + &quot;&gt;&quot;;</span>
+<span class="fc" id="L497">        int end = lower.indexOf(asciiLower(close), gt + 1);</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        return end &lt; 0 ? null : source.substring(gt + 1, end);</span>
+    }
+
+    private static List&lt;String&gt; elements(String source, String local) {
+<span class="fc" id="L502">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L504">            return out;</span>
+        }
+<span class="fc" id="L506">        String lower = asciiLower(source);</span>
+<span class="fc" id="L507">        int from = 0;</span>
+        while (true) {
+<span class="fc" id="L509">            int open = findElement(lower, asciiLower(local), from);</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">            if (open &lt; 0) {</span>
+<span class="fc" id="L511">                break;</span>
+            }
+<span class="fc" id="L513">            int gt = source.indexOf('&gt;', open);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (gt &lt; 0) {</span>
+<span class="nc" id="L515">                break;</span>
+            }
+<span class="fc" id="L517">            String tag = source.substring(open + 1, gt).trim();</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            if (tag.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L519">                out.add(&quot;&quot;);</span>
+<span class="nc" id="L520">                from = gt + 1;</span>
+<span class="nc" id="L521">                continue;</span>
+            }
+<span class="fc" id="L523">            int space = tag.indexOf(' ');</span>
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">            if (space &gt;= 0) {</span>
+<span class="nc" id="L525">                tag = tag.substring(0, space);</span>
+            }
+<span class="fc" id="L527">            String close = &quot;&lt;/&quot; + tag + &quot;&gt;&quot;;</span>
+<span class="fc" id="L528">            int end = lower.indexOf(asciiLower(close), gt + 1);</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc" id="L530">                break;</span>
+            }
+<span class="fc" id="L532">            out.add(source.substring(gt + 1, end));</span>
+<span class="fc" id="L533">            from = end + close.length();</span>
+<span class="fc" id="L534">        }</span>
+<span class="fc" id="L535">        return out;</span>
+    }
+
+    private static int findElement(String source, String local, int from) {
+<span class="fc" id="L539">        int position = from;</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        while (position &lt; source.length()) {</span>
+<span class="fc" id="L541">            int open = source.indexOf('&lt;', position);</span>
+<span class="pc bpc" id="L542" title="1 of 4 branches missed.">            if (open &lt; 0 || open + 1 &gt;= source.length()) {</span>
+<span class="fc" id="L543">                return -1;</span>
+            }
+<span class="fc" id="L545">            int start = open + 1;</span>
+<span class="fc" id="L546">            char first = source.charAt(start);</span>
+<span class="pc bpc" id="L547" title="1 of 6 branches missed.">            if (first == '/' || first == '!' || first == '?') {</span>
+<span class="fc" id="L548">                position = start + 1;</span>
+<span class="fc" id="L549">                continue;</span>
+            }
+<span class="fc" id="L551">            int end = start;</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">            while (end &lt; source.length()) {</span>
+<span class="fc" id="L553">                char c = source.charAt(end);</span>
+<span class="pc bpc" id="L554" title="3 of 12 branches missed.">                if (c == ' ' || c == '\t' || c == '\r' || c == '\n'</span>
+                        || c == '&gt;' || c == '/') {
+<span class="fc" id="L556">                    break;</span>
+                }
+<span class="fc" id="L558">                end++;</span>
+<span class="fc" id="L559">            }</span>
+<span class="fc" id="L560">            String qualified = source.substring(start, end);</span>
+<span class="fc" id="L561">            int colon = qualified.lastIndexOf(':');</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">            String name = colon &lt; 0 ? qualified : qualified.substring(colon + 1);</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">            if (local.equals(name)) {</span>
+<span class="fc" id="L564">                return open;</span>
+            }
+<span class="fc" id="L566">            position = end + 1;</span>
+<span class="fc" id="L567">        }</span>
+<span class="nc" id="L568">        return -1;</span>
+    }
+
+    private static String stripTags(String value) {
+<span class="fc" id="L572">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L573">        boolean tag = false;</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="pc bpc" id="L575" title="1 of 4 branches missed.">            if (!tag &amp;&amp; value.startsWith(&quot;&lt;![CDATA[&quot;, i)) {</span>
+<span class="fc" id="L576">                int end = value.indexOf(&quot;]]&gt;&quot;, i + 9);</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="nc" id="L578">                    out.append(value.substring(i + 9));</span>
+<span class="nc" id="L579">                    break;</span>
+                }
+<span class="fc" id="L581">                out.append(value.substring(i + 9, end));</span>
+<span class="fc" id="L582">                i = end + 2;</span>
+<span class="fc" id="L583">                continue;</span>
+            }
+<span class="fc" id="L585">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">            if (c == '&lt;') {</span>
+<span class="nc" id="L587">                tag = true;</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">            } else if (c == '&gt;') {</span>
+<span class="nc" id="L589">                tag = false;</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">            } else if (!tag) {</span>
+<span class="fc" id="L591">                out.append(c);</span>
+            }
+        }
+<span class="fc" id="L594">        return out.toString();</span>
+    }
+
+    private static String xml(String value) {
+<span class="nc bnc" id="L598" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    private static String unxml(String value) {
+<span class="fc" id="L602">        return value.replace(&quot;&amp;lt;&quot;, &quot;&lt;&quot;).replace(&quot;&amp;gt;&quot;, &quot;&gt;&quot;).replace(&quot;&amp;quot;&quot;, &quot;\&quot;&quot;).replace(&quot;&amp;apos;&quot;, &quot;'&quot;).replace(&quot;&amp;amp;&quot;, &quot;&amp;&quot;);</span>
+    }
+
+    private static &lt;T&gt; SuccessCallback&lt;Throwable&gt; error(final AsyncResource&lt;T&gt; out) {
+<span class="fc" id="L606">        return new SuccessCallback&lt;Throwable&gt;() {</span>
+
+            @Override
+            public void onSucess(Throwable error) {
+<span class="nc" id="L610">                out.error(error);</span>
+<span class="nc" id="L611">            }</span>
+        };
+    }
+
+    private static &lt;T&gt; AsyncResource&lt;T&gt; fail(AsyncResource&lt;T&gt; out, String message) {
+<span class="nc" id="L616">        out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, message));</span>
+<span class="nc" id="L617">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

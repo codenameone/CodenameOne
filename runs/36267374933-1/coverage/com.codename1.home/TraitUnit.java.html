@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraitUnit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">TraitUnit.java</span></div><h1>TraitUnit.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+/// A unit of measure for a [Trait] value.
+///
+/// #### Conversion is affine, with one honest exception
+///
+/// `canonical = value * scale + offset`, the same model
+/// `com.codename1.health.HealthUnit` uses, because temperature needs the
+/// offset. Converting between units of different
+/// [TraitUnitDimension]s throws [IllegalArgumentException]: that is a bug in
+/// the calling code, not a condition to report through an `AsyncResource`.
+///
+/// **Mireds and Kelvin are reciprocal, not affine**, so Kelvin is deliberately
+/// not a constant here -- it cannot be expressed in the table, and forcing it
+/// in would produce a colour temperature that is silently wrong rather than
+/// obviously wrong. Use [#miredToKelvin(double)] and
+/// [#kelvinToMired(double)], or [TraitValue#getColorTemperatureKelvin()],
+/// which are named so that stepping outside the conversion table is a visible
+/// act.
+///
+/// And the trap that catches everyone once: **a higher mired value is a warmer
+/// light**, because mireds are the reciprocal of Kelvin. 153 mireds is a cold
+/// blue-white; 400 is candlelight.
+///
+/// #### Why this is an enum where HealthUnit is a class
+///
+/// `HealthUnit` is an interned final class because its symbol is the wire
+/// format Apple's `HKUnit(from:)` parses, and because the set grows with the
+/// data types. Neither is true here: the set is small, closed and defined by
+/// what the two backends can actually express, and nothing about a home
+/// accessory will need a unit that is not already on this list. An enum gets
+/// `switch` and exhaustive reasoning for free.
+///
+/// The one thing an enum does not get for free is a stable wire form --
+/// `ordinal()` shifts the moment a constant is inserted in the middle -- so
+/// each carries an explicit [#getWireId()] and [#forWireId(int)] resolves it.
+<span class="fc" id="L59">public enum TraitUnit {</span>
+
+    /// No unit: an ordinal, a count, a plain number. The canonical unit of
+    /// [TraitUnitDimension#DIMENSIONLESS].
+<span class="fc" id="L63">    NONE(0, TraitUnitDimension.DIMENSIONLESS, 1, 0),</span>
+
+    /// Percent, 0 to 100. The canonical unit of
+    /// [TraitUnitDimension#RATIO], and the unit of every proportion in this
+    /// API -- brightness, saturation, covering position, fan speed, battery
+    /// level, humidity.
+    ///
+    /// Both backends carry these as scaled integers with different scales
+    /// (Matter's level control is 0 to 254, its covering position is 0 to
+    /// 10000, its battery percentage is in halves) and every one of those
+    /// conversions happens inside the port. Application code sees percent.
+<span class="fc" id="L74">    PERCENT(1, TraitUnitDimension.RATIO, 1, 0),</span>
+
+    /// Degrees Celsius. The canonical unit of
+    /// [TraitUnitDimension#TEMPERATURE].
+<span class="fc" id="L78">    CELSIUS(2, TraitUnitDimension.TEMPERATURE, 1, 0),</span>
+
+    /// Degrees Fahrenheit.
+<span class="fc" id="L81">    FAHRENHEIT(3, TraitUnitDimension.TEMPERATURE, 5.0 / 9.0, -160.0 / 9.0),</span>
+
+    /// Degrees of arc, 0 to 360. The canonical unit of
+    /// [TraitUnitDimension#ANGLE], used for colour hue.
+<span class="fc" id="L85">    ARC_DEGREE(4, TraitUnitDimension.ANGLE, 1, 0),</span>
+
+    /// Mireds -- micro reciprocal degrees, the reciprocal of colour
+    /// temperature in Kelvin scaled by a million. The canonical unit of
+    /// [TraitUnitDimension#COLOR_TEMPERATURE].
+    ///
+    /// Chosen over Kelvin because it is what **both** platforms use natively:
+    /// HomeKit's `HMCharacteristicTypeColorTemperature` is in mireds and
+    /// Matter's `ColorTemperatureMireds` is in mireds. Making Kelvin
+    /// canonical would mean a reciprocal on every read and every write, in
+    /// both ports, for no gain.
+<span class="fc" id="L96">    MIRED(5, TraitUnitDimension.COLOR_TEMPERATURE, 1, 0),</span>
+
+    /// Lux. The canonical unit of [TraitUnitDimension#ILLUMINANCE].
+<span class="fc" id="L99">    LUX(6, TraitUnitDimension.ILLUMINANCE, 1, 0),</span>
+
+    /// Parts per million. The canonical unit of
+    /// [TraitUnitDimension#CONCENTRATION_PARTS].
+<span class="fc" id="L103">    PPM(7, TraitUnitDimension.CONCENTRATION_PARTS, 1, 0),</span>
+
+    /// Parts per billion.
+<span class="fc" id="L106">    PPB(8, TraitUnitDimension.CONCENTRATION_PARTS, 0.001, 0),</span>
+
+    /// Micrograms per cubic metre. The canonical unit of
+    /// [TraitUnitDimension#CONCENTRATION_MASS], used for particulate matter.
+<span class="fc" id="L110">    MICROGRAM_PER_CUBIC_METER(9, TraitUnitDimension.CONCENTRATION_MASS, 1, 0);</span>
+
+    private final int wireId;
+    private final TraitUnitDimension dimension;
+    private final double scale;
+    private final double offset;
+
+    TraitUnit(int wireId, TraitUnitDimension dimension, double scale,
+<span class="fc" id="L118">            double offset) {</span>
+<span class="fc" id="L119">        this.wireId = wireId;</span>
+<span class="fc" id="L120">        this.dimension = dimension;</span>
+<span class="fc" id="L121">        this.scale = scale;</span>
+<span class="fc" id="L122">        this.offset = offset;</span>
+<span class="fc" id="L123">    }</span>
+
+    /// The stable identifier this unit crosses the native boundary as.
+    ///
+    /// Fixed per constant and never reused, so inserting a unit into the
+    /// middle of this list cannot silently re-label values a port already
+    /// sends.
+    ///
+    /// #### Returns
+    ///
+    /// the wire identifier
+    public int getWireId() {
+<span class="fc" id="L135">        return wireId;</span>
+    }
+
+    /// What this unit measures.
+    ///
+    /// #### Returns
+    ///
+    /// the dimension, never `null`
+    public TraitUnitDimension getDimension() {
+<span class="fc" id="L144">        return dimension;</span>
+    }
+
+    /// Whether a value in this unit can be converted into the supplied one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `other`: the target unit, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when both measure the same dimension
+    public boolean isCompatibleWith(TraitUnit other) {
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        return other != null &amp;&amp; other.dimension == dimension;</span>
+    }
+
+    /// Converts a value between two units of the same dimension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the quantity to convert
+    ///
+    /// - `from`: the unit `value` is expressed in
+    ///
+    /// - `to`: the unit to express it in
+    ///
+    /// #### Returns
+    ///
+    /// the converted quantity
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when either unit is `null` or they
+    ///   measure different dimensions
+    public static double convert(double value, TraitUnit from, TraitUnit to) {
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        if (from == null || to == null) {</span>
+<span class="nc" id="L180">            throw new IllegalArgumentException(</span>
+                    &quot;both units are required to convert&quot;);
+        }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (from.dimension != to.dimension) {</span>
+<span class="fc" id="L184">            throw new IllegalArgumentException(&quot;cannot convert &quot;</span>
+<span class="fc" id="L185">                    + from.name() + &quot; (&quot; + from.dimension.name() + &quot;) to &quot;</span>
+<span class="fc" id="L186">                    + to.name() + &quot; (&quot; + to.dimension.name()</span>
+                    + &quot;): different dimensions&quot;);
+        }
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (from == to) {</span>
+<span class="fc" id="L190">            return value;</span>
+        }
+<span class="fc" id="L192">        double canonical = value * from.scale + from.offset;</span>
+<span class="fc" id="L193">        return (canonical - to.offset) / to.scale;</span>
+    }
+
+    /// Resolves a unit by its wire identifier, total: an unrecognized id
+    /// answers `null` rather than throwing, so a value from a newer port
+    /// degrades to &quot;no value&quot; instead of taking down the decode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wireId`: an identifier previously returned by [#getWireId()]
+    ///
+    /// #### Returns
+    ///
+    /// the matching unit, or `null`
+    public static TraitUnit forWireId(int wireId) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (TraitUnit candidate : values()) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (candidate.wireId == wireId) {</span>
+<span class="fc" id="L210">                return candidate;</span>
+            }
+        }
+<span class="fc" id="L213">        return null;</span>
+    }
+
+    /// Converts mireds to Kelvin.
+    ///
+    /// Outside the [#convert(double, TraitUnit, TraitUnit)] table on purpose:
+    /// the relationship is reciprocal, and an affine table that pretended
+    /// otherwise would return a plausible number that is wrong everywhere
+    /// except at one point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mireds`: a colour temperature in mireds; must be greater than zero
+    ///
+    /// #### Returns
+    ///
+    /// the same colour temperature in Kelvin
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `mireds` is zero, negative or
+///   not a number
+    public static double miredToKelvin(double mireds) {
+        // NaN named on its own, because it compares false against every
+        // operator: `mireds &lt;= 0` lets it straight through, and a reciprocal of
+        // NaN is NaN, so a bad reading became a colour temperature that
+        // spread through every calculation it touched instead of failing
+        // here.
+<span class="fc bfc" id="L241" title="All 4 branches covered.">        if (Double.isNaN(mireds) || mireds &lt;= 0) {</span>
+<span class="fc" id="L242">            throw new IllegalArgumentException(</span>
+                    &quot;mireds must be positive, got &quot; + mireds);
+        }
+<span class="fc" id="L245">        return 1000000.0 / mireds;</span>
+    }
+
+    /// Converts Kelvin to mireds. See [#miredToKelvin(double)] for why this
+    /// is a named method rather than a table entry.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kelvin`: a colour temperature in Kelvin; must be greater than zero
+    ///
+    /// #### Returns
+    ///
+    /// the same colour temperature in mireds
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `kelvin` is zero, negative or
+///   not a number
+    public static double kelvinToMired(double kelvin) {
+        // NaN named on its own, because it compares false against every
+        // operator: `kelvin &lt;= 0` lets it straight through, and a reciprocal of
+        // NaN is NaN, so a bad reading became a colour temperature that
+        // spread through every calculation it touched instead of failing
+        // here.
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">        if (Double.isNaN(kelvin) || kelvin &lt;= 0) {</span>
+<span class="fc" id="L270">            throw new IllegalArgumentException(</span>
+                    &quot;kelvin must be positive, got &quot; + kelvin);
+        }
+<span class="nc" id="L273">        return 1000000.0 / kelvin;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

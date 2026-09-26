@@ -1,0 +1,1093 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StateCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.continuity</a> &gt; <span class="el_source">StateCodec.java</span></div><h1>StateCodec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.continuity;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.JSONWriter;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Turns an `AppState` into the two forms it has to travel in, and refuses payloads that cannot
+/// make the trip.
+///
+/// The two forms are deliberately different. A *continuation* is handed to the operating system,
+/// which stores it as a property list and may deliver it to another device, so it is a nested map
+/// of plist-representable values. A *relay* payload crosses a network to a device that may not be
+/// an Apple one at all, so it is JSON. Both are lossless for the value types the payload admits,
+/// which is the whole reason the payload admits so few.
+///
+/// This class is public so that a `StateRelay` written by an application can use the same wire
+/// format the built-in one does, and so tests can assert on it.
+public final class StateCodec {
+    private static final String KEY_ROUTES = &quot;routes&quot;;
+    private static final String KEY_PAYLOAD = &quot;payload&quot;;
+
+    /// Says that this document's payload values carry type tags.
+    ///
+    /// The decision has to be made once for the DOCUMENT, not guessed per value. decode() used to
+    /// ask of every string whether it looked tagged, so an untagged payload -- what a
+    /// hand-written endpoint or an older build produces, and which this codec deliberately
+    /// accepts -- had any ordinary string of the form &quot;i:5&quot; or &quot;s:note&quot; silently reinterpreted:
+    /// the first became an Integer, the second lost its prefix. That is application data changed
+    /// in transit, and no per-string rule can tell the two apart, because &quot;i:5&quot; is a perfectly
+    /// good string.
+    ///
+    /// A document written by this codec says so. One without the marker is read exactly as it
+    /// arrived.
+    private static final String KEY_ENCODING = &quot;enc&quot;;
+
+    /// The only encoding this codec writes. Absent means untagged.
+    private static final String ENCODING_TAGGED = &quot;1&quot;;
+    private static final String KEY_DEVICE = &quot;device&quot;;
+    private static final String KEY_TITLE = &quot;title&quot;;
+    private static final String KEY_SEQUENCE = &quot;seq&quot;;
+    private static final String KEY_TIMESTAMP = &quot;ts&quot;;
+
+    /// The fields this codec writes. A document carrying none of them is not a state, whatever
+    /// else it contains.
+<span class="fc" id="L73">    private static final String[] KNOWN_KEYS = {</span>
+        KEY_ROUTES, KEY_PAYLOAD, KEY_DEVICE, KEY_TITLE, KEY_SEQUENCE, KEY_TIMESTAMP,
+    };
+
+    private StateCodec() {
+    }
+
+    /// Renders a state as the nested map an operating system can carry between devices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the state, must not be null
+    ///
+    /// #### Returns
+    ///
+    /// a map of plist-representable values
+    public static Map&lt;String, Object&gt; toMap(AppState state) {
+<span class="fc" id="L90">        Map&lt;String, Object&gt; m = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L91">        m.put(KEY_ROUTES, new ArrayList&lt;String&gt;(state.getRoutes()));</span>
+<span class="fc" id="L92">        m.put(KEY_PAYLOAD, encode(state.payloadRef()));</span>
+<span class="fc" id="L93">        m.put(KEY_ENCODING, ENCODING_TAGGED);</span>
+<span class="fc" id="L94">        m.put(KEY_DEVICE, state.getDeviceId());</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (state.getTitle() != null) {</span>
+<span class="fc" id="L96">            m.put(KEY_TITLE, state.getTitle());</span>
+        }
+        // Written as strings rather than as numbers. Both survive a property list, but a JSON
+        // round trip through JSONParser reads every number back as a Double, and a millisecond
+        // timestamp is past the range a double represents exactly -- so the same two fields would
+        // come back changed on the relay path and unchanged on the continuation path. One
+        // encoding for both keeps a state comparable with itself however it arrived.
+<span class="fc" id="L103">        m.put(KEY_SEQUENCE, Long.toString(state.getSequence()));</span>
+<span class="fc" id="L104">        m.put(KEY_TIMESTAMP, Long.toString(state.getTimestamp()));</span>
+<span class="fc" id="L105">        return m;</span>
+    }
+
+    /// Rebuilds a state from the map form. Unknown keys are ignored, so a newer build of the app
+    /// on another device can add fields without breaking this one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the map, or null
+    ///
+    /// #### Returns
+    ///
+    /// the state, or null when the map is null or carries nothing recognizable
+    public static AppState fromMap(Map&lt;String, Object&gt; m) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L120">            return null;</span>
+        }
+        // Something recognizable has to be in there. An empty object, or an unrelated one, used
+        // to come back as a default AppState -- which the continuation callback then CLAIMED and
+        // delivered, so a relay answering &quot;{}&quot; ran the application's listeners and could put a
+        // &quot;continue what you were doing?&quot; prompt in front of the user over nothing at all.
+<span class="fc" id="L126">        boolean recognized = false;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (String known : KNOWN_KEYS) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (m.containsKey(known)) {</span>
+<span class="fc" id="L129">                recognized = true;</span>
+<span class="fc" id="L130">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (!recognized) {</span>
+<span class="fc" id="L134">            return null;</span>
+        }
+        try {
+            // HERE, not only in fromJson. A platform continuation -- an NSUserActivity, or
+            // anything a custom bridge hands over -- reaches this method DIRECTLY, so every
+            // schema check added for the relay wire was missing from the other way in. A
+            // continuation with a good origin and sequence but &quot;routes&quot; as a string dropped the
+            // field, produced an empty state, and admission consumed that as a tombstone and
+            // advanced the origin's durable high-water mark: the same harm, on the path that
+            // never touches JSON.
+            //
+            // NULL rather than an exception, because this is the answer every caller of this
+            // method already handles and the continuation callback is not a place to throw.
+            // fromJson keeps its own throwing check so a bad fetch is reported as a failed read
+            // rather than as an empty relay.
+<span class="fc" id="L149">            requireKnownTypes(m);</span>
+<span class="fc" id="L150">        } catch (IOException malformed) {</span>
+<span class="fc" id="L151">            Log.e(malformed);</span>
+<span class="fc" id="L152">            return null;</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        AppState state = new AppState();</span>
+<span class="fc" id="L155">        Object routes = m.get(KEY_ROUTES);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (routes instanceof List) {</span>
+<span class="fc" id="L157">            List&lt;String&gt; paths = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (Object path : (List&lt;?&gt;) routes) {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                if (path instanceof String) {</span>
+<span class="fc" id="L160">                    paths.add((String) path);</span>
+                }
+<span class="fc" id="L162">            }</span>
+            // Unchecked, exactly as the payload below is: this document came from another
+            // device, and one route past this device's stored-string limit used to throw out of
+            // fromJson -- which the relay reads as a failed fetch, and the document never
+            // changes, so this device stopped publishing for good.
+<span class="fc" id="L167">            state.setRoutesUnchecked(paths);</span>
+        }
+        // Whether the values are tagged is the DOCUMENT's answer, not a guess made per string.
+        // See KEY_ENCODING: without it, &quot;i:5&quot; is just a string and stays one.
+<span class="fc" id="L171">        Object encoding = m.get(KEY_ENCODING);</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        boolean tagged = encoding instanceof String &amp;&amp; ENCODING_TAGGED.equals(encoding);</span>
+<span class="fc" id="L173">        Object payload = m.get(KEY_PAYLOAD);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (payload instanceof Map) {</span>
+<span class="fc" id="L175">            Map&lt;String, Object&gt; copy = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L176">            Map&lt;?, ?&gt; read = (Map&lt;?, ?&gt;) payload;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; entry : read.entrySet()) {</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (entry.getKey() instanceof String) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                    copy.put((String) entry.getKey(),</span>
+<span class="fc" id="L180">                            tagged ? decode(entry.getValue()) : entry.getValue());</span>
+                }
+<span class="fc" id="L182">            }</span>
+            // Validated, with the SAME check a locally built payload gets -- there is one
+            // definition of what a payload may hold and this is it. AppState documents the
+            // restriction and setPayload() enforced it, while a payload arriving from another
+            // device went in unchecked: a null nested in a list survived to the listeners and the
+            // provider, was acknowledged, and then met the iOS property-list sanitizer, which
+            // drops it and shifts every index after it. The application's data changes shape
+            // between one device and the next, silently.
+            //
+            // NULL rather than an exception, which is the same answer the field-type checks above
+            // give and the reason the old comment here gave for skipping this: a remote mistake
+            // must not become an exception on this device. It does not -- it becomes a failed
+            // read, so the document stays on the relay for a build that can use it.
+            try {
+<span class="fc" id="L196">                state.setPayload(copy);</span>
+<span class="fc" id="L197">            } catch (IllegalArgumentException malformed) {</span>
+<span class="fc" id="L198">                Log.e(malformed);</span>
+<span class="fc" id="L199">                return null;</span>
+<span class="fc" id="L200">            }</span>
+        }
+<span class="fc" id="L202">        Object device = m.get(KEY_DEVICE);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (device instanceof String) {</span>
+<span class="fc" id="L204">            state.setDeviceIdUnchecked((String) device);</span>
+        }
+<span class="fc" id="L206">        Object title = m.get(KEY_TITLE);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (title instanceof String) {</span>
+<span class="fc" id="L208">            String label = (String) title;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (exceedsWritableLength(label)) {</span>
+                // DROPPED, and only this field. A title is the label a receiving device may show
+                // before the user accepts -- losing it costs a nicety, while refusing the
+                // document costs the user their work. Carrying it was the worst of the three:
+                // commit() persists it through externalize(), which throws on the oversized
+                // string every time, so the arrival is parked, re-applied on every retry and
+                // holds every relay publication behind it -- after the provider and the route
+                // rebuild have already run.
+                //
+                // Nothing this framework sends produces one: setTitle() refuses it at the call.
+<span class="fc" id="L219">                Log.p(&quot;Continuity: dropping a continuation title longer than &quot;</span>
+                        + MAX_STRING_BYTES + &quot; bytes. The state itself is kept.&quot;);
+            } else {
+<span class="fc" id="L222">                state.setTitleUnchecked(label);</span>
+            }
+        }
+<span class="fc" id="L225">        state.setSequence(asLong(m.get(KEY_SEQUENCE)));</span>
+<span class="fc" id="L226">        state.setTimestamp(asLong(m.get(KEY_TIMESTAMP)));</span>
+<span class="fc" id="L227">        return state;</span>
+    }
+
+    /// Renders a state as JSON, for a relay.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the state, must not be null
+    ///
+    /// #### Returns
+    ///
+    /// the JSON document
+    public static String toJson(AppState state) {
+<span class="fc" id="L240">        return JSONWriter.toJson(toMap(state));</span>
+    }
+
+    /// Parses the JSON form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document, or null
+    ///
+    /// #### Returns
+    ///
+    /// the state, or null when the document is null, empty or not an object
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: when the document is malformed
+    public static AppState fromJson(String json) throws IOException {
+<span class="fc bfc" id="L257" title="All 4 branches covered.">        if (json == null || json.trim().length() == 0) {</span>
+<span class="fc" id="L258">            return null;</span>
+        }
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (!isValidJsonObject(json)) {</span>
+            // JSONParser does NOT throw on a malformed document: it logs the failure, closes the
+            // reader, and returns whatever partial map it had built. So a truncated relay response
+            // came back as a valid-looking state, and the shape it takes is the worst one -- a
+            // document cut off after &quot;device&quot; and &quot;seq&quot; has no routes and no payload, which is an
+            // EMPTY state, which this framework reads as a tombstone. The origin is then recorded
+            // as having cleared its work, durably, and fetch() reports a SUCCESSFUL read, which
+            // releases a queued POST over the relay's real document.
+            //
+            // So the check is here rather than left to the parser. Truncation is the corruption
+            // that actually happens on a network, and it is exactly what a structural scan
+            // catches -- and so is a bad token, which a structural scan alone let through:
+            // {&quot;device&quot;:&quot;d&quot;,&quot;seq&quot;:&quot;2&quot;,&quot;payload&quot;:tru} is balanced, quoted, and invalid.
+<span class="fc" id="L273">            throw new IOException(&quot;The continuity relay returned a document that is not a &quot;</span>
+                    + &quot;valid JSON object. Treated as a failed read rather than as an empty &quot;
+                    + &quot;relay, because a truncated document is indistinguishable from one that &quot;
+                    + &quot;says the other device has nothing.&quot;);
+        }
+        // Parsed with NULLS KEPT. The convenience parser drops a null-valued field before
+        // anything can look at it, so {&quot;payload&quot;:null} reached the checks below as an ABSENT
+        // payload -- and absent routes plus an absent payload is an empty state, which this
+        // framework reads as a tombstone. A field that is present and null has to stay
+        // distinguishable from one that was never sent.
+<span class="fc" id="L283">        JSONParser parser = new JSONParser();</span>
+<span class="fc" id="L284">        parser.setIncludeNullsInstance(true);</span>
+        // Booleans as BOOLEANS. The parser defaults to answering a raw JSON true or false with
+        // the strings &quot;true&quot; and &quot;false&quot;, which is fine for the tagged form this codec writes --
+        // &quot;b:true&quot; is a string either way -- and wrong for an untagged compatibility document
+        // from a hand-written endpoint: the payload reached the listeners and the provider with
+        // Strings where the sender wrote booleans, passed validation because a String is a
+        // representable type, and was acknowledged.
+<span class="fc" id="L291">        parser.setUseBooleanInstance(true);</span>
+<span class="fc" id="L292">        Map&lt;String, Object&gt; parsed = parser.parseJSON(new java.io.StringReader(json));</span>
+<span class="fc" id="L293">        requireKnownTypes(parsed);</span>
+<span class="fc" id="L294">        AppState state = fromMap(parsed);</span>
+<span class="pc bpc" id="L295" title="1 of 6 branches missed.">        if (state == null &amp;&amp; parsed != null &amp;&amp; !parsed.isEmpty()) {</span>
+            // A document with CONTENT that this build recognises none of. fromMap answers null
+            // for it, and null means &quot;the relay holds nothing&quot; to the code that reads a fetch --
+            // so the publisher is released and a local checkpoint overwrites a document this
+            // device never managed to read. `{&quot;error&quot;:&quot;temporarily unavailable&quot;}` returned with a
+            // 2xx is the shape that does it.
+            //
+            // NON-EMPTY is the whole condition. A bare `{}` is a plausible way for an endpoint to
+            // say it holds nothing, alongside the 404 and the empty body this class documents,
+            // and refusing that would leave such an endpoint unable to publish anything, ever.
+            // An object carrying fields none of which are ours is a different thing: something is
+            // there and this build cannot read it.
+<span class="fc" id="L307">            throw new IOException(&quot;The continuity relay returned an object with no fields this &quot;</span>
+                    + &quot;build recognises. Treated as a failed read rather than as an empty relay, &quot;
+                    + &quot;because something is stored there and publishing over it would destroy &quot;
+                    + &quot;work this device could not read.&quot;);
+        }
+<span class="fc" id="L312">        return state;</span>
+    }
+
+    /// Refuses a document whose known fields carry the wrong kind of value.
+    ///
+    /// Valid syntax is not a valid STATE. `{&quot;device&quot;:&quot;other&quot;,&quot;seq&quot;:&quot;10&quot;,&quot;payload&quot;:[]}` parses
+    /// cleanly, and fromMap then ignores the array where a payload belongs -- leaving routes and
+    /// payload both empty, which is an EMPTY state, which the framework reads as a tombstone. So
+    /// a relay serving one wrong type has the origin recorded as having cleared its work, marked
+    /// durably, and a queued publish released over the server's document. The same shape with
+    /// valid routes restores and acknowledges a state whose payload was silently dropped.
+    ///
+    /// Only fields that are PRESENT are checked, and only ones this codec knows. An absent field
+    /// is an older or smaller document, which is legitimate; an unknown field belongs to a
+    /// sender that knows something this build does not, and ignoring it is how the format stays
+    /// extensible. What is refused is a known field that cannot mean what it says.
+    private static void requireKnownTypes(Map&lt;String, Object&gt; m) throws IOException {
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L330">            return;</span>
+        }
+<span class="fc" id="L332">        requireType(m, KEY_ROUTES, List.class, &quot;an array of route strings&quot;);</span>
+<span class="fc" id="L333">        requireRouteStrings(m);</span>
+<span class="fc" id="L334">        requireType(m, KEY_PAYLOAD, Map.class, &quot;an object&quot;);</span>
+<span class="fc" id="L335">        requireType(m, KEY_ENCODING, String.class, &quot;a string&quot;);</span>
+<span class="fc" id="L336">        Object encoding = m.get(KEY_ENCODING);</span>
+<span class="fc bfc" id="L337" title="All 4 branches covered.">        if (encoding != null &amp;&amp; !ENCODING_TAGGED.equals(encoding)) {</span>
+            // An unknown ENCODING is not an unknown field. A field this codec does not know is
+            // ignored on purpose -- that is how the format stays extensible and how a newer
+            // sender goes on talking to this build. An encoding marker changes how the fields it
+            // DOES know must be read, so falling back to &quot;untagged&quot; handed the provider every
+            // encoded scalar as a raw string, and the state was then persisted and acknowledged:
+            // the origin's high-water mark advanced, so the correctly encoded document was never
+            // offered again, not even after the receiving app was upgraded to understand it.
+            //
+            // A failed read instead, which is retryable and leaves the document on the relay.
+<span class="fc" id="L347">            throw new IOException(&quot;The continuity relay returned a document encoded as \&quot;&quot;</span>
+                    + encoding + &quot;\&quot;, which this build cannot read -- it understands \&quot;&quot;
+                    + ENCODING_TAGGED + &quot;\&quot; and documents with no encoding marker at all. &quot;
+                    + &quot;Treated as a failed read so the document stays where a build that &quot;
+                    + &quot;understands it can still use it.&quot;);
+        }
+<span class="fc" id="L353">        requireType(m, KEY_DEVICE, String.class, &quot;a string&quot;);</span>
+<span class="fc" id="L354">        Object device = m.get(KEY_DEVICE);</span>
+<span class="fc bfc" id="L355" title="All 4 branches covered.">        if (device instanceof String &amp;&amp; exceedsWritableLength((String) device)) {</span>
+            // REFUSED, where an oversized title is dropped. The two are not alike: a title is a
+            // label a receiving device may show, and losing it costs a nicety, while the origin
+            // id is the key every mark and every dedup decision is made against -- a state
+            // without one is refused by admit() anyway, so dropping it would only move the
+            // refusal somewhere less clear.
+            //
+            // Carrying it is the answer that does damage: commit() writes the id through
+            // Util.writeUTF, which throws on it every time, so the arrival is parked, re-applied
+            // on every retry and holds every relay publication behind it -- after the provider
+            // and the route rebuild have already run.
+<span class="fc" id="L366">            throw new IOException(&quot;The continuity relay returned a document whose device id is &quot;</span>
+                    + &quot;longer than &quot; + MAX_STRING_BYTES + &quot; bytes of modified UTF-8, which is &quot;
+                    + &quot;more than a stored checkpoint can hold. Treated as a failed read, so the &quot;
+                    + &quot;document stays where a sender that fixes it can replace it.&quot;);
+        }
+<span class="fc" id="L371">        requireType(m, KEY_TITLE, String.class, &quot;a string&quot;);</span>
+<span class="fc" id="L372">        requireNumberLike(m, KEY_SEQUENCE);</span>
+<span class="fc" id="L373">        requireNumberLike(m, KEY_TIMESTAMP);</span>
+        // And a timestamp that is not in the PAST-or-absent shape the rest of the framework reads
+        // it as. Zero is the documented &quot;this state carries no time&quot;, and isTooOld() reads
+        // anything not positive that way -- so a negative one is a state that can never expire,
+        // whatever maxAge the application configured. An expired checkout or a released booking
+        // hold would go on being restorable for the life of the install, which is the one thing
+        // maxAge exists to stop.
+        //
+        // Refused HERE rather than clamped, for the reason the sequence check gives: a value this
+        // codec silently repaired would differ from what the sender believes it sent, and the two
+        // sides then disagree about a state neither can see. It is also where the arithmetic
+        // stays safe -- Long.MIN_VALUE would overflow a subtraction, and the only reason it does
+        // not today is the positive-guard that this same malformed value hides behind.
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (asLong(m.get(KEY_TIMESTAMP)) &lt; 0) {</span>
+<span class="fc" id="L387">            throw new IOException(&quot;The continuity relay returned a document whose \&quot;&quot;</span>
+                    + KEY_TIMESTAMP + &quot;\&quot; is negative. Zero means a state carries no time and &quot;
+                    + &quot;anything below it means nothing at all, so it is refused rather than read &quot;
+                    + &quot;as a state that can never expire.&quot;);
+        }
+<span class="fc" id="L392">    }</span>
+
+    /// Every ELEMENT of the route array, not just the array.
+    ///
+    /// Checking the container alone left {&quot;routes&quot;:[1]} passing: the list is a list, the loop
+    /// that reads it drops the element it cannot use, and what comes out has no routes and no
+    /// payload -- an empty state, which this framework reads as a tombstone. The same door as a
+    /// wrong payload type and a null field, one level further in.
+    private static void requireRouteStrings(Map&lt;String, Object&gt; m) throws IOException {
+<span class="fc" id="L401">        Object routes = m.get(KEY_ROUTES);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (!(routes instanceof List)) {</span>
+<span class="fc" id="L403">            return;</span>
+        }
+<span class="fc" id="L405">        List&lt;?&gt; list = (List&lt;?&gt;) routes;</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        for (int i = 0; i &lt; list.size(); i++) {</span>
+<span class="fc" id="L407">            Object path = list.get(i);</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">            if (path instanceof String) {</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                if (((String) path).length() &gt; 0) {</span>
+<span class="fc" id="L410">                    continue;</span>
+                }
+                // An EMPTY string is a string, and it is not a route. It survives every check
+                // above, so the state is not empty and is not read as a tombstone -- and then
+                // restoreStack() skips the path, rebuilds nothing, and the arrival is classified
+                // as an attempt that failed: parked for ever, re-offered on every launch, with
+                // every relay publication held behind it.
+                //
+                // Refused rather than filtered, for the reason the refusal below gives: dropping
+                // the only route turns the document into an empty state, which means something
+                // else entirely. Nothing this framework writes produces one -- setRoutes() skips
+                // empty paths -- so no legitimate sender is refused.
+<span class="fc" id="L422">                throw new IOException(&quot;The continuity relay returned a document whose route at &quot;</span>
+                        + &quot;index &quot; + i + &quot; is an empty string. It is not a path that can be &quot;
+                        + &quot;rebuilt, and keeping it would leave an arrival that can never be &quot;
+                        + &quot;applied and never be let go of.&quot;);
+            }
+<span class="fc" id="L427">            throw new IOException(&quot;The continuity relay returned a document whose route at index &quot;</span>
+                    + i + &quot; is not a string. Dropping it would leave a state with fewer routes &quot;
+                    + &quot;than the sender meant, and dropping the only one would make it an empty &quot;
+                    + &quot;state -- which means the sending device cleared its work.&quot;);
+        }
+<span class="fc" id="L432">    }</span>
+
+    private static void requireType(Map&lt;String, Object&gt; m, String key, Class&lt;?&gt; type, String what)
+            throws IOException {
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (!m.containsKey(key)) {</span>
+<span class="fc" id="L437">            return;</span>
+        }
+<span class="fc" id="L439">        Object value = m.get(key);</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L441">            throw new IOException(&quot;The continuity relay returned a document whose \&quot;&quot; + key</span>
+                    + &quot;\&quot; is null. A sender that means \&quot;absent\&quot; leaves the key out; a key that &quot;
+                    + &quot;is present and empty is a document this codec cannot read, and reading it &quot;
+                    + &quot;as absent would make it an empty state -- which means the sending device &quot;
+                    + &quot;cleared its work.&quot;);
+        }
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (type.isInstance(value)) {</span>
+<span class="fc" id="L448">            return;</span>
+        }
+<span class="fc" id="L450">        throw new IOException(&quot;The continuity relay returned a document whose \&quot;&quot; + key</span>
+                + &quot;\&quot; is not &quot; + what + &quot;. Treated as a failed read rather than as a state, &quot;
+                + &quot;because a field this codec cannot use is indistinguishable from one that is &quot;
+                + &quot;absent -- and an absent payload and routes make an empty state, which means &quot;
+                + &quot;the sending device cleared its work.&quot;);
+    }
+
+    /// seq and ts, which this codec writes as strings and older senders may write as numbers.
+    private static void requireNumberLike(Map&lt;String, Object&gt; m, String key) throws IOException {
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        if (!m.containsKey(key)) {</span>
+<span class="fc" id="L460">            return;</span>
+        }
+<span class="fc" id="L462">        Object value = m.get(key);</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (value instanceof Number) {</span>
+            // NOT just &quot;a number&quot;. JSONParser answers a bare 1e100 with a Double, and asLong()
+            // then converts it to Long.MAX_VALUE -- so one such document raises this origin's
+            // durable high-water mark to the largest value there is, and every ordinary sequence
+            // it sends afterwards is refused as already seen, for the life of the installation.
+            // A fractional value is refused for the same reason in miniature: 5.7 becomes 5, and
+            // the sender's 5 is then indistinguishable from it.
+<span class="pc bpc" id="L470" title="4 of 8 branches missed.">            if (value instanceof Long || value instanceof Integer</span>
+                    || value instanceof Short || value instanceof Byte) {
+                // Already a whole number inside the range, by its own type. Routing these
+                // through a double would REJECT a perfectly good Long near the top of the
+                // range, because that is precisely the region a double cannot represent.
+                // JSONParser answers with Long rather than Double when useLongs is on, which
+                // any code in the process can turn on through the static setter.
+<span class="nc" id="L477">                return;</span>
+            }
+<span class="fc" id="L479">            double d = ((Number) value).doubleValue();</span>
+            // The upper bound is &gt;= and is written against MIN_VALUE, which is the only one of
+            // the two a double holds exactly. Long.MAX_VALUE is not representable: (double)
+            // Long.MAX_VALUE rounds UP to 2^63, so a sender's 9223372036854775808 -- one past
+            // the range -- compares equal to it and a &quot;&gt; (double) Long.MAX_VALUE&quot; test let it
+            // through, to be clamped back to Long.MAX_VALUE by the conversion. -(double)
+            // Long.MIN_VALUE is exactly 2^63, and a double is convertible to a long precisely
+            // when it is at least -2^63 and strictly below 2^63.
+            //
+            // This does refuse a sender that writes Long.MAX_VALUE itself as a bare NUMBER,
+            // and there is no way not to: no double distinguishes it from the value one past
+            // the range. This codec writes seq as a STRING for exactly that reason, and the
+            // string path parses it exactly.
+<span class="pc bpc" id="L492" title="2 of 4 branches missed.">            if (Double.isNaN(d) || Double.isInfinite(d)</span>
+<span class="fc bfc" id="L493" title="All 6 branches covered.">                    || d != Math.floor(d)</span>
+                    || d &lt; (double) Long.MIN_VALUE || d &gt;= -((double) Long.MIN_VALUE)) {
+<span class="fc" id="L495">                throw new IOException(&quot;The continuity relay returned a document whose \&quot;&quot; + key</span>
+                        + &quot;\&quot; is &quot; + value + &quot;, which is not a whole number this device can &quot;
+                        + &quot;hold. Accepting it would clamp the value to the largest sequence &quot;
+                        + &quot;there is and refuse every later state from that device as already &quot;
+                        + &quot;seen.&quot;);
+            }
+<span class="fc" id="L501">            return;</span>
+        }
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        if (value instanceof String) {</span>
+            try {
+<span class="fc" id="L505">                Long.parseLong(((String) value).trim());</span>
+<span class="fc" id="L506">                return;</span>
+<span class="fc" id="L507">            } catch (NumberFormatException err) {</span>
+                // Falls through to the refusal below: a string that is not a number cannot be a
+                // sequence, and asLong() would silently answer 0 -- which is a valid-looking
+                // sequence that every later state supersedes.
+<span class="fc" id="L511">                Log.e(err);</span>
+            }
+        }
+<span class="fc" id="L514">        throw new IOException(&quot;The continuity relay returned a document whose \&quot;&quot; + key</span>
+                + &quot;\&quot; is not a number. Read as zero it would be a sequence every later state &quot;
+                + &quot;supersedes, so it is refused instead.&quot;);
+    }
+
+    /// Whether `json` is ONE syntactically valid JSON object and nothing else.
+    ///
+    /// A real grammar check, because a structural one was not enough. Counting braces and closing
+    /// strings catches a document cut in half, and lets
+    /// `{&quot;device&quot;:&quot;d&quot;,&quot;seq&quot;:&quot;2&quot;,&quot;payload&quot;:tru}` through -- balanced, quoted, and invalid. The
+    /// parser then logs the bad token and returns the map it had built up to that point, which is
+    /// a partial state with the same consequences as a truncated one.
+    ///
+    /// Nothing is built here and no value is interpreted: this answers only &quot;is the whole of this
+    /// document well formed&quot;, so it cannot disagree with the parser about what anything MEANS.
+    /// The alternative was asking the parser, and it has no way to say -- its exception handler
+    /// logs, closes the reader, and returns the partial result.
+    static boolean isValidJsonObject(String json) {
+<span class="fc" id="L532">        String t = json.trim();</span>
+<span class="pc bpc" id="L533" title="2 of 4 branches missed.">        if (t.length() &lt; 2 || t.charAt(0) != '{') {</span>
+<span class="nc" id="L534">            return false;</span>
+        }
+<span class="fc" id="L536">        int[] at = new int[1];</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (!scanValue(t, at)) {</span>
+<span class="fc" id="L538">            return false;</span>
+        }
+<span class="fc" id="L540">        skipWhitespace(t, at);</span>
+        // Trailing content is not a second document, it is a broken one.
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        return at[0] == t.length();</span>
+    }
+
+    private static void skipWhitespace(String s, int[] at) {
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        while (at[0] &lt; s.length()) {</span>
+<span class="fc" id="L547">            char c = s.charAt(at[0]);</span>
+<span class="pc bpc" id="L548" title="3 of 8 branches missed.">            if (c != ' ' &amp;&amp; c != '\t' &amp;&amp; c != '\n' &amp;&amp; c != '\r') {</span>
+<span class="fc" id="L549">                return;</span>
+            }
+<span class="fc" id="L551">            at[0]++;</span>
+<span class="fc" id="L552">        }</span>
+<span class="fc" id="L553">    }</span>
+
+    private static boolean scanValue(String s, int[] at) {
+<span class="fc" id="L556">        skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (at[0] &gt;= s.length()) {</span>
+<span class="nc" id="L558">            return false;</span>
+        }
+<span class="fc" id="L560">        char c = s.charAt(at[0]);</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        if (c == '{') {</span>
+<span class="fc" id="L562">            return scanObject(s, at);</span>
+        }
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (c == '[') {</span>
+<span class="fc" id="L565">            return scanArray(s, at);</span>
+        }
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (c == '&quot;') {</span>
+<span class="fc" id="L568">            return scanString(s, at);</span>
+        }
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        if (c == 't') {</span>
+<span class="fc" id="L571">            return scanLiteral(s, at, &quot;true&quot;);</span>
+        }
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        if (c == 'f') {</span>
+<span class="fc" id="L574">            return scanLiteral(s, at, &quot;false&quot;);</span>
+        }
+<span class="fc bfc" id="L576" title="All 2 branches covered.">        if (c == 'n') {</span>
+<span class="fc" id="L577">            return scanLiteral(s, at, &quot;null&quot;);</span>
+        }
+<span class="fc" id="L579">        return scanNumber(s, at);</span>
+    }
+
+    private static boolean scanObject(String s, int[] at) {
+<span class="fc" id="L583">        at[0]++;</span>
+<span class="fc" id="L584">        skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L585" title="1 of 4 branches missed.">        if (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) == '}') {</span>
+<span class="fc" id="L586">            at[0]++;</span>
+<span class="fc" id="L587">            return true;</span>
+        }
+        for (;;) {
+<span class="fc" id="L590">            skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L591" title="1 of 6 branches missed.">            if (at[0] &gt;= s.length() || s.charAt(at[0]) != '&quot;' || !scanString(s, at)) {</span>
+<span class="fc" id="L592">                return false;</span>
+            }
+<span class="fc" id="L594">            skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L595" title="2 of 4 branches missed.">            if (at[0] &gt;= s.length() || s.charAt(at[0]) != ':') {</span>
+<span class="nc" id="L596">                return false;</span>
+            }
+<span class="fc" id="L598">            at[0]++;</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">            if (!scanValue(s, at)) {</span>
+<span class="fc" id="L600">                return false;</span>
+            }
+<span class="fc" id="L602">            skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">            if (at[0] &gt;= s.length()) {</span>
+<span class="nc" id="L604">                return false;</span>
+            }
+<span class="fc" id="L606">            char c = s.charAt(at[0]);</span>
+<span class="fc" id="L607">            at[0]++;</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">            if (c == '}') {</span>
+<span class="fc" id="L609">                return true;</span>
+            }
+<span class="fc bfc" id="L611" title="All 2 branches covered.">            if (c != ',') {</span>
+<span class="fc" id="L612">                return false;</span>
+            }
+<span class="fc" id="L614">        }</span>
+    }
+
+    private static boolean scanArray(String s, int[] at) {
+<span class="fc" id="L618">        at[0]++;</span>
+<span class="fc" id="L619">        skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L620" title="1 of 4 branches missed.">        if (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) == ']') {</span>
+<span class="fc" id="L621">            at[0]++;</span>
+<span class="fc" id="L622">            return true;</span>
+        }
+        for (;;) {
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (!scanValue(s, at)) {</span>
+<span class="nc" id="L626">                return false;</span>
+            }
+<span class="fc" id="L628">            skipWhitespace(s, at);</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (at[0] &gt;= s.length()) {</span>
+<span class="nc" id="L630">                return false;</span>
+            }
+<span class="fc" id="L632">            char c = s.charAt(at[0]);</span>
+<span class="fc" id="L633">            at[0]++;</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">            if (c == ']') {</span>
+<span class="fc" id="L635">                return true;</span>
+            }
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            if (c != ',') {</span>
+<span class="nc" id="L638">                return false;</span>
+            }
+<span class="fc" id="L640">        }</span>
+    }
+
+    private static boolean scanString(String s, int[] at) {
+<span class="fc" id="L644">        at[0]++;</span>
+<span class="fc bfc" id="L645" title="All 2 branches covered.">        while (at[0] &lt; s.length()) {</span>
+<span class="fc" id="L646">            char c = s.charAt(at[0]);</span>
+<span class="fc" id="L647">            at[0]++;</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L649">                return true;</span>
+            }
+<span class="fc bfc" id="L651" title="All 2 branches covered.">            if (c &lt; ' ') {</span>
+                // JSON forbids an unescaped character below U+0020 inside a string, and this
+                // check accepted every one of them. It is not a formality: the framework parser
+                // appends a raw control byte to whatever it is building rather than stopping, so
+                // a document carrying a literal newline INSIDE a key -- &quot;pay&lt;LF&gt;load&quot; -- passed
+                // as valid and came out with a key that is not &quot;payload&quot;. The field is then
+                // unknown and dropped, and a state with no payload and no routes is a tombstone:
+                // the sending device is read as having cleared its work.
+                //
+                // No conformant encoder emits one, so nothing legitimate is refused by this.
+<span class="fc" id="L661">                return false;</span>
+            }
+<span class="fc bfc" id="L663" title="All 2 branches covered.">            if (c == '\\') {</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">                if (at[0] &gt;= s.length()) {</span>
+<span class="nc" id="L665">                    return false;</span>
+                }
+<span class="fc" id="L667">                char e = s.charAt(at[0]);</span>
+<span class="fc" id="L668">                at[0]++;</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">                if (e == 'u') {</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">                    if (at[0] + 4 &gt; s.length()) {</span>
+<span class="nc" id="L671">                        return false;</span>
+                    }
+<span class="fc bfc" id="L673" title="All 2 branches covered.">                    for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc bfc" id="L674" title="All 2 branches covered.">                        if (hexValue(s.charAt(at[0] + i)) &lt; 0) {</span>
+<span class="fc" id="L675">                            return false;</span>
+                        }
+                    }
+<span class="fc" id="L678">                    at[0] += 4;</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">                } else if (&quot;\&quot;\\/bfnrt&quot;.indexOf(e) &lt; 0) {</span>
+<span class="nc" id="L680">                    return false;</span>
+                }
+            }
+<span class="fc" id="L683">        }</span>
+<span class="fc" id="L684">        return false;</span>
+    }
+
+    private static int hexValue(char c) {
+<span class="pc bpc" id="L688" title="1 of 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L689">            return c - '0';</span>
+        }
+<span class="pc bpc" id="L691" title="1 of 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="fc" id="L692">            return c - 'a' + 10;</span>
+        }
+<span class="pc bpc" id="L694" title="2 of 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="nc" id="L695">            return c - 'A' + 10;</span>
+        }
+<span class="fc" id="L697">        return -1;</span>
+    }
+
+    private static boolean scanLiteral(String s, int[] at, String literal) {
+<span class="fc bfc" id="L701" title="All 2 branches covered.">        if (!s.startsWith(literal, at[0])) {</span>
+<span class="fc" id="L702">            return false;</span>
+        }
+<span class="fc" id="L704">        at[0] += literal.length();</span>
+<span class="fc" id="L705">        return true;</span>
+    }
+
+    private static boolean scanNumber(String s, int[] at) {
+<span class="fc" id="L709">        int start = at[0];</span>
+<span class="pc bpc" id="L710" title="1 of 4 branches missed.">        if (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) == '-') {</span>
+<span class="fc" id="L711">            at[0]++;</span>
+        }
+        // JSON's integer rule exactly: a single 0, or a non-zero digit and any digits after it.
+        // A permissive loop accepted &quot;01&quot;, which is not JSON -- and being laxer than the grammar
+        // is the whole failure this validator exists to correct, so it does not get to make its
+        // own small version of it.
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">        if (at[0] &gt;= s.length()) {</span>
+<span class="nc" id="L718">            return false;</span>
+        }
+<span class="fc" id="L720">        char first = s.charAt(at[0]);</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">        if (first == '0') {</span>
+<span class="fc" id="L722">            at[0]++;</span>
+<span class="pc bpc" id="L723" title="2 of 4 branches missed.">        } else if (first &gt;= '1' &amp;&amp; first &lt;= '9') {</span>
+<span class="pc bpc" id="L724" title="1 of 6 branches missed.">            while (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) &gt;= '0' &amp;&amp; s.charAt(at[0]) &lt;= '9') {</span>
+<span class="fc" id="L725">                at[0]++;</span>
+            }
+        } else {
+<span class="nc" id="L728">            return false;</span>
+        }
+<span class="pc bpc" id="L730" title="1 of 4 branches missed.">        if (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) == '.') {</span>
+<span class="fc" id="L731">            at[0]++;</span>
+<span class="fc" id="L732">            int frac = 0;</span>
+<span class="pc bpc" id="L733" title="2 of 6 branches missed.">            while (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) &gt;= '0' &amp;&amp; s.charAt(at[0]) &lt;= '9') {</span>
+<span class="fc" id="L734">                at[0]++;</span>
+<span class="fc" id="L735">                frac++;</span>
+            }
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">            if (frac == 0) {</span>
+<span class="nc" id="L738">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L741" title="2 of 6 branches missed.">        if (at[0] &lt; s.length() &amp;&amp; (s.charAt(at[0]) == 'e' || s.charAt(at[0]) == 'E')) {</span>
+<span class="fc" id="L742">            at[0]++;</span>
+<span class="pc bpc" id="L743" title="3 of 6 branches missed.">            if (at[0] &lt; s.length() &amp;&amp; (s.charAt(at[0]) == '+' || s.charAt(at[0]) == '-')) {</span>
+<span class="nc" id="L744">                at[0]++;</span>
+            }
+<span class="fc" id="L746">            int exp = 0;</span>
+<span class="pc bpc" id="L747" title="1 of 6 branches missed.">            while (at[0] &lt; s.length() &amp;&amp; s.charAt(at[0]) &gt;= '0' &amp;&amp; s.charAt(at[0]) &lt;= '9') {</span>
+<span class="fc" id="L748">                at[0]++;</span>
+<span class="fc" id="L749">                exp++;</span>
+            }
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">            if (exp == 0) {</span>
+<span class="nc" id="L752">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">        return at[0] &gt; start;</span>
+    }
+
+    /// Throws when any value in the map could not survive being written to a property list, sent
+    /// as JSON and read back by another build of the app on another device.
+    ///
+    /// The admitted types are `String`, `Integer`, `Long`, `Double`, `Boolean`, and `List` and
+    /// `Map` of those. `Map` keys must be strings, because neither destination format has any
+    /// other kind of key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `payload`: the payload, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: naming the path to the first offending value
+    public static void requireRepresentable(Map&lt;String, Object&gt; payload) {
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">        if (payload == null) {</span>
+<span class="nc" id="L774">            return;</span>
+        }
+<span class="fc bfc" id="L776" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : payload.entrySet()) {</span>
+<span class="pc bpc" id="L777" title="1 of 2 branches missed.">            if (entry.getKey() == null) {</span>
+<span class="nc" id="L778">                throw new IllegalArgumentException(&quot;A continuity payload cannot have a null key.&quot;);</span>
+            }
+            // Keys go through the same writeUTF as values, so an oversized one loses the
+            // checkpoint just as quietly.
+<span class="fc" id="L782">            requireWritable(entry.getKey(), entry.getKey());</span>
+<span class="fc" id="L783">            check(entry.getValue(), entry.getKey(), 0);</span>
+<span class="fc" id="L784">        }</span>
+<span class="fc" id="L785">    }</span>
+
+    /// The number of characters the rendered JSON form occupies, which is the closest portable
+    /// stand-in for what a payload costs on any of the transports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the state
+    ///
+    /// #### Returns
+    ///
+    /// the encoded size in characters
+    public static int encodedSize(AppState state) {
+<span class="fc" id="L798">        return toJson(state).length();</span>
+    }
+
+    /// Renders a payload value so its Java type survives every transport.
+    ///
+    /// Neither destination format preserves the types this payload admits. `JSONParser` reads
+    /// every JSON number back as a `Double` -- so an `Integer` returns as `3.0`, and a `Long`
+    /// past 2^53 comes back a different number -- and it reads `true` back as the *string*
+    /// `&quot;true&quot;`. A property list is kinder but not identical. The result was an application
+    /// casting a value to the type it stored and getting a `ClassCastException` on Android and
+    /// the desktop, and on iOS something worse: ParparVM does not throw for a failed cast, so
+    /// the wrong object is handed to the next instruction.
+    ///
+    /// So every scalar crosses as a tagged string and is put back together on arrival. Strings
+    /// are tagged too, which is what stops an application's own `&quot;i:5&quot;` from being read as an
+    /// integer. Lists and maps stay themselves -- both formats carry those natively -- and their
+    /// contents are encoded element by element.
+    private static Object encodeValue(Object value) {
+<span class="fc bfc" id="L816" title="All 2 branches covered.">        if (value instanceof String) {</span>
+<span class="fc" id="L817">            return &quot;s:&quot; + value;</span>
+        }
+<span class="fc bfc" id="L819" title="All 2 branches covered.">        if (value instanceof Integer) {</span>
+<span class="fc" id="L820">            return &quot;i:&quot; + value;</span>
+        }
+<span class="fc bfc" id="L822" title="All 2 branches covered.">        if (value instanceof Long) {</span>
+<span class="fc" id="L823">            return &quot;l:&quot; + value;</span>
+        }
+<span class="fc bfc" id="L825" title="All 2 branches covered.">        if (value instanceof Double) {</span>
+<span class="fc" id="L826">            return &quot;d:&quot; + value;</span>
+        }
+<span class="fc bfc" id="L828" title="All 2 branches covered.">        if (value instanceof Boolean) {</span>
+<span class="fc" id="L829">            return &quot;b:&quot; + value;</span>
+        }
+<span class="fc bfc" id="L831" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L832">            List&lt;?&gt; in = (List&lt;?&gt;) value;</span>
+<span class="fc" id="L833">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L834" title="All 2 branches covered.">            for (Object element : in) {</span>
+<span class="fc" id="L835">                out.add(encodeValue(element));</span>
+<span class="fc" id="L836">            }</span>
+<span class="fc" id="L837">            return out;</span>
+        }
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">        if (value instanceof Map) {</span>
+<span class="fc" id="L840">            return encode(castToStringKeyed((Map&lt;?, ?&gt;) value));</span>
+        }
+        // Unreachable for a payload that went through requireRepresentable, which is every
+        // payload this framework produces. A hand-built map handed straight to toMap reaches
+        // here, and its own toString is a better answer than dropping the entry.
+<span class="nc" id="L845">        return &quot;s:&quot; + String.valueOf(value);</span>
+    }
+
+    private static Map&lt;String, Object&gt; encode(Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L849">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">        if (payload == null) {</span>
+<span class="nc" id="L851">            return out;</span>
+        }
+<span class="fc bfc" id="L853" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : payload.entrySet()) {</span>
+<span class="fc" id="L854">            out.put(e.getKey(), encodeValue(e.getValue()));</span>
+<span class="fc" id="L855">        }</span>
+<span class="fc" id="L856">        return out;</span>
+    }
+
+    /// Rebuilds a value `encodeValue` wrote.
+    ///
+    /// Only ever called for a document that DECLARED its values tagged, through KEY_ENCODING. A
+    /// document without that marker -- a hand-written endpoint, or a build older than the
+    /// tagging -- is passed through untouched by the caller, because there is no way to tell an
+    /// encoded &quot;i:5&quot; from a string whose value happens to be &quot;i:5&quot;, and guessing corrupts the
+    /// second to rescue the first.
+    ///
+    /// A value that is untagged INSIDE a tagged document is still passed through: nested
+    /// containers are walked, and anything unrecognized is more useful untyped than discarded.
+    private static Object decode(Object value) {
+<span class="fc bfc" id="L870" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L871">            List&lt;?&gt; in = (List&lt;?&gt;) value;</span>
+<span class="fc" id="L872">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L873" title="All 2 branches covered.">            for (Object element : in) {</span>
+<span class="fc" id="L874">                out.add(decode(element));</span>
+<span class="fc" id="L875">            }</span>
+<span class="fc" id="L876">            return out;</span>
+        }
+<span class="fc bfc" id="L878" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L879">            Map&lt;?, ?&gt; in = (Map&lt;?, ?&gt;) value;</span>
+<span class="fc" id="L880">            Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; e : in.entrySet()) {</span>
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">                if (e.getKey() instanceof String) {</span>
+<span class="fc" id="L883">                    out.put((String) e.getKey(), decode(e.getValue()));</span>
+                }
+<span class="fc" id="L885">            }</span>
+<span class="fc" id="L886">            return out;</span>
+        }
+<span class="pc bpc" id="L888" title="1 of 2 branches missed.">        if (!(value instanceof String)) {</span>
+<span class="nc" id="L889">            return value;</span>
+        }
+<span class="fc" id="L891">        String text = (String) value;</span>
+<span class="pc bpc" id="L892" title="2 of 4 branches missed.">        if (text.length() &lt; 2 || text.charAt(1) != ':') {</span>
+<span class="nc" id="L893">            return text;</span>
+        }
+<span class="fc" id="L895">        String body = text.substring(2);</span>
+<span class="fc" id="L896">        char tag = text.charAt(0);</span>
+        try {
+<span class="fc bfc" id="L898" title="All 2 branches covered.">            if (tag == 's') {</span>
+<span class="fc" id="L899">                return body;</span>
+            }
+            // parseX rather than valueOf(String). Core is compiled a second time against
+            // Ports/CLDC11 and translated against vm/JavaAPI, and neither carries the
+            // String-taking valueOf overloads -- only valueOf(primitive). The Maven build accepts
+            // them against the full JDK, so the mistake only appears in the Ant leg.
+<span class="fc bfc" id="L905" title="All 2 branches covered.">            if (tag == 'i') {</span>
+<span class="fc" id="L906">                return Integer.valueOf(Integer.parseInt(body));</span>
+            }
+<span class="fc bfc" id="L908" title="All 2 branches covered.">            if (tag == 'l') {</span>
+<span class="fc" id="L909">                return Long.valueOf(Long.parseLong(body));</span>
+            }
+<span class="fc bfc" id="L911" title="All 2 branches covered.">            if (tag == 'd') {</span>
+<span class="fc" id="L912">                return Double.valueOf(Double.parseDouble(body));</span>
+            }
+<span class="pc bpc" id="L914" title="1 of 2 branches missed.">            if (tag == 'b') {</span>
+                // The EXACT bodies the encoder writes, and nothing else. Boolean.valueOf answers
+                // false for every string that is not &quot;true&quot;, so &quot;b:unknown&quot; arrived as a
+                // confident false: application data changed in transit, restored, and
+                // acknowledged, with nothing said. Every other tag here already preserves a body
+                // it cannot parse -- the number tags do it through the catch below -- and this
+                // one now falls through to the same answer.
+<span class="fc bfc" id="L921" title="All 2 branches covered.">                if (&quot;true&quot;.equals(body)) {</span>
+<span class="fc" id="L922">                    return Boolean.TRUE;</span>
+                }
+<span class="fc bfc" id="L924" title="All 2 branches covered.">                if (&quot;false&quot;.equals(body)) {</span>
+<span class="fc" id="L925">                    return Boolean.FALSE;</span>
+                }
+            }
+<span class="nc" id="L928">        } catch (NumberFormatException malformed) {</span>
+            // A tag whose body will not parse came from somewhere this build does not control.
+            // The text is the honest answer; throwing would lose the whole state over one key.
+<span class="nc" id="L931">            return text;</span>
+<span class="fc" id="L932">        }</span>
+<span class="fc" id="L933">        return text;</span>
+    }
+
+    private static Map&lt;String, Object&gt; castToStringKeyed(Map&lt;?, ?&gt; in) {
+<span class="fc" id="L937">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">        for (Map.Entry&lt;?, ?&gt; e : in.entrySet()) {</span>
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">            if (e.getKey() instanceof String) {</span>
+<span class="fc" id="L940">                out.put((String) e.getKey(), e.getValue());</span>
+            }
+<span class="fc" id="L942">        }</span>
+<span class="fc" id="L943">        return out;</span>
+    }
+
+    /// The most modified-UTF-8 bytes a single string in a payload may occupy.
+    ///
+    /// `Util.writeObject` writes every String with `DataOutputStream.writeUTF`, which cannot
+    /// encode more than this and throws when asked to. `Continuity.persist()` logs that failure
+    /// and carries on, so an oversized payload produced a checkpoint that LOOKED successful and
+    /// simply was not there after the process died -- the one thing state restoration exists to
+    /// prevent, arriving with nothing said. Refused here instead, naming the key, which is the
+    /// same contract an unrepresentable type already gets.
+    static final int MAX_STRING_BYTES = 65535;
+
+    /// A map key trimmed to something a message can carry.
+    ///
+    /// The key itself may be the oversized thing being reported, and reproducing all of it in the
+    /// exception would bury the sentence that names the problem.
+    private static String keyLabel(String key) {
+<span class="fc bfc" id="L961" title="All 2 branches covered.">        return key.length() &lt;= 64 ? key</span>
+<span class="fc" id="L962">                : key.substring(0, 64) + &quot;...(&quot; + key.length() + &quot; chars)&quot;;</span>
+    }
+
+    /// Refuses a string the local checkpoint could not store.
+    static void requireWritable(String value, String path) {
+<span class="fc bfc" id="L967" title="All 2 branches covered.">        if (exceedsWritableLength(value)) {</span>
+<span class="fc" id="L968">            throw new IllegalArgumentException(&quot;The continuity payload at \&quot;&quot; + path + &quot;\&quot; is &quot;</span>
+                    + &quot;longer than &quot; + MAX_STRING_BYTES + &quot; bytes of modified UTF-8, which is the &quot;
+                    + &quot;most a stored checkpoint can hold. Keep the payload small -- it is a &quot;
+                    + &quot;pointer to where the user was, not the document they were working on -- &quot;
+                    + &quot;and load the rest from your own storage when the state is restored.&quot;);
+        }
+<span class="fc" id="L974">    }</span>
+
+    /// Whether `s` encodes to more than MAX_STRING_BYTES.
+    ///
+    /// Counted rather than approximated from `length()`, because the limit is on BYTES and a
+    /// string of accented or CJK characters reaches it at a third of the character count. Stops
+    /// at the limit, so a huge string costs the limit rather than its own length, and the running
+    /// total cannot overflow.
+    static boolean exceedsWritableLength(String s) {
+<span class="fc bfc" id="L983" title="All 2 branches covered.">        return writableLength(s) &gt; MAX_STRING_BYTES;</span>
+    }
+
+    /// The number of bytes `s` occupies in the modified UTF-8 a stored string is written as.
+    ///
+    /// Counted rather than approximated from `length()`, because the limit is on BYTES and a
+    /// string of accented or CJK characters reaches it at a third of the character count.
+    ///
+    /// Stops counting once past the limit, so a huge string costs the limit rather than its own
+    /// length and the running total cannot overflow. Callers may therefore read the answer as
+    /// &quot;this many bytes, or more than the limit&quot; -- which is all either of them needs, one to
+    /// refuse the string and the other to budget for it.
+    static int writableLength(String s) {
+<span class="fc" id="L996">        int len = 0;</span>
+<span class="fc bfc" id="L997" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L998">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L999" title="1 of 4 branches missed.">            if (c &gt;= 0x0001 &amp;&amp; c &lt;= 0x007F) {</span>
+<span class="fc" id="L1000">                len++;</span>
+<span class="pc bpc" id="L1001" title="1 of 2 branches missed.">            } else if (c &gt; 0x07FF) {</span>
+<span class="fc" id="L1002">                len += 3;</span>
+            } else {
+<span class="nc" id="L1004">                len += 2;</span>
+            }
+<span class="fc bfc" id="L1006" title="All 2 branches covered.">            if (len &gt; MAX_STRING_BYTES) {</span>
+<span class="fc" id="L1007">                return len;</span>
+            }
+        }
+<span class="fc" id="L1010">        return len;</span>
+    }
+
+    private static void check(Object value, String path, int depth) {
+<span class="fc bfc" id="L1014" title="All 2 branches covered.">        if (depth &gt; 16) {</span>
+            // A payload cannot legitimately be this deep, and a cycle looks exactly like a very
+            // deep tree until the stack runs out. Refused with the path so the shape is findable.
+<span class="fc" id="L1017">            throw new IllegalArgumentException(&quot;The continuity payload at \&quot;&quot; + path</span>
+                    + &quot;\&quot; nests more than 16 levels deep, or contains a cycle. Neither a property &quot;
+                    + &quot;list nor JSON can represent a cycle.&quot;);
+        }
+<span class="fc bfc" id="L1021" title="All 2 branches covered.">        if (value instanceof String) {</span>
+<span class="fc" id="L1022">            requireWritable((String) value, path);</span>
+<span class="fc" id="L1023">            return;</span>
+        }
+<span class="fc bfc" id="L1025" title="All 8 branches covered.">        if (value instanceof Integer</span>
+                || value instanceof Long || value instanceof Double || value instanceof Boolean) {
+<span class="fc" id="L1027">            return;</span>
+        }
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">        if (value == null) {</span>
+            // Refused rather than carried. A property list has no null: the iOS sanitizer drops a
+            // null-valued entry and drops a null LIST ELEMENT, which shifts every index after it,
+            // so the payload that arrives on the other device is a different shape from the one
+            // that was sent. Saying so here, where the key is known, beats a list that is quietly
+            // one shorter on an iPad.
+<span class="fc" id="L1035">            throw new IllegalArgumentException(&quot;The continuity payload at \&quot;&quot; + path + &quot;\&quot; is &quot;</span>
+                    + &quot;null. A property list cannot carry one, and dropping it would change the &quot;
+                    + &quot;shape of what arrives on another device -- a null list element would shift &quot;
+                    + &quot;every index after it. Leave the key out instead.&quot;);
+        }
+<span class="fc bfc" id="L1040" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L1041">            List&lt;?&gt; list = (List&lt;?&gt;) value;</span>
+<span class="fc" id="L1042">            int index = 0;</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">            for (Object element : list) {</span>
+<span class="fc" id="L1044">                check(element, path + &quot;[&quot; + index + &quot;]&quot;, depth + 1);</span>
+<span class="fc" id="L1045">                index++;</span>
+<span class="fc" id="L1046">            }</span>
+<span class="fc" id="L1047">            return;</span>
+        }
+<span class="fc bfc" id="L1049" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L1050">            Map&lt;?, ?&gt; map = (Map&lt;?, ?&gt;) value;</span>
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">            for (Map.Entry&lt;?, ?&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L1052">                Object key = entry.getKey();</span>
+<span class="fc bfc" id="L1053" title="All 2 branches covered.">                if (!(key instanceof String)) {</span>
+<span class="pc bpc" id="L1054" title="1 of 2 branches missed.">                    throw new IllegalArgumentException(&quot;The continuity payload at \&quot;&quot; + path</span>
+                            + &quot;\&quot; has a map key of type &quot;
+<span class="fc" id="L1056">                            + (key == null ? &quot;null&quot; : key.getClass().getName())</span>
+                            + &quot;. Only string keys can be written to a property list or to JSON.&quot;);
+                }
+                // Nested keys reach Util.writeObject's writeUTF exactly as top-level ones do.
+                // Validating only the top level left a deep key able to throw inside
+                // externalize(), which Continuity.persist() logs and carries on from -- so the
+                // checkpoint went out to the other device and was silently absent from local
+                // storage, the failure this validation exists to prevent.
+<span class="fc" id="L1064">                requireWritable((String) key, path + &quot;.&quot; + keyLabel((String) key));</span>
+<span class="fc" id="L1065">                check(entry.getValue(), path + &quot;.&quot; + keyLabel((String) key), depth + 1);</span>
+<span class="fc" id="L1066">            }</span>
+<span class="fc" id="L1067">            return;</span>
+        }
+<span class="fc" id="L1069">        throw new IllegalArgumentException(&quot;The continuity payload at \&quot;&quot; + path + &quot;\&quot; is a &quot;</span>
+<span class="fc" id="L1070">                + value.getClass().getName() + &quot;. A continuity payload has to survive being &quot;</span>
+                + &quot;written to a property list and delivered to another device, possibly running a &quot;
+                + &quot;different build of this app, so it admits only String, Integer, Long, Double, &quot;
+                + &quot;Boolean, and List and Map of those. Convert this value before adding it.&quot;);
+    }
+
+    private static long asLong(Object o) {
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        if (o instanceof String) {</span>
+            try {
+<span class="fc" id="L1079">                return Long.parseLong(((String) o).trim());</span>
+<span class="nc" id="L1080">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L1081">                return 0;</span>
+            }
+        }
+        // Never a cast: on ParparVM a failed CHECKCAST does not throw, so the guarded instanceof
+        // is the only portable way to ask. A relay written before the string encoding, or a
+        // hand-written server, can still send a number here.
+<span class="fc bfc" id="L1087" title="All 2 branches covered.">        if (o instanceof Number) {</span>
+<span class="fc" id="L1088">            return ((Number) o).longValue();</span>
+        }
+<span class="fc" id="L1090">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

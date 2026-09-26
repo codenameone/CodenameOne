@@ -1,0 +1,914 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Telemetry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.telemetry</a> &gt; <span class="el_source">Telemetry.java</span></div><h1>Telemetry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.telemetry;
+
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Data;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.NetworkTracer;
+import com.codename1.security.Hash;
+import com.codename1.security.SecureRandom;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+
+/// OpenTelemetry tracing for the app: every network request is a span, and carries
+/// W3C trace context to the server it reaches, so the app's request and the
+/// backend's handling of it are one trace.
+///
+/// Usually installed by the build rather than by hand -- put
+/// `@OpenTelemetry` on the main class and the generated bootstrap calls
+/// [#install(TelemetryConfig)] before the app starts:
+///
+/// ```java
+/// @OpenTelemetry(relay = &quot;https://api.example.com&quot;, serviceName = &quot;shop-app&quot;)
+/// public class ShopApp extends Lifecycle { ... }
+/// ```
+///
+/// Every [ConnectionRequest] is covered, which is every REST, gRPC-Web and GraphQL
+/// client the build generates. To group the requests a user action causes, time
+/// the action:
+///
+/// ```java
+/// Telemetry.run(&quot;checkout&quot;, () -&gt; cart.submit());
+/// ```
+///
+/// Spans are batched and exported with OTLP/HTTP -- through the app's own backend
+/// by default, which keeps the collector's credentials out of the app (see
+/// [TelemetryConfig]).
+public final class Telemetry {
+    private static final String TRACEPARENT = &quot;traceparent&quot;;
+    private static final String TRACESTATE = &quot;tracestate&quot;;
+    /// How many export batches may wait in the network queue at once.
+    static final int MAX_PENDING_EXPORTS = 2;
+    /// The installation. A plain field, deliberately, like the tracer and guard
+    /// slots in NetworkManager it fills: install and uninstall are lifecycle
+    /// calls -- the generated bootstrap's, before Display.init, or the app's, on
+    /// the EDT -- and Codename One core does not synchronize framework state
+    /// (PMD's AvoidUsingVolatile gate says the same). A network thread or a task
+    /// started after the install sees it through Thread.start's happens-before
+    /// edge. Reinstalling telemetry while background tasks are mid-flight is not
+    /// a supported pattern, and locking every span start to serve it would tax
+    /// every request of every app that never does it.
+    private static State state;
+    /// The span [#run(String, Runnable)] has made current, per thread. Mostly the
+    /// EDT's, since that is where a user action runs and where requests are queued,
+    /// but `run` is public and a background task may time its own work: one static
+    /// slot let two overlapping tasks adopt and restore each other's spans.
+<span class="fc" id="L90">    private static final ThreadLocal&lt;TelemetrySpan&gt; CURRENT = new ThreadLocal&lt;TelemetrySpan&gt;();</span>
+
+    private Telemetry() {
+    }
+
+    /// Installs telemetry, replacing any earlier installation.
+    ///
+    /// Safe to call before `Display.init`, which is where the generated bootstrap
+    /// calls it: nothing that needs the platform -- not even the secure random
+    /// source the ids come from -- is touched until the first span.
+    ///
+    /// #### Parameters
+    ///
+    /// - `config`: where and how to export; a configuration with no endpoint
+    ///   installs nothing
+    public static void install(TelemetryConfig config) {
+<span class="fc" id="L106">        uninstall();</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        if (config == null || config.exportUrl() == null) {</span>
+<span class="nc" id="L108">            Log.p(&quot;Telemetry: no endpoint configured, so no spans are recorded&quot;);</span>
+<span class="nc" id="L109">            return;</span>
+        }
+<span class="fc" id="L111">        State installed = new State(config);</span>
+<span class="fc" id="L112">        state = installed;</span>
+<span class="fc" id="L113">        NetworkManager.setNetworkTracer(installed);</span>
+<span class="fc" id="L114">    }</span>
+
+    /// Stops recording, exports what is buffered, and removes the network hook.
+    public static void uninstall() {
+<span class="fc" id="L118">        State old = state;</span>
+<span class="fc" id="L119">        state = null;</span>
+<span class="fc" id="L120">        CURRENT.remove();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (old != null) {</span>
+            // Only if the slot still holds OURS: an app may have replaced the
+            // generated tracer with its own, and uninstalling telemetry must not
+            // silently switch that one off.
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (NetworkManager.getNetworkTracer() == old) { //NOPMD CompareObjectsWithEquals -- identity: is the slot still THIS installation</span>
+<span class="fc" id="L126">                NetworkManager.setNetworkTracer(null);</span>
+            }
+<span class="fc" id="L128">            old.stop();</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    /// Whether telemetry is installed.
+    public static boolean isInstalled() {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        return state != null;</span>
+    }
+
+    /// A new span, a child of the current one. It is not made current; the caller
+    /// must end it. Never null -- with telemetry off it records nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: what the span times
+    public static TelemetrySpan startSpan(String name) {
+<span class="fc" id="L144">        State s = state;</span>
+<span class="fc bfc" id="L145" title="All 4 branches covered.">        TelemetrySpan span = s == null || !s.permitted() ? null</span>
+<span class="fc" id="L146">                : s.start(name, TelemetrySpan.KIND_INTERNAL, CURRENT.get());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        return span != null ? span : new TelemetrySpan(null, name, TelemetrySpan.KIND_INTERNAL,</span>
+                &quot;00000000000000000000000000000000&quot;, &quot;0000000000000000&quot;, null, false);
+    }
+
+    /// Runs `work` inside a new span, which is current while it runs: requests
+    /// queued inside it become its children. A RuntimeException is recorded on
+    /// the span and rethrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: what the span times
+    ///
+    /// - `work`: the work
+    public static void run(String name, Runnable work) {
+<span class="fc" id="L161">        TelemetrySpan span = startSpan(name);</span>
+<span class="fc" id="L162">        TelemetrySpan previous = CURRENT.get();</span>
+<span class="fc" id="L163">        CURRENT.set(span);</span>
+        try {
+<span class="fc" id="L165">            work.run();</span>
+<span class="nc" id="L166">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L167">            span.recordException(err);</span>
+<span class="nc" id="L168">            throw err;</span>
+        } finally {
+<span class="fc" id="L170">            CURRENT.set(previous);</span>
+<span class="fc" id="L171">            span.end();</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    /// The span [#run(String, Runnable)] made current on this thread, or null.
+    public static TelemetrySpan getCurrentSpan() {
+<span class="fc" id="L177">        return CURRENT.get();</span>
+    }
+
+    /// Exports what is buffered now, rather than at the next interval. Call it
+    /// when the app is paused: a span still in memory when the process is
+    /// reclaimed is lost.
+    public static void flush() {
+<span class="fc" id="L184">        State s = state;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (s != null) {</span>
+<span class="fc" id="L186">            s.flush();</span>
+        }
+<span class="fc" id="L188">    }</span>
+
+    /// Everything one installation owns. It is the [NetworkTracer] too, so the
+    /// network thread reaches the same configuration the app installed.
+    /// Not final so a test can stand in for the network queue: whether exports are
+    /// backed up is a property of the shared NetworkManager, which a test cannot hold
+    /// still reliably.
+    static class State implements NetworkTracer {
+        private final TelemetryConfig config;
+        private final String exportUrl;
+        /// The relay's ORIGIN -- scheme, host and effective port -- which is what
+        /// the browser keys CORS on. The host alone let a request to another port
+        /// or scheme on the same host through, and a traceparent can turn a request
+        /// the browser would have sent as-is into a preflight that fails.
+        private final String backendOrigin;
+        /// Touched on the EDT only: spans that end elsewhere are marshalled there.
+<span class="fc" id="L204">        final List&lt;TelemetrySpan&gt; buffer = new ArrayList&lt;TelemetrySpan&gt;();</span>
+        private Timer timer;
+        private Map&lt;String, Object&gt; resource;
+        private boolean stopped;
+        /// Set once, the first time the platform refuses secure random bytes.
+        private boolean idsUnavailable;
+
+<span class="fc" id="L211">        State(TelemetryConfig config) {</span>
+            // A snapshot: see TelemetryConfig.copy.
+<span class="fc" id="L213">            this.config = config.copy();</span>
+<span class="fc" id="L214">            this.exportUrl = config.exportUrl();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            this.backendOrigin = config.mode == TelemetryConfig.Mode.RELAY ? origin(exportUrl) : null;</span>
+<span class="fc" id="L216">        }</span>
+
+        /// A new span, or null when ids cannot be made on this platform.
+        TelemetrySpan start(String name, int kind, TelemetrySpan parent) {
+            String traceId;
+<span class="fc" id="L221">            String parentId = null;</span>
+            boolean sampled;
+<span class="fc" id="L223">            byte[] spanBytes = random(8);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if (spanBytes == null) {</span>
+<span class="nc" id="L225">                return null;</span>
+            }
+            // Only a parent THIS installation recorded. A thread still inside
+            // run() across an uninstall and reinstall holds the old one's span, and
+            // inheriting it would file the new installation's spans under the old
+            // trace, with the old sampling decision, possibly at another collector.
+<span class="pc bpc" id="L231" title="1 of 6 branches missed.">            if (parent != null &amp;&amp; parent.isOwnedBy(this) &amp;&amp; parent.traceId.length() == 32</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                    &amp;&amp; !isZero(parent.spanId)) {</span>
+<span class="fc" id="L233">                traceId = parent.traceId;</span>
+<span class="fc" id="L234">                parentId = parent.spanId;</span>
+                // Follow the parent's decision, so a trace is whole or absent.
+<span class="fc" id="L236">                sampled = parent.sampled;</span>
+            } else {
+<span class="fc" id="L238">                byte[] traceBytes = random(16);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                if (traceBytes == null) {</span>
+<span class="nc" id="L240">                    return null;</span>
+                }
+<span class="fc" id="L242">                traceId = Hash.toHex(traceBytes);</span>
+<span class="fc" id="L243">                sampled = sample(traceBytes);</span>
+            }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            return new TelemetrySpan(this, name, kind, traceId, Hash.toHex(spanBytes), parentId,</span>
+                    sampled, parentId == null ? null : parent);
+        }
+
+        /// Secure random bytes, or null when the platform has none. Asked here,
+        /// at the first span, rather than at install: install runs before
+        /// Display.init, where no platform exists yet to answer, and treating that
+        /// as &quot;no random source&quot; switched telemetry off on every device.
+        private byte[] random(int length) {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (idsUnavailable) {</span>
+<span class="nc" id="L255">                return null;</span>
+            }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (!Display.isInitialized()) {</span>
+                // Too early to ask, not a platform without a source: before
+                // Display.init there is no implementation behind SecureRandom. Not
+                // cached, or a span a program started during start-up switched
+                // telemetry off for good once the display did exist.
+<span class="nc" id="L262">                return null;</span>
+            }
+            try {
+<span class="fc" id="L265">                return SecureRandom.bytes(length);</span>
+<span class="nc" id="L266">            } catch (RuntimeException err) {</span>
+<span class="nc" id="L267">                idsUnavailable = true;</span>
+<span class="nc" id="L268">                Log.p(&quot;Telemetry: this platform has no secure random source, so it cannot make &quot;</span>
+                        + &quot;trace ids; no spans are recorded&quot;);
+<span class="nc" id="L270">                return null;</span>
+            }
+        }
+
+        /// Whether tracing may run now: always, unless the configuration asked for
+        /// analytics consent, in which case the recorded choice -- or, before the
+        /// user has made one, the consent mode -- decides. Read each time, so a
+        /// choice the user changes takes effect on the next request.
+        boolean permitted() {
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            if (!config.requireAnalyticsConsent) {</span>
+<span class="fc" id="L280">                return true;</span>
+            }
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            if (!Display.isInitialized()) {</span>
+                // No storage yet, so the saved choice cannot be read -- and reading
+                // it anyway made Analytics record &quot;loaded, nothing saved&quot; for the
+                // rest of the run, ignoring a persisted grant, or in opt-out mode a
+                // persisted denial. Nothing is traced until it can be asked.
+<span class="nc" id="L287">                return false;</span>
+            }
+<span class="fc" id="L289">            AnalyticsConsent consent = Analytics.getConsent();</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if (consent != null) {</span>
+<span class="fc" id="L291">                return consent.isAnalytics();</span>
+            }
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            return Analytics.getConsentMode() == ConsentMode.OPT_OUT;</span>
+        }
+
+        /// The ratio decision, from the id's low bytes as the other OpenTelemetry
+        /// SDKs take it, so a backend sampling at the same ratio agrees without
+        /// being told.
+        private boolean sample(byte[] traceId) {
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (config.sampleRatio &gt;= 1) {</span>
+<span class="fc" id="L301">                return true;</span>
+            }
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (config.sampleRatio &lt;= 0) {</span>
+<span class="fc" id="L304">                return false;</span>
+            }
+<span class="nc" id="L306">            long low = 0;</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            for (int i = 8; i &lt; 16; i++) {</span>
+<span class="nc" id="L308">                low = (low &lt;&lt; 8) | (traceId[i] &amp; 0xff);</span>
+            }
+<span class="nc" id="L310">            long bound = (long) (config.sampleRatio * (double) Long.MAX_VALUE);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            return (low &amp; Long.MAX_VALUE) &lt; bound;</span>
+        }
+
+        /// From any thread, as a span ends. The buffer is the EDT's, so the span
+        /// is handed over there rather than guarded where it is.
+        void ended(final TelemetrySpan span) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            if (stopped) {</span>
+<span class="nc" id="L318">                return;</span>
+            }
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (!Display.isInitialized()) {</span>
+                // Nowhere to deliver it yet; a span before the app exists is
+                // start-up noise, not what anyone is tracing.
+<span class="nc" id="L323">                return;</span>
+            }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (CN.isEdt()) {</span>
+<span class="nc" id="L326">                record(span);</span>
+<span class="nc" id="L327">                return;</span>
+            }
+<span class="fc" id="L329">            CN.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L332">                    recordHandedOff(span);</span>
+<span class="fc" id="L333">                }</span>
+            });
+<span class="fc" id="L335">        }</span>
+
+        /// A span that ended on another thread and reaches the EDT only now. It
+        /// passed the stopped check where it ended, so it finished while this
+        /// installation was running; if an uninstall or a reinstall ran on the EDT
+        /// in between, it is exported on its own rather than discarded -- which
+        /// lost the request spans that were completing just as telemetry was
+        /// reconfigured.
+        void recordHandedOff(TelemetrySpan span) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (!stopped) {</span>
+<span class="fc" id="L345">                record(span);</span>
+<span class="fc" id="L346">                return;</span>
+            }
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">            if (!permitted()) {</span>
+<span class="nc" id="L349">                return;</span>
+            }
+<span class="fc" id="L351">            buffer.add(span);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (buffer.size() &gt; maxBuffered()) {</span>
+<span class="nc" id="L353">                buffer.remove(0);</span>
+            }
+            // ONE final flush for the burst, not one per span: every other late
+            // handoff already queued on the EDT runs before this, so they share a
+            // single export. A flush per span put an uncapped export -- and its
+            // encoded body -- in the network queue for each of them.
+<span class="fc bfc" id="L359" title="All 2 branches covered.">            if (!lateFlushScheduled) {</span>
+<span class="fc" id="L360">                lateFlushScheduled = true;</span>
+<span class="fc" id="L361">                CN.callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="fc" id="L364">                        lateFlushScheduled = false;</span>
+<span class="fc" id="L365">                        flush(true);</span>
+<span class="fc" id="L366">                    }</span>
+                });
+            }
+<span class="fc" id="L369">        }</span>
+
+        /// Whether a final flush for late handoffs is already queued on the EDT.
+        private boolean lateFlushScheduled;
+
+        void record(TelemetrySpan span) {
+<span class="pc bpc" id="L375" title="2 of 4 branches missed.">            if (stopped || !permitted()) {</span>
+<span class="nc" id="L376">                return;</span>
+            }
+<span class="fc" id="L378">            buffer.add(span);</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (buffer.size() &gt; maxBuffered()) {</span>
+                // BOUNDED. While exports cannot keep up -- the collector is slow, or
+                // the app's own traffic keeps outranking them -- the oldest spans
+                // go, rather than the app's memory.
+<span class="fc" id="L383">                buffer.remove(0);</span>
+            }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (timer == null) {</span>
+                // Started on the first span, on the EDT, because CN.setInterval
+                // needs the display and install() may run before there is one.
+<span class="fc" id="L388">                timer = CN.setInterval(config.flushIntervalMillis, new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="fc" id="L391">                        flush();</span>
+<span class="fc" id="L392">                    }</span>
+                });
+            }
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (buffer.size() &gt;= config.batchSize) {</span>
+<span class="fc" id="L396">                flush();</span>
+            }
+<span class="fc" id="L398">        }</span>
+
+        void flush() {
+<span class="fc" id="L401">            flush(false);</span>
+<span class="fc" id="L402">        }</span>
+
+        /// `last` is the installation's final flush, from [#stop()]: it sends the
+        /// buffer even when exports are already waiting. Otherwise an uninstall or a
+        /// reinstall behind a full export queue left the buffer behind for good --
+        /// the state stops, its timer is cancelled, and nothing would ever flush it
+        /// again. One extra batch, and the buffer it comes from is bounded.
+        void flush(final boolean last) {
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (!CN.isEdt()) {</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                if (Display.isInitialized()) {</span>
+<span class="fc" id="L412">                    CN.callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="fc" id="L415">                            flush(last);</span>
+<span class="fc" id="L416">                        }</span>
+                    });
+                }
+<span class="fc" id="L419">                return;</span>
+            }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (buffer.isEmpty()) {</span>
+<span class="fc" id="L422">                return;</span>
+            }
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (!permitted()) {</span>
+                // Consent was withdrawn after these were recorded: what the user
+                // refused is not sent, whenever it was collected.
+<span class="nc" id="L427">                buffer.clear();</span>
+<span class="nc" id="L428">                return;</span>
+            }
+<span class="fc bfc" id="L430" title="All 4 branches covered.">            if (!last &amp;&amp; pendingExports() &gt;= MAX_PENDING_EXPORTS) {</span>
+                // Exports are already waiting in the network queue. Queuing another
+                // batch would hold one more byte array per flush for as long as the
+                // app's requests outrank them, with no limit; the spans stay in the
+                // bounded buffer and go out once the queue drains.
+<span class="fc" id="L435">                return;</span>
+            }
+<span class="fc" id="L437">            List&lt;TelemetrySpan&gt; batch = new ArrayList&lt;TelemetrySpan&gt;(buffer);</span>
+<span class="fc" id="L438">            buffer.clear();</span>
+<span class="pc bpc" id="L439" title="1 of 4 branches missed.">            boolean json = config.mode == TelemetryConfig.Mode.RELAY || !config.protobuf;</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            byte[] body = json ? OtlpEncoding.json(resource(), batch)</span>
+<span class="fc" id="L441">                    : OtlpEncoding.protobuf(resource(), batch);</span>
+<span class="fc" id="L442">            ExportRequest request = new ExportRequest(this, body);</span>
+<span class="fc" id="L443">            request.setUrl(exportUrl);</span>
+<span class="fc" id="L444">            request.setPost(true);</span>
+<span class="fc" id="L445">            request.setHttpMethod(&quot;POST&quot;);</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (config.mode == TelemetryConfig.Mode.DIRECT) {</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">                for (String[] header : config.headers) {</span>
+<span class="fc" id="L448">                    request.addRequestHeader(header[0], header[1]);</span>
+<span class="fc" id="L449">                }</span>
+<span class="pc bpc" id="L450" title="1 of 4 branches missed.">            } else if (config.relayToken != null &amp;&amp; config.relayToken.length() &gt; 0) {</span>
+<span class="fc" id="L451">                request.addRequestHeader(&quot;X-CN1-Telemetry-Token&quot;, config.relayToken);</span>
+            }
+            // AFTER the configured headers, so nothing among them can relabel the
+            // body: the config refuses a Content-Type, and this holds regardless.
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            request.setContentType(json ? &quot;application/json&quot; : &quot;application/x-protobuf&quot;);</span>
+            // A failed export is dropped, never retried into the queue: telemetry
+            // must not compete with the app's own requests for the network.
+<span class="fc" id="L458">            request.setFailSilently(true);</span>
+<span class="fc" id="L459">            request.setReadResponseForErrors(false);</span>
+            // Never followed. A redirect re-queues this same request with its
+            // headers intact, so a collector that redirected elsewhere -- another
+            // origin included -- would be handed the Authorization or API-key
+            // header meant for it, and 301/302/303 turn the POST into a bodiless
+            // GET anyway. An export that is redirected fails, and is dropped like
+            // any other failed export; point the endpoint at the real collector.
+<span class="fc" id="L466">            request.setFollowRedirects(false);</span>
+            // SHORT, and behind the app's own requests. By default a request may
+            // take five minutes and the manager has one network thread, so a
+            // collector that accepts the connection and never answers would hold
+            // every request the app makes behind an export nobody is waiting for.
+<span class="fc" id="L471">            request.setTimeout(10000);</span>
+<span class="fc" id="L472">            request.setReadTimeout(10000);</span>
+<span class="fc" id="L473">            request.setPriority(ConnectionRequest.PRIORITY_LOW);</span>
+<span class="fc" id="L474">            NetworkManager.getInstance().addToQueue(request);</span>
+<span class="fc" id="L475">        }</span>
+
+        /// Telemetry exports still waiting to be sent. Read from the queue itself
+        /// rather than counted, because a fail-silent export that fails reports
+        /// nothing back to count with. Any installation's exports count: after a
+        /// reinstall the previous one's are still competing for the same network.
+        int pendingExports() {
+<span class="fc" id="L482">            int count = 0;</span>
+<span class="fc" id="L483">            java.util.Enumeration queue = NetworkManager.getInstance().enumurateQueue();</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">            while (queue.hasMoreElements()) {</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                if (queue.nextElement() instanceof ExportRequest) {</span>
+<span class="nc" id="L486">                    count++;</span>
+                }
+            }
+<span class="fc" id="L489">            return count;</span>
+        }
+
+        private int maxBuffered() {
+<span class="fc" id="L493">            return Math.max(config.batchSize * 4, 128);</span>
+        }
+
+        void stop() {
+<span class="fc" id="L497">            flush(true);</span>
+<span class="fc" id="L498">            stopped = true;</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">            if (timer != null) {</span>
+<span class="fc" id="L500">                timer.cancel();</span>
+<span class="fc" id="L501">                timer = null;</span>
+            }
+<span class="fc" id="L503">        }</span>
+
+        /// The app, as the collector should see it. Built at the first export,
+        /// when the display that knows these things exists.
+        private Map&lt;String, Object&gt; resource() {
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">            if (resource == null) {</span>
+<span class="fc" id="L509">                Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L510">                String appName = Display.getInstance().getProperty(&quot;AppName&quot;, null);</span>
+                // Trimmed, as the annotation's is: &quot; &quot; is no name, and exported
+                // as one the app had no usable service identity.
+<span class="fc bfc" id="L513" title="All 2 branches covered.">                String configured = config.serviceName == null ? &quot;&quot; : config.serviceName.trim();</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">                String service = configured.length() &gt; 0 ? configured : appName;</span>
+<span class="pc bpc" id="L515" title="1 of 4 branches missed.">                out.put(&quot;service.name&quot;, service == null || service.length() == 0</span>
+                        ? &quot;unknown_service&quot; : service);
+<span class="fc" id="L517">                String version = Display.getInstance().getProperty(&quot;AppVersion&quot;, null);</span>
+<span class="pc bpc" id="L518" title="3 of 4 branches missed.">                if (version != null &amp;&amp; version.length() &gt; 0) {</span>
+<span class="nc" id="L519">                    out.put(&quot;service.version&quot;, version);</span>
+                }
+<span class="fc" id="L521">                String platform = Display.getInstance().getPlatformName();</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                if (platform != null) {</span>
+<span class="fc" id="L523">                    out.put(&quot;os.name&quot;, platform);</span>
+                }
+<span class="fc" id="L525">                String osVersion = Display.getInstance().getProperty(&quot;OSVer&quot;, null);</span>
+<span class="pc bpc" id="L526" title="3 of 4 branches missed.">                if (osVersion != null &amp;&amp; osVersion.length() &gt; 0) {</span>
+<span class="nc" id="L527">                    out.put(&quot;os.version&quot;, osVersion);</span>
+                }
+<span class="fc" id="L529">                out.put(&quot;telemetry.sdk.name&quot;, &quot;codenameone&quot;);</span>
+<span class="fc" id="L530">                out.put(&quot;telemetry.sdk.language&quot;, &quot;java&quot;);</span>
+<span class="fc" id="L531">                resource = out;</span>
+            }
+<span class="fc" id="L533">            return resource;</span>
+        }
+
+        // --------------------------------------------------------------
+        // NetworkTracer
+        // --------------------------------------------------------------
+
+        @Override
+        public Object requestQueued(ConnectionRequest request) {
+<span class="fc" id="L542">            return CURRENT.get();</span>
+        }
+
+        @Override
+        public Object beforeRequest(ConnectionRequest request, Object parent) {
+<span class="pc bpc" id="L547" title="1 of 6 branches missed.">            if (stopped || request instanceof ExportRequest || !permitted()) {</span>
+                // The export's own request is not traced: each would be a span,
+                // and exporting that one another.
+<span class="fc" id="L550">                return null;</span>
+            }
+<span class="fc bfc" id="L552" title="All 2 branches covered.">            if (request.getRequestHeader(TRACEPARENT) != null</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">                    || request.getRequestHeader(TRACESTATE) != null) {</span>
+                // The app chose which trace this request belongs to. The service it
+                // reaches joins THAT trace, so a span recorded here in another one
+                // would describe the same request twice, in two traces that never
+                // meet. The app's own instrumentation owns this request. A
+                // tracestate alone counts too: it is part of the app's context,
+                // and a traceparent of ours beside it paired the app's vendor state
+                // with an unrelated trace id.
+<span class="fc" id="L561">                return null;</span>
+            }
+<span class="fc" id="L563">            String url = request.getUrl();</span>
+<span class="fc" id="L564">            String method = request.getHttpMethod();</span>
+<span class="pc bpc" id="L565" title="3 of 4 branches missed.">            if (method == null || method.length() == 0) {</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                method = request.isPost() ? &quot;POST&quot; : &quot;GET&quot;;</span>
+            }
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            TelemetrySpan span = start(method, TelemetrySpan.KIND_CLIENT,</span>
+                    parent instanceof TelemetrySpan ? (TelemetrySpan) parent : null);
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">            if (span == null) {</span>
+<span class="nc" id="L571">                return null;</span>
+            }
+<span class="fc" id="L573">            String host = host(url);</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">            if (span.isRecording()) {</span>
+<span class="fc" id="L575">                span.setAttribute(&quot;http.request.method&quot;, method);</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                if (url != null) {</span>
+<span class="fc" id="L577">                    span.setAttribute(&quot;url.full&quot;, redact(url));</span>
+                }
+<span class="fc bfc" id="L579" title="All 2 branches covered.">                if (host != null) {</span>
+<span class="fc" id="L580">                    span.setAttribute(&quot;server.address&quot;, host);</span>
+                }
+            }
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            if (shouldPropagate(url, host)) {</span>
+                // The app's own traceparent was ruled out above. Ours is removed
+                // again when the attempt ends (afterRequest), so a retry or a
+                // redirect starts clean -- the request object is reused, and a
+                // header left from an allowed host would otherwise follow a redirect
+                // to one that is not.
+<span class="fc" id="L589">                request.addRequestHeaderIfAbsent(TRACEPARENT, span.getTraceparent());</span>
+            }
+<span class="fc" id="L591">            return span;</span>
+        }
+
+        @Override
+        public void afterRequest(ConnectionRequest request, Object attempt, int responseCode,
+                                 Throwable error) {
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">            if (!(attempt instanceof TelemetrySpan)) {</span>
+<span class="nc" id="L598">                return;</span>
+            }
+<span class="fc" id="L600">            TelemetrySpan span = (TelemetrySpan) attempt;</span>
+            // Only if it is still the value this attempt set; an app's own
+            // traceparent, or one it replaced ours with, is left alone.
+<span class="fc" id="L603">            request.removeRequestHeaderIfUnchanged(TRACEPARENT, span.getTraceparent());</span>
+<span class="fc bfc" id="L604" title="All 2 branches covered.">            if (responseCode &gt;= 100) {</span>
+<span class="fc" id="L605">                span.setAttribute(&quot;http.response.status_code&quot;, responseCode);</span>
+            }
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            if (error != null) {</span>
+<span class="fc" id="L608">                span.recordException(error);</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">            } else if (responseCode &gt;= 400) {</span>
+<span class="fc" id="L610">                span.setError(String.valueOf(responseCode));</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">            } else if (responseCode &lt; 100) {</span>
+                // Neither a response nor an exception: the request was killed or
+                // stopped after it had started. Ended without a status, it read as
+                // a success in every trace backend.
+<span class="fc" id="L615">                span.setError(&quot;cancelled before a response&quot;);</span>
+            }
+<span class="fc" id="L617">            span.end();</span>
+<span class="fc" id="L618">        }</span>
+
+        /// Where the trace context may go. See [TelemetryConfig#propagateTo(String)]
+        /// for why the web is different.
+        private boolean shouldPropagate(String url, String host) {
+<span class="pc bpc" id="L623" title="1 of 4 branches missed.">            if (config.propagateToAll || isSameOriginRelative(url)) {</span>
+<span class="fc" id="L624">                return true;</span>
+            }
+<span class="fc bfc" id="L626" title="All 4 branches covered.">            if (backendOrigin != null &amp;&amp; backendOrigin.equals(origin(url))) {</span>
+<span class="fc" id="L627">                return true;</span>
+            }
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (host != null) {</span>
+                // Hosts the app named itself, as it named them.
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                for (String allowed : config.propagateTo) {</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                    if (host.equalsIgnoreCase(allowed)) {</span>
+<span class="nc" id="L633">                        return true;</span>
+                    }
+<span class="nc" id="L635">                }</span>
+            }
+<span class="fc bfc" id="L637" title="All 2 branches covered.">            return !&quot;HTML5&quot;.equals(Display.getInstance().getPlatformName());</span>
+        }
+    }
+
+    /// The export's own request, a type of its own so the tracer can recognise it,
+    /// and a binary body without an intermediate String.
+    static final class ExportRequest extends ConnectionRequest {
+        /// The installation that recorded these spans. Its consent policy, not
+        /// whichever installation is current when the export finally runs, decides
+        /// whether they may be sent: after an uninstall, or a reinstall without the
+        /// consent flag, the static slot says nothing about THESE spans.
+        private final State origin;
+
+<span class="fc" id="L650">        ExportRequest(State origin, byte[] body) {</span>
+<span class="fc" id="L651">            this.origin = origin;</span>
+<span class="fc" id="L652">            setRequestBody(new ByteBody(body));</span>
+<span class="fc" id="L653">        }</span>
+
+        /// The acknowledgement is read and DROPPED, at most 64KB of it. An OTLP
+        /// success body is empty or a few bytes; the inherited reader kept the whole
+        /// stream in memory, so a misbehaving collector or proxy answering 200 with
+        /// a large body could spend a phone's memory on every export.
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L661">            byte[] discard = new byte[4096];</span>
+<span class="fc" id="L662">            int total = 0;</span>
+            int read;
+<span class="fc bfc" id="L664" title="All 4 branches covered.">            while (total &lt; 65536 &amp;&amp; (read = input.read(discard)) &gt; 0) {</span>
+<span class="fc" id="L665">                total += read;</span>
+            }
+<span class="fc" id="L667">        }</span>
+
+        /// None of the app's default headers. They are the app's credentials for
+        /// its own services; copied onto an export they reached a third-party
+        /// collector, and a default Content-Type relabelled the body. An export
+        /// carries only what the telemetry configuration names.
+        @Override
+        protected boolean shouldApplyDefaultHeaders() {
+<span class="fc" id="L675">            return false;</span>
+        }
+
+        /// Identity. The inherited equality compares URL and arguments, so every
+        /// export to one collector compared equal though each carries its own
+        /// spans; that made no two exports distinguishable to the queue.
+        @Override
+        public boolean equals(Object o) {
+<span class="nc bnc" id="L683" title="All 2 branches missed.">            return o == this; //NOPMD CompareObjectsWithEquals</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L688">            return System.identityHashCode(this);</span>
+        }
+
+        /// Stopped, and nothing sent, once consent is required and no longer
+        /// given. An export waits in the queue behind the app's own requests, and
+        /// a user who withdraws consent in that time has refused these spans too;
+        /// performOperationComplete asks this before it connects.
+        @Override
+        protected boolean shouldStop() {
+<span class="pc bpc" id="L697" title="1 of 2 branches missed.">            if (super.shouldStop()) {</span>
+<span class="nc" id="L698">                return true;</span>
+            }
+<span class="fc bfc" id="L700" title="All 2 branches covered.">            return !origin.permitted();</span>
+        }
+    }
+
+    /// A request body that is already bytes.
+    private static final class ByteBody implements Data {
+        private final byte[] body;
+
+<span class="fc" id="L708">        ByteBody(byte[] body) {</span>
+<span class="fc" id="L709">            this.body = body;</span>
+<span class="fc" id="L710">        }</span>
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+<span class="fc" id="L714">            output.write(body);</span>
+<span class="fc" id="L715">        }</span>
+
+        @Override
+        public long getSize() {
+<span class="nc" id="L719">            return body.length;</span>
+        }
+    }
+
+    /// Whether `url` is relative to the page, `/api/orders` or `orders?id=1`, and
+    /// so goes to the origin that served the app. The stock
+    /// `ConnectionRequest.validate()` refuses such a URL, but a request that
+    /// overrides it can send one, and in the browser it reaches the app's own
+    /// backend -- the one destination that never needs a CORS allowance. Refusing
+    /// it, which [#host(String)] returning null did, dropped the context from the
+    /// call it matters most on. A scheme (`data:`, `mailto:`) or a
+    /// protocol-relative `//host/...` names another origin and is not relative.
+    private static boolean isSlash(char c) {
+<span class="fc bfc" id="L732" title="All 4 branches covered.">        return c == '/' || c == '\\';</span>
+    }
+
+    static boolean isSameOriginRelative(String url) {
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L737">            return false;</span>
+        }
+        // Read as the browser reads it (the WHATWG URL parser): leading and
+        // trailing C0 controls and spaces are stripped, and every tab and newline
+        // removed, BEFORE anything is resolved -- so &quot; //host/x&quot; and &quot;\t\\\\host/x&quot;
+        // are network paths to it, and were same-origin here.
+<span class="fc" id="L743">        StringBuilder cleaned = new StringBuilder(url.length());</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        for (int i = 0; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L745">            char c = url.charAt(i);</span>
+<span class="pc bpc" id="L746" title="1 of 6 branches missed.">            if (c != '\t' &amp;&amp; c != '\n' &amp;&amp; c != '\r') {</span>
+<span class="fc" id="L747">                cleaned.append(c);</span>
+            }
+        }
+<span class="fc" id="L750">        int start = 0;</span>
+<span class="fc" id="L751">        int end = cleaned.length();</span>
+<span class="fc bfc" id="L752" title="All 4 branches covered.">        while (start &lt; end &amp;&amp; cleaned.charAt(start) &lt;= ' ') {</span>
+<span class="fc" id="L753">            start++;</span>
+        }
+<span class="pc bpc" id="L755" title="1 of 4 branches missed.">        while (end &gt; start &amp;&amp; cleaned.charAt(end - 1) &lt;= ' ') {</span>
+<span class="nc" id="L756">            end--;</span>
+        }
+        // Through toString(): CLDC11's StringBuilder has no substring.
+<span class="fc" id="L759">        url = cleaned.toString().substring(start, end);</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">        if (url.length() == 0) {</span>
+<span class="fc" id="L761">            return false;</span>
+        }
+        // A network-path reference names another origin, and a browser's URL
+        // parser reads '\' as '/' for http(s): &quot;\\host/x&quot; and &quot;/\\host&quot; are
+        // &quot;//host/x&quot; to it. Refused in any mix of the two, or the trace header
+        // went cross-origin without a propagateTo allowance.
+<span class="pc bpc" id="L767" title="1 of 6 branches missed.">        if (url.length() &gt;= 2 &amp;&amp; isSlash(url.charAt(0)) &amp;&amp; isSlash(url.charAt(1))) {</span>
+<span class="fc" id="L768">            return false;</span>
+        }
+<span class="fc bfc" id="L770" title="All 2 branches covered.">        for (int i = 0; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L771">            char c = url.charAt(i);</span>
+<span class="fc bfc" id="L772" title="All 2 branches covered.">            if (c == ':') {</span>
+<span class="fc" id="L773">                return false;</span>
+            }
+<span class="pc bpc" id="L775" title="1 of 6 branches missed.">            if (c == '/' || c == '?' || c == '#') {</span>
+<span class="fc" id="L776">                return true;</span>
+            }
+        }
+<span class="fc" id="L779">        return true;</span>
+    }
+
+    /// `scheme://host:port` of an http or https URL, lower case, with the
+    /// scheme's default port filled in, so two spellings of one origin compare
+    /// equal; null for anything else.
+    static String origin(String url) {
+<span class="fc" id="L786">        String host = host(url);</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">        if (host == null) {</span>
+<span class="fc" id="L788">            return null;</span>
+        }
+        String scheme;
+        int defaultPort;
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (url.regionMatches(true, 0, &quot;https://&quot;, 0, 8)) {</span>
+<span class="fc" id="L793">            scheme = &quot;https&quot;;</span>
+<span class="fc" id="L794">            defaultPort = 443;</span>
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">        } else if (url.regionMatches(true, 0, &quot;http://&quot;, 0, 7)) {</span>
+<span class="fc" id="L796">            scheme = &quot;http&quot;;</span>
+<span class="fc" id="L797">            defaultPort = 80;</span>
+        } else {
+<span class="nc" id="L799">            return null;</span>
+        }
+<span class="fc" id="L801">        int start = scheme.length() + 3;</span>
+<span class="fc" id="L802">        String authority = url.substring(start, authorityEnd(url, start));</span>
+<span class="fc" id="L803">        authority = authority.substring(authority.lastIndexOf('@') + 1);</span>
+<span class="fc" id="L804">        int close = authority.lastIndexOf(']');</span>
+<span class="fc" id="L805">        int colon = authority.lastIndexOf(':');</span>
+<span class="fc" id="L806">        int port = defaultPort;</span>
+<span class="pc bpc" id="L807" title="1 of 4 branches missed.">        if (colon &gt; close &amp;&amp; colon + 1 &lt; authority.length()) {</span>
+            try {
+<span class="fc" id="L809">                port = Integer.parseInt(authority.substring(colon + 1));</span>
+<span class="nc" id="L810">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L811">                return null;</span>
+<span class="fc" id="L812">            }</span>
+        }
+        // host() drops an IPv6 literal's brackets; an origin keeps them, or the
+        // port could not be told from the address.
+<span class="fc" id="L816">        String name = asciiLower(host);</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">        if (name.indexOf(':') &gt;= 0) {</span>
+<span class="fc" id="L818">            name = &quot;[&quot; + name + &quot;]&quot;;</span>
+        }
+<span class="fc" id="L820">        return scheme + &quot;://&quot; + name + &quot;:&quot; + port;</span>
+    }
+
+    private static String asciiLower(String value) {
+<span class="fc" id="L824">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L825" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L826">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L827" title="All 4 branches covered.">            out.append(c &gt;= 'A' &amp;&amp; c &lt;= 'Z' ? (char) (c + 32) : c);</span>
+        }
+<span class="fc" id="L829">        return out.toString();</span>
+    }
+
+    /// The host of an absolute URL, without port or userinfo; null when there is
+    /// none.
+    static String host(String url) {
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L836">            return null;</span>
+        }
+<span class="fc" id="L838">        int scheme = url.indexOf(&quot;://&quot;);</span>
+<span class="fc bfc" id="L839" title="All 2 branches covered.">        if (scheme &lt; 0) {</span>
+<span class="fc" id="L840">            return null;</span>
+        }
+<span class="fc" id="L842">        int start = scheme + 3;</span>
+<span class="fc" id="L843">        String authority = url.substring(start, authorityEnd(url, start));</span>
+<span class="fc" id="L844">        int at = authority.lastIndexOf('@');</span>
+<span class="fc bfc" id="L845" title="All 2 branches covered.">        if (at &gt;= 0) {</span>
+<span class="fc" id="L846">            authority = authority.substring(at + 1);</span>
+        }
+<span class="fc bfc" id="L848" title="All 2 branches covered.">        if (authority.startsWith(&quot;[&quot;)) {</span>
+<span class="fc" id="L849">            int close = authority.indexOf(']');</span>
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">            return close &gt; 0 ? authority.substring(1, close) : authority;</span>
+        }
+<span class="fc" id="L852">        int colon = authority.indexOf(':');</span>
+<span class="fc bfc" id="L853" title="All 2 branches covered.">        return colon &gt;= 0 ? authority.substring(0, colon) : authority;</span>
+    }
+
+    /// The URL as it may be recorded: no query, no fragment, no userinfo. A query
+    /// is where tokens and personal data travel, and a trace backend is not where
+    /// either belongs.
+    static String redact(String url) {
+<span class="fc" id="L860">        int cut = url.length();</span>
+<span class="fc" id="L861">        int query = url.indexOf('?');</span>
+<span class="fc" id="L862">        int fragment = url.indexOf('#');</span>
+<span class="fc bfc" id="L863" title="All 2 branches covered.">        if (query &gt;= 0) {</span>
+<span class="fc" id="L864">            cut = query;</span>
+        }
+<span class="pc bpc" id="L866" title="1 of 4 branches missed.">        if (fragment &gt;= 0 &amp;&amp; fragment &lt; cut) {</span>
+<span class="fc" id="L867">            cut = fragment;</span>
+        }
+<span class="fc" id="L869">        String out = url.substring(0, cut);</span>
+<span class="fc" id="L870">        int scheme = out.indexOf(&quot;://&quot;);</span>
+<span class="fc bfc" id="L871" title="All 2 branches covered.">        if (scheme &gt;= 0) {</span>
+            // The LAST '@' before the path, as URL parsers split it: in
+            // &quot;https://alice:secret@tenant@host/x&quot; the first '@' belongs to the
+            // password, and cutting there exported &quot;tenant@&quot; as part of url.full.
+            // Only '/' ends the authority here, not authorityEnd's backslash: the
+            // browser reads one as a slash but the other ports' URL parsers do
+            // not, so what it separates may be userinfo, and a redactor that
+            // hides too much is the safe way to be wrong.
+<span class="fc" id="L879">            int start = scheme + 3;</span>
+<span class="fc" id="L880">            int slash = out.indexOf('/', start);</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">            int at = out.substring(start, slash &lt; 0 ? out.length() : slash).lastIndexOf('@');</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">            if (at &gt;= 0) {</span>
+<span class="fc" id="L883">                out = out.substring(0, start) + out.substring(start + at + 1);</span>
+            }
+        }
+<span class="fc" id="L886">        return out;</span>
+    }
+
+    /// Where the authority that starts at `start` ends: the first '/', '\\', '?' or
+    /// '#'. The backslash counts because an http(s) URL parser -- the browser the
+    /// JavaScript port runs in, among them -- reads it as a slash, so
+    /// &quot;https://evil.example\\@api.example/x&quot; goes to evil.example. Reading the
+    /// backslash as part of the authority instead named api.example as the host,
+    /// and a trace context approved for that host went to the other one.
+    static int authorityEnd(String url, int start) {
+<span class="fc bfc" id="L896" title="All 2 branches covered.">        for (int i = start; i &lt; url.length(); i++) {</span>
+<span class="fc" id="L897">            char c = url.charAt(i);</span>
+<span class="pc bpc" id="L898" title="2 of 8 branches missed.">            if (c == '/' || c == '\\' || c == '?' || c == '#') {</span>
+<span class="fc" id="L899">                return i;</span>
+            }
+        }
+<span class="fc" id="L902">        return url.length();</span>
+    }
+
+    private static boolean isZero(String hex) {
+<span class="pc bpc" id="L906" title="1 of 2 branches missed.">        for (int i = 0; i &lt; hex.length(); i++) {</span>
+<span class="pc bpc" id="L907" title="1 of 2 branches missed.">            if (hex.charAt(i) != '0') {</span>
+<span class="fc" id="L908">                return false;</span>
+            }
+        }
+<span class="nc" id="L911">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

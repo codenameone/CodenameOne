@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BodyDef.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics</a> &gt; <span class="el_source">BodyDef.java</span></div><h1>BodyDef.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics;
+
+import com.codename1.gaming.physics.box2d.common.Vec2;
+
+// updated to rev 100
+/// A body definition holds all the data needed to construct a rigid body.
+/// You can safely re-use body definitions. Shapes are added to a body
+/// after construction.
+///
+/// @author daniel
+public class BodyDef {
+	
+	/// The body type: static, kinematic, or dynamic.
+	/// Note: if a dynamic body would have zero mass, the mass is set to one.
+	public BodyType type;
+	
+	/// Use this to store application specific body data.
+	public Object userData;
+	
+	/// The world position of the body. Avoid creating bodies at the origin
+	/// since this can lead to many overlapping shapes.
+	public Vec2 position;
+	
+	/// The world angle of the body in radians.
+	public float angle;
+	
+	/// The linear velocity of the body in world co-ordinates.
+	public Vec2 linearVelocity;
+	
+	/// The angular velocity of the body.
+	public float angularVelocity;
+	
+	/// Linear damping is use to reduce the linear velocity. The damping parameter
+	/// can be larger than 1.0f but the damping effect becomes sensitive to the
+	/// time step when the damping parameter is large.
+	public float linearDamping;
+	
+	/// Angular damping is use to reduce the angular velocity. The damping parameter
+	/// can be larger than 1.0f but the damping effect becomes sensitive to the
+	/// time step when the damping parameter is large.
+	public float angularDamping;
+	
+	/// Set this flag to false if this body should never fall asleep. Note that
+	/// this increases CPU usage.
+	public boolean allowSleep;
+	
+	/// Is this body initially sleeping?
+	public boolean awake;
+	
+	/// Should this body be prevented from rotating? Useful for characters.
+	public boolean fixedRotation;
+	
+	/// Is this a fast moving body that should be prevented from tunneling through
+	/// other moving bodies? Note that all bodies are prevented from tunneling through
+	/// kinematic and static bodies. This setting is only considered on dynamic bodies.
+	///
+	/// @warning You should use this flag sparingly since it increases processing time.
+	public boolean bullet;
+	
+	/// Does this body start out active?
+	public boolean active;
+	
+	/// Experimental: scales the inertia tensor.
+	public float gravityScale;
+	
+<span class="fc" id="L89">	public BodyDef() {</span>
+<span class="fc" id="L90">		userData = null;</span>
+<span class="fc" id="L91">		position = new Vec2();</span>
+<span class="fc" id="L92">		angle = 0f;</span>
+<span class="fc" id="L93">		linearVelocity = new Vec2();</span>
+<span class="fc" id="L94">		angularVelocity = 0f;</span>
+<span class="fc" id="L95">		linearDamping = 0f;</span>
+<span class="fc" id="L96">		angularDamping = 0f;</span>
+<span class="fc" id="L97">		allowSleep = true;</span>
+<span class="fc" id="L98">		awake = true;</span>
+<span class="fc" id="L99">		fixedRotation = false;</span>
+<span class="fc" id="L100">		bullet = false;</span>
+<span class="fc" id="L101">		type = BodyType.STATIC;</span>
+<span class="fc" id="L102">		active = true;</span>
+<span class="fc" id="L103">		gravityScale = 1.0f;</span>
+<span class="fc" id="L104">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
