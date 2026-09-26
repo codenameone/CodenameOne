@@ -141,6 +141,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_parkMainThread___int(CODENAME_ONE
     /* Keep the process alive for up to timeoutMillis while workers run, then
      * force-exit; callers leave early via exitProcess when their work completes. */
     int remaining = timeoutMillis > 0 ? (int) timeoutMillis : 0;
+    /* Parked for the whole wait, as the Windows port's parkMainThread is: main is a
+     * managed thread on the clean target, so a sleep it does not park across makes
+     * every collection wait the safepoint bound for it and then force-stop it. */
+    CN1_YIELD_THREAD;
     while (remaining > 0) {
         struct timespec ts;
         int slice = remaining > 100 ? 100 : remaining;
@@ -149,11 +153,15 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_parkMainThread___int(CODENAME_ONE
         nanosleep(&ts, 0);
         remaining -= slice;
     }
+    CN1_RESUME_THREAD;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_runHeadlessLoop__(CODENAME_ONE_THREAD_STATE) {
     /* No window: park the main thread indefinitely while the EDT renders into the
      * offscreen buffer; the EDT exits the process once the screenshot is saved. */
+    /* Parked for good: this thread never runs Java again, and the process exits from
+     * the EDT. Not parking made every collection wait for it; see parkMainThread. */
+    CN1_YIELD_THREAD;
     for (;;) {
         struct timespec ts;
         ts.tv_sec = 1;

@@ -58,8 +58,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * private final instance field, and the Canvas in its place was itself live
  * (mark epoch 18, not the -1 that means fresh) -- a recycled slot, not garbage.
  *
- * The emitted mark callback must cover the complete flattened layout, including
- * inherited fields. Weak referents must be registered rather than marked strongly.
+ * The mark CHAIN must cover the complete layout, inherited fields included:
+ * __GC_MARK_X starts __GC_MARK_FIELDS_X, which traces the fields X declares and
+ * then calls its superclass's. Each link traces only its own class's fields -- a
+ * link that re-traced inherited ones is how mark code grew with hierarchy depth
+ * (Dialog's was 10KB). Weak referents must be registered rather than marked
+ * strongly.
  */
 class GcMarkCompletenessTest {
 
@@ -70,6 +74,13 @@ class GcMarkCompletenessTest {
     private static final Pattern MARKFN =
             Pattern.compile("void __GC_MARK_(\\w+)\\(CODENAME_ONE_THREAD_STATE[^)]*\\)\\s*\\{(.*?)\\n\\}",
                     Pattern.DOTALL);
+    /** void __GC_MARK_FIELDS_X(...) { ... } -- one link of the chain. */
+    private static final Pattern FIELDSFN =
+            Pattern.compile("void __GC_MARK_FIELDS_(\\w+)\\(CODENAME_ONE_THREAD_STATE[^)]*\\)\\s*\\{(.*?)\\n\\}",
+                    Pattern.DOTALL);
+    /** A CALL to the next link (not its extern declaration). */
+    private static final Pattern NEXT_LINK =
+            Pattern.compile("__GC_MARK_FIELDS_(\\w+)\\(threadStateData");
     /** A JAVA_OBJECT member, i.e. exactly what the collector must follow. */
     private static final Pattern OBJ_FIELD =
             Pattern.compile("^\\s*JAVA_OBJECT\\s+(\\w+)\\s*;", Pattern.MULTILINE);
@@ -148,6 +159,15 @@ class GcMarkCompletenessTest {
         int classesChecked = 0;
         int fieldsChecked = 0;
 
+        java.util.Map<String, String> links = new java.util.HashMap<String, String>();
+        try (Stream<Path> files = Files.walk(srcRoot)) {
+            for (Path c : (Iterable<Path>) files.filter(p -> p.toString().endsWith(".c"))::iterator) {
+                Matcher lf = FIELDSFN.matcher(new String(Files.readAllBytes(c), StandardCharsets.ISO_8859_1));
+                while (lf.find()) {
+                    links.put(lf.group(1), lf.group(2));
+                }
+            }
+        }
         try (Stream<Path> files = Files.walk(srcRoot)) {
             for (Path c : (Iterable<Path>) files.filter(p -> p.toString().endsWith(".c"))::iterator) {
                 String body = new String(Files.readAllBytes(c), StandardCharsets.ISO_8859_1);
@@ -160,7 +180,10 @@ class GcMarkCompletenessTest {
                 Matcher mf = MARKFN.matcher(body);
                 while (mf.find()) {
                     String cls = mf.group(1);
-                    String markBody = mf.group(2);
+                    if (cls.startsWith("FIELDS_")) {
+                        continue;
+                    }
+                    String markBody = chain(mf.group(2), links);
                     Set<String> declared = declaredObjectFields(head, cls);
                     if (declared.isEmpty()) {
                         continue;
@@ -180,23 +203,23 @@ class GcMarkCompletenessTest {
             }
         }
 
-        String leaf = new String(Files.readAllBytes(srcRoot.resolve("MarkLeaf.c")), StandardCharsets.ISO_8859_1);
-        Matcher leafMark = MARKFN.matcher(leaf);
-        assertTrue(leafMark.find());
-        assertFalse(leafMark.group(2).contains("__GC_MARK_MarkMid"));
-        assertTrue(leafMark.group(2).contains("objInstance->MarkBase_baseRef"));
-        assertTrue(leafMark.group(2).contains("objInstance->MarkBase_privateRef"));
-        assertTrue(leafMark.group(2).contains("objInstance->MarkMid_midRef"));
-        String list = new String(Files.readAllBytes(srcRoot.resolve("MarkList.c")), StandardCharsets.ISO_8859_1);
-        Matcher listMark = MARKFN.matcher(list);
-        assertTrue(listMark.find());
-        assertTrue(listMark.group(2).contains("java_util_ArrayList_cn1Storage"),
+        String leafChain = markChain(srcRoot, "MarkLeaf", links);
+        assertTrue(leafChain.contains("objInstance->MarkBase_baseRef"), "leaf chain must reach MarkBase");
+        assertTrue(leafChain.contains("objInstance->MarkBase_privateRef"));
+        assertTrue(leafChain.contains("objInstance->MarkMid_midRef"));
+        // Each link traces its OWN fields only: re-tracing inherited ones is what made
+        // mark code grow with hierarchy depth.
+        String leafOwn = links.get("MarkLeaf");
+        assertTrue(leafOwn != null, "MarkLeaf must have a chain link");
+        assertFalse(leafOwn.contains("objInstance->MarkBase_baseRef"),
+                "MarkLeaf's own link re-traces an inherited field");
+        assertFalse(leafOwn.contains("objInstance->MarkMid_midRef"),
+                "MarkLeaf's own link re-traces an inherited field");
+        assertTrue(markChain(srcRoot, "MarkList", links).contains("java_util_ArrayList_cn1Storage"),
                 "subclass must trace its inherited native reference block");
-        String weak = new String(Files.readAllBytes(srcRoot.resolve("java_lang_ref_WeakReference.c")), StandardCharsets.ISO_8859_1);
-        Matcher weakMark = MARKFN.matcher(weak);
-        assertTrue(weakMark.find());
-        assertTrue(weakMark.group(2).contains("cn1GcDiscoverReference"));
-        assertFalse(weakMark.group(2).contains("cn1GcMarkField(threadStateData, objInstance->java_lang_ref_Reference_objReference"));
+        String weakChain = markChain(srcRoot, "java_lang_ref_WeakReference", links);
+        assertTrue(weakChain.contains("cn1GcDiscoverReference"));
+        assertFalse(weakChain.contains("cn1GcMarkField(threadStateData, objInstance->java_lang_ref_Reference_objReference"));
 
         // A pass that inspected nothing is not a pass. The fixture alone declares
         // eight object fields across three classes in one hierarchy.
@@ -233,6 +256,35 @@ class GcMarkCompletenessTest {
         assertFalse(missing.isEmpty(), "the check must notice a field that is not marked");
         assertTrue(missing.contains("Foo_dropped") && missing.size() == 1,
                 "it must name exactly the untraced field, got " + missing);
+    }
+
+    /** The concatenated bodies of every link a __GC_MARK_ body starts. */
+    private static String chain(String markBody, java.util.Map<String, String> links) {
+        StringBuilder all = new StringBuilder(markBody);
+        Set<String> seen = new LinkedHashSet<String>();
+        Matcher next = NEXT_LINK.matcher(markBody);
+        String at = next.find() ? next.group(1) : null;
+        while (at != null && seen.add(at)) {
+            String body = links.get(at);
+            if (body == null) {
+                break;
+            }
+            all.append('\n').append(body);
+            Matcher n = NEXT_LINK.matcher(body);
+            at = n.find() ? n.group(1) : null;
+        }
+        return all.toString();
+    }
+
+    private static String markChain(Path srcRoot, String cls, java.util.Map<String, String> links) throws Exception {
+        String c = new String(Files.readAllBytes(srcRoot.resolve(cls + ".c")), StandardCharsets.ISO_8859_1);
+        Matcher m = MARKFN.matcher(c);
+        while (m.find()) {
+            if (m.group(1).equals(cls)) {
+                return chain(m.group(2), links);
+            }
+        }
+        throw new AssertionError("no __GC_MARK_" + cls);
     }
 
     private static boolean tracesField(String body, String field) {

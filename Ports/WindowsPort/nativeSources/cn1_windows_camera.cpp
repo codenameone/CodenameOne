@@ -333,7 +333,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_cameraSessionStop___long(
     CN1CameraSession* s = (CN1CameraSession*) (intptr_t) handle;
     if (!s) return;
     InterlockedExchange(&s->running, 0);
-    if (s->thread) { WaitForSingleObject(s->thread, 5000); CloseHandle(s->thread); }
+    if (s->thread) {
+        /* Parked for the wait: Windows cannot force-stop a thread, so a collection would
+           otherwise wait out up to five seconds for this one. */
+        CN1_YIELD_THREAD;
+        WaitForSingleObject(s->thread, 5000);
+        CN1_RESUME_THREAD;
+        CloseHandle(s->thread);
+    }
     delete s;
 }
 

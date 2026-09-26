@@ -249,7 +249,11 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileLockExclusive___java_lang
         if (GetLastError() != ERROR_SHARING_VIOLATION) {
             break;
         }
+        /* Parked for each retry's wait, which can add up to thirty seconds: Windows
+           cannot force-stop a thread, so a collection would otherwise wait it out. */
+        CN1_YIELD_THREAD;
         Sleep(50);
+        CN1_RESUME_THREAD;
     }
     free(path);
     return 0;
