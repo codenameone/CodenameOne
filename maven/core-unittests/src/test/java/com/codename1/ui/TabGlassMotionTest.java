@@ -40,6 +40,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * frame of a real UITabBarController selection on the iOS 27 simulator, and the
  * model must reproduce it frame by frame. The tolerances are in points on the
  * native 62 pt bar -- at @3x a point is three device pixels.
+ *
+ * Every captured frame is evaluated at its VSYNC time, round(t * 60) / 60: the
+ * springs are rendered on the display clock (inverting them recovers each frame
+ * at exactly n / 60 s, to 0.03 ms), while the logged times carry the main
+ * thread's jitter -- the frame after the touch-up is logged 1.3 ms late in every
+ * tap. The closed-form channels' tolerances sit just above their measured worst
+ * error on that clock; the deformation and bar-pulse tables keep theirs.
  */
 class TabGlassMotionTest {
 
@@ -108,7 +115,8 @@ class TabGlassMotionTest {
         float worstContent = 0;
         float worstBar = 0;
         for (Frame f : load()) {
-            TabGlassMotion m = TabGlassMotion.at(f.t * 1000f, f.travelPt);
+            float vsync = Math.round(f.t * TabGlassMotion.SAMPLE_HZ) / (float) TabGlassMotion.SAMPLE_HZ;
+            TabGlassMotion m = TabGlassMotion.at(vsync * 1000f, f.travelPt);
             String where = f.tap + " t=" + f.t;
             float d = Math.abs(f.travelPt);
             worstPos = Math.max(worstPos, Math.abs(m.position - f.position) * d);
@@ -129,13 +137,14 @@ class TabGlassMotionTest {
                 assertEquals(f.scaleY, m.scaleY, 0.03f, "scaleY " + where);
             }
         }
-        assertTrue(worstPos <= 1.6f, "lens centre off by " + worstPos + " pt");
+        // Closed forms (measured worst: 0.77 pt, 0.12 pt, 0.007).
+        assertTrue(worstPos <= 0.9f, "lens centre off by " + worstPos + " pt");
         assertTrue(worstLead <= 1.6f, "lens lead off by " + worstLead + " pt");
         assertTrue(worstBar <= 0.5f, "bar growth off by " + worstBar + " pt");
-        assertTrue(worstLift <= 0.25f, "lift off by " + worstLift + " pt");
+        assertTrue(worstLift <= 0.15f, "lift off by " + worstLift + " pt");
         assertTrue(worstW <= 2.0f, "lens width off by " + worstW + " pt");
         assertTrue(worstH <= 1.5f, "lens height off by " + worstH + " pt");
-        assertTrue(worstPlatter <= 0.02f, "platter opacity off by " + worstPlatter);
+        assertTrue(worstPlatter <= 0.01f, "platter opacity off by " + worstPlatter);
         assertTrue(worstContent <= 0.004f, "content magnification off by " + worstContent);
     }
 
@@ -166,6 +175,80 @@ class TabGlassMotionTest {
             assertEquals(r.leadPt, -l.leadPt, 0f);
             assertEquals(r.lift, l.lift, 0f);
         }
+    }
+
+    /// Native touch glow, per-frame means over the eleven clean taps of the capture
+    /// (the fixture does not carry the glow): frame, diameter scale, drawn opacity.
+    private static final float[][] NATIVE_GLOW = {
+        {2, 1.0000f, 0.08153f}, {3, 1.0000f, 0.15444f}, {5, 1.0573f, 0.21906f}, {8, 1.6145f, 0.17483f},
+        {12, 2.4973f, 0.07740f}, {20, 3.5425f, 0.00782f}, {30, 3.9165f, 0.00028f}, {34, 3.9592f, 0f},
+        {45, 3.9946f, 0f}
+    };
+
+    @Test
+    void theTouchGlowIsTheMeasuredSprings() {
+        for (float[] g : NATIVE_GLOW) {
+            TabGlassMotion m = TabGlassMotion.at(g[0] * 1000f / TabGlassMotion.SAMPLE_HZ, 86f);
+            // The scale has no tap-to-tap spread in the capture; the opacity spreads
+            // by up to 0.0024 on the rising frames.
+            assertEquals(g[1], m.glowScale, 0.0005f, "glow scale at frame " + (int) g[0]);
+            assertEquals(g[2], m.glowOpacity, 0.001f, "glow opacity at frame " + (int) g[0]);
+        }
+    }
+
+    @Test
+    void theGlowMaskIsAFixedFractionOfTheLayerAndHidesAtTheSameLevel() {
+        // Drawn opacity = mask * layer with mask = 0.33675 * layer, so while both
+        // are visible it is 0.33675 * layer^2; the mask drops out first.
+        float s = 10f / TabGlassMotion.SAMPLE_HZ;
+        float layer = TabGlassMotion.glowLayerOpacity(s);
+        assertEquals(0.33675f * layer * layer, TabGlassMotion.glowOpacity(s), 1e-6f);
+        assertEquals(0f, TabGlassMotion.glowOpacity(34f / TabGlassMotion.SAMPLE_HZ), 0f);
+        assertTrue(TabGlassMotion.glowLayerOpacity(39f / TabGlassMotion.SAMPLE_HZ) > 0f);
+        assertEquals(0f, TabGlassMotion.glowLayerOpacity(40f / TabGlassMotion.SAMPLE_HZ), 0f);
+    }
+
+    @Test
+    void theTravelSettlesLikeUikit() {
+        // UIKit ends the travel past its overshoot once less than 0.2 pt remains:
+        // the frame it happened at in the capture, per jump distance.
+        float[][] snaps = {{64.04f, 29}, {86f, 31}, {128.1f, 33}, {172f, 34}};
+        for (float[] sn : snaps) {
+            float at = sn[1] / TabGlassMotion.SAMPLE_HZ;
+            float before = (sn[1] - 1) / TabGlassMotion.SAMPLE_HZ;
+            assertEquals(1f, TabGlassMotion.settledPosition(at, sn[0]), 0f, sn[0] + " pt at frame " + (int) sn[1]);
+            assertTrue(TabGlassMotion.settledPosition(before, sn[0]) > 1f, sn[0] + " pt before frame " + (int) sn[1]);
+        }
+        // The unsettled curve is the spring of duration 0.4 s and bounce 0.15: its
+        // overshoot peak is 0.6% at ~0.38 s.
+        float peak = 0;
+        for (int ms = 300; ms < 500; ms++) {
+            peak = Math.max(peak, TabGlassMotion.position(ms / 1000f));
+        }
+        assertEquals(1.0063f, peak, 0.0002f);
+    }
+
+    @Test
+    void theLiftAndPlatterEndOnTheCapturedFrames() {
+        // Counted from the release frame, the capture drops the lift to 0 on frame 14
+        // (13 in one tap) and lands the platter on 1 on frame 29 (28 in one tap).
+        float release = TabGlassMotion.releaseSeconds(86f);
+        float hz = TabGlassMotion.SAMPLE_HZ;
+        assertTrue(TabGlassMotion.liftFall(13f / hz) > 0f, "lift gone before frame 14");
+        assertEquals(0f, TabGlassMotion.liftFall(14f / hz), 0f);
+        assertTrue(TabGlassMotion.platterReturn(28f / hz, release) < 1f, "platter back before frame 29");
+        assertEquals(1f, TabGlassMotion.platterReturn(29f / hz, release), 0f);
+    }
+
+    @Test
+    void theClosedFormsRestBeforeTheTablesEnd() {
+        float end = TabGlassMotion.durationMs() / 1000f;
+        float release = TabGlassMotion.releaseSeconds(258f);
+        assertEquals(1f, TabGlassMotion.settledPosition(end, 258f), 0f);
+        assertEquals(0f, TabGlassMotion.liftFall(end - release), 0f);
+        assertEquals(1f, TabGlassMotion.platterReturn(end - release, release), 0f);
+        assertEquals(0f, TabGlassMotion.glowOpacity(end), 0f);
+        assertEquals(4f, TabGlassMotion.glowScale(end), 0.001f);
     }
 
     @Test

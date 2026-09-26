@@ -6,16 +6,18 @@ UITabBarController on the simulator, see
 scripts/fidelity-app/ios-native-ref/motion-probe/README.md). Subcommands:
 
   fit LOG... -o templates.json
-      Aligns every clean tap-driven selection in the logs and fits the motion
-      channels: one normalized travel curve, the lift rise/fall around the release,
-      and the deformation as E(t) + distance * S(t).
+      Aligns every clean tap-driven selection in the logs and averages the motion
+      channels at 60 Hz, the deformation as E(t) + distance * S(t).
   java templates.json TabGlassMotion.java
-      Rewrites the lookup tables inside TabGlassMotion.java.
+      Rewrites the tables TabGlassMotion still keeps (the deformation and the
+      whole-bar pulse); the other channels are closed forms (MotionForms).
   fixture LOG... -o native-ios27.csv
       Exports the per-frame native channels TabGlassMotionTest checks the Java
       model against.
   check templates.json LOG...
-      Replays the fitted model against every tap and prints the worst errors.
+      Replays the model -- closed forms plus the kept tables -- against every tap
+      on the vsync clock, prints the worst errors, and fails if a closed form is
+      off by more than TabGlassMotionTest allows.
   material SHOT_DIR
       Fits the bar's glass material (GlassRecipe) from the lossless screenshots.
 
@@ -224,6 +226,84 @@ def fit(taps):
     return {k: [float(x) for x in v] for k, v in out.items()}
 
 
+# --------------------------------------------------------------------------- closed forms
+
+def spring_displacement(omega, zeta, x0, v0, t):
+    """DampedSpring.displacement: free response of a damped spring resting at 0."""
+    if t <= 0:
+        return x0
+    decay = np.exp(-zeta * omega * t)
+    if zeta < 1:
+        wd = omega * np.sqrt(1 - zeta * zeta)
+        b = (v0 + zeta * omega * x0) / wd
+        return decay * (x0 * np.cos(wd * t) + b * np.sin(wd * t))
+    if zeta == 1:
+        return decay * (x0 + (v0 + omega * x0) * t)
+    s = omega * np.sqrt(zeta * zeta - 1)
+    r1, r2 = -zeta * omega + s, -zeta * omega - s
+    c2 = (v0 - r1 * x0) / (r2 - r1)
+    return (x0 - c2) * np.exp(r1 * t) + c2 * np.exp(r2 * t)
+
+
+def spring_velocity(omega, zeta, x0, v0, t, h=1e-7):
+    return (spring_displacement(omega, zeta, x0, v0, t + h) - spring_displacement(omega, zeta, x0, v0, t - h)) / (2 * h)
+
+
+class MotionForms:
+    """The closed forms TabGlassMotion implements (same constants, same names). They
+    were found in these captures on the VSYNC clock: every frame renders at exactly
+    start + n/60 s, while the logged frame times carry the main thread's jitter."""
+    START_S = 0.00226
+    POSITION_OMEGA, POSITION_ZETA, SETTLE_PT = 2 * np.pi / 0.4, 0.85, 0.195
+    LIFT_OMEGA, LIFT_FALL_S = 2 * np.pi / 0.25, 13.5 / FPS
+    PLATTER_OMEGA, PLATTER_RETURN_S = 2 * np.pi / 0.4, 28.5 / FPS
+    GLOW_RISE_OMEGA, GLOW_FALL_OMEGA, GLOW_PEAK, GLOW_UP_S = 2 * np.pi / 0.1, 2 * np.pi / 0.5, 0.8445, 4 / FPS
+    GLOW_MASK, GLOW_HIDE, GLOW_GROWTH = 0.33675, 0.005, 3.0
+
+    def position(self, t):
+        return 1 + spring_displacement(self.POSITION_OMEGA, self.POSITION_ZETA, -1, 0, t - self.START_S)
+
+    def settled_position(self, t, d):
+        p = self.position(t)
+        peak = self.START_S + np.pi / (self.POSITION_OMEGA * np.sqrt(1 - self.POSITION_ZETA ** 2))
+        return 1.0 if t >= peak and d * abs(p - 1) < self.SETTLE_PT else p
+
+    def lift_rise(self, t):
+        return 1 + spring_displacement(self.LIFT_OMEGA, 1, -1, 0, t - self.START_S)
+
+    def lift_fall(self, s):
+        return 0.0 if s >= self.LIFT_FALL_S else spring_displacement(self.LIFT_OMEGA, 1, 1, 0, s)
+
+    def platter_return(self, s, release):
+        if s >= self.PLATTER_RETURN_S:
+            return 1.0
+        v0 = -spring_velocity(self.LIFT_OMEGA, 1, -1, 0, release - self.START_S)
+        return 1 + spring_displacement(self.PLATTER_OMEGA, 1, -self.lift_rise(release), v0, s)
+
+    def glow_layer(self, t):
+        if t < self.GLOW_UP_S:
+            return self.GLOW_PEAK + spring_displacement(self.GLOW_RISE_OMEGA, 1, -self.GLOW_PEAK, 0, t - self.START_S)
+        up = self.GLOW_UP_S - self.START_S
+        x0 = self.GLOW_PEAK + spring_displacement(self.GLOW_RISE_OMEGA, 1, -self.GLOW_PEAK, 0, up)
+        v0 = spring_velocity(self.GLOW_RISE_OMEGA, 1, -self.GLOW_PEAK, 0, up)
+        v = spring_displacement(self.GLOW_FALL_OMEGA, 1, x0, v0, t - self.GLOW_UP_S)
+        return 0.0 if v < self.GLOW_HIDE else v
+
+    def glow_opacity(self, t):
+        layer = self.glow_layer(t)
+        mask = self.GLOW_MASK * layer
+        return 0.0 if t >= self.GLOW_UP_S and mask < self.GLOW_HIDE else mask * layer
+
+    def glow_scale(self, t):
+        return 1 + self.GLOW_GROWTH * (1 + spring_displacement(self.GLOW_FALL_OMEGA, 1, -1, 0, t - self.GLOW_UP_S))
+
+
+FORMS = MotionForms()
+# What TabGlassMotionTest allows the closed forms (pt, pt, opacity); the glow is
+# checked against the raw frames here since the fixture does not carry it.
+FORM_TOLERANCE = dict(pos=0.9, lift=0.15, plat=0.01, glow_scale=0.001, glow_op=0.005)
+
+
 # --------------------------------------------------------------------------- model
 
 class Model:
@@ -244,21 +324,21 @@ class Model:
     def release(self, D):
         # The first falling frame is the first one within RELEASE_PT of the target,
         # but never before the frame after the lift has snapped to full.
-        snap = next(i for i, u in enumerate(self.T["U"]) if u >= LIFT_SNAP)
-        for i, p in enumerate(self.T["P"]):
-            if i > 0 and abs(D) * (1 - p) < RELEASE_PT:
+        snap = next(i for i in range(1000) if FORMS.lift_rise(i / FPS) >= LIFT_SNAP)
+        for i in range(1, 2 * int(FPS)):
+            if abs(D) * (1 - FORMS.position(i / FPS)) < RELEASE_PT:
                 return (max(i, snap + 1) - 1) / FPS
-        return len(self.T["P"]) / FPS
+        return 2.0
 
     def frame(self, t, D):
         ad, sg = abs(D), (1 if D >= 0 else -1)
         tr = self.release(D)
         if t < tr:
-            u = self.samp("U", t)
+            u = FORMS.lift_rise(t)
             L, op = (1.0 if u >= LIFT_SNAP else u), 1 - u
         else:
-            L, op = self.samp("LF", t - tr), self.samp("GOP", t - tr)
-        return dict(p=self.samp("P", t), L=L, platOp=op, cs=1 + 0.16 * L,
+            L, op = FORMS.lift_fall(t - tr), FORMS.platter_return(t - tr, tr)
+        return dict(p=FORMS.settled_position(t, ad), L=L, platOp=op, cs=1 + 0.16 * L,
                     sx=1 + self.samp("SXE", t) + ad * self.samp("SXS", t),
                     sy=1 + self.samp("SYE", t) + ad * self.samp("SYS", t),
                     tx=sg * (self.samp("TXE", t) + ad * self.samp("TXS", t)),
@@ -266,43 +346,58 @@ class Model:
 
 
 def check(tpl, taps):
+    """Every tap on the vsync clock (round(t * 60) / 60, see MotionForms). The closed
+    forms are held to FORM_TOLERANCE on the clean taps -- the ones with the fast
+    lift the model describes -- and the run fails if one is exceeded."""
     m = Model(tpl)
+    worst = {}
     for tp in taps:
         c, D, err = tp["c"], tp["D"], {}
         rest_w = c["lw"][-1]
+        glow_scale = np.array(c["gs"], dtype=float)
+        last = 1.0
+        for i in range(len(glow_scale)):
+            if np.isnan(glow_scale[i]):
+                glow_scale[i] = last  # the glow layer is removed once it has faded
+            else:
+                last = glow_scale[i]
         for i, t in enumerate(tp["t"]):
             if t < 0:
                 continue
+            t = round(t * FPS) / FPS
             f = m.frame(t, D)
             e = dict(pos=abs(f["p"] - tp["p"][i]) * abs(D),
                      lift=abs(LIFT_PT * f["L"] - (c["lh"][i] - REST_LENS_H)),
                      w=abs((rest_w + LIFT_PT * f["L"]) * f["sx"] - c["lw"][i] * c["sx"][i]),
                      h=abs((REST_LENS_H + LIFT_PT * f["L"]) * f["sy"] - c["lh"][i] * c["sy"][i]),
-                     lead=abs(f["tx"] - c["tx"][i]), plat=abs(f["platOp"] - c["platOp"][i]))
+                     lead=abs(f["tx"] - c["tx"][i]), plat=abs(f["platOp"] - c["platOp"][i]),
+                     glow_scale=abs(FORMS.glow_scale(t) - glow_scale[i]),
+                     glow_op=abs(FORMS.glow_opacity(t) - c["gop"][i] * c["gcop"][i]))
             for key, v in e.items():
                 err[key] = max(err.get(key, 0), v)
         print("%-40s tap %d D=%7.1f clean=%s " % (tp["src"][-40:], tp["k"], D, is_clean(tp))
-              + " ".join("%s=%.2f" % kv for kv in err.items()))
+              + " ".join("%s=%.3f" % kv for kv in err.items()))
+        if is_clean(tp):
+            for key in FORM_TOLERANCE:
+                worst[key] = max(worst.get(key, 0), err[key])
+    print("closed forms, worst over the clean taps: "
+          + " ".join("%s=%.4f (<=%g)" % (k, worst.get(k, 0), FORM_TOLERANCE[k]) for k in FORM_TOLERANCE))
+    bad = [k for k in FORM_TOLERANCE if worst.get(k, 0) > FORM_TOLERANCE[k]]
+    if bad:
+        sys.exit("closed forms no longer match the capture: " + ", ".join(bad))
 
 
 # --------------------------------------------------------------------------- java
 
-TABLES = [("P", "POSITION", "Normalized lens-centre travel 0..1 (all jump distances share it)."),
-          ("U", "LIFT_RISE", "Lift rise before release; also 1 - grey platter opacity until release."),
-          ("LF", "LIFT_FALL", "Lift after release, indexed from the release frame."),
-          ("GOP", "PLATTER_RETURN", "Grey platter opacity after release, indexed from the release frame."),
-          ("SXE", "STRETCH_X", "Lens scaleX - 1, distance-independent part."),
+# The channels TabGlassMotion still keeps as tables; the others are MotionForms.
+TABLES = [("SXE", "STRETCH_X", "Lens scaleX - 1, distance-independent part."),
           ("SXS", "STRETCH_X_PER_PT", "Lens scaleX - 1 per point of travel."),
           ("SYE", "STRETCH_Y", "Lens scaleY - 1, distance-independent part."),
           ("SYS", "STRETCH_Y_PER_PT", "Lens scaleY - 1 per point of travel."),
           ("TXE", "LEAD_PT", "Lens centre lead in points along the travel direction, distance-independent part."),
           ("TXS", "LEAD_PER_PT", "Lens centre lead per point of travel."),
-          ("BAR", "BAR_GROW_PT", "Whole-bar width growth in points; the bar scales uniformly by (w + grow) / w."),
-          ("GLOWS", "GLOW_SCALE", "Touch glow diameter as a multiple of GLOW_DIAMETER_PT."),
-          ("GLOWOP", "GLOW_MASK_OPACITY", "Touch glow mask opacity."),
-          ("GLOWC", "GLOW_LAYER_OPACITY", "Touch glow layer opacity.")]
-REST = {"P": 1, "U": 1, "LF": 0, "GOP": 1, "SXE": 0, "SXS": 0, "SYE": 0, "SYS": 0, "TXE": 0, "TXS": 0,
-        "BAR": 0, "GLOWS": None, "GLOWOP": 0, "GLOWC": 0}
+          ("BAR", "BAR_GROW_PT", "Whole-bar width growth in points; the bar scales uniformly by (w + grow) / w.")]
+REST = {"SXE": 0, "SXS": 0, "SYE": 0, "SYS": 0, "TXE": 0, "TXS": 0, "BAR": 0}
 PER_PT = ("SXS", "SYS", "TXS")
 
 
@@ -310,15 +405,11 @@ def java_tables(tpl):
     out = []
     for key, name, doc in TABLES:
         v, r = list(tpl[key]), REST[key]
-        if r is None:
-            last = max(i for i, x in enumerate(tpl["GLOWOP"]) if abs(x) > 2e-4) + 1
-        else:
-            # per-point tables are multiplied by up to ~260 pt of travel
-            thr = 1e-6 if key in PER_PT else 2e-4
-            last = max([i for i, x in enumerate(v) if abs(x - r) > thr] + [0]) + 1
+        # per-point tables are multiplied by up to ~260 pt of travel
+        thr = 1e-6 if key in PER_PT else 2e-4
+        last = max([i for i, x in enumerate(v) if abs(x - r) > thr] + [0]) + 1
         v = v[:last + 1]
-        if r is not None:
-            v[-1] = r
+        v[-1] = r
         dec = 7 if key in PER_PT else 4
         vals = [("%." + str(dec) + "f") % x + "f" for x in v]
         vals = [s.replace("-0." + "0" * dec + "f", "0." + "0" * dec + "f") for s in vals]
@@ -335,7 +426,7 @@ def java_tables(tpl):
 
 def write_java(tpl, path):
     s = read_text(path)
-    a = s.index("    /// Normalized lens-centre travel")
+    a = s.index("    /// " + TABLES[0][2])
     b = s.index("    // ---- outputs ----")
     write_text(path, s[:a] + java_tables(tpl) + s[b:])
 

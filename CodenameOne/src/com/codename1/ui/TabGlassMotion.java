@@ -30,26 +30,38 @@ package com.codename1.ui;
 /// XCUITest, and logs the presentation geometry of every layer under the tab bar
 /// on every display frame. UIKit attaches no `CAAnimation` for this motion -- it
 /// writes the layer values itself each frame -- so the per-frame log IS the curve.
-/// The tables below are those curves resampled at 60 Hz from the moment the lens
-/// starts to move; `scripts/fidelity-app/tools/tab-motion/` regenerates them from
-/// a fresh capture.
+///
+/// Most channels turned out to be springs UIKit evaluates on the display's vsync
+/// clock, and are written here in closed form (DampedSpring): the lens travel is a
+/// spring of duration 0.4 s and bounce 0.15, the lift and the platter critically
+/// damped springs of 0.25 s and 0.4 s, the touch glow critically damped springs of
+/// 0.1 s and 0.5 s. They reproduce the capture to its noise, which the averaged
+/// tables they replaced did not: every captured frame renders at exactly
+/// `start + n / 60` s (to 0.03 ms), so the per-frame log times, which carry the
+/// main thread's jitter, are not the times the curves were evaluated at. The
+/// deformation and the whole-bar pulse have no closed form that matched the
+/// capture as well as a table, and stay 60 Hz tables resampled from the moment the
+/// lens starts to move. `scripts/fidelity-app/tools/tab-motion/` regenerates the
+/// tables and checks the closed forms against a fresh capture.
 ///
 /// What UIKit does, channel by channel (lens = the selection capsule):
 ///
 /// - The lens centre travels on one normalized curve for every jump distance:
-///   at the target after ~0.33 s, a 0.6% overshoot at ~0.38 s, settled by 0.6 s.
+///   at the target after ~0.33 s, a 0.6% overshoot at ~0.38 s; UIKit ends it once
+///   less than SETTLE_PT remains past the overshoot.
 /// - On touch the lens LIFTS: its bounds grow by 16 pt in both directions, the
 ///   grey platter under it fades out (it becomes clear glass) and the accent copy
 ///   of the tab content seen through it is magnified by up to 16%. The lift is
-///   released once the lens is within 3.5 pt of its target, and falls back on a
-///   fixed curve while the platter fades back in.
+///   released once the lens is within 3.5 pt of its target, and falls back on the
+///   same spring while the platter springs back from wherever it was.
 /// - The lens deforms: a distance-independent stretch pulse (x up to 1.12, y down
 ///   to 0.84) leading the travel, then a squash on arrival whose depth is linear
 ///   in the distance travelled (x 0.96 after 64 pt, 0.85 after 258 pt), and a
 ///   small second wobble about a second in.
 /// - The whole bar -- glass, content and lens together -- scales about its centre
 ///   by a pulse that adds ~8.7 pt to its width at 0.13 s and undershoots slightly.
-/// - A white glow expands from the touch point across the bar and fades.
+/// - A white glow brightens under the finger, then, from the touch-up, expands to
+///   four times its size across the bar and fades.
 ///
 /// Deformation is `E(t) + d * S(t)` for travel distance `d`; that fits every
 /// captured jump from 64 to 258 pt to within 0.01 of scale.
@@ -58,7 +70,7 @@ package com.codename1.ui;
 /// converts points to pixels, and TabGlassMotionTest pins the model against the
 /// native capture.
 final class TabGlassMotion {
-    /// Sample rate of every table below.
+    /// Sample rate of the tables below.
     static final int SAMPLE_HZ = 60;
     /// Height of the native floating tab bar; points convert to pixels by the
     /// ratio of the theme's pill height to this.
@@ -74,35 +86,48 @@ final class TabGlassMotion {
     /// Diameter of the touch glow before it expands.
     static final float GLOW_DIAMETER_PT = 93f;
 
-    /// Normalized lens-centre travel 0..1 (all jump distances share it).
-    private static final float[] POSITION = {
-            0.0000f, 0.0228f, 0.0905f, 0.1775f, 0.2886f, 0.3954f, 0.4970f, 0.5896f, 0.6715f,
-            0.7421f, 0.8014f, 0.8504f, 0.8901f, 0.9191f, 0.9457f, 0.9638f, 0.9785f, 0.9886f,
-            0.9957f, 1.0005f, 1.0035f, 1.0053f, 1.0061f, 1.0063f, 1.0060f, 1.0056f, 1.0050f,
-            1.0043f, 1.0036f, 1.0027f, 1.0022f, 1.0005f, 1.0004f, 1.0002f, 1.0000f
-    };
+    // ---- closed forms (checked against the capture by tabmotion.py check) ----
+    /// The springs start together, this long after the tables' t = 0 (the last
+    /// frame at rest).
+    static final float START_S = 0.00226f;
+    /// Lens travel: duration 0.4 s, bounce 0.15 (omega = 2 pi / duration,
+    /// zeta = 1 - bounce).
+    private static final double POSITION_OMEGA = 2 * Math.PI / 0.4;
+    private static final double POSITION_ZETA = 0.85;
+    /// Past its overshoot, UIKit ends the travel once less than this remains
+    /// (the capture puts it between 0.194 and 0.197 pt).
+    static final float SETTLE_PT = 0.195f;
+    /// Lift: critically damped, 0.25 s, both the rise from the press and the fall
+    /// from full lift at the release.
+    private static final double LIFT_OMEGA = 2 * Math.PI / 0.25;
+    /// The lift fall ends (snaps to 0) this long after the release: between the
+    /// 13th and 14th frame in the capture, so half way.
+    static final float LIFT_FALL_S = 13.5f / SAMPLE_HZ;
+    /// Grey platter: 1 - rise until the release, then critically damped, 0.4 s,
+    /// back to 1 from its opacity and velocity at the release.
+    private static final double PLATTER_OMEGA = 2 * Math.PI / 0.4;
+    /// The platter return ends (snaps to 1) this long after the release: between
+    /// the 28th and 29th frame in the capture.
+    static final float PLATTER_RETURN_S = 28.5f / SAMPLE_HZ;
+    /// Touch glow layer: critically damped, 0.1 s, towards GLOW_PEAK from START_S;
+    /// at GLOW_UP_S (the tap's touch-up reaching the glow) it turns back to 0 on a
+    /// critically damped 0.5 s spring, from where it was and how fast it moved.
+    private static final double GLOW_RISE_OMEGA = 2 * Math.PI / 0.1;
+    private static final double GLOW_FALL_OMEGA = 2 * Math.PI / 0.5;
+    private static final float GLOW_PEAK = 0.8445f;
+    static final float GLOW_UP_S = 4f / SAMPLE_HZ;
+    /// The glow's mask opacity is this fraction of its layer opacity; the glow is
+    /// drawn with their product.
+    private static final float GLOW_MASK = 0.33675f;
+    /// Each glow opacity is hidden (0) once it has fallen under this.
+    private static final float GLOW_HIDE = 0.005f;
+    /// From GLOW_UP_S the glow grows by this multiple of GLOW_DIAMETER_PT, on the
+    /// glow's 0.5 s spring.
+    private static final float GLOW_GROWTH = 3f;
 
-    /// Lift rise before release; also 1 - grey platter opacity until release.
-    private static final float[] LIFT_RISE = {
-            0.0000f, 0.0522f, 0.1847f, 0.3270f, 0.4809f, 0.6046f, 0.7043f, 0.7818f, 0.8411f,
-            0.8854f, 0.9178f, 0.9416f, 0.9586f, 0.9698f, 0.9780f, 0.9840f, 0.9883f, 0.9915f,
-            0.9938f, 0.9955f, 0.9967f, 0.9976f, 0.9982f, 0.9987f, 0.9991f, 0.9993f, 0.9995f,
-            0.9996f, 0.9997f, 1.0000f
-    };
 
-    /// Lift after release, indexed from the release frame.
-    private static final float[] LIFT_FALL = {
-            1.0000f, 0.9333f, 0.7950f, 0.6426f, 0.5009f, 0.3815f, 0.2845f, 0.2094f, 0.1525f,
-            0.1106f, 0.0788f, 0.0556f, 0.0395f, 0.0281f, 0.0000f
-    };
 
-    /// Grey platter opacity after release, indexed from the release frame.
-    private static final float[] PLATTER_RETURN = {
-            0.0177f, 0.0411f, 0.1057f, 0.1919f, 0.2854f, 0.3785f, 0.4667f, 0.5477f, 0.6197f,
-            0.6812f, 0.7360f, 0.7820f, 0.8208f, 0.8529f, 0.8800f, 0.9030f, 0.9210f, 0.9360f,
-            0.9490f, 0.9590f, 0.9670f, 0.9729f, 0.9790f, 0.9829f, 0.9860f, 0.9889f, 0.9910f,
-            0.9930f, 0.9950f, 1.0000f
-    };
+
 
     /// Lens scaleX - 1, distance-independent part.
     private static final float[] STRETCH_X = {
@@ -216,30 +241,8 @@ final class TabGlassMotion {
             -0.0007f, 0.0000f
     };
 
-    /// Touch glow diameter as a multiple of GLOW_DIAMETER_PT.
-    private static final float[] GLOW_SCALE = {
-            1.0000f, 1.0000f, 1.0000f, 1.0000f, 1.0000f, 1.0576f, 1.2008f, 1.3945f, 1.6152f,
-            1.8456f, 2.0738f, 2.2927f, 2.4980f, 2.6720f, 2.8555f, 3.0050f, 3.1469f, 3.2668f,
-            3.3720f, 3.4634f, 3.5429f, 3.6114f, 3.6704f, 3.7210f, 3.7641f, 3.8005f, 3.8323f,
-            3.8589f, 3.8815f, 3.9005f, 3.9166f, 3.9302f, 3.9416f, 3.9511f, 3.9592f
-    };
 
-    /// Touch glow mask opacity.
-    private static final float[] GLOW_MASK_OPACITY = {
-            0.0000f, 0.0657f, 0.1654f, 0.2236f, 0.2593f, 0.2716f, 0.2700f, 0.2590f, 0.2426f,
-            0.2232f, 0.2024f, 0.1814f, 0.1614f, 0.1438f, 0.1248f, 0.1091f, 0.0942f, 0.0812f,
-            0.0699f, 0.0600f, 0.0512f, 0.0440f, 0.0370f, 0.0318f, 0.0270f, 0.0230f, 0.0190f,
-            0.0160f, 0.0139f, 0.0110f, 0.0100f, 0.0080f, 0.0070f, 0.0060f, 0.0000f
-    };
 
-    /// Touch glow layer opacity.
-    private static final float[] GLOW_LAYER_OPACITY = {
-            0.0000f, 0.1953f, 0.4909f, 0.6637f, 0.7701f, 0.8064f, 0.8010f, 0.7689f, 0.7204f,
-            0.6627f, 0.6012f, 0.5393f, 0.4792f, 0.4268f, 0.3709f, 0.3243f, 0.2797f, 0.2416f,
-            0.2078f, 0.1783f, 0.1523f, 0.1300f, 0.1104f, 0.0937f, 0.0794f, 0.0674f, 0.0569f,
-            0.0480f, 0.0401f, 0.0340f, 0.0282f, 0.0240f, 0.0200f, 0.0170f, 0.0140f, 0.0120f,
-            0.0100f, 0.0080f, 0.0070f, 0.0060f, 0.0000f
-    };
 
     // ---- outputs ----
     /// Lens centre travel, 0 at the source and 1 at the target (overshoots slightly).
@@ -268,9 +271,10 @@ final class TabGlassMotion {
     /// Duration of the whole motion in milliseconds, the late wobble included.
     static int durationMs() {
         int n = 0;
-        float[][] all = {POSITION, LIFT_RISE, LIFT_FALL, PLATTER_RETURN, STRETCH_X, STRETCH_X_PER_PT,
-            STRETCH_Y, STRETCH_Y_PER_PT, LEAD_PT, LEAD_PER_PT, BAR_GROW_PT, GLOW_SCALE,
-            GLOW_MASK_OPACITY, GLOW_LAYER_OPACITY};
+        // The closed forms are at rest well before the tables end (see
+        // TabGlassMotionTest.theClosedFormsRestBeforeTheTablesEnd).
+        float[][] all = {STRETCH_X, STRETCH_X_PER_PT, STRETCH_Y, STRETCH_Y_PER_PT, LEAD_PT, LEAD_PER_PT,
+            BAR_GROW_PT};
         for (float[] a : all) {
             if (a.length > n) {
                 n = a.length;
@@ -312,16 +316,17 @@ final class TabGlassMotion {
     /// the frame before it, because UIKit already shows a falling value there.
     static float releaseSeconds(float travelPt) {
         float d = Math.abs(travelPt);
+        int last = 2 * SAMPLE_HZ;
         int snap = 0;
-        while (snap < LIFT_RISE.length - 1 && LIFT_RISE[snap] < LIFT_SNAP) {
+        while (snap < last && liftRise(snap / (float) SAMPLE_HZ) < LIFT_SNAP) {
             snap++;
         }
-        for (int i = 1; i < POSITION.length; i++) {
-            if (d * (1f - POSITION[i]) < RELEASE_PT) {
+        for (int i = 1; i < last; i++) {
+            if (d * (1f - position(i / (float) SAMPLE_HZ)) < RELEASE_PT) {
                 return (Math.max(i, snap + 1) - 1) / (float) SAMPLE_HZ;
             }
         }
-        return (POSITION.length - 1) / (float) SAMPLE_HZ;
+        return last / (float) SAMPLE_HZ;
     }
 
     /// Computes the frame `elapsedMs` after the selection started, for a jump of
@@ -334,24 +339,24 @@ final class TabGlassMotion {
         float t = elapsedMs < 0 ? 0 : elapsedMs / 1000f;
         float d = Math.abs(travelPt);
         float sign = travelPt < 0 ? -1f : 1f;
-        m.position = sample(POSITION, t);
+        m.position = settledPosition(t, d);
         float release = releaseSeconds(travelPt);
         if (t < release) {
-            float u = sample(LIFT_RISE, t);
+            float u = liftRise(t);
             m.lift = u >= LIFT_SNAP ? 1f : u;
             m.platterOpacity = 1f - u;
         } else {
             float s = t - release;
-            m.lift = sample(LIFT_FALL, s);
-            m.platterOpacity = sample(PLATTER_RETURN, s);
+            m.lift = liftFall(s);
+            m.platterOpacity = platterReturn(s, release);
         }
         m.contentScale = 1f + CONTENT_MAGNIFICATION * m.lift;
         m.scaleX = 1f + sample(STRETCH_X, t) + d * sample(STRETCH_X_PER_PT, t);
         m.scaleY = 1f + sample(STRETCH_Y, t) + d * sample(STRETCH_Y_PER_PT, t);
         m.leadPt = sign * (sample(LEAD_PT, t) + d * sample(LEAD_PER_PT, t));
         m.barGrowPt = sample(BAR_GROW_PT, t);
-        m.glowScale = sample(GLOW_SCALE, t);
-        m.glowOpacity = sample(GLOW_MASK_OPACITY, t) * sample(GLOW_LAYER_OPACITY, t);
+        m.glowScale = glowScale(t);
+        m.glowOpacity = glowOpacity(t);
         return m;
     }
 
@@ -378,15 +383,15 @@ final class TabGlassMotion {
         float t = elapsedS < 0 ? 0 : elapsedS;
         float d = Math.abs(travelPt);
         float sign = travelPt < 0 ? -1f : 1f;
-        m.position = sample(POSITION, t);
+        m.position = settledPosition(t, d);
         if (upS < 0 || t < releaseS) {
-            float u = sample(LIFT_RISE, t);
+            float u = liftRise(t);
             m.lift = u >= LIFT_SNAP ? 1f : u;
             m.platterOpacity = 1f - u;
         } else {
             float s = t - releaseS;
-            m.lift = sample(LIFT_FALL, s);
-            m.platterOpacity = sample(PLATTER_RETURN, s);
+            m.lift = liftFall(s);
+            m.platterOpacity = platterReturn(s, releaseS);
         }
         m.contentScale = 1f + CONTENT_MAGNIFICATION * m.lift;
         float tapWobble = t - TAP_UP_S;
@@ -413,14 +418,72 @@ final class TabGlassMotion {
         } else {
             glowT = TAP_UP_S + t - Math.max(upS, TAP_UP_S);
         }
-        m.glowScale = sample(GLOW_SCALE, glowT);
-        m.glowOpacity = sample(GLOW_MASK_OPACITY, glowT) * sample(GLOW_LAYER_OPACITY, glowT);
+        m.glowScale = glowScale(glowT);
+        m.glowOpacity = glowOpacity(glowT);
         return m;
     }
 
-    /// The normalized lens-centre travel `s` seconds into a selection.
+    /// The normalized lens-centre travel `s` seconds into a selection: the travel
+    /// spring, without UIKit's settle (see settledPosition).
     static float position(float s) {
-        return sample(POSITION, s);
+        return (float) (1 + DampedSpring.displacement(POSITION_OMEGA, POSITION_ZETA, -1, 0, s - START_S));
+    }
+
+    /// The travel of a jump of `d` points as UIKit shows it: the spring until, past
+    /// its overshoot peak, less than SETTLE_PT remains, then exactly 1.
+    static float settledPosition(float s, float d) {
+        float p = position(s);
+        double peak = START_S + Math.PI / (POSITION_OMEGA * Math.sqrt(1 - POSITION_ZETA * POSITION_ZETA));
+        return s >= peak && d * Math.abs(p - 1f) < SETTLE_PT ? 1f : p;
+    }
+
+    /// The lift's rise `s` seconds into a selection, before UIKit's LIFT_SNAP.
+    static float liftRise(float s) {
+        return (float) (1 + DampedSpring.displacement(LIFT_OMEGA, 1, -1, 0, s - START_S));
+    }
+
+    /// The lift `s` seconds after its release, falling from full lift at rest.
+    static float liftFall(float s) {
+        return s >= LIFT_FALL_S ? 0f : (float) DampedSpring.displacement(LIFT_OMEGA, 1, 1, 0, s);
+    }
+
+    /// The grey platter's opacity `s` seconds after a release at `releaseS`: it
+    /// leaves `1 - liftRise` with that curve's velocity and springs back to 1.
+    static float platterReturn(float s, float releaseS) {
+        if (s >= PLATTER_RETURN_S) {
+            return 1f;
+        }
+        double x0 = -liftRise(releaseS);
+        double v0 = -DampedSpring.velocity(LIFT_OMEGA, 1, -1, 0, releaseS - START_S);
+        return (float) (1 + DampedSpring.displacement(PLATTER_OMEGA, 1, x0, v0, s));
+    }
+
+    /// The touch glow's layer opacity `s` seconds into a tap (see GLOW_PEAK).
+    static float glowLayerOpacity(float s) {
+        if (s < GLOW_UP_S) {
+            return (float) (GLOW_PEAK + DampedSpring.displacement(GLOW_RISE_OMEGA, 1, -GLOW_PEAK, 0, s - START_S));
+        }
+        double up = GLOW_UP_S - START_S;
+        double x0 = GLOW_PEAK + DampedSpring.displacement(GLOW_RISE_OMEGA, 1, -GLOW_PEAK, 0, up);
+        double v0 = DampedSpring.velocity(GLOW_RISE_OMEGA, 1, -GLOW_PEAK, 0, up);
+        float v = (float) DampedSpring.displacement(GLOW_FALL_OMEGA, 1, x0, v0, s - GLOW_UP_S);
+        return v < GLOW_HIDE ? 0f : v;
+    }
+
+    /// The touch glow's drawn opacity (mask times layer) `s` seconds into a tap.
+    static float glowOpacity(float s) {
+        float layer = glowLayerOpacity(s);
+        float mask = GLOW_MASK * layer;
+        if (s >= GLOW_UP_S && mask < GLOW_HIDE) {
+            return 0f;
+        }
+        return mask * layer;
+    }
+
+    /// The touch glow's diameter, as a multiple of GLOW_DIAMETER_PT, `s` seconds
+    /// into a tap.
+    static float glowScale(float s) {
+        return (float) (1 + GLOW_GROWTH * (1 + DampedSpring.displacement(GLOW_FALL_OMEGA, 1, -1, 0, s - GLOW_UP_S)));
     }
 
     /// When a press on a jump of `travelPt` releases its lift: where the tap would
@@ -432,7 +495,7 @@ final class TabGlassMotion {
     /// Seconds after the press at which a held press has fully played out.
     static float heldDurationS(float upS, float releaseS) {
         float tables = durationMs() / 1000f;
-        float fall = releaseS + (Math.max(LIFT_FALL.length, PLATTER_RETURN.length) - 1) / (float) SAMPLE_HZ;
+        float fall = releaseS + Math.max(LIFT_FALL_S, PLATTER_RETURN_S);
         float wobble = upS + TabGlassGesture.WOBBLE_START_S
                 + (TabGlassGesture.WOBBLE_X.length - 1) / (float) SAMPLE_HZ;
         return Math.max(tables, Math.max(fall, wobble));
