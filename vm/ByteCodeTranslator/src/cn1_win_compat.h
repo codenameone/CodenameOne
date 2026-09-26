@@ -145,6 +145,12 @@ int gettimeofday(struct timeval* tv, void* tz);
    system clock must not stretch or cut the remaining sleep. */
 long long cn1_monotonic_micros(void);
 
+/* Physical memory the host could still hand this process, in bytes
+   (GlobalMemoryStatusEx ullAvailPhys), or 0 when the call fails. A safety
+   bound for the collector's trigger, never a size target: see
+   cn1HostMemoryBound in cn1_globals.m. */
+long long cn1_win_available_memory(void);
+
 /* --- IANA time zone offsets ---
    Answers the total offset (zone plus daylight) in milliseconds for an IANA
    zone identifier at an instant, writing the offset to offsetOut and whether

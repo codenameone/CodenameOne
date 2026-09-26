@@ -382,6 +382,15 @@ long long cn1_monotonic_micros(void) {
          + ((count.QuadPart % freq.QuadPart) * 1000000LL) / freq.QuadPart;
 }
 
+long long cn1_win_available_memory(void) {
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (!GlobalMemoryStatusEx(&status)) {
+        return 0;
+    }
+    return (long long) status.ullAvailPhys;
+}
+
 int gettimeofday(struct timeval* tv, void* tz) {
     FILETIME ft;
     ULARGE_INTEGER li;

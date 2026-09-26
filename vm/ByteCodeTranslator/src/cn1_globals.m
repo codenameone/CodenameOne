@@ -520,6 +520,65 @@ static long cn1ProcFootprintBytes(void) {
 #endif
 }
 
+// A SAFETY BOUND on how large the collection trigger may grow, in bytes -- never a
+// size target. What the trigger grows TO is decided by how much of each cycle survives
+// (see the high-survival doubling in the sweep); this only caps that growth at a
+// fraction of the memory the host could still give the process.
+//
+// Apple answers with cn1_available_memory, exactly as before. Everywhere else that
+// function is a flat 100MB placeholder, and the placeholder was being read as a real
+// ceiling: its eighth is 12.5MB, under the 24MB minimum trigger, so the trigger could
+// never grow at all on Linux or Windows however much of every cycle survived; a
+// workload that retains what it allocates collected every 24MB regardless. Measured in
+// a 4-CPU Linux container, 3 interleaved rounds of 25 reps: hashMapChurn 32.6ms ->
+// 28.2ms (-14%) at an unchanged 72MB peak RSS.
+//
+// What this deliberately does NOT do is let free memory size the PACING cap here, as it
+// does on Apple. That was measured too, and it is a trade, not a fix: objectAllocation
+// (pure garbage -- low survival, so this trigger rightly never grows for it) parks on
+// the 72MB run-ahead cap, and lifting the cap to trigger x 6 took it 47ms -> 39ms but
+// its peak RSS 250MB -> 475MB, and handing it fm/8 as Apple does reached 700MB. Its
+// cost is the collector tracing the fresh generation on every core, which no sizing
+// knob removes.
+//
+// Linux reads MemAvailable, which counts reclaimable page cache the way the Apple
+// probe counts inactive and purgeable pages; Windows reads ullAvailPhys. A platform
+// with neither, or a probe that fails, keeps the placeholder and therefore the old
+// pinned trigger. CN1_SIMULATE_FREE_MEMORY pins this reading like every other one.
+static long long cn1HostMemoryBound(void) {
+    long long simFree = cn1SimulatedFreeMemBytes();
+    if(simFree > 0) {
+        return simFree;
+    }
+#if defined(__APPLE__)
+    return (long long)cn1_available_memory();
+#elif defined(_WIN32)
+    long long avail = cn1_win_available_memory();
+    return avail > 0 ? avail : (long long)cn1_available_memory();
+#elif defined(__linux__)
+    // fgets + strtoull for the same __isoc23_fscanf link reason as cn1ProcFootprintBytes.
+    FILE* f = fopen("/proc/meminfo", "r");
+    if(f != 0) {
+        char buf[256];
+        while(fgets(buf, sizeof(buf), f) != 0) {
+            if(strncmp(buf, "MemAvailable:", 13) == 0) {
+                char* end = 0;
+                unsigned long long kb = strtoull(buf + 13, &end, 10);
+                fclose(f);
+                if(end != buf + 13 && kb > 0) {
+                    return (long long)(kb * 1024ULL);
+                }
+                return (long long)cn1_available_memory();
+            }
+        }
+        fclose(f);
+    }
+    return (long long)cn1_available_memory();
+#else
+    return (long long)cn1_available_memory();
+#endif
+}
+
 static _Atomic int cn1ProcHasMemoryLimit = 0;
 static long cn1ProcessHeadroom(void) {
     long long simLimit = cn1SimulatedProcLimitBytes();
@@ -9390,12 +9449,16 @@ _Atomic long cn1CachedFreeMem = 0;
 // the pacing cap to decide whether the growth bound above applies; 0 where the platform
 // has no probe, which reads as "not large" and leaves the cap alone.
 static _Atomic long long cn1CachedProcFootprint = 0;
+// cn1HostMemoryBound, on the same cadence. Read only by the trigger's growth ceiling.
+static _Atomic long long cn1CachedHostMemoryBound = 0;
 void cn1RefreshFreeMemCache(void) {
     long long simFree = cn1SimulatedFreeMemBytes();
     atomic_store_explicit(&cn1CachedFreeMem,
                           simFree > 0 ? (long)simFree : cn1_available_memory(),
                           memory_order_relaxed);
     atomic_store_explicit(&cn1CachedProcFootprint, (long long)cn1ProcFootprintBytes(),
+                          memory_order_relaxed);
+    atomic_store_explicit(&cn1CachedHostMemoryBound, cn1HostMemoryBound(),
                           memory_order_relaxed);
 }
 
@@ -11546,10 +11609,14 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         if(survival >= CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
+                // The host's free memory BOUNDS this growth; it does not size it.
+                // See cn1HostMemoryBound for why this is not cn1CachedFreeMem.
                 long ceiling = CN1_BIBOP_GC_MAX_TRIGGER_BYTES;
-                long freeMem = atomic_load_explicit(&cn1CachedFreeMem,
-                                                    memory_order_relaxed);
-                if(freeMem > 0 && freeMem / 8 < ceiling) ceiling = freeMem / 8;
+                long long hostMem = atomic_load_explicit(&cn1CachedHostMemoryBound,
+                                                         memory_order_relaxed);
+                if(hostMem > 0 && hostMem / 8 < (long long)ceiling) {
+                    ceiling = (long)(hostMem / 8);
+                }
                 if(ceiling < CN1_BIBOP_GC_MIN_TRIGGER_BYTES) {
                     ceiling = CN1_BIBOP_GC_MIN_TRIGGER_BYTES;
                 }
