@@ -118,7 +118,7 @@ foreach ($tag in 'admin', 'user') {
   $status = "$Out\$tag-cefmaps-status.txt"
   if (-not (Test-Path $status)) {
     Write-Host "::error::The $tag run of the installed app produced no status file."; $failed = $true
-  } elseif (-not (Select-String -Path $status -Pattern '^reason=tiles-loaded$' -Quiet)) {
+  } elseif (-not (Select-String -Path $status -Pattern '^reason=(tiles-loaded|page-complete)$' -Quiet)) {
     Write-Host "::error::The map did not finish loading in the $tag run of the installed app."; $failed = $true
   }
 }
