@@ -93,7 +93,7 @@ env:
 
 jobs:
   vm-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     # The two database engines the backend speaks a wire protocol to.
     #
@@ -442,7 +442,7 @@ jobs:
   # cases it happens to pass.
   backend-websocket-conformance:
     name: WebSocket conformance (Autobahn)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
@@ -487,7 +487,7 @@ jobs:
 
   release-jars:
     if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: write

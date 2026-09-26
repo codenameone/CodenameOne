@@ -88,7 +88,7 @@ concurrency:
 jobs:
   linux-tests:
     name: Core tests, plugin & Android compile, sample javac
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Same container the main PR workflow uses; it ships JDK 8/17/21 and
     # cn1-binaries pre-staged at /opt/cn1-binaries.
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
@@ -212,7 +212,7 @@ jobs:
 
   sample-secrets:
     name: Scan demo sample for accidental credentials
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 10 rather than 3. The scan itself is one grep over ten paths and takes
     # under a second; the three minutes went entirely to checking out a
     # repository this size, and the job was cancelled mid-checkout having done

@@ -9,7 +9,7 @@ jobs:
   browser-link:
     strategy:
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:

@@ -23,7 +23,7 @@ concurrency:
 jobs:
   build-linux-jdk8:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
