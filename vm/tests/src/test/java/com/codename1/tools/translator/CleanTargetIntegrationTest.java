@@ -1995,8 +1995,37 @@ class CleanTargetIntegrationTest {
         }
         int exit = process.waitFor();
         assertEquals(0, exit, "Command failed: " + String.join(" ", command)
-                + "\nOutput (tail):\n" + tailOf(output));
+                + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir));
         return output;
+    }
+
+    /// What the generated project's source roots held when its build failed.
+    ///
+    /// A Linux run once failed at LINK with every symbol cn1_globals.c defines undefined and no
+    /// compile error anywhere -- the same sources built and linked under the other compiler
+    /// configs of the same job, and fifteen local runs never reproduced it. That leaves two
+    /// stories the build output cannot tell apart: the file was absent when CMake globbed, or
+    /// present and empty. The runtime files' sizes and the translation-unit count answer it.
+    static String sourceRootSummary(Path workingDir) {
+        StringBuilder b = new StringBuilder();
+        java.io.File[] roots = workingDir.toFile().listFiles();
+        if (roots == null) {
+            return "";
+        }
+        for (java.io.File root : roots) {
+            if (!root.isDirectory() || !root.getName().endsWith("-src")) {
+                continue;
+            }
+            java.io.File[] cFiles = root.listFiles((dir, name) -> name.endsWith(".c"));
+            b.append("\nSource root ").append(root.getName()).append(": ")
+                    .append(cFiles == null ? 0 : cFiles.length).append(" .c files");
+            for (String runtime : new String[]{"cn1_globals.c", "nativeMethods.c", "cn1_globals.h"}) {
+                java.io.File f = new java.io.File(root, runtime);
+                b.append(", ").append(runtime).append('=')
+                        .append(f.exists() ? f.length() + " bytes" : "MISSING");
+            }
+        }
+        return b.toString();
     }
 
     static String helloWorldSource() {
