@@ -391,6 +391,10 @@ long long cn1_win_available_memory(void) {
     return (long long) status.ullAvailPhys;
 }
 
+int cn1_win_cpu_count(void) {
+    return (int) GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+}
+
 int gettimeofday(struct timeval* tv, void* tz) {
     FILETIME ft;
     ULARGE_INTEGER li;

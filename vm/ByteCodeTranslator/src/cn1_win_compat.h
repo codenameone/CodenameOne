@@ -151,6 +151,10 @@ long long cn1_monotonic_micros(void);
    cn1HostMemoryBound in cn1_globals.m. */
 long long cn1_win_available_memory(void);
 
+/* Logical processors this process may run on (GetActiveProcessorCount over
+   every group), or 0 when the call fails. Sizes the collector's mark pool. */
+int cn1_win_cpu_count(void);
+
 /* --- IANA time zone offsets ---
    Answers the total offset (zone plus daylight) in milliseconds for an IANA
    zone identifier at an instant, writing the offset to offsetOut and whether

@@ -16510,30 +16510,23 @@ static int gcMarkResolveThreadCount() {
     // elsewhere in the branch GC changes (nursery / tagged-int / BiBOP sweep).
     int n = 1;
 #elif defined(_WIN32)
-    // WINDOWS STAYS SERIAL BY DEFAULT, because the parallel marker has never executed on
-    // its threading layer.
+    // Windows used to stay SERIAL here, not because parallel marking was known to fail
+    // on it but because it had never run on the Win32 pthread shim: every arm that
+    // validates the marker pool runs on POSIX threads. An arm64 screenshot-capture
+    // failure was once blamed on the marker count, but the worklist grew in the same
+    // range and the isolating run was cancelled, so nothing established it.
     //
-    // Every arm that validates parallel marking runs on POSIX threads: the GC suite at 1
-    // and 4 markers on native arm64 Linux and on x64, and every measurement behind the
-    // defaults above. Windows does not -- it goes through the Win32 pthread SHIM, and
-    // this branch was hardcoded to one marker, so the shim has never run a marker pool
-    // at all. Unvalidated is reason enough to keep the behaviour Windows already shipped.
-    //
-    // WHAT IS NOT ESTABLISHED, and an earlier version of this comment claimed it was:
-    // `ParparVM Java Tests (Windows)` / screenshot-capture (arm64) did go from green to
-    // red across this work -- the translated app reported pass=113 fail=24 not-run=54,
-    // emitting 132 of 166 screenshots, i.e. stopping part-way through the suite, while
-    // the same job stayed green on master. But TWO things changed in that range: this
-    // branch became CPU-derived, AND the mark worklist grew to 1048576 entries (17MB of
-    // static zerofill). Either could be responsible, and the run that would have
-    // isolated the marker count was cancelled by a later push before its Windows jobs
-    // ran. Attributing the failure to the marker count alone would be a guess wearing a
-    // measurement's clothes.
-    //
-    // -DCN1_GC_MARK_THREADS=N turns it on for whoever picks up the shim; re-enabling it
-    // by default needs that Windows job green, not a measurement from another platform.
-    (void)CN1_GC_MARK_THREAD_CAP;
-    int n = 1;
+    // It is also the largest Windows-only difference known on the allocation path: on a
+    // 4-CPU Linux container one marker made objectAllocation 3.4x slower, and the Windows
+    // perf-gate row sat at 30-35x JDK 25 against 3-7x on Linux. So Windows now
+    // sizes the pool exactly as POSIX does, and the Windows CI jobs -- clean-target
+    // suite, screenshot capture on x64 and arm64 -- are the validation this comment
+    // used to ask for. CN1_GC_MARK_THREADS=1 at run time, or -DCN1_GC_MARK_THREADS=1
+    // at build time, restores serial marking.
+    int n = cn1_win_cpu_count() - 1;
+    if(n > CN1_GC_MARK_THREAD_CAP) {
+        n = CN1_GC_MARK_THREAD_CAP;
+    }
 #else
     long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
     int n = (int)(ncpu - 1);
