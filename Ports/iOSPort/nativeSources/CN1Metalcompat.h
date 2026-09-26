@@ -119,6 +119,15 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
 // active encoder reference so subsequent ops no-op until the next frame.
 void CN1MetalEndFrame(void);
 
+// Marks the end of a frame (METALView.presentFramebuffer). Until then, a
+// CN1MetalBeginFrame on a new encoder is a MID-FRAME restart -- the screen
+// effects (blur, glass, lens, colour matrix) end the encoder to read the
+// frame and open another -- and carries the graphics state the Java side
+// already sent (transform, rectangular clip, polygon clip) onto it, since
+// the Java side does not re-send state it believes is still in force. After
+// this call the next CN1MetalBeginFrame starts a fresh frame.
+void CN1MetalFrameFinished(void);
+
 // Returns the active encoder or nil if no frame is in flight. Ops use this
 // to skip drawing when setFramebuffer couldn't acquire a drawable.
 id<MTLRenderCommandEncoder> CN1MetalActiveEncoder(void);

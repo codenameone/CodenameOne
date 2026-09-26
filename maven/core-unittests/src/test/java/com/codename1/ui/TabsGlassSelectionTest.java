@@ -298,6 +298,54 @@ class TabsGlassSelectionTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void eachTabIsVibrantInItsOwnTint() {
+        // A tab with its own colour (a custom UIID, a disabled tab) keeps it: the
+        // unselected content splits into one mask per tint, each with its matrix.
+        Tabs tabs = glassTabs();
+        Container tc = tabs.getTabsContainer();
+        for (int i = 0; i < tc.getComponentCount(); i++) {
+            Button b = (Button) tc.getComponentAt(i);
+            Style[] styles = {b.getUnselectedStyle(), b.getSelectedStyle(), b.getPressedStyle()};
+            for (Style st : styles) {
+                st.setBgTransparency(255);
+                st.setBgColor(0xff0000);
+            }
+        }
+        Button middle = (Button) tc.getComponentAt(1);
+        Button last = (Button) tc.getComponentAt(2);
+        int own = 0x00aa00;
+        last.getUnselectedStyle().setFgColor(own);
+        assertNotEquals(own, middle.getUnselectedStyle().getFgColor(), "precondition: the tints differ");
+        implementation.setColorMatrixRegionSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Image img = Image.createImage(form.getWidth(), form.getHeight(), 0xffffffff);
+            form.paintComponent(img.getGraphics());
+            java.util.List<com.codename1.testing.TestCodenameOneImplementation.ColorMatrixCall> calls =
+                    implementation.getColorMatrixCalls();
+            assertEquals(4, calls.size(), "platter, two unselected tints, selected content");
+            int fg = tc.getStyle().getFgColor();
+            boolean dark = 0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff) > 128;
+            com.codename1.testing.TestCodenameOneImplementation.ColorMatrixCall shared = calls.get(1);
+            com.codename1.testing.TestCodenameOneImplementation.ColorMatrixCall ownTint = calls.get(2);
+            assertArrayEquals(com.codename1.ui.plaf.VibrancyMatrix.forTint(
+                    middle.getUnselectedStyle().getFgColor(), dark), shared.matrix, 1e-6f);
+            assertArrayEquals(com.codename1.ui.plaf.VibrancyMatrix.forTint(own, dark), ownTint.matrix, 1e-6f);
+            int mx = middle.getAbsoluteX() + middle.getWidth() / 2 - shared.x;
+            int my = middle.getAbsoluteY() + middle.getHeight() / 2 - shared.y;
+            int lx = last.getAbsoluteX() + last.getWidth() / 2 - ownTint.x;
+            int ly = last.getAbsoluteY() + last.getHeight() / 2 - ownTint.y;
+            assertTrue(alpha(shared, mx, my) > 0, "the middle tab is in the shared tint's mask");
+            assertEquals(0, alpha(shared, lx, ly), "the last tab is not in the shared tint's mask");
+            assertTrue(alpha(ownTint, lx, ly) > 0, "the last tab is in its own tint's mask");
+            assertEquals(0, alpha(ownTint, mx, my), "the middle tab is not in the last tab's mask");
+        } finally {
+            implementation.setColorMatrixRegionSupported(false);
+            implementation.clearColorMatrixCalls();
+        }
+    }
+
     @org.junit.jupiter.api.Test
     void platterMatrixReproducesTheNativeReadback() {
         // What UIKit reports for the platter's colorMatrix filter (motion probe KVC

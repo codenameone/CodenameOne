@@ -806,6 +806,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 
 - (BOOL)presentFramebuffer {
+    // Whatever happens below, this frame is over (see CN1MetalFrameFinished).
+    CN1MetalFrameFinished();
     if (self.renderCommandEncoder == nil) {
         self.commandBuffer = nil;
         return NO;

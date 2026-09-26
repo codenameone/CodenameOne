@@ -46,6 +46,21 @@ static int currentFramebufferWidth = 0;
 static int currentFramebufferHeight = 0;
 static CN1MetalPipelineCache *pipelineCache = nil;
 
+// Graphics state a mid-frame encoder restart must carry over (see
+// CN1MetalFrameFinished): whether a frame is live, the last scissor set on the
+// screen encoder, and the active polygon clip (its points, since a new render
+// pass starts with a cleared stencil; 0 = none, -1 = degenerate / clip all).
+static BOOL frameLive = NO;
+// YES while a mutable image's encoder is swapped in for the screen's (see
+// CN1MetalBeginMutableImageDraw); its clips are not the screen's to carry.
+static BOOL savedScreenStateValid = NO;
+static BOOL carriedScissorValid = NO;
+static int carriedScissor[4];
+static float *carriedPolyX = NULL;
+static float *carriedPolyY = NULL;
+static int carriedPolyCapacity = 0;
+static int carriedPolyN = 0;
+
 // --------------- Per-encoder state cache ---------------
 //
 // Every drawQuad / drawSolidPrimitive used to call setRenderPipelineState
@@ -199,6 +214,11 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
                         simd_float4x4 projection,
                         int framebufferWidth,
                         int framebufferHeight) {
+    BOOL resume = frameLive && encoder != nil;
+    simd_float4x4 carriedTransform = currentTransform;
+    BOOL scissorValid = carriedScissorValid;
+    int scissor[4] = { carriedScissor[0], carriedScissor[1], carriedScissor[2], carriedScissor[3] };
+    int polyN = carriedPolyN;
     activeEncoder = encoder;
     invalidateEncoderStateCache();
     currentProjection = projection;
@@ -207,10 +227,33 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
     // modelView is always identity for 2D UI rendering. The GL path uses it
     // only as a y-flip in drawFrame; our ortho projection bakes the flip in.
     currentModelView = identityMatrix();
-    if (modelViewStackTop == 0) {
-        currentTransform = identityMatrix();
-    }
     ensurePipelineCache();
+    if (!resume) {
+        if (modelViewStackTop == 0) {
+            currentTransform = identityMatrix();
+        }
+        carriedScissorValid = NO;
+        carriedPolyN = 0;
+        frameLive = encoder != nil;
+        return;
+    }
+    // Mid-frame restart: put back what the previous encoder had. The polygon is
+    // re-stamped first (it opens the scissor), then the scissor narrowed again.
+    currentTransform = carriedTransform;
+    if (polyN > 0) {
+        CN1MetalApplyPolygonStencilClip(carriedPolyX, carriedPolyY, polyN);
+    } else if (polyN < 0) {
+        CN1MetalApplyPolygonStencilClip(NULL, NULL, 0);
+    }
+    if (scissorValid) {
+        CN1MetalSetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+    }
+}
+
+void CN1MetalFrameFinished(void) {
+    frameLive = NO;
+    carriedScissorValid = NO;
+    carriedPolyN = 0;
 }
 
 void CN1MetalEndFrame(void) {
@@ -339,6 +382,13 @@ void CN1MetalRotate(float angle, float x, float y, float z) {
 
 void CN1MetalSetScissor(int x, int y, int width, int height) {
     if (activeEncoder == nil) return;
+    if (!savedScreenStateValid) {
+        carriedScissor[0] = x;
+        carriedScissor[1] = y;
+        carriedScissor[2] = width;
+        carriedScissor[3] = height;
+        carriedScissorValid = YES;
+    }
     if (width <= 0 || height <= 0) {
         // Empty clip -- this MUST cull everything, it does NOT mean
         // "disable clipping". A 0/negative-size rect arrives here when the
@@ -448,6 +498,36 @@ static void ensureDepthStencilStates(void) {
 
 void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords, int num) {
     if (activeEncoder == nil || pipelineCache == nil) return;
+    if (savedScreenStateValid) {
+        // Drawing into a mutable image: nothing to carry for the screen.
+    } else if (num >= 3 && xCoords != NULL && yCoords != NULL) {
+        // Remember the polygon so a mid-frame restart can re-stamp it (the
+        // restart itself passes these same buffers back in).
+        if (xCoords != carriedPolyX) {
+            if (num > carriedPolyCapacity) {
+                float *nx = (float *)realloc(carriedPolyX, sizeof(float) * (size_t)num);
+                float *ny = (float *)realloc(carriedPolyY, sizeof(float) * (size_t)num);
+                if (nx != NULL) {
+                    carriedPolyX = nx;
+                }
+                if (ny != NULL) {
+                    carriedPolyY = ny;
+                }
+                if (nx != NULL && ny != NULL) {
+                    carriedPolyCapacity = num;
+                }
+            }
+            if (num <= carriedPolyCapacity) {
+                memcpy(carriedPolyX, xCoords, sizeof(float) * (size_t)num);
+                memcpy(carriedPolyY, yCoords, sizeof(float) * (size_t)num);
+                carriedPolyN = num;
+            } else {
+                carriedPolyN = 0;
+            }
+        }
+    } else {
+        carriedPolyN = -1;
+    }
     if (num < 3 || xCoords == NULL || yCoords == NULL) {
         // Degenerate polygon: nothing inside it can pass -- emulate by
         // shrinking the scissor to a zero-size rect (matches the
@@ -534,6 +614,9 @@ void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords,
 
 void CN1MetalDisablePolygonStencilClip(void) {
     if (activeEncoder == nil) return;
+    if (!savedScreenStateValid) {
+        carriedPolyN = 0;
+    }
     ensureDepthStencilStates();
     [activeEncoder setDepthStencilState:depthStencilStateAlwaysPass];
 }
@@ -1802,7 +1885,6 @@ static simd_float4x4 savedScreenProjection;
 static int savedScreenFw = 0;
 static int savedScreenFh = 0;
 static uint32_t savedScreenStencilReference = 0;
-static BOOL savedScreenStateValid = NO;
 
 // Build a Y-down ortho projection for an offscreen (w x h) framebuffer.
 // Mirrors METALView's CN1MetalOrtho -- if that one ever changes, update

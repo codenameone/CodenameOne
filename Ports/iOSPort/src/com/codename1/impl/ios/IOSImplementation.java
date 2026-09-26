@@ -3432,8 +3432,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isGlassLensRegionSupported(Object graphics) {
         // The op exists only in the Metal renderer (BlurRegion compiles it out
-        // elsewhere); a GL or watchOS build must report no support so callers
-        // take their fallback instead of queueing a no-op.
+        // elsewhere); the watchOS Core Graphics build must report no support so
+        // callers take their fallback instead of queueing a no-op.
         return metalRendering && ((NativeGraphics) graphics).associatedImage == null;
     }
 

@@ -2170,8 +2170,10 @@ public class Tabs extends Container {
     }
 
     /// Coverage masks for the vibrant content, reused between frames.
-    private Image glassMaskDefault;
-    private Image glassMaskSelected;
+    // Coverage masks of the vibrant tab content, one per distinct tint in each
+    // paint state (normally one each), reused across frames.
+    private Image[] glassMasksDefault = new Image[1];
+    private Image[] glassMasksSelected = new Image[1];
 
     /// The native iOS 27 bar is lit along its top and bottom edges: over flat grey
     /// the outermost rows read +42/+29/+18/+7 levels (dark) and +36/+26/+17/+8
@@ -2409,34 +2411,91 @@ public class Tabs extends Container {
         }
         // The masks are the bar's own size, unscaled, so they are allocated once;
         // colorMatrixRegion stretches them over the pulsing bar.
-        // Each tab is painted once per mask; then the lens capsule is cut out of the
-        // unselected mask and everything outside it out of the selected one. One
-        // mask is finished before the other is touched (see cutGlassCapsule).
-        glassMaskDefault = clearedGlassMask(glassMaskDefault, mw, mh);
-        Graphics dg = glassMaskDefault.getGraphics();
-        paintGlassMaskTabs(dg, Button.GLASS_PAINT_DEFAULT, 1f);
-        cutGlassCapsule(dg, lx, ly, lw, lh, mw, mh, false);
-        glassMaskSelected = clearedGlassMask(glassMaskSelected, mw, mh);
-        Graphics sg = glassMaskSelected.getGraphics();
-        paintGlassMaskTabs(sg, Button.GLASS_PAINT_SELECTED, f.motion.contentScale);
-        cutGlassCapsule(sg, lx, ly, lw, lh, mw, mh, true);
+        // A mask holds the tabs of one tint (each tab's own colour in that state:
+        // a custom UIID, a disabled tab), so tabs are grouped by tint -- normally
+        // one group per state. Each tab is painted once into its mask; then the
+        // lens capsule is cut out of the unselected masks and everything outside
+        // it out of the selected ones. One mask is finished before the next is
+        // touched (see cutGlassCapsule).
         float s = f.barScale;
         int rx = Math.round(scaleAbout(tc.getX(), f.pivotX, s));
         int ry = Math.round(scaleAbout(tc.getY(), f.pivotY, s));
         int rr = Math.round(scaleAbout(tc.getX() + mw, f.pivotX, s));
         int rb = Math.round(scaleAbout(tc.getY() + mh, f.pivotY, s));
-        int defaultTint = glassContentTint(Button.GLASS_PAINT_DEFAULT);
-        int selectedTint = glassContentTint(Button.GLASS_PAINT_SELECTED);
-        g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(defaultTint, dark), glassMaskDefault, 0, 1f);
-        g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(selectedTint, dark), glassMaskSelected, 0, 1f);
+        int n = tc.getComponentCount();
+        int[] defaultTints = new int[n];
+        int[] selectedTints = new int[n];
+        for (int i = 0; i < n; i++) {
+            defaultTints[i] = glassContentTint(tc.getComponentAt(i), Button.GLASS_PAINT_DEFAULT);
+            selectedTints[i] = glassContentTint(tc.getComponentAt(i), Button.GLASS_PAINT_SELECTED);
+        }
+        int[] groups = distinctTints(defaultTints);
+        glassMasksDefault = glassMaskSlots(glassMasksDefault, groups.length);
+        for (int k = 0; k < groups.length; k++) {
+            glassMasksDefault[k] = clearedGlassMask(glassMasksDefault[k], mw, mh);
+            Graphics dg = glassMasksDefault[k].getGraphics();
+            paintGlassMaskTabs(dg, Button.GLASS_PAINT_DEFAULT, 1f, defaultTints, groups[k]);
+            cutGlassCapsule(dg, lx, ly, lw, lh, mw, mh, false);
+        }
+        int[] selectedGroups = distinctTints(selectedTints);
+        glassMasksSelected = glassMaskSlots(glassMasksSelected, selectedGroups.length);
+        for (int k = 0; k < selectedGroups.length; k++) {
+            glassMasksSelected[k] = clearedGlassMask(glassMasksSelected[k], mw, mh);
+            Graphics sg = glassMasksSelected[k].getGraphics();
+            paintGlassMaskTabs(sg, Button.GLASS_PAINT_SELECTED, f.motion.contentScale, selectedTints, selectedGroups[k]);
+            cutGlassCapsule(sg, lx, ly, lw, lh, mw, mh, true);
+        }
+        for (int k = 0; k < groups.length; k++) {
+            g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(groups[k], dark), glassMasksDefault[k],
+                    0, 1f);
+        }
+        for (int k = 0; k < selectedGroups.length; k++) {
+            g.colorMatrixRegion(rx, ry, rr - rx, rb - ry, VibrancyMatrix.forTint(selectedGroups[k], dark),
+                    glassMasksSelected[k], 0, 1f);
+        }
     }
 
-    /// Paints every tab once into a mask, in the given glass paint state, each
-    /// scaled by `scale` about its own centre (the accent copy's magnification).
-    private void paintGlassMaskTabs(Graphics mg, int state, float scale) {
+    /// The distinct values of `tints`, in first-seen order.
+    private static int[] distinctTints(int[] tints) {
+        int[] out = new int[tints.length];
+        int count = 0;
+        for (int tint : tints) {
+            boolean seen = false;
+            for (int j = 0; j < count; j++) {
+                if (out[j] == tint) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) {
+                out[count++] = tint;
+            }
+        }
+        int[] trimmed = new int[count];
+        System.arraycopy(out, 0, trimmed, 0, count);
+        return trimmed;
+    }
+
+    /// `slots` grown to hold at least `count` masks, keeping the ones it has.
+    private static Image[] glassMaskSlots(Image[] slots, int count) {
+        if (slots.length >= count) {
+            return slots;
+        }
+        Image[] grown = new Image[count];
+        System.arraycopy(slots, 0, grown, 0, slots.length);
+        return grown;
+    }
+
+    /// Paints the tabs whose tint in this state is `tint` into a mask, in the
+    /// given glass paint state, each scaled by `scale` about its own centre (the
+    /// accent copy's magnification).
+    private void paintGlassMaskTabs(Graphics mg, int state, float scale, int[] tints, int tint) {
         Container tc = tabsContainer;
         int n = tc.getComponentCount();
         for (int i = 0; i < n; i++) {
+            if (tints[i] != tint) {
+                continue;
+            }
             Component c = tc.getComponentAt(i);
             Button b = c instanceof Button ? (Button) c : null;
             int oldState = b == null ? 0 : b.glassPaintState;
@@ -2528,25 +2587,21 @@ public class Tabs extends Container {
         return mask;
     }
 
-    /// The foreground colour the tab content is painted with in the given glass
-    /// paint state (the unselected label colour, or the accent).
-    private int glassContentTint(int state) {
-        Container tc = tabsContainer;
-        int n = tc.getComponentCount();
-        for (int i = 0; i < n; i++) {
-            Component c = tc.getComponentAt(i);
-            if (c instanceof Button) {
-                Button b = (Button) c;
-                int old = b.glassPaintState;
-                b.glassPaintState = state;
-                try {
-                    return b.getStyle().getFgColor();
-                } finally {
-                    b.glassPaintState = old;
-                }
-            }
+    /// The foreground colour tab `c` paints its content with in the given glass
+    /// paint state (its unselected label colour or its accent -- or, for a
+    /// disabled tab, its disabled colour, which Button keeps in every state).
+    private static int glassContentTint(Component c, int state) {
+        if (!(c instanceof Button)) {
+            return c.getStyle().getFgColor();
         }
-        return state == Button.GLASS_PAINT_SELECTED ? 0x0091ff : 0;
+        Button b = (Button) c;
+        int old = b.glassPaintState;
+        b.glassPaintState = state;
+        try {
+            return b.getStyle().getFgColor();
+        } finally {
+            b.glassPaintState = old;
+        }
     }
 
     /// Horizontal inset of a capsule of radius `r` from its bounding box at row

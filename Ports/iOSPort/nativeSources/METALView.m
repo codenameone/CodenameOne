@@ -906,6 +906,8 @@ int cn1DirectToDrawableEnabled(void) {
         // the old top at the new top (no vertical flip needed).
         CN1MetalDrawImage(oldScreen, 255, 0, 0, pw, ph);
         CN1MetalEndFrame();
+        // A one-off pass, not the start of a frame to resume.
+        CN1MetalFrameFinished();
     }
     [clearEnc endEncoding];
     [clearCb commit];
@@ -1746,6 +1748,9 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 
 - (BOOL)presentFramebuffer
 {
+    // Whatever happens below, this frame is over: the next setFramebuffer
+    // starts a fresh one rather than resuming this one's clip and transform.
+    CN1MetalFrameFinished();
     if (self.renderCommandEncoder == nil) {
         // Nothing was encoded (setFramebuffer was not called after the
         // previous present). Nothing to do. Leave needsResizePresent set: the
