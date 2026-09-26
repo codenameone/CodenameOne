@@ -25,18 +25,24 @@
    VM from them; and lets the app create a VM thread from a context that blocks the
    collector's stop signal. See GcForeignThreadApp. */
 #include "cn1_globals.h"
-#include <pthread.h>
 #if !defined(_WIN32)
+#include <pthread.h>
 #include <signal.h>
 #endif
 #if defined(__APPLE__)
 #include <dispatch/dispatch.h>
 #endif
 
+/* Set just before the exiting thread returns: the Windows compatibility layer has no
+   pthread_join, and the thread's exit (and its key destructor) follows the flag within
+   moments -- far inside the seconds of churn the app runs afterwards. */
+static volatile int cn1ForeignExited = 0;
+
 /* Touches the VM, then EXITS. */
 static void* cn1ForeignExitingThread(void* arg) {
     (void)arg;
     getThreadLocalData();
+    __atomic_store_n(&cn1ForeignExited, 1, __ATOMIC_RELEASE);
     return 0;
 }
 
@@ -55,7 +61,13 @@ JAVA_INT GcForeignThreadApp_registerForeignThreads___R_int(CODENAME_ONE_THREAD_S
     CN1_YIELD_THREAD;
     pthread_t exiting;
     if(pthread_create(&exiting, 0, cn1ForeignExitingThread, 0) == 0) {
+#if defined(_WIN32)
+        while(!__atomic_load_n(&cn1ForeignExited, __ATOMIC_ACQUIRE)) {
+            usleep(1000);
+        }
+#else
         pthread_join(exiting, 0);
+#endif
         registered++;
     }
 #if defined(__APPLE__)

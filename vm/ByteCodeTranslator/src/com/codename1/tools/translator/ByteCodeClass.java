@@ -3030,10 +3030,69 @@ public class ByteCodeClass {
     /// in its own table code). One that always throws makes the class unusable in every
     /// run; running it eagerly moves that failure from the first use to startup.
     public boolean isEagerInitEligible() {
-        if (isEliminated()) {
+        if (isEliminated() || !initReferenced) {
             return false;
         }
         return !hasClinit() || pureClinit;
+    }
+
+    /// Whether surviving Java code can trigger this class's initialization at all.
+    private boolean initReferenced;
+
+    /// ONLY A CLASS THE PROGRAM CAN INITIALIZE IS INITIALIZED EAGERLY.
+    ///
+    /// The eager lists call every listed class's __STATIC_INITIALIZER unconditionally, and
+    /// for a class with no <clinit> that initializer fills its vtable -- a reference to
+    /// every virtual method it has. Lazily, an initializer is called only from the code
+    /// that uses the class, so for a class nothing uses there is no caller at all and the
+    /// linker's dead-stripping removes it together with everything only it reached. Listing
+    /// every class that merely survived the translator's cull took that away: the Bench
+    /// binary kept 481 more functions (87 static initializers, their mark functions,
+    /// constructors and setters, java.io and java.net it never touches) and its code grew
+    /// 64%, a Linux gallery app 38%.
+    ///
+    /// So a class is listed only if some surviving method names it where the JVM would
+    /// initialize it: NEW, a static field access, a static call, or an interface call (an
+    /// interface's initializer builds the tables its thunks dispatch through). A class
+    /// left off keeps its guards and initializes on first use, exactly as before eager
+    /// initialization existed -- so missing one here costs a guard, never correctness. That
+    /// is also why the scan need not be exact: a static reached only through a subclass
+    /// name, or a class only C code allocates, simply stays lazy.
+    ///
+    /// Computed before computePureClinits, which reads eligibility: a pure <clinit> may
+    /// allocate only eager classes, and the NEW it does that with marks the class it
+    /// allocates, so the two agree.
+    static void computeInitReferences(List<ByteCodeClass> classes) {
+        for (ByteCodeClass c : classes) {
+            c.initReferenced = false;
+        }
+        for (ByteCodeClass c : classes) {
+            for (BytecodeMethod m : c.methods) {
+                for (Instruction i : m.getInstructions()) {
+                    String owner = null;
+                    int op = i.getOpcode();
+                    if (i instanceof Field) {
+                        if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
+                            owner = ((Field) i).getOwner();
+                        }
+                    } else if (i instanceof TypeInstruction) {
+                        if (op == Opcodes.NEW) {
+                            owner = ((TypeInstruction) i).getTypeName();
+                        }
+                    } else if (i instanceof Invoke) {
+                        if (op == Opcodes.INVOKESTATIC || op == Opcodes.INVOKEINTERFACE) {
+                            owner = ((Invoke) i).getOwner();
+                        }
+                    }
+                    if (owner != null) {
+                        ByteCodeClass oc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+                        if (oc != null) {
+                            oc.initReferenced = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public boolean hasClinit() {

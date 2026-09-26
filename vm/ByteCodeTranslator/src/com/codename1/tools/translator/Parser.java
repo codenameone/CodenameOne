@@ -1453,6 +1453,7 @@ public class Parser extends ClassVisitor {
             }
             // On the raw bytecode, before any fusion pass below rewrites instructions:
             // see ByteCodeClass.isEagerInitEligible.
+            ByteCodeClass.computeInitReferences(classes);
             ByteCodeClass.computePureClinits(classes);
             // Also on the raw bytecode, where every field access is still a plain
             // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
