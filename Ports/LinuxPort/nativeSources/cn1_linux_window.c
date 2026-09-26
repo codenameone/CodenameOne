@@ -406,11 +406,19 @@ void cn1LinuxRunOnMainAndWait(void (*fn)(void*), void* arg) {
     pthread_mutex_init(&mc.m, 0);
     pthread_cond_init(&mc.c, 0);
     gdk_threads_add_idle(cn1MainCallTrampoline, &mc);
+    /* Parked while the main thread runs the call, which can take as long as a modal
+     * dialog stays open. The caller is a managed thread (the EDT, nearly always) that
+     * runs no Java until this returns, so a collection must not wait for it -- one
+     * that did waited the safepoint bound and then force-stopped it. Its own frames,
+     * including the request this waits on, are above the captured stack pointer and
+     * are scanned as usual. */
+    CN1_YIELD_THREAD;
     pthread_mutex_lock(&mc.m);
     while (!mc.done) {
         pthread_cond_wait(&mc.c, &mc.m);
     }
     pthread_mutex_unlock(&mc.m);
+    CN1_RESUME_THREAD;
     pthread_mutex_destroy(&mc.m);
     pthread_cond_destroy(&mc.c);
 }

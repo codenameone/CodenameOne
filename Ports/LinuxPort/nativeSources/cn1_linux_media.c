@@ -583,7 +583,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_cameraSessionStop___long(CODENAME
         return;
     }
     s->running = 0;
+    /* Parked for the join: the capture thread can take a frame's time to notice. */
+    CN1_YIELD_THREAD;
     pthread_join(s->thread, 0);
+    CN1_RESUME_THREAD;
     p_gst_element_set_state(s->pipe, GST_STATE_NULL);
     p_gst_object_unref(s->sink);
     p_gst_object_unref(s->pipe);
