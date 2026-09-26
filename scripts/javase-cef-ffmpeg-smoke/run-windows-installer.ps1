@@ -75,8 +75,16 @@ function Run-Launcher($tag, $userProfile, $credential) {
 
 $setup = Get-ChildItem $InstallerDir -Filter *.exe -Recurse | Sort-Object Length -Descending | Select-Object -First 1
 Write-Host "Installer: $($setup.FullName) ($($setup.Length) bytes)"
+# Start-Process joins ArgumentList with spaces and does not quote, so a path with spaces
+# has to carry its own quotes or Inno installs to its first word (C:\Program).
 $p = Start-Process -FilePath $setup.FullName -PassThru -Wait -ArgumentList `
-  '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$app", "/LOG=$Out\install.log"
+  '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$app`"", "/LOG=`"$Out\install.log`""
+# win.runAfterInstall starts the app from the (elevated) installer; that first run is kept
+# as its own result before the explicit launches below.
+$first = Get-Process -Name javaw -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($first -and -not $first.WaitForExit(150000)) { Save-Screen 'postinstall-hung.png' }
+Get-Process -Name java, javaw -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Collect 'postinstall' $env:USERPROFILE
 Write-Host "Installer exit: $($p.ExitCode)"
 Get-ChildItem $app -Recurse -Depth 2 | Select-Object FullName, Length | Out-File "$Out\installed-tree.txt"
 $exe = Get-ChildItem $app -Filter *.exe | Where-Object { $_.Name -notmatch '^unins' } | Select-Object -First 1
@@ -111,7 +119,7 @@ Run-Launcher 'user' "C:\Users\$userName" $credential
 
 Get-ChildItem $Out | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Host
 $failed = $false
-foreach ($tag in 'admin', 'user') {
+foreach ($tag in 'postinstall', 'admin', 'user') {
   foreach ($f in "$tag-result.txt", "$tag-cefmaps-status.txt") {
     if (Test-Path "$Out\$f") { Write-Host "== $f"; Get-Content "$Out\$f" | Write-Host }
   }
