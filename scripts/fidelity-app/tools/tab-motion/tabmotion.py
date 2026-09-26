@@ -23,10 +23,14 @@ scripts/fidelity-app/ios-native-ref/motion-probe/README.md). Subcommands:
 
 Gestures (holds and drags, see TabGlassGesture):
 
-  gesture --hold HOLD.log --drags LOG... --templates templates.json -o TabGlassGesture.java
-      Fits the release wobble (from the quick tap in the hold log), the settle
-      after a scrub and the scrub deformation kernels, and rewrites the tables
-      between the "generated tables (tabmotion.py gesture)" markers.
+  gesture --hold HOLD.log --drags LOG... --settle LOG... -o TabGlassGesture.java
+      Fits the release wobble (from the quick tap in the hold log) and the scrub
+      deformation kernels (from every drag log) and rewrites the tables between
+      the "generated tables (tabmotion.py gesture)" markers, then replays the
+      settle after a scrub (the tap's travel spring, a closed form) over the
+      episodes of the --settle logs -- the ones gesture-fixture exports, whose
+      rest positions are the tabs -- and fails if it is off by more than its
+      tolerance.
   gesture-fixture LOG... -o native-gestures.csv
       Exports the per-frame native episodes TabGlassGestureTest replays.
   springs --press LOG... --drag LOG
@@ -527,11 +531,15 @@ TOUCH_LAG = 0.02
 # The release wobble starts WOBBLE_START after touch-up; WOBBLE_N frames are fitted.
 WOBBLE_START = 0.90
 WOBBLE_N = 45
-# The settle after a scrub is fitted over SETTLE_N frames from touch-up.
-SETTLE_N = int(1.25 * FPS)
 # Scrub deformation kernels: FIR_TAPS frames of delay, ridge-regularized.
 FIR_TAPS = 60
 FIR_RIDGE = 1e-2
+# The settle after a scrub is a closed form (the tap's travel spring, FORMS, started
+# from the scrub's state); `gesture` replays it exactly as TabGlassGesture does over
+# the fixture's scrubs. The tolerance is what it reaches on the committed captures,
+# plus 10%.
+SETTLE_TOLERANCE = {"rms": 0.38, "max": 3.8}
+STEP = 1 / 240.
 GESTURE_BEGIN = "    // ---- generated tables (tabmotion.py gesture) ----\n"
 TABLES_END = "    // ---- end of generated tables ----\n"
 
@@ -663,42 +671,85 @@ def wobble(hold_log):
     return W
 
 
-def settle(drags, P):
-    """Lens position after a scrub's release: the tap position curve from the release
-    point to the final tab, plus a kernel per pt/s of lens velocity (row 0) and per pt
-    of follow lag, finger target - lens, at release (row 1)."""
-    g = np.arange(len(P)) / FPS
-    G = np.arange(SETTLE_N) / FPS
-    eps = []
-    for path, off in drags:
-        R, T = lens_series(path)
-        t, x = R[:, 0], R[:, 1]
-        finger = Finger(T)
-        for d, u in presses(T):
-            u = u["t"]
-            m = (t >= u) & (t <= u + 1.3)
-            xr = np.interp(u, t, x)
-            pre = (t <= u) & (t >= u - 0.05)
-            final = x[m][-1]
-            v = np.polyfit(t[pre], x[pre], 1)[0] if pre.sum() >= 2 else 0.0
-            e = (finger(u - TOUCH_LAG) - off) - xr
-            if abs(final - xr) < 3:
-                continue
-            base = np.interp(G, t[m] - u, x[m]) - (xr + (final - xr) * np.interp(G - TOUCH_LAG, g, P, left=0,
-                                                                                right=P[-1]))
-            eps.append((path, v, e, base))
+def fixture_episodes(lines):
+    """The E/T/F rows of a gesture fixture as episodes (what TabGlassGestureTest loads)."""
+    eps = {}
+    for line in lines:
+        p = line.split(",")
+        i = int(p[1])
+        if p[0] == "E":
+            eps[i] = dict(tag=p[2], fromPt=float(p[3]), toPt=float(p[4]), minPt=float(p[5]), maxPt=float(p[6]),
+                          upS=float(p[7]), scrubS=float(p[8]), settlePt=float(p[9]), T=[], F=[])
+        else:
+            eps[i]["T" if p[0] == "T" else "F"].append([float(x) for x in p[2:]])
+    return eps
 
-    def solve(sel):
-        X = np.array([[eps[i][1], eps[i][2]] for i in sel])
-        Y = np.array([eps[i][3] for i in sel])
-        return np.linalg.lstsq(X, Y, rcond=None)[0]
 
-    worst = []
-    for k in range(len(eps)):
-        c = solve([i for i in range(len(eps)) if i != k])
-        worst.append(np.abs(eps[k][3] - np.array([eps[k][1], eps[k][2]]) @ c).max())
-    print("settle: %d releases, leave-one-out max error %.2f pt" % (len(eps), max(worst)), file=sys.stderr)
-    return solve(range(len(eps)))
+def scrub_centre(e, end):
+    """TabGlassGesture.scrubTrack: the lens centre at 60 Hz from the scrub start -- the
+    follow spring (stepped like the Java) until the release reaches the lens, then
+    the settle spring from that state, in closed form."""
+    touches = e["T"]
+
+    def target(s):
+        f = None
+        for q in touches:
+            if q[0] <= s - TOUCH_LAG:
+                f = q[1]
+            else:
+                break
+        return e["fromPt"] if f is None else min(max(f, e["minPt"]), e["maxPt"])
+
+    w, z = FOLLOW_OMEGA, FOLLOW_ZETA
+    handoff = e["upS"] + TOUCH_LAG
+    frames = max(1, int(np.ceil((end - e["scrubS"]) * FPS)) + 2)
+    out = np.empty(frames)
+    x, v, s, settling = e["fromPt"], 0.0, e["scrubS"], False
+    for i in range(frames):
+        fs = e["scrubS"] + i / FPS
+        if fs >= handoff:
+            if not settling:
+                while s < handoff:
+                    v += (w * w * (target(s) - x) - 2 * z * w * v) * STEP
+                    x += v * STEP
+                    s += STEP
+                settling = True
+            out[i] = e["settlePt"] + spring_displacement(FORMS.POSITION_OMEGA, FORMS.POSITION_ZETA,
+                                                         x - e["settlePt"], v, fs - handoff)
+            continue
+        for k in range(int(round(1 / (FPS * STEP)))):
+            if s >= fs:
+                break
+            v += (w * w * (target(s) - x) - 2 * z * w * v) * STEP
+            x += v * STEP
+            s += STEP
+        out[i] = x
+    return out
+
+
+def settle_check(lines):
+    """The lens centre of every scrub in the fixture rows, replayed like
+    TabGlassGesture.at, against the captured frames."""
+    errs = []
+    for e in fixture_episodes(lines).values():
+        if e["scrubS"] < 0:
+            continue
+        F = np.array([f for f in e["F"] if f[0] >= 0])
+        tr = scrub_centre(e, F[-1, 0] + 2 / FPS)
+        for f in F:
+            if f[0] < e["scrubS"]:
+                centre = e["fromPt"]
+            else:
+                fx = (f[0] - e["scrubS"]) * FPS
+                n = min(int(fx), len(tr) - 2)
+                centre = tr[n] + (tr[n + 1] - tr[n]) * (fx - n)
+            errs.append(centre - f[1])
+    errs = np.array(errs)
+    rms, worst = np.sqrt(np.mean(errs ** 2)), np.abs(errs).max()
+    print("settle (tap spring %.3f rad/s, zeta %.3f): %d frames, rms %.3f pt, max %.2f pt (tolerance %.2f / %.1f)"
+          % (FORMS.POSITION_OMEGA, FORMS.POSITION_ZETA, len(errs), rms, worst, SETTLE_TOLERANCE["rms"],
+             SETTLE_TOLERANCE["max"]), file=sys.stderr)
+    return rms <= SETTLE_TOLERANCE["rms"] and worst <= SETTLE_TOLERANCE["max"]
 
 
 def scrub_kernels(drag_logs, W):
@@ -774,21 +825,26 @@ def java_array(name, doc, vals, dec, private=False):
         doc, "private " if private else "", name, "\n".join(lines))
 
 
-def gesture_tables(W, S, K):
-    t = [("WOBBLE_X", "Release wobble, lens scaleX - 1, from WOBBLE_START_S after touch-up.", W["sx"], 5),
+FIR_NOTE = """    // The deformation kernels below are free 60-tap fits. Folded onto velocity
+    // alone each channel is one smooth kernel, scaleY's that of scaleX inverted and
+    // about 1.5 times larger. Two damped modes shared by all channels (omega_n 6.0
+    // and 15.5 rad/s, zeta 0.38 and 0.42) match their RMS but not their worst frame.
+"""
+
+
+def gesture_tables(W, K):
+    w = [("WOBBLE_X", "Release wobble, lens scaleX - 1, from WOBBLE_START_S after touch-up.", W["sx"], 5),
          ("WOBBLE_Y", "Release wobble, lens scaleY - 1.", W["sy"], 5),
-         ("WOBBLE_TX", "Release wobble, lens centre offset in points (always towards +x).", W["tx"], 4),
-         ("SETTLE_V", "Settle after a scrub: lens offset (pt) per pt/s of lens velocity at release.", S[0], 6),
-         ("SETTLE_E", "Settle after a scrub: lens offset (pt) per pt of follow lag (target - lens) at release.",
-          S[1], 5),
-         ("FIR_SX_SPEED", "Scrub deformation kernels: scaleX - 1 per |v|/1000 pt/s, per frame of delay.",
+         ("WOBBLE_TX", "Release wobble, lens centre offset in points (always towards +x).", W["tx"], 4)]
+    k = [("FIR_SX_SPEED", "Scrub deformation kernels: scaleX - 1 per |v|/1000 pt/s, per frame of delay.",
           K["sx"][0], 6),
          ("FIR_SX_ACCEL", "scaleX - 1 per (a * sign(v))/10000 pt/s^2.", K["sx"][1], 6),
          ("FIR_SY_SPEED", "scaleY - 1 per |v|/1000 pt/s.", K["sy"][0], 6),
          ("FIR_SY_ACCEL", "scaleY - 1 per (a * sign(v))/10000 pt/s^2.", K["sy"][1], 6),
          ("FIR_TX_VEL", "Centre offset (pt) per v/1000 pt/s.", K["tx"][0], 5),
          ("FIR_TX_ACCEL", "Centre offset (pt) per a/10000 pt/s^2.", K["tx"][1], 5)]
-    return "\n".join(java_array(*x) for x in t) + "\n"
+    return ("\n".join(java_array(*x) for x in w) + "\n" + FIR_NOTE
+            + "\n".join(java_array(*x) for x in k) + "\n")
 
 
 def splice(path, begin, block):
@@ -801,7 +857,7 @@ def splice(path, begin, block):
     write_text(path, s[:a] + block + s[b:], newline="")
 
 
-def gesture_fixture(logs, path):
+def gesture_rows(logs):
     """One E(pisode) row per press, its T(ouch) rows (scrubs only) and F(rame) rows."""
     out, eid = [], 0
     for log in logs:
@@ -843,8 +899,13 @@ def gesture_fixture(logs, path):
             for r in seg:
                 out.append("F,%d,%.4f,%.3f,%.4f,%.5f,%.5f,%.4f,%.3f" % (eid, r[0] - t0, *r[1:]))
             eid += 1
+    return out
+
+
+def gesture_fixture(logs, path):
+    out = gesture_rows(logs)
     write_text(path, "# kind,episode,... see TabGlassGestureTest\n" + "\n".join(out) + "\n")
-    print("%d episodes, %d lines" % (eid, len(out)), file=sys.stderr)
+    print("%d episodes, %d lines" % (sum(1 for r in out if r.startswith("E,")), len(out)), file=sys.stderr)
 
 
 def springs(press_logs, drag_log):
@@ -1011,7 +1072,7 @@ def main():
     a = sub.add_parser("gesture")
     a.add_argument("--hold", required=True)
     a.add_argument("--drags", nargs="+", required=True)
-    a.add_argument("--templates", required=True, help="the `fit` output (its tap position curve)")
+    a.add_argument("--settle", nargs="+", required=True, help="the logs gesture-fixture exports")
     a.add_argument("-o", required=True)
     a = sub.add_parser("gesture-fixture")
     a.add_argument("logs", nargs="+")
@@ -1041,11 +1102,10 @@ def main():
     elif args.cmd == "material":
         material(args.shots)
     elif args.cmd == "gesture":
-        drags = [(log, finger_offset(log)) for log in args.drags]
         W = wobble(args.hold)
-        S = settle(drags, np.array(read_json(args.templates)["P"]))
-        K = scrub_kernels(args.drags, W)
-        splice(args.o, GESTURE_BEGIN, gesture_tables(W, S, K))
+        splice(args.o, GESTURE_BEGIN, gesture_tables(W, scrub_kernels(args.drags, W)))
+        if not settle_check(gesture_rows(args.settle)):
+            sys.exit("the settle after a scrub no longer matches the capture")
     elif args.cmd == "gesture-fixture":
         gesture_fixture(args.logs, args.o)
     elif args.cmd == "springs":

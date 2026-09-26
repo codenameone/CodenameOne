@@ -132,10 +132,10 @@ class TabGlassGestureTest {
 
     // Worst error allowed per episode: x (pt), lift, scaleX, scaleY, lead (pt), bar (pt).
     private static final float[] HOLD_LIMITS = {1.5f, 0.05f, 0.02f, 0.025f, 1.2f, 1.2f};
-    // Scrubs include flicks released with the lens ~100 pt behind the finger,
-    // where the linear settle is a few points off; the RMS bounds below keep the
-    // ordinary releases tight.
-    private static final float[] SCRUB_LIMITS = {8f, 0.45f, 0.04f, 0.05f, 2f, 2.2f};
+    // Scrubs: the worst captured errors plus about 10% -- x 3.44 pt (a flick
+    // released ~70 pt behind the finger), lift 0.141, scaleX 0.0373, scaleY 0.0415,
+    // lead 1.77 pt, bar 2.13 pt. The RMS bounds below keep the rest tight.
+    private static final float[] SCRUB_LIMITS = {3.8f, 0.155f, 0.041f, 0.046f, 1.95f, 2.2f};
 
     @Test
     void reproducesNativeHoldsAndScrubs() throws Exception {
@@ -170,8 +170,108 @@ class TabGlassGestureTest {
         }
         float rmsX = (float) Math.sqrt(sx2 / n);
         float rmsLift = (float) Math.sqrt(sl2 / n);
-        assertTrue(rmsX <= 0.8f, "scrub x rms " + rmsX + "\n" + report);
-        assertTrue(rmsLift <= 0.04f, "scrub lift rms " + rmsLift + "\n" + report);
+        // Measured 0.346 pt and 0.0166: the settle spring started where the follow
+        // spring leaves the lens, at the lift release that follows from it.
+        assertTrue(rmsX <= 0.38f, "scrub x rms " + rmsX + "\n" + report);
+        assertTrue(rmsLift <= 0.019f, "scrub lift rms " + rmsLift + "\n" + report);
+    }
+
+    @Test
+    void scrubSettlesOnTheTapsTravelCurve() {
+        // The settle is the tap's travel spring restarted from the scrub's state: a
+        // lens resting under a still finger that is let go towards another tab moves
+        // exactly like a tap between the two, from the moment the release reaches it.
+        // Compared on the scrub track's own 60 Hz frames (in between, at() blends
+        // neighbouring frames); the release is placed so the hand-off is one. They
+        // agree to float precision (4e-5 pt).
+        float start = 0.2f;
+        float up = start + 78 / 60f - TabGlassGesture.TOUCH_LAG_S;
+        TabGlassGesture g = new TabGlassGesture(51, 51);
+        g.startScrub(start, 51, 223);
+        g.finger(start, 51);
+        g.settleTo(137);
+        g.up(up);
+        float[] c = new float[1];
+        float worst = 0;
+        for (int i = 0; i <= 60; i++) {
+            float t = i / 60f;
+            g.at(start + (78 + i) / 60f, c);
+            float tap = 51 + (137 - 51) * TabGlassMotion.position(t + TabGlassMotion.START_S);
+            worst = Math.max(worst, Math.abs(c[0] - tap));
+        }
+        assertTrue(worst <= 0.001f, "settle vs the tap travel: " + worst + " pt");
+    }
+
+    @Test
+    void scrubDeformationFollowsTheLensMotion() throws Exception {
+        // While the finger is down nothing but the deformation kernels bend the lens
+        // (the wobble and the settle come after), so these frames pin them to
+        // native. Measured over the 17 scrubs: scaleX 0.00535, scaleY 0.00794, lead
+        // 0.234 pt RMS.
+        double[] sq = new double[3];
+        int n = 0;
+        float[] c = new float[1];
+        for (Map.Entry<Integer, Episode> en : load().entrySet()) {
+            Episode e = en.getValue();
+            if (en.getKey() == 0 || e.scrubS < 0) {
+                continue;
+            }
+            TabGlassGesture g = replay(e);
+            for (float[] f : e.frames) {
+                if (f[0] < 0 || f[0] >= e.upS) {
+                    continue;
+                }
+                TabGlassMotion m = g.at(f[0], c);
+                float[] err = {(m.scaleX - 1) - f[3], (m.scaleY - 1) - f[4], m.leadPt - f[5]};
+                for (int i = 0; i < 3; i++) {
+                    sq[i] += err[i] * err[i];
+                }
+                n++;
+            }
+        }
+        assertTrue(n > 1000, "scrub frames " + n);
+        float[] limits = {0.0059f, 0.0088f, 0.26f};
+        String[] names = {"scaleX", "scaleY", "lead"};
+        for (int i = 0; i < 3; i++) {
+            float rms = (float) Math.sqrt(sq[i] / n);
+            assertTrue(rms <= limits[i], names[i] + " rms while scrubbing " + rms + ", limit " + limits[i]);
+        }
+    }
+
+    @Test
+    void mirroredScrubsDeformAlike() {
+        // Speed drives the scale and signed velocity the centre offset: a scrub to
+        // the left bends the lens exactly like the same scrub to the right, and
+        // shifts it the other way. A scrub that stays put gives the part that is not
+        // the lens's own motion (the wobble always leans towards +x).
+        TabGlassGesture right = scrub(223);
+        TabGlassGesture left = scrub(51);
+        TabGlassGesture still = scrub(137);
+        float[] c = new float[1];
+        float moved = 0;
+        for (int i = 0; i <= 90; i++) {
+            float s = 0.2f + i / 60f;
+            TabGlassMotion r = right.at(s, c);
+            TabGlassMotion l = left.at(s, c);
+            TabGlassMotion z = still.at(s, c);
+            assertEquals(r.scaleX, l.scaleX, 1e-4f, "scaleX at " + s);
+            assertEquals(r.scaleY, l.scaleY, 1e-4f, "scaleY at " + s);
+            assertEquals(r.leadPt - z.leadPt, -(l.leadPt - z.leadPt), 1e-3f, "lead at " + s);
+            moved = Math.max(moved, Math.abs(r.scaleY - z.scaleY));
+        }
+        assertTrue(moved > 0.01f, "the scrub deformed the lens by only " + moved);
+    }
+
+    /// A scrub from the middle tab (137 pt) to `toPt` over 0.3 s, released at 0.6 s.
+    private static TabGlassGesture scrub(float toPt) {
+        TabGlassGesture g = new TabGlassGesture(137, 137);
+        g.startScrub(0.2f, 51, 223);
+        for (int i = 0; i <= 12; i++) {
+            g.finger(0.2f + i * 0.025f, 137 + (toPt - 137) * i / 12f);
+        }
+        g.settleTo(toPt);
+        g.up(0.6f);
+        return g;
     }
 
     @Test

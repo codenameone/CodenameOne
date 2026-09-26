@@ -22,8 +22,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.util.MathUtil;
-
 /// The parts of the iOS 27 tab selection that depend on the GESTURE rather than
 /// on a tap: holding the press, scrubbing the lens along the bar with the finger,
 /// and letting go of a scrub. Measured like TabGlassMotion, with the same probe
@@ -38,8 +36,8 @@ import com.codename1.util.MathUtil;
 ///   (omega 32 rad/s, zeta 0.90, 20 ms behind), within the first and last tab.
 /// - Releasing a scrub selects the tab nearest the FINGER (not the lens, which
 ///   can be far behind after a flick; a tie keeps the current tab). The lens
-///   travels there on the tap's position curve, corrected by its velocity and its
-///   lag behind the finger at release (SETTLE_V, SETTLE_E).
+///   travels there on the tap's own spring, starting from the position and
+///   velocity the scrub left it with.
 /// - While scrubbing, the lens deforms with its own motion: a kernel over its
 ///   recent speed and acceleration (the FIR_ tables).
 /// - Every release ends in a small wobble that starts WOBBLE_START_S after the
@@ -62,6 +60,16 @@ final class TabGlassGesture {
     /// The tap tables start at the last frame at rest, one frame after the
     /// touch; a press is evaluated on them this much later.
     static final float TEMPLATE_DELAY_S = 0.018f;
+    /// After a scrub the follow spring keeps the lens until the release reaches
+    /// it, TOUCH_LAG_S after touch-up; from there the lens travels to the chosen
+    /// tab on the tap's own travel spring (TabGlassMotion.POSITION_OMEGA,
+    /// POSITION_ZETA), started from the position and velocity the scrub left it
+    /// with. Fitted to the scrub releases alone that spring comes out at
+    /// 15.5 rad/s and zeta 0.847.
+    ///
+    /// Long enough for that spring to come within 0.1 pt of the tab from a
+    /// release 300 pt away (e^(-zeta omega t) = 1/3000).
+    static final float SETTLE_DURATION_S = 0.6f;
     /// Integration step of the follow spring.
     private static final float STEP_S = 1f / 240f;
 
@@ -96,26 +104,10 @@ final class TabGlassGesture {
             0.0608f, 0.0408f, 0.0017f
     };
 
-    /// Settle after a scrub: lens offset (pt) per pt/s of lens velocity at release.
-    static final float[] SETTLE_V = {
-            0.002263f, 0.000871f, -0.002719f, -0.004932f, -0.006817f, -0.005184f, -0.005578f,
-            -0.004491f, -0.004612f, -0.004095f, -0.003479f, -0.002938f, -0.002392f, -0.001918f,
-            -0.001562f, -0.001233f, -0.000900f, -0.000713f, -0.000527f, -0.000408f, -0.000284f,
-            -0.000168f, -0.000102f, -0.000181f, -0.000157f, -0.000261f, -0.000194f, -0.000197f,
-            -0.000055f, 0.000069f, 0.000068f, 0.000054f, 0.000020f, 0.000010f, 0.000006f,
-            0.000002f
-    };
-
-    /// Settle after a scrub: lens offset (pt) per pt of follow lag (target - lens) at release.
-    static final float[] SETTLE_E = {
-            0.00516f, 0.34670f, 0.68555f, 0.87646f, 0.96867f, 0.91844f, 0.87645f,
-            0.77691f, 0.69398f, 0.59510f, 0.49772f, 0.40891f, 0.32887f, 0.25944f,
-            0.20447f, 0.15461f, 0.11400f, 0.08268f, 0.05785f, 0.03895f, 0.02456f,
-            0.01347f, 0.00612f, 0.00311f, -0.00014f, -0.00018f, -0.00205f, -0.00232f,
-            -0.00480f, -0.00664f, -0.00547f, -0.00434f, -0.00163f, -0.00082f, -0.00047f,
-            -0.00020f, -0.00003f
-    };
-
+    // The deformation kernels below are free 60-tap fits. Folded onto velocity
+    // alone each channel is one smooth kernel, scaleY's that of scaleX inverted and
+    // about 1.5 times larger. Two damped modes shared by all channels (omega_n 6.0
+    // and 15.5 rad/s, zeta 0.38 and 0.42) match their RMS but not their worst frame.
     /// Scrub deformation kernels: scaleX - 1 per |v|/1000 pt/s, per frame of delay.
     static final float[] FIR_SX_SPEED = {
             0.005386f, 0.012912f, -0.028749f, -0.016629f, -0.033210f, -0.024031f, -0.020600f,
@@ -295,67 +287,52 @@ final class TabGlassGesture {
     }
 
     /// The scrub lens centre at 60 Hz, from the scrub start to `endS`: the follow
-    /// spring while the finger is down, then the settle. Returns the samples and
-    /// writes the release state into `release` (x, v, e) when the finger lifted.
-    private float[] scrubTrack(float endS, float[] release) {
+    /// spring until the release reaches the lens (TOUCH_LAG_S after the finger
+    /// lifts), then the settle spring from wherever that left it.
+    private float[] scrubTrack(float endS) {
         int frames = Math.max(1, (int) Math.ceil((endS - scrubStartS) * TabGlassMotion.SAMPLE_HZ) + 2);
         float[] out = new float[frames];
         float x = scrubX0;
         float v = scrubV0;
         float s = scrubStartS;
-        float rx = Float.NaN;
-        float rv = 0;
-        float re = 0;
+        float handoff = upS < 0 ? Float.MAX_VALUE : upS + TOUCH_LAG_S;
+        boolean settling = false;
         float w = FOLLOW_OMEGA;
         float z = FOLLOW_ZETA;
         int substeps = Math.round(1f / (TabGlassMotion.SAMPLE_HZ * STEP_S));
         for (int i = 0; i < frames; i++) {
             float fs = scrubStartS + i / (float) TabGlassMotion.SAMPLE_HZ;
-            if (upS >= 0 && fs >= upS) {
-                if (rx != rx) {
-                    // The finger lifted during the previous frame: integrate up to it.
-                    while (s < upS) {
-                        float f = fingerAt(s - TOUCH_LAG_S);
-                        float target = f != f ? scrubX0 : clampPt(f);
-                        float a = w * w * (target - x) - 2 * z * w * v;
+            if (fs >= handoff) {
+                if (!settling) {
+                    // Finish the follow spring up to the hand-off instant.
+                    while (s < handoff) {
+                        float a = w * w * (followTarget(s) - x) - 2 * z * w * v;
                         v += a * STEP_S;
                         x += v * STEP_S;
                         s += STEP_S;
                     }
-                    float f = fingerAt(upS - TOUCH_LAG_S);
-                    rx = x;
-                    rv = v;
-                    re = (f != f ? scrubX0 : clampPt(f)) - x;
+                    settling = true;
                 }
-                out[i] = settle(fs - upS, rx, rv, re);
+                out[i] = settleToPt + (float) DampedSpring.displacement(TabGlassMotion.POSITION_OMEGA,
+                        TabGlassMotion.POSITION_ZETA, x - settleToPt, v, fs - handoff);
                 continue;
             }
             for (int k = 0; k < substeps && s < fs; k++) {
-                float f = fingerAt(s - TOUCH_LAG_S);
-                float target = f != f ? scrubX0 : clampPt(f);
-                float a = w * w * (target - x) - 2 * z * w * v;
+                float a = w * w * (followTarget(s) - x) - 2 * z * w * v;
                 v += a * STEP_S;
                 x += v * STEP_S;
                 s += STEP_S;
             }
             out[i] = x;
         }
-        if (release != null) {
-            release[0] = rx;
-            release[1] = rv;
-            release[2] = re;
-        }
         return out;
     }
 
-    /// The settle `t` seconds after a scrub released at `x` with velocity `v`
-    /// and follow lag `e`.
-    private float settle(float t, float x, float v, float e) {
-        float p = TabGlassMotion.position(t - TOUCH_LAG_S);
-        if (t - TOUCH_LAG_S <= 0) {
-            p = 0;
-        }
-        return x + (settleToPt - x) * p + v * table(SETTLE_V, t) + e * table(SETTLE_E, t);
+    /// What the follow spring pulls towards at `s`: the finger, one touch lag
+    /// late and kept within the tabs (it stays where the finger lifted).
+    private float followTarget(float s) {
+        float f = fingerAt(s - TOUCH_LAG_S);
+        return f != f ? scrubX0 : clampPt(f);
     }
 
     /// A 60 Hz table that is zero outside itself.
@@ -392,11 +369,7 @@ final class TabGlassGesture {
         if (t <= 0) {
             return 0;
         }
-        double w = BAR_OMEGA;
-        double z = BAR_ZETA;
-        double wd = w * Math.sqrt(1 - z * z);
-        double e = MathUtil.exp(-z * w * t);
-        return (float) (1 - e * (Math.cos(wd * t) + z / Math.sqrt(1 - z * z) * Math.sin(wd * t)));
+        return (float) (1 + DampedSpring.displacement(BAR_OMEGA, BAR_ZETA, -1, 0, t));
     }
 
     /// When the lift is released, in seconds after the press, or a large value
@@ -412,7 +385,7 @@ final class TabGlassGesture {
         }
         // A scrub releases once the settling lens is within RELEASE_PT of its tab.
         float end = Math.max(nowS, upS) + 1f;
-        float[] track = scrubTrack(end, null);
+        float[] track = scrubTrack(end);
         for (int i = 0; i < track.length; i++) {
             float fs = scrubStartS + i / (float) TabGlassMotion.SAMPLE_HZ;
             if (fs >= upS && Math.abs(settleToPt - track[i]) < TabGlassMotion.RELEASE_PT) {
@@ -430,7 +403,7 @@ final class TabGlassGesture {
         float rel = releaseS(s);
         float end = TabGlassMotion.heldDurationS(upS, rel) + TEMPLATE_DELAY_S;
         if (isScrubbing()) {
-            end = Math.max(end, upS + SETTLE_V.length / (float) TabGlassMotion.SAMPLE_HZ
+            end = Math.max(end, upS + TOUCH_LAG_S + SETTLE_DURATION_S
                     + FIR_SX_SPEED.length / (float) TabGlassMotion.SAMPLE_HZ);
         }
         return s >= end;
@@ -448,7 +421,7 @@ final class TabGlassGesture {
             centreOut[0] = tapCentre(s);
             return m;
         }
-        float[] track = scrubTrack(s + 2f / TabGlassMotion.SAMPLE_HZ, null);
+        float[] track = scrubTrack(s + 2f / TabGlassMotion.SAMPLE_HZ);
         float fx = (s - scrubStartS) * TabGlassMotion.SAMPLE_HZ;
         int n = Math.min((int) fx, track.length - 2);
         float f = fx - n;

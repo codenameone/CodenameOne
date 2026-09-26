@@ -92,8 +92,8 @@ final class TabGlassMotion {
     static final float START_S = 0.00226f;
     /// Lens travel: duration 0.4 s, bounce 0.15 (omega = 2 pi / duration,
     /// zeta = 1 - bounce).
-    private static final double POSITION_OMEGA = 2 * Math.PI / 0.4;
-    private static final double POSITION_ZETA = 0.85;
+    static final double POSITION_OMEGA = 2 * Math.PI / 0.4;
+    static final double POSITION_ZETA = 0.85;
     /// Past its overshoot, UIKit ends the travel once less than this remains
     /// (the capture puts it between 0.194 and 0.197 pt).
     static final float SETTLE_PT = 0.195f;
