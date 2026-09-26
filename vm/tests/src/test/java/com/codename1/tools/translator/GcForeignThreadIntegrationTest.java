@@ -60,12 +60,18 @@ import static org.junit.jupiter.api.Assertions.fail;
  *   <li>Windows has no stop signal and could not report another thread's stack bounds, so
  *       every thread's capture failed there. Threads now record their own bounds when they
  *       register, and one that is not parked is suspended.</li>
+ *   <li>the VM's OWN threads: a thread inherits its creator's signal mask, so one started
+ *       where the stop signal is blocked ignored it for life. In a macOS gallery app that
+ *       was four VM threads timing out on every cycle ({@code site=5 lightweight=1
+ *       stopErr=-1}). A thread now unblocks the stop signal when it registers.</li>
  * </ul>
  *
- * <p>The gate asserts no sweep is skipped, then rebuilds the same translation with both
- * fixes compiled out ({@code -DCN1_GC_NO_FOREIGN_THREAD_EXIT -DCN1_GC_NO_OS_SUSPEND}) and
- * REQUIRES skipped sweeps, so it cannot pass by never exercising the path. The native half
- * registers an exiting thread everywhere and a libdispatch worker on Apple.</p>
+ * <p>The gate asserts no sweep is skipped, then rebuilds the same translation with the
+ * fixes compiled out ({@code -DCN1_GC_NO_FOREIGN_THREAD_EXIT -DCN1_GC_NO_OS_SUSPEND
+ * -DCN1_GC_NO_STOP_SIGNAL_UNBLOCK}) and REQUIRES skipped sweeps, so it cannot pass by never
+ * exercising the path. The native half registers an exiting thread everywhere and a
+ * libdispatch worker on Apple, and the churn runs on a worker started with the stop signal
+ * blocked.</p>
  */
 class GcForeignThreadIntegrationTest {
 
@@ -140,6 +146,9 @@ class GcForeignThreadIntegrationTest {
         assertEquals(0, fixed.exit, "The workload must finish. Output: " + tail(fixed.output));
         assertTrue(fixed.output.contains("GC_FOREIGN_THREAD_DONE"),
                 "The workload should run to completion. Output: " + tail(fixed.output));
+        assertTrue(fixed.output.contains("MASKED_WORKER=true") || CompilerHelper.isWindows(),
+                "The churn should run on a worker started with the stop signal blocked. Output: "
+                        + tail(fixed.output));
         assertTrue(registered(fixed.output) >= 1,
                 "The native half must have registered a foreign thread, or this gate exercised"
                         + " nothing. Output: " + tail(fixed.output));
@@ -152,7 +161,8 @@ class GcForeignThreadIntegrationTest {
 
         // ---- 2. the same translation with both fixes compiled out must fail -----------
         Run faulted = run(build(distDir, tempDirs, "faulted",
-                " -DCN1_GC_NO_FOREIGN_THREAD_EXIT -DCN1_GC_NO_OS_SUSPEND "), distDir);
+                " -DCN1_GC_NO_FOREIGN_THREAD_EXIT -DCN1_GC_NO_OS_SUSPEND -DCN1_GC_NO_STOP_SIGNAL_UNBLOCK "),
+                distDir);
         int faultedSkips = count(faulted.output, SKIPPED_SWEEP);
         System.out.println("[GcForeignThread] ablation arm: skippedSweeps=" + faultedSkips);
         assertTrue(faultedSkips > 0,

@@ -22,9 +22,13 @@
  */
 
 /* Registers threads the VM did not start, the way a port callback does: by touching the
-   VM from them. See GcForeignThreadApp. */
+   VM from them; and lets the app create a VM thread from a context that blocks the
+   collector's stop signal. See GcForeignThreadApp. */
 #include "cn1_globals.h"
 #include <pthread.h>
+#if !defined(_WIN32)
+#include <signal.h>
+#endif
 #if defined(__APPLE__)
 #include <dispatch/dispatch.h>
 #endif
@@ -63,4 +67,20 @@ JAVA_INT GcForeignThreadApp_registerForeignThreads___R_int(CODENAME_ONE_THREAD_S
 #endif
     CN1_RESUME_THREAD;
     return registered;
+}
+
+/* Blocks (1) or restores (0) the collector's stop signal on the calling thread, so a Java
+   thread started in between inherits the block the way one started from a
+   signal-masked context does. Answers whether it did anything: Windows has no signal. */
+JAVA_BOOLEAN GcForeignThreadApp_maskStopSignal___boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN block) {
+#if !defined(_WIN32)
+    sigset_t stop;
+    sigemptyset(&stop);
+    sigaddset(&stop, SIGUSR2);
+    pthread_sigmask(block ? SIG_BLOCK : SIG_UNBLOCK, &stop, 0);
+    return JAVA_TRUE;
+#else
+    (void)block;
+    return JAVA_FALSE;
+#endif
 }

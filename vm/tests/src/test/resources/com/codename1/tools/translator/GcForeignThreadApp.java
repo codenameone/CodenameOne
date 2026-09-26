@@ -33,14 +33,22 @@
  * pthread_kill cannot signal at all. Either one was enough to stop the whole program
  * reclaiming anything; see GcForeignThreadIntegrationTest.</p>
  *
- * <p>The native half registers both kinds before the churn starts, and the churn is
- * objectAllocation's shape: pure garbage, many cycles.</p>
+ * <p>A third came from the VM's OWN threads: a thread inherits its creator's signal
+ * mask, so one started where the stop signal is blocked ignored it for life. The churn
+ * therefore runs on a worker started with the signal blocked on this thread.</p>
+ *
+ * <p>The native half registers the foreign threads before the churn starts, and the
+ * churn is objectAllocation's shape: pure garbage, many cycles.</p>
  */
 public class GcForeignThreadApp {
     private static final int ROUNDS = 6;
     private static final int PER_ROUND = 8000000;
 
     private static native int registerForeignThreads();
+
+    private static native boolean maskStopSignal(boolean block);
+
+    private static long checksum;
 
     static final class Node {
         final int v;
@@ -52,8 +60,23 @@ public class GcForeignThreadApp {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         System.out.println("FOREIGN_THREADS=" + registerForeignThreads());
+        boolean masked = maskStopSignal(true);
+        Thread worker = new Thread() {
+            public void run() {
+                checksum = churn();
+            }
+        };
+        worker.start();
+        maskStopSignal(false);
+        System.out.println("MASKED_WORKER=" + masked);
+        worker.join();
+        System.out.println("RESULT=" + checksum);
+        System.out.println("GC_FOREIGN_THREAD_DONE");
+    }
+
+    private static long churn() {
         long checksum = 0;
         for (int round = 0; round < ROUNDS; round++) {
             Node head = null;
@@ -71,7 +94,6 @@ public class GcForeignThreadApp {
                 }
             }
         }
-        System.out.println("RESULT=" + checksum);
-        System.out.println("GC_FOREIGN_THREAD_DONE");
+        return checksum;
     }
 }
