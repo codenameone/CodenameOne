@@ -125,10 +125,6 @@ final class TabGlassMotion {
     /// glow's 0.5 s spring.
     private static final float GLOW_GROWTH = 3f;
 
-
-
-
-
     /// Lens scaleX - 1, distance-independent part.
     private static final float[] STRETCH_X = {
             0.0000f, 0.0000f, 0.0055f, 0.0184f, 0.0384f, 0.0604f, 0.0837f, 0.1028f, 0.1135f,
@@ -240,9 +236,6 @@ final class TabGlassMotion {
             -0.7085f, -0.8119f, -0.8255f, -0.7726f, -0.6875f, -0.5753f, -0.4631f, -0.2694f,
             -0.0007f, 0.0000f
     };
-
-
-
 
     // ---- outputs ----
     /// Lens centre travel, 0 at the source and 1 at the target (overshoots slightly).
