@@ -557,6 +557,13 @@ final class JavascriptReachability {
         seedRuntimeDispatched("java_util_HashMap", "removeImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
         seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
+        seedRuntimeDispatched("java_util_HashSet", "cn1AddImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ContainsImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ClearImpl", "()V");
+        seedRuntimeDispatched("java_util_HashSet", "cn1NextOccupiedImpl", "(I)I");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ElementAtImpl", "(I)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveSlotImpl", "(I)V");
         // valueOfHeap is STATIC: virtual seeding does not resolve it. One per tagged box --
         // every type whose valueOf became a native to return an immediate on the C targets
         // delegates to its heap twin here, and the JS port has no immediates so it ALWAYS

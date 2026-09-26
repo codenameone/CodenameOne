@@ -6107,6 +6107,29 @@ bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], fun
 bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
   return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
 });
+// HashSet keeps its table natively on the C targets; here each native delegates to
+// the pure-Java twin in HashSet.java, exactly as HashMap's do above.
+bindNative(["cn1_java_util_HashSet_cn1AddNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1AddImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1ContainsNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ContainsImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1RemoveNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
+});
+bindNative(["cn1_java_util_HashSet_cn1ClearNative"], function*(__cn1ThisObject) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ClearImpl(__cn1ThisObject));
+});
+bindNative(["cn1_java_util_HashSet_cn1NextOccupied_int_R_int"], function*(__cn1ThisObject, from) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1NextOccupiedImpl_int_R_int(__cn1ThisObject, from));
+});
+bindNative(["cn1_java_util_HashSet_cn1ElementAt_int_R_java_lang_Object"], function*(__cn1ThisObject, index) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ElementAtImpl_int_R_java_lang_Object(__cn1ThisObject, index));
+});
+bindNative(["cn1_java_util_HashSet_cn1RemoveSlot_int"], function*(__cn1ThisObject, index) {
+  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveSlotImpl_int(__cn1ThisObject, index));
+});
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));
   jvm.log(nativeStringFromCharArray(chars));

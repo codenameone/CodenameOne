@@ -72,6 +72,26 @@ public class JsNativeCollectionStorageApp {
         self.setLength(0);
         self.setLength(8);
         if (immutable.equals("a\u00ffbcabc") && self.charAt(6) == 0) score |= 128;
+        // HashSet keeps its table natively on the C targets; the JS port binds each of
+        // those natives to a pure-Java twin. Equality by value, a null element,
+        // removal, removal through the iterator and clear all go through them.
+        HashSet<Object> set = new HashSet<Object>();
+        for (int i = 0; i < 300; i++) set.add(Integer.valueOf(i));
+        for (int i = 0; i < 200; i++) set.remove(Integer.valueOf(i));
+        boolean dup = set.add(Integer.valueOf(250));
+        set.add(null);
+        set.add(new String(new char[] {'k', 'e', 'y'}));
+        int seen = 0;
+        for (Iterator<Object> it = set.iterator(); it.hasNext(); ) {
+            Object o = it.next();
+            seen++;
+            if (o instanceof Integer && ((Integer) o).intValue() % 2 == 0) it.remove();
+        }
+        boolean shape = !dup && seen == 102 && set.size() == 52 && set.contains(null)
+                && set.contains("key") && set.contains(Integer.valueOf(299)) && !set.contains(Integer.valueOf(298))
+                && !set.contains(Integer.valueOf(5));
+        set.clear();
+        if (shape && set.isEmpty() && set.add("again") && set.size() == 1) score |= 256;
         result = score;
         System.out.println("RESULT=" + result);
     }

@@ -70,6 +70,139 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
     private native Object cn1ElementAt(int index);
     private native void cn1RemoveSlot(int index);
 
+    // THE JAVASCRIPT PORT'S IMPLEMENTATION of the seven natives above. The JS runtime
+    // binds each native to its twin here (parparvm_runtime.js), the same way HashMap's
+    // natives delegate to getImpl/putImpl; nothing in bytecode calls these, so they are
+    // retention roots in JavascriptNativeRegistry and JavascriptReachability. Plain
+    // linear probing over a reference block in cn1KeysBlock: deletion leaves a
+    // tombstone rather than shifting, so removing through an iterator never moves an
+    // element the iterator has not reached yet. The C targets never call these.
+    // Created on first use rather than by an initializer, so HashSet gains no static
+    // initializer on the targets that never run this code.
+    private static Object CN1_JS_NULL;
+    private static Object CN1_JS_DELETED;
+
+    private static Object cn1JsKey(Object element) {
+        if (CN1_JS_NULL == null) {
+            CN1_JS_NULL = new Object();
+            CN1_JS_DELETED = new Object();
+        }
+        return element == null ? CN1_JS_NULL : element;
+    }
+
+    private int cn1JsFind(Object key) {
+        int cap = NativeStorage.capacity(cn1KeysBlock);
+        if (cap == 0) {
+            return -1;
+        }
+        int slot = (key.hashCode() & 0x7fffffff) % cap;
+        for (int probes = 0; probes < cap; probes++) {
+            Object at = NativeStorage.get(cn1KeysBlock, slot);
+            if (at == null) {
+                return -1;
+            }
+            if (at != CN1_JS_DELETED && (at == key || key.equals(at))) {
+                return slot;
+            }
+            slot = slot + 1 == cap ? 0 : slot + 1;
+        }
+        return -1;
+    }
+
+    private void cn1JsGrow() {
+        int oldCap = NativeStorage.capacity(cn1KeysBlock);
+        long old = cn1KeysBlock;
+        int cap = Math.max(cn1Cap < 4 ? 4 : cn1Cap, oldCap * 2);
+        cn1KeysBlock = NativeStorage.references(cap);
+        cn1Occupied = 0;
+        for (int i = 0; i < oldCap; i++) {
+            Object at = NativeStorage.get(old, i);
+            if (at != null && at != CN1_JS_DELETED) {
+                int slot = (at.hashCode() & 0x7fffffff) % cap;
+                while (NativeStorage.get(cn1KeysBlock, slot) != null) {
+                    slot = slot + 1 == cap ? 0 : slot + 1;
+                }
+                NativeStorage.set(cn1KeysBlock, slot, at);
+                cn1Occupied++;
+            }
+        }
+    }
+
+    boolean cn1AddImpl(Object element) {
+        Object key = cn1JsKey(element);
+        if (cn1JsFind(key) >= 0) {
+            return false;
+        }
+        int cap = NativeStorage.capacity(cn1KeysBlock);
+        if (cap == 0 || (cn1Occupied + 1) * 4 > cap * 3) {
+            cn1JsGrow();
+            cap = NativeStorage.capacity(cn1KeysBlock);
+        }
+        int slot = (key.hashCode() & 0x7fffffff) % cap;
+        while (true) {
+            Object at = NativeStorage.get(cn1KeysBlock, slot);
+            if (at == null || at == CN1_JS_DELETED) {
+                if (at == null) {
+                    cn1Occupied++;
+                }
+                break;
+            }
+            slot = slot + 1 == cap ? 0 : slot + 1;
+        }
+        NativeStorage.set(cn1KeysBlock, slot, key);
+        cn1Size++;
+        cn1ModCount++;
+        return true;
+    }
+
+    boolean cn1ContainsImpl(Object element) {
+        return cn1JsFind(cn1JsKey(element)) >= 0;
+    }
+
+    boolean cn1RemoveImpl(Object element) {
+        int slot = cn1JsFind(cn1JsKey(element));
+        if (slot < 0) {
+            return false;
+        }
+        cn1RemoveSlotImpl(slot);
+        return true;
+    }
+
+    void cn1ClearImpl() {
+        int cap = NativeStorage.capacity(cn1KeysBlock);
+        if (cap > 0) {
+            NativeStorage.clear(cn1KeysBlock, 0, cap);
+        }
+        cn1Size = 0;
+        cn1Occupied = 0;
+        cn1ModCount++;
+    }
+
+    int cn1NextOccupiedImpl(int from) {
+        cn1JsKey(null);
+        int cap = NativeStorage.capacity(cn1KeysBlock);
+        for (int i = from < 0 ? 0 : from; i < cap; i++) {
+            Object at = NativeStorage.get(cn1KeysBlock, i);
+            if (at != null && at != CN1_JS_DELETED) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    Object cn1ElementAtImpl(int index) {
+        cn1JsKey(null);
+        Object at = NativeStorage.get(cn1KeysBlock, index);
+        return at == CN1_JS_NULL ? null : at;
+    }
+
+    void cn1RemoveSlotImpl(int index) {
+        cn1JsKey(null);
+        NativeStorage.set(cn1KeysBlock, index, CN1_JS_DELETED);
+        cn1Size--;
+        cn1ModCount++;
+    }
+
     public HashSet() { this(DEFAULT_CAPACITY, 0.75f); }
 
     public HashSet(int capacity) { this(capacity, 0.75f); }
