@@ -330,3 +330,42 @@ for (const probe of [
   }
   console.log(`colour matrix replay PASS offcanvas crc=${actual.toString(16)}`);
 }
+
+// Graphics.colorMatrixRegion does not apply the current transform: the region is
+// already in device pixels (core adds the translation; Tabs scales its own
+// regions), so the same op under a scaled or a rotated canvas transform must read
+// and write exactly the pixels it does under identity -- not move, and not vanish.
+for (const [label, transform] of [
+  ['scaled', { a: 2, b: 0, c: 0, d: 2, e: 7, f: 5 }],
+  ['rotated', { a: 0, b: 1, c: -1, d: 0, e: 0, f: 0 }]
+]) {
+  const calls = [];
+  let drawn = null;
+  const context = {
+    canvas: { width: 60, height: 20 },
+    getTransform() { return transform; },
+    getImageData(x, y, w, h) {
+      calls.push(['getImageData', x, y, w, h]);
+      return { data: colorMatrixPattern(w, h, x, y) };
+    },
+    putImageData() { throw new Error('putImageData ignores the clip; the op must not use it'); },
+    save() { calls.push(['save']); },
+    restore() { calls.push(['restore']); },
+    setTransform(...args) { calls.push(['setTransform', ...args]); },
+    clearRect(...args) { calls.push(['clearRect', ...args]); },
+    drawImage(source, x, y) { calls.push(['drawImage', x, y]); drawn = source; }
+  };
+  sandbox.applyColorMatrix(context, -6, -3, 44, 26, vibrantMatrix, colorMatrixMask(11, 7), -1, 0.9);
+  const expectedCalls = JSON.stringify([
+    ['getImageData', 0, 0, 38, 20], ['save'], ['setTransform', 1, 0, 0, 1, 0, 0],
+    ['clearRect', 0, 0, 38, 20], ['drawImage', 0, 0], ['restore']
+  ]);
+  if (JSON.stringify(calls) !== expectedCalls) {
+    throw new Error(`Colour matrix under a ${label} transform: ${JSON.stringify(calls)}`);
+  }
+  const actual = crc32(rgbaToArgb(drawn.pixels));
+  if (actual !== 0x48ee53ca) {
+    throw new Error(`Colour matrix under a ${label} transform: expected 48ee53ca, got ${actual.toString(16)}`);
+  }
+  console.log(`colour matrix replay PASS ${label} transform ignored crc=${actual.toString(16)}`);
+}

@@ -40,6 +40,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class TabsGlassSelectionTest extends UITestBase {
 
     private Tabs glassTabs() {
+        return glassTabs(Component.BOTTOM, new String[]{"One", "Two", "Three"}, false);
+    }
+
+    private Tabs glassTabs(int placement, String[] names, boolean rtl) {
         Hashtable props = new Hashtable();
         props.put("@tabsMorphPreset", "ios27");
         props.put("@tabsSelectionCapsuleBool", "true");
@@ -49,13 +53,93 @@ class TabsGlassSelectionTest extends UITestBase {
         Form form = Display.getInstance().getCurrent();
         form.removeAll();
         form.setLayout(new BorderLayout());
-        Tabs tabs = new Tabs(Component.BOTTOM);
-        tabs.addTab("One", new Label("1"));
-        tabs.addTab("Two", new Label("2"));
-        tabs.addTab("Three", new Label("3"));
+        Tabs tabs = new Tabs(placement);
+        for (int i = 0; i < names.length; i++) {
+            tabs.addTab(names[i], new Label(names[i]));
+        }
         form.add(BorderLayout.CENTER, tabs);
         form.revalidate();
         return tabs;
+    }
+
+    @FormTest
+    void verticalPlacementsKeepTheRegularTabs() {
+        // The floating pill and its lens are horizontal; LEFT and RIGHT keep the
+        // ordinary rendering even under the ios27 preset.
+        assertFalse(glassTabs(Component.LEFT, new String[]{"One", "Two"}, false).isGlassMotion());
+        assertFalse(glassTabs(Component.RIGHT, new String[]{"One", "Two"}, false).isGlassMotion());
+        assertTrue(glassTabs(Component.TOP, new String[]{"One", "Two"}, false).isGlassMotion());
+    }
+
+    @FormTest
+    void anEmptyBarPaintsWithoutTabs() {
+        Tabs tabs = glassTabs(Component.BOTTOM, new String[0], false);
+        assertTrue(tabs.isGlassMotion());
+        Container tc = tabs.getTabsContainer();
+        Image img = Image.createImage(Math.max(1, tc.getWidth()), Math.max(1, tc.getHeight()), 0);
+        Graphics g = img.getGraphics();
+        g.translate(-tc.getX(), -tc.getY());
+        // Before the first tab, and again after the last one is removed: the bar's
+        // glass and its paint both resolve the (tab-less) glass geometry.
+        tabs.paintGlassBarBackground(g);
+        tc.paintComponent(g, true);
+        tabs.addTab("One", new Label("1"));
+        tabs.removeTabAt(0);
+        tabs.getComponentForm().revalidate();
+        tabs.paintGlassBarBackground(g);
+        tc.paintComponent(g, true);
+    }
+
+    @FormTest
+    void rightToLeftPutsTheFirstTabOnTheRight() {
+        // RTL as an application turns it on: for the whole look and feel.
+        UIManager.getInstance().getLookAndFeel().setRTL(true);
+        try {
+            Tabs tabs = glassTabs(Component.BOTTOM, new String[]{"One", "Two", "Three"}, true);
+            Container tc = tabs.getTabsContainer();
+            assertTrue(tc.isRTL(), "precondition: the bar is right to left");
+            assertTrue(tc.getComponentAt(0).getX() > tc.getComponentAt(1).getX()
+                    && tc.getComponentAt(1).getX() > tc.getComponentAt(2).getX(), "tabs must run right to left");
+        } finally {
+            UIManager.getInstance().getLookAndFeel().setRTL(false);
+        }
+    }
+
+    @FormTest
+    void overlappingTabsSplitAtTheMidpointBetweenCentres() {
+        // Each tab is as wide as its resting lens, wider than the pitch, so
+        // neighbours overlap. A point just on one side of the midpoint between two
+        // centres belongs to that side's tab, for taps and scrubs alike.
+        // Neighbours overlap by twice the lens inset; a larger inset makes that
+        // many pixels wide at the test display's density.
+        Hashtable wide = new Hashtable();
+        wide.put("@tabsGlassInsetPt", "20");
+        UIManager.getInstance().addThemeProps(wide);
+        Tabs tabs = glassTabs(Component.BOTTOM, new String[]{"A", "B", "C", "D", "E"}, false);
+        Container tc = tabs.getTabsContainer();
+        Component b = tc.getComponentAt(1);
+        Component c = tc.getComponentAt(2);
+        assertTrue(b.getX() + b.getWidth() > c.getX(), "precondition: neighbouring tabs overlap");
+        float mid = (b.getAbsoluteX() + b.getWidth() / 2f + c.getAbsoluteX() + c.getWidth() / 2f) / 2f;
+        int y = c.getAbsoluteY() + c.getHeight() / 2;
+        // Both probe points lie inside the overlap, one on each side of the midpoint.
+        int leftOfMid = c.getAbsoluteX();
+        int rightOfMid = b.getAbsoluteX() + b.getWidth() - 1;
+        assertTrue(leftOfMid < mid - 1 && rightOfMid > mid + 1,
+                "precondition: the overlap straddles the midpoint (" + leftOfMid + ".." + rightOfMid + " around " + mid + ")");
+        assertSame(b, tc.getComponentAt(leftOfMid, y), "left of the midpoint is the left tab");
+        assertSame(c, tc.getComponentAt(rightOfMid, y), "right of the midpoint is the right tab");
+    }
+
+    @FormTest
+    void theLensTracksPressesWithSwipingOff() {
+        Tabs tabs = glassTabs();
+        tabs.setSwipeActivated(false);
+        Component target = tabs.getTabsContainer().getComponentAt(2);
+        implementation.dispatchPointerPress(target.getAbsoluteX() + target.getWidth() / 2,
+                target.getAbsoluteY() + target.getHeight() / 2);
+        flushSerialCalls();
+        assertTrue(tabs.isGlassMotionRunningTo(2), "touch-down must lift the lens with swiping disabled");
     }
 
     @FormTest

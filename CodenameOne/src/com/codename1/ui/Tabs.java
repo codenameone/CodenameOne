@@ -239,10 +239,29 @@ public class Tabs extends Container {
             }
 
             @Override
+            public Component getComponentAt(int x, int y) {
+                // The glass tabs' bounds overlap (each is as wide as its resting
+                // lens), so the tab under a point is the one whose centre is
+                // nearest, the same rule a scrub's release uses.
+                if (isGlassMotion() && getComponentCount() > 1 && visibleBoundsContains(x, y)) {
+                    int idx = glassTabNearest(fingerInnerX(x - getAbsoluteX()));
+                    Component c = idx < 0 ? null : getComponentAt(idx);
+                    if (c != null && c.isVisible() && c.visibleBoundsContains(x, y)) {
+                        return c instanceof Container ? ((Container) c).getComponentAt(x, y) : c;
+                    }
+                }
+                return super.getComponentAt(x, y);
+            }
+
+            @Override
             public void paint(Graphics g) {
                 if (isGlassMotion()) {
-                    layoutForPaint();
-                    paintGlassTabs(g);
+                    // An empty bar (before the first tab, or after the last is
+                    // removed) keeps its glass but has no lens or content to draw.
+                    if (getComponentCount() > 0) {
+                        layoutForPaint();
+                        paintGlassTabs(g);
+                    }
                     paintBottomDivider(g);
                     return;
                 }
@@ -430,7 +449,10 @@ public class Tabs extends Container {
     protected void initComponent() {
         super.initComponent();
         TopLevelContainer form = getTopLevelContainer();
-        if (form != null && swipeActivated) {
+        // Registered whether or not swiping is on: the same listeners track the
+        // glass lens's press, hold and scrub, and skip the swipe themselves when
+        // swipeActivated is false.
+        if (form != null) {
             form.asContainer().addPointerPressedListener(press);
             form.asContainer().addPointerReleasedListener(release);
             form.asContainer().addPointerDraggedListener(drag);
@@ -1744,9 +1766,12 @@ public class Tabs extends Container {
     }
 
     /// True when the theme selects the measured iOS 27 Liquid Glass selection motion
-    /// (`tabsMorphPreset: "ios27"` together with `tabsSelectionCapsuleBool`).
+    /// (`tabsMorphPreset: "ios27"` together with `tabsSelectionCapsuleBool`) and the
+    /// tabs run horizontally: the floating pill, its lens travel and gestures are
+    /// horizontal, so LEFT and RIGHT placements keep the regular tab rendering.
     boolean isGlassMotion() {
         return selectionCapsule && tabsContainer != null
+                && (tabPlacement == TOP || tabPlacement == BOTTOM)
                 && "ios27".equals(getUIManager().getThemeConstant("tabsMorphPreset", "ios26"));
     }
 
@@ -1858,23 +1883,9 @@ public class Tabs extends Container {
         float ptPx = glassPtPx();
         float fx = fingerInnerX(x - tabsContainer.getAbsoluteX());
         gg.finger(s, fx / ptPx);
-        // The tab whose cell holds the finger -- for equal cells, the centre nearest
-        // it (natively a finger exactly between two keeps the current tab).
+        int best = glassTabNearest(fx);
         int inset = selectionCapsuleInsetPx();
         int[] cb = new int[2];
-        int n = tabsContainer.getComponentCount();
-        int best = n - 1;
-        for (int i = 0; i < n; i++) {
-            capsuleCellBounds(i, inset, cb);
-            float right = cb[0] + cb[1];
-            if (fx < right || i == n - 1) {
-                best = i;
-                if (fx == right && i == activeComponent - 1) {
-                    best = activeComponent;
-                }
-                break;
-            }
-        }
         capsuleCellBounds(best, inset, cb);
         glassToCenter = cb[0] + cb[1] / 2f;
         glassToW = cb[1];
@@ -1884,6 +1895,27 @@ public class Tabs extends Container {
         if (best != activeComponent && best >= 0) {
             setSelectedIndex(best);
         }
+    }
+
+    /// The tab whose centre is nearest `innerX` (relative to the bar's inner x); a
+    /// finger exactly between two keeps the current tab, as natively. Taps and
+    /// scrubs both resolve through this: the resting lenses are wider than the
+    /// pitch between tabs, so the button bounds overlap and cannot decide it.
+    int glassTabNearest(float innerX) {
+        int n = tabsContainer.getComponentCount();
+        int inset = selectionCapsuleInsetPx();
+        int[] cb = new int[2];
+        int best = -1;
+        float bestD = Float.MAX_VALUE;
+        for (int i = 0; i < n; i++) {
+            capsuleCellBounds(i, inset, cb);
+            float d = Math.abs(cb[0] + cb[1] / 2f - innerX);
+            if (d < bestD || (d == bestD && i == activeComponent)) {
+                best = i;
+                bestD = d;
+            }
+        }
+        return best;
     }
 
     /// After a release has been processed: a press that started the lens towards a
@@ -1990,6 +2022,13 @@ public class Tabs extends Container {
             fromW = glassFromW;
             toC = glassToCenter;
             toW = glassToW;
+        } else if (tc.getComponentCount() == 0) {
+            // No tabs: a zero-width lens at the centre, so the bar's own glass
+            // still resolves its geometry.
+            fromC = tc.getInnerWidth() / 2f;
+            fromW = 0;
+            toC = fromC;
+            toW = 0;
         } else {
             int[] cb = new int[2];
             int idx = activeComponent < 0 ? 0 : Math.min(activeComponent, tc.getComponentCount() - 1);
@@ -2919,23 +2958,9 @@ public class Tabs extends Container {
     ///
     /// - `swipeActivated`
     public void setSwipeActivated(boolean swipeActivated) {
-        if (this.swipeActivated != swipeActivated) {
-            this.swipeActivated = swipeActivated;
-            if (isInitialized()) {
-                TopLevelContainer form = getTopLevelContainer();
-                if (form != null) {
-                    if (swipeActivated) {
-                        form.asContainer().addPointerPressedListener(press);
-                        form.asContainer().addPointerReleasedListener(release);
-                        form.asContainer().addPointerDraggedListener(drag);
-                    } else {
-                        form.asContainer().removePointerPressedListener(press);
-                        form.asContainer().removePointerReleasedListener(release);
-                        form.asContainer().removePointerDraggedListener(drag);
-                    }
-                }
-            }
-        }
+        // The pointer listeners stay registered (they also drive the glass lens);
+        // SwipeListener consults this flag before swiping.
+        this.swipeActivated = swipeActivated;
     }
 
     private void initTabsFocus() {
@@ -3361,9 +3386,13 @@ public class Tabs extends Container {
             glassLensWidth = lensW;
             int top = Math.round(sy + inset);
             int h = Math.max(0, Math.round(pillH - 2 * inset));
+            boolean rtl = parent.isRTL();
             for (int i = 0; i < n; i++) {
                 Component c = parent.getComponentAt(i);
-                float centre = pillX + inset + lensW / 2f + i * pitch;
+                // Right to left, the first tab sits at the right end (as GridLayout
+                // places it for the other presets).
+                int slot = rtl ? n - 1 - i : i;
+                float centre = pillX + inset + lensW / 2f + slot * pitch;
                 int left = Math.round(centre - lensW / 2f);
                 c.setX(left);
                 c.setY(top);

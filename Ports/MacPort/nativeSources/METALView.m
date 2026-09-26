@@ -3418,12 +3418,17 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
     CGFloat s = CN1AppKitBackingScale(self) / sv;
     int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
-    int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
-    if (fx < 0) { fw += fx; fx = 0; }
-    if (fy < 0) { fh += fy; fy = 0; }
+    // The scratch covers the FULL region, with the on-screen part copied to its
+    // offset inside it, so the quad, the texture coordinates and the mask all stay
+    // anchored to the region when it runs off a screen edge (the off-screen part
+    // of the quad falls outside the viewport).
+    int fullW = (int)(w * s), fullH = (int)(h * s);
+    int fx = (int)(x * s), fy = (int)(y * s), fw = fullW, fh = fullH, ox = 0, oy = 0;
+    if (fx < 0) { ox = -fx; fw += fx; fx = 0; }
+    if (fy < 0) { oy = -fy; fh += fy; fy = 0; }
     if (fx + fw > texW) { fw = texW - fx; }
     if (fy + fh > texH) { fh = texH - fy; }
-    if (fw <= 0 || fh <= 0) { return; }
+    if (fw <= 0 || fh <= 0 || fullW <= 0 || fullH <= 0) { return; }
 
     if (self.renderCommandEncoder != nil) {
         CN1MetalEndFrame();
@@ -3435,7 +3440,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     }
     id<MTLDevice> device = CN1MetalDevice();
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:fw height:fh mipmapped:NO];
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:fullW height:fullH mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
@@ -3444,7 +3449,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
               sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
                  toTexture:scratch destinationSlice:0 destinationLevel:0
-         destinationOrigin:MTLOriginMake(0, 0, 0)];
+         destinationOrigin:MTLOriginMake(ox, oy, 0)];
     [blit endEncoding];
 
     [self createRenderPassDescriptor];
@@ -3454,7 +3459,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
 
     float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
-    CN1MetalDrawColorMatrix(scratch, mask, x, y, w, h, fw, fh, matrix, crPx, amount);
+    CN1MetalDrawColorMatrix(scratch, mask, x, y, w, h, fullW, fullH, matrix, crPx, amount);
 #ifndef CN1_USE_ARC
     [scratch release];
 #endif

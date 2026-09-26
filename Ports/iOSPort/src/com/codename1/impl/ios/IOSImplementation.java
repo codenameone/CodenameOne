@@ -3431,7 +3431,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isGlassLensRegionSupported(Object graphics) {
-        return ((NativeGraphics) graphics).associatedImage == null;
+        // The op exists only in the Metal renderer (BlurRegion compiles it out
+        // elsewhere); a GL or watchOS build must report no support so callers
+        // take their fallback instead of queueing a no-op.
+        return metalRendering && ((NativeGraphics) graphics).associatedImage == null;
     }
 
     @Override
@@ -3442,7 +3445,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         NativeGraphics ng = (NativeGraphics) graphics;
         // Live screen only, on the GPU (cn1_fs_glass_lens), like colorMatrixRegion.
-        if (ng.associatedImage != null || optics == null) {
+        if (!metalRendering || ng.associatedImage != null || optics == null) {
             return false;
         }
         ng.checkControl();
@@ -3452,7 +3455,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isColorMatrixRegionSupported(Object graphics) {
-        return ((NativeGraphics) graphics).associatedImage == null;
+        // Metal only, as isGlassLensRegionSupported.
+        return metalRendering && ((NativeGraphics) graphics).associatedImage == null;
     }
 
     @Override
@@ -3464,7 +3468,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeGraphics ng = (NativeGraphics) graphics;
         // Live screen only, on the GPU (cn1_fs_colormatrix). Off-screen images return
         // false so the caller can fall back, as lensRegion does.
-        if (ng.associatedImage != null || matrix == null || matrix.length < 12) {
+        if (!metalRendering || ng.associatedImage != null || matrix == null || matrix.length < 12) {
             return false;
         }
         long maskPeer = 0;

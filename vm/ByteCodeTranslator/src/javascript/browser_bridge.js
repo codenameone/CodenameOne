@@ -3033,8 +3033,11 @@
     return { alpha: alpha, w: mw, h: mh };
   }
 
-  // In-place colour matrix over this surface's own pixels. The region is
-  // resolved through the context transform exactly like the lens; pixels off
+  // In-place colour matrix over this surface's own pixels. The region is in
+  // device pixels as given: Graphics.colorMatrixRegion does not apply the
+  // current transform (core has already added its translation, and callers such
+  // as Tabs scale the region themselves), so the context transform -- the user
+  // transform -- is ignored here, as on iOS and JavaSE. Pixels off
   // the canvas are left out but the shape and the mask stay anchored to the
   // FULL region (as JavaSEPort.colorMatrixRegion does), so a region that is
   // partly scrolled off does not squeeze its rounded corners or its glyphs.
@@ -3047,8 +3050,8 @@
     if (!ctx.canvas || width <= 0 || height <= 0 || amount <= 0) {
       return;
     }
-    var rect = lensDeviceRect(ctx, x, y, width, height);
-    if (!rect || rect.w <= 0 || rect.h <= 0) {
+    var rect = { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    if (rect.w <= 0 || rect.h <= 0) {
       return;
     }
     var fullW = rect.w, fullH = rect.h;
