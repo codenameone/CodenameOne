@@ -48,6 +48,7 @@ API, so there a core count is LOGICAL -- both arms are told it, neither is confi
 -- and the report marks it.
 """
 import argparse
+import ctypes
 import importlib.util
 import json
 import os
@@ -97,6 +98,22 @@ def available_cores():
     return os.cpu_count() or 1
 
 
+def _kernel32():
+    """kernel32 with its signatures DECLARED. ctypes defaults every result to a 32-bit
+    int, so GetCurrentProcess's pseudo-handle (-1) came back truncated and
+    GetProcessAffinityMask then failed on an invalid 64-bit handle."""
+    from ctypes import wintypes
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.GetCurrentProcess.argtypes = []
+    kernel32.GetProcessAffinityMask.restype = wintypes.BOOL
+    kernel32.GetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_size_t),
+                                                ctypes.POINTER(ctypes.c_size_t)]
+    kernel32.SetProcessAffinityMask.restype = wintypes.BOOL
+    kernel32.SetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
+    return kernel32
+
+
 class Affinity:
     """Confine THIS process to the first n cores for the duration of a run; the child
     inherits the mask on Linux and Windows. A no-op on macOS, which has no such API."""
@@ -113,18 +130,17 @@ class Affinity:
             os.sched_setaffinity(0, sorted(self.saved)[:self.cores])
             self.enforced = True
         elif system == 'Windows':
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
+            kernel32 = _kernel32()
             process = kernel32.GetCurrentProcess()
             proc_mask = ctypes.c_size_t()
             sys_mask = ctypes.c_size_t()
             if not kernel32.GetProcessAffinityMask(process, ctypes.byref(proc_mask),
                                                    ctypes.byref(sys_mask)):
-                raise RuntimeError('GetProcessAffinityMask failed')
+                raise RuntimeError('GetProcessAffinityMask failed (error %d)' % ctypes.get_last_error())
             self.saved = proc_mask.value
             bits = [b for b in range(64) if self.saved & (1 << b)][:self.cores]
-            if not kernel32.SetProcessAffinityMask(process, ctypes.c_size_t(sum(1 << b for b in bits))):
-                raise RuntimeError('SetProcessAffinityMask failed')
+            if not kernel32.SetProcessAffinityMask(process, sum(1 << b for b in bits)):
+                raise RuntimeError('SetProcessAffinityMask failed (error %d)' % ctypes.get_last_error())
             self.enforced = True
         return self
 
@@ -133,10 +149,8 @@ class Affinity:
         if self.saved is not None and system == 'Linux':
             os.sched_setaffinity(0, self.saved)
         elif self.saved is not None and system == 'Windows':
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-            kernel32.SetProcessAffinityMask(kernel32.GetCurrentProcess(),
-                                            ctypes.c_size_t(self.saved))
+            kernel32 = _kernel32()
+            kernel32.SetProcessAffinityMask(kernel32.GetCurrentProcess(), self.saved)
         return False
 
 
