@@ -67,14 +67,25 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         NativeStorage.setOwned(this, cn1Storage, index, value);
     }
 
+    // The native block does no bounds checking of its own -- it computes base + index
+    // and writes there -- so these two check the range the way System.arraycopy and
+    // Arrays.fill did for the array they replaced. Without it setSize(-1) cleared the
+    // slot BEFORE the block, over its header, where the array form threw.
     private void cn1Move(int from, int to, int count) {
-        if (cn1Native) NativeStorage.move(cn1Storage, from, to, count);
-        else System.arraycopy(elementData, from, elementData, to, count);
+        if (!cn1Native) { System.arraycopy(elementData, from, elementData, to, count); return; }
+        int cap = cn1Capacity();
+        if (count < 0 || from < 0 || to < 0 || from > cap - count || to > cap - count) {
+            throw new ArrayIndexOutOfBoundsException();
+        }
+        NativeStorage.move(cn1Storage, from, to, count);
     }
 
     private void cn1Clear(int from, int to) {
-        if (cn1Native) NativeStorage.clear(cn1Storage, from, to - from);
-        else Arrays.fill(elementData, from, to, null);
+        if (!cn1Native) { Arrays.fill(elementData, from, to, null); return; }
+        if (from < 0 || from > to || to > cn1Capacity()) {
+            throw new ArrayIndexOutOfBoundsException(from < 0 ? from : to);
+        }
+        NativeStorage.clear(cn1Storage, from, to - from);
     }
 
     private void cn1CopyTo(Object[] destination, int count) {

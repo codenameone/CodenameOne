@@ -43,7 +43,9 @@ J8="${JDK_8_HOME:?set JDK_8_HOME to a working JDK 8}"
 [ "$WINDOWS" = 1 ] && J8="$(cygpath -u "$J8")"
 OUT="$REPO/vm/selfhost/target"
 mkdir -p "$OUT"
-CN1_BUILD_SOURCE_SNAPSHOT="$(native_path "$(mktemp -t cn1sources)")"
+# An explicit XXXXXX template: BSD mktemp accepts `-t name` alone, GNU mktemp (Linux,
+# Git Bash) refuses it with "too few X's in template".
+CN1_BUILD_SOURCE_SNAPSHOT="$(native_path "$(mktemp "${TMPDIR:-/tmp}/cn1sources.XXXXXX")")"
 export CN1_BUILD_SOURCE_SNAPSHOT
 "$PYTHON" "$REPO/vm/selfhost/bench-selfhost.py" --snapshot-sources "$CN1_BUILD_SOURCE_SNAPSHOT"
 
@@ -63,7 +65,7 @@ TR_MANIFEST="$REPO/vm/ByteCodeTranslator/target/selfhost-src.manifest"
 # moved into place, so the guard rebuilt on every single run and then failed on the
 # missing file. Caught by asking the gate to stay SILENT when nothing changed, which is
 # the half of a negative control that is easy to skip.
-TR_MANIFEST_NOW="$(mktemp -t cn1selfhostmanifest)"
+TR_MANIFEST_NOW="$(mktemp "${TMPDIR:-/tmp}/cn1selfhostmanifest.XXXXXX")"
 trap 'rm -f "$TR_MANIFEST_NOW" "$CN1_BUILD_SOURCE_SNAPSHOT"' EXIT
 find "$REPO/vm/ByteCodeTranslator/src" -type f | sort > "$TR_MANIFEST_NOW"
 needs_build=0
@@ -129,6 +131,10 @@ ASM_CP="$(cat "$ASM_CP_FILE")"
 
 # 3. JavaAPI, rebuilt from source whenever the source set changed.
 #
+# Every javac here names -encoding UTF-8: the sources carry UTF-8 comments, and the
+# platform default is US-ASCII in a POSIX locale and Cp1252 on Windows, where they are
+# compile errors. Maven, which builds the same sources elsewhere, sets it in the pom.
+#
 # The presence check alone is not enough, and it fails in a way that looks like a VM
 # bug rather than a stale cache: a class compiled before a method stopped being
 # native still declares it native, so the translator emits a call to a symbol nothing
@@ -145,7 +151,7 @@ if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || [ ! -f "$STAMP" ] || [ ! -f "$M
    [ -n "$(find "$REPO/vm/JavaAPI/src" -name '*.java' -newer "$STAMP" -print -quit 2>/dev/null)" ]; then
     rm -rf "$JAVAAPI"; mkdir -p "$JAVAAPI"
     native_list "$MANIFEST.now" > "$MANIFEST.args"
-    "$J8/bin/javac" -nowarn -Xmaxerrs 10000 -source 1.8 -target 1.8 -d "$(native_path "$JAVAAPI")" \
+    "$J8/bin/javac" -nowarn -encoding UTF-8 -Xmaxerrs 10000 -source 1.8 -target 1.8 -d "$(native_path "$JAVAAPI")" \
         "@$(native_path "$MANIFEST.args")"
     rm -f "$MANIFEST.args"
     mv "$MANIFEST.now" "$MANIFEST"
@@ -179,7 +185,7 @@ native_list "$SRCLIST" > "$SRCLIST.args"
 # 5. compile it against JavaAPI ALONE. -Xmaxerrs because javac's default cap of 100
 #    silently truncates and makes a large gap look small.
 rm -rf "$OUT/classes"; mkdir -p "$OUT/classes"
-"$J8/bin/javac" -nowarn -Xmaxerrs 100000 -source 1.8 -target 1.8 \
+"$J8/bin/javac" -nowarn -encoding UTF-8 -Xmaxerrs 100000 -source 1.8 -target 1.8 \
     -bootclasspath "$(native_path "$JAVAAPI")" -cp "$ASM_CP" -d "$(native_path "$OUT/classes")" \
     "@$(native_path "$SRCLIST.args")"
 

@@ -1331,7 +1331,7 @@ long long cn1StallNowNs(void) {
 // is null and the collector would be counted, which costs nothing in practice -- measured,
 // the collector records no stalls at all -- and self-corrects within one probe slice.
 static _Atomic long long cn1StallMutatorNs = 0;
-static struct ThreadLocalData* _Atomic cn1GcThreadTld = 0;
+static struct ThreadLocalData* _Atomic cn1GcThreadTld;   /* zeroed; see gcGraceWalkCursor */
 
 void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
     if(ns <= 0 || cause < 0 || cause >= CN1_STALL_CAUSES) {
@@ -5078,7 +5078,9 @@ static JAVA_BOOLEAN cn1GcProcessReferences(CODENAME_ONE_THREAD_STATE) {
 // The page the next marker will claim. Pages are handed out by CAS rather than by
 // a mutex: the only contention is one pointer swap per page, against a page's worth
 // of tracing.
-static _Atomic(CN1BibopPage*) gcGraceWalkCursor = 0;
+// No initializer: a static is zeroed anyway, and clang 14 (Debian bookworm) rejects
+// `_Atomic(T*) x = 0` as "not a compile-time constant".
+static _Atomic(CN1BibopPage*) gcGraceWalkCursor;
 // Set while the grace page walk is open, so a helper waking into the generation
 // knows to join the walk before it starts consuming the worklist. Plain int with
 // atomic accessors -- read by every marker, written only by the producer.

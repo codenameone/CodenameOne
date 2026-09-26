@@ -211,7 +211,9 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
         if (capacity < 0) throw new IllegalArgumentException();
         if (loadFactor <= 0 || Float.isNaN(loadFactor)) throw new IllegalArgumentException();
         int cap = DEFAULT_CAPACITY;
-        while (cap < capacity) cap <<= 1;
+        // Capped at 2^30, as HashMap.calculateCapacity and Hashtable.cn1Capacity are:
+        // past it the shift wraps negative, then to zero, and the loop never ends.
+        while (cap < capacity && cap < (1 << 30)) cap <<= 1;
         /* No threshold field. It was always (int)(cap * 0.75f) -- the loadFactor
          * argument is validated and then ignored -- and for the only capacities this
          * table ever has, powers of two starting at 4, that is exactly

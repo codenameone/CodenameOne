@@ -1771,7 +1771,7 @@ class CleanTargetIntegrationTest {
      * the build just translated rather than a corpus borrowed from another platform.
      * Nothing is written when the variable is unset.
      */
-    static void recordTranslation(String sources, String appName, String appType) throws java.io.IOException {
+    static void recordTranslation(String sources, String appName, String appType) {
         String record = System.getenv("CN1_TRANSLATION_RECORD");
         if (record == null || record.trim().isEmpty()) {
             return;
@@ -1789,8 +1789,19 @@ class CleanTargetIntegrationTest {
             appendJsonString(json, roots[i]);
         }
         json.append("]}\n");
-        Files.write(Paths.get(record.trim()), json.toString().getBytes(StandardCharsets.UTF_8),
-                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        // Instrumentation for a later step, never a reason for this test to fail: a record
+        // that cannot be written is reported, and the performance gate then says it has no
+        // workload.
+        try {
+            Path file = Paths.get(record.trim());
+            if (file.getParent() != null) {
+                Files.createDirectories(file.getParent());
+            }
+            Files.write(file, json.toString().getBytes(StandardCharsets.UTF_8),
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (java.io.IOException e) {
+            System.err.println("CN1_TRANSLATION_RECORD: could not write " + record + ": " + e);
+        }
     }
 
     private static void appendJsonString(StringBuilder out, String value) {

@@ -110,7 +110,7 @@ MAX_SPREAD="${CN1_PERF_MAX_SPREAD:-15}"
 # parpar measures 15-21% here, so memory is effectively ungated until the pacing
 # variance is fixed -- which is the honest state of affairs, not a loophole.
 MAX_MEM_SPREAD="${CN1_PERF_MAX_MEM_SPREAD:-8}"
-OUT=$(mktemp -t cn1perf)
+OUT=$(mktemp "${TMPDIR:-/tmp}/cn1perf.XXXXXX")   # GNU mktemp needs the Xs
 echo "perf-guard: corpus=$CORPUS_NAME"
 ./bench-selfhost.sh "$CORPUS" "$APP" "$PKG" "$ROUNDS" | tee "$OUT"
 # The bench prints "vs jdk25: elapsed 0.843x, peak memory 0.599x". Both halves of

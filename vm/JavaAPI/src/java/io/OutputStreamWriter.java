@@ -84,6 +84,17 @@ public class OutputStreamWriter extends java.io.Writer {
                 || e.equalsIgnoreCase("utf-8");
     }
 
+    // Buffering hides the underlying stream from every write, so it can no longer be
+    // what reports a closed writer: without this a write after close() only appended to
+    // buf, returned normally, and the bytes were silently lost.
+    private boolean closed;
+
+    private void ensureOpen() throws java.io.IOException {
+        if(closed) {
+            throw new java.io.IOException("Stream closed");
+        }
+    }
+
     private void flushBuffer() throws java.io.IOException {
         if(count > 0) {
             os.write(buf, 0, count);
@@ -95,15 +106,23 @@ public class OutputStreamWriter extends java.io.Writer {
      * Close the stream.
      */
     public void close() throws java.io.IOException{
-        finishPending();
-        flushBuffer();
-        os.close();
+        if(closed) {
+            return;   // closing a closed writer has no effect, as in the JDK
+        }
+        try {
+            finishPending();
+            flushBuffer();
+        } finally {
+            closed = true;
+            os.close();
+        }
     }
 
     /**
      * Flush the stream.
      */
     public void flush() throws java.io.IOException{
+        ensureOpen();
         flushBuffer();
         os.flush();
     }
@@ -116,6 +135,7 @@ public class OutputStreamWriter extends java.io.Writer {
         // inside the String the old body built; the encode loop below would simply
         // run zero times for a negative length and return as though it had written
         // something, where Writer.write says it throws.
+        ensureOpen();
         if(off < 0 || len < 0 || off + len > cbuf.length || off + len < 0) {
             throw new IndexOutOfBoundsException();
         }
@@ -133,6 +153,7 @@ public class OutputStreamWriter extends java.io.Writer {
      * Write a single character.
      */
     public void write(int c) throws java.io.IOException{
+        ensureOpen();
         if(utf8) {
             encodeChar((char)c);
             return;
@@ -146,6 +167,7 @@ public class OutputStreamWriter extends java.io.Writer {
     public void write(java.lang.String str, int off, int len) throws java.io.IOException{
         // Same reasoning as the char[] overload: substring used to raise this, and
         // the encode loop does not.
+        ensureOpen();
         if(off < 0 || len < 0 || off + len > str.length() || off + len < 0) {
             throw new StringIndexOutOfBoundsException();
         }

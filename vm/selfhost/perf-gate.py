@@ -404,13 +404,13 @@ def main(argv):
         if 'version "25' not in version:
             raise RuntimeError('the reference arm is not JDK 25:\n' + version)
 
-        specs = [load_hello(args),
-                 {'id': 'translator', 'label': 'translator (self)', 'kind': 'translation',
+        wanted = set(args.only.split(',')) if args.only else None
+        specs = [load_hello(args)] if wanted is None or 'hello' in wanted else []
+        specs += [{'id': 'translator', 'label': 'translator (self)', 'kind': 'translation',
                   'sources': [str(TARGET / d) for d in ('javaapi-classes', 'asm-classes', 'classes')],
                   'app': TRANSLATOR_APP, 'package': TRANSLATOR_PKG}]
         specs += [{'id': w, 'label': w, 'kind': 'workload'} for w in WORKLOADS]
-        if args.only:
-            wanted = set(args.only.split(','))
+        if wanted is not None:
             specs = [s for s in specs if s['id'] in wanted]
         for s in specs:
             report['labels'][s['id']] = s['label']
