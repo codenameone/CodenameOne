@@ -1493,110 +1493,112 @@ public class ByteCodeClass {
 
         b.append("}\n\n");
                 
-        // mark function for the GC mark cycle to tag the objects that are reachable
-        b.append("void __GC_MARK_");
-        b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n");
-        // The complete layout is known here: trace inherited fields in the same
-        // callback, sharing one marking context rather than chaining base callbacks.
-        List<ByteCodeField> markFields = new ArrayList<ByteCodeField>();
-        for (ByteCodeClass owner = this; owner != null; owner = owner.baseClassObject) {
-            for (ByteCodeField field : owner.fields) {
-                if (!field.isStaticField()) markFields.add(field);
-            }
-        }
-        boolean marksFields = false;
-        for(ByteCodeField fld : markFields) {
-            if(!fld.isStaticField() && fld.isObjectType()) {
-                marksFields = true;
+        // MARK FUNCTIONS: one per class, each tracing only the fields that class DECLARES.
+        //
+        // __GC_MARK_FIELDS_X traces X's own reference fields and native blocks and then
+        // tail-calls its superclass's; __GC_MARK_X looks the marking context up once and
+        // starts the chain. That keeps what the flattened form was for -- one context lookup
+        // per object, not one per hierarchy level -- without re-emitting every inherited
+        // field in every subclass. The flattened form cost code in proportion to depth times
+        // fields: Dialog's mark function was 10KB where master's was 312 bytes, the median
+        // shared one grew 64 -> 224 bytes, and mark code alone was ~770KB of a Linux app's
+        // 3.3MB (+33%) text growth. The superclass call comes last, so it is a tail call.
+        boolean ownRefFields = false;
+        for (ByteCodeField fld : fields) {
+            if (!fld.isStaticField() && fld.isObjectType()) {
+                ownRefFields = true;
                 break;
             }
         }
-        if(marksFields) {
-            b.append("    struct obj__");
+        boolean chainMarks = hasMarkWork();
+        if (chainMarks) {
+            b.append("void __GC_MARK_FIELDS_");
             b.append(clsName);
-            b.append("* objInstance = (struct obj__");
-            b.append(clsName);
-            b.append("*)objToMark;\n");
-            b.append("    const int markEpoch = cn1GcFieldMarkEpoch(force);\n");
-        }
-        for(ByteCodeField fld : markFields) {
-            if(!fld.isStaticField() && fld.isObjectType()) {
-                if(isReferenceReferent(fld.getClsName(), fld)) {
-                    // THE REFERENT IS NOT TRACED. Handing it to gcMarkObject here is
-                    // what made every WeakReference strong; instead the collector is
-                    // told the reference exists and is given the addresses it needs to
-                    // decide, once the strong mark has closed, whether to keep the
-                    // referent or clear the field.
+            b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force, int markEpoch) {\n");
+            if (ownRefFields) {
+                b.append("    struct obj__");
+                b.append(clsName);
+                b.append("* objInstance = (struct obj__");
+                b.append(clsName);
+                b.append("*)objToMark;\n");
+            } else {
+                b.append("    (void)markEpoch;\n");
+            }
+            for(ByteCodeField fld : fields) {
+                if(!fld.isStaticField() && fld.isObjectType()) {
+                    if(isReferenceReferent(fld.getClsName(), fld)) {
+                        // THE REFERENT IS NOT TRACED. Handing it to gcMarkObject here is
+                        // what made every WeakReference strong; instead the collector is
+                        // told the reference exists and is given the addresses it needs to
+                        // decide, once the strong mark has closed, whether to keep the
+                        // referent or clear the field.
+                        //
+                        // Addresses rather than the object, deliberately: cn1_globals.m is a
+                        // fixed template compiled beside whatever the translator emitted, and
+                        // it cannot name `struct obj__java_lang_ref_Reference` -- the class is
+                        // absent from any program that never uses a reference, and including
+                        // its generated header would make the runtime fail to build for those.
+                        // Passing field pointers keeps the layout knowledge on this side,
+                        // where it is generated from the layout itself.
+                        b.append("    cn1GcDiscoverReference(threadStateData, objToMark, force, &objInstance->");
+                        b.append(fld.getClsName()).append("_").append(fld.getFieldName());
+                        b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1TouchAge");
+                        b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1AgedCycle");
+                        b.append(", objInstance->").append(REFERENCE_CLASS).append("_cn1Strength);\n");
+                        continue;
+                    }
+                    // TYPE-IDENTITY CHECK, verifier builds only.
                     //
-                    // Addresses rather than the object, deliberately: cn1_globals.m is a
-                    // fixed template compiled beside whatever the translator emitted, and
-                    // it cannot name `struct obj__java_lang_ref_Reference` -- the class is
-                    // absent from any program that never uses a reference, and including
-                    // its generated header would make the runtime fail to build for those.
-                    // Passing field pointers keeps the layout knowledge on this side,
-                    // where it is generated from the layout itself.
-                    b.append("    cn1GcDiscoverReference(threadStateData, objToMark, force, &objInstance->");
-                    b.append(fld.getClsName()).append("_").append(fld.getFieldName());
-                    b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1TouchAge");
-                    b.append(", &objInstance->").append(REFERENCE_CLASS).append("_cn1AgedCycle");
-                    b.append(", objInstance->").append(REFERENCE_CLASS).append("_cn1Strength);\n");
+                    // CN1_GC_VERIFY already proves every traced reference RESOLVES, which
+                    // is why a reclaimed-and-recycled slot slips past it: the slot holds a
+                    // perfectly valid object, just not the one the field was pointing at.
+                    // A Linux suite core caught the consequence -- ArrayList.add running on
+                    // an object whose class word said charts.compat.Canvas, reading the
+                    // list's backing-array slot out of two of Canvas's int fields.
+                    //
+                    // The field's DECLARED type is known here and thrown away, so the
+                    // collector has no way to notice. Passing it lets the verifier ask
+                    // whether what the field holds is assignable to what it was declared
+                    // as, which is exactly the question a recycled slot answers wrongly --
+                    // and it names the field, instead of leaving a SIGSEGV in an unrelated
+                    // method a whole cycle later.
+                    //
+                    // Arrays are skipped for now: their id mapping is dimensional and the
+                    // failure this was written for was a plain object field.
+                    // getRuntimeDescriptor() is the mangled type for a plain object field
+                    // and carries "[]" for an array, which is how arrays are excluded.
+                    String fldType = fld.getRuntimeDescriptor();
+                    if (fldType != null && fldType.indexOf('[') < 0
+                            && Parser.getClassObject(fldType) != null) {
+                        b.append("#ifdef CN1_GC_VERIFY\n");
+                        b.append("    cn1GcVerifyFieldType(threadStateData, objToMark, objInstance->");
+                        b.append(fld.getClsName()).append("_").append(fld.getFieldName());
+                        b.append(", cn1_class_id_").append(fldType);
+                        b.append(", \"").append(clsName).append(".").append(fld.getFieldName()).append("\");\n");
+                        b.append("#endif\n");
+                    }
+                    b.append("    cn1GcMarkField(threadStateData, ");
+                    if (fld.isVolatile()) {
+                        b.append("atomic_load_explicit(&objInstance->");
+                        b.append(fld.getClsName());
+                        b.append("_");
+                        b.append(fld.getFieldName());
+                        b.append(", memory_order_acquire)");
+                    } else {
+                        b.append("objInstance->");
+                        b.append(fld.getClsName());
+                        b.append("_");
+                        b.append(fld.getFieldName());
+                    }
+                    b.append(", force, markEpoch);\n");
+                }
+            }
+            // This class's own native backing blocks; an inherited block is traced by the
+            // superclass's link of the chain.
+            for (NativeBlock block : NATIVE_BLOCKS) {
+                if (!block.references || !block.owner.equals(clsName)) {
                     continue;
                 }
-                // TYPE-IDENTITY CHECK, verifier builds only.
-                //
-                // CN1_GC_VERIFY already proves every traced reference RESOLVES, which
-                // is why a reclaimed-and-recycled slot slips past it: the slot holds a
-                // perfectly valid object, just not the one the field was pointing at.
-                // A Linux suite core caught the consequence -- ArrayList.add running on
-                // an object whose class word said charts.compat.Canvas, reading the
-                // list's backing-array slot out of two of Canvas's int fields.
-                //
-                // The field's DECLARED type is known here and thrown away, so the
-                // collector has no way to notice. Passing it lets the verifier ask
-                // whether what the field holds is assignable to what it was declared
-                // as, which is exactly the question a recycled slot answers wrongly --
-                // and it names the field, instead of leaving a SIGSEGV in an unrelated
-                // method a whole cycle later.
-                //
-                // Arrays are skipped for now: their id mapping is dimensional and the
-                // failure this was written for was a plain object field.
-                // getRuntimeDescriptor() is the mangled type for a plain object field
-                // and carries "[]" for an array, which is how arrays are excluded.
-                String fldType = fld.getRuntimeDescriptor();
-                if (fldType != null && fldType.indexOf('[') < 0
-                        && Parser.getClassObject(fldType) != null) {
-                    b.append("#ifdef CN1_GC_VERIFY\n");
-                    b.append("    cn1GcVerifyFieldType(threadStateData, objToMark, objInstance->");
-                    b.append(fld.getClsName()).append("_").append(fld.getFieldName());
-                    b.append(", cn1_class_id_").append(fldType);
-                    b.append(", \"").append(clsName).append(".").append(fld.getFieldName()).append("\");\n");
-                    b.append("#endif\n");
-                }
-                b.append("    cn1GcMarkField(threadStateData, ");
-                if (fld.isVolatile()) {
-                    b.append("atomic_load_explicit(&objInstance->");
-                    b.append(fld.getClsName());
-                    b.append("_");
-                    b.append(fld.getFieldName());
-                    b.append(", memory_order_acquire)");
-                } else {
-                    b.append("objInstance->");
-                    b.append(fld.getClsName());
-                    b.append("_");
-                    b.append(fld.getFieldName());
-                }
-                b.append(", force, markEpoch);\n");
-            }
-        }
-        // Trace native backing blocks from the complete inherited layout too.
-        for (NativeBlock block : NATIVE_BLOCKS) {
-            boolean ownsBlock = false;
-            for (ByteCodeField field : markFields) {
-                if (!field.isStaticField() && block.owner.equals(field.getClsName())
-                        && block.field.equals(field.getFieldName())) { ownsBlock = true; break; }
-            }
-            if (block.references && ownsBlock) {
                 // No count argument: the block carries its own length one slot below the
                 // pointer. Passing a separate capacity field would let a marker pair a new
                 // block with a stale capacity -- see cn1RefBlockAlloc.
@@ -1610,6 +1612,26 @@ public class ByteCodeClass {
                     b.append(", force);\n");
                 }
             }
+            if (baseClassObject != null && baseClassObject.hasMarkWork()) {
+                // Declared here rather than relied on through the include graph.
+                b.append("    {\n        extern void __GC_MARK_FIELDS_");
+                b.append(baseClassObject.clsName);
+                b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force, int markEpoch);\n");
+                b.append("        __GC_MARK_FIELDS_");
+                b.append(baseClassObject.clsName);
+                b.append("(threadStateData, objToMark, force, markEpoch);\n    }\n");
+            }
+            b.append("}\n\n");
+        }
+
+        // mark function for the GC mark cycle to tag the objects that are reachable
+        b.append("void __GC_MARK_");
+        b.append(clsName);
+        b.append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT objToMark, JAVA_BOOLEAN force) {\n");
+        if (chainMarks) {
+            b.append("    __GC_MARK_FIELDS_");
+            b.append(clsName);
+            b.append("(threadStateData, objToMark, force, cn1GcFieldMarkEpoch(force));\n");
         }
         // NO SELF-STAMP. This function used to end by storing currentGcMarkValue into the
         // object it traced -- a leftover from when mark functions chained up to Object's
@@ -2999,6 +3021,25 @@ public class ByteCodeClass {
         return size;
     }
     
+    /// Whether this class, or any superclass, declares something the collector traces: a
+    /// reference field or a native reference block. Decides whether __GC_MARK_FIELDS_X is
+    /// emitted and whether a subclass chains to it.
+    public boolean hasMarkWork() {
+        for (ByteCodeClass c = this; c != null; c = c.baseClassObject) {
+            for (ByteCodeField fld : c.fields) {
+                if (!fld.isStaticField() && fld.isObjectType()) {
+                    return true;
+                }
+            }
+            for (NativeBlock block : NATIVE_BLOCKS) {
+                if (block.references && block.owner.equals(c.clsName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /// EAGER INITIALIZATION. A class or interface whose initialization runs no code a
     /// program can observe the timing of is initialized once at startup, before any
     /// Java executes, and every guard on it -- `if(!class__X.initialized)
