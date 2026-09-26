@@ -375,7 +375,12 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--cores', default='1,2,4')
     parser.add_argument('--rounds', type=int, default=5)
-    parser.add_argument('--reps', type=int, default=5,
+    # 25, not Bench's default 5. objectAllocation's repetitions last tens of ms, so at 5
+    # whether a collection lands inside the window decides the number: identical work
+    # measured 22-51ms (Bench.java), and two CI runs of unchanged code put its ratio 37%
+    # apart and failed the gate on noise. Twenty-five consecutive repetitions reach the
+    # allocator's steady state, where six processes agreed to 0.8%.
+    parser.add_argument('--reps', type=int, default=25,
                         help='measured repetitions per workload process (Bench argv[0])')
     parser.add_argument('--baseline', default=str(HERE / 'perf-baseline.json'))
     parser.add_argument('--platform', default=platform_key())
