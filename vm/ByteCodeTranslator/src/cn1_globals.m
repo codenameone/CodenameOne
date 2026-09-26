@@ -859,6 +859,44 @@ static JAVA_BOOLEAN cn1GcPageIndexStale = JAVA_FALSE;
 // GC-thread only. A missed native-stack capture invalidates this cycle's
 // liveness decisions, even if every heap page resolved successfully.
 static JAVA_BOOLEAN cn1GcRootsIncomplete = JAVA_FALSE;
+// WHICH capture failed, for the one line that reports a skipped sweep. Recorded, not
+// printed, where it happens: the scan runs while other threads may be frozen, and a
+// frozen thread can hold the stdio lock, so the collector writes nothing until the sweep
+// has decided to skip -- the point the existing message is already printed from. The
+// message used to say only that a capture failed, which is how a fix for two causes
+// shipped while a third went on skipping every cycle in a real application.
+#define CN1_GC_ROOT_MISS_MAX 8
+static struct {
+    int site;
+    long threadId;
+    int lightweight;
+    int stopError;
+    int hasPthread;
+    pthread_t pthread;      // named only when printed: see cn1GcNoteRootMiss
+} cn1GcRootMiss[CN1_GC_ROOT_MISS_MAX];
+static int cn1GcRootMissCount = 0;      // GC thread only; reset with the flag
+// Why the last stop attempt failed: an errno from pthread_kill, -1 for a timeout, -2 for
+// a failed Mach suspend, -3 for a failed Mach state read, -4 for a failed Windows
+// suspend. 0 when it succeeded. GC thread only.
+static int cn1GcLastStopError = 0;
+static void cn1GcNoteRootMiss(int site, struct ThreadLocalData* t) {
+    cn1GcRootsIncomplete = JAVA_TRUE;
+    if(cn1GcRootMissCount < CN1_GC_ROOT_MISS_MAX) {
+        int i = cn1GcRootMissCount;
+        cn1GcRootMiss[i].site = site;
+        cn1GcRootMiss[i].threadId = t != 0 ? (long)t->threadId : -1;
+        cn1GcRootMiss[i].lightweight = t != 0 && t->lightweightThread ? 1 : 0;
+        cn1GcRootMiss[i].stopError = cn1GcLastStopError;
+        // The handle only. Asking for the thread's NAME here is not safe: on Apple
+        // pthread_getname_np takes the global thread-list lock, which a thread frozen
+        // for this very scan may be holding.
+        cn1GcRootMiss[i].hasPthread = t != 0 && t->gcPthreadValid ? 1 : 0;
+        if(cn1GcRootMiss[i].hasPthread) {
+            cn1GcRootMiss[i].pthread = t->gcPthread;
+        }
+    }
+    cn1GcRootMissCount++;
+}
 // Physical reclamation can lag on mutator-owned/partial pages. A stale native
 // stack word must not revive a logically dead slot after its children were swept.
 // Publish only after a successful sweep; an incomplete mark cannot advance it.
@@ -5337,6 +5375,7 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
 
 void codenameOneGCMark() {
     cn1GcRootsIncomplete = JAVA_FALSE;
+    cn1GcRootMissCount = 0;
     currentGcMarkValue++;
     // PUBLISH THE EPOCH HERE, not only from cn1BibopBeginGcCycle, because that call is
     // compiled out under -DCN1_DISABLE_BIBOP and the mirror then stays at 1 forever.
@@ -6806,6 +6845,23 @@ void codenameOneGCSweep() {
     // parked because the index could not be built would hang the app instead.
     if(cn1GcRootsIncomplete) {
         fprintf(stderr, "CN1 GC: incomplete native root capture; skipped sweep\n");
+        // Which captures failed. Sites: 1-2 forced-stop capture, 3 no stack bounds,
+        // 4 and 6 a virtual thread's resumer outside its host stack, 5 the thread could
+        // not be stopped (stopErr says why), 7 stack pointer outside the stack, 8 no
+        // registers, 9-10 the collector's own stack.
+        for(int __m = 0; __m < cn1GcRootMissCount && __m < CN1_GC_ROOT_MISS_MAX; __m++) {
+            char __name[64];
+            __name[0] = 0;
+#if defined(__APPLE__) || defined(__linux__)
+            // Safe here: every thread was released before the sweep decided to skip.
+            if(cn1GcRootMiss[__m].hasPthread) {
+                pthread_getname_np(cn1GcRootMiss[__m].pthread, __name, sizeof(__name));
+            }
+#endif
+            fprintf(stderr, "CN1 GC:   site=%d thread=%ld lightweight=%d stopErr=%d name=%s\n",
+                    cn1GcRootMiss[__m].site, cn1GcRootMiss[__m].threadId,
+                    cn1GcRootMiss[__m].lightweight, cn1GcRootMiss[__m].stopError, __name);
+        }
         cn1GcReleaseBlockedThreads();
         return;
     }
@@ -14280,6 +14336,7 @@ void cn1GcInstallSignalHandler(void) {
 static char* cn1GcMachStopOne(struct ThreadLocalData* t) {
     mach_port_t port = pthread_mach_thread_np(t->gcPthread);
     if(port == MACH_PORT_NULL || thread_suspend(port) != KERN_SUCCESS) {
+        cn1GcLastStopError = -2;
         return 0;
     }
     void* sp = 0;
@@ -14302,6 +14359,7 @@ static char* cn1GcMachStopOne(struct ThreadLocalData* t) {
     kr = KERN_FAILURE;
 #endif
     if(kr != KERN_SUCCESS || sp == 0) {
+        cn1GcLastStopError = -3;
         thread_resume(port);
         return 0;
     }
@@ -14327,6 +14385,7 @@ static char* cn1GcWinStopOne(struct ThreadLocalData* t) {
     void* sp = cn1_win_suspend_capture(t->gcPthread.id, &handle, t->gcSigRegs,
                                        sizeof(t->gcSigRegs), &len);
     if(sp == 0) {
+        cn1GcLastStopError = -4;
         return 0;
     }
     t->gcSigRegsLen = (sig_atomic_t)len;
@@ -14367,9 +14426,11 @@ static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
     t->gcSigStackPointer = 0;
     __atomic_thread_fence(__ATOMIC_RELEASE);
     t->gcSigStopRequest = (sig_atomic_t)gen;
+    cn1GcLastStopError = 0;
     {
         int killed = pthread_kill(t->gcPthread, CN1_GC_STOP_SIGNAL);
         if(killed != 0) {
+            cn1GcLastStopError = killed;
             t->gcSigStopRequest = 0;
 #if defined(__APPLE__)
             // A libdispatch worker cannot be signalled at all: pthread_kill answers
@@ -14394,6 +14455,7 @@ static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
         if((spins & 1023) == 0) usleep(50);
     }
     if((int)t->gcSigStopped != gen) {
+        cn1GcLastStopError = -1;
         // Counted only for the caller that can act on it: an escalation timeout says the
         // thread was busy for 250ms, not that it never answers.
         if(maySkip && t->gcStopFailures < 1000000) { t->gcStopFailures++; }
@@ -14664,12 +14726,12 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
                 && fsp >= fbase - (long)fssz && fsp < fbase) {
             cn1ConservativeMarkRange(threadStateData, fsp, fbase);
         } else {
-            cn1GcRootsIncomplete = JAVA_TRUE;
+            cn1GcNoteRootMiss(1, t);
         }
         if(t->gcSigRegsLen > 0) {
             cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
         } else {
-            cn1GcRootsIncomplete = JAVA_TRUE;
+            cn1GcNoteRootMiss(2, t);
         }
         return;
     }
@@ -14677,7 +14739,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 
     size_t ssz = 0;
     char* base = cn1GcThreadStackBase(t, &ssz);
-    if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
+    if(base == 0 || ssz == 0) { cn1GcNoteRootMiss(3, t); return; }
 
     // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
     cn1GcBuildRootSnapshots();
@@ -14700,7 +14762,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
             if(resumer >= base - (long)ssz && resumer < base) {
                 cn1ConservativeMarkRange(threadStateData, resumer, base);
             } else {
-                cn1GcRootsIncomplete = JAVA_TRUE;
+                cn1GcNoteRootMiss(4, t);
             }
             cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
                                      (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
@@ -14737,7 +14799,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
                 return;
             }
         }
-        cn1GcRootsIncomplete = JAVA_TRUE;
+        cn1GcNoteRootMiss(5, t);
         return;   // nothing was frozen, so the counter was never raised
     }
     // Raised only on the success path, so the sub below always pairs with an add.
@@ -14756,18 +14818,18 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
             if(resumer >= base - (long)ssz && resumer < base) {
                 cn1ConservativeMarkRange(threadStateData, resumer, base);
             } else {
-                cn1GcRootsIncomplete = JAVA_TRUE;
+                cn1GcNoteRootMiss(6, t);
             }
         } else if(sp >= base - (long)ssz && sp < base) {
             cn1ConservativeMarkRange(threadStateData, sp, base);
         } else {
-            cn1GcRootsIncomplete = JAVA_TRUE;
+            cn1GcNoteRootMiss(7, t);
         }
     }
     if(t->gcSigRegsLen > 0) {
         cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
     } else {
-        cn1GcRootsIncomplete = JAVA_TRUE;
+        cn1GcNoteRootMiss(8, t);
     }
     cn1GcSignalReleaseOne(t);
     atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
@@ -14782,8 +14844,8 @@ static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE) {
     char* sp = (char*)spv;
     size_t ssz = 0;
     char* base = cn1GcThreadStackBase(threadStateData, &ssz);
-    if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
-    if(sp < base - (long)ssz || sp >= base) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
+    if(base == 0 || ssz == 0) { cn1GcNoteRootMiss(9, threadStateData); return; }
+    if(sp < base - (long)ssz || sp >= base) { cn1GcNoteRootMiss(10, threadStateData); return; }
     cn1GcBuildRootSnapshots();
     cn1ConservativeMarkRange(threadStateData, sp, base);
     cn1ConservativeMarkRange(threadStateData, (char*)&ownRegs, (char*)&ownRegs + sizeof(ownRegs));
