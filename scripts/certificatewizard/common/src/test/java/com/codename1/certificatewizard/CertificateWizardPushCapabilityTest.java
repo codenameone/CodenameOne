@@ -388,13 +388,20 @@ class CertificateWizardPushCapabilityTest {
                 fire(app[0].getForm(), "btn.profileNeedsBundle");
             }
         });
+        // The registration dialog replaces the profile dialog with an animated show, and its
+        // fields are not in the tree until that has run: read one turn later, they were there on
+        // some runs and not on others. And the lookups are asserted HERE, on the test thread --
+        // an assertion inside onEdt is an application error, and the run hung for hours waiting
+        // on an event thread that had already swallowed it.
+        settle();
+        final Component id = find(app[0].getForm(), "modal.bundle.identifier");
+        assertNotNull(id, "the registration dialog has to be on screen");
+        final Component groups = find(app[0].getForm(), "modal.bundle.appGroups");
+        assertNotNull(groups, "with the App Groups option on it");
+        assertNotNull(find(app[0].getForm(), "modal.bundle.submit"), "with its submit action");
         onEdt(new Runnable() {
             public void run() {
-                Component id = find(app[0].getForm(), "modal.bundle.identifier");
-                assertNotNull(id, "the registration dialog has to be on screen");
                 ((TextField) id).setText("com.example.brandnew");
-                Component groups = find(app[0].getForm(), "modal.bundle.appGroups");
-                assertNotNull(groups, "with the App Groups option on it");
                 ((CheckBox) groups).setSelected(true);
                 fire(app[0].getForm(), "modal.bundle.submit");
             }

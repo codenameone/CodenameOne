@@ -1063,6 +1063,11 @@ final class IOSProvisioningPreflight {
             problems.add(wrongApp);
             return;
         }
+        Problem wrongTeam = checkAppIdTeamMatchesProfile(profile, settings, describe, settingKey);
+        if (wrongTeam != null) {
+            problems.add(wrongTeam);
+            return;
+        }
 
         if (!checkMethodMismatch) {
             return;
@@ -1095,11 +1100,9 @@ final class IOSProvisioningPreflight {
      * judged at all, and a profile that names no App ID has already returned above. What remains
      * is a profile Apple issued for a different application.
      *
-     * <p>What it does NOT catch is the same bundle identifier under a different TEAM prefix, and
-     * that half of the Xcode message stays a build-server failure. {@code profileCoversBundleId}
-     * compares the App ID pattern with the prefix stripped, deliberately: nothing in
-     * {@code codenameone_settings.properties} states the team, so the only honest comparison here
-     * is the one that does not need it.
+     * <p>The team half of the same Xcode message is {@link #checkAppIdTeamMatchesProfile}.
+     * {@code profileCoversBundleId} compares the App ID pattern with the prefix stripped, because
+     * the bundle identifier and the team come from two different settings.
      *
      * @return the problem, or null when the profile covers this app or nothing here can tell
      */
@@ -1125,6 +1128,62 @@ final class IOSProvisioningPreflight {
                 + ", or set codename1.packageName to the bundle ID the profile was issued for. "
                 + "The certificate wizard creates a matching profile from the project's own "
                 + "package name.", true);
+    }
+
+    /**
+     * Whether {@code codename1.ios.appid} names the team the profile was issued to.
+     *
+     * <p>The build server writes that setting VERBATIM as the app's
+     * {@code application-identifier} entitlement and as its keychain access group, so its team
+     * prefix has to be the profile's. When it is not, Xcode fails the build with the same
+     * message as a profile for the wrong app -- "doesn't match the entitlements file's values
+     * for the application-identifier and keychain-access-groups entitlements" -- which is what
+     * issue #5901 kept hitting after {@link #checkProfileSignsThisApp} had already ruled the
+     * bundle identifier out. New projects are generated with the placeholder
+     * {@code Q5GHSKAL2F.<package>}, a team nobody owns, and the certificate wizard did not
+     * rewrite it, so a project signed with nothing but the wizard failed every device build.
+     *
+     * <p>Fatal, because nothing on the server repairs the prefix. Both sides have to be a well
+     * formed ten character team ID before this judges: an App ID with no prefix, or one this
+     * cannot resolve, is left alone.
+     *
+     * @return the problem, or null when the teams agree or nothing here can tell
+     */
+    static Problem checkAppIdTeamMatchesProfile(Profile profile, Properties settings,
+            String describe, String settingKey) {
+        String appId = trimmed(settings.getProperty("codename1.ios.appid"));
+        if (appId == null || appId.isEmpty() || appId.indexOf("${") >= 0) {
+            return null;
+        }
+        String appIdTeam = teamPrefix(appId);
+        String profileTeam = profile.applicationIdentifier == null ? null
+                : teamPrefix(profile.applicationIdentifier);
+        if (appIdTeam == null || profileTeam == null || appIdTeam.equals(profileTeam)) {
+            return null;
+        }
+        String bundle = appId.substring(appIdTeam.length() + 1);
+        return new Problem("codename1.ios.appid is " + appId + ", so the app's "
+                + "application-identifier and keychain-access-groups entitlements name team "
+                + appIdTeam + ", but the provisioning profile " + describe + " (" + settingKey
+                + ") was issued to team " + profileTeam + ". Xcode refuses to sign with a profile "
+                + "whose team does not match those entitlements.\n"
+                + "Set codename1.ios.appid=" + profileTeam + "." + bundle + ", or re-run the "
+                + "certificate wizard, which writes it when it installs the profile.", true);
+    }
+
+    /** The ten character team ID an App ID starts with, or null when it does not start with one. */
+    static String teamPrefix(String appId) {
+        int dot = appId.indexOf('.');
+        if (dot != 10) {
+            return null;
+        }
+        for (int i = 0; i < dot; i++) {
+            char c = appId.charAt(i);
+            if (!(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9')) {
+                return null;
+            }
+        }
+        return appId.substring(0, dot);
     }
 
     /**

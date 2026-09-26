@@ -232,9 +232,9 @@ public class IOSProvisioningPreflightTest {
     }
 
     /**
-     * The team prefix is not part of the comparison, so a profile from another team under the
-     * same bundle id still passes here. Asserted rather than left implied: it is the half of the
-     * Xcode message this check cannot answer, because nothing in the settings states the team.
+     * The bundle comparison ignores the team prefix, so with no codename1.ios.appid to state a
+     * team, a profile from another team under the same bundle id passes. The team is judged
+     * against codename1.ios.appid, below.
      */
     @Test
     public void aDifferentTeamPrefixIsNotJudged() throws Exception {
@@ -242,6 +242,62 @@ public class IOSProvisioningPreflightTest {
                 true, "app-store");
         p.setProperty("codename1.packageName", "com.example.app");
         assertTrue(check(p, true).isEmpty());
+    }
+
+    /**
+     * Issue #5901: the project template's placeholder App ID, Q5GHSKAL2F.<package>, against a
+     * profile Apple issued to the developer's real team. The server writes the App ID verbatim
+     * into the application-identifier and keychain-access-groups entitlements, so Xcode refused
+     * both the debug and the release build with a profile that was right in every other way.
+     */
+    @Test
+    public void appIdFromAnotherTeamIsRefused() throws Exception {
+        Properties p = settings(write(appStoreFor("Demo STORE", "A1B2C3D4E5.com.example.app")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.ios.appid", "Q5GHSKAL2F.com.example.app");
+        assertFatal(check(p, true), "Demo STORE", "Q5GHSKAL2F", "A1B2C3D4E5",
+                "codename1.ios.appid=A1B2C3D4E5.com.example.app", "keychain-access-groups");
+    }
+
+    /** The early pass, before CN1Libs are merged, already knows the answer. */
+    @Test
+    public void appIdFromAnotherTeamIsRefusedBeforeTheMerge() throws Exception {
+        Properties p = settings(write(appStoreFor("Demo STORE", "A1B2C3D4E5.com.example.app")),
+                true, null);
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.ios.appid", "Q5GHSKAL2F.com.example.app");
+        assertFatal(IOSProvisioningPreflight.checkProfileFile(p, true, new Date()), "A1B2C3D4E5");
+    }
+
+    @Test
+    public void appIdFromTheProfilesTeamPasses() throws Exception {
+        Properties p = settings(write(appStoreFor("Store", "A1B2C3D4E5.com.example.app")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.ios.appid", "A1B2C3D4E5.com.example.app");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    /** An App ID that does not start with a team ID states no team, so there is nothing to hold. */
+    @Test
+    public void appIdWithoutATeamIsNotJudged() throws Exception {
+        Properties p = settings(write(appStoreFor("Store", "A1B2C3D4E5.com.example.app")),
+                true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.ios.appid", "com.example.app");
+        assertTrue(check(p, true).isEmpty());
+        p.setProperty("codename1.ios.appid", "${team}.com.example.app");
+        assertTrue(check(p, true).isEmpty());
+    }
+
+    @Test
+    public void teamPrefixIsOnlyAWellFormedTeamId() {
+        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.teamPrefix("A1B2C3D4E5.com.example.app"));
+        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.teamPrefix("A1B2C3D4E5.*"));
+        assertNull(IOSProvisioningPreflight.teamPrefix("com.example.app"));
+        assertNull(IOSProvisioningPreflight.teamPrefix("ABCD1234.com.example.app"));
+        assertNull(IOSProvisioningPreflight.teamPrefix("a1b2c3d4e5.com.example.app"));
     }
 
     /** No package name to compare against, and a profile is not refused on a guess. */

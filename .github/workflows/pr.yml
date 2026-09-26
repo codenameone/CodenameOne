@@ -57,6 +57,9 @@ on:
       - 'scripts/check-cn1lib-native-coverage.py'
       - 'scripts/check-cn1lib-native-sources.py'
       - 'scripts/cn1lib-api-check/**'
+      # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
+      # tests"), so a change to the wizard alone has to trigger it.
+      - 'scripts/certificatewizard/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -119,6 +122,9 @@ on:
       - 'scripts/check-cn1lib-native-coverage.py'
       - 'scripts/check-cn1lib-native-sources.py'
       - 'scripts/cn1lib-api-check/**'
+      # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
+      # tests"), so a change to the wizard alone has to trigger it.
+      - 'scripts/certificatewizard/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -648,6 +654,20 @@ jobs:
           # whole retry sequence.
           JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
             mvn -B -pl common test -Dcn1.settings.skipTests=false
+      - name: Run Certificate Wizard tests
+        if: ${{ matrix.java-version == 8 }}
+        # The same arrangement as the Settings step above, and after it for the same
+        # reason: it needs the maven plugin and codenameone-javase that step has just
+        # installed. Before this the wizard's tests ran nowhere -- only the release
+        # workflow built the module, with tests skipped -- so the stylesheet checks, the
+        # push-capability rules and the signing-install tests were never exercised.
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          set -euo pipefail
+          cd scripts/certificatewizard
+          JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
+            mvn -B -pl common test -Dcn1.certificatewizard.skipTests=false
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
