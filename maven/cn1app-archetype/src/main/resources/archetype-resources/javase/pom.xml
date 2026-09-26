@@ -76,11 +76,18 @@
         Optional bundled ffmpeg runtime for desktop media. BrowserComponent gets
         JCEF Maven transitively from codenameone-javase; JCEF Maven downloads and
         installs the matching native runtime on first use.
+
+        Runtime scope, never compile: this is ~300 MB of ffmpeg natives for
+        every OS and CPU. The simulator and desktop run classpaths are runtime
+        classpaths, so they still get it; the jar that cn1:build uploads is
+        assembled from the compile classpath, so it does not. At compile scope
+        it went into every desktop upload and the build client refused the jar.
       -->
       <dependency>
           <groupId>com.codenameone</groupId>
           <artifactId>cn1-binaries-javase</artifactId>
           <type>pom</type>
+          <scope>runtime</scope>
       </dependency>
       <!--
         JUnit Jupiter so Surefire (which is bound to this module's test
