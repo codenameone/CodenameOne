@@ -39,7 +39,7 @@
  * The bridge functions are ParparVM-mangled instance natives, so the first two
  * parameters are the thread state and the receiver (__cn1ThisObject), followed by
  * the declared arguments. Java arrays cross as JAVA_OBJECT and the element data is
- * reached through ((JAVA_ARRAY)obj)->data, exactly as in IOSSimd.m.
+ * reached through CN1_ARRAY_DATA((JAVA_ARRAY)obj), exactly as in IOSSimd.m.
  */
 
 #if 1  /* SIMD: arch-gated below (SSE2 x64 / NEON arm64), portable to Linux */
@@ -70,9 +70,9 @@ static JAVA_ARRAY_BYTE cn1SimdSaturateByte(int value) {
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -93,9 +93,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -116,9 +116,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_mul___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
     /* SSE2 has no 32-bit integer multiply; arm64 NEON does. */
 #if defined(CN1_SIMD_ARM64)
@@ -134,9 +134,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_mul___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_min___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_ARM64)
     for (; i <= end - 4; i += 4) {
@@ -151,9 +151,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_min___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_max___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_ARM64)
     for (; i <= end - 4; i += 4) {
@@ -168,9 +168,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_max___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_and___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -189,9 +189,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_and___int_1ARRAY_int_1ARRAY_int_1AR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_or___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -210,9 +210,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_or___int_1ARRAY_int_1ARRAY_int_1ARR
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_xor___int_1ARRAY_int_1ARRAY_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -230,7 +230,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_xor___int_1ARRAY_int_1ARRAY_int_1AR
 
 JAVA_INT com_codename1_impl_linux_LinuxSimd_sum___int_1ARRAY_int_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
     int i = offset, end = offset + length;
     int total = 0;
 #if defined(CN1_SIMD_X64)
@@ -258,8 +258,8 @@ JAVA_INT com_codename1_impl_linux_LinuxSimd_sum___int_1ARRAY_int_int_R_int(
 
 JAVA_INT com_codename1_impl_linux_LinuxSimd_dot___int_1ARRAY_int_1ARRAY_int_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) srcB)->data;
+    JAVA_ARRAY_INT* a = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_INT* b = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
     int i = offset, end = offset + length;
     int total = 0;
 #if defined(CN1_SIMD_ARM64)
@@ -280,9 +280,9 @@ JAVA_INT com_codename1_impl_linux_LinuxSimd_dot___int_1ARRAY_int_1ARRAY_int_int_
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -301,9 +301,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___float_1ARRAY_float_1ARRAY_flo
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -322,9 +322,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___float_1ARRAY_float_1ARRAY_flo
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_mul___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -343,9 +343,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_mul___float_1ARRAY_float_1ARRAY_flo
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_min___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -364,9 +364,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_min___float_1ARRAY_float_1ARRAY_flo
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_max___float_1ARRAY_float_1ARRAY_float_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_FLOAT* d = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 4; i += 4) {
@@ -384,7 +384,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_max___float_1ARRAY_float_1ARRAY_flo
 
 JAVA_FLOAT com_codename1_impl_linux_LinuxSimd_sum___float_1ARRAY_int_int_R_float(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) src)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
     int i = offset, end = offset + length;
     float total = 0.0f;
 #if defined(CN1_SIMD_X64)
@@ -412,8 +412,8 @@ JAVA_FLOAT com_codename1_impl_linux_LinuxSimd_sum___float_1ARRAY_int_int_R_float
 
 JAVA_FLOAT com_codename1_impl_linux_LinuxSimd_dot___float_1ARRAY_float_1ARRAY_int_int_R_float(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY) srcB)->data;
+    JAVA_ARRAY_FLOAT* a = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_FLOAT* b = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
     int i = offset, end = offset + length;
     float total = 0.0f;
 #if defined(CN1_SIMD_X64)
@@ -444,9 +444,9 @@ JAVA_FLOAT com_codename1_impl_linux_LinuxSimd_dot___float_1ARRAY_float_1ARRAY_in
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 16; i += 16) {
@@ -465,9 +465,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_add___byte_1ARRAY_byte_1ARRAY_byte_
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 16; i += 16) {
@@ -486,9 +486,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_sub___byte_1ARRAY_byte_1ARRAY_byte_
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_and___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 16; i += 16) {
@@ -507,9 +507,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_and___byte_1ARRAY_byte_1ARRAY_byte_
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_or___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 16; i += 16) {
@@ -528,9 +528,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_or___byte_1ARRAY_byte_1ARRAY_byte_1
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_xor___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT srcA, JAVA_OBJECT srcB,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcA)->data;
-    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) srcB)->data;
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_BYTE* a = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcA);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)srcB);
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = offset, end = offset + length;
 #if defined(CN1_SIMD_X64)
     for (; i <= end - 16; i += 16) {
@@ -552,9 +552,9 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_xor___byte_1ARRAY_byte_1ARRAY_byte_
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_replaceTopByteFromUnsignedBytes___int_1ARRAY_int_byte_1ARRAY_int_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT rgbSrc, JAVA_INT rgbSrcOffset,
         JAVA_OBJECT alphaSrc, JAVA_INT alphaSrcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    JAVA_ARRAY_INT* rgb = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) rgbSrc)->data;
-    JAVA_ARRAY_BYTE* alpha = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) alphaSrc)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* rgb = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)rgbSrc);
+    JAVA_ARRAY_BYTE* alpha = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)alphaSrc);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = 0;
 #if defined(CN1_SIMD_X64)
     __m128i rgbMask = _mm_set1_epi32(0x00ffffff);
@@ -590,8 +590,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_replaceTopByteFromUnsignedBytes___i
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_blendByMaskTestNonzero___int_1ARRAY_int_int_int_int_int_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_INT testMask, JAVA_INT trueKeepMask, JAVA_INT trueOrValue, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = 0;
 #if defined(CN1_SIMD_X64)
     __m128i vTest = _mm_set1_epi32(testMask);
@@ -633,8 +633,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxSimd_blendByMaskTestNonzeroSubstituteOnK
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_INT testMask, JAVA_INT trueKeepMask, JAVA_INT trueOrValue, JAVA_INT removeMatch,
         JAVA_INT removeValue, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data;
-    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) ((JAVA_ARRAY) dst)->data;
+    JAVA_ARRAY_INT* s = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
+    JAVA_ARRAY_INT* d = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
     int i = 0;
 #if defined(CN1_SIMD_X64)
     __m128i vTest = _mm_set1_epi32(testMask);
@@ -738,26 +738,26 @@ static void cn1SimdByteShr(JAVA_ARRAY_BYTE* s, int so, JAVA_ARRAY_BYTE* d, int d
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_shl___byte_1ARRAY_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT bits,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    cn1SimdByteShl((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, offset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, bits, length);
+    cn1SimdByteShl((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), offset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), offset, bits, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_shl___byte_1ARRAY_int_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdByteShl((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, bits, length);
+    cn1SimdByteShl((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, bits, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_shrLogical___byte_1ARRAY_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT bits,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    cn1SimdByteShr((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, offset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, bits, length);
+    cn1SimdByteShr((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), offset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), offset, bits, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_shrLogical___byte_1ARRAY_int_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_INT bits, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdByteShr((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, bits, length);
+    cn1SimdByteShr((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, bits, length);
 }
 
 /* dst[i] = (table[indices[i] & 0xff] when in range else 0); scalar, like IOSSimd. */
@@ -771,16 +771,16 @@ static void cn1SimdLookup(JAVA_ARRAY_BYTE* t, int tableLen, JAVA_ARRAY_BYTE* idx
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT indices,
         JAVA_OBJECT dst, JAVA_INT offset, JAVA_INT length) {
-    cn1SimdLookup((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
-                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) indices)->data, offset,
-                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, length);
+    cn1SimdLookup((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)table), ((JAVA_ARRAY) table)->length,
+                  (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)indices), offset,
+                  (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), offset, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_lookupBytes___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT indices,
         JAVA_INT indicesOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdLookup((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
-                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) indices)->data, indicesOffset,
-                  (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+    cn1SimdLookup((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)table), ((JAVA_ARRAY) table)->length,
+                  (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)indices), indicesOffset,
+                  (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 
 /* dst[i] = (byte) src[i]; int32 -> byte truncate. */
@@ -792,14 +792,14 @@ static void cn1SimdPackIntToByte(JAVA_ARRAY_INT* s, int so, JAVA_ARRAY_BYTE* d, 
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packIntToByteTruncate___int_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_OBJECT dst,
         JAVA_INT offset, JAVA_INT length) {
-    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data, offset,
-                         (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, offset, length);
+    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)src), offset,
+                         (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), offset, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packIntToByteTruncate___int_1ARRAY_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) ((JAVA_ARRAY) src)->data, srcOffset,
-                         (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+    cn1SimdPackIntToByte((JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
+                         (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 
 /* 3-way de-interleave: src is [a0 b0 c0 a1 b1 c1 ...] -> d0/d1/d2. */
@@ -823,16 +823,16 @@ static void cn1SimdUnpack3(JAVA_ARRAY_BYTE* s, int so, JAVA_ARRAY_BYTE* d0, int 
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_OBJECT dst0, JAVA_OBJECT dst1, JAVA_OBJECT dst2, JAVA_INT length) {
-    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst0)->data, 0,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst1)->data, 0,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst2)->data, 0, length);
+    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst0), 0,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst1), 0,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst2), 0, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_unpackBytesInterleaved3___byte_1ARRAY_int_byte_1ARRAY_int_int_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT srcOffset,
         JAVA_OBJECT dst, JAVA_INT dst0Offset, JAVA_INT dst1Offset, JAVA_INT dst2Offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
-    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
+    cn1SimdUnpack3((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
                    d, dst0Offset, d, dst1Offset, d, dst2Offset, length);
 }
 
@@ -858,17 +858,17 @@ static void cn1SimdPack3(JAVA_ARRAY_BYTE* s0, int o0, JAVA_ARRAY_BYTE* s1, int o
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packBytesInterleaved3___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src0, JAVA_OBJECT src1,
         JAVA_OBJECT src2, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdPack3((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src0)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src1)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src2)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+    cn1SimdPack3((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src0), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src1), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src2), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packBytesInterleaved3___byte_1ARRAY_int_int_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT src0Offset,
         JAVA_INT src1Offset, JAVA_INT src2Offset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data;
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
     cn1SimdPack3(s, src0Offset, s, src1Offset, s, src2Offset,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 
 /* 4-way interleave. */
@@ -896,19 +896,19 @@ static void cn1SimdPack4(JAVA_ARRAY_BYTE* s0, int o0, JAVA_ARRAY_BYTE* s1, int o
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src0, JAVA_OBJECT src1,
         JAVA_OBJECT src2, JAVA_OBJECT src3, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
-    cn1SimdPack4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src0)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src1)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src2)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src3)->data, 0,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+    cn1SimdPack4((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src0), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src1), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src2), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src3), 0,
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 JAVA_VOID com_codename1_impl_linux_LinuxSimd_packBytesInterleaved4___byte_1ARRAY_int_int_int_int_byte_1ARRAY_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT src, JAVA_INT src0Offset,
         JAVA_INT src1Offset, JAVA_INT src2Offset, JAVA_INT src3Offset, JAVA_OBJECT dst,
         JAVA_INT dstOffset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data;
+    JAVA_ARRAY_BYTE* s = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src);
     cn1SimdPack4(s, src0Offset, s, src1Offset, s, src2Offset, s, src3Offset,
-                 (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data, dstOffset, length);
+                 (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst), dstOffset, length);
 }
 
 /* 4-way de-interleave with a table lookup on each byte. Matches the base Simd
@@ -934,20 +934,20 @@ static int cn1SimdUnpackLookup4(JAVA_ARRAY_BYTE* t, int tableLen, JAVA_ARRAY_BYT
 JAVA_INT com_codename1_impl_linux_LinuxSimd_unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT src,
         JAVA_INT srcOffset, JAVA_OBJECT dst0, JAVA_OBJECT dst1, JAVA_OBJECT dst2, JAVA_OBJECT dst3, JAVA_INT length) {
-    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst0)->data, 0,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst1)->data, 0,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst2)->data, 0,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst3)->data, 0, length);
+    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)table), ((JAVA_ARRAY) table)->length,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst0), 0,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst1), 0,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst2), 0,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst3), 0, length);
 }
 JAVA_INT com_codename1_impl_linux_LinuxSimd_unpackLookupBytesInterleaved4___byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int_int_int_int_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT table, JAVA_OBJECT src,
         JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dst0Offset, JAVA_INT dst1Offset, JAVA_INT dst2Offset,
         JAVA_INT dst3Offset, JAVA_INT length) {
-    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) dst)->data;
-    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) table)->data, ((JAVA_ARRAY) table)->length,
-                   (JAVA_ARRAY_BYTE*) ((JAVA_ARRAY) src)->data, srcOffset,
+    JAVA_ARRAY_BYTE* d = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)dst);
+    return cn1SimdUnpackLookup4((JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)table), ((JAVA_ARRAY) table)->length,
+                   (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA((JAVA_ARRAY)src), srcOffset,
                    d, dst0Offset, d, dst1Offset, d, dst2Offset, d, dst3Offset, length);
 }
 

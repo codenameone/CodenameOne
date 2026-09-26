@@ -42,6 +42,7 @@ import java.util.Map;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class SessionImpl implements com.codename1.orm.session.Session {
     private final SqlAccess sql;
     private final Map<String, EntityModel<?>> models;

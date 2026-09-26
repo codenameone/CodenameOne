@@ -27,6 +27,7 @@ package com.codename1.orm.session;
 /// Both methods receive null values and must define how to represent them.
 /// @param <T> domain value type
 /// @param <S> SQL scalar type declared by the mapping
+@com.codename1.impl.SharedWithBackend
 public interface AttributeConverter<T, S> {
     /// Converts an entity field value to its stored scalar representation.
     /// @param value domain value, possibly null

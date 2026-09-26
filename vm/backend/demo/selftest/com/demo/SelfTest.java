@@ -1398,11 +1398,11 @@ public class SelfTest {
             List rows = db.query("SELECT whenMs, ch FROM scalars WHERE id = ?",
                     new Object[] {Long.valueOf(1L)});
             check("a Date binds as its millisecond value", "1234567890",
-                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("whenMs"), -1L)));
+                    String.valueOf(com.codename1.impl.orm.Values.asLong(((Map)rows.get(0)).get("whenMs"), -1L)));
             // 'x' is 120. The ORM stores the code unit, so raw SQL has to as well
             // or a query written either way misses rows written the other.
             check("a Character binds as its code unit", "120",
-                    String.valueOf(com.codename1.backend.orm.Values.asLong(((Map)rows.get(0)).get("ch"), -1L)));
+                    String.valueOf(com.codename1.impl.orm.Values.asLong(((Map)rows.get(0)).get("ch"), -1L)));
         } finally {
             db.close();
             new java.io.File(path).delete();

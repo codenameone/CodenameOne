@@ -1948,7 +1948,7 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
 #endif
     Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl((void *)n1, data, n3, n4, n5, n6, n7, n8);
     POOL_END();
@@ -1961,7 +1961,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_
     org_xmlvm_runtime_XMLVMArray* intArray = n1;
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n1)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n1);
 #endif
     JAVA_ARRAY_LONG i = (JAVA_ARRAY_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl((void *)data, n2, n3);
     POOL_END();
@@ -1982,8 +1982,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(
 #else
     JAVA_ARRAY byteArray = (JAVA_ARRAY)n1;
     JAVA_ARRAY intArray = (JAVA_ARRAY)n2;
-    void* data = byteArray->data;
-    void* data2 = intArray->data;
+    void* data = CN1_ARRAY_DATA(byteArray);
+    void* data2 = CN1_ARRAY_DATA(intArray);
     JAVA_LONG i = (JAVA_LONG)Java_com_codename1_impl_ios_IOSImplementation_createImageImpl(data, byteArray->length, data2);
 #endif
     return i;
@@ -1999,7 +1999,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+    JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
 #endif
     data2[0] = (int)img.size.width;
     data2[1] = (int)img.size.height;
@@ -2073,7 +2073,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
     [rendered addRepresentation:rep];
     GLUIImage* g = [[GLUIImage alloc] initWithImage:rendered];
     if (n2 != JAVA_NULL) {
-        JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+        JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
         if (((JAVA_ARRAY)n2)->length >= 2) {
             dims[0] = pw;
             dims[1] = ph;
@@ -2121,7 +2121,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int arrayLen = (int)intArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
         int arrayLen = (int)((JAVA_ARRAY)n2)->length;
 #endif
         int slotPct = 100, vBiasPct = 50;
@@ -2448,8 +2448,8 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillPolygonGlobal___int_int_int_1ARRAY_int_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_OBJECT xPoints, JAVA_OBJECT yPoints, JAVA_INT nPoints) {
     POOL_BEGIN();
-    JAVA_INT* x = (JAVA_INT*)((JAVA_ARRAY)xPoints)->data;
-    JAVA_INT* y = (JAVA_INT*)((JAVA_ARRAY)yPoints)->data;
+    JAVA_INT* x = (JAVA_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)xPoints);
+    JAVA_INT* y = (JAVA_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)yPoints);
     JAVA_FLOAT xFloats[nPoints];
     JAVA_FLOAT yFloats[nPoints];
     for (int i=0; i<nPoints; i++) {
@@ -2810,7 +2810,7 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
     org_xmlvm_runtime_XMLVMArray* byteArray = n3;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)n3)->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)n3);
 #endif
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n1);
     int l = strlen(chr) + 1;
@@ -3093,9 +3093,9 @@ void pointerPressed(int* x, int* y, int length) {
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         enteringNativeAllocations();
         JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)xArray), x, length * sizeof(JAVA_INT));
         JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)yArray), y, length * sizeof(JAVA_INT));
         com_codename1_impl_ios_IOSImplementation_pointerPressed___int_1ARRAY_int_1ARRAY(threadStateData,get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
         finishedNativeAllocations();
 #endif
@@ -3116,9 +3116,9 @@ void pointerDragged(int* x, int* y, int length) {
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         enteringNativeAllocations();
         JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)xArray), x, length * sizeof(JAVA_ARRAY_INT));
         JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)yArray), y, length * sizeof(JAVA_ARRAY_INT));
         com_codename1_impl_ios_IOSImplementation_pointerDragged___int_1ARRAY_int_1ARRAY(threadStateData,
                                                                                         get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
         finishedNativeAllocations();
@@ -3140,9 +3140,9 @@ void pointerReleased(int* x, int* y, int length) {
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         enteringNativeAllocations();
         JAVA_OBJECT xArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)xArray)->data, x, length * sizeof(JAVA_ARRAY_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)xArray), x, length * sizeof(JAVA_ARRAY_INT));
         JAVA_OBJECT yArray = __NEW_ARRAY_JAVA_INT(threadStateData, length);
-        memcpy(((JAVA_ARRAY)yArray)->data, y, length * sizeof(JAVA_ARRAY_INT));
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)yArray), y, length * sizeof(JAVA_ARRAY_INT));
         com_codename1_impl_ios_IOSImplementation_pointerReleased___int_1ARRAY_int_1ARRAY(threadStateData,
                                                                                          get_static_com_codename1_impl_ios_IOSImplementation_instance(threadStateData), xArray, yArray);
         finishedNativeAllocations();
@@ -3538,7 +3538,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macMainWindowGetBounds_
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return JAVA_FALSE;
     }
-    return CN1MacMainWindowGetBounds((int*) ((JAVA_ARRAY) out)->data) ? JAVA_TRUE : JAVA_FALSE;
+    return CN1MacMainWindowGetBounds((int*) CN1_ARRAY_DATA((JAVA_ARRAY)out)) ? JAVA_TRUE : JAVA_FALSE;
 #else
     return JAVA_FALSE;
 #endif
@@ -3549,7 +3549,7 @@ void com_codename1_impl_ios_CatalystWindowNative_macWindowGetBounds___int_int_1A
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
     }
-    CN1MacWindowGetBounds(slot, (int*) ((JAVA_ARRAY) out)->data);
+    CN1MacWindowGetBounds(slot, (int*) CN1_ARRAY_DATA((JAVA_ARRAY)out));
 #endif
 }
 
@@ -3580,7 +3580,7 @@ void com_codename1_impl_ios_CatalystWindowNative_macWindowPresent___int_int_1ARR
     if (argb == JAVA_NULL) {
         return;
     }
-    CN1MacWindowPresent(slot, ((JAVA_ARRAY) argb)->data, width, height);
+    CN1MacWindowPresent(slot, CN1_ARRAY_DATA((JAVA_ARRAY)argb), width, height);
 #endif
 }
 
@@ -3613,7 +3613,7 @@ void com_codename1_impl_ios_CatalystWindowNative_macMonitorBounds___int_boolean_
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
     }
-    CN1MacMonitorBounds(monitor, workArea ? YES : NO, (int*) ((JAVA_ARRAY) out)->data);
+    CN1MacMonitorBounds(monitor, workArea ? YES : NO, (int*) CN1_ARRAY_DATA((JAVA_ARRAY)out));
 #endif
 }
 
@@ -3705,7 +3705,7 @@ void com_codename1_impl_ios_IOSNative_read___long_byte_1ARRAY_int_int_int(CN1_TH
     org_xmlvm_runtime_XMLVMArray* byteArray = destination;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    void* data = ((JAVA_ARRAY)destination)->data;
+    void* data = CN1_ARRAY_DATA((JAVA_ARRAY)destination);
 #endif
     void* actual = &(data[offset]);
     [n getBytes:actual range:NSMakeRange(pointer, length)];
@@ -3724,7 +3724,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int length = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    void *data = ((JAVA_ARRAY)n1)->data;
+    void *data = CN1_ARRAY_DATA((JAVA_ARRAY)n1);
     int length = ((JAVA_ARRAY)n1)->length;
 #endif
     NSData* d = [NSData dataWithBytes:data length:length];
@@ -3750,7 +3750,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_appendToFile___byte_1ARRAY_java_lang_S
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    void* data = ((JAVA_ARRAY)n1)->data;
+    void* data = CN1_ARRAY_DATA((JAVA_ARRAY)n1);
     int len = ((JAVA_ARRAY)n1)->length;
 #endif
     NSData* d = [NSData dataWithBytes:data length:len];
@@ -3817,7 +3817,7 @@ void com_codename1_impl_ios_IOSNative_readFile___java_lang_String_byte_1ARRAY(CN
     org_xmlvm_runtime_XMLVMArray* byteArray = n1;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    void *data = ((JAVA_ARRAY)n1)->data;
+    void *data = CN1_ARRAY_DATA((JAVA_ARRAY)n1);
 #endif
     memcpy(data, d.bytes, d.length);
     POOL_END();
@@ -3925,13 +3925,14 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     org_xmlvm_runtime_XMLVMArray* strArray = files;
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)files)->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)files);
 #endif
     
     int count = nsArr.count;
     for(int iter = 0 ; iter < count ; iter++) {
         NSString* currentString = [nsArr objectAtIndex:iter];
         JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG currentString);
+        CN1_WRITE_BARRIER(files, str);  // files is the caller's array and may be old
         data[iter] = str;
     }
 #ifndef CN1_USE_ARC
@@ -4158,7 +4159,7 @@ void com_codename1_impl_ios_IOSNative_setBody___long_byte_1ARRAY(CN1_THREAD_STAT
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    void* data = ((JAVA_ARRAY)arr)->data;
+    void* data = CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     int len = ((JAVA_ARRAY)arr)->length;
 #endif
     [impl setBody:data size:len];
@@ -4741,7 +4742,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         // window's scale reported a peer on a 1x display beside a Retina main
         // window at twice its size, and layout then allocated those bounds.
         CGFloat prefScale = cn1MacPeerScale(v);
-        JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
+        JAVA_ARRAY_INT* data = (JAVA_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)response);
         data[0] = (JAVA_INT)(s.width * prefScale);
         data[1] = (JAVA_INT)(s.height * prefScale);
         POOL_END();
@@ -4756,7 +4757,7 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         org_xmlvm_runtime_XMLVMArray* intArray = response;
         JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-        JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
+        JAVA_ARRAY_INT* data = (JAVA_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)response);
 #endif
         data[0] = (JAVA_INT)(s.width * scaleValue);
         data[1] = (JAVA_INT)(s.height * scaleValue);
@@ -4846,7 +4847,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
 #if TARGET_OS_OSX
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
     __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4884,7 +4885,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
     __block JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)arr);
 #endif
     __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5153,7 +5154,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
         JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        void* data = ((JAVA_ARRAY)b)->data;
+        void* data = CN1_ARRAY_DATA((JAVA_ARRAY)b);
         int len = ((JAVA_ARRAY)b)->length;
 #endif
         NSData* d = [NSData dataWithBytes:data length:len];
@@ -5194,7 +5195,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
         JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        void* data = ((JAVA_ARRAY)b)->data;
+        void* data = CN1_ARRAY_DATA((JAVA_ARRAY)b);
         int len = ((JAVA_ARRAY)b)->length;
 #endif
         NSData* d = [NSData dataWithBytes:data length:len];
@@ -5483,8 +5484,8 @@ void com_codename1_impl_ios_IOSNative_fillGradient___int_int_float_1ARRAY_float_
         (JAVA_ARRAY_FLOAT *)((org_xmlvm_runtime_XMLVMArray *)colorsArr)
             ->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_FLOAT *positions = (JAVA_FLOAT *)((JAVA_ARRAY)positionsArr)->data;
-    JAVA_ARRAY_FLOAT *colors = (JAVA_FLOAT *)((JAVA_ARRAY)colorsArr)->data;
+    JAVA_ARRAY_FLOAT *positions = (JAVA_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)positionsArr);
+    JAVA_ARRAY_FLOAT *colors = (JAVA_FLOAT *)CN1_ARRAY_DATA((JAVA_ARRAY)colorsArr);
 #endif
 
     DrawMultiStopGradient *d = [[DrawMultiStopGradient alloc]
@@ -5998,8 +5999,8 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
 
-            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
-            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)keys);
+            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)values);
             int count = ((JAVA_ARRAY)keys)->length;
 
             for(int iter = 0 ; iter < count ; iter++) {
@@ -6016,8 +6017,8 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
             NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
             NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
 
-            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
-            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+            JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)keys);
+            JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)values);
             int count = ((JAVA_ARRAY)keys)->length;
 
             for(int iter = 0 ; iter < count ; iter++) {
@@ -6660,7 +6661,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
             JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
             int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     #else
-            void* data = ((JAVA_ARRAY)dataObject)->data;
+            void* data = CN1_ARRAY_DATA((JAVA_ARRAY)dataObject);
             int len = ((JAVA_ARRAY)dataObject)->length;
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
@@ -6696,7 +6697,7 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
 
-            void* data = ((JAVA_ARRAY)dataObject)->data;
+            void* data = CN1_ARRAY_DATA((JAVA_ARRAY)dataObject);
             int len = ((JAVA_ARRAY)dataObject)->length;
 
             NSData* d = [NSData dataWithBytes:data length:len];
@@ -6755,7 +6756,7 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
 
-            void* data = ((JAVA_ARRAY)dataObject)->data;
+            void* data = CN1_ARRAY_DATA((JAVA_ARRAY)dataObject);
             int len = ((JAVA_ARRAY)dataObject)->length;
 
             NSData* d = [NSData dataWithBytes:data length:len];
@@ -6797,7 +6798,7 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
             JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
             int len = byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
     #else
-            void* data = ((JAVA_ARRAY)dataObject)->data;
+            void* data = CN1_ARRAY_DATA((JAVA_ARRAY)dataObject);
             int len = ((JAVA_ARRAY)dataObject)->length;
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
@@ -7043,7 +7044,7 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
     // sendMessage on this port opened nothing and failed silently.
     NSMutableArray *recipientsArray = [NSMutableArray array];
     if (recipients != JAVA_NULL) {
-        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA((JAVA_ARRAY)recipients);
         int recipientCount = ((JAVA_ARRAY)recipients)->length;
         for (int iter = 0; iter < recipientCount; iter++) {
             NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[iter]);
@@ -7095,7 +7096,7 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
     // Recipient.
     NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
 
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)recipients)->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)recipients);
     int recipientCount = ((JAVA_ARRAY)recipients)->length;
 
     for(int iter = 0 ; iter < recipientCount ; iter++) {
@@ -7131,7 +7132,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : @"";
     [items addObject:nBody];
     if (attachment != JAVA_NULL) {
-        JAVA_ARRAY_OBJECT *attData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)attachment)->data;
+        JAVA_ARRAY_OBJECT *attData = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA((JAVA_ARRAY)attachment);
         int attCount = ((JAVA_ARRAY)attachment)->length;
         for (int iter = 0; iter < attCount; iter++) {
             NSString *path = toNSString(CN1_THREAD_GET_STATE_PASS_ARG attData[iter]);
@@ -7150,7 +7151,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     }
     NSMutableArray *toList = [NSMutableArray array];
     if (recipients != JAVA_NULL) {
-        JAVA_ARRAY_OBJECT *recData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        JAVA_ARRAY_OBJECT *recData = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA((JAVA_ARRAY)recipients);
         int recCount = ((JAVA_ARRAY)recipients)->length;
         for (int iter = 0; iter < recCount; iter++) {
             NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG recData[iter]);
@@ -7255,7 +7256,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
         int recipientCount = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)recipients)->data;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)recipients);
         int recipientCount = ((JAVA_ARRAY)recipients)->length;
 #endif
         for(int iter = 0 ; iter < recipientCount ; iter++) {
@@ -7279,9 +7280,9 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
             org_xmlvm_runtime_XMLVMArray* mimeArray = attachmentMimeType;
             JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)mimeArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-            JAVA_ARRAY_OBJECT* attachmentData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)attachment)->data;
+            JAVA_ARRAY_OBJECT* attachmentData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)attachment);
             int attachmentCount = ((JAVA_ARRAY)attachment)->length;
-            JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)attachmentMimeType)->data;
+            JAVA_ARRAY_OBJECT* mimeData = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)attachmentMimeType);
 #endif
             
             for(int iter = 0 ; iter < attachmentCount ; iter++) {
@@ -8384,11 +8385,13 @@ void com_codename1_impl_ios_IOSNative_wifiDisconnect___java_lang_String(CN1_THRE
     if (txt != nil && txt.count > 0) {
         keys = __NEW_ARRAY_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT) txt.count);
         vals = __NEW_ARRAY_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT) txt.count);
-        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) keys)->data;
-        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) vals)->data;
+        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)keys);
+        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)vals);
         int i = 0;
         for (NSString *k in txt.allKeys) {
-            kArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG k);
+            { JAVA_OBJECT cn1__k = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG k);
+              CN1_WRITE_BARRIER(keys, cn1__k);  // each fromNSString is a safepoint
+              kArr[i] = cn1__k; }
             id v = [txt objectForKey:k];
             NSString *s = nil;
             if ([v isKindOfClass:[NSData class]]) {
@@ -8397,7 +8400,9 @@ void com_codename1_impl_ios_IOSNative_wifiDisconnect___java_lang_String(CN1_THRE
             } else if ([v isKindOfClass:[NSString class]]) {
                 s = (NSString*) v;
             }
-            vArr[i] = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (s == nil ? @"" : s));
+            { JAVA_OBJECT cn1__v = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG (s == nil ? @"" : s));
+              CN1_WRITE_BARRIER(vals, cn1__v);
+              vArr[i] = cn1__v; }
             i++;
         }
     }
@@ -8456,8 +8461,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_bonjourPublishStart___java_lang_Strin
     NSNetService *svc = [[NSNetService alloc]
             initWithDomain:@"local." type:type name:name port:(int) port];
     if (keysObj != JAVA_NULL && valsObj != JAVA_NULL) {
-        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) keysObj)->data;
-        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) ((JAVA_ARRAY) valsObj)->data;
+        JAVA_ARRAY_OBJECT *kArr = (JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)keysObj);
+        JAVA_ARRAY_OBJECT *vArr = (JAVA_ARRAY_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)valsObj);
         int n = (int) ((JAVA_ARRAY) keysObj)->length;
         NSMutableDictionary *d = [NSMutableDictionary dictionary];
         for (int i = 0; i < n; i++) {
@@ -9730,7 +9735,7 @@ void com_codename1_impl_ios_IOSNative_getLinkedContactIds___int_int_int_1ARRAY(C
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)out);
     int size = ((JAVA_ARRAY)out)->length;
 #endif
     ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), refId);
@@ -9755,7 +9760,7 @@ void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)intArray)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)intArray);
     int size = ((JAVA_ARRAY)intArray)->length;
 #endif
     ABAddressBookRef addressBook = getAddressBook();
@@ -10606,12 +10611,14 @@ void com_codename1_impl_ios_IOSNative_updatePickedContact___int_com_codename1_co
         if ([urls count] > 0) {
             JAVA_OBJECT array = __NEW_ARRAY_java_lang_String(CN1_THREAD_STATE_PASS_ARG
                     (JAVA_INT)[urls count]);
-            JAVA_ARRAY_OBJECT* entries = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)array)->data;
+            JAVA_ARRAY_OBJECT* entries = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)array);
             int pos = 0;
             for (CNLabeledValue<NSString*>* entry in urls) {
                 NSString* url = (NSString*)entry.value;
-                entries[pos++] = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                JAVA_OBJECT cn1__u = fromNSString(CN1_THREAD_STATE_PASS_ARG
                         (url == nil ? @"" : url));
+                CN1_WRITE_BARRIER(array, cn1__u);  // each fromNSString is a safepoint
+                entries[pos++] = cn1__u;
             }
             com_codename1_contacts_Contact_setUrls___java_lang_String_1ARRAY(
                     CN1_THREAD_STATE_PASS_ARG cnt, array);
@@ -11200,7 +11207,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #else
         enteringNativeAllocations();
         JAVA_OBJECT warr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG wlen);
-        memcpy(((JAVA_ARRAY)warr)->data, [wpng bytes], wlen);
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)warr), [wpng bytes], wlen);
         finishedNativeAllocations();
         wbyteArr = warr;
 #endif
@@ -11248,7 +11255,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #else
             enteringNativeAllocations();
             JAVA_OBJECT arr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG len);
-            memcpy(((JAVA_ARRAY)arr)->data, [capturedPng bytes], len);
+            memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)arr), [capturedPng bytes], len);
             finishedNativeAllocations();
             byteArr = arr;
 #endif
@@ -11912,7 +11919,7 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
     org_xmlvm_runtime_XMLVMArray* byteArray = dataArray;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    void* data = ((JAVA_ARRAY)dataArray)->data;
+    void* data = CN1_ARRAY_DATA((JAVA_ARRAY)dataArray);
 #endif
     memcpy(data, d.bytes, d.length);
     POOL_END();
@@ -12245,37 +12252,37 @@ void com_codename1_impl_ios_IOSNative_cleanupAudioRecord___long(CN1_THREAD_STATE
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
     // second part of the expression check that this isn't a primitive array
-    return n1->__codenameOneParentClsReference->isArray && cn1_array_start_offset + 100 < n1->__codenameOneParentClsReference->classId;
+    return CN1_OBJ_CLASS(n1)->isArray && cn1_array_start_offset + 100 < CN1_OBJ_CLASS(n1)->classId;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofByteArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_BYTE;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_BYTE;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofShortArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_SHORT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_SHORT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofLongArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_LONG;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_LONG;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofIntArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_INT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_INT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofFloatArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_FLOAT;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_FLOAT;
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofDoubleArrayI___java_lang_Object_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
 {
-    return n1->__codenameOneParentClsReference->classId == cn1_array_1_id_JAVA_DOUBLE;
+    return CN1_OBJ_CLASS(n1)->classId == cn1_array_1_id_JAVA_DOUBLE;
 }
 #else // NEW_CODENAME_ONE_VM
 JAVA_BOOLEAN com_codename1_impl_ios_IOSImplementation_instanceofObjArrayI___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT n1)
@@ -12630,7 +12637,7 @@ void com_codename1_impl_ios_IOSNative_sqlStmtBindText___long_int_byte_1ARRAY(CN1
     // Any non-null pointer with a length of zero is an empty string to SQLite.
     cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
             sqlite3_bind_text((sqlite3_stmt*)statementPeer, index,
-                    arr->length > 0 ? (const char*)arr->data : "",
+                    arr->length > 0 ? (const char*)CN1_ARRAY_DATA(arr) : "",
                     arr->length, SQLITE_TRANSIENT), index);
 }
 
@@ -12641,7 +12648,7 @@ void com_codename1_impl_ios_IOSNative_sqlStmtBindBlob___long_int_byte_1ARRAY(CN1
         return;
     }
     JAVA_ARRAY byteArray = (JAVA_ARRAY)value;
-    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->data;
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(byteArray);
     // Same as the text bind above: a zero length array carries a null pointer, and that is how
     // SQL NULL is spelled to sqlite3_bind_blob. An empty blob is a pointer that is not null.
     cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
@@ -12726,7 +12733,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
         return;
     }
     JAVA_ARRAY stringArray = (JAVA_ARRAY)args;
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(stringArray);
     int count = stringArray->length;
     for (int iter = 0; iter < count; iter++) {
         JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
@@ -12759,7 +12766,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
     }
     if (args != JAVA_NULL) {
         JAVA_ARRAY stringArray = (JAVA_ARRAY)args;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)stringArray->data;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(stringArray);
         int count = stringArray->length;
         for (int iter = 0; iter < count; iter++) {
             JAVA_OBJECT str = (JAVA_OBJECT)data[iter];
@@ -12884,7 +12891,7 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)strArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int count = strArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)skus)->data;
+    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA((JAVA_ARRAY)skus);
     int count = ((JAVA_ARRAY)skus)->length;
 #endif
     
@@ -13258,7 +13265,7 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JA
 NSData* arrayToData(JAVA_OBJECT arr) {
     if (arr == JAVA_NULL) return nil;
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
-    void* data = (void*)byteArray->data;
+    void* data = (void*)CN1_ARRAY_DATA(byteArray);
     NSData* d = [NSData dataWithBytes:data length:byteArray->length * byteArray->primitiveSize];
     return d;
 }
@@ -13266,7 +13273,7 @@ NSData* arrayToData(JAVA_OBJECT arr) {
 NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
     if (arr == JAVA_NULL) return nil;
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
-    char* data = (char*)byteArray->data;
+    char* data = (char*)CN1_ARRAY_DATA(byteArray);
     NSData* d = [NSData dataWithBytes:(data + offset * byteArray->primitiveSize) length:len * byteArray->primitiveSize];
     return d;
 }
@@ -13274,64 +13281,144 @@ NSData* arrayToDataRange(JAVA_OBJECT arr, int offset, int len) {
 JAVA_OBJECT nsDataToByteArr(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length] / sizeof(JAVA_ARRAY_BYTE), &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_BYTE));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToBooleanArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_BOOLEAN), &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_BOOLEAN));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToCharArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_CHAR), &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_CHAR));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToShortArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_SHORT), &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_SHORT));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToIntArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_INT), &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_INT));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToLongArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_LONG), &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_LONG));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToFloatArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_FLOAT), &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_FLOAT));
+    }
     return byteArray;
 }
 
 JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
     NSData* d = data;
     JAVA_OBJECT byteArray = allocArray(getThreadLocalData(), [d length]/sizeof(JAVA_ARRAY_DOUBLE), &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1);
-    void* dtd = (void*)((JAVA_ARRAY)byteArray)->data;
-    memcpy(dtd, d.bytes, d.length);
+    void* dtd = (void*)CN1_ARRAY_DATA((JAVA_ARRAY)byteArray);
+    // COPY WHAT WAS ALLOCATED, NOT WHAT THE NSData HAPPENS TO HOLD. The length
+    // above is [d length]/sizeof(element), so a byte count that is not a whole
+    // number of elements allocates a payload SHORTER than d.length -- by up to
+    // esz-1, which is 7 for long and double. That overrun used to land in the
+    // eight bytes every array over-allocated. Those are gone, and on a payload
+    // whose 32+size lands exactly on a BiBOP class boundary there is no slack at
+    // all, so the copy would write into the next object's header. An NSData comes
+    // from third-party Objective-C; its length is not ours to constrain.
+    if (dtd != NULL) {
+        memcpy(dtd, d.bytes, (size_t)((JAVA_ARRAY)byteArray)->length * sizeof(JAVA_ARRAY_DOUBLE));
+    }
     return byteArray;
 }
 #else // NEW_CODENAME_ONE_VM
@@ -15271,7 +15358,7 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_i
     org_xmlvm_runtime_XMLVMArray* arr = (org_xmlvm_runtime_XMLVMArray*)bounds;
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)arr->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*) ((JAVA_ARRAY)bounds)->data;
+    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA((JAVA_ARRAY)bounds);
 #endif
     Renderer_getOutputBounds(renderer, iArr);
 }
@@ -15409,11 +15496,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     JAVA_ARRAY_BYTE* bArr = (JAVA_ARRAY_BYTE*)ac.alphas;
 #else
     JAVA_OBJECT data = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
-    ac.alphas = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)data)->data;
+    ac.alphas = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)data);
     
     Renderer_produceAlphas((Renderer*)(uintptr_t)renderer, &ac);
     JAVA_OBJECT idata = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
-    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)((JAVA_ARRAY)idata)->data;
+    JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)idata);
     JAVA_ARRAY_BYTE* bArr = (JAVA_ARRAY_BYTE*)ac.alphas;
 #endif
     
@@ -15543,10 +15630,10 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
     JAVA_ARRAY_FLOAT* rhsData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)rhs)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     JAVA_ARRAY_FLOAT* resultData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)result)->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
-    JAVA_ARRAY_FLOAT* lhsData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)lhs)->data;
-    JAVA_ARRAY_FLOAT* rhsData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)rhs)->data;
-    JAVA_ARRAY_FLOAT* resultData = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)result)->data;
+    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
+    JAVA_ARRAY_FLOAT* lhsData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)lhs);
+    JAVA_ARRAY_FLOAT* rhsData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)rhs);
+    JAVA_ARRAY_FLOAT* resultData = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)result);
     
 #endif
     
@@ -15581,9 +15668,9 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     
 #else
-    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)m)->data;
-    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
-    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)m);
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)in);
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)out);
 #endif
     // Matrix-vector multiply; mData is a 4x4 column-major matrix.
     const JAVA_ARRAY_FLOAT *M = mData;
@@ -15621,8 +15708,8 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_translatePoints___int_float_float_flo
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     
 #else
-    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
-    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)in);
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)out);
 #endif
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i=0; i<len; i+= pointSize) {
@@ -15644,8 +15731,8 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_scalePoints___int_float_float_float_f
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     
 #else
-    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
-    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)in);
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)out);
 #endif
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i=0; i<len; i+= pointSize) {
@@ -15669,9 +15756,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int
     JAVA_ARRAY_FLOAT* mInvData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)mInv)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     
 #else
-    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
-    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)m)->data;
-    JAVA_ARRAY_FLOAT* mInvData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)mInv)->data;
+    //JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA((JAVA_ARRAY)n2);
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)m);
+    JAVA_ARRAY_FLOAT* mInvData = (JAVA_ARRAY_FLOAT*) CN1_ARRAY_DATA((JAVA_ARRAY)mInv);
     
     
 #endif
@@ -16696,7 +16783,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_readFile___long_byte_1ARRAY_int_int(C
     org_xmlvm_runtime_XMLVMArray* byteArray = b;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    void* data = ((JAVA_ARRAY)b)->data;
+    void* data = CN1_ARRAY_DATA((JAVA_ARRAY)b);
 #endif
     void* actual = &(data[off]);
     
@@ -18529,7 +18616,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
 #define CN1_PRIM_ARR_DATA(arr) ((void*)((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.array_)
 #define CN1_PRIM_ARR_LEN(arr)  (((org_xmlvm_runtime_XMLVMArray*)(arr))->fields.org_xmlvm_runtime_XMLVMArray.length_)
 #else
-#define CN1_PRIM_ARR_DATA(arr) ((void*)((JAVA_ARRAY)(arr))->data)
+#define CN1_PRIM_ARR_DATA(arr) ((void*)CN1_ARRAY_DATA((JAVA_ARRAY)(arr)))
 #define CN1_PRIM_ARR_LEN(arr)  (((JAVA_ARRAY)(arr))->length)
 #endif
 
@@ -19259,7 +19346,7 @@ void com_codename1_impl_ios_IOSNative_carPlayRegisterImage___java_lang_String_by
             int len = ba->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
             JAVA_ARRAY ba = (JAVA_ARRAY)pngArr;
-            void* bytes = ba->data;
+            void* bytes = CN1_ARRAY_DATA(ba);
             int len = (int)ba->length;
 #endif
             data = [NSData dataWithBytes:bytes length:len];
@@ -19751,8 +19838,8 @@ void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_j
     if (imageNames != JAVA_NULL && imageBlobs != JAVA_NULL) {
         JAVA_ARRAY names = (JAVA_ARRAY)imageNames;
         JAVA_ARRAY blobs = (JAVA_ARRAY)imageBlobs;
-        JAVA_OBJECT *nameData = (JAVA_OBJECT *)names->data;
-        JAVA_OBJECT *blobData = (JAVA_OBJECT *)blobs->data;
+        JAVA_OBJECT *nameData = (JAVA_OBJECT *)CN1_ARRAY_DATA(names);
+        JAVA_OBJECT *blobData = (JAVA_OBJECT *)CN1_ARRAY_DATA(blobs);
         int count = (int)(names->length < blobs->length ? names->length : blobs->length);
         for (int i = 0; i < count; i++) {
             if (nameData[i] == JAVA_NULL || blobData[i] == JAVA_NULL) {
@@ -19763,7 +19850,7 @@ void com_codename1_impl_ios_IOSNative_surfacesMirrorToWatch___java_lang_String_j
             if (name == nil || blob->length <= 0) {
                 continue;
             }
-            [payload setObject:[NSData dataWithBytes:blob->data length:(NSUInteger)blob->length]
+            [payload setObject:[NSData dataWithBytes:CN1_ARRAY_DATA(blob) length:(NSUInteger)blob->length]
                         forKey:[@"cn1.surfaces.img." stringByAppendingString:name]];
         }
     }
@@ -20713,7 +20800,7 @@ void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_
     POOL_BEGIN();
     NSString *key = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     JAVA_ARRAY byteArray = (JAVA_ARRAY)dataArr;
-    NSData *data = [NSData dataWithBytes:(JAVA_BYTE *)byteArray->data length:length];
+    NSData *data = [NSData dataWithBytes:(JAVA_BYTE *)CN1_ARRAY_DATA(byteArray) length:length];
     @synchronized (cn1IntentImagesLock) {
         [cn1IntentImages setObject:data forKey:key];
     }
@@ -21516,7 +21603,7 @@ static NSData *cn1WearableToNSData(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT arr) {
         return [NSData data];
     }
     JAVA_ARRAY byteArray = (JAVA_ARRAY) arr;
-    JAVA_ARRAY_BYTE *data = (JAVA_ARRAY_BYTE *) byteArray->data;
+    JAVA_ARRAY_BYTE *data = (JAVA_ARRAY_BYTE *) CN1_ARRAY_DATA(byteArray);
     return [NSData dataWithBytes:data length:byteArray->length];
 }
 
@@ -22238,7 +22325,7 @@ static int cn1_nfcSendError(int requestId, NSError *err) {
     JAVA_OBJECT arr = JAVA_NULL;
     if (raw != nil) {
         JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[raw length]);
-        memcpy(((JAVA_ARRAY_BYTE *)ja->data), [raw bytes], [raw length]);
+        memcpy(((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja)), [raw bytes], [raw length]);
         arr = (JAVA_OBJECT)ja;
     }
     com_codename1_impl_ios_IOSNfc_nativeNdefResult___int_byte_1ARRAY(getThreadLocalData(), self.requestId, arr);
@@ -22356,7 +22443,7 @@ static int cn1_nfcSendError(int requestId, NSError *err) {
         JAVA_OBJECT uidArr = JAVA_NULL;
         if (uid != nil && [uid length] > 0) {
             JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[uid length]);
-            memcpy(((JAVA_ARRAY_BYTE *)ja->data), [uid bytes], [uid length]);
+            memcpy(((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja)), [uid bytes], [uid length]);
             uidArr = (JAVA_OBJECT)ja;
         }
         com_codename1_impl_ios_IOSNfc_nativeTagDiscovered___int_long_int_byte_1ARRAY(getThreadLocalData(), self.requestId, (JAVA_LONG)handle, mask, uidArr);
@@ -22513,7 +22600,7 @@ void com_codename1_impl_ios_IOSNative_nfcTransceive___int_long_byte_1ARRAY(CN1_T
         }
         id<NFCISO7816Tag> iso = [tag asNFCISO7816Tag];
         JAVA_ARRAY pa = (JAVA_ARRAY)payload;
-        NSData *data = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)pa->data) length:pa->length];
+        NSData *data = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(pa)) length:pa->length];
         // Slice the APDU into CLA/INS/P1/P2/data/Le per NFCISO7816APDU API.
         NSError *parseErr = nil;
         NFCISO7816APDU *apdu = [[NFCISO7816APDU alloc] initWithData:data];
@@ -22529,10 +22616,10 @@ void com_codename1_impl_ios_IOSNative_nfcTransceive___int_long_byte_1ARRAY(CN1_T
             NSUInteger len = (response != nil ? [response length] : 0) + 2;
             JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)len);
             if (response != nil && [response length] > 0) {
-                memcpy(((JAVA_ARRAY_BYTE *)ja->data), [response bytes], [response length]);
+                memcpy(((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja)), [response bytes], [response length]);
             }
-            ((JAVA_ARRAY_BYTE *)ja->data)[len - 2] = sw1;
-            ((JAVA_ARRAY_BYTE *)ja->data)[len - 1] = sw2;
+            ((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja))[len - 2] = sw1;
+            ((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja))[len - 1] = sw2;
             com_codename1_impl_ios_IOSNfc_nativeTransceiveResult___int_byte_1ARRAY(getThreadLocalData(), requestId, (JAVA_OBJECT)ja);
         }];
         [apdu release];
@@ -22564,7 +22651,7 @@ void com_codename1_impl_ios_IOSNative_nfcReadNdefFromTag___int_long(CN1_THREAD_S
             JAVA_OBJECT arr = JAVA_NULL;
             if (raw != nil) {
                 JAVA_ARRAY ja = (JAVA_ARRAY)__NEW_ARRAY_JAVA_BYTE(getThreadLocalData(), (JAVA_INT)[raw length]);
-                memcpy(((JAVA_ARRAY_BYTE *)ja->data), [raw bytes], [raw length]);
+                memcpy(((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(ja)), [raw bytes], [raw length]);
                 arr = (JAVA_OBJECT)ja;
             }
             com_codename1_impl_ios_IOSNfc_nativeNdefResult___int_byte_1ARRAY(getThreadLocalData(), requestId, arr);
@@ -22585,7 +22672,7 @@ void com_codename1_impl_ios_IOSNative_nfcWriteNdefToTag___int_long_byte_1ARRAY(C
         }
         id<NFCNDEFTag> ndefTag = (id<NFCNDEFTag>)tag;
         JAVA_ARRAY na = (JAVA_ARRAY)ndef;
-        NSData *raw = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)na->data) length:na->length];
+        NSData *raw = [NSData dataWithBytes:((JAVA_ARRAY_BYTE *)CN1_ARRAY_DATA(na)) length:na->length];
         // CoreNFC's NFCNDEFMessage requires the parsed object form; we
         // reconstruct it by parsing the wire-format bytes.
         // Apple does not expose a public reader for the wire bytes so we
@@ -22749,7 +22836,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFoldRegion___int_1ARRAY_R_int(
     JAVA_ARRAY_INT* data =
         (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(out);
 #endif
     int region[4];
     int kind = cn1HingeFoldRegion(region);

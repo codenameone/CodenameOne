@@ -174,7 +174,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_mediaCreate___byte_1ARRAY_int_jav
     if (fd < 0) {
         return 0;
     }
-    bytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    bytes = (unsigned char*) CN1_ARRAY_DATA(data);
     if (write(fd, bytes, (size_t) length) != length) {
         close(fd);
         unlink(tmpl);
@@ -397,7 +397,7 @@ static JAVA_OBJECT cn1CameraSampleToArgb(CODENAME_ONE_THREAD_STATE, GstSample* s
     }
     arr = allocArray(threadStateData, w * h, &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
     if (arr != JAVA_NULL && map.size >= (gsize) (w * h * 4)) {
-        memcpy((*(JAVA_ARRAY) arr).data, map.data, (size_t) (w * h * 4));
+        memcpy(CN1_ARRAY_DATA(arr), map.data, (size_t) (w * h * 4));
     }
     p_gst_buffer_unmap(buf, &map);
     if (outDims) {
@@ -453,8 +453,8 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraCaptureFrame___int_1ARRAY
     p_gst_object_unref(sink);
     p_gst_object_unref(pipe);
     if (outDims != JAVA_NULL && (*(JAVA_ARRAY) outDims).length >= 2) {
-        ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[0] = dims[0];
-        ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[1] = dims[1];
+        ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[0] = dims[0];
+        ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[1] = dims[1];
     }
     return result;
 }
@@ -609,11 +609,11 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_cameraSessionLatestFrame___long
     if (s->frame && s->w > 0 && s->h > 0) {
         arr = allocArray(threadStateData, s->w * s->h, &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
         if (arr != JAVA_NULL) {
-            memcpy((*(JAVA_ARRAY) arr).data, s->frame, (size_t) s->w * s->h * 4);
+            memcpy(CN1_ARRAY_DATA(arr), s->frame, (size_t) s->w * s->h * 4);
         }
         if (outDims != JAVA_NULL && (*(JAVA_ARRAY) outDims).length >= 2) {
-            ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[0] = s->w;
-            ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[1] = s->h;
+            ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[0] = s->w;
+            ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[1] = s->h;
         }
     }
     pthread_mutex_unlock(&s->lock);

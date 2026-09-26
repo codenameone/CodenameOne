@@ -23,6 +23,7 @@
 package com.codename1.orm.session;
 
 /// An ORM failure, including an underlying database failure during lazy access.
+@com.codename1.impl.SharedWithBackend
 public class PersistenceException extends RuntimeException {
     /// Creates an exception describing the persistence failure.
     /// @param message failure description

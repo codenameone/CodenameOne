@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.bench;
 
 /**
@@ -15,6 +37,7 @@ package com.bench;
  */
 public class FusedTest {
     static final StringBuilder LOG = new StringBuilder();
+    static String[] published;
 
     static String makeParent(int seed) {
         StringBuilder b = new StringBuilder();
@@ -101,8 +124,36 @@ public class FusedTest {
         // 7: general @Fused user class (Image-like, two fused children)
         ck = ck * 31 + userFused();
 
+        ck = ck * 31 + alternateRoots();
+
         System.out.println("CK " + ck);
         System.out.println("DONE");
+    }
+
+    // An inline array must not acquire an independent age when the same owner
+    // moves between a known Java root and a conservatively discovered local.
+    static long alternateRoots() {
+        published = new String[128];
+        for (int i = 0; i < published.length; i++) published[i] = makeParent(i);
+        long result = 0;
+        for (int round = 0; round < 6; round++) {
+            churn();
+            String[] local = published;
+            published = null;
+            churn();
+            churn();
+            for (int i = 0; i < local.length; i++) {
+                String text = local[i];
+                for (int j = 0; j < text.length(); j++) {
+                    char expected = (char) ('a' + ((i + j) % 26));
+                    if (text.charAt(j) != expected) throw new AssertionError("Lost fused storage");
+                    result += text.charAt(j);
+                }
+            }
+            published = local;
+        }
+        published = null;
+        return result;
     }
 
     /** Image-like user class: owns its pixel and flag buffers (fused). */

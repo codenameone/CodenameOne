@@ -112,7 +112,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
     if (!s || s->fd < 0 || buffer == JAVA_NULL || length <= 0) {
         return -1;
     }
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     /* read() can block indefinitely (e.g. the cn1ss WebSocket reader waiting on
      * the server). Mark the thread inactive across the blocking call so the
      * concurrent GC -- which spins waiting for every lightweight thread to pause
@@ -148,7 +148,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketWrite___long_byte_1ARRAY_int
     if (!s || s->fd < 0 || buffer == JAVA_NULL || length <= 0) {
         return -1;
     }
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     /* Yield to the concurrent GC across the (potentially blocking) write loop -- a
      * thread parked in write() must not stall a GC mark (see socketRead). */
     CN1_YIELD_THREAD;

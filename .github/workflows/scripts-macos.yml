@@ -122,8 +122,9 @@ jobs:
     runs-on: macos-15
     # build step (<=45) + screenshot-run step (<=45) <= 90, matching the
     # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
-    # SIGKILL the screenshot run mid-post-processing on slow runners.
-    timeout-minutes: 90
+    # SIGKILL the screenshot run mid-post-processing on slow runners. Plus 50 for the
+    # ParparVM vs JDK 25 performance gate.
+    timeout-minutes: 140
     concurrency:
       group: mac-ci-${{ github.workflow }}-macos-${{ github.ref_name }}
       cancel-in-progress: true
@@ -237,9 +238,26 @@ jobs:
         run: ./scripts/build-macos-app.sh -q -DskipTests
         timeout-minutes: 30
 
+      # ParparVM against JDK 25 on this runner: the HelloCodenameOne classes the step
+      # above just built, the translator translating itself, and every Bench workload.
+      # Before the screenshot step, whose PR comment carries the table
+      # (CN1SS_EXTRA_MARKDOWN); the job's last step fails it on a regression. The
+      # workspace JDK 8 comes from setup-workspace's env.sh, exactly as the app build
+      # got it, and JDK 25 is fetched privately so no later step sees a different JDK.
+      - name: ParparVM vs JDK 25 (performance gate)
+        if: success() || failure()
+        run: |
+          set -u
+          ENV_FILE="${TMPDIR%/}/codenameone-tools/tools/env.sh"
+          if [ -f "$ENV_FILE" ]; then . "$ENV_FILE"; fi
+          export JDK_8_HOME="$JAVA_HOME"
+          export PATH="${MAVEN_HOME:+$MAVEN_HOME/bin:}$PATH"
+          vm/selfhost/ci-perf-gate.sh run macos-arm64 artifacts/macos-ui-tests/perf
+
       - name: Run macOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/macos-ui-tests
+          CN1SS_EXTRA_MARKDOWN: ${{ github.workspace }}/artifacts/macos-ui-tests/perf/perf-comment.md
           # Strict screenshot gating: every expected frame must be captured and
           # compared. Enforced centrally in scripts/lib/cn1ss.sh.
           CN1SS_FAIL_ON_MISMATCH: '1'
@@ -313,3 +331,7 @@ jobs:
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Fail on a ParparVM performance regression
+        if: success() || failure()
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/macos-ui-tests/perf

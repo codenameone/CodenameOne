@@ -26,6 +26,7 @@ import com.codename1.orm.session.AttributeConverter;
 /// A public no-arg converter for a basic field; converters also receive null values.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface Convert {
     /// Selects the domain converter. It must be public with a public no-argument constructor.
     /// Converters receive null values in both directions.

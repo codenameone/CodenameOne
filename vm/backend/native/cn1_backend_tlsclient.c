@@ -457,7 +457,7 @@ JAVA_INT com_codename1_backend_Tcp_tlsReadImpl___long_byte_1ARRAY_int_int_R_int(
     if(ssl == 0 || buffer == JAVA_NULL) {
         return -2;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     n = SSL_read(ssl, (char*)&data[offset], (int)length);
     CN1_RESUME_THREAD;
@@ -478,7 +478,7 @@ JAVA_INT com_codename1_backend_Tcp_tlsWriteImpl___long_byte_1ARRAY_int_int_R_int
     if(ssl == 0 || buffer == JAVA_NULL) {
         return -2;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     /* SSL_write can return a short count, and the caller checks for the full
      * length, so the loop is here rather than in Java. */
     while(written < (int)length) {

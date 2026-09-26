@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Test;
@@ -67,6 +89,19 @@ class StreamApiIntegrationTest {
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "StreamEdgeApp");
 
         Path distDir = outputDir.resolve("dist");
+        String generated = new String(Files.readAllBytes(distDir.resolve("StreamEdgeApp-src/StreamEdgeApp.c")), StandardCharsets.UTF_8);
+        assertTrue(generated.split("fused array stream", -1).length >= 9,
+                "All eight immediate helper pipelines must actually lower to C");
+        for (String helper : Arrays.asList("fusedMatch", "fusedCount", "fusedForEach", "fusedAll",
+                "fusedNone", "fusedZero", "fusedThrow", "fusedMutation")) {
+            int start = generated.indexOf(" StreamEdgeApp_" + helper + "_");
+            assertTrue(start >= 0);
+            int end = generated.indexOf("\nJAVA_", start);
+            String body = generated.substring(start, end < 0 ? generated.length() : end);
+            assertTrue(body.contains("fused array stream"), helper);
+            assertFalse(body.contains("lambda$factory"), helper + " must not allocate callback objects");
+            assertFalse(body.contains("virtual_java_util_stream"), helper + " must not dispatch stream stages");
+        }
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 

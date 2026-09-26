@@ -365,7 +365,7 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
     NSMutableSet *shareSet = [NSMutableSet set];
     if (readTypes != JAVA_NULL) {
         JAVA_ARRAY arr = (JAVA_ARRAY)readTypes;
-        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)arr->data;
+        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA(arr);
         for (int i = 0; i < arr->length; i++) {
             HKQuantityType *t = cn1hkQuantityType(
                 toNSString(threadStateData, (JAVA_OBJECT)data[i]));
@@ -376,7 +376,7 @@ com_codename1_impl_ios_IOSNative_hkRequestAuthorization___int_java_lang_String_1
     }
     if (shareTypes != JAVA_NULL) {
         JAVA_ARRAY arr = (JAVA_ARRAY)shareTypes;
-        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)arr->data;
+        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA(arr);
         for (int i = 0; i < arr->length; i++) {
             HKQuantityType *t = cn1hkQuantityType(
                 toNSString(threadStateData, (JAVA_OBJECT)data[i]));

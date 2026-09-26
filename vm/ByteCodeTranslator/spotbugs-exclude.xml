@@ -28,6 +28,8 @@
             <Bug pattern="MS_SHOULD_BE_FINAL" />
             <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
             <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+            <!-- cn1ParseNs: a phase timer of the one translation this process runs. -->
+            <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
         </Or>
     </Match>
 
@@ -43,6 +45,9 @@
             <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
             <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD" />
             <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+            <!-- baseInterfaces and the field/method lists are filled by the parser after
+                 construction and before any code generation reads them. -->
+            <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR" />
         </Or>
     </Match>
 
@@ -79,7 +84,20 @@
             <Bug pattern="UC_USELESS_VOID_METHOD" />
             <Bug pattern="URF_UNREAD_FIELD" />
             <Bug pattern="SF_SWITCH_NO_DEFAULT" />
+            <!-- The census counters (-Dcn1.bceCensus, the frameless and iterator censuses,
+                 the retire counters) are statics summed across the methods of the one
+                 single-threaded translation this process runs, and printed at its end. -->
+            <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
         </Or>
+    </Match>
+
+    <!--
+    LocalReceiverTypes' ASM interpreter casts an AbstractInsnNode to the node type its
+    opcode switch has just selected; ASM guarantees that pairing.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.tools\.translator\.LocalReceiverTypes(\$.*)?" />
+        <Bug pattern="BC_UNCONFIRMED_CAST" />
     </Match>
 
     <!-- ByteCodeField stores metadata collected during class visiting. -->
@@ -118,6 +136,9 @@
             <Bug pattern="DLS_DEAD_LOCAL_STORE" />
             <Bug pattern="LI_LAZY_INIT_STATIC" />
             <Bug pattern="LI_LAZY_INIT_UPDATE_STATIC" />
+            <!-- Label.info is declared Object in ASM; the guard clears only the LabelNode
+                 the analyses installed, even though today that is all it can hold. -->
+            <Bug pattern="BC_VACUOUS_INSTANCEOF" />
         </Or>
     </Match>
 

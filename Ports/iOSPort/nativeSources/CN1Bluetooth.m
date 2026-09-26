@@ -147,7 +147,7 @@ static NSData *cn1btDataFromJavaArray(JAVA_OBJECT arr) {
     if (a->length <= 0) {
         return [NSData data];
     }
-    return [NSData dataWithBytes:a->data length:a->length];
+    return [NSData dataWithBytes:CN1_ARRAY_DATA(a) length:a->length];
 }
 
 static NSString *cn1btHexFromData(NSData *d) {
@@ -215,7 +215,7 @@ static NSArray *cn1btUuidArray(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr) {
     if (a->length <= 0) {
         return nil;
     }
-    JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)a->data;
+    JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)CN1_ARRAY_DATA(a);
     NSMutableArray *out = [NSMutableArray arrayWithCapacity:a->length];
     for (int i = 0; i < a->length; i++) {
         if (data[i] == JAVA_NULL) {
@@ -2238,7 +2238,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_btL2capRead___long_byte_1ARRAY_int_int
     if (offset < 0 || offset + len > a->length) {
         return -2;
     }
-    NSInteger n = [in read:((uint8_t *)a->data) + offset
+    NSInteger n = [in read:((uint8_t *)CN1_ARRAY_DATA(a)) + offset
             maxLength:(NSUInteger)len];
     if (n == 0) {
         return -1;
@@ -2275,7 +2275,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_btL2capWrite___long_byte_1ARRAY_int_in
     if (offset < 0 || offset + len > a->length) {
         return -2;
     }
-    NSInteger n = [out write:((const uint8_t *)a->data) + offset
+    NSInteger n = [out write:((const uint8_t *)CN1_ARRAY_DATA(a)) + offset
             maxLength:(NSUInteger)len];
     if (n <= 0) {
         return -2;

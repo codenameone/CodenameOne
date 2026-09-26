@@ -310,7 +310,8 @@ jobs:
     name: screenshot-capture (x64)
     if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
-    timeout-minutes: 90
+    # 90 for the suite plus the ParparVM vs JDK 25 performance gate.
+    timeout-minutes: 140
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -491,6 +492,8 @@ jobs:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          # The suite's own translation, replayed by the performance gate below.
+          CN1_TRANSLATION_RECORD: ${{ github.workspace }}\artifacts\windows-port\raw\translation-record.jsonl
           CN1_REQUIRE_SUITE: ${{ github.event_name != 'pull_request' }}
           CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
@@ -547,6 +550,20 @@ jobs:
             Write-Host "no native log at $log"
           }
 
+      # ParparVM against JDK 25 on this runner: this job's own suite translation, the
+      # translator translating itself, and every Bench workload. The table lands in this
+      # arch's screenshot comment and the job's last step fails it on a regression.
+      # JDK_8_HOME falls back to the job's JDK where there is no JDK 8 (arm64): the
+      # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
+      - name: ParparVM vs JDK 25 (performance gate, x64)
+        if: success() || failure()
+        shell: bash
+        run: |
+          export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"
+          vm/selfhost/ci-perf-gate.sh run windows-x64 artifacts/windows-port/raw/perf \
+            --hello-workload "$(cygpath -m "$GITHUB_WORKSPACE/artifacts/windows-port/raw/translation-record.jsonl")" \
+            --hello-app WinHelloMain
+
       - name: Upload screenshot artifact (x64)
         if: always()
         uses: ./.github/actions/upload-artifact-with-retry
@@ -555,6 +572,11 @@ jobs:
           path: artifacts/windows-port/raw
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Fail on a ParparVM performance regression (x64)
+        if: success() || failure()
+        shell: bash
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 
   # Native arm64 leg of the screenshot capture: reuses the core + port bytecode
   # compiled by the x64 job (architecture-independent), then translates +
@@ -566,7 +588,8 @@ jobs:
     needs: windows-port-screenshot
     if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-11-arm
-    timeout-minutes: 60
+    # 60 for the suite plus the ParparVM vs JDK 25 performance gate.
+    timeout-minutes: 110
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -663,6 +686,8 @@ jobs:
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          # The suite's own translation, replayed by the performance gate below.
+          CN1_TRANSLATION_RECORD: ${{ github.workspace }}\artifacts\windows-port\raw\translation-record.jsonl
           CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           # Master reports must include the non-rendering tail of the suite too.
           # PR screenshot jobs may still stop after the visual set stabilizes.
@@ -723,6 +748,20 @@ jobs:
             Write-Host "no native log at $log"
           }
 
+      # ParparVM against JDK 25 on this runner: this job's own suite translation, the
+      # translator translating itself, and every Bench workload. The table lands in this
+      # arch's screenshot comment and the job's last step fails it on a regression.
+      # JDK_8_HOME falls back to the job's JDK where there is no JDK 8 (arm64): the
+      # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
+      - name: ParparVM vs JDK 25 (performance gate, arm64)
+        if: success() || failure()
+        shell: bash
+        run: |
+          export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"
+          vm/selfhost/ci-perf-gate.sh run windows-arm64 artifacts/windows-port/raw/perf \
+            --hello-workload "$(cygpath -m "$GITHUB_WORKSPACE/artifacts/windows-port/raw/translation-record.jsonl")" \
+            --hello-app WinHelloMain
+
       - name: Upload screenshot artifact (arm64)
         if: always()
         uses: ./.github/actions/upload-artifact-with-retry
@@ -731,6 +770,11 @@ jobs:
           path: artifacts/windows-port/raw
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Fail on a ParparVM performance regression (arm64)
+        if: success() || failure()
+        shell: bash
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
 
   # Per-architecture PR comments. x64 (Intel/AMD) and arm64 (Apple Silicon / Arm)
   # post SEPARATE comments with DISTINCT markers, each depending only on its own
@@ -771,6 +815,8 @@ jobs:
         shell: bash
         env:
           CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_X64_COMMENT -->'
+          # This arch's ParparVM vs JDK 25 table, measured by its capture job.
+          CN1SS_EXTRA_MARKDOWN: artifacts/windows-port/raw/perf/perf-comment.md
           CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port x64]'
           CN1SS_PREVIEW_SUBDIR: 'windows-native-x64'
           CN1SS_SUCCESS_MESSAGE: 'Native Windows port (x64 / Intel-AMD): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, SSE2 SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
@@ -872,6 +918,8 @@ jobs:
         shell: bash
         env:
           CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_ARM64_COMMENT -->'
+          # This arch's ParparVM vs JDK 25 table, measured by its capture job.
+          CN1SS_EXTRA_MARKDOWN: artifacts/windows-port/raw/perf/perf-comment.md
           CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port arm64]'
           CN1SS_PREVIEW_SUBDIR: 'windows-native-arm64'
           CN1SS_SUCCESS_MESSAGE: 'Native Windows port (arm64 / Apple Silicon - Arm): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, NEON SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'

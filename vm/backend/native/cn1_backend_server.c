@@ -231,21 +231,31 @@ static __thread JAVA_INT cn1BackendReadCap = 0;
  */
 static __thread struct JavaArrayPrototype* cn1BackendWouldBlockArray = 0;
 
+/*
+ * An off-heap byte[] whose payload follows its header in the SAME block, as every
+ * ParparVM array's does: the header records the payload as an offset from itself
+ * (CN1_ARRAY_DATA), not as a pointer, so storage cannot live anywhere else.
+ */
+static struct JavaArrayPrototype* cn1BackendNewOffHeapBytes(JAVA_INT capacity) {
+    struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)
+            calloc(1, CN1_ARRAY_ALLOC_BYTES(capacity));
+    if(a == 0) {
+        return 0;
+    }
+    CN1_OBJ_SET_CLASS(a, &class_array1__JAVA_BYTE);
+    CN1_OBJ_SET_MARK(a, -1);
+    CN1_OBJ_SET_HEAPPOS(a, -1);
+    a->dimensions = 1;
+    a->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
+    a->length = capacity;
+    a->dataOffset = (unsigned short)CN1_ARRAY_PAYLOAD_OFFSET;
+    cn1AddImmortalRoot((JAVA_OBJECT)a);
+    return a;
+}
+
 static struct JavaArrayPrototype* cn1BackendEnsureWouldBlockArray(void) {
     if(cn1BackendWouldBlockArray == 0) {
-        cn1BackendWouldBlockArray = (struct JavaArrayPrototype*)
-                calloc(1, sizeof(struct JavaArrayPrototype));
-        if(cn1BackendWouldBlockArray == 0) {
-            return 0;
-        }
-        cn1BackendWouldBlockArray->__codenameOneParentClsReference = &class_array1__JAVA_BYTE;
-        cn1BackendWouldBlockArray->__codenameOneGcMark = -1;
-        cn1BackendWouldBlockArray->__heapPosition = -1;
-        cn1BackendWouldBlockArray->dimensions = 1;
-        cn1BackendWouldBlockArray->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
-        cn1BackendWouldBlockArray->length = 0;
-        cn1BackendWouldBlockArray->data = 0;
-        cn1AddImmortalRoot((JAVA_OBJECT)cn1BackendWouldBlockArray);
+        cn1BackendWouldBlockArray = cn1BackendNewOffHeapBytes(0);
     }
     return cn1BackendWouldBlockArray;
 }
@@ -304,30 +314,26 @@ static struct JavaArrayPrototype* cn1BackendEnsureReadArray(JAVA_INT capacity) {
     if(cn1BackendReadArray != 0 && cn1BackendReadCap >= capacity) {
         return cn1BackendReadArray;
     }
-    if(cn1BackendReadArray == 0) {
-        cn1BackendReadArray = (struct JavaArrayPrototype*)
-                calloc(1, sizeof(struct JavaArrayPrototype));
-        if(cn1BackendReadArray == 0) {
-            return 0;
-        }
-        cn1BackendReadArray->__codenameOneParentClsReference = &class_array1__JAVA_BYTE;
-        cn1BackendReadArray->__codenameOneGcMark = -1;
-        cn1BackendReadArray->__heapPosition = -1;
-        cn1BackendReadArray->dimensions = 1;
-        cn1BackendReadArray->primitiveSize = sizeof(JAVA_ARRAY_BYTE);
-        cn1AddImmortalRoot((JAVA_OBJECT)cn1BackendReadArray);
-    }
     {
-        char* grown = (char*)realloc(cn1BackendReadStorage, (size_t)capacity);
+        // A LARGER BUFFER IS A NEW ARRAY. The payload lives inside its header's block,
+        // so it cannot be moved under an existing header the way the old separate
+        // storage was realloc'd. The previous block is left allocated and rooted: a
+        // connection may still be borrowing it, and it now keeps its own bytes rather
+        // than seeing the storage change underneath it. At least doubling bounds what
+        // that retains to less than the final buffer, and callers ask for one fixed
+        // size (HttpServer passes its 8KB scratch length), so in practice it happens
+        // once per thread.
+        JAVA_INT want = capacity;
+        if(cn1BackendReadCap > 0 && want < cn1BackendReadCap * 2) {
+            want = cn1BackendReadCap * 2;
+        }
+        struct JavaArrayPrototype* grown = cn1BackendNewOffHeapBytes(want);
         if(grown == 0) {
             return 0;
         }
-        cn1BackendReadStorage = grown;
-        cn1BackendReadCap = capacity;
-        // The header outlives every grow, so the Java side keeps one identity and
-        // only the storage moves -- which is safe precisely because no Java
-        // reference points INTO the storage, only at the header.
-        cn1BackendReadArray->data = cn1BackendReadStorage;
+        cn1BackendReadArray = grown;
+        cn1BackendReadStorage = (char*)CN1_ARRAY_DATA(grown);
+        cn1BackendReadCap = want;
     }
     return cn1BackendReadArray;
 }
@@ -365,18 +371,57 @@ JAVA_OBJECT com_codename1_backend_ServerSocket_readIntoThreadBufferImpl___int_in
     if(a == 0 || fd < 0) {
         return JAVA_NULL;
     }
-    // YIELD around the blocking read, exactly as readImpl does. Without it the
-    // thread stays marked active while it sits in the kernel, so the collector has
-    // to wait for every worker that is parked on a socket before it can stop the
-    // world. Omitting it cost HALF the throughput -- 147k against 288k req/s -- and
-    // it is a liveness bug before it is a performance one: a quiet connection
-    // would hold the collector for as long as the client stayed silent.
-    CN1_YIELD_THREAD;
-    do {
-        n = read(fd, cn1BackendReadStorage, (size_t)capacity);
-    } while(n < 0 && errno == EINTR);
-    readErrno = errno;
-    CN1_RESUME_THREAD;
+    if(cn1VirtualThreadCurrent() != 0) {
+        // ON A VIRTUAL THREAD THE READ MUST NOT BE BRACKETED, because the bracket
+        // can hand the host to another virtual thread while the bytes are sitting
+        // in the shared storage.
+        //
+        // CN1_RESUME_THREAD waits out a collection that has this thread blocked,
+        // and on a virtual thread it waits by YIELDING -- to the other virtual
+        // threads multiplexed onto this host. Any of them may call this function,
+        // and its read lands in the same __thread storage. So: this read
+        // completes, a collection is in progress, the resume yields, another
+        // connection's read overwrites the storage, and this one resumes, stamps
+        // its own length on the array and returns ANOTHER CONNECTION'S REQUEST
+        // as its own. That request is then answered twice -- once to its own
+        // client and once, with whatever it carried, to this one -- and this
+        // connection's real request is never answered at all. advance() cannot
+        // catch it: it privatises a buffer the connection is borrowing, and this
+        // one has not taken the borrow yet. Measured with a stress client: about
+        // one request in 300k under virtual threads, zero with the zero-copy read
+        // switched off; CI saw it as a pipelined request answered 400 "duplicate
+        // Host header", the bytes of some other client's head.
+        //
+        // Leaving the thread active is what the bracket exists to avoid, and it
+        // is fine here because this read cannot wait: descriptors are
+        // non-blocking in virtual-thread mode, and MSG_DONTWAIT makes that true
+        // of this call whatever the descriptor's flags say, so a collection
+        // waits for one syscall that returns at once -- the same as any other
+        // short native call. Nothing between the read and the return can yield.
+        do {
+#ifdef MSG_DONTWAIT
+            n = recv(fd, cn1BackendReadStorage, (size_t)capacity, MSG_DONTWAIT);
+#else
+            n = read(fd, cn1BackendReadStorage, (size_t)capacity);
+#endif
+        } while(n < 0 && errno == EINTR);
+        readErrno = errno;
+    } else {
+        // YIELD around the blocking read, exactly as readImpl does. Without it the
+        // thread stays marked active while it sits in the kernel, so the collector
+        // has to wait for every worker that is parked on a socket before it can
+        // stop the world. Omitting it cost HALF the throughput -- 147k against
+        // 288k req/s -- and it is a liveness bug before it is a performance one: a
+        // quiet connection would hold the collector for as long as the client
+        // stayed silent. Safe off a virtual thread: the resume below then waits
+        // with usleep, so nothing else runs on this OS thread to touch the storage.
+        CN1_YIELD_THREAD;
+        do {
+            n = read(fd, cn1BackendReadStorage, (size_t)capacity);
+        } while(n < 0 && errno == EINTR);
+        readErrno = errno;
+        CN1_RESUME_THREAD;
+    }
     if(n < 0 && (readErrno == EAGAIN || readErrno == EWOULDBLOCK)) {
         // NOT end of stream. serveOne leaves plaintext descriptors non-blocking in
         // virtual-thread mode, so a request whose bytes have not landed yet -- the
@@ -640,7 +685,7 @@ JAVA_INT com_codename1_backend_ServerSocket_readImpl___int_byte_1ARRAY_int_int_R
     if(fd < 0 || buffer == JAVA_NULL) {
         return -2;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     for(;;) {
         n = (long)recv(fd, (char*)&data[offset], (size_t)length, 0);
@@ -664,7 +709,7 @@ JAVA_INT com_codename1_backend_ServerSocket_readImpl___int_byte_1ARRAY_int_int_R
         // buffer is an ordinary Java object -- so re-read the data pointer after
         // every resume rather than trusting the one taken before the park.
         cn1VirtualThreadYield();
-        data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+        data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     }
     /* Captured before CN1_RESUME_THREAD for the same reason as the poll loop above:
        the resume is a GC safepoint and can park this thread on a timed wait, which
@@ -736,7 +781,7 @@ JAVA_INT com_codename1_backend_ServerSocket_writeImpl___int_byte_1ARRAY_int_int_
     if(fd < 0 || buffer == JAVA_NULL) {
         return -1;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     while(written < length) {
         /* MSG_NOSIGNAL where it exists, so this write cannot raise SIGPIPE even if
@@ -1005,7 +1050,7 @@ JAVA_INT com_codename1_backend_Reactor_waitImpl___int_int_1ARRAY_int_R_int(CODEN
         return -1;
     }
     arr = (JAVA_ARRAY)readyFds;
-    out = (JAVA_ARRAY_INT*)arr->data;
+    out = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(arr);
     capacity = arr->length;
 #if defined(CN1_HAVE_EPOLL)
     {

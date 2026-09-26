@@ -66,6 +66,15 @@ import org.objectweb.asm.Opcodes;
  * @author Shai Almog
  */
 public class BytecodeMethod implements SignatureSet {
+    // Initial native stack buffer in bytes; API-visible capacity remains unchanged.
+    private static final int SB_STACK_FLOOR_UNITS = 128;
+
+    /// Ceiling on the TOTAL stack-resident fused buffers one method may declare. These
+    /// are C locals and iOS secondary threads have 512KB stacks, so the floor above
+    /// must not scale a frame without bound.
+    private static final int SB_STACK_BUDGET_BYTES = 2048;
+
+
     private static MethodDependencyGraph dependencyGraph;
 
     /**
@@ -555,6 +564,24 @@ public class BytecodeMethod implements SignatureSet {
             case Opcodes.DUP2_X1:
             case Opcodes.DUP2_X2:
             case Opcodes.NEWARRAY:
+            // ATHROW: an explicit throw is throwException(threadStateData, obj), which
+            // reads only thread state -- the try-block stack, the exception slot -- and
+            // longjmps to the nearest handler. It touches nothing a frameless frame
+            // lacks, and frameless code already throws through the identical path for
+            // every implicit exception (bounds and null checks call
+            // throwArrayIndexOutOfBoundsException and friends from frameless bodies).
+            // Excluding it made a method pay a full frame on EVERY call for a throw it
+            // almost never takes: the census put ATHROW as the first blocker of ~90% of
+            // the methods still excluded by an instruction (234 of 260 blockers on the
+            // Bench translation; MONITORENTER the other 26). StringBuilder.resizeBuffer
+            // was one -- DEFINE_INSTANCE_METHOD_STACK, line tracking and
+            // releaseForReturn on every append that grows, for `throw new
+            // OutOfMemoryError()`.
+            //
+            // The one observable difference is the one every frameless method already
+            // has: it records no call-stack entry, so a trace filled in by this throw
+            // does not list it.
+            case Opcodes.ATHROW:
                 return true;
         }
         return false;
@@ -573,11 +600,99 @@ public class BytecodeMethod implements SignatureSet {
      * object-touching opcode makes it ineligible -- such a frame would carry a GC
      * root, which is exactly what frameless relies on being absent.
      */
+    /// FRAMELESS CENSUS (-Dcn1.framelessCensus=true). Plan item D6 says its first step
+    /// is a measurement rather than code: a method with any try/catch loses frameless
+    /// codegen, bounds-check elimination and StringBuilder stack allocation at once, and
+    /// the question is how many methods that exclusion ALONE is costing. Counted here
+    /// because this is the one place that already knows the answer.
+    static final boolean FRAMELESS_CENSUS =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.framelessCensus", "false"));
+    static int censusEligible, censusExcludedTryCatch, censusExcludedOther, censusTotal;
+    // StringBuilder stack-allocation census. The corpus measurement that motivated it:
+    // StringBuilder is 9.53MB of the 168.97MB peak occupied heap and 0% of it is traced,
+    // i.e. every live builder at peak is already garbage waiting to be reclaimed. Whether
+    // that is worth attacking depends entirely on how many allocation sites the analysis
+    // currently refuses and WHY, so count the reasons rather than guess at them.
+    static int sbCensusSites, sbCensusBailTryCatch, sbCensusBailSync, sbCensusStackAllocated;
+    static final boolean SB_SKIP_ESCAPE_VALIDATION =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.sbSkipEscapeValidation", "false"));
+    /// Why the 'other' exclusions happened, so the census answers where the REMAINING
+    /// frameless opportunity is rather than only ruling try/catch out.
+    static int censusNoConstructor, censusNoSync, censusNoDebug, censusNoOpcode, censusEmpty;
+    /// Which instruction stopped a method from going frameless, by opcode. The census
+    /// used to report only "unhandledOpcode", which says a whitelist refused something
+    /// and not what -- and the answer decides the next change: an opcode that blocks
+    /// thousands of methods for no semantic reason is worth admitting, one that blocks
+    /// a handful is not. Counts the FIRST blocker per method only.
+    static final java.util.Map<String, Integer> censusBlockers = new java.util.TreeMap<String, Integer>();
+    static boolean censusBlocked(Instruction i, boolean ignoreTryCatch) {
+        if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+            String k = i.getClass().getSimpleName() + ":" + i.getOpcode();
+            Integer c = censusBlockers.get(k);
+            censusBlockers.put(k, c == null ? 1 : c + 1);
+        }
+        return false;
+    }
+    static void censusReason(int which) {
+        switch (which) {
+            case 0: censusNoConstructor++; break;
+            case 1: censusNoSync++; break;
+            case 2: censusNoDebug++; break;
+            case 3: censusNoOpcode++; break;
+            default: censusEmpty++; break;
+        }
+    }
+
+    /** Set while emitting: this method is frameless AND contains a try/catch, so its
+     *  frame needs the two extra names CN1_FRAMELESS_TRY_FRAME defines. */
+    private boolean framelessHasTryCatch;
+
+    /** @return true if a return in this method must unwind the try-block stack itself. */
+    public boolean isFramelessWithTryCatch() {
+        return framelessHasTryCatch;
+    }
+
+    private int rawFramelessEligibility = -1;
+    private boolean rawFramelessWithoutHandlers;
+
+    /** Preserve the bytecode proof before native lowering introduces opaque C instructions. */
+    void freezeFramelessEligibility() {
+        if (rawFramelessEligibility < 0) {
+            rawFramelessEligibility = isFramelessEligibleImpl(false) ? 1 : 0;
+            if (FRAMELESS_CENSUS && rawFramelessEligibility == 0) {
+                rawFramelessWithoutHandlers = isFramelessEligibleImpl(true);
+            }
+        }
+    }
+
     private boolean isFramelessEligible() {
+        boolean r = rawFramelessEligibility < 0
+                ? isFramelessEligibleImpl(false) : rawFramelessEligibility != 0;
+        if (FRAMELESS_CENSUS && !nativeMethod && !abstractMethod && !eliminated) {
+            censusTotal++;
+            if (r) {
+                censusEligible++;
+            } else if (rawFramelessEligibility < 0
+                    ? isFramelessEligibleImpl(true) : rawFramelessWithoutHandlers) {
+                // Would be eligible if try/catch alone were not disqualifying.
+                censusExcludedTryCatch++;
+            } else {
+                censusExcludedOther++;
+            }
+        }
+        return r;
+    }
+
+    /// @param ignoreTryCatch when true, a TryCatch range does not disqualify -- used
+    ///                       only by the census above to attribute the exclusion
+    private boolean isFramelessEligibleImpl(boolean ignoreTryCatch) {
         if (!FRAMELESS_ENABLED) {
             return false;
         }
         if (nativeMethod || abstractMethod || eliminated || synchronizedMethod || onDeviceDebug) {
+            if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                censusReason(synchronizedMethod ? 1 : (onDeviceDebug ? 2 : 4));
+            }
             return false;
         }
         // PHASE 3b: object args/return/locals are allowed only when object-frameless is on
@@ -589,8 +704,23 @@ public class BytecodeMethod implements SignatureSet {
             // `this` (__cn1ThisObject, a C parameter) is an object root found by the
             // conservative native-stack scan. Constructors are deferred (super-call /
             // field-init / partially-constructed-receiver semantics need more care).
-            if (!obj || !FRAMELESS_INSTANCE_ENABLED || constructor
-                    || methodName.equals("__INIT__") || methodName.equals("__CLINIT__")) {
+            // PHASE 3c: CONSTRUCTORS ARE FRAMELESS TOO. They were the single largest
+            // remaining exclusion by a wide margin -- the census counted 3,850 of 23,445
+            // methods against 357 for try/catch -- and the exclusion was a DEFERRAL
+            // ("super-call / field-init / partially-constructed-receiver semantics need
+            // more care"), never a proof. A constructor's receiver is a C parameter
+            // exactly like any instance method's, and the conservative native-stack scan
+            // finds it whether its fields are written yet or not: allocation zeroes the
+            // object before the constructor is entered, so a partially built receiver
+            // traces as itself plus null fields, never as garbage.
+            //
+            // __CLINIT__ stays excluded, and that is a semantic criterion rather than
+            // caution: a static initializer is entered through the class-init guard and
+            // can re-enter arbitrary other clinits.
+            if (!obj || !FRAMELESS_INSTANCE_ENABLED || methodName.equals("__CLINIT__")) {
+                if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                    censusReason(0);
+                }
                 return false;
             }
         }
@@ -610,7 +740,19 @@ public class BytecodeMethod implements SignatureSet {
         boolean hasRealInstruction = false;
         for (Instruction i : instructions) {
             if (i instanceof TryCatch) {
-                return false;
+                // A try/catch used to disqualify the method outright -- the last of the
+                // three guardrails it controlled, and like the other two a DEFERRAL
+                // rather than a proof. What a frameless frame lacks is two NAMES the
+                // exception macros use (methodBlockOffset and
+                // currentCodenameOneCallStackOffset); CN1_FRAMELESS_TRY_FRAME supplies
+                // both, emitted only into the methods that need them. The setjmp
+                // requirement was already met independently: volatileLocals is set by
+                // the same instruction scan and selects the _VSP frame variant, so the
+                // locals and SP are volatile here exactly as they are in an ordinary
+                // frame.
+                //
+                // ignoreTryCatch is now only the census' way of asking the old question.
+                continue;
             }
             if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable) {
                 continue;
@@ -618,14 +760,14 @@ public class BytecodeMethod implements SignatureSet {
             if (i instanceof Field) {
                 // GETFIELD/PUTFIELD/GETSTATIC/PUTSTATIC are SP-based; safe under object mode.
                 if (!obj) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 hasRealInstruction = true;
                 continue;
             }
             if (i instanceof TypeInstruction) {
                 if (!obj) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 switch (i.getOpcode()) {
                     case Opcodes.NEW:
@@ -635,11 +777,11 @@ public class BytecodeMethod implements SignatureSet {
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false;
+                        return censusBlocked(i, ignoreTryCatch);
                 }
             }
             if (i instanceof MultiArray) {
-                return false; // MULTIANEWARRAY -- deferred (expand later)
+                return censusBlocked(i, ignoreTryCatch); // MULTIANEWARRAY -- deferred (expand later)
             }
             if (i instanceof IInc) {
                 hasRealInstruction = true;
@@ -679,12 +821,12 @@ public class BytecodeMethod implements SignatureSet {
                         // object local slot that lives in the method-local frame array,
                         // scanned conservatively.
                         if (!obj) {
-                            return false;
+                            return censusBlocked(i, ignoreTryCatch);
                         }
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false;
+                        return censusBlocked(i, ignoreTryCatch);
                 }
             }
             if (i instanceof Jump) {
@@ -709,12 +851,12 @@ public class BytecodeMethod implements SignatureSet {
                     case Opcodes.IFNULL:
                     case Opcodes.IFNONNULL:
                         if (!obj) {
-                            return false;
+                            return censusBlocked(i, ignoreTryCatch);
                         }
                         hasRealInstruction = true;
                         continue;
                     default:
-                        return false; // JSR
+                        return censusBlocked(i, ignoreTryCatch); // JSR
                 }
             }
             if (i instanceof Ldc) {
@@ -729,7 +871,7 @@ public class BytecodeMethod implements SignatureSet {
                     hasRealInstruction = true;
                     continue;
                 }
-                return false;
+                return censusBlocked(i, ignoreTryCatch);
             }
             if (i instanceof Invoke) {
                 if (obj) {
@@ -740,10 +882,10 @@ public class BytecodeMethod implements SignatureSet {
                     continue;
                 }
                 if (i.getOpcode() != Opcodes.INVOKESTATIC) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 if (!isPrimitiveOnlyDescriptor(((Invoke) i).getDesc())) {
-                    return false;
+                    return censusBlocked(i, ignoreTryCatch);
                 }
                 hasRealInstruction = true;
                 continue;
@@ -757,12 +899,18 @@ public class BytecodeMethod implements SignatureSet {
                     hasRealInstruction = true;
                     continue;
                 }
-                return false;
+                return censusBlocked(i, ignoreTryCatch);
             }
             // Any other instruction type (CustomInvoke/CustomJump/CustomIntruction/
             // ArithmeticExpression are produced only by optimize and must not appear
             // here; anything else is unrecognized) -> conservatively ineligible.
-            return false;
+            if (FRAMELESS_CENSUS && !ignoreTryCatch) {
+                censusReason(3);
+            }
+            return censusBlocked(i, ignoreTryCatch);
+        }
+        if (FRAMELESS_CENSUS && !ignoreTryCatch && !hasRealInstruction) {
+            censusReason(4);
         }
         return hasRealInstruction;
     }
@@ -1192,6 +1340,7 @@ public class BytecodeMethod implements SignatureSet {
     public void updateInlinableFieldDependencies() {
         for (Instruction i : instructions) {
             if (i instanceof Invoke) {
+                ((Invoke) i).addResolvedDependencies(dependentClasses);
                 Field folded = ((Invoke) i).asInlinableFieldAccess();
                 if (folded != null) {
                     folded.addDependencies(dependentClasses);
@@ -1334,6 +1483,15 @@ public class BytecodeMethod implements SignatureSet {
         // removes the dependence, and costs one walk per method instead of one
         // per method per consumer.
         snapshotDebugVarScopes();
+    }
+
+    /**
+     * Re-snapshots the raw plans after a pass that runs on the raw list edited it
+     * (DeadFieldElimination). Every analysis above resets its own state first.
+     */
+    public void recomputeRawMethodPlans() {
+        rawPlansComputed = false;
+        computeRawMethodPlans();
     }
 
     public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
@@ -1689,6 +1847,18 @@ public class BytecodeMethod implements SignatureSet {
             return;
         }
             
+        // NativeStorage handles point outside the GC heap. Optimizing C may keep
+        // only that handle and drop this, so preserve the owner through the final
+        // access. This also protects iterator instances that retain their owner.
+        if (!staticMethod) {
+            for (Instruction instruction : instructions) {
+                if (instruction instanceof Invoke
+                        && "java/util/NativeStorage".equals(((Invoke) instruction).getOwner().replace('_', '/'))) {
+                    b.append("    CN1_KEEP_NATIVE_OWNER(__cn1StorageOwner, __cn1ThisObject);\n");
+                    break;
+                }
+            }
+        }
         b.append(declaration);
         boolean fastMethodStackCandidate = canUseFastMethodStack();
 
@@ -1697,10 +1867,19 @@ public class BytecodeMethod implements SignatureSet {
         // optimize()'s return fast-paths (plain return, no frame release) so it must
         // be set first.
         frameless = isFramelessEligible();
+        // Phase 1 shares the raw-bytecode requirement with frameless eligibility.
+        collectRetireCandidates();
 
         boolean hasInstructions = true;
         if(optimizerOn) {
             hasInstructions = optimize();
+            // AFTER optimize(), never before. optimize() is what decides scalar
+            // replacement and stack allocation, and `frameless` is set just above --
+            // running this earlier reads both as "no", so every StringBuilder site
+            // looks like a heap object and every frameless method looks framed. That
+            // is exactly why the first wiring emitted nothing: the analysis kept 14
+            // sites and codegen then discarded all of them.
+            analyzeRetirableLocals();
         }
 
         if(hasInstructions) {
@@ -1749,12 +1928,12 @@ public class BytecodeMethod implements SignatureSet {
             // eventually refused to compile at all.
             boolean volatileLocals = FORCE_VOLATILE_LOCALS || onDeviceDebug
                     || synchronizedMethod;
-            if (!volatileLocals) {
-                for (Instruction tcScan : instructions) {
-                    if (tcScan instanceof TryCatch) {
-                        volatileLocals = true;
-                        break;
-                    }
+            framelessHasTryCatch = false;
+            for (Instruction tcScan : instructions) {
+                if (tcScan instanceof TryCatch) {
+                    volatileLocals = true;
+                    framelessHasTryCatch = true;
+                    break;
                 }
             }
             // Selects the _VSP variant of whichever frame macro is emitted
@@ -1807,7 +1986,7 @@ public class BytecodeMethod implements SignatureSet {
                     // methods keep their class-init check; instance methods don't carry
                     // one (the receiver already forced the class to initialize). Then
                     // guard the native C stack since this frame does not bump call depth.
-                    if (staticMethod) {
+                    if (staticMethod && !ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
                         String framelessCls = clsName.replace('/', '_').replace('$', '_');
                         b.append("    if (!class__").append(framelessCls);
                         b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
@@ -1818,11 +1997,19 @@ public class BytecodeMethod implements SignatureSet {
                     b.append(", ");
                     b.append(maxLocals);
                     b.append(", 0);\n");
-                    b.append("    CN1_FRAMELESS_SOE_GUARD(");
-                    if (!returnType.isVoid()) {
-                        b.append("0");
+                    if (framelessHasTryCatch) {
+                        b.append("    CN1_FRAMELESS_TRY_FRAME();\n");
                     }
-                    b.append(");\n");
+                    // A bounded instance field getter cannot recurse or grow the
+                    // call chain. Let C inline it to a load without retaining a
+                    // native-stack limit test at every getter use.
+                    if (!isSoeGuardUnnecessary()) {
+                        b.append("    CN1_FRAMELESS_SOE_GUARD(");
+                        if (!returnType.isVoid()) {
+                            b.append("0");
+                        }
+                        b.append(");\n");
+                    }
                 } else if(staticMethod) {
                     if(methodName.equals("__CLINIT__")) {
                         if (useFastMethodStack) {
@@ -1835,18 +2022,23 @@ public class BytecodeMethod implements SignatureSet {
                             b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     } else {
-                        b.append("    if (!class__");
-                        b.append(clsName.replace('/', '_').replace('$', '_'));
-                        b.append(".initialized) __STATIC_INITIALIZER_");
-                        b.append(clsName.replace('/', '_').replace('$', '_'));
+                        // Guard omitted for an eagerly initialized class (see
+                        // ByteCodeClass.isEagerInitEligible).
+                        if (!ByteCodeClass.eagerInit(clsName.replace('/', '_').replace('$', '_'))) {
+                            b.append("    if (!class__");
+                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append(".initialized) __STATIC_INITIALIZER_");
+                            b.append(clsName.replace('/', '_').replace('$', '_'));
+                            b.append("(threadStateData);\n");
+                        }
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
                             } else {
-                                b.append("(threadStateData);\n    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
                             }
                         } else {
-                            b.append("(threadStateData);\n    DEFINE_METHOD_STACK").append(spVariant).append("(");
+                            b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
                         }
                     }
                 } else {
@@ -1880,6 +2072,11 @@ public class BytecodeMethod implements SignatureSet {
                 b.append("    struct elementStruct*").append(volatileLocals ? " volatile" : "")
                         .append(" SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
             }
+            // Frame-exit retirement scope. Emitted here because `locals` exists from
+            // the DEFINE_*_METHOD_STACK macro above, and because a declaration at the
+            // top of the function body is what makes its cleanup attribute cover every
+            // return path below it.
+            b.append(frameRetireScopeDecl());
             int startOffset = 0;
             if(synchronizedMethod) {
                 if(staticMethod) {
@@ -1990,6 +2187,15 @@ public class BytecodeMethod implements SignatureSet {
                 String saType = saTi.getStackAllocType();
                 if(saType != null) {
                     b.append("    struct obj__").append(saType).append(" __cn1stk_").append(saIter).append(";\n");
+                    if(saTi.getStackBuilderBytes() > 0) {
+                        b.append("    unsigned char __cn1sbdata_").append(saIter).append("[")
+                                .append(saTi.getStackBuilderBytes()).append("] __attribute__((aligned(16)));\n");
+                        b.append("    struct CN1StackBuffer __cn1sbscope_").append(saIter)
+                                .append(" __attribute__((cleanup(cn1StackBufferLeave))) = {threadStateData->nativeBuffers, threadStateData, (JAVA_OBJECT)&__cn1stk_")
+                                .append(saIter).append(", __cn1sbdata_").append(saIter).append(", 0, ")
+                                .append(saTi.getStackBuilderBytes()).append("};\n");
+                        b.append("    threadStateData->nativeBuffers = &__cn1sbscope_").append(saIter).append(";\n");
+                    }
                     if(saTi.getStackFusedLen() >= 0) {
                         // constant-capacity fused child buffer lives on the stack
                         // too (8-aligned via the long long element type); the NEW
@@ -2003,6 +2209,56 @@ public class BytecodeMethod implements SignatureSet {
                     saTi.setStackAllocId(saIter);
                 }
             }
+        }
+        // SAME RULE AS THE ORDINARY LOCALS, and for the same reason. ParparVM implements
+        // exceptions with setjmp/longjmp, and a non-volatile C local modified between the
+        // setjmp and the longjmp is INDETERMINATE after the jump. The cursor, the mode
+        // flag and the modCount snapshot are all modified inside the loop, so in a method
+        // that catches anything they have to be volatile.
+        //
+        // This is not theoretical: it is what the first version got wrong. A for-each with
+        // a try/catch in its body ran correctly at -O0, where the variables happen to live
+        // in memory, and segfaulted at -O1, where they live in registers that the longjmp
+        // leaves stale -- the loop resumed with a garbage cursor and a garbage mode flag.
+        boolean feVolatile = FORCE_VOLATILE_LOCALS || onDeviceDebug || synchronizedMethod;
+        if (!feVolatile) {
+            for (Instruction tcScan : instructions) {
+                if (tcScan instanceof TryCatch) {
+                    feVolatile = true;
+                    break;
+                }
+            }
+        }
+        String feQual = feVolatile ? "volatile JAVA_INT " : "JAVA_INT ";
+        for(int feIter = 0 ; feIter < forEachIntrinsicCount ; feIter++) {
+            if (frameless) {
+                // Native collection buffers do not keep their Java owners alive.
+                // One lifetime fence per traversal lets the cursor stay in C
+                // registers while retaining the owner through every normal return.
+                b.append("    CN1_KEEP_NATIVE_OWNER(__feOwner_").append(feIter).append(", JAVA_NULL);\n");
+            }
+            // The collection owner stays in a rooted Java local. The cached null
+            // sentinel is also held by IdentityHashMap.NULL_OBJECT, a static root.
+            // All remaining cursor state is primitive.
+            b.append("    ").append(feQual).append("__feIdx_").append(feIter).append(" = 0;\n");
+            if (!directForEachSites.contains(feIter)) b.append("    ").append(feQual).append("__feFast_").append(feIter).append(" = 0;\n");
+            b.append("    ").append(feQual).append("__feMod_").append(feIter).append(" = 0;\n");
+            b.append(feVolatile ? "    JAVA_OBJECT volatile " : "    JAVA_OBJECT ").append("__feNull_").append(feIter).append(" = JAVA_NULL;\n");
+            b.append("    ").append(feQual).append("__feLast_").append(feIter).append(" = -1;\n");
+            // The SLOW path still needs an iterator, and it may as well be a stack one:
+            // the loop has already been proved not to let it escape, and offering the
+            // buffer here is what keeps a mixed program from paying heap allocation on
+            // the receivers that are not ArrayLists. Measured on ForEachT: without it the
+            // intrinsic left 111 heap iterators where the buffer mechanism alone left 93.
+            if (!directForEachSites.contains(feIter)) b.append("    long long __feBuf_").append(feIter)
+                    .append("[(CN1_ITER_BUF_BYTES + 7) / 8];\n");
+        }
+        for(int sbIter = 0 ; sbIter < stackIterCount ; sbIter++) {
+            // long long for 8-alignment, which every object header needs. Declared for
+            // the whole frame rather than per loop: the iterator must stay valid until
+            // the loop ends, and a nested for-each needs its own buffer anyway.
+            b.append("    long long __cn1iterbuf_").append(sbIter)
+                    .append("[(CN1_ITER_BUF_BYTES + 7) / 8];\n");
         }
         for(Instruction i : instructions) {
             i.setMethod(this);
@@ -2143,6 +2399,15 @@ public class BytecodeMethod implements SignatureSet {
         return this.clsName + "_"+this.getCMethodName();
     }
     
+    /* Cases for the class-id switch in an interface thunk: {classIdToken, function}.
+     * Set by the interface's emitter right before the thunk is written, and cleared
+     * after, because one BytecodeMethod is shared across the classes that inherit it. */
+    private List<String[]> thunkCases;
+
+    void setThunkCases(List<String[]> cases) {
+        this.thunkCases = cases;
+    }
+
     public void appendVirtualMethodC(String cls, StringBuilder b, String offset, boolean includeStaticInitializer) {
         if(virtualOverriden) {
             return;
@@ -2188,21 +2453,118 @@ public class BytecodeMethod implements SignatureSet {
             b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER && CN1_TAG_CODE(__cn1Arg1) == CN1_TAG_INTEGER) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
         }
 
-        if(includeStaticInitializer) {
-            b.append("__STATIC_INITIALIZER_");
+        // An eagerly initialized interface (no <clinit>) had its classToInterfaceMap
+        // rows written in initConstantPool before any Java thread existed, so there is
+        // nothing left for this guard to publish -- see
+        // ByteCodeClass.isEagerInitEligible.
+        if(includeStaticInitializer && !ByteCodeClass.eagerInit(cls)) {
+            // GUARD IT. This is the INTERFACE thunk, and it used to call the class
+            // initializer UNCONDITIONALLY -- every other class-init site in the
+            // translator tests the flag first (see the frameless prologue above,
+            // TypeInstruction and FusedConstructor). The initializer returns
+            // immediately once loaded, but it is a huge function that clang will never
+            // inline, so the call itself was the cost: an unconditional, non-inlinable
+            // call on the hottest dispatch path this VM has.
+            //
+            // Iterator.hasNext() and Iterator.next() are interface thunks, so a
+            // for-each paid it TWICE PER ELEMENT. Profiled on the self-hosting corpus,
+            // __STATIC_INITIALIZER_java_util_Iterator alone was 4.4% of main-thread
+            // self time doing nothing but returning.
+            //
+            // The flag is the right thing to test and the ordering is not incidental:
+            // class__X.initialized is RELEASE-stored after the vtable and the
+            // classToInterfaceMap rows are written, and this thunk is about to index
+            // exactly those rows -- so the ACQUIRE load here is what makes them visible.
+            // Testing __X_LOADED__ instead would be a weaker gate that publishes
+            // nothing; that distinction is why the inline guards were moved onto this
+            // flag in the first place.
+            b.append("if(__builtin_expect(!__atomic_load_n(&class__");
+            b.append(cls);
+            b.append(".initialized, __ATOMIC_ACQUIRE), 0)) __STATIC_INITIALIZER_");
             b.append(cls);
             b.append("(threadStateData);\n    ");
         }
         if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             b.append("\n    if(__cn1ThisObject == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();\n    ");
         } 
+        // CN1_CLASS_OF is not a field load when tagged values are compiled in: it
+        // masks the pointer, tests the tag and selects between a proxy and the object
+        // before it loads anything. The interface form of this thunk used it twice --
+        // once for the vtable and once for the classId that indexes
+        // classToInterfaceMap -- so resolving it once here removes that work from
+        // every interface dispatch, which is the hottest indirect call the VM makes.
+        // Skip the tagged resolve where a tagged value cannot arrive: this thunk only
+        // ever sees objects whose class is its owner or below, and a boxed immediate
+        // is assignable to very few of those. See CN1_CLASS_OF_UNTAGGED.
+        b.append("struct clazz* cn1__cls = ")
+         // `cls`, not clsName: this thunk is virtual_<cls>_<method>, so its receiver is
+         // a `cls` or a subclass. clsName is where the METHOD was declared, which for
+         // an Object method is java.lang.Object and would keep the tagged resolve on
+         // every equals/hashCode/toString thunk in the program.
+         .append(Parser.canReceiveTagged(cls) ? "CN1_CLASS_OF" : "CN1_CLASS_OF_UNTAGGED")
+         .append("(__cn1ThisObject);\n    ");
+
+        /* A SWITCH ON THE CLASS ID, ahead of the indirect dispatch below.
+         *
+         * The indirect form is six dependent loads -- class pointer, class id, the
+         * classToInterfaceMap row, the offset within it, the vtable, the slot -- and
+         * then a branch the C compiler cannot see through, so nothing on either side
+         * of the call is optimised across it. The switch is ONE load and a jump table,
+         * and every arm is a named callee that ThinLTO can inline.
+         *
+         * This is the dispatch lambdas need. A lambda becomes its own synthetic class
+         * implementing the functional interface, so a listener invoked out of a
+         * collection -- addActionListener(e -> ...) and then fireActionEvent -- has no
+         * provable receiver at the CALL SITE and no per-site analysis can help it. The
+         * thunk is the one place that sees every implementation, and every lambda is
+         * simply another case here.
+         *
+         * Nothing is kept alive by this: the thunk already reached all of these
+         * through the vtable, and the indirect form remains as the default arm, so a
+         * receiver from a path the analysis did not see still dispatches correctly.
+         * Their headers come in through the include-only channel, never the dependency
+         * list -- see the note in ByteCodeClass.generateCCode. */
+        if (thunkCases != null && !thunkCases.isEmpty()) {
+            b.append("switch(cn1__cls->classId) {\n");
+            for (int ci = 0 ; ci < thunkCases.size() ; ci++) {
+                String[] c = thunkCases.get(ci);
+                // The cases arrive grouped by target, so a run of classes that share one
+                // implementation shares one arm. 116 classes implementing Iterator do not
+                // mean 116 bodies -- they inherit from a handful, and stacking the labels
+                // is what keeps a hot interface under the distinct-target cap instead of
+                // being refused for having a wide cone.
+                b.append("        case ").append(c[0]).append(":");
+                if (ci + 1 < thunkCases.size() && thunkCases.get(ci + 1)[1].equals(c[1])) {
+                    b.append("\n");
+                    continue;
+                }
+                b.append(" ");
+                if (!returnType.isVoid()) {
+                    b.append("return ");
+                }
+                b.append(c[1]).append("(threadStateData, __cn1ThisObject");
+                for (int iter = 0 ; iter < arguments.size() ; iter++) {
+                    b.append(", __cn1Arg").append(iter + 1);
+                }
+                b.append(");");
+                if (returnType.isVoid()) {
+                    // RETURN, not break. A break leaves the switch and falls straight
+                    // into the indirect dispatch below, which would call the method a
+                    // SECOND time -- invisible for a query, state corruption for a
+                    // mutator. MapTorture, SetTorture and IdmTorture all caught it.
+                    b.append(" return;");
+                }
+                b.append("\n");
+            }
+            b.append("    }\n    ");
+        }
         if(!returnType.isVoid()) {
             b.append("return (*(functionPtr_");
         } else {
             b.append("(*(functionPtr_");            
         }
         b.append(bld);
-        b.append(")CN1_CLASS_OF(__cn1ThisObject)->vtable[");
+        b.append(")cn1__cls->vtable[");
         b.append(offset);
         b.append("])(threadStateData, ");
         
@@ -2463,6 +2825,9 @@ public class BytecodeMethod implements SignatureSet {
      * return something it did not just allocate has to be rejected rather than
      * guessed at.
      */
+    // Exact NEW provenance on every object return, captured before IR rewrites.
+    String freshReturnType;
+
     public String allocatedReturnType() {
         List<Instruction> real = new ArrayList<Instruction>();
         for (Instruction i : instructions) {
@@ -2558,6 +2923,469 @@ public class BytecodeMethod implements SignatureSet {
             }
         }
         return n;
+    }
+
+    /// True if this instruction reads or writes the given local slot.
+    private static boolean touchesSlot(Instruction ins, int slot) {
+        if (ins instanceof VarOp) {
+            return ((VarOp) ins).getIndex() == slot;
+        }
+        if (ins instanceof IInc) {
+            return ((IInc) ins).getVar() == slot;
+        }
+        return false;
+    }
+
+    /// Index of the LabelInstruction carrying this label, or -1. Compared by identity:
+    /// ASM Labels are unique objects, so this is exact rather than name-based.
+    private int indexOfLabel(Label l) {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction && ((LabelInstruction) ins).getLabel() == l) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// Number of stack buffers required by escaping fallback iterators.
+    private int stackIterCount;
+
+    /// Whole-program tallies for the census: for-each sites scoped, and sites refused
+    /// because the loop is not the canonical shape or the slot outlives it.
+    static int stackIterScoped;
+    static int stackIterRefused;
+
+    /// Per-site state for an intrinsified for-each; one set of C locals per loop.
+    private int forEachIntrinsicCount;
+    private final Set<Integer> directForEachSites = new HashSet<Integer>();
+
+    /// Whole-program tally for the census.
+    static int forEachIntrinsified;
+
+    /** Lower immediate stream pipelines before reachability culling. */
+    public void fuseStreams() {
+        List<Invoke> calls = StreamFusion.lower(this);
+        for (Invoke call : calls) {
+            addInstruction(new StreamFusion.Dependency(call));
+        }
+        usedSigs = null; usedMethods = null;
+    }
+
+    /**
+     * Lower validated, nonescaping foreach protocols to rooted native cursors.
+     * Closed-world exact receivers omit dispatch and guards. Unknown receivers
+     * retain an exact-class guard and the ordinary iterator fallback. Mutation
+     * checks remain at next/remove, including when the loop body invokes user code.
+     */
+    public void intrinsifyForEach() {
+        if (!STACK_ITERATORS) {
+            return;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName())
+                    || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            int recvIdx = prevExecutable(i - 1);
+            if (recvIdx < 0) {
+                continue;
+            }
+            // Fold an expression when it is already available. Raw stack
+            // producers remain in the IR and use a non-assignable consumer,
+            // so later expression folding cannot discard their evaluation.
+            StringBuilder recvCode = new StringBuilder();
+            Instruction recv = instructions.get(recvIdx);
+            Invoke foldedMapView = null;
+            int viewIndex = -1;
+            if (recv instanceof Invoke) {
+                Invoke view = (Invoke) recv;
+                boolean knownMap = view.hasExactReceiver("java_util_HashMap") || view.hasExactReceiver("java_util_LinkedHashMap") || view.hasExactReceiver("java_util_IdentityHashMap");
+                boolean viewCall = "keySet".equals(view.getName()) && "()Ljava/util/Set;".equals(view.getDesc())
+                        || "values".equals(view.getName()) && "()Ljava/util/Collection;".equals(view.getDesc());
+                int mapIndex = prevExecutable(recvIdx - 1);
+                if (knownMap && viewCall && mapIndex >= 0 && instructions.get(mapIndex) instanceof AssignableExpression) {
+                    StringBuilder mapCode = new StringBuilder();
+                    if (((AssignableExpression) instructions.get(mapIndex)).assignTo("__c", mapCode)) {
+                        foldedMapView = view; viewIndex = recvIdx; recvIdx = mapIndex;
+                        recv = instructions.get(recvIdx);
+                    }
+                }
+            }
+            boolean foldedReceiver = recv instanceof AssignableExpression
+                    && ((AssignableExpression) recv).assignTo("__c", recvCode);
+            if (!foldedReceiver) {
+                // Raw fields and call results are still operand-stack producers at
+                // this stage. Keep them in the IR so later expression folding can
+                // optimize them normally, and consume their one result explicitly.
+                recvCode.setLength(0);
+                recvCode.append("__c = POP_OBJ();\n");
+            }
+            int[] v = validateForEach(i);
+            if (v == null) {
+                if (INTRINSIC_TRACE) {
+                    System.out.println("[FEI-NO] " + clsName + "." + methodName
+                            + " recv=" + instructions.get(recvIdx).getClass().getSimpleName()
+                            + " owner=" + inv.getOwner());
+                }
+                continue;
+            }
+            int storeIdx = v[0], itSlot = v[1], ld1 = v[2], hn = v[3];
+            int ld2 = v[5], nx = v[6], endIdx = v[7];
+            // -Dcn1.iterIntrinsicLimit=N intrinsifies only the first N sites in the
+            // whole program. Purely a bisection aid: a crash that appears once 21 sites
+            // are rewritten says nothing about WHICH one, and the alternative is guessing
+            // at shapes one driver at a time.
+            if (INTRINSIC_LIMIT >= 0 && forEachIntrinsified >= INTRINSIC_LIMIT) {
+                continue;
+            }
+            int id = forEachIntrinsicCount++;
+            NativeTraversal traversal = new NativeTraversal(inv, foldedMapView, id, itSlot, rawFramelessEligibility == 1);
+            if (traversal.isDirect()) directForEachSites.add(id);
+            forEachIntrinsified++;
+            List<String> deps = traversal.dependencies();
+            for (String dependency : deps) {
+                if (!dependentClasses.contains(dependency)) dependentClasses.add(dependency);
+            }
+            String iterCall = "virtual_" + mangle(inv.getOwner()) + "_iterator___R_java_util_Iterator";
+
+            List<Integer> removes = new ArrayList<Integer>();
+            for (int k = storeIdx + 1; k < endIdx; k++) {
+                if (k == ld1 || k == ld2) {
+                    continue;
+                }
+                Instruction in = instructions.get(k);
+                if (in instanceof Invoke && "remove".equals(((Invoke) in).getName())
+                        && "()V".equals(((Invoke) in).getDesc())) {
+                    int r = prevExecutable(k - 1);
+                    if (r >= 0 && isALoadOf(r, itSlot)) {
+                        removes.add(k);
+                    }
+                }
+            }
+
+            // Splice from the BACK so earlier indices stay valid.
+            for (int ri = removes.size() - 1; ri >= 0; ri--) {
+                int k = removes.get(ri);
+                int r = prevExecutable(k - 1);
+                String code = traversal.remove();
+                instructions.set(k, new CustomIntruction(code, code, deps));
+                instructions.remove(r);
+            }
+
+            if (!removes.isEmpty() && Parser.getClassObject("java_util_IdentityHashMap") != null) {
+                addInstruction(new StreamFusion.Dependency(new Invoke(Opcodes.INVOKEVIRTUAL,
+                        "java/util/IdentityHashMap", "remove", "(Ljava/lang/Object;)Ljava/lang/Object;", false)));
+            }
+            String nextCode = traversal.next();
+            instructions.set(nx, new CustomIntruction(nextCode, nextCode, deps));
+            instructions.remove(ld2);
+
+            String hasCode = traversal.hasNext();
+            instructions.set(hn, new CustomIntruction(hasCode, hasCode, deps));
+            instructions.remove(ld1);
+
+            String beginCode = traversal.setup(recvCode.toString(), iterCall, itSlot);
+            // The slot is written HERE rather than left to the ASTORE, and the ASTORE goes
+            // with it. Pushing the value and letting the existing store consume it looks
+            // tidier and does not work: CustomIntruction implements AssignableExpression,
+            // so the ASTORE folds the push into itself, finds no assignable expression
+            // attached, and emits NOTHING -- the entire setup block disappeared from the
+            // generated C while the loop that depended on it stayed.
+            instructions.set(i, foldedReceiver ? new CustomIntruction(beginCode, beginCode, deps)
+                    : new NativeTraversal.StackBegin(beginCode, deps));
+            instructions.remove(storeIdx);
+            if (viewIndex >= 0) instructions.remove(viewIndex);
+            if (foldedReceiver) instructions.remove(recvIdx);
+            if (INTRINSIC_TRACE) {
+                System.out.println("[FEI] placed begin for " + clsName + "." + methodName
+                        + " at " + i + " recvIdx=" + recvIdx + " storeIdx=" + storeIdx
+                        + " listSize=" + instructions.size()
+                        + " atI=" + instructions.get(i - 1).getClass().getSimpleName());
+            }
+        }
+    }
+
+    private static String mangle(String t) {
+        return t.replace('/', '_').replace('.', '_').replace('$', '_');
+    }
+
+    public int getForEachIntrinsicCount() {
+        return forEachIntrinsicCount;
+    }
+
+    /// Offer a C stack buffer to the iterator of every for-each this method still has.
+    ///
+    /// Runs AFTER intrinsifyForEach, so it only sees the loops that could not be
+    /// turned into indexed ones -- the ones whose receiver type is not provable, which is
+    /// where nearly all the remaining iterator allocation lives. It needs no receiver
+    /// type: the buffer is offered to whatever iterator() turns out to allocate, and only
+    /// a class the escape analysis cleared will take it.
+    ///
+    /// The OFFER is scoped to the call, not to the loop. Withdrawing it immediately after
+    /// the iterator is stored means a `break`, a `return` or a `throw` out of the loop
+    /// body cannot leave a pointer to a dead frame pending for some later allocation to
+    /// pick up. The buffer itself stays valid for the whole method, so the iterator living
+    /// in it is unaffected -- what is short-lived is permission to take it, not the
+    /// storage.
+    /// -Dcn1.stackIterators=false turns the whole mechanism off, so the A/B is one
+    /// translator flag rather than two source trees -- the only way to measure it without
+    /// the comparison picking up an unrelated difference.
+    // One-arg getProperty on purpose: the translator is compiled against vm/JavaAPI when
+    // it self-hosts, and that System has no two-argument overload. A default supplied
+    // here instead of there is the difference between building and not.
+    static final int INTRINSIC_LIMIT = intProperty("cn1.iterIntrinsicLimit", -1);
+
+    private static int intProperty(String name, int def) {
+        String v = System.getProperty(name);
+        if (v == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+    static final boolean INTRINSIC_TRACE =
+            "true".equals(System.getProperty("cn1.iterIntrinsicTrace"));
+
+    static final boolean STACK_ITERATORS =
+            !"false".equals(System.getProperty("cn1.stackIterators"));
+
+    public void markStackIterators() {
+        if (!STACK_ITERATORS) {
+            return;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke)) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            int op = inv.getOpcode();
+            if (op != Opcodes.INVOKEINTERFACE && op != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            if (!"iterator".equals(inv.getName())
+                    || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
+                continue;
+            }
+            int[] v = validateForEach(i);
+            if (v == null) {
+                // -Dcn1.iteratorCensus=true: count the for-each sites that keep their
+                // heap iterator, so the next widening is aimed at a measured shape rather
+                // than a guessed one. 118 of 203 surviving iterator() sites were scoped
+                // on the self-hosting corpus, and the 85 that were not are where the
+                // residual 377k allocations live.
+                stackIterRefused++;
+                continue;
+            }
+            int id = stackIterCount++;
+            stackIterScoped++;
+            String begin = "    cn1IterScopeBegin(threadStateData, __cn1iterbuf_" + id + ");\n";
+            String end = "    cn1IterScopeEnd(threadStateData);\n";
+            // Back to front so the earlier index stays valid: the store is after the call.
+            instructions.add(v[0] + 1, new CustomIntruction(end, end, new ArrayList<String>()));
+            instructions.add(i, new CustomIntruction(begin, begin, new ArrayList<String>()));
+            i++;   // step over the instruction just inserted
+        }
+    }
+
+    public int getStackIterCount() {
+        return stackIterCount;
+    }
+
+    /// The canonical javac for-each shape plus the iterator slot's lifetime, shared by
+    /// both consumers of that proof: the indexed lowering, and the stack-iterator scope.
+    ///
+    /// Returns {storeIdx, itSlot, ld1, hn, ifq, ld2, nx, endIdx} or null. Keeping it in
+    /// one place matters because the two callers rely on the SAME guarantee -- that the
+    /// iterator is read only by hasNext() and next() and is dead after the loop. If they
+    /// drifted apart, the stack-allocating one would be the one that crashed.
+    private int[] validateForEach(int iterIdx) {
+        int storeIdx = nextExecutable(iterIdx + 1);
+        if (storeIdx < 0) {
+            return null;
+        }
+        Instruction store = instructions.get(storeIdx);
+        if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+            return null;
+        }
+        int itSlot = ((VarOp) store).getIndex();
+        if (itSlot < firstNonParameterSlot()) {
+            return null;
+        }
+        // The condition label must follow the store immediately; anything executable in
+        // between is not the shape javac emits.
+        int condLabelIdx = -1;
+        for (int k = storeIdx + 1; k < instructions.size(); k++) {
+            Instruction in = instructions.get(k);
+            if (in instanceof LabelInstruction) {
+                condLabelIdx = k;
+                break;
+            }
+            if (in instanceof LineNumber || in instanceof TryCatch) {
+                continue;
+            }
+            break;
+        }
+        if (condLabelIdx < 0) {
+            return null;
+        }
+        int ld1 = nextExecutable(condLabelIdx + 1);
+        int hn = ld1 < 0 ? -1 : nextExecutable(ld1 + 1);
+        int ifq = hn < 0 ? -1 : nextExecutable(hn + 1);
+        int ld2 = ifq < 0 ? -1 : nextExecutable(ifq + 1);
+        int nx = ld2 < 0 ? -1 : nextExecutable(ld2 + 1);
+        if (nx < 0) {
+            return null;
+        }
+        if (!isALoadOf(ld1, itSlot) || !isIteratorCall(hn, "hasNext", "()Z")) {
+            return null;
+        }
+        Instruction jump = instructions.get(ifq);
+        if (!(jump instanceof Jump) || jump.getOpcode() != Opcodes.IFEQ) {
+            return null;
+        }
+        if (!isALoadOf(ld2, itSlot) || !isIteratorCall(nx, "next", "()Ljava/lang/Object;")) {
+            return null;
+        }
+        Label endLabel = ((Jump) jump).getLabel();
+        if (endLabel == null) {
+            return null;
+        }
+        int endIdx = indexOfLabel(endLabel);
+        if (endIdx <= nx) {
+            return null;
+        }
+        // THE ITERATOR SLOT IS CHECKED OVER THIS LOOP'S LIFETIME, NOT OVER THE METHOD.
+        // Counting ASTOREs and ALOADs across the whole method looks safer and is much
+        // worse: javac REUSES one slot for the iterators of sequential for-each loops,
+        // so a method with two of them counts two stores and four loads and every loop
+        // in it is refused. That is not a corner -- it cost 38 of ~88 eligible sites on
+        // the self-hosting corpus, and ByteCodeClass and BytecodeMethod are full of the
+        // shape. What actually has to hold is narrower: between the store and the end
+        // label the slot is read exactly at hasNext() and next() and written nowhere,
+        // and after the loop it is redefined before it is ever read again.
+        for (int k = storeIdx + 1; k < endIdx; k++) {
+            if (k == ld1 || k == ld2) {
+                continue;
+            }
+            if (!touchesSlot(instructions.get(k), itSlot)) {
+                continue;
+            }
+            // A third read is the body calling it.remove(). An INDEXED loop cannot
+            // express that, which is why this used to refuse outright -- but the C
+            // intrinsic can: remove() there is a memmove, a size decrement and a step
+            // back of the cursor. So the pair is allowed through, and the consumer that
+            // cannot handle it (lowerForEachToIndexed) checks for itself.
+            Instruction cur = instructions.get(k);
+            if (cur instanceof VarOp && cur.getOpcode() == Opcodes.ALOAD
+                    && ((VarOp) cur).getIndex() == itSlot) {
+                int nxt = nextExecutable(k + 1);
+                if (nxt >= 0 && instructions.get(nxt) instanceof Invoke
+                        && "remove".equals(((Invoke) instructions.get(nxt)).getName())
+                        && "()V".equals(((Invoke) instructions.get(nxt)).getDesc())) {
+                    continue;
+                }
+            }
+            return null;
+        }
+        if (!iteratorLifetimeEnds(storeIdx, itSlot, ld1, ld2, endIdx)) return null;
+        return new int[] {storeIdx, itSlot, ld1, hn, ifq, ld2, nx, endIdx};
+    }
+
+    /** Follow every successor until this value is overwritten, including primitive
+     * slot reuse and exception handlers. A textual first-store search can accept
+     * a read reached by jumping around that store. */
+    private boolean iteratorLifetimeEnds(int store, int slot, int hasLoad, int nextLoad, int end) {
+        int size = instructions.size();
+        boolean[] seen = new boolean[size];
+        int[] work = new int[size];
+        int handlerCount = 0;
+        for (Instruction candidate : instructions) if (candidate instanceof TryCatch) handlerCount++;
+        int[] handlers = new int[handlerCount * 3];
+        int handlerIndex = 0;
+        for (Instruction candidate : instructions) if (candidate instanceof TryCatch) {
+            TryCatch handler = (TryCatch) candidate;
+            handlers[handlerIndex++] = indexOfLabel(handler.getStart());
+            handlers[handlerIndex++] = indexOfLabel(handler.getEnd());
+            handlers[handlerIndex++] = indexOfLabel(handler.getHandler());
+        }
+        int read = 0, write = 0;
+        if (store + 1 < size) { work[write++] = store + 1; seen[store + 1] = true; }
+        while (read < write) {
+            int at = work[read++];
+            Instruction instruction = instructions.get(at);
+            int op = instruction.getOpcode();
+            if (touchesSlot(instruction, slot)) {
+                if (instruction instanceof VarOp && op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) continue;
+                boolean allowed = at == hasLoad || at == nextLoad;
+                if (!allowed && at < end && isALoadOf(at, slot)) {
+                    int call = nextExecutable(at + 1);
+                    allowed = call >= 0 && isIteratorCall(call, "remove", "()V");
+                }
+                if (!allowed) return false;
+            }
+            // Exception edges keep the pre-instruction local value. Stores and
+            // primitive operations cannot throw; including their handlers is a
+            // conservative over-approximation for this proof.
+            for (int h = 0; h < handlers.length; h += 3) {
+                if (at >= handlers[h] && at < handlers[h + 1]) {
+                    int target = handlers[h + 2];
+                    if (target < 0) return false;
+                    if (!seen[target]) { seen[target] = true; work[write++] = target; }
+                }
+            }
+            if (instruction instanceof Jump) {
+                int target = indexOfLabel(((Jump) instruction).getLabel());
+                if (target < 0) return false;
+                if (!seen[target]) { seen[target] = true; work[write++] = target; }
+                if (op == Opcodes.GOTO) continue;
+                if (op == Opcodes.JSR) return false;
+            } else if (instruction instanceof SwitchInstruction) {
+                SwitchInstruction branch = (SwitchInstruction) instruction;
+                for (Label label : branch.getLabels()) {
+                    int target = indexOfLabel(label);
+                    if (target < 0) return false;
+                    if (!seen[target]) { seen[target] = true; work[write++] = target; }
+                }
+                int target = indexOfLabel(branch.getDefaultLabel());
+                if (target < 0) return false;
+                if (!seen[target]) { seen[target] = true; work[write++] = target; }
+                continue;
+            }
+            if (op == Opcodes.ATHROW || op >= Opcodes.IRETURN && op <= Opcodes.RETURN) continue;
+            if (op == Opcodes.RET) return false;
+            if (at + 1 < size && !seen[at + 1]) { seen[at + 1] = true; work[write++] = at + 1; }
+        }
+        return true;
+    }
+
+    private boolean isALoadOf(int idx, int slot) {
+        Instruction ins = instructions.get(idx);
+        return ins instanceof VarOp && ins.getOpcode() == Opcodes.ALOAD
+                && ((VarOp) ins).getIndex() == slot;
+    }
+
+    private boolean isIteratorCall(int idx, String name, String desc) {
+        Instruction ins = instructions.get(idx);
+        if (!(ins instanceof Invoke)) {
+            return false;
+        }
+        Invoke iv = (Invoke) ins;
+        return "java/util/Iterator".equals(iv.getOwner()) && name.equals(iv.getName())
+                && desc.equals(iv.getDesc());
     }
 
     /**
@@ -2669,10 +3497,173 @@ public class BytecodeMethod implements SignatureSet {
             direct.setMethod(this);
             direct.addDependencies(dependentClasses);
             if (dependencyGraph != null) {
-                String uses = direct.getMethodUsed();
-                if (uses != null) {
-                    dependencyGraph.recordMethodCall(this, uses);
-                }
+                dependencyGraph.recordMethodCall(this, direct.getMethodUsed());
+            }
+        }
+    }
+
+    /**
+     * ELIDE String.toCharArray() WHERE THE ARRAY IS ONLY EVER READ.
+     *
+     * toCharArray() is 22.8% of all char[] allocations on the self-hosting corpus --
+     * 293,175 of 1,285,250 -- and most of those arrays exist only to be scanned and
+     * dropped. The array is a COPY by contract, so the allocation cannot be removed by
+     * sharing it: com.codename1.io.Util.toCharArray exists precisely because some JVMs
+     * returned the backing store, calls that "a serious security hole in the JVM", and
+     * detects it at runtime with `s.toCharArray() == s.toCharArray()`. Handing back the
+     * backing array would make every String mutable through its own accessor AND flip
+     * that expression. It would also do nothing for a COMPACT string, which has a byte[]
+     * and no char[] to hand back.
+     *
+     * So do not build the array. Where the result is stored to a local whose every use
+     * is a read, the local can hold the STRING instead and each read becomes a call:
+     *
+     *     ALOAD a; ARRAYLENGTH          ->  ALOAD a; String.length()
+     *     ALOAD a; &lt;index&gt;; CALOAD      ->  ALOAD a; &lt;index&gt;; String.charAt(I)
+     *
+     * and the toCharArray() call itself is deleted so the ASTORE stores the receiver.
+     * Nothing aliases or mutates an array that does not exist, and on a compact string
+     * charAt is a byte load and a mask.
+     *
+     * THE SUBSTITUTIONS ARE STACK-NEUTRAL BY CONSTRUCTION -- CALOAD and charAt are both
+     * pop-2/push-1, ARRAYLENGTH and length are both pop-1/push-1 -- so maxStack does not
+     * move and no local is added. That is deliberate: of the three correctness defects
+     * that got the earlier bytecode rewrites on this branch withdrawn, one was maxStack
+     * under-reservation and one was running after the cull. This pass avoids the first by
+     * changing no stack depth, and the second by running from Parser BEFORE
+     * eliminateUnusedMethods, registering each created call the way addInstruction would.
+     *
+     * The third was receiver identity, and the answer here is to refuse anything not
+     * trivially provable rather than to track the operand stack. A use qualifies ONLY as
+     * `ALOAD slot` immediately followed by ARRAYLENGTH, or by a single constant/local int
+     * push and then CALOAD. `a[b[i]]`, a computed index, or any other shape disqualifies
+     * the whole site. That covers the indexed loop and the array for-each, which is what
+     * the scanner found in practice, and nothing it cannot prove.
+     *
+     * Parameter slots are excluded for the same reason lowerIteratorCalls excludes them:
+     * a parameter reaches its slot with no ASTORE, so a single store does not mean a
+     * single value.
+     *
+     * ONE ACCEPTED SEMANTIC DIFFERENCE: on a null receiver the NullPointerException now
+     * arises at the first length()/charAt() rather than at toCharArray(). Both are inside
+     * this method and both are an NPE; only the line number can differ. On this VM the
+     * distinction is already academic -- no null check is emitted for either
+     * (CN1_INCLUDE_NPE_CHECKS is off), so both are a native fault the iOS handler
+     * converts. Sites with no uses at all are skipped rather than reasoned about, so the
+     * call is never removed from a method that does nothing else with it.
+     */
+    public void elideToCharArrayScans() {
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof Invoke) || ins.getOpcode() != Opcodes.INVOKEVIRTUAL) {
+                continue;
+            }
+            Invoke inv = (Invoke) ins;
+            if (!"java/lang/String".equals(inv.getOwner())
+                    || !"toCharArray".equals(inv.getName())
+                    || !"()[C".equals(inv.getDesc())) {
+                continue;
+            }
+            int st = nextExecutable(i + 1);
+            if (st < 0) {
+                continue;
+            }
+            Instruction store = instructions.get(st);
+            if (!(store instanceof VarOp) || store.getOpcode() != Opcodes.ASTORE) {
+                continue;
+            }
+            int slot = ((VarOp) store).getIndex();
+            if (slot < firstNonParameterSlot() || countStoresTo(slot) != 1) {
+                continue;
+            }
+            if (!charArrayUsesAreReadOnly(slot, st)) {
+                continue;
+            }
+            rewriteCharArrayReads(slot, st);
+            instructions.remove(i);
+            i--;
+        }
+    }
+
+    /// True when EVERY use of {@code slot} after {@code storeIdx} is one of the two
+    /// read shapes this pass can rewrite, and there is at least one. Validation is a
+    /// separate pass from the rewrite on purpose: a site that fails halfway must leave
+    /// the instruction stream untouched.
+    private boolean charArrayUsesAreReadOnly(int slot, int storeIdx) {
+        int uses = 0;
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp) || ((VarOp) ins).getIndex() != slot) {
+                continue;
+            }
+            if (ins.getOpcode() != Opcodes.ALOAD) {
+                return false;
+            }
+            if (classifyCharArrayRead(i) < 0) {
+                return false;
+            }
+            uses++;
+        }
+        return uses > 0;
+    }
+
+    /// @return the index of the ARRAYLENGTH or CALOAD this ALOAD feeds, or -1 when the
+    ///         shape is anything else -- which includes the array escaping into a call,
+    ///         a store, a return, or an index expression this pass refuses to reason about
+    private int classifyCharArrayRead(int aloadIdx) {
+        int n = nextExecutable(aloadIdx + 1);
+        if (n < 0) {
+            return -1;
+        }
+        if (instructions.get(n).getOpcode() == Opcodes.ARRAYLENGTH) {
+            return n;
+        }
+        // a[i]: exactly ONE simple int push may sit between the ALOAD and the CALOAD.
+        // Anything else -- a call, another array read, arithmetic -- is refused rather
+        // than tracked, because tracking the operand stack is what this pass is
+        // deliberately not doing.
+        if (!isSimpleIntPush(instructions.get(n))) {
+            return -1;
+        }
+        int c = nextExecutable(n + 1);
+        if (c < 0 || instructions.get(c).getOpcode() != Opcodes.CALOAD) {
+            return -1;
+        }
+        return c;
+    }
+
+    private boolean isSimpleIntPush(Instruction ins) {
+        int op = ins.getOpcode();
+        if (ins instanceof VarOp && op == Opcodes.ILOAD) {
+            return true;
+        }
+        return op == Opcodes.ICONST_0 || op == Opcodes.ICONST_1 || op == Opcodes.ICONST_2
+                || op == Opcodes.ICONST_3 || op == Opcodes.ICONST_4 || op == Opcodes.ICONST_5
+                || op == Opcodes.BIPUSH || op == Opcodes.SIPUSH;
+    }
+
+    private void rewriteCharArrayReads(int slot, int storeIdx) {
+        for (int i = storeIdx + 1; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp) || ((VarOp) ins).getIndex() != slot
+                    || ins.getOpcode() != Opcodes.ALOAD) {
+                continue;
+            }
+            int target = classifyCharArrayRead(i);
+            if (target < 0) {
+                continue;   // cannot happen: validated above
+            }
+            boolean isLength = instructions.get(target).getOpcode() == Opcodes.ARRAYLENGTH;
+            Invoke call = isLength
+                    ? new Invoke(Opcodes.INVOKEVIRTUAL, "java/lang/String", "length", "()I", false)
+                    : new Invoke(Opcodes.INVOKEVIRTUAL, "java/lang/String", "charAt", "(I)C", false);
+            instructions.set(target, call);
+            // Register it exactly as addInstruction() would; see retypeIteratorUses for
+            // why the list entry alone is not enough.
+            call.setMethod(this);
+            call.addDependencies(dependentClasses);
+            if (dependencyGraph != null) {
+                dependencyGraph.recordMethodCall(this, call.getMethodUsed());
             }
         }
     }
@@ -2843,6 +3834,7 @@ public class BytecodeMethod implements SignatureSet {
         b.append("    if (CN1_TRY_SETJMP(__tryJmp) == 0) {\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0;\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;\n");
         b.append("        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __tryJmp, sizeof(jmp_buf));\n");
         b.append("        threadStateData->tryBlockOffset++;\n");
         // Emit the actual call
@@ -3017,31 +4009,152 @@ public class BytecodeMethod implements SignatureSet {
      * branches into the body bypassing the test. Any construct we don't model
      * precisely (try/catch, switch, computed jumps, non-constant init) bails.
      */
+    /* BOUNDS-CHECK ELIMINATION CENSUS (-Dcn1.bceCensus=true).
+     *
+     * The other two guardrails this method's javadoc names -- frameless codegen and
+     * StringBuilder stack allocation -- have both been counted, and the answers were
+     * 1% of methods and 17% of sites. This one never was, and it is the one that
+     * costs a compare and a branch on every array access rather than a frame or an
+     * allocation. Count what try/catch alone refuses before deciding it is worth
+     * modelling exception edges to recover.
+     */
+    static final boolean BCE_CENSUS =
+            "true".equalsIgnoreCase(Util.getProperty("cn1.bceCensus", "false"));
+    static int bceMethods, bceMethodsWithArrays, bceRefusedTryCatch,
+               bceArrayOpsTotal, bceArrayOpsRefusedTryCatch;
+    /* Loops that matched the counted shape and were then refused because a handler
+     * landed inside them. Non-vacuity evidence for bceHandlerLandsIn: if this is 0
+     * over a corpus the size of the translator's own, the check is not a guard, it
+     * is decoration, and that is worth knowing. */
+    static int bceLoopsRefusedByHandler;
+    /* Array accesses this pass actually cleared, split by whether the method has a
+     * try/catch at all. The second number IS the change: before the per-loop check
+     * it was necessarily zero, because such a method never reached the analysis. */
+    static int bceAccessesMarked, bceAccessesMarkedInTryCatchMethod;
+    /* WHY a candidate loop was rejected, first failing precondition wins. 106 of the
+     * corpus' 19,164 array accesses are cleared, so the try/catch guardrail was never
+     * the thing holding this pass back -- the shape it recognizes is. These say which
+     * part of the shape does the refusing, so the widening is chosen rather than
+     * guessed at. Indices match BCE_WHY below. */
+    static final String[] BCE_WHY = {
+        "exitNotForward", "lengthNotArraylength", "arrayNotLocal", "indexNotLocal",
+        "noHeaderLabel", "handlerInside", "arrayIsIndex", "inductionNotProven",
+        "headerHasOtherEntries", "arrayWrittenInBody", "accepted", "hoistedLengthUnproven"
+    };
+    static final int[] bceWhy = new int[BCE_WHY.length];
+    /* Array ops inside an ACCEPTED loop's body that were still not cleared, by reason. */
+    static final String[] BCE_MISS = {
+        "notALoad", "indexNotInductionVar", "arrayNotLoopArray", "indexWrittenBeforeAccess",
+        "foreignEntry", "cleared"
+    };
+    static final int[] bceMiss = new int[BCE_MISS.length];
+    /* Which half of the hoisted-length proof refused. Only 20 of 1,154 candidates got
+     * through the first version, and "the corpus does not have that shape" and "the
+     * rule is too strict" look identical from the outside. */
+    static final String[] BCE_HOIST = {
+        "lengthLocalWrittenTwice", "lengthLocalNoCapture", "captureAfterHeader",
+        "arraySlotWritten", "captureNotDominating", "unused", "proven"
+    };
+    static final int[] bceHoist = new int[BCE_HOIST.length];
+
+    private int countArrayOps() {
+        int c = 0;
+        for (Instruction in : instructions) {
+            int op = in.getOpcode();
+            if (op == Opcodes.IALOAD || op == Opcodes.AALOAD || op == Opcodes.BALOAD
+                    || op == Opcodes.CALOAD || op == Opcodes.SALOAD || op == Opcodes.LALOAD
+                    || op == Opcodes.FALOAD || op == Opcodes.DALOAD
+                    || op == Opcodes.IASTORE || op == Opcodes.AASTORE || op == Opcodes.BASTORE
+                    || op == Opcodes.CASTORE || op == Opcodes.SASTORE || op == Opcodes.LASTORE
+                    || op == Opcodes.FASTORE || op == Opcodes.DASTORE) {
+                c++;
+            }
+        }
+        return c;
+    }
+
     void analyzeBoundsChecks() {
         if (DISABLE_BCE) {
             return;
         }
+        if (BCE_CENSUS && !nativeMethod && !abstractMethod && !eliminated) {
+            int ops = countArrayOps();
+            bceMethods++;
+            bceArrayOpsTotal += ops;
+            if (ops > 0) {
+                bceMethodsWithArrays++;
+                // The instruction scan, NOT TryCatch.isTryCatchInMethod(): that
+                // static flag is set in TryCatch.appendInstruction and cleared by
+                // TryCatch.reset() inside appendMethodC, i.e. both happen during
+                // EMISSION, while this pass runs in optimize(), before any of that.
+                // Read here it answers for whichever method was emitted last, so
+                // the first census over-counted by however many try/catch-free
+                // methods happened to follow one that had them.
+                boolean tc = false;
+                for (Instruction in : instructions) {
+                    if (in instanceof TryCatch) { tc = true; break; }
+                }
+                if (tc) {
+                    bceRefusedTryCatch++;
+                    bceArrayOpsRefusedTryCatch += ops;
+                }
+            }
+        }
         // View without LineNumber noise but keeping labels for back-edge detection.
         java.util.ArrayList<Instruction> r = new java.util.ArrayList<Instruction>(instructions.size());
+        java.util.ArrayList<Label> handlers = null;
         for (Instruction in : instructions) {
             if (in instanceof LineNumber) {
                 continue;
             }
+            if (in instanceof TryCatch) {
+                // A try/catch used to disable this pass for the WHOLE method, and it
+                // was the most expensive of the three guardrails try/catch controls:
+                // 20% of the corpus' array accesses sat in a method it refused,
+                // against 17% of StringBuilder sites and 1% of methods for frameless.
+                //
+                // It refuses less than that now. A TryCatch instruction is a
+                // DECLARATION of an exception edge, not the edge itself, so it is not
+                // control flow in this positional view and is kept out of it (leaving
+                // it in would also break the fixed-width condition-shape window
+                // below). What the edge can do is land control INSIDE a loop without
+                // running its test -- the same hazard bceForeignEntry already refuses
+                // for an ordinary Jump, minus the instruction that makes it visible.
+                // So the landing pad is what matters: record it, and refuse per loop.
+                if (handlers == null) {
+                    handlers = new java.util.ArrayList<Label>();
+                }
+                handlers.add(((TryCatch) in).getHandler());
+                continue;
+            }
             // Control flow we don't model precisely -> disable BCE for the whole method.
-            if (in instanceof SwitchInstruction || in instanceof CustomJump || in instanceof TryCatch) {
+            if (in instanceof SwitchInstruction || in instanceof CustomJump) {
                 return;
             }
             r.add(in);
         }
-        if (TryCatch.isTryCatchInMethod()) {
-            return;
-        }
+        // NOT TryCatch.isTryCatchInMethod() -- that flag belongs to emission (see the
+        // census note above), and reading it here answered for a different method.
         int n = r.size();
         java.util.HashMap<Label, Integer> pos = new java.util.HashMap<Label, Integer>();
         for (int i = 0; i < n; i++) {
             Instruction x = r.get(i);
             if (x instanceof LabelInstruction) {
                 pos.put(((LabelInstruction) x).getLabel(), i);
+            }
+        }
+        // Resolve every landing pad to a position. A handler we cannot locate is a
+        // transfer we cannot reason about, so the method goes back to being refused
+        // whole -- exactly today's behaviour, reached only when the label is missing.
+        int[] handlerAt = NO_HANDLERS;
+        if (handlers != null) {
+            handlerAt = new int[handlers.size()];
+            for (int i = 0; i < handlerAt.length; i++) {
+                Integer hp = pos.get(handlers.get(i));
+                if (hp == null) {
+                    return;
+                }
+                handlerAt[i] = hp;
             }
         }
         // Canonical javac top-test counted loop:
@@ -3060,37 +4173,333 @@ public class BytecodeMethod implements SignatureSet {
             Jump j = (Jump) ji;
             Integer exitP = pos.get(j.getLabel());
             if (exitP == null || exitP <= jx) {
+                if (BCE_CENSUS) { bceWhy[0]++; }
                 continue; // exit must be a forward target
             }
             int exit = exitP;
-            // condition shape:  ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit
+            // Two condition shapes. The original one reads the length at the test:
+            //
+            //     header: ILOAD i ; ALOAD a ; ARRAYLENGTH ; IF_ICMPGE exit
+            //
+            // and the second hoists it into a local, which is what NINE TENTHS of this
+            // corpus' counted loops actually compile to (2,384 candidates against 133
+            // for the direct form -- measured, see the census):
+            //
+            //     ALOAD a ; ARRAYLENGTH ; ISTORE n
+            //     header: ILOAD i ; ILOAD n ; IF_ICMPGE exit
+            //
+            // bceHoistedLengthArray proves n IS a.length rather than assuming it, and
+            // hands back the array's slot so everything below is unchanged.
+            int header;
+            int arrVar;
+            int indVar;
             Instruction len = r.get(jx - 1);
-            Instruction arr = r.get(jx - 2);
-            Instruction idx = r.get(jx - 3);
-            Instruction hdr = r.get(jx - 4);
-            if (len.getOpcode() != Opcodes.ARRAYLENGTH) continue;
-            if (!(arr instanceof VarOp) || arr.getOpcode() != Opcodes.ALOAD) continue;
-            if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) continue;
-            if (!(hdr instanceof LabelInstruction)) continue;     // header label the back-edge returns to
-            int header = jx - 4;
-            int arrVar = ((VarOp) arr).getIndex();
-            int indVar = ((VarOp) idx).getIndex();
-            if (arrVar == indVar) continue;
-            if (!bceInductionMonotonicNonNegative(r, indVar)) continue;
-            if (bceCountJumpsTargeting(r, header) != 1) continue;          // only the back-edge enters the header
-            if (bceLocalWrittenInRange(r, arrVar, jx, exit)) continue;     // array invariant in loop body
+            if (len.getOpcode() == Opcodes.ARRAYLENGTH) {
+                Instruction arr = r.get(jx - 2);
+                Instruction idx = r.get(jx - 3);
+                Instruction hdr = r.get(jx - 4);
+                if (!(arr instanceof VarOp) || arr.getOpcode() != Opcodes.ALOAD) { if (BCE_CENSUS) { bceWhy[2]++; } continue; }
+                if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[3]++; } continue; }
+                if (!(hdr instanceof LabelInstruction)) { if (BCE_CENSUS) { bceWhy[4]++; } continue; }     // header label the back-edge returns to
+                header = jx - 4;
+                arrVar = ((VarOp) arr).getIndex();
+                indVar = ((VarOp) idx).getIndex();
+            } else {
+                if (!(len instanceof VarOp) || len.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[1]++; } continue; }
+                Instruction idx = r.get(jx - 2);
+                Instruction hdr = r.get(jx - 3);
+                if (!(idx instanceof VarOp) || idx.getOpcode() != Opcodes.ILOAD) { if (BCE_CENSUS) { bceWhy[3]++; } continue; }
+                if (!(hdr instanceof LabelInstruction)) { if (BCE_CENSUS) { bceWhy[4]++; } continue; }
+                header = jx - 3;
+                indVar = ((VarOp) idx).getIndex();
+                arrVar = bceHoistedLengthArray(r, pos, ((VarOp) len).getIndex(), header, handlerAt);
+                if (arrVar < 0) { if (BCE_CENSUS) { bceWhy[11]++; } continue; }
+            }
+            // An exception edge that lands anywhere in [header, exit) enters the
+            // condition or the body without IF_ICMPGE having run, so i < a.length is
+            // no longer established there and the whole proof below collapses. A pad
+            // OUTSIDE the loop is just another way to LEAVE it; a jump from there
+            // back in is an ordinary Jump, which bceForeignEntry still refuses.
+            if (bceHandlerLandsIn(handlerAt, header, exit)) {
+                if (BCE_CENSUS) {
+                    bceLoopsRefusedByHandler++;
+                    bceWhy[5]++;
+                }
+                continue;
+            }
+            if (arrVar == indVar) { if (BCE_CENSUS) { bceWhy[6]++; } continue; }
+            if (!bceInductionMonotonicNonNegative(r, indVar)) { if (BCE_CENSUS) { bceWhy[7]++; } continue; }
+            if (bceCountJumpsTargeting(r, header) != 1) { if (BCE_CENSUS) { bceWhy[8]++; } continue; }          // only the back-edge enters the header
+            if (bceLocalWrittenInRange(r, arrVar, jx, exit)) { if (BCE_CENSUS) { bceWhy[9]++; } continue; }     // array invariant in loop body
+            if (BCE_CENSUS) { bceWhy[10]++; }
 
             for (int k = jx + 1; k < exit; k++) {
                 Instruction ld = r.get(k);
-                if (!bceIsArrayLoadOpcode(ld.getOpcode())) continue;
+                if (bceIsArrayStoreOpcode(ld.getOpcode())) {
+                    // a[i] = <value>. The value expression sits BETWEEN the index and
+                    // the store, so there is nothing adjacent to match -- walk the
+                    // operand stack back from the store to find where it began. A call
+                    // in the value cannot touch this frame's locals and cannot change
+                    // an array's length, so the proof is the same one the load path
+                    // uses; only the way the pair is located differs.
+                    int vbase = bceStoreValueBase(r, k);
+                    if (vbase < jx + 3) { if (BCE_CENSUS) { bceMiss[0]++; } continue; }
+                    Instruction si = r.get(vbase - 1);
+                    Instruction sa = r.get(vbase - 2);
+                    if (!(si instanceof VarOp) || si.getOpcode() != Opcodes.ILOAD || ((VarOp) si).getIndex() != indVar) { if (BCE_CENSUS) { bceMiss[1]++; } continue; }
+                    if (!(sa instanceof VarOp) || sa.getOpcode() != Opcodes.ALOAD || ((VarOp) sa).getIndex() != arrVar) { if (BCE_CENSUS) { bceMiss[2]++; } continue; }
+                    if (bceLocalWrittenInRange(r, indVar, jx, k)) { if (BCE_CENSUS) { bceMiss[3]++; } continue; }
+                    if (bceForeignEntry(r, pos, header, k, j)) { if (BCE_CENSUS) { bceMiss[4]++; } continue; }
+                    ld.markBoundsSafe();
+                    if (BCE_CENSUS) {
+                        bceMiss[5]++;
+                        bceAccessesMarked++;
+                        if (handlerAt.length > 0) { bceAccessesMarkedInTryCatchMethod++; }
+                    }
+                    continue;
+                }
+                if (!bceIsArrayLoadOpcode(ld.getOpcode())) {
+                    if (BCE_CENSUS && bceIsArrayOpcode(ld.getOpcode())) { bceMiss[0]++; }
+                    continue;
+                }
                 Instruction li = r.get(k - 1);
                 Instruction la = r.get(k - 2);
-                if (!(li instanceof VarOp) || li.getOpcode() != Opcodes.ILOAD || ((VarOp) li).getIndex() != indVar) continue;
-                if (!(la instanceof VarOp) || la.getOpcode() != Opcodes.ALOAD || ((VarOp) la).getIndex() != arrVar) continue;
-                if (bceLocalWrittenInRange(r, indVar, jx, k)) continue;     // i unchanged test->access
-                if (bceForeignEntry(r, pos, header, k, j)) continue;        // no bypass entry into cond/body
+                if (!(li instanceof VarOp) || li.getOpcode() != Opcodes.ILOAD || ((VarOp) li).getIndex() != indVar) { if (BCE_CENSUS) { bceMiss[1]++; } continue; }
+                if (!(la instanceof VarOp) || la.getOpcode() != Opcodes.ALOAD || ((VarOp) la).getIndex() != arrVar) { if (BCE_CENSUS) { bceMiss[2]++; } continue; }
+                if (bceLocalWrittenInRange(r, indVar, jx, k)) { if (BCE_CENSUS) { bceMiss[3]++; } continue; }     // i unchanged test->access
+                if (bceForeignEntry(r, pos, header, k, j)) { if (BCE_CENSUS) { bceMiss[4]++; } continue; }        // no bypass entry into cond/body
+                if (BCE_CENSUS) { bceMiss[5]++; }
                 ld.markBoundsSafe();
+                if (BCE_CENSUS) {
+                    bceAccessesMarked++;
+                    if (handlerAt.length > 0) {
+                        bceAccessesMarkedInTryCatchMethod++;
+                    }
+                }
             }
+        }
+    }
+
+    private static final int[] NO_HANDLERS = new int[0];
+
+    // True if any exception landing pad sits in [from, to). Linear: a method has a
+    // handful of handlers, and the alternative (a sorted array plus a binary search)
+    // would cost more to get right than it saves.
+    private static boolean bceHandlerLandsIn(int[] handlerAt, int from, int to) {
+        for (int i = 0; i < handlerAt.length; i++) {
+            if (handlerAt[i] >= from && handlerAt[i] < to) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The array slot whose length is parked in local {@code nVar}, or -1.
+     *
+     * The proof has to survive both halves changing under it, so all three of these
+     * hold: {@code nVar} is written EXACTLY ONCE in the whole method and that write is
+     * the ARRAYLENGTH capture; the array's slot is never written at all, so the length
+     * it captured is the length it still has; and nothing jumps INTO the region between
+     * the capture and the loop, so reaching the header means the capture ran. Refusing
+     * every write to the array slot is stricter than it has to be -- a store before the
+     * capture is harmless unless a back edge can re-run it -- and the strict form is
+     * what a parameter or a field read into a fresh local already satisfies.
+     */
+    private static int bceHoistedLengthArray(java.util.List<Instruction> r,
+                                             java.util.HashMap<Label, Integer> pos,
+                                             int nVar, int header, int[] handlerAt) {
+        int q = -1;
+        for (int i = 0; i < r.size(); i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == nVar) {
+                if (BCE_CENSUS) { bceHoist[0]++; }
+                return -1;
+            }
+            if (in instanceof VarOp && ((VarOp) in).getIndex() == nVar && bceIsStoreOpcode(in.getOpcode())) {
+                if (q >= 0 || in.getOpcode() != Opcodes.ISTORE) {
+                    if (BCE_CENSUS) { bceHoist[0]++; }
+                    return -1; // written twice, or the slot is reused for another type
+                }
+                q = i;
+            }
+        }
+        if (q < 2) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        if (q >= header) {
+            if (BCE_CENSUS) { bceHoist[2]++; }
+            return -1;
+        }
+        if (r.get(q - 1).getOpcode() != Opcodes.ARRAYLENGTH) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        Instruction a = r.get(q - 2);
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD) {
+            if (BCE_CENSUS) { bceHoist[1]++; }
+            return -1;
+        }
+        int arrVar = ((VarOp) a).getIndex();
+        // Writes to the array's slot are allowed BEFORE the capture and refused at or
+        // after it. Re-running such a write means jumping back to it, and everything
+        // between there and the loop is then re-run too -- the capture included, so n
+        // is re-taken for whatever array the slot now holds. What cannot be allowed is
+        // a write the capture has already passed, which would leave n describing an
+        // array the loop no longer indexes. Refusing every write regardless was the
+        // first rule here and it alone accounted for 307 of the 1,134 refusals.
+        for (int i = q; i < r.size(); i++) {
+            Instruction in = r.get(i);
+            if (in instanceof IInc && ((IInc) in).getVar() == arrVar) {
+                if (BCE_CENSUS) { bceHoist[3]++; }
+                return -1;
+            }
+            if (in instanceof VarOp && ((VarOp) in).getIndex() == arrVar && bceIsStoreOpcode(in.getOpcode())) {
+                if (BCE_CENSUS) { bceHoist[3]++; }
+                return -1;
+            }
+        }
+        // Reaching the header must mean the capture ran -- q must DOMINATE the header.
+        // Ask that directly: walk the control-flow graph from every entry with q deleted
+        // and see whether the header is still reachable.
+        //
+        // The two approximations tried first were both wrong in instructive ways.
+        // Refusing any jump into (q, header] refuses the BACK EDGE, which every loop
+        // has, and proved 0 of 1,154 candidates. Narrowing it to (q, header) then proved
+        // only the FIRST loop of any method that hoists one length and runs several
+        // loops on it, because the earlier loops' own exit labels are jump targets
+        // sitting between the capture and the later headers.
+        if (!bceDominates(r, pos, q, header, handlerAt)) {
+            if (BCE_CENSUS) { bceHoist[4]++; }
+            return -1;
+        }
+        if (BCE_CENSUS) { bceHoist[6]++; }
+        return arrVar;
+    }
+
+    /**
+     * True when every path from an entry to {@code header} runs {@code barrier} -- plain
+     * dominance, computed by deleting the barrier and asking whether the header is still
+     * reachable. Exception handlers are entries too: a handler is entered from anywhere
+     * in its range, so a handler that reaches the header without passing the capture is
+     * exactly the hole a scan over jump targets cannot see.
+     */
+    private static boolean bceDominates(java.util.List<Instruction> r,
+                                        java.util.HashMap<Label, Integer> pos,
+                                        int barrier, int header, int[] handlerAt) {
+        int n = r.size();
+        boolean[] seen = new boolean[n];
+        java.util.ArrayDeque<Integer> work = new java.util.ArrayDeque<Integer>();
+        work.add(Integer.valueOf(0));
+        for (int i = 0; i < handlerAt.length; i++) {
+            work.add(Integer.valueOf(handlerAt[i]));
+        }
+        while (!work.isEmpty()) {
+            int i = work.poll().intValue();
+            if (i < 0 || i >= n || i == barrier || seen[i]) {
+                continue;
+            }
+            seen[i] = true;
+            if (i == header) {
+                return false;
+            }
+            Instruction c = r.get(i);
+            int op = c.getOpcode();
+            if (c instanceof Jump) {
+                Integer t = pos.get(((Jump) c).getLabel());
+                if (t == null) {
+                    return false; // a target we cannot place could be the header
+                }
+                work.add(t);
+                if (op != Opcodes.GOTO) {
+                    work.add(Integer.valueOf(i + 1));
+                }
+                continue;
+            }
+            if (op == Opcodes.ATHROW || op == Opcodes.RETURN || op == Opcodes.IRETURN
+                    || op == Opcodes.LRETURN || op == Opcodes.FRETURN || op == Opcodes.DRETURN
+                    || op == Opcodes.ARETURN) {
+                continue; // no fallthrough
+            }
+            work.add(Integer.valueOf(i + 1));
+        }
+        return true;
+    }
+
+    private static boolean bceIsStoreOpcode(int op) {
+        return op == Opcodes.ISTORE || op == Opcodes.LSTORE || op == Opcodes.FSTORE
+                || op == Opcodes.DSTORE || op == Opcodes.ASTORE;
+    }
+
+    /**
+     * Index of the first instruction of the VALUE expression of the array store at
+     * {@code k}, or -1. Walks the operand stack backwards from the store until the
+     * depth below it is exactly the array+index pair, so the caller can check those two
+     * by position. Anything the stack model cannot account for -- a label, a branch, a
+     * DUP -- ends the walk rather than being guessed at.
+     */
+    private int bceStoreValueBase(java.util.List<Instruction> r, int k) {
+        int op = r.get(k).getOpcode();
+        int need = (op == Opcodes.LASTORE || op == Opcodes.DASTORE) ? 2 : 1;
+        int d = 2 + need; // depth after r[k-1], i.e. just before the store runs
+        for (int m = k - 1; m >= 2; m--) {
+            Instruction c = r.get(m);
+            if (c instanceof LabelInstruction || c instanceof Jump || c instanceof CustomJump
+                    || c instanceof SwitchInstruction || c instanceof TryCatch) {
+                return -1;
+            }
+            int popped;
+            int pushed;
+            if (c instanceof Invoke) {
+                Invoke iv = (Invoke) c;
+                if (c.getOpcode() == Opcodes.INVOKEDYNAMIC) {
+                    return -1;
+                }
+                popped = sbDescArgSlots(iv.getDesc()) + (c.getOpcode() == Opcodes.INVOKESTATIC ? 0 : 1);
+                pushed = sbDescRetSlots(iv.getDesc());
+            } else if (c.getOpcode() == Opcodes.CHECKCAST) {
+                popped = 1;
+                pushed = 1;
+            } else {
+                int[] pp = sbPopPush(c);
+                if (pp == null) {
+                    return -1;
+                }
+                popped = pp[0];
+                pushed = pp[1];
+            }
+            int before = d - pushed + popped;
+            if (before == 2) {
+                return m;
+            }
+            if (before < 2) {
+                return -1;
+            }
+            d = before;
+        }
+        return -1;
+    }
+
+    private static boolean bceIsArrayStoreOpcode(int op) {
+        switch (op) {
+            case Opcodes.IASTORE: case Opcodes.LASTORE: case Opcodes.FASTORE:
+            case Opcodes.DASTORE: case Opcodes.AASTORE: case Opcodes.BASTORE:
+            case Opcodes.CASTORE: case Opcodes.SASTORE: return true;
+            default: return false;
+        }
+    }
+
+    /** Every array element access, load or store -- what countArrayOps counts. */
+    private static boolean bceIsArrayOpcode(int op) {
+        switch (op) {
+            case Opcodes.IALOAD: case Opcodes.LALOAD: case Opcodes.FALOAD:
+            case Opcodes.DALOAD: case Opcodes.AALOAD: case Opcodes.BALOAD:
+            case Opcodes.CALOAD: case Opcodes.SALOAD:
+            case Opcodes.IASTORE: case Opcodes.LASTORE: case Opcodes.FASTORE:
+            case Opcodes.DASTORE: case Opcodes.AASTORE: case Opcodes.BASTORE:
+            case Opcodes.CASTORE: case Opcodes.SASTORE: return true;
+            default: return false;
         }
     }
 
@@ -3456,11 +4865,8 @@ public class BytecodeMethod implements SignatureSet {
     // returned alias is tracked too -- it may be popped, chained into the
     // next receiver, or re-stored into the SAME local) and lower the NEW to
     // the method-scoped stack struct the @StackAllocate machinery already
-    // provides. The builder object then never touches the heap; its char[]
-    // buffer stays a heap array (the @Fused ctor's keep-if-null init
-    // allocates it on seeing value==NULL) and is kept alive by the
-    // conservative scan, which walks the whole native stack region the
-    // struct lives in.
+    // provides. A bounded native stack buffer serves small builders; overflow
+    // uses a native block reclaimed on normal return and Java exception unwind.
     //
     // Bails (keeps the heap path) on: methods with try/catch or
     // synchronization, a tracked ref crossing a label/branch/switch while
@@ -3473,6 +4879,298 @@ public class BytecodeMethod implements SignatureSet {
     private static final boolean DISABLE_SB_STACK_ALLOC =
             "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_SB_STACK_ALLOC", "false"));
     private static final String SB_OWNER = "java/lang/StringBuilder";
+    private Map<Integer, Boolean> borrowedBuilderParameters;
+    private boolean builderOwnershipFrozen;
+
+    public void freezeBuilderOwnership() { builderOwnershipFrozen = true; }
+
+    // Compute before instruction rewriting. A false entry also breaks recursive
+    // proof cycles conservatively; no caller relies on an unfinished proof.
+    private static final boolean DISABLE_FRAME_RETIRE =
+            "true".equalsIgnoreCase(Util.getProperty("CN1_DISABLE_FRAME_RETIRE", "false"));
+
+    /// Locals holding an object this frame allocated and provably never let escape.
+    /// Retired at frame exit; see cn1MarkDeadNow in cn1_globals.m.
+    private java.util.List<Integer> retirableLocals;
+    private java.util.List<Integer> retirableGuards;
+
+    /// Where sites are lost, so a zero at the end of the pipe is explainable rather
+    /// than mysterious. Printed by Parser when -Dcn1.allocCensus is on.
+    static int retireSeen, retireDropStack, retireDropEscape, retireDropNoLocal,
+            retireDropCallee, retireDropFrameless, retireKept;
+
+    /// FRAME EXIT IS WHERE DEADNESS IS KNOWN.
+    ///
+    /// A non-escaping object dies with the frame that made it, by definition -- no
+    /// last-use liveness analysis, no worrying about a local being reassigned in a loop.
+    /// The question collapses to "did this reference leave the frame", which the escape
+    /// analysis already answers, and the answer is consumed at exactly one place.
+    ///
+    /// Three conditions, all necessary:
+    ///   1. newEscapesStrict == SAFE -- the reference never leaves this frame, ARETURN
+    ///      included (the iterator scheme allows ARETURN because it allocates in the
+    ///      CALLER's frame; retiring at THIS frame's exit does not have that property).
+    ///   2. Every callee invoked ON the object keeps `this`. The walk permits the tracked
+    ///      value as a receiver only because "that callee is checked on its own", and for
+    ///      an arbitrary type nothing else performs that check.
+    ///   3. It reached a local, and the site is not already scalar-replaced or
+    ///      stack-allocated -- those have no heap object to retire.
+    /// Candidate sites found on RAW bytecode, held until the allocation decisions exist.
+    private java.util.Map<TypeInstruction, Integer> retireCandidates;
+
+    /// PHASE 1, on RAW bytecode. The escape walk models real opcodes; optimize() fuses
+    /// them into opaque custom instructions, after which the walk cannot follow a value
+    /// and conservatively answers ESCAPES for everything. Measured: running this after
+    /// optimize() dropped 209 of 209 non-stack sites, against 14 kept before it. The
+    /// same ordering constraint is why `frameless` is decided on raw bytecode too.
+    public void collectRetireCandidates() {
+        if (DISABLE_FRAME_RETIRE || isNative() || abstractMethod) {
+            return;
+        }
+        for (Instruction ins : instructions) {
+            if (!(ins instanceof TypeInstruction) || ins.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            retireSeen++;
+            String owner = IteratorEscape.mangle(ti.getTypeName());
+            // CLUSTER walk, not the per-object one. A self-referential structure built
+            // and dropped inside one frame -- the `head = new Node(v, head)` shape -- has
+            // no frame-local MEMBER, because each member is stored into the next one's
+            // field, yet the chain as a whole never leaves the frame. Per-object escape
+            // analysis must reject every member of it; HotSpot does not scalar-replace
+            // these either (-XX:-EliminateAllocations costs it only 5% on this shape).
+            // -Dcn1.retireDebug=<methodName> reports the verdict per NEW site.
+            String __dbg = Util.getProperty("cn1.retireDebug", "");
+            boolean __on = __dbg.length() > 0 && methodName.contains(__dbg);
+            int __r = IteratorEscape.clusterEscapes(this, owner);
+            if (__on) {
+                System.out.println("[RETIRE-DBG] " + clsName + "." + methodName
+                        + " NEW " + owner + " -> " + __r + " local=" + IteratorEscape.lastTrackedLocal
+                        + " reason=" + IteratorEscape.lastReason
+                        + " calls=" + IteratorEscape.receiverCalls);
+            }
+            if (__r != IteratorEscape.SAFE) {
+                retireDropEscape++;
+                continue;
+            }
+            int local = IteratorEscape.lastTrackedLocal;
+            if (local < 0) {
+                retireDropNoLocal++;
+                continue;
+            }
+            java.util.List<String> calls =
+                    new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
+            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+                retireDropCallee++;
+                continue;
+            }
+            if (retireCandidates == null) {
+                // LinkedHashMap, and the generated C is WRONG-BY-DIVERGENCE without it.
+                // Phase 2 numbers the guards by walking this map, so iteration order
+                // decides which site gets __cn1dead_1 and which gets __cn1dead_2. A
+                // HashMap keyed by TypeInstruction -- which overrides neither hashCode
+                // nor equals -- iterates in IDENTITY HASH order, i.e. by allocation
+                // address, so two runs of the SAME translator on the SAME input emit
+                // different C. Measured: three files (XMLParser, Resources, CSSEngine)
+                // differed between two runs of the self-hosted translator, each by the
+                // same 8 lines with _1 and _2 exchanged. Semantically harmless -- the
+                // guards are independent -- but it breaks the byte-identical output
+                // invariant the whole selfhost benchmark is gated on, which is why the
+                // SELFHOST row read NA. Insertion order here is bytecode order (the
+                // loop above walks `instructions`), so this is also the order a reader
+                // of the generated C expects.
+                retireCandidates = new java.util.LinkedHashMap<TypeInstruction, Integer>();
+            }
+            retireCandidates.put(ti, Integer.valueOf(local));
+        }
+    }
+
+    /// PHASE 2, after optimize(). Only now is it known whether a site still has a heap
+    /// object -- scalar replacement and stack allocation are decided inside optimize --
+    /// and whether this method has a frame to exit at all.
+    public void analyzeRetirableLocals() {
+        if (DISABLE_FRAME_RETIRE || retireCandidates == null) {
+            return;
+        }
+        // NOTE: frameless is NOT a disqualifier. It only decides whether the method
+        // calls releaseForReturn, and the retire scope does not ride on that -- its
+        // cleanup attribute fires on scope exit either way. What DOES matter is how
+        // the method names its object locals, which is isBarebone(), handled in
+        // frameRetireScopeDecl. Excluding frameless here cost 3 of every 4 surviving
+        // candidates for no safety reason at all.
+        int guard = 0;
+        for (java.util.Map.Entry<TypeInstruction, Integer> e : retireCandidates.entrySet()) {
+            TypeInstruction ti = e.getKey();
+            if (ti.isScalarReplaced() || ti.getStackAllocType() != null) {
+                retireDropStack++;
+                continue;   // no heap object exists at this site
+            }
+            if (guard >= 8) {
+                break;      // slots[8] in CN1RetireScope
+            }
+            // The SITE writes its own guard, so the scope can only ever retire the
+            // object this analysis actually reasoned about.
+            ti.setDeadGuardId(guard);
+            // The NEW may have been fused during optimize(): init-before-publish leaves
+            // the TypeInstruction emitting only a NULL placeholder while an
+            // InlinableConstructor performs the real allocation further down. The guard
+            // has to reach whichever instruction actually produces the object.
+            int tiIdx = instructions.indexOf(ti);
+            if (tiIdx >= 0) {
+                for (int k = tiIdx + 1; k < instructions.size() && k < tiIdx + 12; k++) {
+                    Instruction fi = instructions.get(k);
+                    if (fi instanceof com.codename1.tools.translator.bytecodes.CustomInvoke) {
+                        ((com.codename1.tools.translator.bytecodes.CustomInvoke) fi)
+                                .setDeadGuardId(guard);
+                        break;
+                    }
+                    if (fi instanceof TypeInstruction) {
+                        break;   // a different allocation starts here
+                    }
+                }
+            }
+            if (retirableGuards == null) {
+                retirableGuards = new java.util.ArrayList<Integer>();
+            }
+            retirableGuards.add(Integer.valueOf(guard));
+            guard++;
+            retireKept++;
+        }
+    }
+
+    private void unusedOldRetirePass() {
+        for (Instruction ins : instructions) {
+            if (!(ins instanceof TypeInstruction) || ins.getOpcode() != Opcodes.NEW) {
+                continue;
+            }
+            TypeInstruction ti = (TypeInstruction) ins;
+            retireSeen++;
+            if (ti.isScalarReplaced() || ti.getStackAllocType() != null) {
+                retireDropStack++;
+                continue;   // no heap object exists at this site
+            }
+            String owner = IteratorEscape.mangle(ti.getTypeName());
+            if (IteratorEscape.newEscapesStrict(this, owner) != IteratorEscape.SAFE) {
+                retireDropEscape++;
+                continue;
+            }
+            int local = IteratorEscape.lastTrackedLocal;
+            if (local < 0) {
+                retireDropNoLocal++;
+                continue;
+            }
+            java.util.List<String> calls =
+                    new java.util.ArrayList<String>(IteratorEscape.receiverCalls);
+            if (!Parser.calleesKeepThis(calls, new java.util.HashMap<String, Boolean>())) {
+                retireDropCallee++;
+                continue;
+            }
+            if (frameless) {
+                retireDropFrameless++;
+                continue;
+            }
+            if (retirableLocals == null) {
+                retirableLocals = new java.util.ArrayList<Integer>();
+            }
+            Integer key = Integer.valueOf(local);
+            if (!retirableLocals.contains(key)) {
+                retirableLocals.add(key);
+                retireKept++;
+            }
+        }
+    }
+
+    /// The C emitted immediately before a frame is released. Empty when nothing
+    /// qualifies, which is the overwhelming majority of methods.
+    /// The scope declaration placed once at the top of the generated function. Its
+    /// cleanup attribute fires on every ordinary return, so no return-emission site
+    /// needs to know this optimization exists -- there are a dozen of them across
+    /// BytecodeMethod and BasicInstruction, one per return type plus the exception
+    /// variants, and patching each is how one gets missed.
+    /// Declares one guard per retirable site plus the scope that retires them.
+    ///
+    /// Guards rather than locals: a guard is written by the NEW itself and by nothing
+    /// else, so it cannot be holding some other object at frame exit. It also makes the
+    /// emission independent of how the method names its locals (locals[] vs olocals_N_),
+    /// which is decided by isBarebone() and had already cost this pass most of its
+    /// population once.
+    String frameRetireScopeDecl() {
+        if (retirableGuards == null || retirableGuards.isEmpty()) {
+            return "";
+        }
+        StringBuilder r = new StringBuilder();
+        StringBuilder slots = new StringBuilder();
+        int n = 0;
+        for (Integer g : retirableGuards) {
+            r.append("    JAVA_OBJECT __cn1dead_").append(g).append(" = JAVA_NULL;\n");
+            if (n > 0) { slots.append(", "); }
+            slots.append("&__cn1dead_").append(g);
+            n++;
+        }
+        r.append("    struct CN1RetireScope __cn1retire __attribute__((cleanup(cn1RetireScopeLeave))) = {{")
+         .append(slots).append("}, ").append(n).append("};\n");
+        return r.toString();
+    }
+
+    public void analyzeBuilderOwnership() {
+        if (!desc.contains("Ljava/lang/StringBuilder;")) return;
+        int slot = staticMethod ? 0 : 1;
+        for (org.objectweb.asm.Type type : org.objectweb.asm.Type.getArgumentTypes(desc)) {
+            if ("Ljava/lang/StringBuilder;".equals(type.getDescriptor())) builderParameterIsBorrowed(slot);
+            slot += type.getSize();
+        }
+    }
+
+    private boolean builderParameterIsBorrowed(int slot) {
+        if (isNative() || abstractMethod || synchronizedMethod) return false;
+        if (builderOwnershipFrozen) {
+            return borrowedBuilderParameters != null && Boolean.TRUE.equals(borrowedBuilderParameters.get(slot));
+        }
+        if (borrowedBuilderParameters == null) borrowedBuilderParameters = new HashMap<Integer, Boolean>();
+        Boolean cached = borrowedBuilderParameters.get(slot);
+        if (cached != null) return cached;
+        borrowedBuilderParameters.put(slot, false);
+        Map<org.objectweb.asm.Label, Integer> labels = new HashMap<org.objectweb.asm.Label, Integer>();
+        Set<Integer> aliases = new HashSet<Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof TryCatch) return false;
+            if (in instanceof LabelInstruction) labels.put(((LabelInstruction)in).getLabel(), i);
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof VarOp && ((VarOp)in).getIndex() == slot) {
+                if (in.getOpcode() == Opcodes.ALOAD) {
+                    if (sbWalkUse(i + 1, 0, slot, labels, aliases) == SB_WALK_BAIL) return false;
+                } else if (in.getOpcode() != Opcodes.ASTORE) return false;
+            }
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof VarOp && ((VarOp)in).getIndex() == slot
+                    && in.getOpcode() == Opcodes.ASTORE && !aliases.contains(i)) return false;
+        }
+        borrowedBuilderParameters.put(slot, true);
+        return true;
+    }
+
+    private static boolean builderArgumentIsBorrowed(Invoke call, int above) {
+        int remaining = sbDescArgSlots(call.getDesc());
+        if (above >= remaining) return false;
+        BytecodeMethod target = call.getOwnershipTarget();
+        if (target == null) return false;
+        int slot = call.getOpcode() == Opcodes.INVOKESTATIC ? 0 : 1;
+        for (org.objectweb.asm.Type type : org.objectweb.asm.Type.getArgumentTypes(call.getDesc())) {
+            remaining -= type.getSize();
+            if (remaining == above) {
+                return (type.getSort() == org.objectweb.asm.Type.OBJECT)
+                        && target.builderParameterIsBorrowed(slot);
+            }
+            slot += type.getSize();
+        }
+        return false;
+    }
 
     /** Slots consumed by the argument list of a method descriptor (no receiver). */
     private static int sbDescArgSlots(String desc) {
@@ -3485,13 +5183,12 @@ public class BytecodeMethod implements SignatureSet {
             } else if (c == 'L') {
                 slots += 1; i = desc.indexOf(';', i) + 1;
             } else if (c == '[') {
-                i++;
-                continue; // element char (or more brackets) still to come; array = 1 slot
+                do { i++; } while (desc.charAt(i) == '[');
+                i = desc.charAt(i) == 'L' ? desc.indexOf(';', i) + 1 : i + 1;
+                slots++;
             } else {
                 slots += 1; i++;
             }
-            // arrays: the '[' prefix loop above falls through to the element char,
-            // which added the single slot for the whole array reference
         }
         return slots;
     }
@@ -3714,6 +5411,7 @@ public class BytecodeMethod implements SignatureSet {
                         }
                         break; // consumed for good on this path
                     }
+                    if (builderArgumentIsBorrowed(inv, cur)) break;
                     return SB_WALK_BAIL;
                 }
                 if (op == Opcodes.POP && cur == 0) {
@@ -3755,19 +5453,61 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private void stackAllocStringBuilders() {
+        long stackFusedBudget = 0;
         if (DISABLE_SB_STACK_ALLOC) {
             return;
         }
+        // Count this method's StringBuilder allocation sites BEFORE any bail, or a
+        // refusal reports as zero sites refused and the census answers its own
+        // question wrongly.
+        int sbSites = 0;
+        boolean sawTryCatch = false;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof TryCatch) {
+                sawTryCatch = true;
+            } else if (in instanceof TypeInstruction && in.getOpcode() == Opcodes.NEW
+                    && SB_OWNER.equals(((TypeInstruction) in).getTypeName())) {
+                sbSites++;
+            }
+        }
+        sbCensusSites += sbSites;
         if (synchronizedMethod) {
+            sbCensusBailSync += sbSites;
             return;
+        }
+        if (sawTryCatch) {
+            // ONE try/catch anywhere in the method used to disable stack allocation for
+            // EVERY builder in it -- 315 of this corpus' 1,818 sites, 17%, including
+            // builders nowhere near the protected range. 300 of those 315 survive the
+            // analysis unchanged, and the reason is that the analysis was already
+            // control-flow-INSENSITIVE where it counts.
+            //
+            // Walk the argument. A builder parked in a local is validated by checking
+            // EVERY instruction in the method that touches that slot, in index order,
+            // with no regard for how control reaches it -- so a use inside a handler is
+            // checked exactly like any other, and an escape there (PUTFIELD, a
+            // non-borrowing call) bails the same way. A builder never parked in a local
+            // is consumed inside one expression, and an exception mid-expression
+            // DISCARDS it: the catch block resets SP to &stack[1], so nothing in flight
+            // survives the edge to be captured.
+            //
+            // What the edge cannot do is extend the object's LIFETIME, which is the only
+            // thing stack allocation actually depends on. The struct is a C local of the
+            // same function as the setjmp, so a longjmp lands in the frame that owns it.
+            //
+            // The residual risk is a wrong escape analysis, and that risk is not new --
+            // it applies to every stack allocation this translator already does. It is
+            // now checked rather than argued: the verifier compares every traced
+            // reference against each thread's C stack range, and run-gc-verify.sh's
+            // self-test6 requires it to catch a deliberately escaped builder and to stay
+            // quiet on correctly compiled code.
+            sbCensusBailTryCatch += sbSites;
         }
         java.util.Map<org.objectweb.asm.Label, Integer> labelIndex =
                 new java.util.HashMap<org.objectweb.asm.Label, Integer>();
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
-            if (in instanceof TryCatch) {
-                return; // exception edges aren't modeled by the walks
-            }
             if (in instanceof LabelInstruction) {
                 labelIndex.put(((LabelInstruction) in).getLabel(), i);
             }
@@ -3831,7 +5571,12 @@ public class BytecodeMethod implements SignatureSet {
             }
 
             boolean ok = true;
-            if (trackedLocal >= 0) {
+            // -Dcn1.sbSkipEscapeValidation=true drops the whole-lifetime check below so a
+            // builder that provably escapes is stack-allocated anyway. It exists for one
+            // reason: the verifier's escaped-stack-object check has to be shown catching
+            // a real escape, and nothing in correct code produces one. Never set outside
+            // run-gc-verify.sh's self-test.
+            if (trackedLocal >= 0 && !SB_SKIP_ESCAPE_VALIDATION) {
                 // The construction walk parked the ref in a local. Validate the
                 // slot's whole lifetime: no reads that could belong to a previous
                 // scope's value, every ALOAD walks to a legal consumption, every
@@ -3881,33 +5626,12 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             ti.markImplicitStackAlloc();
+            sbCensusStackAllocated++;
 
-            // When the ctor's @Fused plan has exactly one CONSTANT-length
-            // primitive-array child (the no-arg StringBuilder: value = new
-            // char[INITIAL_CAPACITY]), park the buffer on the stack too and
-            // pre-install it -- the keep-if-null ctor init then keeps it and
-            // the builder allocates NOTHING on the heap. Non-constant
-            // capacities keep the heap buffer (still correct via keep-if-null).
-            Invoke ctorInv = (Invoke) instructions.get(invIdx);
-            com.codename1.tools.translator.bytecodes.FusedConstructor fp =
-                    com.codename1.tools.translator.bytecodes.FusedConstructor.analyze(
-                            ctorInv.getOwner(), ctorInv.getDesc());
-            if (fp != null && fp.getChildren().size() == 1) {
-                com.codename1.tools.translator.bytecodes.FusedConstructor.Child ch =
-                        fp.getChildren().get(0);
-                if (ch.getUsedParamCount() == 0) {
-                    int len = -1;
-                    try {
-                        len = Integer.parseInt(ch.getLengthExpr().trim());
-                    } catch (NumberFormatException ignore) {
-                    }
-                    if (len >= 0 && len <= 4096) {
-                        ti.setStackFusedChild(len, ch.getElemCTypePublic(),
-                                ch.getArrayClassRefPublic(),
-                                ch.getCOwner() + "_" + ch.getFieldName());
-                    }
-                }
-            }
+            int bytes = stackFusedBudget + SB_STACK_FLOOR_UNITS <= SB_STACK_BUDGET_BYTES
+                    ? SB_STACK_FLOOR_UNITS : 16;
+            stackFusedBudget += bytes;
+            ti.setStackBuilderBytes(bytes);
         }
     }
 
@@ -4334,6 +6058,73 @@ public class BytecodeMethod implements SignatureSet {
     // The GETFIELD a trivial getter returns, snapshotted from the RAW instruction list at parse
     // time; null when this method is not a trivial getter. Only the field's owner/name/descriptor
     // are ever read from it, and those are fixed at construction.
+    /**
+     * True when this frameless method provably cannot deepen the native C stack
+     * past its own frame, so CN1_FRAMELESS_SOE_GUARD can be left off.
+     *
+     * THE GUARD IS NOT FREE AND IT IS NOT RARE. It is a load, a frame-address
+     * read and a two-sided compare on entry, measured at 0.277ns against a
+     * 0.694ns bare call, and a counting build of the hello corpus took
+     * 597,522,393 guarded entries in one translation -- 165ms of a 5.4s run.
+     *
+     * WHY A LEAF IS SAFE. The guard exists because a frameless frame does not
+     * bump callStackOffset, so the 1024-deep call limit cannot see it and
+     * unbounded Java recursion would run the C stack into a SIGSEGV instead of
+     * throwing StackOverflowError. A method that issues no call cannot recurse,
+     * and it adds exactly one frame below a caller that IS guarded. That frame
+     * cannot cross the guard band on its own: the band is 256KB and, as the
+     * guard's own comment puts it, no single frameless frame approaches 256KB.
+     * So the deepest a leaf can reach is its guarded caller's depth plus a few
+     * dozen bytes, which is inside the headroom the band exists to provide.
+     *
+     * "Issues no call" is read conservatively -- an allocation counts, because
+     * its slow path reaches codenameOneGcMalloc and possibly a collection, and
+     * a static field read counts, because it can run a class initializer.
+     */
+    private boolean isSoeGuardUnnecessary() {
+        // The pre-existing carve-out: a bounded instance field getter.
+        if (!staticMethod && trivialGetterField != null && maxStack + maxLocals <= 16) {
+            return true;
+        }
+        return isLeafForStackDepth();
+    }
+
+    /** @return true if nothing in the body can transfer control into another frame. */
+    private boolean isLeafForStackDepth() {
+        for (Instruction i : instructions) {
+            if (i instanceof Invoke || i instanceof CustomInvoke || i instanceof MultiArray) {
+                return false;
+            }
+            if (i instanceof TypeInstruction) {
+                int op = i.getOpcode();
+                // NEW / ANEWARRAY reach the allocator, which can collect.
+                if (op == Opcodes.NEW || op == Opcodes.ANEWARRAY) {
+                    return false;
+                }
+                continue;
+            }
+            if (i instanceof Field) {
+                // GETSTATIC/PUTSTATIC can run a class initializer.
+                int op = i.getOpcode();
+                if (op == Opcodes.GETSTATIC || op == Opcodes.PUTSTATIC) {
+                    return false;
+                }
+                continue;
+            }
+            switch (i.getOpcode()) {
+                case Opcodes.ATHROW:
+                case Opcodes.MONITORENTER:
+                case Opcodes.MONITOREXIT:
+                case Opcodes.NEWARRAY:
+                case Opcodes.MULTIANEWARRAY:
+                    return false;
+                default:
+                    break;
+            }
+        }
+        return true;
+    }
+
     private Field trivialGetterField;
 
     private void analyzeTrivialGetterRaw() {
@@ -4945,7 +6736,7 @@ public class BytecodeMethod implements SignatureSet {
                                         "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
                                         "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
                                         check +
-                                        "        ((JAVA_ARRAY_" + elementType + "*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp] = __cn1ValueTmp;\n" +
+                                        "        ((JAVA_ARRAY_" + elementType + "*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1ArrayTmp))[__cn1IndexTmp] = __cn1ValueTmp;\n" +
                                         "    }\n";
                             } else {
                                 code = "    {\n" +
@@ -4971,7 +6762,9 @@ public class BytecodeMethod implements SignatureSet {
                                                 + "            CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n"
                                                 + "            CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n"
                                                 + "        }\n"
-                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
+                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType
+                                                    + ((current.isBoundsSafe() || isDisableNullAndArrayBoundsChecks()) ? "_NOCHK" : "")
+                                                    + "(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
                                         "    }\n";
                             }
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));

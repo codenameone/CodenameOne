@@ -352,7 +352,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createImageFromARGB___int_1AR
     if (__cn1Arg1 == JAVA_NULL || width <= 0 || height <= 0) {
         return 0;
     }
-    src = (JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg1).data;
+    src = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg1);
     pixels = (size_t)width * (size_t)height;
     buffer = (uint32_t*)malloc(pixels * sizeof(uint32_t));
     if (buffer == NULL) {
@@ -426,7 +426,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createImageFromBytes___byte_1
     if (__cn1Arg1 == JAVA_NULL || length <= 0 || offset < 0) {
         return 0;
     }
-    bytes = (JAVA_ARRAY_BYTE*)(*(JAVA_ARRAY)__cn1Arg1).data;
+    bytes = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(__cn1Arg1);
     /* JAVA_ARRAY_BYTE is signed char; reinterpret the slice as raw bytes. */
     img = cn1WinDecodeImage((const BYTE*)(bytes + offset), (UINT32)length);
     return (JAVA_LONG)(intptr_t)img;
@@ -678,7 +678,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_imageGetRGB___long_int_1ARRAY
         ownSrc = 1;
     }
 
-    out = (JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    out = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg2);
     /* Destination scanline stride equals the requested width (CN1 contract). */
     for (row = 0; row < height; row++) {
         uint32_t* srcRow = srcArgb + (size_t)(y + row) * img->width + x;

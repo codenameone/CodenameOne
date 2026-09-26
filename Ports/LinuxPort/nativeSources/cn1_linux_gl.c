@@ -255,7 +255,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateFloatBuffer___float_1AR
     }
     glGenBuffers(1, &buf);
     glBindBuffer(GL_ARRAY_BUFFER, buf);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr) floatCount * 4, (*(JAVA_ARRAY) data).data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr) floatCount * 4, CN1_ARRAY_DATA(data), GL_STATIC_DRAW);
     return (JAVA_LONG) buf;
 }
 
@@ -264,7 +264,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dUpdateFloatBuffer___long_floa
         return;
     }
     glBindBuffer(GL_ARRAY_BUFFER, (GLuint) bufferPeer);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr) floatCount * 4, (*(JAVA_ARRAY) data).data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr) floatCount * 4, CN1_ARRAY_DATA(data), GL_STATIC_DRAW);
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateShortBuffer___short_1ARRAY_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data, JAVA_INT indexCount) {
@@ -274,7 +274,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateShortBuffer___short_1AR
     }
     glGenBuffers(1, &buf);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr) indexCount * 2, (*(JAVA_ARRAY) data).data, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr) indexCount * 2, CN1_ARRAY_DATA(data), GL_STATIC_DRAW);
     return (JAVA_LONG) buf;
 }
 
@@ -283,7 +283,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dUpdateShortBuffer___long_shor
         return;
     }
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint) bufferPeer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr) indexCount * 2, (*(JAVA_ARRAY) data).data, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr) indexCount * 2, CN1_ARRAY_DATA(data), GL_STATIC_DRAW);
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateTexture___int_1ARRAY_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
@@ -294,7 +294,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_gl3dCreateTexture___int_1ARRAY_in
     if (argb == JAVA_NULL || width <= 0 || height <= 0) {
         return 0;
     }
-    px = (JAVA_INT*) (*(JAVA_ARRAY) argb).data;
+    px = (JAVA_INT*) CN1_ARRAY_DATA(argb);
     n = width * height;
     rgba = (unsigned char*) malloc((size_t) n * 4);
     for (i = 0; i < n; i++) {
@@ -531,7 +531,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawIndexed___long_long_long_
         return;
     }
     cn1GlMakeCurrent(c);
-    cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) (*(JAVA_ARRAY) uniforms).data,
+    cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) CN1_ARRAY_DATA(uniforms),
             uniformFloats, (GLuint) texturePeer, texFilter, texWrap);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint) iboPeer);
     glDrawElements(cn1GlPrimitive(primitive), indexCount, GL_UNSIGNED_SHORT, 0);
@@ -544,7 +544,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_gl3dDrawArrays___long_long_long_i
         return;
     }
     cn1GlMakeCurrent(c);
-    cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) (*(JAVA_ARRAY) uniforms).data,
+    cn1GlBindDraw(c, p, (GLuint) vboPeer, strideBytes, (float*) CN1_ARRAY_DATA(uniforms),
             uniformFloats, (GLuint) texturePeer, texFilter, texWrap);
     glDrawArrays(cn1GlPrimitive(primitive), 0, vertexCount);
 }

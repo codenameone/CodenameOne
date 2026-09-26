@@ -116,7 +116,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                 if(f.isNaN()) {
                     b.append("0.0/0.0");
                 } else {
-                    b.append(f.floatValue());
+                    b.append(com.codename1.tools.translator.CNumber.literal(f.floatValue()));
                 }
             }
             //b.append("); /* LDC */\n");
@@ -142,7 +142,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                 if(d.isNaN()) {
                     b.append("0.0/0.0");
                 } else {
-                    b.append(d.doubleValue());
+                    b.append(com.codename1.tools.translator.CNumber.literal(d.doubleValue()));
                 }
             }
             //b.append("); /* LDC */\n");
@@ -243,7 +243,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                 if(f.isNaN()) {
                     b.append("0.0/0.0");
                 } else {
-                    b.append(f.floatValue());
+                    b.append(com.codename1.tools.translator.CNumber.literal(f.floatValue()));
                 }
             }
             b.append("); /* LDC */\n");
@@ -269,7 +269,7 @@ public class Ldc extends Instruction implements AssignableExpression {
                 if(d.isNaN()) {
                     b.append("0.0/0.0");
                 } else {
-                    b.append(d.doubleValue());
+                    b.append(com.codename1.tools.translator.CNumber.literal(d.doubleValue()));
                 }
             }
             b.append("); /* LDC */\n");

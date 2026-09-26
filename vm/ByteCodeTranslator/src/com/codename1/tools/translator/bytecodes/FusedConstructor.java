@@ -516,7 +516,7 @@ public final class FusedConstructor {
      * We accept it only for exactly String.value with a char or byte NEWARRAY.
      */
     private static boolean stringCompactValueMatch(String ctorClsName, Field f, int arrayType) {
-        return "java_lang_String".equals(ctorClsName)
+        return ("java_lang_String".equals(ctorClsName) || "java_lang_StringBuilder".equals(ctorClsName))
                 && "value".equals(f.getFieldName())
                 && "Ljava/lang/Object;".equals(f.getDesc())
                 && (arrayType == 5 /* char */ || arrayType == 8 /* byte */);

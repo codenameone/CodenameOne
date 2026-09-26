@@ -170,23 +170,16 @@ class StackOverflowIntegrationTest {
     }
 
     private String nativeReportSource() {
+        // Through the runtime's own conversion rather than by reading the String's
+        // fields: the layout is the VM's to change (it has -- there is no offset field,
+        // and an array's payload is not at ->data any more), and a fixture that decodes
+        // it by hand stops compiling the moment it does, which fails every case here
+        // before a single overflow is exercised.
         return "#include \"cn1_globals.h\"\n" +
-                "#include \"java_lang_String.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
-                "    struct obj__java_lang_String* str = (struct obj__java_lang_String*)msg;\n" +
-                "    if (str && str->java_lang_String_value) {\n" +
-                "        JAVA_ARRAY arr = (JAVA_ARRAY)str->java_lang_String_value;\n" +
-                "        int len = str->java_lang_String_count;\n" +
-                "        int off = str->java_lang_String_offset;\n" +
-                "        if (arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {\n" +
-                "            JAVA_ARRAY_BYTE* bytes = (JAVA_ARRAY_BYTE*)arr->data;\n" +
-                "            for (int i = 0; i < len; i++) { printf(\"%c\", (char)(bytes[off + i] & 0xff)); }\n" +
-                "        } else {\n" +
-                "            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)arr->data;\n" +
-                "            for (int i = 0; i < len; i++) { printf(\"%c\", (char)chars[off + i]); }\n" +
-                "        }\n" +
-                "        printf(\"\\n\");\n" +
+                "    if (msg != JAVA_NULL) {\n" +
+                "        printf(\"%s\\n\", stringToUTF8(threadStateData, msg));\n" +
                 "        fflush(stdout);\n" +
                 "    }\n" +
                 "}\n";

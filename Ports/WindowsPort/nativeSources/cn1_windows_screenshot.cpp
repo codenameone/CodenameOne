@@ -158,7 +158,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_encodeArgbToPng___int_1ARRA
     }
     UINT w = (UINT) __cn1Arg2;
     UINT h = (UINT) __cn1Arg3;
-    JAVA_ARRAY_INT* px = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    JAVA_ARRAY_INT* px = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(__cn1Arg1);
     UINT stride = w * 4;
     UINT bufSize = stride * h;
 
@@ -191,7 +191,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_encodeArgbToPng___int_1ARRA
                 result = allocArray(threadStateData, (int) size,
                         &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
                 if (result != JAVA_NULL) {
-                    memcpy((*(JAVA_ARRAY) result).data, mem, size);
+                    memcpy(CN1_ARRAY_DATA(result), mem, size);
                 }
             }
             if (mem != NULL) {
@@ -235,7 +235,7 @@ static JAVA_OBJECT cn1WinWicSourceToPngBytes(CODENAME_ONE_THREAD_STATE, IWICBitm
                 result = allocArray(threadStateData, (int) size,
                         &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
                 if (result != JAVA_NULL) {
-                    memcpy((*(JAVA_ARRAY) result).data, mem, size);
+                    memcpy(CN1_ARRAY_DATA(result), mem, size);
                 }
             }
             if (mem != NULL) {

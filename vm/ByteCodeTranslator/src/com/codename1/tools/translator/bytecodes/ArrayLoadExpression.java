@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.tools.translator.bytecodes;
 
@@ -202,7 +219,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             if (!isBoundsSafe() && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
                 b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
             }
-            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) (*(JAVA_ARRAY)__cn1ArrayTmp).data)[__cn1IndexTmp];\n");
+            b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1ArrayTmp))[__cn1IndexTmp];\n");
             b.append("}\n");
             sb.append(b);
             return true;
@@ -306,7 +323,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
                .append(tempName).append("_i, ").append(retvalText).append(");\n    ");
         }
         out.append(elemType).append(' ').append(tempName).append(" = ((").append(dataType)
-           .append("*) (*(JAVA_ARRAY)").append(tempName).append("_a).data)[").append(tempName).append("_i];\n    ");
+           .append("*) CN1_ARRAY_DATA((JAVA_ARRAY)").append(tempName).append("_a))[").append(tempName).append("_i];\n    ");
         return true;
     }
 

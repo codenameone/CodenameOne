@@ -79,8 +79,14 @@ trap 'rm -rf "$OUT"' EXIT
 BUILD_CP="$OUT"
 if [ -n "$GEN" ]; then BUILD_CP="$BUILD_CP:$GEN"; fi
 if [ -n "$DRIVERS" ]; then BUILD_CP="$BUILD_CP:$DRIVERS"; fi
+# The core classes marked @SharedWithBackend come from CodenameOne/src directly.
+# Read into an array: these are ABSOLUTE paths, so an unquoted expansion would
+# split a checkout that lives under a directory with a space in its name.
+SHARED_LIST="$(./shared-sources.sh)"
+SHARED=()
+while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
 "$JAVAC" -nowarn -encoding UTF-8 -cp "$BUILD_CP" -d "$OUT" \
-    $(find src impl/javase $COMMON "$DEMO" -name '*.java')
+    $(find src impl/javase $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$OUT/"; fi
 
 CP="$OUT"

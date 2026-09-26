@@ -45,6 +45,7 @@ import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
@@ -66,6 +67,12 @@ public class Parser extends ClassVisitor {
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<>();
 
+    /// The closed world, for analyses that must resolve a callee body. An analysis that
+    /// cannot find a body must answer conservatively rather than assume anything.
+    static List<ByteCodeClass> getClasses() {
+        return classes;
+    }
+
     // ---- CLOSED-WORLD DEVIRTUALIZATION -----------------------------------
     // ParparVM compiles a closed world: after dead-code elimination the class
     // list is final, so an INVOKEVIRTUAL whose method has NO reachable override
@@ -77,6 +84,9 @@ public class Parser extends ClassVisitor {
     // changed; emission runs after the list is final.
     private static java.util.Map<String, java.util.List<ByteCodeClass>> cn1SubclassIndex;
     private static int cn1SubclassIndexSize = -1;
+    private static int readingClassDepth;
+
+    public static boolean isReadingClass() { return readingClassDepth != 0; }
 
     private static void cn1EnsureSubclassIndex() {
         if (cn1SubclassIndexSize == classes.size()) {
@@ -98,11 +108,323 @@ public class Parser extends ClassVisitor {
     }
 
     /**
+     * TRUE when nothing live extends {@code clsName}, so an object is an instance of it
+     * exactly when its class word IS that class.
+     *
+     * That distinction is worth a load. The general test reads the class word, then
+     * reads classId out of it -- a SECOND load, dependent on the first -- and indexes
+     * the type-test bitmap with it. Against a leaf, comparing the class word to the
+     * class itself answers the same question with one load and no bitmap. Read beside
+     * C2's output for the same test, that dependent load is most of the difference:
+     * HotSpot compares the klass word directly because for it the klass IS the
+     * identity, while we had been comparing ids.
+     *
+     * Only meaningful after the cull, because "nothing live extends it" is a statement
+     * about the classes that survived. Interfaces are excluded: an interface is never a
+     * class word.
+     */
+    /**
+     * TRUE when a value whose static type is {@code clsName} could be a TAGGED immediate.
+     *
+     * CN1_CLASS_OF is not a field load when tagged values are compiled in: it masks the
+     * pointer, tests the tag and selects between a proxy table entry and the object
+     * before loading anything -- five instructions, on every virtual dispatch and every
+     * class query. That work only ever finds something for a boxed Integer, Long,
+     * Double, Float, Character or Short.
+     *
+     * A virtual thunk for class X only ever receives objects whose class is X or below,
+     * so if no taggable class is assignable to X the test cannot fire and the class word
+     * can be read straight out of the object. Derived from the hierarchy rather than
+     * hardcoded, so a future tagged type is covered by adding it to CN1_TAGGABLE_CLASSES
+     * alone.
+     */
+    public static synchronized boolean canReceiveTagged(String clsName) {
+        if (cn1TaggedReachable == null) {
+            cn1TaggedReachable = new java.util.HashSet<String>();
+            for (String t : CN1_TAGGABLE_CLASSES) {
+                cn1TaggedReachable.add(t);
+                ByteCodeClass c = getClassObject(t);
+                // Every supertype and interface of a taggable class can be the static
+                // type of a tagged value: Object, Number, Comparable, Serializable.
+                while (c != null) {
+                    cn1TaggedReachable.add(c.getClsName());
+                    if (c.getBaseInterfaces() != null) {
+                        for (String i : c.getBaseInterfaces()) {
+                            cn1TaggedReachable.add(i.replace('/', '_').replace('$', '_'));
+                        }
+                    }
+                    String base = c.getBaseClass();
+                    c = base == null ? null
+                            : getClassObject(base.replace('/', '_').replace('$', '_'));
+                }
+            }
+            // Belt and braces: a class we could not resolve must not become "safe".
+            cn1TaggedReachable.add("java_lang_Object");
+        }
+        return cn1TaggedReachable.contains(clsName);
+    }
+
+    private static java.util.Set<String> cn1TaggedReachable;
+
+    /** Classes a TAGGED immediate reports as its own -- see CN1_TAG_* in cn1_globals.h. */
+    private static final java.util.Set<String> CN1_TAGGABLE_CLASSES =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "java_lang_Integer", "java_lang_Long", "java_lang_Double",
+                    "java_lang_Float", "java_lang_Character", "java_lang_Short"));
+
+    public static synchronized boolean isLeafClass(String clsName) {
+        ByteCodeClass c = getClassObject(clsName);
+        if (c == null || c.isIsInterface() || c.isEliminated()) {
+            return false;
+        }
+        // A BOXED type is final, so it is a leaf by the subclass test -- and the leaf
+        // form is still wrong for it, because a tagged immediate IS an instance and has
+        // no class word to compare. `Integer.valueOf(5) instanceof Integer` has to be
+        // true. BoxEdge, HtTorture and InstanceOfT all caught this at once; the earlier
+        // reasoning that "a tagged value's class is never a leaf anyone tests for" was
+        // simply false, and final is exactly what these classes are.
+        if (CN1_TAGGABLE_CLASSES.contains(clsName)) {
+            return false;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.List<ByteCodeClass> subs = cn1SubclassIndex.get(clsName);
+        if (subs == null) {
+            return true;
+        }
+        for (ByteCodeClass sub : subs) {
+            if (!sub.isEliminated()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * If (name, desc) invoked virtually on {@code owner} has no reachable
      * override in any non-eliminated subclass, returns the mangled name of the
      * class whose non-abstract declaration implements it (owner or an
      * ancestor); otherwise null (the call must stay a vtable dispatch).
      */
+    /* Memo for the devirtualization queries.
+     *
+     * These are asked once per call site PER ROUND of the dead code pass, which is
+     * four passes over every method, and each answer walks a class cone. Uncached
+     * that is not a small cost on the thing being measured: the translator is the
+     * benchmark, so a more thorough analysis shows up directly as a slower run. It
+     * measured at 162B instructions against 136B before the memo -- the analysis was
+     * costing more than the better code it produced was saving.
+     *
+     * Cleared at the start of every round, because the answers depend on what has
+     * been eliminated so far and that is exactly what each round changes. */
+    private static final Map<String, java.util.List<ByteCodeClass>> cn1DevirtMemo =
+            new HashMap<String, java.util.List<ByteCodeClass>>();
+    private static final Map<String, java.util.List<ByteCodeClass>> cn1ConeMemo =
+            new HashMap<String, java.util.List<ByteCodeClass>>();
+
+    static void cn1InvalidateDevirtMemo() {
+        cn1DevirtMemo.clear();
+        cn1ConeMemo.clear();
+    }
+
+    /* Interface -> the reachable classes implementing it. Built once, the same way
+     * and for the same reason as the subclass index: the devirtualizer asks this per
+     * call site, and a scan of every class per site is quadratic on a real corpus. */
+    private static java.util.Map<String, java.util.List<ByteCodeClass>> cn1ImplementorIndex;
+    private static int cn1ImplementorIndexSize = -1;
+
+    private static void cn1EnsureImplementorIndex() {
+        if (cn1ImplementorIndex != null && cn1ImplementorIndexSize == classes.size()) {
+            return;
+        }
+        cn1ImplementorIndex = new HashMap<String, java.util.List<ByteCodeClass>>();
+        java.util.List<ByteCodeClass> interfaces = new java.util.ArrayList<ByteCodeClass>();
+        for (ByteCodeClass c : classes) {
+            if (c.isIsInterface()) {
+                interfaces.add(c);
+            }
+        }
+        for (ByteCodeClass c : classes) {
+            if (c.isIsInterface() || c.isEliminated()) {
+                continue;
+            }
+            for (ByteCodeClass i : interfaces) {
+                if (c.doesImplement(i)) {
+                    java.util.List<ByteCodeClass> l = cn1ImplementorIndex.get(i.getClsName());
+                    if (l == null) {
+                        l = new java.util.ArrayList<ByteCodeClass>();
+                        cn1ImplementorIndex.put(i.getClsName(), l);
+                    }
+                    l.add(c);
+                }
+            }
+        }
+        cn1ImplementorIndexSize = classes.size();
+    }
+
+    /**
+     * Every reachable implementation of {@code (name, desc)} reachable through an
+     * INTERFACE call on {@code iface}: the declaring class of the method in each
+     * class that implements the interface, plus the interface's own default
+     * implementation when a class inherits it rather than declaring one.
+     *
+     * Interface dispatch is the most expensive call this VM makes -- a class id, a
+     * map row, an offset, a vtable slot and then an indirect branch -- so a site with
+     * a single reachable implementation is worth far more to resolve than a virtual
+     * one, and INVOKEINTERFACE was not being resolved at all.
+     *
+     * @param iface the interface named by the call site
+     * @param name method name
+     * @param desc method descriptor
+     * @return distinct implementing classes, or null when the interface is unknown
+     */
+    /**
+     * The concrete, non-eliminated classes a receiver of static type {@code owner}
+     * can actually be at run time.
+     *
+     * This, not the number of implementations, is what decides whether a site can be
+     * dispatched by comparing class ids: the guard tests the RECEIVER's id, and
+     * several receiver classes can share one inherited implementation.
+     *
+     * @param owner static receiver type, class or interface
+     * @return concrete assignable classes, or null when the type is unknown
+     */
+    public static synchronized java.util.List<ByteCodeClass> concreteReceiverCone(ByteCodeClass owner) {
+        if (owner == null) {
+            return null;
+        }
+        java.util.List<ByteCodeClass> coneMemo = cn1ConeMemo.get(owner.getClsName());
+        if (coneMemo != null) {
+            return coneMemo;
+        }
+        java.util.List<ByteCodeClass> cone = new java.util.ArrayList<ByteCodeClass>(4);
+        if (owner.isIsInterface()) {
+            cn1EnsureImplementorIndex();
+            java.util.List<ByteCodeClass> impls = cn1ImplementorIndex.get(owner.getClsName());
+            if (impls != null) {
+                for (ByteCodeClass c : impls) {
+                    if (!c.isEliminated() && !c.isIsAbstract()) {
+                        cone.add(c);
+                    }
+                }
+            }
+            cn1ConeMemo.put(owner.getClsName(), cone);
+            return cone;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        stack.add(owner);
+        while (!stack.isEmpty()) {
+            ByteCodeClass c = stack.pop();
+            if (!c.isEliminated() && !c.isIsAbstract()) {
+                cone.add(c);
+            }
+            java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(c.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        cn1ConeMemo.put(owner.getClsName(), cone);
+        return cone;
+    }
+
+    public static synchronized java.util.List<ByteCodeClass> resolveInterfaceTargets(
+            ByteCodeClass iface, String name, String desc) {
+        if (iface == null || !iface.isIsInterface()) {
+            return null;
+        }
+        String memoKey = "I" + iface.getClsName() + '#' + name + desc;
+        java.util.List<ByteCodeClass> memo = cn1DevirtMemo.get(memoKey);
+        if (memo != null) {
+            return memo;
+        }
+        cn1EnsureImplementorIndex();
+        java.util.List<ByteCodeClass> impls = cn1ImplementorIndex.get(iface.getClsName());
+        java.util.List<ByteCodeClass> targets = new java.util.ArrayList<ByteCodeClass>(4);
+        if (impls != null) {
+            for (ByteCodeClass c : impls) {
+                ByteCodeClass d = c;
+                while (d != null) {
+                    if (d.hasDeclaredNonAbstractMethod(name, desc)) {
+                        if (!targets.contains(d)) {
+                            targets.add(d);
+                        }
+                        break;
+                    }
+                    String b = d.getBaseClass();
+                    d = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+                }
+                if (d == null) {
+                    // Inherited from the interface as a default method, or not found at
+                    // all. Either way this receiver does not resolve to a class, so the
+                    // site cannot be reduced to one target.
+                    return null;
+                }
+            }
+        }
+        cn1DevirtMemo.put(memoKey, targets);
+        return targets;
+    }
+
+    /**
+     * Every reachable implementation of {@code (name, desc)} that a virtual call on
+     * {@code owner} could land in -- the class hierarchy cone below the static type,
+     * restricted to classes the dead code pass kept.
+     *
+     * resolveDevirtualizedOwner answers the same question but collapses it to
+     * "exactly one, or give up". That throws away the case a closed world makes
+     * cheap: a site with two or three possible targets does not need a vtable at
+     * all, it needs a compare and a direct call, which the C compiler can then
+     * inline through. Only the count of targets decides which, so the set is what
+     * this returns.
+     *
+     * @param owner static receiver type
+     * @param name method name
+     * @param desc method descriptor
+     * @return the implementing classes, or null when the receiver type is unknown
+     */
+    public static synchronized java.util.List<ByteCodeClass> resolveVirtualTargets(
+            ByteCodeClass owner, String name, String desc) {
+        if (owner == null) {
+            return null;
+        }
+        String memoKey = owner.getClsName() + '#' + name + desc;
+        java.util.List<ByteCodeClass> memo = cn1DevirtMemo.get(memoKey);
+        if (memo != null) {
+            return memo;
+        }
+        cn1EnsureSubclassIndex();
+        java.util.List<ByteCodeClass> targets = new java.util.ArrayList<ByteCodeClass>(4);
+        // The implementation inherited at or above the static type, which is what a
+        // receiver of exactly that type runs.
+        ByteCodeClass c = owner;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                targets.add(c);
+                break;
+            }
+            String b = c.getBaseClass();
+            c = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+        }
+        // Plus every override below it.
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(owner.getClsName());
+        if (kids != null) {
+            stack.addAll(kids);
+        }
+        while (!stack.isEmpty()) {
+            ByteCodeClass k = stack.pop();
+            if (!k.isEliminated() && k.hasDeclaredNonAbstractMethod(name, desc) && !targets.contains(k)) {
+                targets.add(k);
+            }
+            kids = cn1SubclassIndex.get(k.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        cn1DevirtMemo.put(memoKey, targets);
+        return targets;
+    }
+
     public static synchronized String resolveDevirtualizedOwner(ByteCodeClass owner, String name, String desc) {
         if (owner == null) {
             return null;
@@ -169,6 +491,73 @@ public class Parser extends ClassVisitor {
     private int lambdaCounter;
     private int stringConcatCounter;
     public static void cleanup() {
+        if ("true".equals(System.getProperty("cn1.iteratorCensus"))) {
+            // Reported HERE rather than from the census itself: the census runs BEFORE
+            // the pass that scopes the loops, so printing it there reports zero for both.
+            System.out.println("[ITER] for-each intrinsified=" + BytecodeMethod.forEachIntrinsified
+                    + " scoped=" + BytecodeMethod.stackIterScoped
+                    + " refused=" + BytecodeMethod.stackIterRefused);
+        }
+        if ("true".equals(System.getProperty("cn1.sbCensus"))) {
+            int sites = BytecodeMethod.sbCensusSites;
+            System.out.println("[SB] StringBuilder NEW sites=" + sites
+                    + " stackAllocated=" + BytecodeMethod.sbCensusStackAllocated
+                    + " inTryCatchMethods=" + BytecodeMethod.sbCensusBailTryCatch
+                    + " refusedBySynchronized=" + BytecodeMethod.sbCensusBailSync
+                    + (sites > 0 ? "  (try/catch no longer refuses any of the "
+                        + (100 * BytecodeMethod.sbCensusBailTryCatch / sites) + "% of sites it reaches)" : ""));
+        }
+        if (BytecodeMethod.BCE_CENSUS) {
+            int ops = BytecodeMethod.bceArrayOpsTotal;
+            System.out.println("[BCE] methods=" + BytecodeMethod.bceMethods
+                + " withArrayOps=" + BytecodeMethod.bceMethodsWithArrays
+                + " refusedByTryCatch=" + BytecodeMethod.bceRefusedTryCatch
+                + " arrayOps=" + ops
+                + " arrayOpsInRefusedMethods=" + BytecodeMethod.bceArrayOpsRefusedTryCatch
+                + (ops > 0 ? "  (" + (100 * BytecodeMethod.bceArrayOpsRefusedTryCatch / ops)
+                    + "% of array accesses sit in a method that used to be refused whole)" : ""));
+            System.out.println("[BCE] cleared=" + BytecodeMethod.bceAccessesMarked
+                + " ofThoseInTryCatchMethods=" + BytecodeMethod.bceAccessesMarkedInTryCatchMethod
+                + " loopsRefusedByHandlerInside=" + BytecodeMethod.bceLoopsRefusedByHandler);
+            StringBuilder why = new StringBuilder("[BCE] candidateLoops:");
+            for (int i = 0; i < BytecodeMethod.BCE_WHY.length; i++) {
+                why.append(' ').append(BytecodeMethod.BCE_WHY[i]).append('=').append(BytecodeMethod.bceWhy[i]);
+            }
+            System.out.println(why);
+            StringBuilder miss = new StringBuilder("[BCE] inAcceptedLoops:");
+            for (int i = 0; i < BytecodeMethod.BCE_MISS.length; i++) {
+                miss.append(' ').append(BytecodeMethod.BCE_MISS[i]).append('=').append(BytecodeMethod.bceMiss[i]);
+            }
+            System.out.println(miss);
+            StringBuilder ho = new StringBuilder("[BCE] hoistedLength:");
+            for (int i = 0; i < BytecodeMethod.BCE_HOIST.length; i++) {
+                ho.append(' ').append(BytecodeMethod.BCE_HOIST[i]).append('=').append(BytecodeMethod.bceHoist[i]);
+            }
+            System.out.println(ho);
+        }
+        if (BytecodeMethod.FRAMELESS_CENSUS) {
+            System.out.println("[EAGER-INIT] clinits=" + ByteCodeClass.clinitCount
+                + " pure=" + ByteCodeClass.pureClinitCount
+                + " first blocker (reason -> classes): " + ByteCodeClass.PURE_CLINIT_BLOCKERS);
+            int t = BytecodeMethod.censusTotal;
+            System.out.println("[FRAMELESS] methods=" + t
+                + " frameless=" + BytecodeMethod.censusEligible
+                + " excludedByTryCatchALONE=" + BytecodeMethod.censusExcludedTryCatch
+                + " excludedOther=" + BytecodeMethod.censusExcludedOther
+                + (t > 0 ? "  (tryCatchAlone=" + (100 * BytecodeMethod.censusExcludedTryCatch / t)
+                    + "% of all methods)" : ""));
+            System.out.println("[FRAMELESS] excludedOther breakdown:"
+                + " ctorOrClinit=" + BytecodeMethod.censusNoConstructor
+                + " synchronized=" + BytecodeMethod.censusNoSync
+                + " onDeviceDebug=" + BytecodeMethod.censusNoDebug
+                + " unhandledOpcode=" + BytecodeMethod.censusNoOpcode
+                + " empty=" + BytecodeMethod.censusEmpty);
+            System.out.println("[FRAMELESS] first blocking instruction (class:opcode -> methods): "
+                + BytecodeMethod.censusBlockers);
+        }
+        LocalReceiverTypes.clear();
+        cn1SubclassIndex = null;
+        cn1SubclassIndexSize = -1;
         nativeSources = null;
         classes.clear();
         // classes is cleared in place (same List reference), so the name index's
@@ -195,7 +584,12 @@ public class Parser extends ClassVisitor {
         
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
         p.cls = new ByteCodeClass(p.clsName, r.getClassName());
-        r.accept(p, ClassReader.EXPAND_FRAMES);
+        readingClassDepth++;
+        try {
+            r.accept(p, ClassReader.EXPAND_FRAMES);
+        } finally {
+            readingClassDepth--;
+        }
         
         classes.add(p.cls);
     }
@@ -486,6 +880,81 @@ public class Parser extends ClassVisitor {
     // String.equals 11.2%, the iterator 10.3%, indexOf 6.2% and ArrayList.get 5.1%
     // of samples, all of it here.
     private static final Map<String, Integer> constantPoolIndex = new HashMap<String, Integer>();
+
+    /* Constant-time instanceof.
+     *
+     * instanceofFunction resolves a test by walking classInstanceOf[runtimeClassId],
+     * the class's supertype list, until it finds the tested type or the -1 sentinel.
+     * That is O(number of supertypes) on a path a real translation takes hundreds of
+     * millions of times, and it is a pointer chase, so every step is a dependent load
+     * the CPU cannot overlap.
+     *
+     * A closed world does not have to do that. The type on the right of an instanceof
+     * is a compile-time constant, and across a whole application only a couple of
+     * hundred distinct types are ever tested against -- 252 over a 5,326 class corpus.
+     * So each tested type gets a dense bit index here, and each class gets a bitmap of
+     * the tested types it is an instance of. The test is then a load, a shift and an
+     * and, with no call and no loop, which is what a JIT emits for the same check.
+     *
+     * Array types keep the old path: classInstanceOf is indexed by ordinary class ids
+     * only, array ids live above cn1_array_start_offset, and instanceofFunction already
+     * handles them separately before it reaches the scan.
+     *
+     * Iteration order over classes and their instructions is deterministic, so the
+     * indices are stable -- the self-hosting gate compares emitted C byte for byte. */
+    private static final LinkedHashMap<String, Integer> typeTestIds = new LinkedHashMap<String, Integer>();
+
+    /**
+     * Dense bitmap index of a type tested by instanceof, or -1 when this type is not
+     * tested anywhere and therefore has no bit.
+     *
+     * @param actualType mangled class name as TypeInstruction spells it
+     * @return the bit index, or -1
+     */
+    /* Long.toHexString does not exist in vm/JavaAPI, and the translator has to
+     * compile against it to self-host, so the 64-bit rows are formatted here. */
+    private static String unsignedHex(long v) {
+        if(v == 0) {
+            return "0";
+        }
+        char[] digits = new char[16];
+        int at = 16;
+        while(v != 0) {
+            int nib = (int)(v & 0xf);
+            digits[--at] = (char)(nib < 10 ? ('0' + nib) : ('a' + nib - 10));
+            v >>>= 4;
+        }
+        return new String(digits, at, 16 - at);
+    }
+
+    public static int typeTestIndex(String actualType) {
+        Integer i = typeTestIds.get(actualType);
+        return i == null ? -1 : i.intValue();
+    }
+
+    /**
+     * Assigns a bit index to every class an instanceof tests against. Runs before any
+     * code is emitted, because the emitter bakes the index into the call site.
+     */
+    private static void collectTypeTests() {
+        typeTestIds.clear();
+        for(ByteCodeClass bc : classes) {
+            for(BytecodeMethod bm : bc.getMethods()) {
+                if(bm.isEliminated()) {
+                    continue;
+                }
+                for(Instruction i : bm.getInstructions()) {
+                    if(!(i instanceof TypeInstruction)) {
+                        continue;
+                    }
+                    String t = ((TypeInstruction)i).instanceofTargetClass();
+                    if(t != null && !typeTestIds.containsKey(t)) {
+                        typeTestIds.put(t, Integer.valueOf(typeTestIds.size()));
+                    }
+                }
+            }
+        }
+    }
     
     // Name -> class index, replacing the O(N) linear scans that getClassObject /
     // getClassByName / ByteCodeClass.findClass used to do. Those run per dependency
@@ -606,6 +1075,23 @@ public class Parser extends ClassVisitor {
             arrayId++;
         }
 
+        // THE HIGHEST CLASS ID THIS TRANSLATION CAN PRODUCE, emitted rather than guessed.
+        // Anything sizing a per-class-id table needs this bound, and the only previous way
+        // to spell it was to name a class and hope it was last: the heap histogram sized
+        // its tables with cn1_array_3_id_java_util_Vector, which stops existing the moment
+        // an application does not reach java.util.Vector, so that diagnostic failed to
+        // compile on any app that culls it. arrayId is one past the last id handed out,
+        // so the last valid id is arrayId - 1. Nothing consumes this yet -- the histogram
+        // that needed it was deleted as superseded -- and it is emitted anyway because the
+        // NEXT per-class-id table wants a bound that is a fact rather than a guess.
+        bld.append("#define cn1_max_class_id ");
+        bld.append(arrayId - 1);
+        bld.append("\n");
+        // Object-header class indices of the two java.lang.String twins, after every
+        // array id's index (see cn1ClazzById and cn1InitStringTwin).
+        bld.append("#define cn1_header_index_java_lang_String_i8 ").append(arrayId + 1).append("\n");
+        bld.append("#define cn1_header_index_java_lang_String_i16 ").append(arrayId + 2).append("\n");
+
         bld.append("\n\n");
 
         bld.append("// maps to offsets in the constant pool below\nextern int methodNameLookup[];\n");
@@ -622,22 +1108,73 @@ public class Parser extends ClassVisitor {
         }
         bldM.append("};\n\n");
         
+        // Dense bit index of every type an instanceof tests against, keyed by the id
+        // rather than the name so the per-class rows below can be filled straight from
+        // the supertype list appendClassOffset already produces.
+        HashMap<Integer, Integer> denseByOffset = new HashMap<Integer, Integer>();
+        for(Map.Entry<String, Integer> e : typeTestIds.entrySet()) {
+            ByteCodeClass tc = getClassByName(e.getKey());
+            if(tc != null) {
+                denseByOffset.put(Integer.valueOf(tc.getClassOffset()), e.getValue());
+            }
+        }
+        int typeTestWords = (typeTestIds.size() + 63) / 64;
+        if(typeTestWords == 0) {
+            // An application with no instanceof at all still has to emit a valid array.
+            typeTestWords = 1;
+        }
+        long[][] typeTestRows = new long[classes.size()][typeTestWords];
+
         ArrayList<Integer> instances = new ArrayList<>();
         int counter = 0;
         for(ByteCodeClass bc : classes) {
             bldM.append("int classInstanceOfArr");
             bldM.append(counter);
             bldM.append("[] = {");
-            counter++;
             appendClassOffset(bc, instances);
             
             for(Integer i : instances) {
                 bldM.append(i);
                 bldM.append(", ");
             }
+
+            // Same row the scan would have walked, precomputed. The class is an
+            // instance of itself, which the scan never sees because instanceofFunction
+            // answers the identity case before it reaches the list.
+            long[] row = typeTestRows[counter];
+            Integer selfDense = denseByOffset.get(Integer.valueOf(bc.getClassOffset()));
+            if(selfDense != null) {
+                row[selfDense.intValue() >> 6] |= 1L << (selfDense.intValue() & 63);
+            }
+            for(Integer i : instances) {
+                Integer d = denseByOffset.get(i);
+                if(d != null) {
+                    row[d.intValue() >> 6] |= 1L << (d.intValue() & 63);
+                }
+            }
+
+            counter++;
             instances.clear();
             bldM.append("-1};\n");
         }
+
+        bld.append("#define CN1_TYPETEST_WORDS ");
+        bld.append(typeTestWords);
+        bld.append("\n#define CN1_TYPETEST_ROWS ");
+        bld.append(classes.size());
+        bld.append("\nextern const unsigned long long cn1TypeTestBits[];\n");
+        bldM.append("\n// Bit d of row c is set when class c is an instance of the type\n");
+        bldM.append("// holding dense index d. See Parser.typeTestIds.\n");
+        bldM.append("const unsigned long long cn1TypeTestBits[] = {");
+        for(int r = 0 ; r < typeTestRows.length ; r++) {
+            bldM.append("\n    ");
+            for(int w = 0 ; w < typeTestWords ; w++) {
+                bldM.append("0x");
+                bldM.append(unsignedHex(typeTestRows[r][w]));
+                bldM.append("ULL, ");
+            }
+        }
+        bldM.append("\n};\n\n");
         bld.append("extern int *classInstanceOf[];\n");
         bldM.append("int *classInstanceOf[");
         bldM.append(classes.size());
@@ -691,6 +1228,53 @@ public class Parser extends ClassVisitor {
             bldM.append(bc.getClsName().replace('/', '_').replace('$', '_'));
             bldM.append(";\n");
         }
+        // cn1ClazzById: the object header's class INDEX (classId + 1) -> descriptor, for
+        // every class and every array class this program has. Index 0 is "no class".
+        // The index is 16 bits wide (CN1_OBJ_HEADER_FIELDS); refuse a program whose
+        // numbering does not fit rather than wrap an id onto another class.
+        // The two java.lang.String twins (cn1InitStringTwin) share String's classId and take
+        // the two indices after every array id.
+        int maxId = arrayId + 2;
+        if (maxId > 0xFFFF) {
+            throw new IllegalStateException("Too many classes for the 16-bit object header class "
+                    + "index: " + classes.size() + " classes need ids up to " + maxId
+                    + " (limit 65535)");
+        }
+        String[] primitives = {"JAVA_BOOLEAN", "JAVA_CHAR", "JAVA_BYTE", "JAVA_SHORT", "JAVA_INT",
+                "JAVA_LONG", "JAVA_FLOAT", "JAVA_DOUBLE"};
+        for (ByteCodeClass bc : classes) {
+            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            for (int dim = 1; dim <= 3; dim++) {
+                if (ByteCodeClass.emitsArrayClass(n, dim)) {
+                    bldM.append("extern struct clazz class_array").append(dim).append("__").append(n).append(";\n");
+                }
+            }
+        }
+        bldM.append("extern struct clazz ClazzClazz;\n");
+        bldM.append("\n\nstruct clazz* const cn1ClazzById[] = {\n    [0] = 0");
+        for (ByteCodeClass bc : classes) {
+            String n = bc.getClsName().replace('/', '_').replace('$', '_');
+            bldM.append(",\n    [cn1_class_id_").append(n).append(" + 1] = &class__").append(n);
+            for (int dim = 1; dim <= 3; dim++) {
+                if (ByteCodeClass.emitsArrayClass(n, dim)) {
+                    bldM.append(",\n    [cn1_array_").append(dim).append("_id_").append(n)
+                            .append(" + 1] = &class_array").append(dim).append("__").append(n);
+                }
+            }
+        }
+        for (String p : primitives) {
+            for (int dim = 1; dim <= 3; dim++) {
+                bldM.append(",\n    [cn1_array_").append(dim).append("_id_").append(p)
+                        .append(" + 1] = &class_array").append(dim).append("__").append(p);
+            }
+        }
+        // The runtime's descriptor for class objects (nativeMethods.m), classId
+        // cn1_array_start_offset -- an id no array takes.
+        bldM.append(",\n    [cn1_array_start_offset + 1] = &ClazzClazz");
+        bldM.append(",\n    [cn1_header_index_java_lang_String_i8] = &class__java_lang_String_i8");
+        bldM.append(",\n    [cn1_header_index_java_lang_String_i16] = &class__java_lang_String_i16");
+        bldM.append("};\nconst int cn1ClazzByIdCount = (int)(sizeof(cn1ClazzById) / sizeof(cn1ClazzById[0]));\n");
+
         bldM.append("\n\nstruct clazz* classesList[] = {");
         first = true;
         for(ByteCodeClass bc : classes) {
@@ -709,6 +1293,34 @@ public class Parser extends ClassVisitor {
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsExtern(bldM);
         }        
+        // Eager class initialization: see ByteCodeClass.isEagerInitEligible. Emitted
+        // here because this is the one generated file that lists every class.
+        bldM.append("\n\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible()) {
+                bldM.append("extern CN1_CLINIT_ATTR void __STATIC_INITIALIZER_").append(bc.getClsName())
+                    .append("(CODENAME_ONE_THREAD_STATE);\n");
+            }
+        }
+        // Two phases. Classes with no <clinit> only build tables and run first, before
+        // anything else in initConstantPool. Classes with a PURE <clinit> run Java --
+        // they allocate arrays and read string literals -- so they run once the
+        // constant pool is published, still before any other Java.
+        bldM.append("void cn1EagerInitClasses(CODENAME_ONE_THREAD_STATE) {\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible() && !bc.hasClinit()) {
+                bldM.append("    __STATIC_INITIALIZER_").append(bc.getClsName()).append("(threadStateData);\n");
+            }
+        }
+        bldM.append("}\n");
+        bldM.append("void cn1EagerInitPureClasses(CODENAME_ONE_THREAD_STATE) {\n");
+        for(ByteCodeClass bc : classes) {
+            if(bc.isEagerInitEligible() && bc.hasClinit()) {
+                bldM.append("    cn1RunEagerInitializer(threadStateData, __STATIC_INITIALIZER_").append(bc.getClsName())
+                    .append(", \"").append(bc.getClsName()).append("\");\n");
+            }
+        }
+        bldM.append("}\n");
         bldM.append("\n\nextern int recursionKey;\nvoid markStatics(CODENAME_ONE_THREAD_STATE) {\n    recursionKey++;\n");
         for(ByteCodeClass bc : classes) {
             bc.appendStaticFieldsMark(bldM);
@@ -769,6 +1381,10 @@ public class Parser extends ClassVisitor {
     }
     
     public static void writeOutput(File outputDirectory) throws Exception {
+        // Must run before anything is emitted: the instanceof call sites bake the
+        // dense bit index in, so the assignment has to exist before the first one.
+        collectTypeTests();
+    
         if(ByteCodeTranslator.verbose) {
             System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
         }
@@ -835,6 +1451,18 @@ public class Parser extends ClassVisitor {
                 removedClass.setEliminated(true);
                 neliminated++;
             }
+            // On the raw bytecode, before any fusion pass below rewrites instructions:
+            // see ByteCodeClass.isEagerInitEligible.
+            ByteCodeClass.computePureClinits(classes);
+            // Also on the raw bytecode, where every field access is still a plain
+            // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
+            // (its own field model), and not under on-device debugging, whose sidecar
+            // shows every field the source declares.
+            if (BytecodeMethod.optimizerOn
+                    && ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                    && !"true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
+                DeadFieldElimination.run(classes, nativeSources);
+            }
 
             // Fuse all-String StringBuilder concat chains into String.cn1ConcatN
             // BEFORE the cull, not during code generation.
@@ -849,9 +1477,40 @@ public class Parser extends ClassVisitor {
             // nowhere near the rewrite. Running here, the references exist before
             // anything is eliminated. See BytecodeMethod.lowerIteratorCalls.
             if (BytecodeMethod.optimizerOn) {
+                LocalReceiverTypes.resolveFactories(getNativeSymbolIndex(nativeSources));
+                iteratorStackCensus();
+                allocationEscapeCensus();
+                // NOTE: the retire counters are deliberately NOT reported from here.
+                // The pass runs per method inside optimize(), so totals are not final at
+                // this point, and a shutdown hook does not compile in this build (the
+                // Runtime/Thread visible to the translator has no addShutdownHook). The
+                // population is measured from the generated C instead, by counting
+                // __cn1retire scopes -- which is the number that actually matters,
+                // because it counts what codegen EMITTED rather than what analysis liked.
+                for (ByteCodeClass ownershipClass : classes) {
+                    for (BytecodeMethod method : ownershipClass.getMethods()) method.analyzeBuilderOwnership();
+                }
+                for (ByteCodeClass ownershipClass : classes) {
+                    for (BytecodeMethod method : ownershipClass.getMethods()) method.freezeBuilderOwnership();
+                }
                 for (ByteCodeClass fuseCls : classes) {
                     for (BytecodeMethod fuseMtd : fuseCls.getMethods()) {
+                        // These rewrites preserve local-stack semantics but introduce
+                        // instructions outside the raw-bytecode eligibility whitelist.
+                        // Prove the frame requirement before replacing that bytecode.
+                        fuseMtd.freezeFramelessEligibility();
+                        // BEFORE lowerIteratorCalls, which retypes the very calls this
+                        // recognises: after it they are INVOKEVIRTUAL on the concrete
+                        // iterator and the for-each shape no longer matches.
+                        // The C intrinsic first: it removes the iterator entirely where
+                        // it applies, so a buffer offer would be dead weight there.
+                        if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                            fuseMtd.fuseStreams();
+                            fuseMtd.intrinsifyForEach();
+                            fuseMtd.markStackIterators();
+                        }
                         fuseMtd.lowerIteratorCalls();
+                        fuseMtd.elideToCharArrayScans();
                     }
                 }
             }
@@ -1069,6 +1728,7 @@ public class Parser extends ClassVisitor {
     }
 
     private static int cullMethods() {
+        cn1InvalidateDevirtMemo();
         int nfound = 0;
         for(ByteCodeClass bc : classes) {
             bc.unmark();
@@ -1298,15 +1958,23 @@ public class Parser extends ClassVisitor {
      * failure the forms are left unset and the emitter uses its legacy
      * (category-1-assuming) path -- i.e. no worse than before.
      */
-    private static void resolveDupForms(String owner, MethodNode mn, BytecodeMethod mtd) {
+    private static void resolveDupForms(String owner, MethodNode mn, BytecodeMethod mtd,
+            Frame<? extends org.objectweb.asm.tree.analysis.Value>[] existingFrames) {
         if (owner == null || mn == null || mn.instructions == null || mn.instructions.size() == 0) {
             return;
         }
-        Frame<BasicValue>[] frames;
-        try {
-            frames = new Analyzer<BasicValue>(new BasicInterpreter()).analyze(owner, mn);
-        } catch (Throwable t) {
-            return;
+        boolean needsForms = false;
+        for (AbstractInsnNode instruction = mn.instructions.getFirst(); instruction != null; instruction = instruction.getNext()) {
+            if (isCategorySensitiveStackOp(instruction.getOpcode())) { needsForms = true; break; }
+        }
+        if (!needsForms) return;
+        Frame<? extends org.objectweb.asm.tree.analysis.Value>[] frames = existingFrames;
+        if (frames == null) {
+            try {
+                frames = new Analyzer<BasicValue>(new BasicInterpreter()).analyze(owner, mn);
+            } catch (org.objectweb.asm.tree.analysis.AnalyzerException error) {
+                return;
+            }
         }
         // Decisions for category-sensitive ops, in linear (parse) order.
         List<int[]> decisions = new ArrayList<int[]>();
@@ -1345,7 +2013,7 @@ public class Parser extends ClassVisitor {
      * Returns null when the frame is unavailable (unreachable code).
      * ASM analysis frames model a long/double as ONE stack entry with size 2.
      */
-    private static int[] dupForm(int op, Frame<BasicValue> f) {
+    private static int[] dupForm(int op, Frame<? extends org.objectweb.asm.tree.analysis.Value> f) {
         if (f == null) {
             return null;
         }
@@ -1517,6 +2185,17 @@ public class Parser extends ClassVisitor {
         private final BytecodeMethod mtd;
         String dupAnalysisOwner;
         MethodNode dupAnalysisNode;
+        // One entry per invokedynamic in this method, in visit order: the synthetic
+        // lambda class it becomes, or null for an indy that is not a lambda (string
+        // concat). The analysis below walks a SEPARATE MethodNode whose nodes are not
+        // the ones visited here, so position is what ties the two together.
+        final java.util.List<String> indyLambdas = new java.util.ArrayList<String>();
+        // A lambda cannot be invoked through a local before it is created, so a SAM
+        // call only becomes worth analysing once one has been seen in this method.
+        // This keeps the dataflow off the overwhelming majority of methods.
+        boolean sawLambdaIndy;
+        final java.util.Map<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke> flowInvokes =
+                new java.util.IdentityHashMap<org.objectweb.asm.tree.AbstractInsnNode, com.codename1.tools.translator.bytecodes.Invoke>();
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
             super(Opcodes.ASM9, mv);
             this.mtd = mtd;
@@ -1528,7 +2207,24 @@ public class Parser extends ClassVisitor {
             // LEVER B: snapshot the plans that must be read off the RAW instruction
             // list now, before optimize() (run later, per-class) folds the PUTFIELDs.
             mtd.computeRawMethodPlans();
-            resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd);
+            Frame<? extends org.objectweb.asm.tree.analysis.Value>[] flowFrames = BytecodeMethod.optimizerOn
+                    ? LocalReceiverTypes.capture(dupAnalysisOwner, dupAnalysisNode, flowInvokes, mtd,
+                            indyLambdas) : null;
+            resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd, flowFrames);
+            // MethodNode uses Label.info as its label-to-tree-node map. These
+            // Labels survive in our IR, so leaving that map installed retains
+            // the complete doubly linked ASM instruction tree after analysis.
+            // Both analyses have consumed it; code generation needs identity only.
+            for (Instruction instruction : mtd.getInstructions()) {
+                if (instruction instanceof LabelInstruction) {
+                    Label label = ((LabelInstruction) instruction).getLabel();
+                    if (label.info instanceof org.objectweb.asm.tree.LabelNode) label.info = null;
+                }
+            }
+            flowInvokes.clear();
+            indyLambdas.clear();
+            sawLambdaIndy = false;
+            dupAnalysisNode = null;
         }
 
         @Override
@@ -1620,12 +2316,13 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
+            super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+            indyLambdas.add(null);
             if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
                 ("makeConcatWithConstants".equals(bsm.getName()) || "makeConcat".equals(bsm.getName()))) {
 
                 Type invokedType = Type.getMethodType(desc);
                 if (!Type.getType(String.class).equals(invokedType.getReturnType())) {
-                    super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
                     return;
                 }
 
@@ -1796,6 +2493,8 @@ public class Parser extends ClassVisitor {
 
                 // 1. Generate a unique class name for the lambda
                 String lambdaClassName = clsName + "_lambda_" + (lambdaCounter++);
+                indyLambdas.set(indyLambdas.size() - 1, lambdaClassName);
+                sawLambdaIndy = true;
 
                 // 2. Create the ByteCodeClass for the lambda
                 ByteCodeClass lambdaClass = new ByteCodeClass(lambdaClassName, lambdaClassName.replace('_', '/'));
@@ -1988,30 +2687,73 @@ public class Parser extends ClassVisitor {
                 BytecodeMethod factory = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, factoryMethodName, actualFactoryDesc, null, null);
                 lambdaClass.addMethod(factory);
 
-                factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
-                factory.addInstruction(Opcodes.DUP);
+                if (capturedArgs.length == 0) {
+                    // A LAMBDA THAT CAPTURES NOTHING HAS NO DISTINGUISHABLE INSTANCES, so
+                    // it is allocated ONCE instead of on every evaluation.
+                    //
+                    // The class has no instance fields at all in this case -- the fields
+                    // above are the captures -- so two instances differ in nothing a
+                    // program can observe: not state, not behaviour. Identity is the only
+                    // thing, and the JLS explicitly declines to guarantee it here (a
+                    // lambda expression need not produce a new object; the JDK's own
+                    // LambdaMetafactory caches non-capturing instances for exactly this
+                    // reason). So the factory hands back a shared instance.
+                    //
+                    // Measured on the self-hosting corpus: 4 of 6 lambda classes capture
+                    // nothing. This costs no analysis -- "declares no instance fields" is
+                    // known here, at the point the class is synthesised -- and it is the
+                    // only allocation removal in the collections plan that needs neither
+                    // an escape analysis nor a receiver type.
+                    //
+                    // Lazily, and deliberately WITHOUT a lock. A race can construct two
+                    // instances and publish one; the loser is garbage and nothing can tell
+                    // which won, because the instances are indistinguishable. The field is
+                    // written with PUTSTATIC, whose generated setter carries the write
+                    // barrier, so the publish is safe for the collector.
+                    ByteCodeField cache = new ByteCodeField(lambdaClassName,
+                            Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC, "cn1Instance",
+                            factoryRetType, null, null);
+                    lambdaClass.addField(cache);
 
-                // Load factory arguments (captured args)
-                localIndex = 0; // Static method
-                for (Type t : capturedArgs) {
-                    factory.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
-                    localIndex += t.getSize();
+                    Label haveIt = new Label();
+                    factory.addField(lambdaClass, Opcodes.GETSTATIC, lambdaClassName, "cn1Instance", factoryRetType);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addJump(Opcodes.IFNONNULL, haveIt);
+                    factory.addInstruction(Opcodes.POP);
+                    factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
+                    factory.addInstruction(Opcodes.DUP);
+                    factory.addField(lambdaClass, Opcodes.PUTSTATIC, lambdaClassName, "cn1Instance", factoryRetType);
+                    factory.addLabel(haveIt);
+                    factory.addInstruction(Opcodes.ARETURN);
+                    factory.setMaxes(4, 0);
+                } else {
+                    factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
+                    factory.addInstruction(Opcodes.DUP);
+
+                    // Load factory arguments (captured args)
+                    localIndex = 0; // Static method
+                    for (Type t : capturedArgs) {
+                        factory.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                        localIndex += t.getSize();
+                    }
+
+                    factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
+                    factory.addInstruction(Opcodes.ARETURN);
+                    factory.setMaxes(localIndex + 2, localIndex);
                 }
-
-                factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
-                factory.addInstruction(Opcodes.ARETURN);
-                factory.setMaxes(localIndex + 2, localIndex);
 
                 // 7. Register the new class
                 classes.add(lambdaClass);
 
                 // 8. Replace invokedynamic with INVOKESTATIC to factory
                 mtd.addInvoke(Opcodes.INVOKESTATIC, lambdaClassName, factoryMethodName, actualFactoryDesc, false);
+                ((com.codename1.tools.translator.bytecodes.Invoke)mtd.getInstructions().get(mtd.getInstructions().size() - 1)).setLambdaSam(interfaceMethod);
 
                 return;
             }
 
-            super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs); 
         }
 
         /**
@@ -2188,7 +2930,13 @@ public class Parser extends ClassVisitor {
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             mtd.addInvoke(opcode, owner, name, desc, itf);
-            super.visitMethodInsn(opcode, owner, name, desc, itf); 
+            super.visitMethodInsn(opcode, owner, name, desc, itf);
+            if (dupAnalysisNode != null && (LocalReceiverTypes.isCandidate(opcode, owner, name, desc)
+                    || sawLambdaIndy && LocalReceiverTypes.isLambdaCandidate(opcode))) {
+                java.util.List<com.codename1.tools.translator.bytecodes.Instruction> body = mtd.getInstructions();
+                flowInvokes.put(dupAnalysisNode.instructions.getLast(),
+                        (com.codename1.tools.translator.bytecodes.Invoke) body.get(body.size() - 1));
+            }
         }
 
         @Override
@@ -2381,4 +3129,378 @@ public class Parser extends ClassVisitor {
             super.visitEnd();
         }
     }
+
+    /// -Dcn1.iteratorCensus=true: report which Iterator implementations could live in the
+    /// caller's stack frame, and why the rest could not.
+    ///
+    /// Round 23 established that the iterator universe is closed and ours -- 33 of 34
+    /// implementations are java.util classes, every one of them a parent reference plus a
+    /// handful of primitives. That makes a uniform stack buffer possible, but only for
+    /// classes whose instances provably cannot outlive the loop. Three conditions have to
+    /// hold together, and this census measures all three:
+    ///
+    ///   1. `this` does not escape any method of the iterator class, its constructor
+    ///      included -- a ctor that registers itself with its parent is the obvious way an
+    ///      iterator outlives the frame;
+    ///   2. at every site that allocates one, the new object does not escape that method
+    ///      except by being returned -- which covers an iterator() that caches what it
+    ///      hands out;
+    ///   3. the for-each site's own slot does not escape, which the indexed lowering
+    ///      already proves separately.
+    ///
+    /// Printed rather than assumed because the mechanism is only as sound as this set, and
+    /// a class silently dropping out of it is a performance regression that no gate would
+    /// otherwise report.
+    /// Classes whose instances may live in the caller's stack frame, by mangled name.
+    /// COMPUTED, never listed: a hand-written set goes stale the moment someone edits an
+    /// iterator, and the failure would be a dangling pointer rather than a compile error.
+    private static final java.util.Set<String> stackIterClasses = new java.util.HashSet<String>();
+
+    public static boolean isStackIterator(String mangledClsName) {
+        return stackIterClasses.contains(mangledClsName);
+    }
+
+    /// How many allocation sites in this corpus are provably frame-local?
+    ///
+    /// The escape analysis behind the iterator scheme is not iterator-specific -- it answers
+    /// "does this reference escape the frame that produced it" for any type. It is only ever
+    /// ASKED about iterators. This census asks it about every NEW in the program, so the size
+    /// of the unexploited population is a measured number rather than an assumption.
+    ///
+    /// Two strictnesses, because they enable different things:
+    ///   LOOSE  (returnIsLeak=false) -- may be returned; suits caller-frame allocation, the
+    ///          shape the iterator work already ships.
+    ///   STRICT (returnIsLeak=true)  -- dies with the allocating method; the population a
+    ///          wholesale page free at method exit could reclaim without the collector.
+    ///
+    /// -Dcn1.allocCensus=true. Measurement only: nothing reads the result yet.
+    /// Do all of these callees keep `this` to themselves? The precise form of the
+    /// receiver check: only the methods a site ACTUALLY invokes on the tracked object
+    /// matter, not every method the class happens to declare.
+    /// Which callees are answering "unsafe", and how often. A resolution bug here is
+    /// indistinguishable from real leakage in the totals, and the first cut of this
+    /// check took the safe count to ZERO -- which is what an unresolvable callee looks
+    /// like, not what a leaky program looks like.
+    static final Map<String, int[]> calleeFailures = new HashMap<String, int[]>();
+
+    static boolean calleesKeepThis(List<String> calls, Map<String, Boolean> memo) {
+        for (int i = 0; i < calls.size(); i++) {
+            String key = calls.get(i);
+            Boolean cached = memo.get(key);
+            if (cached == null) {
+                cached = Boolean.valueOf(calleeIsSafe(key));
+                memo.put(key, cached);
+            }
+            if (!cached.booleanValue()) {
+                int[] fc = calleeFailures.get(key);
+                if (fc == null) { fc = new int[1]; calleeFailures.put(key, fc); }
+                fc[0]++;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// owner.name+desc -> does that one method keep `this`? A callee that cannot be
+    /// resolved in this closed world answers NO: an unknown body is an unchecked body.
+    static boolean calleeIsSafe(String key) {
+        int dot = key.indexOf('.');
+        if (dot < 0) {
+            return false;
+        }
+        String owner = IteratorEscape.mangle(key.substring(0, dot));
+        String rest = key.substring(dot + 1);
+        int paren = rest.indexOf('(');
+        if (paren < 0) {
+            return false;
+        }
+        String name = rest.substring(0, paren);
+        // BytecodeMethod renames <init> to __INIT__ (see BytecodeMethod:902). Without
+        // this the constructor never resolves, and since EVERY new is followed by
+        // INVOKESPECIAL <init> on the receiver, every site answers "unsafe" -- which is
+        // exactly how the first cut of this check reported ZERO retirable sites.
+        if ("<init>".equals(name)) {
+            name = "__INIT__";
+        }
+        String desc = rest.substring(paren);
+        for (ByteCodeClass c : classes) {
+            if (!IteratorEscape.mangle(c.getClsName()).equals(owner)) {
+                continue;
+            }
+            for (BytecodeMethod m : c.getMethods()) {
+                if (m.getMethodName().equals(name) && desc.equals(m.getDesc())) {
+                    return IteratorEscape.thisEscapes(m) == IteratorEscape.SAFE;
+                }
+            }
+            return false;   // class found, method not -- inherited or synthetic
+        }
+        return false;       // not in this closed world
+    }
+
+    static void reportRetireCounters() {
+        System.out.println("[RETIRE] seen=" + BytecodeMethod.retireSeen
+                + " kept=" + BytecodeMethod.retireKept
+                + " dropStackAlloc=" + BytecodeMethod.retireDropStack
+                + " dropEscapes=" + BytecodeMethod.retireDropEscape
+                + " dropNoLocal=" + BytecodeMethod.retireDropNoLocal
+                + " dropCallee=" + BytecodeMethod.retireDropCallee
+                + " dropFrameless=" + BytecodeMethod.retireDropFrameless);
+    }
+
+    static void allocationEscapeCensus() {
+        if (!"true".equals(System.getProperty("cn1.allocCensus"))) {
+            return;
+        }
+        Map<String, List<BytecodeMethod>> allocations = new HashMap<String, List<BytecodeMethod>>();
+        for (ByteCodeClass c : classes) {
+            allocations.put(IteratorEscape.mangle(c.getClsName()), new ArrayList<BytecodeMethod>());
+        }
+        int sites = 0, loose = 0, strict = 0, escapes = 0, unknown = 0;
+        int unsoundReceiver = 0;
+        Map<String, Boolean> thisSafe = new HashMap<String, Boolean>();
+        Map<String, int[]> byType = new HashMap<String, int[]>();
+        // WHY each undecidable site was refused. There are several UNKNOWN exits, not
+        // just the documented branch-liveness one, and they need different fixes: a CFG
+        // fixpoint for the branch case, more modelled opcodes for "consumed by something
+        // unmodelled". Without this split the 197 is a number nobody can act on.
+        Map<String, int[]> reasons = new HashMap<String, int[]>();
+        for (ByteCodeClass c : classes) {
+            for (BytecodeMethod m : c.getMethods()) {
+                String lastSeen = null;
+                for (Instruction instruction : m.getInstructions()) {
+                    if (!(instruction instanceof TypeInstruction)
+                            || instruction.getOpcode() != Opcodes.NEW) {
+                        continue;
+                    }
+                    String owner = IteratorEscape.mangle(((TypeInstruction) instruction).getTypeName());
+                    if (!allocations.containsKey(owner)) {
+                        continue;   // type not in this closed world
+                    }
+                    // One method is one analysis site per allocated type, matching
+                    // iteratorStackCensus: re-allocating the same type in a loop is
+                    // still a single decision.
+                    if (owner.equals(lastSeen)) {
+                        continue;
+                    }
+                    lastSeen = owner;
+                    sites++;
+                    int rLoose = IteratorEscape.newEscapes(m, owner);
+                    int rStrict = IteratorEscape.newEscapesStrict(m, owner);
+                    // SOUNDNESS: newEscapesStrict permits the tracked value to be a
+                    // RECEIVER, because the walk reasons that a receiver is only `this`
+                    // inside the callee "and that callee is checked on its own". For
+                    // iterators that check exists (iteratorStackCensus runs thisEscapes
+                    // over every method of the class). For an arbitrary type it does not,
+                    // so a callee that stashes `this` -- list.register(this) -- would be
+                    // missed. Counting a site as retirable requires BOTH properties.
+                    if (rStrict == IteratorEscape.SAFE) {
+                        List<String> calls = new ArrayList<String>(IteratorEscape.receiverCalls);
+                        if (!calleesKeepThis(calls, thisSafe)) {
+                            rStrict = IteratorEscape.ESCAPES;
+                            unsoundReceiver++;
+                        }
+                    }
+                    if (rLoose == IteratorEscape.SAFE) { loose++; }
+                    if (rStrict == IteratorEscape.SAFE) { strict++; }
+                    else if (rStrict == IteratorEscape.ESCAPES) { escapes++; }
+                    else { unknown++; }
+                    if (rStrict == IteratorEscape.UNKNOWN) {
+                        String why = IteratorEscape.lastReason;
+                        if (why == null || why.length() == 0) { why = "(unset)"; }
+                        int[] rc = reasons.get(why);
+                        if (rc == null) { rc = new int[1]; reasons.put(why, rc); }
+                        rc[0]++;
+                    }
+                    int[] t = byType.get(owner);
+                    if (t == null) { t = new int[3]; byType.put(owner, t); }
+                    t[0]++;
+                    if (rStrict == IteratorEscape.SAFE) { t[1]++; }
+                    else if (rStrict == IteratorEscape.UNKNOWN) { t[2]++; }
+                }
+            }
+        }
+        List<String> fk = new ArrayList<String>(calleeFailures.keySet());
+        Collections.sort(fk, new Comparator<String>() {
+            public int compare(String a, String b) {
+                return calleeFailures.get(b)[0] - calleeFailures.get(a)[0];
+            }
+        });
+        int fshown = 0;
+        for (String k : fk) {
+            if (fshown++ >= 20) { break; }
+            System.out.println("[ALLOC-CALLEE-FAIL] " + calleeFailures.get(k)[0] + "  " + k);
+        }
+        System.out.println("[ALLOC-CENSUS] receiverUnsound=" + unsoundReceiver
+                + "  (strict-safe by the walk, but the class can leak `this` from a callee)");
+        System.out.println("[ALLOC-CENSUS] sites=" + sites
+                + " frameLocalLoose=" + loose + " frameLocalStrict=" + strict
+                + " escapes=" + escapes + " unknown=" + unknown);
+        List<String> keys = new ArrayList<String>(byType.keySet());
+        Collections.sort(keys);
+        int shown = 0;
+        for (String k : keys) {
+            int[] t = byType.get(k);
+            if (t[1] > 0 && shown < 60) {
+                System.out.println("[ALLOC-CENSUS]   " + k + " sites=" + t[0] + " strictSafe=" + t[1]);
+                shown++;
+            }
+        }
+        // UNKNOWN is the interesting column: those sites do not escape, the analysis
+        // simply refuses to decide because the tracked value is live across a branch
+        // (it has no CFG fixpoint). Ranked by count so the question "are the
+        // undecidable ones the HOT types, or cold leaf nodes?" has an answer.
+        List<String> rk = new ArrayList<String>(reasons.keySet());
+        Collections.sort(rk, new Comparator<String>() {
+            public int compare(String a, String b) {
+                return reasons.get(b)[0] - reasons.get(a)[0];
+            }
+        });
+        for (String r : rk) {
+            System.out.println("[ALLOC-REASON]  " + reasons.get(r)[0] + "  " + r);
+        }
+        List<String> unk = new ArrayList<String>();
+        for (String k : keys) {
+            if (byType.get(k)[2] > 0) { unk.add(k); }
+        }
+        Collections.sort(unk, new Comparator<String>() {
+            public int compare(String a, String b) {
+                return byType.get(b)[2] - byType.get(a)[2];
+            }
+        });
+        int un = 0;
+        for (String k : unk) {
+            if (un++ >= 25) { break; }
+            int[] t = byType.get(k);
+            System.out.println("[ALLOC-UNKNOWN]  " + k + " sites=" + t[0] + " undecidable=" + t[2]);
+        }
+    }
+
+    static void iteratorStackCensus() {
+        boolean verbose = "true".equals(System.getProperty("cn1.iteratorCensus"));
+        int total = 0, safeClasses = 0, leakThis = 0, unknownThis = 0;
+        int sites = 0, safeSites = 0, leakSites = 0, unknownSites = 0;
+        StringBuilder rejected = new StringBuilder();
+        StringBuilder accepted = new StringBuilder();
+        // Index allocating methods once. Scanning every instruction separately for
+        // every iterator implementation makes this pass proportional to their
+        // product, even though each NEW names exactly one class.
+        Map<String, List<BytecodeMethod>> allocations = new HashMap<String, List<BytecodeMethod>>();
+        for (ByteCodeClass c : classes) {
+            if (implementsIterator(c)) {
+                allocations.put(IteratorEscape.mangle(c.getClsName()), new ArrayList<BytecodeMethod>());
+            }
+        }
+        for (ByteCodeClass c : classes) {
+            for (BytecodeMethod m : c.getMethods()) {
+                for (Instruction instruction : m.getInstructions()) {
+                    if (instruction instanceof TypeInstruction && instruction.getOpcode() == Opcodes.NEW) {
+                        List<BytecodeMethod> methods = allocations.get(IteratorEscape.mangle(
+                                ((TypeInstruction) instruction).getTypeName()));
+                        // A method is one analysis site even if it allocates the
+                        // same iterator more than once. Methods are visited contiguously.
+                        if (methods != null && (methods.isEmpty() || methods.get(methods.size() - 1) != m)) {
+                            methods.add(m);
+                        }
+                    }
+                }
+            }
+        }
+        for (ByteCodeClass c : classes) {
+            if (!implementsIterator(c)) {
+                continue;
+            }
+            total++;
+            int worst = IteratorEscape.SAFE;
+            String why = null;
+            String reason = "";
+            for (BytecodeMethod m : c.getMethods()) {
+                int r = IteratorEscape.thisEscapes(m);
+                if (r != IteratorEscape.SAFE && worst == IteratorEscape.SAFE) {
+                    worst = r;
+                    why = m.getMethodName();
+                    // Captured HERE: lastReason is overwritten by every later method, so
+                    // reading it after the loop names the wrong instruction.
+                    reason = IteratorEscape.lastReason;
+                }
+            }
+            boolean eligible = worst == IteratorEscape.SAFE;
+            if (worst == IteratorEscape.SAFE) {
+                safeClasses++;
+            } else if (worst == IteratorEscape.ESCAPES) {
+                leakThis++;
+                rejected.append("    ").append(c.getClsName()).append(" -- this escapes in ")
+                        .append(why).append("\n");
+            } else {
+                unknownThis++;
+                rejected.append("    ").append(c.getClsName()).append(" -- unanalysable ")
+                        .append(why).append(": ").append(reason).append("\n");
+            }
+            // Every site that allocates this iterator, anywhere in the closed world.
+            String mangled = IteratorEscape.mangle(c.getClsName());
+            for (BytecodeMethod m : allocations.get(mangled)) {
+                sites++;
+                int r = IteratorEscape.newEscapes(m, mangled);
+                if (r != IteratorEscape.SAFE) {
+                    // ONE leaking site disqualifies the whole class. The buffer is
+                    // taken by class, not by site -- __NEW_X cannot tell which caller
+                    // it is serving -- so eligibility must hold everywhere the class
+                    // is allocated, not merely at the sites we like.
+                    eligible = false;
+                }
+                if (r == IteratorEscape.SAFE) {
+                    safeSites++;
+                    accepted.append("    OK ").append(m.getClsName()).append(".")
+                            .append(m.getMethodName()).append(" -> ")
+                            .append(c.getClsName()).append("\n");
+                } else if (r == IteratorEscape.ESCAPES) {
+                    leakSites++;
+                    rejected.append("    site ").append(m.getClsName()).append(".")
+                            .append(m.getMethodName()).append(" leaks a ")
+                            .append(c.getClsName()).append("\n");
+                } else {
+                    unknownSites++;
+                    rejected.append("    site ").append(m.getClsName()).append(".")
+                            .append(m.getMethodName()).append(" unanalysable for ")
+                            .append(c.getClsName()).append(": ")
+                            .append(IteratorEscape.lastReason).append("\n");
+                }
+            }
+            if (eligible) {
+                stackIterClasses.add(mangled);
+            }
+        }
+        if (!verbose) {
+            return;
+        }
+        System.out.println("[ITER] Iterator implementations=" + total
+                + " thisSafe=" + safeClasses + " thisEscapes=" + leakThis
+                + " unanalysable=" + unknownThis);
+        System.out.println("[ITER] allocation sites=" + sites
+                + " safe=" + safeSites + " escaping=" + leakSites
+                + " unanalysable=" + unknownSites);
+        System.out.println("[ITER] stack-eligible classes=" + stackIterClasses.size());
+        System.out.println("[ITER] eligible set=" + stackIterClasses);
+        if (accepted.length() > 0) {
+            System.out.println("[ITER] eligible allocation sites:");
+            System.out.print(accepted);
+        }
+        if (rejected.length() > 0) {
+            System.out.println("[ITER] refusals:");
+            System.out.print(rejected);
+        }
+    }
+
+    private static boolean implementsIterator(ByteCodeClass c) {
+        for (ByteCodeClass w = c; w != null; w = w.getBaseClassObject()) {
+            for (String i : w.getBaseInterfaces()) {
+                String n = IteratorEscape.mangle(i);
+                if ("java_util_Iterator".equals(n) || "java_util_ListIterator".equals(n)
+                        || "java_util_Enumeration".equals(n)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

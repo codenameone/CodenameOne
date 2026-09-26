@@ -1430,7 +1430,7 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boole
         return JAVA_FALSE;
     }
     if (cn1LinuxPopEvent(scratch)) {
-        JAVA_INT* arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
+        JAVA_INT* arr = (JAVA_INT*) CN1_ARRAY_DATA(out);
         int len = (int) (*(JAVA_ARRAY) out).length;
         if (len >= 4) {
             arr[0] = scratch[0];

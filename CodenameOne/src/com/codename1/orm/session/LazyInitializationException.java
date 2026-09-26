@@ -23,6 +23,7 @@
 package com.codename1.orm.session;
 
 /// An unloaded association was accessed after its session was detached or closed.
+@com.codename1.impl.SharedWithBackend
 public final class LazyInitializationException extends PersistenceException {
     /// Creates an exception describing the persistence failure.
     /// @param message failure description

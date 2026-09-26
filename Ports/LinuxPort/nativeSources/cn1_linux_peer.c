@@ -118,8 +118,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_peerCalcPreferredSize___long_int_
         cn1LinuxRunOnMainAndWait(cn1PeerPrefOnMain, &op);
     }
     if (out != JAVA_NULL && (*(JAVA_ARRAY) out).length >= 2) {
-        ((JAVA_INT*) (*(JAVA_ARRAY) out).data)[0] = op.out[0];
-        ((JAVA_INT*) (*(JAVA_ARRAY) out).data)[1] = op.out[1];
+        ((JAVA_INT*) CN1_ARRAY_DATA(out))[0] = op.out[0];
+        ((JAVA_INT*) CN1_ARRAY_DATA(out))[1] = op.out[1];
     }
 }
 
@@ -180,12 +180,12 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_peerCaptureArgb___long_int_1ARR
     }
     arr = allocArray(threadStateData, op.out[0] * op.out[1], &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
     if (arr != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) arr).data, op.argb, (size_t) op.out[0] * op.out[1] * 4);
+        memcpy(CN1_ARRAY_DATA(arr), op.argb, (size_t) op.out[0] * op.out[1] * 4);
     }
     free(op.argb);
     if (outDims != JAVA_NULL && (*(JAVA_ARRAY) outDims).length >= 2) {
-        ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[0] = op.out[0];
-        ((JAVA_INT*) (*(JAVA_ARRAY) outDims).data)[1] = op.out[1];
+        ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[0] = op.out[0];
+        ((JAVA_INT*) CN1_ARRAY_DATA(outDims))[1] = op.out[1];
     }
     return arr;
 }

@@ -29,5 +29,6 @@ import java.lang.annotation.Target;
 /// An int or long counter maintained by a managed session for optimistic locking.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface Version {
 }

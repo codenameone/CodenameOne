@@ -30,6 +30,7 @@ import java.util.List;
 /// Keep the owning session open; queries are not thread-safe. Applications should
 /// not implement this interface.
 /// @param <T> mapped entity type
+@com.codename1.impl.SharedWithBackend
 public interface Query<T> {
     /// Adds an inner join on a relationship path.
     /// @param path Java relationship path

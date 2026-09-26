@@ -446,9 +446,11 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements
      *             if {@code location < 0 || > size()}
      */
     public boolean addAll(int location, Collection<? extends E> collection) {
-        Iterator<? extends E> it = collection.iterator();
-        while (it.hasNext()) {
-            add(location++, it.next());
+        // for-each, not an explicit iterator: the translator lowers the former into an
+        // index walk of the backing storage and allocates no iterator at all. See the
+        // note in AbstractCollection.addAll.
+        for (E element : collection) {
+            add(location++, element);
         }
         return !collection.isEmpty();
     }
@@ -488,9 +490,12 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements
                 return false;
             }
 
-            Iterator<?> it1 = iterator(), it2 = list.iterator();
-            while (it1.hasNext()) {
-                Object e1 = it1.next(), e2 = it2.next();
+            // Only the OTHER list needs a hand-held iterator, because the two are
+            // walked in lockstep; this one becomes a for-each and is lowered. The
+            // sizes were compared above, so it2 cannot run out first.
+            Iterator<?> it2 = list.iterator();
+            for (Object e1 : this) {
+                Object e2 = it2.next();
                 if (!(e1 == null ? e2 == null : e1.equals(e2))) {
                     return false;
                 }
@@ -522,9 +527,7 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements
     @Override
     public int hashCode() {
         int result = 1;
-        Iterator<?> it = iterator();
-        while (it.hasNext()) {
-            Object object = it.next();
+        for (Object object : this) {
             result = (31 * result) + (object == null ? 0 : object.hashCode());
         }
         return result;

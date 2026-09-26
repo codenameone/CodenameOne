@@ -46,6 +46,55 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      */
     protected Object[] elementData;
 
+    // Exact library instances use native storage. Subclasses retain the protected
+    // array contract, including direct reads, writes and replacement by user code.
+    private final boolean cn1Native = getClass() == Vector.class || getClass() == Stack.class;
+    private transient volatile long cn1Storage;
+
+    private int cn1Capacity() {
+        return cn1Native ? NativeStorage.capacity(cn1Storage) : elementData.length;
+    }
+
+    final Object cn1Get(int index) {
+        if (!cn1Native) return elementData[index];
+        if (index < 0 || index >= cn1Capacity()) throw new ArrayIndexOutOfBoundsException(index);
+        return NativeStorage.get(cn1Storage, index);
+    }
+
+    final void cn1Set(int index, Object value) {
+        if (!cn1Native) { elementData[index] = value; return; }
+        if (index < 0 || index >= cn1Capacity()) throw new ArrayIndexOutOfBoundsException(index);
+        NativeStorage.setOwned(this, cn1Storage, index, value);
+    }
+
+    // The native block does no bounds checking of its own -- it computes base + index
+    // and writes there -- so these two check the range the way System.arraycopy and
+    // Arrays.fill did for the array they replaced. Without it setSize(-1) cleared the
+    // slot BEFORE the block, over its header, where the array form threw.
+    private void cn1Move(int from, int to, int count) {
+        if (!cn1Native) { System.arraycopy(elementData, from, elementData, to, count); return; }
+        int cap = cn1Capacity();
+        if (count < 0 || from < 0 || to < 0 || from > cap - count || to > cap - count) {
+            throw new ArrayIndexOutOfBoundsException();
+        }
+        NativeStorage.move(cn1Storage, from, to, count);
+    }
+
+    private void cn1Clear(int from, int to) {
+        if (!cn1Native) { Arrays.fill(elementData, from, to, null); return; }
+        if (from < 0 || from > to || to > cn1Capacity()) {
+            throw new ArrayIndexOutOfBoundsException(from < 0 ? from : to);
+        }
+        NativeStorage.clear(cn1Storage, from, to - from);
+    }
+
+    private void cn1CopyTo(Object[] destination, int count) {
+        if (!cn1Native) { System.arraycopy(elementData, 0, destination, 0, count); return; }
+        if (destination == null) throw new NullPointerException();
+        if (count > destination.length) throw new ArrayIndexOutOfBoundsException();
+        for (int i = 0; i < count; i++) destination[i] = NativeStorage.get(cn1Storage, i);
+    }
+
     /**
      * How many elements should be added to the vector when it is detected that
      * it needs to grow to accommodate extra entries. If this value is zero or
@@ -89,7 +138,8 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         if (capacity < 0) {
             throw new IllegalArgumentException();
         }
-        elementData = newElementArray(capacity);
+        if (cn1Native) cn1Storage = NativeStorage.references(capacity);
+        else elementData = newElementArray(capacity);
         elementCount = 0;
         this.capacityIncrement = capacityIncrement;
     }
@@ -106,7 +156,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         this(collection.size(), 0);
         Iterator<? extends E> it = collection.iterator();
         while (it.hasNext()) {
-            elementData[elementCount++] = it.next();
+            cn1Set(elementCount++, it.next());
         }
     }
 
@@ -144,10 +194,10 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      */
     @Override
     public synchronized boolean add(E object) {
-        if (elementCount == elementData.length) {
+        if (elementCount == cn1Capacity()) {
             growByOne();
         }
-        elementData[elementCount++] = object;
+        cn1Set(elementCount++, object);
         modCount++;
         return true;
     }
@@ -175,18 +225,18 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
             if (size == 0) {
                 return false;
             }
-            int required = size - (elementData.length - elementCount);
+            int required = size - (cn1Capacity() - elementCount);
             if (required > 0) {
                 growBy(required);
             }
             int count = elementCount - location;
             if (count > 0) {
-                System.arraycopy(elementData, location, elementData, location
+                cn1Move(location, location
                         + size, count);
             }
             Iterator<? extends E> it = collection.iterator();
             while (it.hasNext()) {
-                elementData[location++] = it.next();
+                cn1Set(location++, it.next());
             }
             elementCount += size;
             modCount++;
@@ -214,10 +264,10 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      *            the object to add to the vector.
      */
     public synchronized void addElement(E object) {
-        if (elementCount == elementData.length) {
+        if (elementCount == cn1Capacity()) {
             growByOne();
         }
-        elementData[elementCount++] = object;
+        cn1Set(elementCount++, object);
         modCount++;
     }
 
@@ -229,7 +279,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      * @see #size
      */
     public synchronized int capacity() {
-        return elementData.length;
+        return cn1Capacity();
     }
 
     /**
@@ -284,7 +334,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      * @see #clone
      */
     public synchronized void copyInto(Object[] elements) {
-        System.arraycopy(elementData, 0, elements, 0, elementCount);
+        cn1CopyTo(elements, elementCount);
     }
 
     /**
@@ -300,7 +350,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @SuppressWarnings("unchecked")
     public synchronized E elementAt(int location) {
         if (location < elementCount) {
-            return (E) elementData[location];
+            return (E) cn1Get(location);
         }
         throw new ArrayIndexOutOfBoundsException(location);
     }
@@ -325,7 +375,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
             public E nextElement() {
                 synchronized (Vector.this) {
                     if (pos < elementCount) {
-                        return (E) elementData[pos++];
+                        return (E) cn1Get(pos++);
                     }
                 }
                 throw new NoSuchElementException();
@@ -343,10 +393,10 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      * @see #capacity
      */
     public synchronized void ensureCapacity(int minimumCapacity) {
-        if (elementData.length < minimumCapacity) {
-            int next = (capacityIncrement <= 0 ? elementData.length
+        if (cn1Capacity() < minimumCapacity) {
+            int next = (capacityIncrement <= 0 ? cn1Capacity()
                     : capacityIncrement)
-                    + elementData.length;
+                    + cn1Capacity();
             grow(minimumCapacity > next ? minimumCapacity : next);
         }
     }
@@ -376,7 +426,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
             int index = 0;
             Iterator<?> it = list.iterator();
             while (it.hasNext()) {
-                Object e1 = elementData[index++], e2 = it.next();
+                Object e1 = cn1Get(index++), e2 = it.next();
                 if (!(e1 == null ? e2 == null : e1.equals(e2))) {
                     return false;
                 }
@@ -399,7 +449,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @SuppressWarnings("unchecked")
     public synchronized E firstElement() {
         if (elementCount > 0) {
-            return (E) elementData[0];
+            return (E) cn1Get(0);
         }
         throw new NoSuchElementException();
     }
@@ -420,10 +470,17 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     }
 
     private void grow(int newCapacity) {
-        E[] newData = newElementArray(newCapacity);
-        // Assumes elementCount is <= newCapacity
-        System.arraycopy(elementData, 0, newData, 0, elementCount);
-        elementData = newData;
+        if (cn1Native) {
+            long replacement = NativeStorage.references(newCapacity);
+            NativeStorage.copy(cn1Storage, 0, replacement, 0, elementCount);
+            long old = cn1Storage;
+            cn1Storage = replacement;
+            NativeStorage.retire(old);
+        } else {
+            E[] replacement = newElementArray(newCapacity);
+            System.arraycopy(elementData, 0, replacement, 0, elementCount);
+            elementData = replacement;
+        }
     }
 
     /**
@@ -432,22 +489,20 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     private void growByOne() {
         int adding = 0;
         if (capacityIncrement <= 0) {
-            if ((adding = elementData.length) == 0) {
+            if ((adding = cn1Capacity()) == 0) {
                 adding = 1;
             }
         } else {
             adding = capacityIncrement;
         }
 
-        E[] newData = newElementArray(elementData.length + adding);
-        System.arraycopy(elementData, 0, newData, 0, elementCount);
-        elementData = newData;
+        grow(cn1Capacity() + adding);
     }
 
     private void growBy(int required) {
         int adding = 0;
         if (capacityIncrement <= 0) {
-            if ((adding = elementData.length) == 0) {
+            if ((adding = cn1Capacity()) == 0) {
                 adding = required;
             }
             while (adding < required) {
@@ -459,9 +514,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
                 adding += capacityIncrement;
             }
         }
-        E[] newData = newElementArray(elementData.length + adding);
-        System.arraycopy(elementData, 0, newData, 0, elementCount);
-        elementData = newData;
+        grow(cn1Capacity() + adding);
     }
 
     /**
@@ -476,7 +529,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         int result = 1;
         for (int i = 0; i < elementCount; i++) {
             result = (31 * result)
-                    + (elementData[i] == null ? 0 : elementData[i].hashCode());
+                    + (cn1Get(i) == null ? 0 : cn1Get(i).hashCode());
         }
         return result;
     }
@@ -519,13 +572,13 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     public synchronized int indexOf(Object object, int location) {
         if (object != null) {
             for (int i = location; i < elementCount; i++) {
-                if (object.equals(elementData[i])) {
+                if (object.equals(cn1Get(i))) {
                     return i;
                 }
             }
         } else {
             for (int i = location; i < elementCount; i++) {
-                if (elementData[i] == null) {
+                if (cn1Get(i) == null) {
                     return i;
                 }
             }
@@ -551,15 +604,14 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      */
     public synchronized void insertElementAt(E object, int location) {
         if (0 <= location && location <= elementCount) {
-            if (elementCount == elementData.length) {
+            if (elementCount == cn1Capacity()) {
                 growByOne();
             }
             int count = elementCount - location;
             if (count > 0) {
-                System.arraycopy(elementData, location, elementData,
-                        location + 1, count);
+                cn1Move(location, location + 1, count);
             }
-            elementData[location] = object;
+            cn1Set(location, object);
             elementCount++;
             modCount++;
         } else {
@@ -592,7 +644,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @SuppressWarnings("unchecked")
     public synchronized E lastElement() {
         try {
-            return (E) elementData[elementCount - 1];
+            return (E) cn1Get(elementCount - 1);
         } catch (IndexOutOfBoundsException e) {
             throw new NoSuchElementException();
         }
@@ -637,13 +689,13 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         if (location < elementCount) {
             if (object != null) {
                 for (int i = location; i >= 0; i--) {
-                    if (object.equals(elementData[i])) {
+                    if (object.equals(cn1Get(i))) {
                         return i;
                     }
                 }
             } else {
                 for (int i = location; i >= 0; i--) {
-                    if (elementData[i] == null) {
+                    if (cn1Get(i) == null) {
                         return i;
                     }
                 }
@@ -668,14 +720,13 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @Override
     public synchronized E remove(int location) {
         if (location < elementCount) {
-            E result = (E) elementData[location];
+            E result = (E) cn1Get(location);
             elementCount--;
             int size = elementCount - location;
             if (size > 0) {
-                System.arraycopy(elementData, location + 1, elementData,
-                        location, size);
+                cn1Move(location + 1, location, size);
             }
-            elementData[elementCount] = null;
+            cn1Set(elementCount, null);
             modCount++;
             return result;
         }
@@ -725,7 +776,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      */
     public synchronized void removeAllElements() {
         for (int i = 0; i < elementCount; i++) {
-            elementData[i] = null;
+            cn1Set(i, null);
         }
         modCount++;
         elementCount = 0;
@@ -772,10 +823,9 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
             elementCount--;
             int size = elementCount - location;
             if (size > 0) {
-                System.arraycopy(elementData, location + 1, elementData,
-                        location, size);
+                cn1Move(location + 1, location, size);
             }
-            elementData[elementCount] = null;
+            cn1Set(elementCount, null);
             modCount++;
         } else {
             throw new ArrayIndexOutOfBoundsException(location);
@@ -802,13 +852,12 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
                 return;
             }
             if (end != elementCount) {
-                System.arraycopy(elementData, end, elementData, start,
-                        elementCount - end);
+                cn1Move(end, start, elementCount - end);
                 int newCount = elementCount - (end - start);
-                Arrays.fill(elementData, newCount, elementCount, null);
+                cn1Clear(newCount, elementCount);
                 elementCount = newCount;
             } else {
-                Arrays.fill(elementData, start, elementCount, null);
+                cn1Clear(start, elementCount);
                 elementCount = start;
             }
             modCount++;
@@ -848,8 +897,8 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @Override
     public synchronized E set(int location, E object) {
         if (location < elementCount) {
-            E result = (E) elementData[location];
-            elementData[location] = object;
+            E result = (E) cn1Get(location);
+            cn1Set(location, object);
             return result;
         }
         throw new ArrayIndexOutOfBoundsException(location);
@@ -869,7 +918,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      */
     public synchronized void setElementAt(E object, int location) {
         if (location < elementCount) {
-            elementData[location] = object;
+            cn1Set(location, object);
         } else {
             throw new ArrayIndexOutOfBoundsException(location);
         }
@@ -891,7 +940,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         }
         ensureCapacity(length);
         if (elementCount > length) {
-            Arrays.fill(elementData, length, elementCount, null);
+            cn1Clear(length, elementCount);
         }
         elementCount = length;
         modCount++;
@@ -938,7 +987,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
     @Override
     public synchronized Object[] toArray() {
         Object[] result = new Object[elementCount];
-        System.arraycopy(elementData, 0, result, 0, elementCount);
+        cn1CopyTo(result, elementCount);
         return result;
     }
 
@@ -962,7 +1011,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         if (elementCount > contents.length) {
             contents = (T[])java.lang.reflect.Array.newInstance(contents.getClass().getComponentType(), elementCount);
         }
-        System.arraycopy(elementData, 0, contents, 0, elementCount);
+        cn1CopyTo(contents, elementCount);
         if (elementCount < contents.length) {
             contents[elementCount] = null;
         }
@@ -984,17 +1033,17 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
         StringBuffer buffer = new StringBuffer(elementCount * 16);
         buffer.append('[');
         for (int i = 0; i < length; i++) {
-            if (elementData[i] == this) {
+            if (cn1Get(i) == this) {
                 buffer.append("(this Collection)"); //$NON-NLS-1$
             } else {
-                buffer.append(elementData[i]);
+                buffer.append(cn1Get(i));
             }
             buffer.append(", "); //$NON-NLS-1$
         }
-        if (elementData[length] == this) {
+        if (cn1Get(length) == this) {
             buffer.append("(this Collection)"); //$NON-NLS-1$
         } else {
-            buffer.append(elementData[length]);
+            buffer.append(cn1Get(length));
         }
         buffer.append(']');
         return buffer.toString();
@@ -1008,7 +1057,7 @@ public class Vector<E> extends AbstractList<E> implements List<E>,
      * @see #size
      */
     public synchronized void trimToSize() {
-        if (elementData.length != elementCount) {
+        if (cn1Capacity() != elementCount) {
             grow(elementCount);
         }
     }

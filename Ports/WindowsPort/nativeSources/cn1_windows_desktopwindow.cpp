@@ -854,7 +854,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowGetBounds___int_
     if (!GetWindowRect(w->hwnd, &r)) {
         return;
     }
-    data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
+    data = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(out);
     if ((*(JAVA_ARRAY) out).length >= 4) {
         data[0] = r.left;
         data[1] = r.top;
@@ -884,7 +884,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_mainWindowGetBounds___int_
     if (!GetWindowRect(cn1Win.hwnd, &r)) {
         return JAVA_FALSE;
     }
-    data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
+    data = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(out);
     data[0] = r.left;
     data[1] = r.top;
     data[2] = r.right - r.left;
@@ -1074,7 +1074,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_monitorBounds___int_boolean_i
         monitor = t.primary;
     }
     r = workArea == JAVA_TRUE ? t.work[monitor] : t.bounds[monitor];
-    data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) out).data;
+    data = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(out);
     if ((*(JAVA_ARRAY) out).length >= 4) {
         data[0] = r.left;
         data[1] = r.top;

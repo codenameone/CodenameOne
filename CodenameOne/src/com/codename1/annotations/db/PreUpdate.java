@@ -25,5 +25,6 @@ import java.lang.annotation.*;
 /// Invokes a public no-argument callback before a dirty entity update during flush.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.METHOD)
+@com.codename1.impl.SharedWithBackend
 public @interface PreUpdate {
 }
