@@ -2067,19 +2067,28 @@ public class Tabs extends Container {
     private static final float[] GLASS_RIM_FALLOFF = {1f, 0.7f, 0.43f, 0.2f};
 
     /// The selection platter's colour matrix, read back from the native bar
-    /// (the colorMatrix filter UIKit puts on the platter's backdrop layer): rows
-    /// r, g, b of [r, g, b, offset]. It turns the dark bar's 134 grey into 98.8
-    /// and the light bar's 195 into 169.4, the measured platter.
-    private static final float[] GLASS_PLATTER_DARK = {
-        1.1298f, -0.2361f, -0.0237f, -0.07f,
-        -0.0701f, 0.964f, -0.0238f, -0.07f,
-        -0.0702f, -0.236f, 1.1762f, -0.07f
-    };
-    private static final float[] GLASS_PLATTER_LIGHT = {
-        1.1851f, -0.0502f, -0.005f, -0.2f,
-        -0.0149f, 1.1499f, -0.0051f, -0.2f,
-        -0.0149f, -0.05f, 1.1949f, -0.2f
-    };
+    /// (the colorMatrix filter UIKit puts on the platter's backdrop layer): a 1.2
+    /// gain less a share of the Rec. 709 luminance, `M = 1.2 * I - k * 1 * w^T`,
+    /// plus an offset -- k 0.33 and offset -0.07 on the dark bar, 0.07 and -0.2 on
+    /// the light one. Every entry UIKit reports matches within 1.4e-4 (under 0.04 of
+    /// a colour level), which is as far as UIKit's own rows agree with each other. It
+    /// turns the dark bar's 134 grey into 98.8 and the light bar's 195 into 169.4,
+    /// the measured platter.
+    private static final float[] GLASS_PLATTER_DARK = platterMatrix(0.33f, -0.07f);
+    private static final float[] GLASS_PLATTER_LIGHT = platterMatrix(0.07f, -0.2f);
+
+    /// Rows r, g, b of [r, g, b, offset] for `1.2 * I - luminanceShare * 1 * w^T + offset`.
+    static float[] platterMatrix(float luminanceShare, float offset) {
+        float[] w = {0.2126f, 0.7152f, 0.0722f};
+        float[] m = new float[12];
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                m[r * 4 + c] = (r == c ? 1.2f : 0f) - luminanceShare * w[c];
+            }
+            m[r * 4 + 3] = offset;
+        }
+        return m;
+    }
 
     /// The lifted native lens, measured over flat grey and colour backdrops (lossless
     /// screenshots of a held press, motion probe): a circular-bevel rim of the height

@@ -214,6 +214,18 @@ class TabsGlassSelectionTest extends UITestBase {
         }
     }
 
+    @org.junit.jupiter.api.Test
+    void platterMatrixReproducesTheNativeReadback() {
+        // What UIKit reports for the platter's colorMatrix filter (motion probe KVC
+        // readback, four decimals), dark then light.
+        float[] dark = {1.1298f, -0.2361f, -0.0237f, -0.07f, -0.0701f, 0.964f, -0.0238f, -0.07f,
+            -0.0702f, -0.236f, 1.1762f, -0.07f};
+        float[] light = {1.1851f, -0.0502f, -0.005f, -0.2f, -0.0149f, 1.1499f, -0.0051f, -0.2f,
+            -0.0149f, -0.05f, 1.1949f, -0.2f};
+        assertArrayEquals(dark, Tabs.platterMatrix(0.33f, -0.07f), 1.5e-4f);
+        assertArrayEquals(light, Tabs.platterMatrix(0.07f, -0.2f), 1.5e-4f);
+    }
+
     private static int alpha(com.codename1.testing.TestCodenameOneImplementation.ColorMatrixCall c, int x, int y) {
         return (c.mask[y * c.maskWidth + x] >>> 24) & 0xff;
     }
