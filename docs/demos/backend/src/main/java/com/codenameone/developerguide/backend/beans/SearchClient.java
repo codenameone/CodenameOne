@@ -20,26 +20,33 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.backend.annotations;
+package com.codenameone.developerguide.backend.beans;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+/**
+ * A client from a library: it has a lifecycle, but it knows nothing about
+ * beans and carries no annotations.
+ */
+public class SearchClient {
+    private final String url;
+    private boolean open;
 
-/// Constructs this bean only when no other bean has its type.
-///
-/// Decided entirely by the build, which sees every bean: a default
-/// implementation marked with this steps aside for one the application
-/// declares.
-///
-/// Without `value`, "its type" is every type the bean can be injected as
-/// other than the JDK's own -- the class and its interfaces -- so a
-/// `DefaultMailer implements Mailer` steps aside for any other `Mailer` bean.
-@Retention(RetentionPolicy.CLASS)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface ConditionalOnMissingBean {
-    /// The types whose presence makes this bean step aside, when the default
-    /// set is too wide or too narrow.
-    Class<?>[] value() default {};
+    public SearchClient(String url) {
+        this.url = url;
+    }
+
+    public void connect() {
+        open = true;
+    }
+
+    public void close() {
+        open = false;
+    }
+
+    public boolean isOpen() {
+        return open;
+    }
+
+    public String getUrl() {
+        return url;
+    }
 }

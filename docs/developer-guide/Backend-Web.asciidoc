@@ -1,0 +1,364 @@
+[[backend-web]]
+== Backend controllers, contracts and WebSockets
+
+A controller turns HTTP into method calls. This chapter covers how requests are
+mapped to methods and how their parts are bound to parameters, how a return value
+becomes a response, how the app and the server share one declaration of their
+API, and how a server holds WebSocket connections open. <<A first server>>
+introduced the shape; this is the detail.
+
+=== Mapping requests
+
+A `@RestController` is a class whose methods answer requests. It's also a bean,
+so its constructor receives whatever it depends on, as <<backend-beans>>
+describes. Each mapped method names a verb and a path:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Products.java[tag=backend-web-mappings,indent=0]
+----
+
+`@GetMapping`, `@PostMapping`, `@PutMapping`, `@PatchMapping` and `@DeleteMapping`
+cover the usual verbs, and `@RequestMapping(value = "/x", method = "OPTIONS")`
+covers the rest. On the class, `@RequestMapping` is a prefix for every mapping
+inside it, and a mapping with no path answers on the prefix itself, as `create`
+does above. A mapping may list several paths, which is how a route keeps an old
+URL working.
+
+A `{name}` segment matches one path segment and is bound with `@PathVariable`.
+Within one controller a literal route is tried before a route with variables that
+would also match it, so `/api/products/search` above reaches `search` rather than
+`get` with an id of `search`.
+
+What the build refuses is a route nothing could ever reach. Two methods answering
+the same verb and path shape are an error, even when their variables are named
+differently, because a variable's name isn't part of what a request carries. The
+same is true across controllers: a variable route in one controller that would
+answer a literal route of another is reported, since the routers are tried in
+turn and the literal one would never run.
+
+==== Binding the parts of a request
+
+Every parameter of a mapped method says where its value comes from, with exactly
+one annotation:
+
+[cols="2,2,3", options="header"]
+|===
+| Annotation | Reads | Binds to
+
+| `@PathVariable("id")`
+| a `{id}` segment of the path
+| `String`, or a numeric or `boolean` primitive
+
+| `@RequestParam("q")`
+| a query parameter
+| `String`, or a numeric or `boolean` primitive
+
+| `@RequestHeader("Idempotency-Key")`
+| a request header
+| `String`, or a numeric or `boolean` primitive
+
+| `@RequestBody`
+| the body
+| `String`, a `Map` or a `List`
+
+| none, typed `HttpServer.Request`
+| the request itself
+| anything the request exposes
+|===
+
+The name is required. Java drops parameter names when it compiles unless it's
+told to keep them, and a router that guessed would bind the wrong value in
+silence, so `@RequestParam("q")` names the parameter the client sends rather than
+the variable in the method. A parameter with no annotation, or with two, is a
+build error: one parameter reads from one place, which matters most for an input
+like a credential that could otherwise arrive from a query string when the code
+meant a header.
+
+`@RequestParam`, `@RequestHeader` and `@RequestBody` are required unless they say
+otherwise. A request that leaves out a required value is answered 400, with the
+value's name in the body, before the method runs. `defaultValue` supplies a value
+for one that's missing. Two combinations are refused at build time, because each
+would hand the method a value nobody sent: `required = false` on a primitive with
+no `defaultValue`, since an `int` can't hold "absent" and would arrive as `0`;
+and a `defaultValue` that isn't a value of the parameter's type.
+
+A body is parsed as JSON, which produces maps, lists, strings, numbers and
+booleans, so that's what a body binds to. A `List<Order>` would arrive as a list
+of maps and fail the first time an element is used as an `Order`, so the build
+refuses it. For typed bodies, declare the API as a contract, as described under
+<<Sharing the contract with the app>>, which generates the codecs on both sides.
+
+A request target with a malformed escape sequence, or one that isn't valid UTF-8,
+is answered 400 before any route is tried, rather than as a 404 the client
+couldn't explain.
+
+==== What a method returns
+
+[cols="2,3", options="header"]
+|===
+| Return type | Response
+
+| `void`
+| 204 with no body, or the `@ResponseStatus` code.
+
+| `String`
+| The text, as `text/plain; charset=utf-8`, with 200 or the `@ResponseStatus` code.
+
+| A `Map`, `List`, `Set`, primitive or box, or a class implementing `Json.Writable`
+| JSON, with 200 or the `@ResponseStatus` code.
+
+| `HttpServer.Response`
+| Exactly what the method built. `@ResponseStatus` on such a method is a build
+  error, since the response already carries its own status.
+
+| `null`, from any of the above
+| 404.
+|===
+
+Any other return type is a build error. A class the router doesn't know how to
+encode would otherwise come out as the JSON string of its `toString()`, with the
+build and the request both reporting success. `@ResponseStatus` takes a final
+status between 200 and 599.
+
+A method that throws is answered 500 with the body `internal error`, and the
+exception is logged. The message isn't sent to the client, because an exception
+message is the most common way a server leaks its internals. To answer a failure
+with a status and a body of your choosing, return an `HttpServer.Response`, built
+with `request.respond(status, contentType, bytes)` or
+`request.respondJson(status, value)`.
+
+==== Taking the request itself
+
+A parameter typed `HttpServer.Request` receives the request, which is the way to
+anything the binding annotations don't model: every header, the raw body, the
+session, or a response with headers of its own. The `label` method in the example
+above takes it for that reason.
+
+A request's byte arrays belong to the connection and are reused by the next
+request on it, so a handler that keeps the body beyond its own call copies what it
+needs. That's the price of a router that allocates nothing for a route without
+path variables.
+
+==== Serving static files
+
+`cn1.static.root` names a directory, and the server answers requests under
+`cn1.static.prefix` (`/static` by default) with its files, after every route has
+had its chance. A directory is answered with its `cn1.static.index` file, and every
+file carries `cn1.static.cacheControl`. The resolved path must be inside the root,
+checked by resolving it on disk rather than by inspecting the request, so `../`,
+an encoded escape sequence and a symbolic link out of the tree are all refused.
+Conditional requests and ranges are honoured, and where the platform supports it
+the file is sent from the page cache to the socket without passing through the
+process.
+
+=== Sharing the contract with the app
+
+This is where having the same language on both ends stops being a slogan. An
+interface annotated for the REST client generates the app's client:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesApi.java[tag=backend-contract,indent=0]
+----
+
+Building the backend module with `-Dcn1.restServer=true` generates two more types
+from that same interface: `NotesApiServer`, a synchronous interface the backend
+implements, and `NotesApiDispatcher`, which routes a method, path and body to it
+and binds the path and query parameters.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/NotesEndpoint.java[tag=backend-contract-server,indent=0]
+----
+
+The client's methods are asynchronous because a UI can't block; the server's
+methods are synchronous because a handler has nothing to call back into. One declaration
+produces both shapes, which is what gRPC does and for the same reason.
+
+The payoff is that changing the contract breaks the build on whichever side did
+not follow it, instead of producing a response the app fails to parse in the
+field. The data transfer objects are shared rather than transcribed, and their
+codecs are generated on both sides, so there is no handwritten mapping layer to
+drift.
+
+The server half is off by default. Every existing project carries these
+interfaces for its client alone, and generating server classes into those builds
+would grow them for nothing.
+
+=== Real-time with WebSockets
+
+The server speaks RFC 6455, so a Codename One app can hold a live connection to a
+Codename One server with the same language on both ends. The client half is
+`com.codename1.io.WebSocket`, which every port has shipped for years; this is the
+other half of it.
+
+An endpoint implements `com.codename1.backend.WebSocket`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-echo,indent=0]
+----
+
+The build finds it, the way it finds a `@RestController`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-annotated,indent=0]
+----
+
+The annotation goes on the type rather than on a method, because a `@GetMapping`
+marks a call and a WebSocket is a connection: its contract is seven callbacks that
+share per-connection state, which is an object. What it keeps from `@GetMapping` is
+what a reader cares about -- the path is relative to a class-level
+`@RequestMapping`, a constructor taking a `DataSource` or an `EntityManager` is
+injected the same way, and two endpoints claiming one path is a build error rather
+than something registration order decides.
+
+==== A server that writes its own main
+
+The annotation is the answer for an ordinary project, and most servers need
+nothing else: the build finds the endpoint and the entry point it writes registers
+it. The builder below is the same narrow case as the one under
+<<Configuration and profiles>> -- a server that writes its own `main` instead of
+using the generated one -- and it names its endpoints the same way it names its
+handlers, through a callback the runtime invokes while it starts.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
+----
+
+`run()` is what makes that a main: it binds, installs a shutdown handler that
+drains what's in flight, and blocks. `start()` exists for tests, which want the
+server back without a signal handler.
+
+There's no `server.websocket(path, endpoint)` to call once the server is running,
+and the absence is deliberate. Nothing else here is configured that way, and a
+setter on a running server has a window a callback can't: the listener is bound
+before the application gets its reference back, so an upgrade arriving in that gap
+finds a route that hasn't been added yet and is answered as ordinary HTTP.
+
+`HttpServer` takes the same callback, for the rare server built without the
+builder at all:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-raw,indent=0]
+----
+
+Only `onOpen`, `onText` and `onBinary` have to be written. `onPing`, `onPong`,
+`onClose` and `onError` have empty defaults, and a PING is answered with its PONG
+before the endpoint is told, so an endpoint that ignores them still keeps its
+connections alive.
+
+==== One endpoint, many connections
+
+An endpoint is created once for the route, not once per client, which is the same
+shape a `@RestController` has. Everything belonging to one client lives on the
+`WebSocketSession` the callbacks are handed, and `setAttachment` is where an
+endpoint puts its own per-connection state.
+
+Messages arrive whole. A client that splits a two megabyte upload into thirty-two
+frames produces one `onBinary`, and a text message is validated as UTF-8 before it
+is decoded, so a handler never sees a replacement character standing in for bytes
+the client didn't send. The array passed to `onBinary` is the session's own
+reassembly buffer and is valid only until that call returns -- the same contract
+`HttpServer.Request` carries, and for the same reason. An endpoint that keeps the
+bytes copies the range it wants.
+
+==== Sending from somewhere else
+
+A callback runs on the thread that owns its connection, and the server reads
+nothing more from that connection until it returns. An endpoint may therefore
+block, and a slow one slows down its own client and nobody else's.
+
+Sending is the other way round: a session may be written to from any thread, which
+is what makes a broadcast possible.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-broadcast,indent=0]
+----
+
+Each session serializes its own writers, so two threads can't interleave halves of
+two messages on one connection. What the server doesn't do is queue: `sendText`
+writes to the socket and blocks if the peer has stopped reading. That's honest
+back pressure rather than a buffer that grows until the machine runs out, but it
+means one unresponsive client can hold up a loop that broadcasts to every other
+one. A server with many clients and large messages should broadcast from a small
+pool rather than from the receiving thread.
+
+==== Subprotocols
+
+An endpoint that speaks more than one protocol lists them best first:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-subprotocol,indent=0]
+----
+
+The server's order decides, not the client's, so a client can't select a
+deprecated protocol over a current one by listing it first. When nothing matches,
+the handshake still succeeds and names no protocol, which is what the standard
+describes; `getSubprotocol` then answers null.
+
+==== A connection, not a request
+
+A WebSocket is a connection that stopped being HTTP, and the difference is
+something an author can feel.
+
+Under virtual threads -- the default on the packaged runtime -- each connection
+owns one, and a parked virtual thread costs a stack rather than an operating system
+thread. Ten thousand mostly silent connections is the workload that model was built
+for.
+
+On the thread pool it's a worker per connection for as long as the connection
+lasts. That's the mode the local development loop always runs in, because the JVM
+has no virtual threads here, and it's also the mode any TLS server runs in. A
+pooled deployment serving many WebSockets has to size `workers` for them, because
+unlike a request they don't give the worker back.
+
+That makes `workers` the ceiling on concurrent connections in pool mode, and going
+past it fails in a way worth knowing about: the process stays healthy, the listener
+stays bound, and new connections are simply refused, because no worker ever comes
+back to accept them. An eight-worker server driven by the conformance suite
+reached case 9.4.4 and refused everything after it. The server says so now --
+it logs once when WebSockets hold half the pool -- and the two ways out are more
+workers or a shorter `CN1_WS_IDLE_TIMEOUT_MS`, so abandoned connections give their
+worker back sooner. On virtual threads none of this applies.
+
+The idle timeout is separate for the same reason. `CN1_HTTP_TIMEOUT_MS` sheds a
+client that began a request and stopped; a WebSocket is idle by design and would
+be shed within seconds by that rule. `CN1_WS_IDLE_TIMEOUT_MS` governs these
+instead, defaults to five minutes, and accepts 0 for connections that may stay
+silent indefinitely. `CN1_WS_MAX_MESSAGE_MB` bounds reassembly, because a message
+is as large as the peer chooses to make it.
+
+`getMetrics()` reports `webSocketConnections`, and an open session doesn't count
+towards `activeRequests` -- it's a connection, and counting it would make an idle
+server read as permanently saturated.
+
+`stop()` sends every open connection a 1001 "going away" close before the drain
+window, so a shutdown reads as one to the client rather than as a network failure.
+
+==== How the frame layer is checked
+
+Most of RFC 6455 is about frames a conformant client never sends, which is how a
+server ends up wrong in ways nothing it talks to will reveal. The
+https://github.com/crossbario/autobahn-testsuite[Autobahn|Testsuite] is what finds
+those, and `vm/backend/ws-conformance.sh` runs it:
+
+----
+vm/backend/ws-conformance.sh --arm javase     # or --arm native
+----
+
+It needs Docker or Podman, starts an echo server, and drives ~300 cases through
+it. The gate has no per-case tolerance: every case must pass, and `NON-STRICT`
+counts as a failure, because a lenient frame parser is the thing this is looking
+for. The set of cases that ran also has to match a committed manifest, so the
+suite can't shrink unnoticed to the ones that happen to pass.
+
+Sections 12 and 13 are excluded while permessage-deflate is unimplemented. They're
+excluded rather than tolerated: accepting their result as a pass would also accept
+it for a case that used to work.

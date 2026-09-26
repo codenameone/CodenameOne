@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -234,6 +235,8 @@ final class BackendBeans {
         boolean primary;
         boolean lazy;
         boolean onMissing;
+        /// @ConditionalOnMissingBean's explicit types, empty for the default.
+        final List<String> missingTypes = new ArrayList<String>();
         /// Each entry is one @Profile's names, of which one must be active; every
         /// entry must hold. More than one only for a factory bean, which also
         /// carries its configuration class's @Profile.
@@ -517,13 +520,61 @@ final class BackendBeans {
         if (!chooseConstructor(bean)) {
             return null;
         }
-        for (FieldInfo f : cls.getFields()) {
+        // Superclasses first, as Spring injects and initializes them: a field an
+        // abstract base declares @Autowired is as much a dependency as one the
+        // bean declares, and AnnotatedClass lists only DECLARED members.
+        List<AnnotatedClass> chain = new ArrayList<AnnotatedClass>();
+        for (AnnotatedClass c = cls; c != null && chain.size() < 64; ) {
+            chain.add(c);
+            String sup = c.getSuperInternalName();
+            c = sup == null || "java/lang/Object".equals(sup) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, sup);
+        }
+        Set<String> fieldNames = new HashSet<String>();
+        for (int level = chain.size() - 1; level >= 0; level--) {
+            Set<String> overridden = new HashSet<String>();
+            Set<String> declaredBelow = new HashSet<String>();
+            for (int below = 0; below < level; below++) {
+                for (MethodInfo m : chain.get(below).getMethods()) {
+                    if (m.isConstructor()) {
+                        continue;
+                    }
+                    declaredBelow.add(m.getName() + m.getDescriptor());
+                    if (!m.isPrivate() && !m.isStatic()) {
+                        overridden.add(m.getName() + m.getDescriptor());
+                    }
+                }
+            }
+            members(bean, cls, chain.get(level), level > 0 && !concerns(chain.get(level)),
+                    overridden, declaredBelow, fieldNames);
+        }
+        AnnotationValues props = cls.getClassAnnotation(CONFIG_PROPERTIES);
+        if (props != null) {
+            bindProperties(bean, props, cls);
+        }
+        collectJobs(bean);
+        collectTools(bean);
+        collectManaged(bean);
+        return bean;
+    }
+
+    /// The injection points and lifecycle methods one class of a bean's
+    /// hierarchy declares.
+    ///
+    /// @param unwoven the class is not rewritten by this build, so nothing that
+    ///        needs a woven setter or bridge can be used from it
+    /// @param overridden methods a subclass redeclares, which are skipped here
+    /// @param declaredBelow every method a subclass declares, private ones too
+    private void members(Bean bean, AnnotatedClass cls, AnnotatedClass declaring,
+                         boolean unwoven, Set<String> overridden, Set<String> declaredBelow,
+                         Set<String> fieldNames) {
+        for (FieldInfo f : declaring.getFields()) {
             boolean autowired = f.getAnnotation(AUTOWIRED) != null;
             AnnotationValues value = f.getAnnotation(VALUE);
             if (!autowired && value == null) {
                 continue;
             }
-            String where = "field " + f.getName() + " of " + cls.getSourceName();
+            String where = "field " + f.getName() + " of " + declaring.getSourceName();
             if (f.isStatic()) {
                 ctx.error(cls, "The build injects instances, and " + where + " is static. "
                         + "Make it an instance field, or give the value to an instance.");
@@ -534,15 +585,48 @@ final class BackendBeans {
                         + "Take it as a constructor parameter, or drop the final.");
                 continue;
             }
+            if (!fieldNames.add(f.getName())) {
+                ctx.error(cls, where + " has the name of another injected field of "
+                        + cls.getSourceName() + "'s class hierarchy, and the build injects a "
+                        + "private field through a setter named after it. Rename one.");
+                continue;
+            }
+            if (unwoven) {
+                ctx.error(cls, cls.getSourceName() + " inherits " + where + ", which the build "
+                        + "cannot inject: its class is not compiled from this project's "
+                        + "sources. Take the dependency in " + cls.getSourceName()
+                        + " instead.");
+                continue;
+            }
             Point p = new Point(where, Type.getType(f.getDescriptor()), f.getSignature());
             readPoint(p, f.getAnnotations());
             bean.fields.put(f, p);
         }
-        for (MethodInfo m : cls.getMethods()) {
-            if (m.isConstructor()) {
+        for (MethodInfo m : declaring.getMethods()) {
+            if (m.isConstructor() || overridden.contains(m.getName() + m.getDescriptor())) {
+                // An overriding method is the one that runs, and it carries its
+                // own annotations or none, as in Spring.
                 continue;
             }
-            String where = cls.getSourceName() + "." + m.getName();
+            if (m.isPrivate() && callsFromWiring(m)
+                    && declaredBelow.contains(m.getName() + m.getDescriptor())) {
+                // Both classes get a public bridge of the same signature, and the
+                // subclass's would override the base's -- running its own method
+                // twice and the base's never.
+                ctx.error(cls, declaring.getSourceName() + "." + m.getName() + " is private and "
+                        + "a subclass in " + cls.getSourceName() + "'s hierarchy declares a "
+                        + "method of the same signature, so the build cannot call both. "
+                        + "Rename one.");
+                continue;
+            }
+            if (unwoven && !m.isPublic() && callsFromWiring(m)) {
+                ctx.error(cls, cls.getSourceName() + " inherits " + declaring.getSourceName()
+                        + "." + m.getName() + ", which is not public and so needs a bridge "
+                        + "the build can only add to a class compiled from this project's "
+                        + "sources. Make it public.");
+                continue;
+            }
+            String where = declaring.getSourceName() + "." + m.getName();
             if (m.getAnnotation(AUTOWIRED) != null) {
                 if (m.isStatic()) {
                     ctx.error(cls, "@Autowired method " + where + " is static; the build "
@@ -560,21 +644,14 @@ final class BackendBeans {
                 }
                 bean.setters.add(call);
             }
-            if (m.getAnnotation(POST_CONSTRUCT) != null && lifecycle(cls, m, "@PostConstruct")) {
+            if (m.getAnnotation(POST_CONSTRUCT) != null
+                    && lifecycle(declaring, m, "@PostConstruct")) {
                 bean.postConstruct.add(m);
             }
-            if (m.getAnnotation(PRE_DESTROY) != null && lifecycle(cls, m, "@PreDestroy")) {
+            if (m.getAnnotation(PRE_DESTROY) != null && lifecycle(declaring, m, "@PreDestroy")) {
                 bean.preDestroy.add(m);
             }
         }
-        AnnotationValues props = cls.getClassAnnotation(CONFIG_PROPERTIES);
-        if (props != null) {
-            bindProperties(bean, props, cls);
-        }
-        collectJobs(bean);
-        collectTools(bean);
-        collectManaged(bean);
-        return bean;
     }
 
     private boolean lifecycle(AnnotatedClass cls, MethodInfo m, String what) {
@@ -627,7 +704,15 @@ final class BackendBeans {
             // A request, session or prototype bean is already built on demand.
             bean.lazy = false;
         }
-        bean.onMissing = annotations.get(ON_MISSING) != null;
+        AnnotationValues missing = annotations.get(ON_MISSING);
+        bean.onMissing = missing != null;
+        if (missing != null && missing.get("value") instanceof List) {
+            for (Object o : (List<?>) missing.get("value")) {
+                if (o instanceof Type) {
+                    bean.missingTypes.add(((Type) o).getInternalName());
+                }
+            }
+        }
         AnnotationValues profile = annotations.get(PROFILE);
         if (profile != null) {
             List<String> values = strings(profile.get("value"));
@@ -863,8 +948,19 @@ final class BackendBeans {
             if (!b.onMissing) {
                 continue;
             }
+            List<String> wanted = stepAsideTypes(b);
             for (Bean other : beans) {
-                if (other != b && !other.onMissing && other.types.contains(b.type)) {
+                if (other == b || other.onMissing) {
+                    continue;
+                }
+                boolean replaces = false;
+                for (String t : wanted) {
+                    if (other.types.contains(t)) {
+                        replaces = true;
+                        break;
+                    }
+                }
+                if (replaces) {
                     drop.add(b);
                     break;
                 }
@@ -875,6 +971,29 @@ final class BackendBeans {
             byName.remove(b.name);
             ctx.getLog().info("cn1: " + b.describe() + " steps aside: another bean has its type");
         }
+    }
+
+    /// The types another bean must have for a @ConditionalOnMissingBean one to
+    /// step aside. By default every type it is injected as except the JDK's --
+    /// the concrete class alone would never match the application's own
+    /// implementation of the interface the default provides, leaving both and
+    /// an ambiguous injection -- and java.* and javax.* types are left out so a
+    /// default that happens to be Closeable does not yield to every Closeable.
+    private static List<String> stepAsideTypes(Bean b) {
+        if (!b.missingTypes.isEmpty()) {
+            return b.missingTypes;
+        }
+        List<String> out = new ArrayList<String>();
+        for (String t : b.types) {
+            if (!t.startsWith("java/") && !t.startsWith("javax/")) {
+                out.add(t);
+            }
+        }
+        if (out.isEmpty()) {
+            // A JDK type returned by a @Bean method: its own type is all it has.
+            out.add(b.type);
+        }
+        return out;
     }
 
     /// Where the entry point goes: the first controller's package, as it always

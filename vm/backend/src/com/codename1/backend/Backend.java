@@ -88,12 +88,19 @@ public final class Backend {
     private final Application application;
     /** The metrics exporter this server started, or null. */
     private final com.codename1.backend.metrics.MetricReader metricReader;
+    /** This server's managed beans; see {@link #getManagedBeans}. */
+    private final List managedBeans;
+    /** This server's session settings and store. */
+    private final Sessions sessions;
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
                     Config config, int shutdownMillis, Tracer ownTracer,
                     Application application,
-                    com.codename1.backend.metrics.MetricReader metricReader) {
+                    com.codename1.backend.metrics.MetricReader metricReader,
+                    List managedBeans, Sessions sessions) {
         this.metricReader = metricReader;
+        this.managedBeans = managedBeans;
+        this.sessions = sessions;
         this.server = server;
         this.dataSource = dataSource;
         this.entities = entities;
@@ -138,6 +145,20 @@ public final class Backend {
         return application;
     }
 
+    /**
+     * The managed beans THIS server registered, as a copy. Per server rather than
+     * per process: a second server in the same process -- or this one started
+     * again -- must not list or invoke the beans of one that has stopped.
+     */
+    public List getManagedBeans() {
+        return new ArrayList(managedBeans);
+    }
+
+    /** This server's sessions: their settings and the store they are kept in. */
+    public Sessions getSessions() {
+        return sessions;
+    }
+
     /** Blocks until the server stops. */
     public void awaitTermination() {
         server.awaitTermination();
@@ -151,6 +172,40 @@ public final class Backend {
      * served with it.
      */
     public void stop() {
+        // Once: a program that calls stop() and a signal hook that calls it
+        // again would otherwise run every @PreDestroy and destroyMethod twice,
+        // closing resources twice or repeating a shutdown write. A second caller
+        // waits for the first to finish rather than returning while the server
+        // is still draining.
+        synchronized(this) {
+            while(stopping) {
+                try {
+                    wait();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            if(stopped) {
+                return;
+            }
+            stopping = true;
+        }
+        try {
+            stopOnce();
+        } finally {
+            synchronized(this) {
+                stopping = false;
+                stopped = true;
+                notifyAll();
+            }
+        }
+    }
+
+    private boolean stopping;
+    private boolean stopped;
+
+    private void stopOnce() {
         // Scheduled jobs first, so none starts while the server drains; the
         // jobs already running are waited for with the requests.
         if(application != null) {
@@ -166,7 +221,9 @@ public final class Backend {
         Tasks.shutdown(shutdownMillis);
         // @PreDestroy after the drain, so no request is still using a bean it
         // tears down, and before the pool closes, so a bean can still flush to
-        // the database on its way out.
+        // the database on its way out. Session beans first: they may use the
+        // singletons, never the other way round.
+        sessions.close();
         if(application != null) {
             try {
                 application.stopped();
@@ -277,6 +334,13 @@ public final class Backend {
          */
         void requestEnded(Object[] beans);
 
+        /**
+         * A session has ended -- invalidated, expired, or the server stopped;
+         * {@code beans} are its {@code @SessionScope} beans, whose destroy
+         * methods run here.
+         */
+        void sessionEnded(Object[] beans);
+
         /** The scheduler running this application's {@code @Scheduled} jobs, or null. */
         Scheduler getScheduler();
 
@@ -308,10 +372,38 @@ public final class Backend {
         private final DataSource dataSource;
         private final EntityManager entities;
 
-        Environment(Config config, DataSource dataSource, EntityManager entities) {
+        private final List tools;
+        private final List managed;
+
+        Environment(Config config, DataSource dataSource, EntityManager entities,
+                    List tools, List managed) {
             this.config = config;
             this.dataSource = dataSource;
             this.entities = entities;
+            this.tools = tools;
+            this.managed = managed;
+        }
+
+        /**
+         * Publishes an {@code @McpTool} on this server's MCP endpoint. Generated
+         * code calls this while it builds the beans; the tool belongs to this
+         * server only, so a server started later in the same process does not
+         * serve a tool bound to a bean that has been destroyed.
+         */
+        public void registerTool(com.codename1.backend.mcp.McpTool tool) {
+            tools.add(tool);
+        }
+
+        /** Registers a managed bean with this server. Generated code calls this. */
+        public void registerManaged(ManagedBean bean) {
+            for(int iter = 0 ; iter < managed.size() ; iter++) {
+                if(((ManagedBean)managed.get(iter)).getObjectName()
+                        .equals(bean.getObjectName())) {
+                    managed.set(iter, bean);
+                    return;
+                }
+            }
+            managed.add(bean);
         }
 
         public Config getConfig() {
@@ -364,6 +456,9 @@ public final class Backend {
         private StaticFiles staticFiles;
         private WebSocketEndpoints webSocketEndpoints;
         private boolean createTables;
+        private final List mcpTools = new ArrayList();
+        /** The application a start in progress has begun building, until a Backend owns it. */
+        private Application createdApplication;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
@@ -599,6 +694,18 @@ public final class Backend {
             return this;
         }
 
+        /**
+         * Adds a tool of the program's own to the MCP endpoint, beside the
+         * {@code @McpTool} methods the build found. Needs {@link #mcp}.
+         */
+        public Builder mcpTool(com.codename1.backend.mcp.McpTool tool) {
+            if(tool == null) {
+                throw new IllegalArgumentException("No tool");
+            }
+            mcpTools.add(tool);
+            return this;
+        }
+
         /** The name this server reports itself as, to MCP clients. */
         public Builder serviceName(String name) {
             this.serviceName = name;
@@ -660,6 +767,18 @@ public final class Backend {
                 // same as whether anything was configured: .dataSource(url)
                 // makes the builder open one, and reading dataSourceGiven here
                 // left exactly that case leaking on a failed start.
+                Application built = createdApplication;
+                createdApplication = null;
+                if(built != null) {
+                    // Before the pool closes, as Backend.stop() orders it, so a
+                    // bean can still flush to the database on its way out.
+                    try {
+                        built.stopped();
+                    } catch (RuntimeException destroyErr) {
+                        System.err.println("Destroying the application's beans failed: "
+                                + destroyErr);
+                    }
+                }
                 if(pool != null && dataSource == null) {
                     pool.close();
                 }
@@ -682,15 +801,24 @@ public final class Backend {
             // a catch-all controller route must not answer a health check.
             Management management = Management.fromConfig(config);
             if(management != null) {
-                routers.add(management);
+                // At the front, not appended: the handlers above are already in
+                // the list, and a catch-all one would otherwise answer
+                // /manage/health or a managed operation's path first.
+                routers.add(relay != null ? 1 : 0, management);
             }
-            // The pool a @Transactional method uses before it has asked for one
-            // by name -- a savepoint, or the transaction's session.
-            Transactions.setDefaultDataSource(pool);
             Tasks.configure(config);
+            // From here until a Backend owns it, a failed start must still run
+            // the destroy callbacks of the beans create() built -- including a
+            // create() that fails partway -- or a caller that retries leaks
+            // whatever their constructors and @PostConstruct opened.
+            createdApplication = application;
+            // Fresh for every start, so a builder started twice does not carry
+            // the first server's beans into the second.
+            List tools = new ArrayList(mcpTools);
+            List managedBeans = new ArrayList();
             if(application != null) {
                 HttpServer.Handler[] built = application.create(
-                        new Environment(config, pool, manager));
+                        new Environment(config, pool, manager, tools, managedBeans));
                 if(built != null) {
                     for(int iter = 0 ; iter < built.length ; iter++) {
                         if(built[iter] != null) {
@@ -704,7 +832,7 @@ public final class Backend {
             // depends on them.
             com.codename1.backend.mcp.McpServer mcpServer = mcp
                     ? com.codename1.backend.mcp.McpServer.fromConfig(config, mcpDevTools,
-                            serviceName) : null;
+                            serviceName, tools) : null;
             if(mcpServer != null) {
                 routers.add(0, mcpServer);
             }
@@ -815,9 +943,9 @@ public final class Backend {
             // context exists to leak there. This is a packaged-runtime path.
             boolean ownsContext = context != null && tls == null;
             HttpServer server;
-            if(application != null) {
-                Sessions.configure(config, context != null, pool);
-            }
+            final Sessions sessions = application != null
+                    ? Sessions.configure(config, context != null, pool, application)
+                    : new Sessions();
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
@@ -828,6 +956,11 @@ public final class Backend {
                                 long started = com.codename1.backend.metrics.Metrics
                                         .requestStarted();
                                 Object previous = null;
+                                // This server's sessions, not a process-wide set:
+                                // cookies are not scoped by port, so a client of
+                                // two servers on one host would otherwise present
+                                // one's session to the other and be let in.
+                                request.sessions = sessions;
                                 if(track) {
                                     previous = CURRENT_REQUEST.get();
                                     CURRENT_REQUEST.set(request);
@@ -846,18 +979,23 @@ public final class Backend {
                                                 break;
                                             }
                                         }
+                                        // Inside the logged region: a session
+                                        // store that fails to save is a 500 the
+                                        // client receives, and the request log
+                                        // must say so rather than record the
+                                        // handler's own status.
+                                        HttpSession session = request.resolvedSession();
+                                        if(session != null) {
+                                            response = sessions.finish(session, response);
+                                        }
                                     } catch (Exception err) {
                                         RequestLog.record(request, 500, startedMillis, err);
                                         throw err;
                                     }
-                                    RequestLog.record(request, response == null ? 404
-                                            : response.getStatus(), startedMillis, null);
                                     // Null is a 404 from here, which is what a
                                     // router answers for a path it does not route.
-                                    HttpSession session = request.resolvedSession();
-                                    if(session != null) {
-                                        response = Sessions.finish(session, response);
-                                    }
+                                    RequestLog.record(request, response == null ? 404
+                                            : response.getStatus(), startedMillis, null);
                                     status = response == null ? 404 : response.getStatus();
                                     return response;
                                 } finally {
@@ -918,7 +1056,10 @@ public final class Backend {
             }
             Backend backend = new Backend(server, pool, manager, config, drain,
                     tracing ? tracer : null, application,
-                    metricReader != null && measuring ? metricReader : null);
+                    metricReader != null && measuring ? metricReader : null,
+                    managedBeans, sessions);
+            // Backend.stop() tears the beans down from here on.
+            createdApplication = null;
             if(management != null) {
                 management.attach(backend);
             }

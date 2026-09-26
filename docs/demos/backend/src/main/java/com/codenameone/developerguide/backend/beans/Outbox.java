@@ -23,45 +23,41 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.PostConstruct;
-import com.codename1.backend.annotations.Service;
-import com.codename1.backend.annotations.Transactional;
+import com.codename1.backend.annotations.PreDestroy;
+import com.codename1.backend.annotations.Repository;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-// tag::backend-bean-service[]
-@Service
-public class Signups {
+// tag::backend-bean-lifecycle[]
+@Repository
+public class Outbox {
     private final DataSource db;
+    private final List<String> pending = new ArrayList<String>();
 
-    @Autowired
-    private Mailer mailer;
-
-    public Signups(DataSource db) {
+    public Outbox(DataSource db) {
         this.db = db;
     }
 
     @PostConstruct
     void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
+        // Every dependency is built, injected and initialized by now.
+        db.execute("CREATE TABLE IF NOT EXISTS outbox (message VARCHAR(500))", null);
     }
-// end::backend-bean-service[]
 
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
+    public synchronized void add(String message) {
+        pending.add(message);
     }
-// end::backend-transactional[]
 
-    @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    @PreDestroy
+    synchronized void flush() throws IOException {
+        // After the last request has finished, before the pool closes.
+        for (String message : pending) {
+            db.execute("INSERT INTO outbox (message) VALUES (?)", new Object[] {message});
+        }
+        pending.clear();
     }
 }
+// end::backend-bean-lifecycle[]

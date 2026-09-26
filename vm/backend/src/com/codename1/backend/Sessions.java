@@ -24,6 +24,7 @@ package com.codename1.backend;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,41 +49,73 @@ import com.codename1.backend.sql.Dialect;
  * calls it costs one field check when it ends.
  */
 public final class Sessions {
-    private static String cookieName = "CN1SESSION";
-    private static int timeoutSeconds = 1800;
-    private static String sameSite = "Lax";
-    private static boolean secure;
-    private static SessionStore store = new Memory();
-    private static long lastPurge;
+    private String cookieName = "CN1SESSION";
+    private int timeoutSeconds = 1800;
+    private String sameSite = "Lax";
+    private boolean secure;
+    private SessionStore store = new Memory();
+    private long lastPurge;
     private static final long PURGE_INTERVAL = 60000L;
+    /** Runs the destroy methods of @SessionScope beans; null without an application. */
+    private final Backend.Application application;
+    /**
+     * The @SessionScope beans of every session that has any, by session id.
+     * Kept here rather than trusted to the store: a database store hands back a
+     * NEW HttpSession on every request, so beans living only on that object
+     * would be built again per request and never destroyed.
+     */
+    private final Map beans = new HashMap();
+    private boolean closed;
 
-    private Sessions() {
+    /**
+     * Default settings and an in-memory store, for a server with no generated
+     * application.
+     */
+    public Sessions() {
+        this(null);
+    }
+
+    Sessions(Backend.Application application) {
+        this.application = application;
     }
 
     /**
-     * Reads {@code cn1.session.*}. Called by the server when it starts.
+     * Reads {@code cn1.session.*} into a server's session settings. Called by the
+     * server when it starts; every server has its own, because cookies are not
+     * scoped by port and a client of two servers on one host would otherwise
+     * present one server's session to the other.
      *
      * @param tls whether the server terminates TLS, for {@code secure=auto}
      * @param pool the database, for {@code store=jdbc}
+     * @param application destroys the session-scoped beans, or null
      */
-    public static synchronized void configure(Config config, boolean tls, DataSource pool)
-            throws IOException {
-        cookieName = config.get("cn1.session.cookie", "CN1SESSION");
-        timeoutSeconds = config.getInt("cn1.session.timeout", 1800);
+    public static Sessions configure(Config config, boolean tls, DataSource pool,
+                                     Backend.Application application) throws IOException {
+        Sessions out = new Sessions(application);
+        out.cookieName = config.get("cn1.session.cookie", "CN1SESSION");
+        out.timeoutSeconds = config.getInt("cn1.session.timeout", 1800);
+        if(out.timeoutSeconds < 0) {
+            // Zero is the documented "never"; a negative one is a typo that
+            // isExpired() would also read as never, silently making every
+            // sign-in permanent.
+            throw new IOException("cn1.session.timeout is " + out.timeoutSeconds
+                    + "; it must be a number of seconds, or 0 for sessions that never "
+                    + "expire");
+        }
         String site = config.get("cn1.session.same-site", "Lax");
         if(!"Lax".equalsIgnoreCase(site) && !"Strict".equalsIgnoreCase(site)
                 && !"None".equalsIgnoreCase(site)) {
             throw new IOException("cn1.session.same-site is \"" + site
                     + "\"; it must be Lax, Strict or None");
         }
-        sameSite = site;
+        out.sameSite = site;
         String secureSetting = config.get("cn1.session.secure", "auto").trim();
         if("auto".equalsIgnoreCase(secureSetting)) {
-            secure = tls;
+            out.secure = tls;
         } else if("true".equalsIgnoreCase(secureSetting)) {
-            secure = true;
+            out.secure = true;
         } else if("false".equalsIgnoreCase(secureSetting)) {
-            secure = false;
+            out.secure = false;
         } else {
             // Refused rather than read as false: a typo such as "tru" would
             // otherwise start a TLS server whose session cookies a browser also
@@ -90,7 +123,7 @@ public final class Sessions {
             throw new IOException("cn1.session.secure is \"" + secureSetting
                     + "\"; it must be auto, true or false");
         }
-        if("None".equalsIgnoreCase(sameSite) && !secure) {
+        if("None".equalsIgnoreCase(out.sameSite) && !out.secure) {
             // Browsers drop a SameSite=None cookie that is not Secure, so the
             // session would silently never come back.
             throw new IOException("cn1.session.same-site=None needs a Secure cookie; "
@@ -102,19 +135,29 @@ public final class Sessions {
                 throw new IOException("cn1.session.store=jdbc needs a database, and this "
                         + "server has none");
             }
-            store = new Jdbc(pool);
-        } else if("memory".equalsIgnoreCase(kind)) {
-            if(!(store instanceof Memory)) {
-                store = new Memory();
-            }
-        } else {
+            out.store = new Jdbc(pool);
+        } else if(!"memory".equalsIgnoreCase(kind)) {
             throw new IOException("cn1.session.store is \"" + kind
                     + "\"; it must be memory or jdbc");
         }
+        return out;
+    }
+
+    private static Sessions standalone;
+
+    /**
+     * The sessions of a bare HttpServer that no Backend started, which has no
+     * per-server settings to read. A Backend always hands its requests its own.
+     */
+    static synchronized Sessions standalone() {
+        if(standalone == null) {
+            standalone = new Sessions();
+        }
+        return standalone;
     }
 
     /** Replaces the store, for one of the application's own. */
-    public static synchronized void setStore(SessionStore replacement) {
+    public synchronized void setStore(SessionStore replacement) {
         if(replacement == null) {
             throw new IllegalArgumentException("No store");
         }
@@ -122,12 +165,12 @@ public final class Sessions {
     }
 
     /** The store sessions are kept in. */
-    public static synchronized SessionStore getStore() {
+    public synchronized SessionStore getStore() {
         return store;
     }
 
     /** The name of the session cookie. */
-    public static synchronized String getCookieName() {
+    public synchronized String getCookieName() {
         return cookieName;
     }
 
@@ -147,10 +190,10 @@ public final class Sessions {
      * The request's session, creating one when {@code create} is set. What
      * {@code Request.getSession} calls.
      */
-    static HttpSession find(String cookieValue, boolean create) throws IOException {
+    HttpSession find(String cookieValue, boolean create) throws IOException {
         SessionStore s;
         int timeout;
-        synchronized(Sessions.class) {
+        synchronized(this) {
             s = store;
             timeout = timeoutSeconds;
         }
@@ -160,10 +203,18 @@ public final class Sessions {
             HttpSession found = s.load(cookieValue);
             if(found != null && found.isValid() && !found.isExpired(now)) {
                 found.touch(now);
+                Held held;
+                synchronized(this) {
+                    held = (Held)beans.get(cookieValue);
+                }
+                if(held != null) {
+                    found.attachBeans(held.beans);
+                }
                 return found;
             }
             if(found != null) {
                 s.delete(cookieValue);
+                destroy(take(cookieValue), found.beansOrNull());
             }
         }
         if(!create) {
@@ -174,12 +225,30 @@ public final class Sessions {
         return created;
     }
 
-    private static void purgeIfDue(SessionStore s, long now) {
-        synchronized(Sessions.class) {
+    private void purgeIfDue(SessionStore s, long now) {
+        List expired = null;
+        synchronized(this) {
             if(now - lastPurge < PURGE_INTERVAL) {
                 return;
             }
             lastPurge = now;
+            Iterator it = beans.values().iterator();
+            while(it.hasNext()) {
+                Held h = (Held)it.next();
+                if(h.maxInactiveSeconds > 0
+                        && now - h.lastAccessed > h.maxInactiveSeconds * 1000L) {
+                    it.remove();
+                    if(expired == null) {
+                        expired = new ArrayList();
+                    }
+                    expired.add(h.beans);
+                }
+            }
+        }
+        if(expired != null) {
+            for(int iter = 0 ; iter < expired.size() ; iter++) {
+                destroy((Object[])expired.get(iter), null);
+            }
         }
         try {
             s.purgeExpired(now);
@@ -192,7 +261,7 @@ public final class Sessions {
      * Stores what the request did to its session and adds the cookie the client
      * needs. Called by the server after the handler returns.
      */
-    static HttpServer.Response finish(HttpSession session, HttpServer.Response response)
+    HttpServer.Response finish(HttpSession session, HttpServer.Response response)
             throws IOException {
         if(session == null) {
             return response;
@@ -202,19 +271,27 @@ public final class Sessions {
         String previous = session.previousId();
         if(!session.isValid()) {
             s.delete(session.getId());
+            Object[] kept = take(session.getId());
             if(previous != null) {
                 s.delete(previous);
+                destroy(take(previous), null);
             }
+            // The beans end with the session, not with whatever next finds it gone.
+            destroy(kept, session.beansOrNull());
+            session.attachBeans(null);
             cookie = cookie("", 0);
-        } else if(session.isDirty()) {
-            boolean announce = session.isNew() || previous != null;
-            s.save(session, previous);
-            if(announce) {
-                cookie = cookie(session.getId(), -1);
+        } else {
+            if(session.isDirty()) {
+                boolean announce = session.isNew() || previous != null;
+                s.save(session, previous);
+                if(announce) {
+                    cookie = cookie(session.getId(), -1);
+                }
+                session.clean();
+            } else if(s instanceof Jdbc) {
+                ((Jdbc)s).touchIfStale(session);
             }
-            session.clean();
-        } else if(s instanceof Jdbc) {
-            ((Jdbc)s).touchIfStale(session);
+            keep(session, previous);
         }
         if(cookie == null || response == null) {
             return response;
@@ -222,7 +299,84 @@ public final class Sessions {
         return withHeader(response, "Set-Cookie", cookie);
     }
 
-    private static synchronized String cookie(String value, int maxAge) {
+    /** Records the session's beans under its current id, after a request used it. */
+    private void keep(HttpSession session, String previousId) {
+        Object[] live = session.beansOrNull();
+        synchronized(this) {
+            Held held = previousId == null ? null : (Held)beans.remove(previousId);
+            if(live == null && held == null) {
+                held = (Held)beans.get(session.getId());
+                if(held == null) {
+                    return;
+                }
+            }
+            if(held == null) {
+                held = (Held)beans.get(session.getId());
+            }
+            if(held == null) {
+                held = new Held();
+            }
+            if(live != null) {
+                held.beans = live;
+            }
+            held.lastAccessed = session.getLastAccessedTime();
+            held.maxInactiveSeconds = session.getMaxInactiveInterval();
+            if(closed) {
+                // The server stopped while this request was in flight; nothing
+                // will destroy what is kept after close().
+                beans.remove(session.getId());
+            } else {
+                beans.put(session.getId(), held);
+                return;
+            }
+        }
+        destroy(live, null);
+    }
+
+    private synchronized Object[] take(String id) {
+        Held held = (Held)beans.remove(id);
+        return held == null ? null : held.beans;
+    }
+
+    /** Runs the destroy methods of one session's beans; the second array may repeat the first. */
+    private void destroy(Object[] first, Object[] second) {
+        if(application == null) {
+            return;
+        }
+        if(first != null) {
+            ended(first);
+        }
+        if(second != null && second != first) {
+            ended(second);
+        }
+    }
+
+    private void ended(Object[] sessionBeans) {
+        try {
+            application.sessionEnded(sessionBeans);
+        } catch (Throwable err) {
+            System.err.println("Destroying a session's beans failed: " + err);
+        }
+    }
+
+    /**
+     * Destroys the beans of every session still open. Called when the server
+     * stops, after its requests have drained, as Spring closes its session
+     * scope with the context.
+     */
+    void close() {
+        List all;
+        synchronized(this) {
+            closed = true;
+            all = new ArrayList(beans.values());
+            beans.clear();
+        }
+        for(int iter = 0 ; iter < all.size() ; iter++) {
+            destroy(((Held)all.get(iter)).beans, null);
+        }
+    }
+
+    private synchronized String cookie(String value, int maxAge) {
         StringBuilder sb = new StringBuilder(cookieName).append('=').append(value)
                 .append("; Path=/; HttpOnly; SameSite=").append(sameSite);
         if(secure) {
@@ -232,6 +386,13 @@ public final class Sessions {
             sb.append("; Max-Age=").append(maxAge);
         }
         return sb.toString();
+    }
+
+    /** One session's beans and when it was last used, for expiring them. */
+    private static final class Held {
+        Object[] beans;
+        long lastAccessed;
+        int maxInactiveSeconds;
     }
 
     /**

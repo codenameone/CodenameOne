@@ -51,9 +51,10 @@ import java.util.Map;
  * numbers, booleans, and maps and lists of those -- because it has to read them
  * back in another process.
  *
- * <p>A {@code @SessionScope} bean lives on the session object itself and is
- * never written to a store, so a session read back from the database store
- * starts with a fresh one.
+ * <p>A {@code @SessionScope} bean is never written to a store: the server that
+ * built it keeps it in memory for as long as the session lives, and runs its
+ * destroy methods when the session is invalidated, expires or the server stops.
+ * Another instance behind a load balancer builds its own.
  */
 public final class HttpSession {
     private String id;
@@ -137,7 +138,8 @@ public final class HttpSession {
         checkValid();
         invalid = true;
         attributes.clear();
-        beans = null;
+        // The @SessionScope beans stay until the request ends, when the server
+        // runs their destroy methods; dropping them here would skip those.
         dirty = true;
     }
 
@@ -210,6 +212,20 @@ public final class HttpSession {
         attributes.clear();
         if(values != null) {
             attributes.putAll(values);
+        }
+    }
+
+    /** The session-scoped beans this object holds, or null. */
+    synchronized Object[] beansOrNull() {
+        return beans;
+    }
+
+    /** Hands this object the beans the server kept for its session, unless it has its own. */
+    synchronized void attachBeans(Object[] kept) {
+        if(kept == null) {
+            beans = null;
+        } else if(beans == null) {
+            beans = kept;
         }
     }
 

@@ -22,46 +22,34 @@
  */
 package com.codenameone.developerguide.backend.beans;
 
-import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
+import com.codename1.orm.session.Session;
+import com.codenameone.developerguide.backend.Reminder;
 
-import java.io.IOException;
+import java.util.Date;
 
-// tag::backend-bean-service[]
+// tag::backend-tx-session[]
 @Service
-public class Signups {
-    private final DataSource db;
+public class ReminderService {
+    private final Session session;      // the current transaction's session
 
-    @Autowired
-    private Mailer mailer;
-
-    public Signups(DataSource db) {
-        this.db = db;
+    public ReminderService(Session session) {
+        this.session = session;
     }
 
-    @PostConstruct
-    void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
+    @Transactional
+    public long remind(String title) {
+        Reminder reminder = new Reminder();
+        reminder.title = title;
+        reminder.due = new Date();
+        session.persist(reminder);      // written by the time the transaction commits
+        return reminder.id;
     }
-// end::backend-bean-service[]
-
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
-    }
-// end::backend-transactional[]
 
     @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    public Reminder find(long id) {
+        return session.find(Reminder.class, Long.valueOf(id));
     }
 }
+// end::backend-tx-session[]

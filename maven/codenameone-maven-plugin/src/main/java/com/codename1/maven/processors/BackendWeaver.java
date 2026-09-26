@@ -164,13 +164,19 @@ final class BackendWeaver {
                 // The body, renamed and package-private, without annotations: it is
                 // an implementation detail, and a second copy of @GetMapping or
                 // @Scheduled would be read as a second declaration.
+                //
+                // `synchronized` moves WITH the body, off the stub. The monitor
+                // guards the code its author wrote, so it has to be held where
+                // that code runs: an @Async body runs on an executor thread, and a
+                // lock the stub took only while enqueueing let two workers run
+                // the body at once. On the body it also matches Spring for
+                // @Transactional, whose transaction wraps the synchronized call.
                 int bodyAccess = access & ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED
-                        | Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNCHRONIZED
-                        | Opcodes.ACC_VARARGS | Opcodes.ACC_FINAL);
+                        | Opcodes.ACC_PRIVATE | Opcodes.ACC_VARARGS | Opcodes.ACC_FINAL);
                 MethodVisitor body = writer.visitMethod(bodyAccess, name + BODY_SUFFIX,
                         descriptor, signature, exceptions);
-                MethodVisitor stub = writer.visitMethod(access, name, descriptor, signature,
-                        exceptions);
+                MethodVisitor stub = writer.visitMethod(access & ~Opcodes.ACC_SYNCHRONIZED,
+                        name, descriptor, signature, exceptions);
                 return new AspectSplitter(body, stub, owner, plan.helperInternalName, access,
                         name, descriptor);
             }

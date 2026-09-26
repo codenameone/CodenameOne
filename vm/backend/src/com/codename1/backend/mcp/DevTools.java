@@ -69,7 +69,7 @@ public final class DevTools implements McpServer.Extension {
         this.backend = running;
         RequestLog.enable(200);
         DevConsole.install();
-        McpServer.register(new Tool("backend_routes",
+        server.register(new Tool("backend_routes",
                 "Lists every HTTP route of the running backend: method, path and the "
                 + "controller method that serves it. Use it to learn the API before "
                 + "calling it with backend_call.", schema()) {
@@ -78,7 +78,7 @@ public final class DevTools implements McpServer.Extension {
                         : application().describeRoutes();
             }
         });
-        McpServer.register(new Tool("backend_beans",
+        server.register(new Tool("backend_beans",
                 "Lists every bean the build wired: its name, type, scope and the beans "
                 + "injected into it. Use it to check dependency injection did what the "
                 + "code intends.", schema()) {
@@ -87,14 +87,14 @@ public final class DevTools implements McpServer.Extension {
                         : application().describeBeans();
             }
         });
-        McpServer.register(new Tool("backend_config",
+        server.register(new Tool("backend_config",
                 "Shows the active profile and every configured key, with values that "
                 + "look secret masked.", schema()) {
             Object run(Map a) throws Exception {
                 return config();
             }
         });
-        McpServer.register(new Tool("backend_call",
+        server.register(new Tool("backend_call",
                 "Sends an HTTP request to the running backend and returns the status, "
                 + "headers and body. Use it to exercise an endpoint after changing it.",
                 schema(new String[] {"method", "string", "GET, POST, PUT, PATCH or DELETE",
@@ -106,7 +106,7 @@ public final class DevTools implements McpServer.Extension {
                 return call(a);
             }
         });
-        McpServer.register(new Tool("backend_requests",
+        server.register(new Tool("backend_requests",
                 "The last requests the backend served, newest first, with status, time "
                 + "and any exception a handler threw. Set failuresOnly to see what broke.",
                 schema(new String[] {"limit", "integer", "How many, default 20",
@@ -115,7 +115,7 @@ public final class DevTools implements McpServer.Extension {
                 return RequestLog.recent(intArg(a, "limit", 20), boolArg(a, "failuresOnly"));
             }
         });
-        McpServer.register(new Tool("backend_logs",
+        server.register(new Tool("backend_logs",
                 "The last lines the backend printed to its console, oldest first.",
                 schema(new String[] {"limit", "integer", "How many lines, default 100"},
                         null)) {
@@ -127,7 +127,7 @@ public final class DevTools implements McpServer.Extension {
                 return DevConsole.recent(intArg(a, "limit", 100));
             }
         });
-        McpServer.register(new Tool("backend_sql",
+        server.register(new Tool("backend_sql",
                 "Runs SQL against the backend's database and returns the rows. Only "
                 + "SELECT-like statements run unless write is true. Use ? placeholders "
                 + "with params; the same SQL works on SQLite, PostgreSQL and MySQL.",
@@ -139,14 +139,14 @@ public final class DevTools implements McpServer.Extension {
                 return sql(a);
             }
         });
-        McpServer.register(new Tool("backend_schema",
+        server.register(new Tool("backend_schema",
                 "Lists the entities the build generated persistence for, with their "
                 + "tables and columns.", schema()) {
             Object run(Map a) {
                 return schemaOf();
             }
         });
-        McpServer.register(new Tool("backend_jobs",
+        server.register(new Tool("backend_jobs",
                 "Lists the scheduled jobs: schedule, runs, failures, last and next run.",
                 schema()) {
             Object run(Map a) {
@@ -154,7 +154,7 @@ public final class DevTools implements McpServer.Extension {
                 return s == null ? new ArrayList() : s.describe();
             }
         });
-        McpServer.register(new Tool("backend_run_job",
+        server.register(new Tool("backend_run_job",
                 "Runs a scheduled job now, whatever its schedule says.",
                 schema(new String[] {"name", "string", "The job's name from backend_jobs"},
                         new String[] {"name"})) {
@@ -167,7 +167,7 @@ public final class DevTools implements McpServer.Extension {
                 return "started";
             }
         });
-        McpServer.register(new Tool("backend_metrics",
+        server.register(new Tool("backend_metrics",
                 "Every metric's current value: request durations by route, pool and "
                 + "executor gauges, and the application's own.",
                 schema(new String[] {"prefix", "string", "Only metrics whose name starts "
@@ -176,14 +176,14 @@ public final class DevTools implements McpServer.Extension {
                 return metrics(stringArg(a, "prefix"));
             }
         });
-        McpServer.register(new Tool("backend_managed",
+        server.register(new Tool("backend_managed",
                 "Lists the @ManagedResource beans with their attributes' current values "
                 + "and their operations.", schema()) {
             Object run(Map a) {
-                return Management.describeBeans();
+                return Management.describeBeans(backend.getManagedBeans());
             }
         });
-        McpServer.register(new Tool("backend_invoke",
+        server.register(new Tool("backend_invoke",
                 "Calls an operation of a @ManagedResource bean.",
                 schema(new String[] {"bean", "string", "The bean's objectName",
                         "operation", "string", "The operation's name",
@@ -191,7 +191,7 @@ public final class DevTools implements McpServer.Extension {
                         new String[] {"bean", "operation"})) {
             Object run(Map a) throws Exception {
                 Object args = a.get("arguments");
-                return Management.invoke(stringArg(a, "bean"), stringArg(a, "operation"),
+                return Management.invoke(backend.getManagedBeans(), stringArg(a, "bean"), stringArg(a, "operation"),
                         args instanceof Map ? (Map)args : new LinkedHashMap());
             }
         });

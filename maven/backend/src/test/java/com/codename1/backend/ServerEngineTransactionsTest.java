@@ -55,7 +55,6 @@ class ServerEngineTransactionsTest {
         DataSource pool = DataSource.open(url, 4, 5000, 10000);
         pool.execute("DROP TABLE IF EXISTS cn1_tx_probe", null);
         pool.execute("CREATE TABLE cn1_tx_probe (v VARCHAR(40))", null);
-        Transactions.setDefaultDataSource(pool);
         return pool;
     }
 

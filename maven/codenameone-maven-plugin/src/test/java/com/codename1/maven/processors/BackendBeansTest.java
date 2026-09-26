@@ -446,6 +446,135 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void membersInheritedFromABaseClassAreInjected() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Clock", PKG + "@Component public class Clock "
+                + "{ public String now() { return \"t\"; } }\n");
+        s.put("com.example.BaseService", PKG + "public abstract class BaseService {\n"
+                + "    @Autowired private Clock clock;\n"
+                + "    @Value(\"${label:base}\") protected String label;\n"
+                + "    protected int inits;\n"
+                + "    @PostConstruct void baseInit() { inits++; }\n"
+                + "    protected String stamp() { return clock.now() + label; }\n"
+                + "}\n");
+        s.put("com.example.Orders", PKG + "@Service public class Orders extends BaseService {\n"
+                + "    @PostConstruct void ownInit() { inits += 10; }\n"
+                + "    public String describe() { return stamp() + inits; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Orders orders;\n"
+                + "    public Api(Orders orders) { this.orders = orders; }\n"
+                + "    @GetMapping(\"/x\") public String x() { return orders.describe(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            // Base field and value injected, base @PostConstruct run, then the bean's.
+            assertEquals("tbase11", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aMissingBeanDefaultStepsAsideForAnotherImplementation() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Mailer", PKG + "public interface Mailer { String name(); }\n");
+        s.put("com.example.DefaultMailer", PKG + "@Component @ConditionalOnMissingBean\n"
+                + "public class DefaultMailer implements Mailer "
+                + "{ public String name() { return \"default\"; } }\n");
+        s.put("com.example.SmtpMailer", PKG + "@Component public class SmtpMailer "
+                + "implements Mailer { public String name() { return \"smtp\"; } }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Mailer mailer;\n"
+                + "    public Api(Mailer mailer) { this.mailer = mailer; }\n"
+                + "    @GetMapping(\"/x\") public String x() { return mailer.name(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("smtp", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aSynchronizedAsyncMethodHoldsItsMonitorWhereTheBodyRuns() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Worker", PKG + "@Service public class Worker {\n"
+                + "    @Async public synchronized void work() { }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Worker w;\n"
+                + "    public Api(Worker w) { this.w = w; }\n"
+                + "    @GetMapping(\"/x\") public String x() { w.work(); return \"ok\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Class<?> worker = loader.loadClass("com.example.Worker");
+        java.lang.reflect.Method body = worker.getDeclaredMethod("work$cn1body");
+        assertTrue("the woven body lost its synchronized, so executor threads could run it "
+                + "at once", java.lang.reflect.Modifier.isSynchronized(body.getModifiers()));
+    }
+
+    @Test
+    public void sessionScopedBeansAreDestroyedWhenTheSessionIsInvalidated() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+                + "    public static int destroyed;\n"
+                + "    private int items;\n"
+                + "    public int add() { return ++items; }\n"
+                + "    @PreDestroy void close() { destroyed++; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Cart cart;\n"
+                + "    @GetMapping(\"/add\") public String add() { return String.valueOf(cart.add()); }\n"
+                + "    @GetMapping(\"/logout\") public String logout(HttpServer.Request r) {\n"
+                + "        r.getSession(true).invalidate();\n"
+                + "        return \"out\";\n"
+                + "    }\n"
+                + "    @GetMapping(\"/destroyed\") public String destroyed() {\n"
+                + "        return String.valueOf(Cart.destroyed);\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            HttpURLConnection first = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/add").openConnection();
+            assertEquals("1", read(first));
+            String cookie = first.getHeaderField("Set-Cookie");
+            String pair = cookie.substring(0, cookie.indexOf(';'));
+            HttpURLConnection out = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/logout").openConnection();
+            out.setRequestProperty("Cookie", pair);
+            assertEquals("out", read(out));
+            assertEquals("the invalidated session's bean was never destroyed", "1",
+                    http("GET", port, "/destroyed"));
+            // A session still open when the server stops is destroyed with it.
+            assertEquals("1", http("GET", port, "/add"));
+        } finally {
+            backend.stop();
+        }
+        URLClassLoader loader = (URLClassLoader) backend.getApplication().getClass()
+                .getClassLoader();
+        assertEquals(2, loader.loadClass("com.example.Cart").getField("destroyed").getInt(null));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

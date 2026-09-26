@@ -20,26 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.backend.annotations;
+package com.codenameone.developerguide.backend.beans;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.codename1.backend.annotations.Bean;
+import com.codename1.backend.annotations.Configuration;
+import com.codename1.backend.annotations.Value;
 
-/// Constructs this bean only when no other bean has its type.
-///
-/// Decided entirely by the build, which sees every bean: a default
-/// implementation marked with this steps aside for one the application
-/// declares.
-///
-/// Without `value`, "its type" is every type the bean can be injected as
-/// other than the JDK's own -- the class and its interfaces -- so a
-/// `DefaultMailer implements Mailer` steps aside for any other `Mailer` bean.
-@Retention(RetentionPolicy.CLASS)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface ConditionalOnMissingBean {
-    /// The types whose presence makes this bean step aside, when the default
-    /// set is too wide or too narrow.
-    Class<?>[] value() default {};
+// tag::backend-bean-init-destroy[]
+@Configuration
+public class SearchConfig {
+    @Bean(initMethod = "connect", destroyMethod = "close")
+    public SearchClient searchClient(@Value("${search.url:http://localhost:9200}") String url) {
+        return new SearchClient(url);
+    }
 }
+// end::backend-bean-init-destroy[]

@@ -23,45 +23,35 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 
-// tag::backend-bean-service[]
+// tag::backend-tx-rules[]
 @Service
-public class Signups {
+public class Orders {
     private final DataSource db;
+    private final AuditLog audit;
 
-    @Autowired
-    private Mailer mailer;
-
-    public Signups(DataSource db) {
+    public Orders(DataSource db, AuditLog audit) {
         this.db = db;
+        this.audit = audit;
     }
 
-    @PostConstruct
-    void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
+    @Transactional(rollbackFor = {IOException.class, PaymentDeclined.class}, timeout = 10)
+    public long place(String sku, int quantity) throws IOException, PaymentDeclined {
+        long id = db.insert("INSERT INTO orders (sku, quantity) VALUES (?, ?)",
+                new Object[] {sku, Integer.valueOf(quantity)}, "id");
+        audit.record("order " + id + " attempted");  // kept even if this rolls back
+        charge(id);                                  // may throw PaymentDeclined
+        return id;
     }
-// end::backend-bean-service[]
+// end::backend-tx-rules[]
 
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
-    }
-// end::backend-transactional[]
-
-    @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    private void charge(long order) throws PaymentDeclined {
+        if (order < 0) {
+            throw new PaymentDeclined("declined");
+        }
     }
 }

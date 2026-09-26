@@ -80,13 +80,6 @@ public final class Transactions {
      */
     static boolean used;
 
-    /**
-     * The pool a transaction uses when the first thing it needs is a connection
-     * nobody asked for by pool -- a savepoint, or a session. Set by the server
-     * when it opens its database.
-     */
-    private static DataSource defaultPool;
-
     private static final int KIND_NONE = 0;
     private static final int KIND_JOINED = 1;
     private static final int KIND_NEW = 2;
@@ -101,8 +94,25 @@ public final class Transactions {
         Database db;
         final boolean readOnly;
         final long deadline;
+        /** Set by a participant that failed: the outer commit must refuse loudly. */
         boolean rollbackOnly;
+        /**
+         * Set by setRollbackOnly() in the method that began the transaction: it
+         * chose to undo its own work, so the rollback is silent, as in Spring.
+         */
+        boolean localRollback;
+        /** How many joined or nested calls are running inside the one that began it. */
+        int participants;
         int savepoints;
+        /**
+         * Savepoints a NESTED method took before the transaction had touched a
+         * database, in order, to be set right after its BEGIN. There is no pool
+         * to ask for a connection yet -- which one the transaction runs on is
+         * decided by the first statement -- and a savepoint at the very start of
+         * a transaction marks the same state BEGIN does, so setting it late
+         * changes nothing.
+         */
+        java.util.List pendingSavepoints;
         com.codename1.orm.session.Session session;
 
         Physical(DataSource pool, boolean readOnly, int timeoutSeconds) {
@@ -142,11 +152,6 @@ public final class Transactions {
         }
     }
 
-    /** Sets the pool a transaction uses when nothing else names one. */
-    public static void setDefaultDataSource(DataSource pool) {
-        defaultPool = pool;
-    }
-
     /** Whether the calling thread is inside a transaction. */
     public static boolean isActive() {
         return used && CURRENT.get() != null;
@@ -155,7 +160,7 @@ public final class Transactions {
     /** Whether the calling thread's transaction has been marked rollback-only. */
     public static boolean isRollbackOnly() {
         Physical p = used ? (Physical)CURRENT.get() : null;
-        return p != null && p.rollbackOnly;
+        return p != null && (p.rollbackOnly || p.localRollback);
     }
 
     /**
@@ -169,7 +174,15 @@ public final class Transactions {
             throw new TransactionException.IllegalState("setRollbackOnly() outside a "
                     + "transaction: there is nothing to roll back");
         }
-        p.rollbackOnly = true;
+        if(p.participants == 0) {
+            // The method that began the transaction: it returns normally and
+            // its work is undone, with nothing thrown.
+            p.localRollback = true;
+        } else {
+            // A joined method: whoever began the transaction must learn that
+            // what it thinks it committed was not saved.
+            p.rollbackOnly = true;
+        }
     }
 
     /**
@@ -181,6 +194,14 @@ public final class Transactions {
      */
     public static Transaction begin(int propagation, boolean readOnly, int timeoutSeconds) {
         used = true;
+        Transaction tx = open(propagation, readOnly, timeoutSeconds);
+        if(tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
+            tx.physical.participants++;
+        }
+        return tx;
+    }
+
+    private static Transaction open(int propagation, boolean readOnly, int timeoutSeconds) {
         Physical current = (Physical)CURRENT.get();
         switch(propagation) {
             case SUPPORTS:
@@ -225,18 +246,20 @@ public final class Transactions {
     }
 
     private static Transaction nested(Physical current) {
-        Database db;
-        try {
-            db = materialize(current, current.pool != null ? current.pool : defaultPool);
-        } catch (IOException err) {
-            throw new TransactionException("Could not begin the transaction a NESTED "
-                    + "method needs: " + err.getMessage(), err);
-        }
-        if(db == null) {
-            throw new TransactionException.IllegalState("A NESTED method needs a database to "
-                    + "set its savepoint in, and this server has none.");
-        }
         String name = "cn1_sp_" + (++current.savepoints);
+        Database db = current.db;
+        if(db == null) {
+            // Nothing has run in the transaction yet, so there is no connection
+            // and -- deliberately -- no process-wide default pool to borrow one
+            // from: two servers in one process would hand this savepoint to
+            // whichever started last. It is set when the first statement picks
+            // the database.
+            if(current.pendingSavepoints == null) {
+                current.pendingSavepoints = new java.util.ArrayList();
+            }
+            current.pendingSavepoints.add(name);
+            return new Transaction(KIND_SAVEPOINT, current, null, false, name);
+        }
         try {
             flushSession(current);
             db.savepoint(name);
@@ -256,8 +279,13 @@ public final class Transactions {
             return;
         }
         tx.completed = true;
+        leave(tx);
         switch(tx.kind) {
             case KIND_SAVEPOINT:
+                if(dropPending(tx)) {
+                    // Never set: the nested method did not touch the database.
+                    return;
+                }
                 try {
                     flushSession(tx.physical);
                     tx.physical.db.releaseSavepoint(tx.savepoint);
@@ -307,11 +335,16 @@ public final class Transactions {
             return;
         }
         tx.completed = true;
+        leave(tx);
         switch(tx.kind) {
             case KIND_JOINED:
                 tx.physical.rollbackOnly = true;
                 return;
             case KIND_SAVEPOINT:
+                if(dropPending(tx)) {
+                    // Never set, so nothing ran after it: nothing to undo.
+                    return;
+                }
                 try {
                     tx.physical.db.rollbackToSavepoint(tx.savepoint);
                     tx.physical.db.releaseSavepoint(tx.savepoint);
@@ -338,6 +371,19 @@ public final class Transactions {
         }
     }
 
+    /** A joined or nested call has ended. */
+    private static void leave(Transaction tx) {
+        if(tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
+            tx.physical.participants--;
+        }
+    }
+
+    /** Forgets a savepoint that was never set; true when it was one. */
+    private static boolean dropPending(Transaction tx) {
+        java.util.List pending = tx.physical.pendingSavepoints;
+        return pending != null && pending.remove(tx.savepoint);
+    }
+
     /** Puts back what this call suspended, or clears what it began. */
     private static void restore(Transaction tx) {
         if(tx.kind == KIND_NEW || tx.suspends) {
@@ -351,6 +397,10 @@ public final class Transactions {
             throw new TransactionException.UnexpectedRollback("The transaction was rolled "
                     + "back because a method that joined it failed. Its own method returned "
                     + "normally, so this is what tells its caller the work was not saved.");
+        }
+        if(p.localRollback) {
+            rollbackPhysical(p);
+            return;
         }
         if(p.deadline != 0 && System.currentTimeMillis() > p.deadline) {
             rollbackPhysical(p);
@@ -481,7 +531,20 @@ public final class Transactions {
                 db.execute("PRAGMA foreign_keys = ON", null);
             }
             db.beginTransaction(p.readOnly);
+            if(p.pendingSavepoints != null) {
+                for(int iter = 0 ; iter < p.pendingSavepoints.size() ; iter++) {
+                    db.savepoint((String)p.pendingSavepoints.get(iter));
+                }
+                p.pendingSavepoints = null;
+            }
         } catch (IOException err) {
+            try {
+                if(db.isInTransaction()) {
+                    db.rollbackTransaction();
+                }
+            } catch (IOException ignored) {
+                db.close();
+            }
             p.pool.releaseToPool(db);
             throw err;
         }

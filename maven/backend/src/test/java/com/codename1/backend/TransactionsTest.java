@@ -54,7 +54,6 @@ class TransactionsTest {
         // tests can look at the table from outside the transaction.
         pool = DataSource.open(new File(dir, "tx.db").getAbsolutePath(), 4, 5000, 10000);
         pool.execute("CREATE TABLE t (v TEXT)", null);
-        Transactions.setDefaultDataSource(pool);
     }
 
     @AfterEach
@@ -149,6 +148,58 @@ class TransactionsTest {
         assertFalse(Transactions.isRollbackOnly());
         Transactions.commit(outer);
         assertEquals(1, rows());
+    }
+
+    @Test
+    @DisplayName("NESTED before the transaction has touched a database sets its savepoint on the first statement")
+    void nestedBeforeAnyStatement() throws Exception {
+        // No process-wide default pool: the savepoint waits for the statement
+        // that decides which database the transaction is on.
+        Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        Transactions.Transaction nested = Transactions.begin(Transactions.NESTED, false, -1);
+        insert("undone");
+        Transactions.afterThrow(nested, true);
+        insert("kept");
+        Transactions.commit(outer);
+        assertEquals(1, rows(), "the late savepoint did not undo exactly the nested insert");
+
+        outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        nested = Transactions.begin(Transactions.NESTED, false, -1);
+        Transactions.commit(nested);                  // never touched the database
+        insert("after");
+        Transactions.commit(outer);
+        assertEquals(2, rows());
+
+        outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        nested = Transactions.begin(Transactions.NESTED, false, -1);
+        Transactions.afterThrow(nested, true);        // nothing ran, nothing to undo
+        assertFalse(Transactions.isRollbackOnly());
+        insert("last");
+        Transactions.commit(outer);
+        assertEquals(3, rows());
+    }
+
+    @Test
+    @DisplayName("setRollbackOnly in the method that began the transaction rolls back silently")
+    void localRollbackOnlyIsSilent() throws Exception {
+        Transactions.Transaction tx = Transactions.begin(Transactions.REQUIRED, false, -1);
+        insert("a");
+        Transactions.setRollbackOnly();
+        assertTrue(Transactions.isRollbackOnly());
+        Transactions.commit(tx);                     // no UnexpectedRollback
+        assertFalse(Transactions.isActive());
+        assertEquals(0, rows());
+
+        // From a joined method it is the participant's failure, and the method
+        // that began the transaction must be told its work was not saved.
+        Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        insert("b");
+        Transactions.Transaction inner = Transactions.begin(Transactions.REQUIRED, false, -1);
+        Transactions.setRollbackOnly();
+        Transactions.commit(inner);
+        assertThrows(TransactionException.UnexpectedRollback.class,
+                () -> Transactions.commit(outer));
+        assertEquals(0, rows());
     }
 
     @Test

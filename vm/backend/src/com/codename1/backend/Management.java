@@ -55,8 +55,6 @@ public final class Management implements HttpServer.Handler {
     public static final String PATH = "cn1.management.path";
     public static final String TOKEN = "cn1.management.token";
 
-    private static final List BEANS = new ArrayList();
-
     private final String path;
     private final byte[] token;
     private final boolean development;
@@ -101,26 +99,18 @@ public final class Management implements HttpServer.Handler {
         this.backend = running;
     }
 
-    /** Registers a managed bean. Generated code calls this at start-up. */
-    public static synchronized void register(ManagedBean bean) {
-        for(int iter = 0 ; iter < BEANS.size() ; iter++) {
-            if(((ManagedBean)BEANS.get(iter)).getObjectName().equals(bean.getObjectName())) {
-                BEANS.set(iter, bean);
-                return;
-            }
-        }
-        BEANS.add(bean);
+    /** The managed beans of the server this endpoint belongs to. */
+    private List beans() {
+        return backend == null ? new ArrayList() : backend.getManagedBeans();
     }
 
-    /** The registered managed beans. */
-    public static synchronized List beans() {
-        return new ArrayList(BEANS);
-    }
-
-    /** Every managed bean with its attributes' current values and its operations. */
-    public static List describeBeans() {
+    /**
+     * Each of {@code all} -- a server's managed beans, from
+     * {@link Backend#getManagedBeans} -- with its attributes' current values and
+     * its operations.
+     */
+    public static List describeBeans(List all) {
         List out = new ArrayList();
-        List all = beans();
         for(int iter = 0 ; iter < all.size() ; iter++) {
             ManagedBean bean = (ManagedBean)all.get(iter);
             Map m = new LinkedHashMap();
@@ -168,9 +158,8 @@ public final class Management implements HttpServer.Handler {
      *
      * @throws IllegalArgumentException when there is no such bean or operation
      */
-    public static Object invoke(String objectName, String operation, Map arguments)
-            throws Exception {
-        List all = beans();
+    public static Object invoke(List all, String objectName, String operation,
+                                Map arguments) throws Exception {
         for(int iter = 0 ; iter < all.size() ; iter++) {
             ManagedBean bean = (ManagedBean)all.get(iter);
             if(!bean.getObjectName().equals(objectName)) {
@@ -225,7 +214,7 @@ public final class Management implements HttpServer.Handler {
                         : scheduler.describe());
             }
             if("/managed".equals(rest)) {
-                return request.respondJson(200, describeBeans());
+                return request.respondJson(200, describeBeans(beans()));
             }
             return null;
         }
@@ -243,7 +232,7 @@ public final class Management implements HttpServer.Handler {
                 Map result = new LinkedHashMap();
                 // Bean and operation names are Java identifiers, so there is
                 // nothing to percent-decode: an escaped one matches nothing.
-                result.put("result", invoke(parts[0], parts[1], arguments));
+                result.put("result", invoke(beans(), parts[0], parts[1], arguments));
                 return request.respondJson(200, result);
             } catch (IllegalArgumentException err) {
                 return request.respondJson(404, error(err.getMessage()));

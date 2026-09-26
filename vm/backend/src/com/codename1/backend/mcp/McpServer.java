@@ -73,7 +73,13 @@ public final class McpServer implements HttpServer.Handler {
     /** The newest protocol revision this server speaks, and the ones it accepts. */
     static final String[] PROTOCOL_VERSIONS = {"2025-06-18", "2025-03-26", "2024-11-05"};
 
-    private static final List TOOLS = new ArrayList();
+    /**
+     * This endpoint's tools. Per server, never per process: a server started
+     * again in the same process -- with its development tools off, or a
+     * conditional @McpTool bean inactive -- must not keep serving the tools of
+     * one that stopped, bound to beans that have been destroyed.
+     */
+    private final List tools = new ArrayList();
 
     private final String path;
     private final byte[] token;
@@ -90,7 +96,12 @@ public final class McpServer implements HttpServer.Handler {
     private final Extension devTools;
 
     private McpServer(String path, String token, String[] allowedOrigins, String serverName,
-                      Extension devTools) {
+                      Extension devTools, List tools) {
+        if(tools != null) {
+            for(int iter = 0 ; iter < tools.size() ; iter++) {
+                register((McpTool)tools.get(iter));
+            }
+        }
         this.path = path;
         this.token = token == null || token.length() == 0 ? null : utf8(token);
         this.allowedOrigins = allowedOrigins;
@@ -105,16 +116,14 @@ public final class McpServer implements HttpServer.Handler {
      * @param devTools the development tools, which the build passes only in a
      *        development build; they are installed only on a development profile
      *        or with {@code cn1.mcp.devTools=true}
+     * @param tools the application's tools, the ones its server registered
      */
-    public static McpServer fromConfig(Config config, Extension devTools, String serverName)
-            throws IOException {
+    public static McpServer fromConfig(Config config, Extension devTools, String serverName,
+                                       List tools) throws IOException {
         boolean development = config.isDevelopmentProfile();
         Extension extension = devTools != null
                 && config.getBoolean(DEV_TOOLS, development) ? devTools : null;
-        boolean anyTools;
-        synchronized(McpServer.class) {
-            anyTools = !TOOLS.isEmpty();
-        }
+        boolean anyTools = tools != null && !tools.isEmpty();
         if(!config.getBoolean(ENABLED, anyTools || extension != null)) {
             return null;
         }
@@ -148,23 +157,23 @@ public final class McpServer implements HttpServer.Handler {
         }
         return new McpServer(path, token, allowed,
                 serverName == null || serverName.length() == 0 ? "codenameone-backend"
-                        : serverName, extension);
+                        : serverName, extension, tools);
     }
 
-    /** Registers a tool, replacing one of the same name. */
-    public static synchronized void register(McpTool tool) {
-        for(int iter = 0 ; iter < TOOLS.size() ; iter++) {
-            if(((McpTool)TOOLS.get(iter)).name().equals(tool.name())) {
-                TOOLS.set(iter, tool);
+    /** Adds a tool to this endpoint, replacing one of the same name. */
+    public synchronized void register(McpTool tool) {
+        for(int iter = 0 ; iter < tools.size() ; iter++) {
+            if(((McpTool)tools.get(iter)).name().equals(tool.name())) {
+                tools.set(iter, tool);
                 return;
             }
         }
-        TOOLS.add(tool);
+        tools.add(tool);
     }
 
-    /** Every registered tool. */
-    public static synchronized List tools() {
-        return new ArrayList(TOOLS);
+    /** Every tool on this endpoint. */
+    public synchronized List tools() {
+        return new ArrayList(tools);
     }
 
     /** Whether the development tools are installed on this endpoint. */

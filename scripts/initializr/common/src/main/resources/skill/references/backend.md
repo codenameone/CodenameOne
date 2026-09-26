@@ -119,7 +119,7 @@ public class Transfers {
 - **The method itself is rewritten at build time**, so unlike Spring the
   transaction also applies to a call through `this`, to a private method, and to an
   object you built with `new`.
-- `Transactions.setRollbackOnly()` rolls back without throwing.
+- `Transactions.setRollbackOnly()` in the method that began the transaction rolls it back without throwing; in a joined method it makes the outer commit throw `UnexpectedRollback`.
 - The injected `Session` only works inside a `@Transactional` method.
 - Use `?` placeholders; the same SQL runs on SQLite, PostgreSQL and MySQL.
 

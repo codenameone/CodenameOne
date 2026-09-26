@@ -122,6 +122,8 @@ public final class HttpServer {
         private byte[] canonicalTarget;
         private int canonicalLength;
         private boolean canonicalChecked;
+        /** The sessions of the server serving this request; set by Backend. */
+        Sessions sessions;
         /** This request's session once looked up; see {@link #getSession(boolean)}. */
         private HttpSession session;
         private boolean sessionResolved;
@@ -584,6 +586,7 @@ public final class HttpServer {
             this.session = null;
             this.sessionResolved = false;
             this.scopedBeans = null;
+            this.sessions = null;
         }
 
         /** The session of this request, creating one if it has none. */
@@ -601,9 +604,10 @@ public final class HttpServer {
             if(sessionResolved && (session != null || !create)) {
                 return session;
             }
+            Sessions owner = sessions != null ? sessions : Sessions.standalone();
             try {
-                session = Sessions.find(sessionResolved ? null
-                        : Sessions.cookieValue(getHeader("cookie"), Sessions.getCookieName()),
+                session = owner.find(sessionResolved ? null
+                        : Sessions.cookieValue(getHeader("cookie"), owner.getCookieName()),
                         create);
             } catch (IOException err) {
                 throw new IllegalStateException("The session store failed: "
@@ -677,6 +681,7 @@ public final class HttpServer {
             this.session = null;
             this.sessionResolved = false;
             this.scopedBeans = null;
+            this.sessions = null;
         }
 
         /**

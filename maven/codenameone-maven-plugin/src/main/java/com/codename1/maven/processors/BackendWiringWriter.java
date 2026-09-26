@@ -202,12 +202,12 @@ final class BackendWiringWriter {
                 sb.append("            ").append(b.managed.adapterBinary).append(" managed")
                   .append(b.var).append(" = new ").append(b.managed.adapterBinary).append('(')
                   .append(ref).append(");\n");
-                sb.append("            com.codename1.backend.Management.register(managed")
+                sb.append("            environment.registerManaged(managed")
                   .append(b.var).append(");\n");
                 sb.append("            managed").append(b.var).append(".registerGauges();\n");
             }
             for (BackendBeans.Tool t : b.tools) {
-                sb.append("            com.codename1.backend.mcp.McpServer.register(new ")
+                sb.append("            environment.registerTool(new ")
                   .append(t.adapterBinary).append('(').append(ref).append("));\n");
             }
             sb.append("        }\n");
@@ -652,12 +652,19 @@ final class BackendWiringWriter {
     }
 
     private void requestEnded(StringBuilder sb) {
-        sb.append("    public void requestEnded(Object[] beans) {\n");
+        scopeEnded(sb, "requestEnded", BackendBeans.REQUEST);
+        scopeEnded(sb, "sessionEnded", BackendBeans.SESSION);
+    }
+
+    /// The destroy callbacks of one scope's beans, which the server calls with
+    /// the array the scope kept them in when the request or session ends.
+    private void scopeEnded(StringBuilder sb, String method, String scope) {
+        sb.append("    public void ").append(method).append("(Object[] beans) {\n");
         for (BackendBeans.Bean b : model.beans) {
             // A @Bean(destroyMethod = ...) counts as much as @PreDestroy: a
             // request-scoped factory bean with only a destroyMethod is exactly
             // the resource (a connection, a stream) that must be closed per request.
-            if (!BackendBeans.REQUEST.equals(b.scope)
+            if (!scope.equals(b.scope)
                     || (b.preDestroy.isEmpty() && b.destroyMethod == null)) {
                 continue;
             }

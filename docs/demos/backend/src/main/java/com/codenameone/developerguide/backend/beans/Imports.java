@@ -23,45 +23,41 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.annotations.PostConstruct;
+import com.codename1.backend.annotations.Propagation;
 import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
+import java.util.List;
 
-// tag::backend-bean-service[]
+// tag::backend-tx-nested[]
 @Service
-public class Signups {
+public class Imports {
     private final DataSource db;
 
-    @Autowired
-    private Mailer mailer;
-
-    public Signups(DataSource db) {
+    public Imports(DataSource db) {
         this.db = db;
     }
 
-    @PostConstruct
-    void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
+    @Transactional
+    public int importAll(List<String> lines) {
+        int imported = 0;
+        for (String line : lines) {
+            try {
+                importLine(line);           // a call through this: still transactional
+                imported++;
+            } catch (Exception bad) {
+                // Only this line's rows were rolled back, to its savepoint.
+            }
+        }
+        return imported;                    // the good lines commit together
     }
-// end::backend-bean-service[]
 
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
-    }
-// end::backend-transactional[]
-
-    @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    @Transactional(propagation = Propagation.NESTED, rollbackFor = IOException.class)
+    void importLine(String line) throws IOException {
+        String[] fields = line.split(",");
+        db.execute("INSERT INTO contact (name) VALUES (?)", new Object[] {fields[0]});
+        db.execute("INSERT INTO phone (number) VALUES (?)", new Object[] {fields[1]});
     }
 }
+// end::backend-tx-nested[]

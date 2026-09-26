@@ -282,14 +282,18 @@ class ApplicationRuntimeTest {
         p.setProperty("cn1.session.secure", "tru");
         try {
             IOException refused = assertThrows(IOException.class,
-                    () -> Sessions.configure(Config.of(p, "test"), true, null));
+                    () -> Sessions.configure(Config.of(p, "test"), true, null, null));
             assertTrue(refused.getMessage().contains("auto, true or false"),
                     refused.getMessage());
             p.setProperty("cn1.session.secure", "FALSE");
-            Sessions.configure(Config.of(p, "test"), true, null);
+            Sessions.configure(Config.of(p, "test"), true, null, null);
+            p.setProperty("cn1.session.timeout", "-1800");
+            IOException negative = assertThrows(IOException.class,
+                    () -> Sessions.configure(Config.of(p, "test"), true, null, null));
+            assertTrue(negative.getMessage().contains("cn1.session.timeout"),
+                    negative.getMessage());
         } finally {
-            // Process-wide settings: put the defaults back for the next test.
-            Sessions.configure(Config.of(new Properties(), "test"), false, null);
+            p.clear();
         }
     }
 
@@ -337,7 +341,7 @@ class ApplicationRuntimeTest {
     @Test
     @DisplayName("the MCP endpoint lists and calls a tool, and reports a bad call as a tool error")
     void mcp() throws Exception {
-        McpServer.register(new McpTool() {
+        McpTool echo = new McpTool() {
             public String name() {
                 return "echo";
             }
@@ -358,12 +362,12 @@ class ApplicationRuntimeTest {
                 }
                 return arguments.get("text");
             }
-        });
+        };
         int port = freePort();
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
-                .mcp(null).handler(new HttpServer.Handler() {
+                .mcp(null).mcpTool(echo).handler(new HttpServer.Handler() {
                     public HttpServer.Response handle(HttpServer.Request request) {
                         return null;
                     }
@@ -394,6 +398,28 @@ class ApplicationRuntimeTest {
         } finally {
             backend.stop();
         }
+        // A server started again in the same process has only its own tools: the
+        // stopped server's echo is gone, so with none there is no endpoint.
+        Backend again = Backend.builder(Config.of(settings, "dev")).quiet()
+                .mcp(null).handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        try {
+            HttpURLConnection c = open(port, "/mcp");
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            OutputStream out = c.getOutputStream();
+            out.write("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"
+                    .getBytes("UTF-8"));
+            out.close();
+            assertEquals(404, c.getResponseCode(),
+                    "a restarted server served the previous server's MCP tools");
+        } finally {
+            again.stop();
+        }
     }
 
     @Test
@@ -402,7 +428,7 @@ class ApplicationRuntimeTest {
         Properties settings = new Properties();
         settings.setProperty(McpServer.ENABLED, "true");
         IOException e = assertThrows(IOException.class,
-                () -> McpServer.fromConfig(Config.of(settings, "prod"), null, null));
+                () -> McpServer.fromConfig(Config.of(settings, "prod"), null, null, null));
         assertTrue(e.getMessage().contains(McpServer.TOKEN), e.getMessage());
     }
 
@@ -431,6 +457,9 @@ class ApplicationRuntimeTest {
         }
 
         public void requestEnded(Object[] beans) {
+        }
+
+        public void sessionEnded(Object[] beans) {
         }
 
         public Scheduler getScheduler() {

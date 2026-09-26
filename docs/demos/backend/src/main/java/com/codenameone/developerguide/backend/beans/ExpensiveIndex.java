@@ -20,26 +20,33 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.backend.annotations;
+package com.codenameone.developerguide.backend.beans;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Lazy;
+import com.codename1.backend.annotations.PostConstruct;
 
-/// Constructs this bean only when no other bean has its type.
-///
-/// Decided entirely by the build, which sees every bean: a default
-/// implementation marked with this steps aside for one the application
-/// declares.
-///
-/// Without `value`, "its type" is every type the bean can be injected as
-/// other than the JDK's own -- the class and its interfaces -- so a
-/// `DefaultMailer implements Mailer` steps aside for any other `Mailer` bean.
-@Retention(RetentionPolicy.CLASS)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface ConditionalOnMissingBean {
-    /// The types whose presence makes this bean step aside, when the default
-    /// set is too wide or too narrow.
-    Class<?>[] value() default {};
+import java.util.HashMap;
+import java.util.Map;
+
+// tag::backend-bean-lazy[]
+@Component
+@Lazy
+public class ExpensiveIndex {
+    private Map<String, String> index;
+
+    public ExpensiveIndex() {
+        // Runs at start-up for the generated stand-in too: keep it cheap.
+    }
+
+    @PostConstruct
+    void load() {
+        // Runs once, on the real instance, the first time something calls it.
+        index = new HashMap<String, String>();
+    }
+
+    public String lookup(String key) {
+        return index.get(key);
+    }
 }
+// end::backend-bean-lazy[]

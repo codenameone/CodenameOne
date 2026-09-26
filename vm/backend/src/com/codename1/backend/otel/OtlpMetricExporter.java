@@ -71,6 +71,8 @@ public final class OtlpMetricExporter implements MetricReader {
     private Thread thread;
     private final Object lock = new Object();
     private boolean stopping;
+    /** Whether the exporter thread sends one last export before it ends. */
+    private boolean finalExport;
     private long exports;
     private long failures;
     private String lastError;
@@ -135,11 +137,18 @@ public final class OtlpMetricExporter implements MetricReader {
                     }
                 }
                 if(stopping) {
-                    return;
+                    if(!finalExport) {
+                        return;
+                    }
+                    break;
                 }
             }
             export();
         }
+        // On THIS thread, after any periodic export still in flight, so the two
+        // never overlap -- and shutdown() only waits for it as long as it was
+        // told to.
+        export();
     }
 
     /** Sends one export now. Answers whether the collector accepted it. */
@@ -182,11 +191,18 @@ public final class OtlpMetricExporter implements MetricReader {
                 return;
             }
             stopping = true;
+            // One last export, so the counts of the final minute are not lost --
+            // made by the exporter thread, which is bounded by the join below
+            // rather than by the HTTP client's own connect and read timeouts.
+            finalExport = timeoutMillis > 0;
             lock.notifyAll();
         }
         if(thread != null && timeoutMillis > 0) {
-            // One last export, so the counts of the final minute are not lost.
-            export();
+            try {
+                thread.join(timeoutMillis);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

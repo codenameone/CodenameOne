@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="450" viewBox="0 0 880 450">
+  <rect x="0" y="0" width="880" height="450" fill="#ffffff"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555555"/></marker></defs>
+  <text x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">A session from the first request to the last</text>
+  <text x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Nothing is stored and no cookie is sent until a handler asks for a session. The store and the cookie are</text>
+  <text x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">updated after the handler returns, as part of the same response.</text>
+  <rect x="24" y="110" width="184" height="64" rx="4" fill="#f7f7f9" stroke="#888888" stroke-width="1.5"/>
+  <text x="116" y="131" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#888888">No session</text>
+  <text x="116" y="146" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">no cookie, nothing stored;</text>
+  <text x="116" y="161" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">getSession(false) is null</text>
+  <rect x="240" y="110" width="184" height="64" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="332" y="131" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a6fa5">New</text>
+  <text x="332" y="146" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">getSession(true) creates it;</text>
+  <text x="332" y="161" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Set-Cookie: CN1SESSION=id</text>
+  <rect x="456" y="110" width="184" height="64" rx="4" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="548" y="131" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#4a7a3d">Active</text>
+  <text x="548" y="146" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">the cookie comes back; each</text>
+  <text x="548" y="161" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">getSession() records the access</text>
+  <rect x="672" y="110" width="184" height="64" rx="4" fill="#fbf3f3" stroke="#a33a3a" stroke-width="1.5"/>
+  <text x="764" y="131" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#a33a3a">Ended</text>
+  <text x="764" y="146" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">invalidate(): cookie cleared</text>
+  <text x="764" y="161" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">with Max-Age=0</text>
+  <line x1="208" y1="142" x2="236" y2="142" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="424" y1="142" x2="452" y2="142" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="640" y1="142" x2="668" y2="142" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
+  <path d="M 520 174 C 520 220, 600 220, 600 178" fill="none" stroke="#a56a3a" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="560" y="232" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#a56a3a">changeSessionId(): new id,</text>
+  <text x="560" y="245" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#a56a3a">same attributes, new cookie</text>
+  <path d="M 548 110 C 600 78, 700 78, 750 106" fill="none" stroke="#888888" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#a)"/>
+  <text x="650" y="80" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#888888">idle longer than cn1.session.timeout: expired</text>
+  <rect x="24" y="270" width="404" height="110" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="40" y="292" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">cn1.session.store=memory (default)</text>
+  <text x="40" y="312" font-family="Arial, sans-serif" font-size="10" fill="#333333">Sessions live in this process. Any attribute value works,</text>
+  <text x="40" y="328" font-family="Arial, sans-serif" font-size="10" fill="#333333">and the instance you set is the instance you get back.</text>
+  <text x="40" y="344" font-family="Arial, sans-serif" font-size="10" fill="#333333">A restart or a second instance does not see them, so</text>
+  <text x="40" y="360" font-family="Arial, sans-serif" font-size="10" fill="#333333">behind a load balancer this needs sticky sessions.</text>
+  <rect x="452" y="270" width="404" height="110" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
+  <text x="468" y="292" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">cn1.session.store=jdbc</text>
+  <text x="468" y="312" font-family="Arial, sans-serif" font-size="10" fill="#333333">Sessions live in cn1_http_session in the server's own</text>
+  <text x="468" y="328" font-family="Arial, sans-serif" font-size="10" fill="#333333">database, attributes stored as JSON, so every instance</text>
+  <text x="468" y="344" font-family="Arial, sans-serif" font-size="10" fill="#333333">sees every session. Values must be strings, numbers,</text>
+  <text x="468" y="360" font-family="Arial, sans-serif" font-size="10" fill="#333333">booleans, or maps and lists of those.</text>
+  <rect x="16" y="396" width="848" height="36" rx="4" fill="#f7f7f9" stroke="#cccccc" stroke-width="1"/>
+  <text x="440" y="415" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#222222">Expired sessions are removed at most once a minute, by the next request that asks for its session.</text>
+</svg>

@@ -749,7 +749,7 @@ Bodymovin
 keyframes?
 
 # -----------------------------------------------------------------------------
-# Server-side backend (Backend.asciidoc).
+# Server-side backend (Backend*.asciidoc).
 # -----------------------------------------------------------------------------
 # Two of the JVM server frameworks the backend chapter positions itself against.
 # Product names, so the dictionary has neither.
@@ -773,7 +773,7 @@ Podman
 cron
 # The SQL construct a NESTED transaction rolls back to. SQL's own keyword, and the
 # term every database's documentation uses.
-savepoint
+savepoints?
 
 # -----------------------------------------------------------------------------
 # Attaching an agent to a build on a device (MCP-Headless-API.asciidoc).

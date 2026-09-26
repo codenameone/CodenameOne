@@ -22,46 +22,34 @@
  */
 package com.codenameone.developerguide.backend.beans;
 
-import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.annotations.PostConstruct;
+import com.codename1.backend.annotations.Qualifier;
 import com.codename1.backend.annotations.Service;
-import com.codename1.backend.annotations.Transactional;
 
-import java.io.IOException;
+import java.util.List;
 
-// tag::backend-bean-service[]
+// tag::backend-bean-candidates[]
 @Service
-public class Signups {
-    private final DataSource db;
+public class Checkout {
+    private final PaymentProvider preferred;       // the @Primary one: CardPayments
 
     @Autowired
-    private Mailer mailer;
+    @Qualifier("invoice")
+    private PaymentProvider invoice;               // the one named "invoice"
 
-    public Signups(DataSource db) {
-        this.db = db;
+    @Autowired
+    private List<PaymentProvider> all;             // every PaymentProvider bean
+
+    @Autowired(required = false)
+    private Audit audit;                           // null when no bean provides one
+
+    public Checkout(PaymentProvider preferred) {
+        this.preferred = preferred;
     }
+// end::backend-bean-candidates[]
 
-    @PostConstruct
-    void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
-    }
-// end::backend-bean-service[]
-
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
-    }
-// end::backend-transactional[]
-
-    @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    public String describe() {
+        return preferred.name() + " / " + invoice.name() + " of " + all.size()
+                + (audit == null ? "" : ", audited");
     }
 }

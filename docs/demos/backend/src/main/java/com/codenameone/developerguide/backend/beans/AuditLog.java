@@ -23,45 +23,25 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Autowired;
-import com.codename1.backend.annotations.PostConstruct;
+import com.codename1.backend.annotations.Propagation;
 import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.Transactional;
 
 import java.io.IOException;
 
-// tag::backend-bean-service[]
+// tag::backend-tx-requires-new[]
 @Service
-public class Signups {
+public class AuditLog {
     private final DataSource db;
 
-    @Autowired
-    private Mailer mailer;
-
-    public Signups(DataSource db) {
+    public AuditLog(DataSource db) {
         this.db = db;
     }
 
-    @PostConstruct
-    void createTable() throws IOException {
-        db.execute("CREATE TABLE IF NOT EXISTS signup (email VARCHAR(200))", null);
-    }
-// end::backend-bean-service[]
-
-// tag::backend-transactional[]
-    @Transactional(rollbackFor = IOException.class)
-    public void register(String email) throws IOException {
-        db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
-        // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
-        mailer.send(email, "Welcome", "Thanks for signing up.");
-    }
-// end::backend-transactional[]
-
-    @Transactional(readOnly = true)
-    public int count() throws IOException {
-        java.util.Map row = db.queryOne("SELECT COUNT(*) AS n FROM signup", null);
-        return ((Number) row.get("n")).intValue();
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(String event) throws IOException {
+        // Commits on its own connection, whatever the caller's transaction does.
+        db.execute("INSERT INTO audit (event) VALUES (?)", new Object[] {event});
     }
 }
+// end::backend-tx-requires-new[]
