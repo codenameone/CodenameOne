@@ -1672,8 +1672,52 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pumpMessages___R_boolean(CODEN
     if (!cn1WindowOpen) {
         return JAVA_FALSE;
     }
-    /* Block for the next event (TRUE = may block) so we are not a busy loop. */
-    g_main_context_iteration(NULL, TRUE);
+    /* Block for the next event so we are not a busy loop -- with this thread PARKED for
+     * the wait and only the wait, as the Windows pump parks across GetMessage.
+     *
+     * This thread is the process's main thread, and the clean target registers main
+     * as a managed thread (it runs Java until exit), so the collector waits for it to
+     * reach a safepoint every cycle. g_main_context_iteration(NULL, TRUE) waits AND
+     * dispatches in one call, and a thread blocked in its poll reaches no safepoint:
+     * every collection waited the full safepoint bound (250ms) and then force-stopped
+     * it, which is what made objectAllocation 3.5x slower in the Linux hello and
+     * gallery apps. Parking across the whole call is not an answer either, because
+     * the dispatch runs GTK callbacks that enter Java on this thread.
+     *
+     * So the iteration is spelled out -- prepare, query, poll, check, dispatch, which
+     * is what g_main_context_iteration does internally -- and only the poll is
+     * bracketed. Dispatch runs with the thread active again. */
+    {
+        GMainContext* ctx = g_main_context_default();
+        if (!g_main_context_acquire(ctx)) {
+            /* Another thread owns the context; nothing of ours to dispatch. */
+            g_usleep(1000);
+            return cn1WindowOpen ? JAVA_TRUE : JAVA_FALSE;
+        }
+        gint maxPriority = 0;
+        g_main_context_prepare(ctx, &maxPriority);
+        GPollFD stackFds[16];
+        GPollFD* fds = stackFds;
+        gint capacity = 16;
+        gint timeout = -1;
+        gint count = g_main_context_query(ctx, maxPriority, &timeout, fds, capacity);
+        if (count > capacity) {
+            capacity = count;
+            fds = g_new(GPollFD, capacity);
+            count = g_main_context_query(ctx, maxPriority, &timeout, fds, capacity);
+        }
+        GPollFunc poll = g_main_context_get_poll_func(ctx);
+        CN1_YIELD_THREAD;
+        poll(fds, (guint) count, timeout);
+        CN1_RESUME_THREAD;
+        if (g_main_context_check(ctx, maxPriority, fds, count)) {
+            g_main_context_dispatch(ctx);
+        }
+        if (fds != stackFds) {
+            g_free(fds);
+        }
+        g_main_context_release(ctx);
+    }
     return cn1WindowOpen ? JAVA_TRUE : JAVA_FALSE;
 }
 
