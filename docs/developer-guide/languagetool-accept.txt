@@ -768,6 +768,12 @@ Testsuite
 # The container runtime, alongside Docker, that the conformance harness accepts.
 # A product name.
 Podman
+# The Unix scheduler whose expression format @Scheduled takes. The standard name
+# for that format, lowercase as every scheduler documents it.
+cron
+# The SQL construct a NESTED transaction rolls back to. SQL's own keyword, and the
+# term every database's documentation uses.
+savepoint
 
 # -----------------------------------------------------------------------------
 # Attaching an agent to a build on a device (MCP-Headless-API.asciidoc).

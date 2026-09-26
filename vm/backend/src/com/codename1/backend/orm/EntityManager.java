@@ -281,6 +281,12 @@ public final class EntityManager {
                 }
             });
         }
+        Database joined = com.codename1.backend.Transactions.joined(pool);
+        if(joined != null) {
+            // Inside a @Transactional method: join its transaction, as a manager
+            // already inside one does above.
+            return body.run(new EntityManager(null, joined, self.dialect, self.tables, true));
+        }
         return pool.withConnection(new DataSource.Work() {
             public Object run(final Database db) throws Exception {
                 return db.transaction(new Database.Work() {

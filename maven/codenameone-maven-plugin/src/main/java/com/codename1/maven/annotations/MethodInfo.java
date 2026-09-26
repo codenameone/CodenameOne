@@ -45,9 +45,20 @@ public final class MethodInfo {
     private final Map<String, AnnotationValues> annotations;
     private final List<Map<String, AnnotationValues>> parameterAnnotations;
 
+    private final List<String> exceptions;
+
     MethodInfo(String name, String descriptor, String signature, int access,
                Map<String, AnnotationValues> annotations,
                List<Map<String, AnnotationValues>> parameterAnnotations) {
+        this(name, descriptor, signature, access, annotations, parameterAnnotations, null);
+    }
+
+    MethodInfo(String name, String descriptor, String signature, int access,
+               Map<String, AnnotationValues> annotations,
+               List<Map<String, AnnotationValues>> parameterAnnotations,
+               String[] exceptions) {
+        this.exceptions = exceptions == null ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(java.util.Arrays.asList(exceptions.clone()));
         this.name = name;
         this.descriptor = descriptor;
         this.signature = signature;
@@ -71,6 +82,11 @@ public final class MethodInfo {
     }
 
     public String getName() { return name; }
+    /// The internal names of the checked exceptions the method declares
+    /// (`java/io/IOException`), in declaration order.
+    public List<String> getExceptions() { return exceptions; }
+    public boolean isPrivate() { return (access & Opcodes.ACC_PRIVATE) != 0; }
+    public boolean isFinal() { return (access & Opcodes.ACC_FINAL) != 0; }
     public String getDescriptor() { return descriptor; }
 
     /// The JVM generic-type signature (e.g.

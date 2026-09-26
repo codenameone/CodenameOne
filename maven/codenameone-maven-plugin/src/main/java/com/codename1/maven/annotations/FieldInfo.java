@@ -65,6 +65,7 @@ public final class FieldInfo {
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
     public boolean isStatic() { return (access & Opcodes.ACC_STATIC) != 0; }
     public boolean isFinal() { return (access & Opcodes.ACC_FINAL) != 0; }
+    public boolean isPrivate() { return (access & Opcodes.ACC_PRIVATE) != 0; }
 
     public Map<String, AnnotationValues> getAnnotations() { return annotations; }
     public AnnotationValues getAnnotation(String descriptor) { return annotations.get(descriptor); }

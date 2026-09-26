@@ -40,6 +40,11 @@ public final class VirtualThread {
         return 0;
     }
 
+    /** Never a virtual thread on this runtime; see {@link #create}. */
+    public static long createTask(long token, int stackBytes) {
+        return 0;
+    }
+
     public static final int FINISHED = 0;
     public static final int PARKED_IO = 1;
     public static final int RUNNABLE = 2;

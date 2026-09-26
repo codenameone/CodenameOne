@@ -395,6 +395,195 @@ no null to read: a nullable column would load as `0`, `false` or `\0`, which is
 indistinguishable from a row that holds those. Declare the field as its boxed
 type -- `Integer` rather than `int` -- when the column can be empty.
 
+=== Services and dependency injection
+
+A controller that does everything itself turns into a class nobody can test.
+The usual split is Spring's: controllers translate HTTP, services hold the logic,
+repositories hold the SQL, and each one receives what it depends on instead of
+building it. The annotations are Spring's too, under
+`com.codename1.backend.annotations`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Signups.java[tag=backend-bean-service,indent=0]
+----
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SignupApi.java[tag=backend-bean-controller,indent=0]
+----
+
+`@Service`, `@Component` and `@Repository` mark a bean; a `@RestController` or
+`@WebSocketMapping` class is one too. A class with one constructor gets that
+constructor; with several, the one marked `@Autowired`. Fields and setters are
+injected only when marked `@Autowired`, and a private field is fine.
+
+What makes this different from Spring is when it happens. The build finds every
+bean, decides which constructor each gets and which bean fills each injection
+point, and writes that down as a class called `BackendWiring` -- a list of `new`
+calls, setter calls and `@PostConstruct` calls in dependency order. At run time
+there is no container, no classpath scan and no reflection, so a server with
+twenty beans starts as fast as one with none, and the translator can still drop
+every class nothing reaches. A dependency that can't be satisfied is a build
+error that names the injection point, rather than a server that fails its first
+request:
+
+----
+constructor parameter 1 of com.example.SignupApi needs a com.example.Signups,
+and no bean has that type. Annotate the implementing class @Component,
+@Service or @Repository, or declare a @Bean method returning one.
+----
+
+Two beans of one type are an error too, until one is marked `@Primary` or the
+injection point names one with `@Qualifier`. Constructors that depend on each
+other in a circle are refused; the same circle through `@Autowired` fields is
+fine, because fields are set after every bean exists.
+
+==== Configuration values
+
+`@Value` reads a setting, with a fallback after the colon, and converts it to the
+field's type:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SmtpMailer.java[tag=backend-bean-value,indent=0]
+----
+
+The value comes from the layers described under <<Configuration and profiles>>,
+so `MAIL_HOST` in the environment -- or `CN1_MAIL_HOST` -- overrides the file. A
+key with no fallback that nothing sets stops the server at startup with the key's
+name. `@ConfigurationProperties("mail")` on a bean does the same for every one of
+its setters at once: `setHost` reads `mail.host`, and `setMaxSize` reads
+`mail.maxSize` or `mail.max-size`.
+
+==== Profiles and factory methods
+
+`@Profile` and `@ConditionalOnProperty` make a bean depend on the deployment:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ConsoleMailer.java[tag=backend-bean-profile,indent=0]
+----
+
+The profile is the one choice the build can't make for you, so it becomes a
+single `if` in the generated startup code. `@ConditionalOnMissingBean` is decided
+entirely at build time: the bean steps aside when the application declares
+another of its type.
+
+A class from a library can't carry annotations. A `@Bean` method in a
+`@Configuration` class makes one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Limits.java[tag=backend-bean-factory,indent=0]
+----
+
+The build calls the method once, directly. There is no proxy around the
+configuration class, so one `@Bean` method calling another gets a second object;
+take the other bean as a parameter instead, which the build fills like a
+constructor's.
+
+==== Scopes
+
+A bean is a singleton unless it says otherwise. `@Scope("prototype")` gives each
+injection point its own instance. `@RequestScope` and `@SessionScope` give one
+per HTTP request or session; injected into a singleton, such a bean is reached
+through a small generated subclass that finds the current request's instance on
+each call, so the class can't be final and needs a constructor that takes no
+arguments. `@Lazy` builds a bean the first time it's used, through the same kind
+of subclass. That subclass has to run the bean's constructor once at startup to
+exist at all, so the expensive part of setting a bean up belongs in its
+`@PostConstruct` method, which runs only on the real instance.
+
+==== Testing
+
+Constructor injection is a constructor, so a unit test builds the object with
+fakes and needs nothing else. For the wired server -- what `@SpringBootTest`
+does in Spring -- a test in the backend module starts the generated wiring on a
+free port:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/WiringTest.java[tag=backend-wiring-test,indent=0]
+----
+
+=== Transactions
+
+`@Transactional` runs a method in a database transaction:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Signups.java[tag=backend-transactional,indent=0]
+----
+
+Everything the method does through the server's `DataSource` joins the
+transaction without being handed anything: the pool's own methods, the daos of an
+entity manager, and a `com.codename1.orm.session.Session` injected into the bean.
+The connection is borrowed, and the transaction begun, only when the method first
+touches the database. The rules are Spring's. An unchecked exception or an
+`Error` rolls back and a checked exception commits, which `rollbackFor` and
+`noRollbackFor` adjust. `propagation` picks what happens when a transaction is
+already open -- join it by default, or `REQUIRES_NEW`, `NESTED` for a savepoint,
+`SUPPORTS`, `MANDATORY`, `NOT_SUPPORTED` and `NEVER` -- and `readOnly = true`
+starts a transaction that PostgreSQL and MySQL refuse to write in.
+
+The build doesn't wrap the object in a proxy. It rewrites the compiled method:
+the body moves to a method of its own, and the method keeps its name and becomes
+three steps -- start the transaction, call that body, commit -- with the rollback
+decision written in as `instanceof` tests. That has one consequence Spring users should know about,
+and it's a welcome one: the transaction applies however the method is called,
+including from `this`, from a private caller and on an object built with `new`,
+each of which a Spring proxy skips.
+
+`Transactions.setRollbackOnly()` rolls back without throwing, for a method that
+wants to return a value and still undo its work.
+
+=== Background work
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Reports.java[tag=backend-background,indent=0]
+----
+
+An `@Async` method returns at once. Its caller gets a `Future` -- or nothing, for
+a `void` method -- that completes when the work does; the body returns
+`AsyncResult.of(value)` to supply the result. An exception from a `void` method is
+logged, because nobody holds anything to deliver it to.
+
+`@Scheduled` takes Spring's six-field cron -- seconds first -- or the `@daily`
+style macros, or `fixedRate` and `fixedDelay` in milliseconds. A literal cron
+expression is parsed by the build, so a typo fails the build instead of producing
+a job that never runs. A run never overlaps the previous run of the same job. With
+several instances of one server behind a load balancer, each would run every job;
+`lock` makes a run first claim a row in a small table in the server's database,
+so exactly one instance runs it.
+
+Background work runs on named executors, sized in configuration with
+`cn1.task.executor.<name>.threads`. The `thread` attribute chooses the kind of
+thread. A platform thread is the default and the right choice for anything that
+talks to a database, for the reason given under <<Limits worth knowing>>: an
+outbound read blocks the host thread under a virtual thread. A virtual thread
+suits work that mostly waits on the network, and costs next to nothing to
+start. Where there are no virtual threads -- the local JVM run, a TLS server,
+Windows -- a virtual task runs on a platform thread instead.
+
+=== Sessions
+
+A server keeps state for a client in an `HttpSession`, found again through a
+cookie:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Login.java[tag=backend-session,indent=0]
+----
+
+Nothing is stored and no cookie is sent until something asks for a session with
+`getSession(true)`. The cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` on a
+TLS server. Sessions live in memory by default; `cn1.session.store=jdbc` keeps
+them in the server's database instead, so any instance behind a load balancer can
+serve any client, at the price of attributes being limited to what JSON can
+store.
+
 === Sharing the contract with the app
 
 This is where having the same language on both ends stops being a slogan. An
@@ -712,6 +901,88 @@ export in whatever protocol the server exports with. It answers as soon as the
 spans are queued, and answers 503 when the queue is full so the app backs off.
 `cn1.otel.relay.maxBytes` and `cn1.otel.relay.maxSpans` bound a single export.
 
+=== Metrics and management
+
+Traces say what one request did; metrics say how the server is doing. With
+OpenTelemetry turned on, the server also exports metrics over OTLP, on the same
+endpoint and with the same settings as its traces: request durations by route,
+method and status, open connections, database pool use, the task queues,
+scheduled job runs, memory, and uptime. `OTEL_METRIC_EXPORT_INTERVAL` sets how
+often, a minute by default, and `cn1.otel.metrics.enabled=false` turns metrics off
+while leaving traces on.
+
+The application's own metrics follow the JMX model -- attributes to watch and
+operations to call -- with Spring's annotations for it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/PriceCache.java[tag=backend-managed,indent=0]
+----
+
+Each numeric `@ManagedAttribute` becomes a gauge named after the resource and the
+attribute, `prices.size` here, read when metrics are collected. `@Timed` records
+each call's duration as a histogram and `@Counted` counts calls and failures; like
+`@Transactional`, they're woven into the method at build time. For anything else,
+`Metrics.counter`, `Metrics.histogram` and `Metrics.gauge` create an instrument,
+which belongs in a static field so recording a value looks nothing up.
+
+The management endpoints make the same information available over HTTP, for a
+load balancer and for an operator:
+
+----
+GET  /manage/health        public; 503 while the server drains
+GET  /manage/metrics       every metric, as JSON
+GET  /manage/prometheus    every metric, in the Prometheus text format
+GET  /manage/jobs          the scheduled jobs and their last runs
+GET  /manage/managed       the managed beans and their attributes
+POST /manage/managed/{bean}/{operation}
+----
+
+They're on by default on a development profile. Anywhere else,
+`cn1.management.enabled=true` turns them on, and the server refuses to start
+unless `cn1.management.token` is set too; every endpoint but health then expects
+it as a bearer token. An operation needs the token even on a development profile,
+because it changes the running server.
+
+=== Serving MCP
+
+The Model Context Protocol lets an AI agent call tools. A backend serves it at
+`/mcp`, and there are two reasons to.
+
+The first is the application's own tools. An `@McpTool` method becomes a tool an
+agent can call, with its JSON Schema written by the build from the parameter
+types:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SupportTools.java[tag=backend-mcp-tool,indent=0]
+----
+
+The description is what an agent chooses tools by, so it says when to use the
+tool as well as what it does. A parameter needs `@McpParam` to name it, since a
+Java parameter name doesn't survive compilation. Outside a development profile
+the endpoint refuses to start without `cn1.mcp.token`, and it refuses a browser
+request from any origin other than the server's own host, which keeps a web page
+from driving it.
+
+The second is development. When the server runs through `cn1:backend` on a
+development profile, the same endpoint also serves tools for inspecting and
+exercising it: `backend_routes`, `backend_beans`, `backend_call` to send it a
+request, `backend_requests` for what it served and what failed, `backend_logs`,
+`backend_sql` against its database, `backend_jobs`, `backend_metrics` and
+`backend_managed`. An agent building the backend uses them the way a developer
+uses a debugger and a database console. The server prints the address when it
+starts, and Claude Code connects to it with one command:
+
+----
+claude mcp add --transport http cn1-backend http://127.0.0.1:8080/mcp
+----
+
+A host that only speaks stdio runs `com.codename1.backend.mcp.StdioBridge` from
+the backend jar with that address instead. None of these tools are compiled into a
+server built with `cn1:backend-package`, unless `-Dcn1.backend.devTools=true`
+asks for them.
+
 === What it costs
 
 Same handler, three ways, plus Go for an outside reference. Two pinned cores, 64
@@ -845,10 +1116,10 @@ no TLS, and what it does need is exactly what a translated binary is good at.
 * The class library is the Codename One runtime, not Java SE. A server dependency
   that assumes the full JDK won't translate, and Maven Central isn't the
   ecosystem this draws on.
-* Routing, configuration, a connection pool and a build-time ORM are the whole of
-  the framework. What a controller can be handed is the pool or the entity
-  manager, by declaring a constructor that takes one; there is no container, no
-  aspect layer and no starter ecosystem, and validation and error mapping are
+* Beans, injection, transactions, scheduling and metrics are resolved at build
+  time, so what a runtime container discovers on its own -- beans in a jar found
+  by scanning, a proxy created for a class decided at run time -- isn't
+  available. There is no starter ecosystem, and validation and error mapping are
   written by hand or generated from the REST contract.
 * The packaging goal compiles Java. It recompiles the module's sources against the
   backend's class library instead of reusing the jar Maven built, which is what

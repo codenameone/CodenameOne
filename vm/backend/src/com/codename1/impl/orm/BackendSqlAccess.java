@@ -38,6 +38,12 @@ public final class BackendSqlAccess implements SqlAccess {
     private final Database supplied;
     private final Dialect dialect;
     private Database transaction;
+    /**
+     * Whether {@link #transaction} is a {@code @Transactional} method's rather
+     * than this session's own. Then the session neither sends BEGIN nor COMMIT:
+     * the method's transaction decides, and a rollback here only marks it.
+     */
+    private boolean joinedTransaction;
     public BackendSqlAccess(DataSource pool,Database supplied,Dialect dialect) {
         this.pool=pool; this.supplied=supplied; this.dialect=dialect;
     }
@@ -84,7 +90,8 @@ public final class BackendSqlAccess implements SqlAccess {
     public String limit(int count,int offset) { return dialect.limit(count,offset); }
     private Database connection() throws IOException {
         Database db=transaction!=null?transaction:supplied!=null?supplied:pool.borrow();
-        if(db!=transaction && db.isInTransaction()) {
+        if(db!=transaction && db.isInTransaction()
+                && !(pool!=null && com.codename1.backend.Transactions.isJoined(pool,db))) {
             if(db!=supplied) { db.close();pool.release(db); }
             throw new IOException("Database is in another transaction");
         }
@@ -144,6 +151,12 @@ public final class BackendSqlAccess implements SqlAccess {
     }
     public void begin() throws IOException {
         if(transaction!=null) throw new IOException("Transaction already active");
+        if(supplied==null && pool!=null) {
+            // Inside a @Transactional method: this session becomes part of that
+            // transaction instead of opening one the connection would refuse.
+            Database joined=com.codename1.backend.Transactions.joined(pool);
+            if(joined!=null) { transaction=joined; joinedTransaction=true; return; }
+        }
         Database db=supplied!=null?supplied:pool.borrow();
         try {
             if("sqlite".equals(dialect())) db.execute("PRAGMA foreign_keys = ON",new Object[0]);
@@ -153,14 +166,21 @@ public final class BackendSqlAccess implements SqlAccess {
     public boolean isTransactionActive() { return transaction!=null && transaction.isInTransaction(); }
     public void commit() throws IOException {
         if(transaction==null) throw new IOException("No transaction");
+        if(joinedTransaction) { unpin(); return; }
         transaction.commitTransaction(); unpin();
     }
     public void rollback() throws IOException {
         if(transaction==null) throw new IOException("No transaction");
+        if(joinedTransaction) { com.codename1.backend.Transactions.markRollbackOnly(pool); unpin(); return; }
         transaction.rollbackTransaction(); unpin();
     }
-    private void unpin() { Database db=transaction; transaction=null; release(db); }
+    private void unpin() { Database db=transaction; transaction=null; joinedTransaction=false; release(db); }
     public void close() throws IOException {
+        if(transaction!=null && joinedTransaction) {
+            // Closed without committing: its changes were never flushed, and the
+            // method's transaction cannot commit as though they had been.
+            com.codename1.backend.Transactions.markRollbackOnly(pool); unpin(); return;
+        }
         if(transaction!=null) {
             boolean rolledBack=false;
             try { transaction.rollbackTransaction();rolledBack=true; }

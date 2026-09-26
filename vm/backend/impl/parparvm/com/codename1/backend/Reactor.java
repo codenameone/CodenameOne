@@ -99,6 +99,30 @@ public final class Reactor {
         }
     }
 
+    /**
+     * A non-blocking pipe, {@code {readEnd, writeEnd}}, for waking a thread that
+     * polls: register the read end, and {@link #wake} the write end from any
+     * thread. Null where there is none (Windows, which has no virtual threads to
+     * wake either).
+     */
+    public static int[] createWakePipe() {
+        int[] fds = new int[2];
+        return createWakePipeImpl(fds) == 0 ? fds : null;
+    }
+
+    /** Wakes whoever polls the pipe's read end. Safe from any thread. */
+    public static void wake(int writeFd) {
+        wakeImpl(writeFd);
+    }
+
+    /** Empties the pipe once its poller has woken. */
+    public static void drainWake(int readFd) {
+        drainWakeImpl(readFd);
+    }
+
+    private static native int createWakePipeImpl(int[] out);
+    private static native void wakeImpl(int fd);
+    private static native void drainWakeImpl(int fd);
     private static native int createImpl();
     private static native int registerImpl(int poller, int fd, int events, boolean modify);
     private static native int unregisterImpl(int poller, int fd);

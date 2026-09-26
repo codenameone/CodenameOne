@@ -201,6 +201,26 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aHandlerCanTakeTheRequestItself() throws Exception {
+        // The escape hatch the "no binding annotation" refusal points at. The
+        // parameter's type is read off the descriptor, where the member class is
+        // HttpServer$Request, and the check compared it with the dotted spelling
+        // only -- so a handler taking the Request was refused by the very message
+        // telling it to take one.
+        Router router = generate("package com.example;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/raw\")\n"
+                + "    public String raw(HttpServer.Request request) {\n"
+                + "        return request.getMethod() + \" \" + request.getTarget();\n"
+                + "    }\n"
+                + "}\n");
+        assertEquals("GET /raw?x=1", router.text("GET", "/raw?x=1"));
+    }
+
+    @Test
     public void theEntryPointDelegatesTheWholeLifecycleToTheBuilder() throws Exception {
         // The twenty lines every server used to open with -- read PORT, start,
         // install a shutdown handler, refuse if it could not be installed, drain

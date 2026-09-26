@@ -615,6 +615,12 @@ JAVA_INT com_codename1_backend_ServerSocket_awaitReadableImpl___int_int_R_int(CO
         // served, then nothing, with no thread in epoll_pwait, five in futex,
         // five in nanosleep, and the process at 7% CPU.
         CN1_YIELD_THREAD;
+        // SAID, not assumed. The reason is sticky: a collector-backpressure yield
+        // leaves it RUNNABLE, and the host's reset before resume runs where no
+        // virtual thread is current and so changes nothing. Left unsaid, this
+        // park was reported runnable after any such yield, and the host spun
+        // resuming a connection with no bytes to read.
+        cn1VirtualThreadSetYieldReason(CN1_VT_YIELD_IO);
         cn1VirtualThreadYield();
         CN1_RESUME_THREAD;
         return 1;
@@ -702,6 +708,8 @@ JAVA_INT com_codename1_backend_ServerSocket_readImpl___int_byte_1ARRAY_int_int_R
         // The array may MOVE while we are parked -- a collection can run, and the
         // buffer is an ordinary Java object -- so re-read the data pointer after
         // every resume rather than trusting the one taken before the park.
+        // Classified explicitly, for the reason given at the keep-alive park.
+        cn1VirtualThreadSetYieldReason(CN1_VT_YIELD_IO);
         cn1VirtualThreadYield();
         data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
     }
@@ -1035,6 +1043,65 @@ JAVA_INT com_codename1_backend_Reactor_unregisterImpl___int_int_R_int(CODENAME_O
  * is idle, which is most of its life -- without it the collector could not mark
  * past the reactor thread.
  */
+/*
+ * A pipe a host thread polls alongside its connections, so another thread can
+ * wake it: a background task handed to a virtual-thread host would otherwise
+ * wait out the host's poll timeout before it ran. Both ends non-blocking --
+ * a full pipe already means the host will wake, so a write that would block is
+ * simply dropped -- and close-on-exec.
+ */
+JAVA_INT com_codename1_backend_Reactor_createWakePipeImpl___int_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+#ifdef _WIN32
+    (void)out;
+    return -1;
+#else
+    int fds[2];
+    int i;
+    JAVA_ARRAY arr;
+    if(out == JAVA_NULL || ((JAVA_ARRAY)out)->length < 2) {
+        return -1;
+    }
+    if(pipe(fds) != 0) {
+        return -1;
+    }
+    for(i = 0 ; i < 2 ; i++) {
+        int flags = fcntl(fds[i], F_GETFL, 0);
+        fcntl(fds[i], F_SETFL, flags | O_NONBLOCK);
+        fcntl(fds[i], F_SETFD, FD_CLOEXEC);
+    }
+    arr = (JAVA_ARRAY)out;
+    ((JAVA_ARRAY_INT*)arr->data)[0] = fds[0];
+    ((JAVA_ARRAY_INT*)arr->data)[1] = fds[1];
+    return 0;
+#endif
+}
+
+/* One byte down the pipe; EAGAIN means it is full, which is as awake as it gets. */
+JAVA_VOID com_codename1_backend_Reactor_wakeImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd) {
+#ifndef _WIN32
+    char b = 1;
+    ssize_t n;
+    do {
+        n = write(fd, &b, 1);
+    } while(n < 0 && errno == EINTR);
+#else
+    (void)fd;
+#endif
+}
+
+/* Empties the pipe after a wake-up, so the next poll does not report it again. */
+JAVA_VOID com_codename1_backend_Reactor_drainWakeImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd) {
+#ifndef _WIN32
+    char buffer[64];
+    ssize_t n;
+    do {
+        n = read(fd, buffer, sizeof(buffer));
+    } while(n > 0 || (n < 0 && errno == EINTR));
+#else
+    (void)fd;
+#endif
+}
+
 JAVA_INT com_codename1_backend_Reactor_waitImpl___int_int_1ARRAY_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT poller, JAVA_OBJECT readyFds, JAVA_INT timeoutMillis) {
     JAVA_ARRAY arr;
     JAVA_ARRAY_INT* out;
@@ -1138,7 +1205,14 @@ extern JAVA_VOID com_codename1_backend_HttpServer_serveVirtual___int(CODENAME_ON
 
 struct cn1BackendVtArg {
     JAVA_INT fd;
+    /* For a background task's virtual thread: the key Tasks.runVirtual finds the
+     * task by. The fd is then -1, which is how the host tells the two apart. */
+    JAVA_LONG token;
 };
+
+/* The Java entry point a background task's virtual thread runs; named here for
+ * the same reason serveVirtual is -- nothing in Java calls it. */
+extern JAVA_VOID com_codename1_backend_Tasks_runVirtual___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG token);
 
 extern void markDeadThread(struct ThreadLocalData* d);
 
@@ -1203,6 +1277,19 @@ static void cn1VtReport(const char* why) {
             atomic_load(&cn1VtCreated) - atomic_load(&cn1VtFreed));
 }
 
+/*
+ * A background task's body: the same shape as a connection's, with the task
+ * looked up by token instead of a descriptor served. threadActive is cleared at
+ * the end for the reason given above, and the state is retired by freeImpl on
+ * the host once the switch back has happened.
+ */
+static void cn1BackendVtTaskBody(void* arg) {
+    struct cn1BackendVtArg* a = (struct cn1BackendVtArg*)arg;
+    struct ThreadLocalData* mine = getThreadLocalData();
+    com_codename1_backend_Tasks_runVirtual___long(mine, a->token);
+    mine->threadActive = JAVA_FALSE;
+}
+
 JAVA_VOID com_codename1_backend_VirtualThread_reportImpl__(CODENAME_ONE_THREAD_STATE) {
     cn1VtReport("report");
 }
@@ -1215,6 +1302,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_createImpl___int_int_R_long(CODENA
         return 0;
     }
     a->fd = fd;
+    a->token = 0;
     vt = cn1SpawnVirtualThread(cn1BackendVtBody, a, (size_t)stackBytes);
     if(vt == 0) {
         static int reported = 0;
@@ -1223,6 +1311,27 @@ JAVA_LONG com_codename1_backend_VirtualThread_createImpl___int_int_R_long(CODENA
             fprintf(stderr, "[CN1-VT] spawn failed (stackBytes=%d, errno=%d %s)\n",
                     (int)stackBytes, errno, strerror(errno));
         }
+        free(a);
+        return 0;
+    }
+    atomic_fetch_add(&cn1VtCreated, 1);
+    return (JAVA_LONG)(intptr_t)vt;
+}
+
+/* A virtual thread for a background task rather than a connection. It has no
+ * descriptor (descriptorOf answers -1), so the host runs it from its ring and
+ * never hands it to the poller. 0 when no stack could be had. */
+JAVA_LONG com_codename1_backend_VirtualThread_createTaskImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG token, JAVA_INT stackBytes) {
+    struct cn1BackendVtArg* a;
+    struct cn1VirtualThread* vt;
+    a = (struct cn1BackendVtArg*)malloc(sizeof(struct cn1BackendVtArg));
+    if(a == 0) {
+        return 0;
+    }
+    a->fd = -1;
+    a->token = token;
+    vt = cn1SpawnVirtualThread(cn1BackendVtTaskBody, a, (size_t)stackBytes);
+    if(vt == 0) {
         free(a);
         return 0;
     }
@@ -1369,6 +1478,11 @@ JAVA_VOID com_codename1_backend_VirtualThread_yieldImpl__(CODENAME_ONE_THREAD_ST
         // park is: a virtual thread that is not on a host cannot answer the
         // collector, and a collector waiting for it stops the whole server.
         CN1_YIELD_THREAD;
+        // RUNNABLE: it wants its next turn, not bytes. Left at the default this
+        // yield was reported as parked on I/O, so the host put the connection back
+        // on the poller -- where a handler waiting to respond waits for a client
+        // that is waiting for the response, and neither moves.
+        cn1VirtualThreadSetYieldReason(CN1_VT_YIELD_RUNNABLE);
         cn1VirtualThreadYield();
         CN1_RESUME_THREAD;
     }

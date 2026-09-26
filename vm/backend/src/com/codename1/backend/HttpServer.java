@@ -122,6 +122,11 @@ public final class HttpServer {
         private byte[] canonicalTarget;
         private int canonicalLength;
         private boolean canonicalChecked;
+        /** This request's session once looked up; see {@link #getSession(boolean)}. */
+        private HttpSession session;
+        private boolean sessionResolved;
+        /** The request's {@code @RequestScope} beans, by the slot the build gave each. */
+        private Object[] scopedBeans;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
@@ -576,6 +581,68 @@ public final class HttpServer {
             this.slices = null;
             this.body = null;
             this.headers = null;
+            this.session = null;
+            this.sessionResolved = false;
+            this.scopedBeans = null;
+        }
+
+        /** The session of this request, creating one if it has none. */
+        public HttpSession getSession() {
+            return getSession(true);
+        }
+
+        /**
+         * The session this request belongs to: the one its cookie names, or, with
+         * {@code create} set and no valid cookie, a new one the response will
+         * send a cookie for. Null when there is none and {@code create} is false.
+         * See {@link Sessions} for the cookie and where sessions are kept.
+         */
+        public HttpSession getSession(boolean create) {
+            if(sessionResolved && (session != null || !create)) {
+                return session;
+            }
+            try {
+                session = Sessions.find(sessionResolved ? null
+                        : Sessions.cookieValue(getHeader("cookie"), Sessions.getCookieName()),
+                        create);
+            } catch (IOException err) {
+                throw new IllegalStateException("The session store failed: "
+                        + err.getMessage());
+            }
+            sessionResolved = true;
+            return session;
+        }
+
+        /** The value of one cookie the client sent, or null. */
+        public String getCookie(String name) {
+            return Sessions.cookieValue(getHeader("cookie"), name);
+        }
+
+        /** The session, if this request looked it up. */
+        HttpSession resolvedSession() {
+            return session;
+        }
+
+        /**
+         * This request's {@code @RequestScope} beans, grown to hold at least
+         * {@code count}. Called by generated code.
+         */
+        public Object[] scopedBeans(int count) {
+            if(scopedBeans == null || scopedBeans.length < count) {
+                Object[] grown = new Object[count];
+                if(scopedBeans != null) {
+                    System.arraycopy(scopedBeans, 0, grown, 0, scopedBeans.length);
+                }
+                scopedBeans = grown;
+            }
+            return scopedBeans;
+        }
+
+        /** The request's beans, handed over for destruction and forgotten. */
+        Object[] takeScopedBeans() {
+            Object[] out = scopedBeans;
+            scopedBeans = null;
+            return out;
         }
 
         /**
@@ -607,6 +674,9 @@ public final class HttpServer {
             this.canonicalTarget = null;
             this.canonicalLength = 0;
             this.canonicalChecked = false;
+            this.session = null;
+            this.sessionResolved = false;
+            this.scopedBeans = null;
         }
 
         /**
@@ -1878,6 +1948,15 @@ public final class HttpServer {
             try {
                 for(int iter = 0 ; iter < hostCount ; iter++) {
                     server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
+                    // So a background task handed to this host runs now rather
+                    // than after the host's poll times out. Without one the task
+                    // still runs, just up to a poll interval later.
+                    int[] wake = Reactor.createWakePipe();
+                    if(wake != null) {
+                        server.vtHosts[iter].wakeRead = wake[0];
+                        server.vtHosts[iter].wakeWrite = wake[1];
+                        server.vtHosts[iter].poller.add(wake[0], Reactor.READ);
+                    }
                 }
                 server.pollers = new Thread[hostCount];
                 for(int iter = 0 ; iter < hostCount ; iter++) {
@@ -2378,6 +2457,9 @@ public final class HttpServer {
         VtHost[] hosts = vtHosts;
         if(hosts != null) {
             for(int iter = 0 ; iter < hosts.length ; iter++) {
+                if(hosts[iter] != null) {
+                    releaseTaskInbox(hosts[iter]);
+                }
                 // Host 0 SHARES the main reactor (see start()), so closing every
                 // host's poller and then the reactor would close that one twice --
                 // a double free of one descriptor, not the release of two.
@@ -2510,6 +2592,133 @@ public final class HttpServer {
     private static final java.util.concurrent.atomic.AtomicBoolean VT_SLOT_TAKEN =
             new java.util.concurrent.atomic.AtomicBoolean();
 
+    /** Background tasks waiting for a virtual thread, by the token its body asks with. */
+    private static final Map VIRTUAL_TASKS = new java.util.HashMap();
+    private static long nextVirtualTask;
+    /** Round-robin cursor over the hosts for new tasks. */
+    private static int nextTaskHost;
+
+    /**
+     * Whether a background task handed to {@link #submitVirtualTask} would get a
+     * virtual thread: this build has them and a server is running on them.
+     */
+    static boolean acceptsVirtualTasks() {
+        HttpServer server = ACTIVE_SERVER;
+        return server != null && server.running && server.vtHosts != null;
+    }
+
+    /**
+     * Runs {@code task} on a virtual thread of the running server's hosts.
+     * Answers false, having done nothing, when there is none to run it on; the
+     * caller then runs it on a platform thread.
+     *
+     * <p>The task is queued on a host and the host woken through its pipe; the
+     * host creates the virtual thread itself, because a virtual thread's VM state
+     * belongs to the host that runs it.
+     */
+    static boolean submitVirtualTask(Runnable task) {
+        HttpServer server = ACTIVE_SERVER;
+        if(task == null || server == null || !server.running || server.vtHosts == null) {
+            return false;
+        }
+        VtHost[] hosts = server.vtHosts;
+        long token;
+        VtHost host;
+        synchronized(VIRTUAL_TASKS) {
+            token = ++nextVirtualTask;
+            VIRTUAL_TASKS.put(new Long(token), task);
+            int index = nextTaskHost;
+            nextTaskHost = index + 1 >= hosts.length ? 0 : index + 1;
+            host = hosts[index];
+        }
+        if(host == null) {
+            takeVirtualTask(token);
+            return false;
+        }
+        synchronized(host.inbox) {
+            host.inbox.add(new Long(token));
+        }
+        if(host.wakeWrite >= 0) {
+            Reactor.wake(host.wakeWrite);
+        }
+        return true;
+    }
+
+    /**
+     * At shutdown: the tasks still queued on a host go to a platform thread
+     * rather than being lost with it, and its wake pipe is closed.
+     */
+    private static void releaseTaskInbox(VtHost host) {
+        Long[] tokens;
+        synchronized(host.inbox) {
+            tokens = (Long[])host.inbox.toArray(new Long[host.inbox.size()]);
+            host.inbox.clear();
+        }
+        for(int iter = 0 ; iter < tokens.length ; iter++) {
+            Runnable task = takeVirtualTask(tokens[iter].longValue());
+            if(task != null) {
+                Tasks.platform(task);
+            }
+        }
+        if(host.wakeRead >= 0) {
+            ServerSocket.closeFd(host.wakeRead);
+            ServerSocket.closeFd(host.wakeWrite);
+            host.wakeRead = -1;
+            host.wakeWrite = -1;
+        }
+    }
+
+    /** The task a virtual thread's body runs, handed over once. */
+    static Runnable takeVirtualTask(long token) {
+        synchronized(VIRTUAL_TASKS) {
+            return (Runnable)VIRTUAL_TASKS.remove(new Long(token));
+        }
+    }
+
+    /**
+     * Gives the tasks queued on {@code me} their virtual threads and puts them on
+     * the run ring. A task that cannot have one -- no stack to be had -- goes to
+     * a platform thread instead: it is not the task's fault, and this host must
+     * not run it inline, where a long task would stall every connection it owns.
+     */
+    private void drainTaskInbox(VtHost me) {
+        Long[] tokens;
+        synchronized(me.inbox) {
+            if(me.inbox.isEmpty()) {
+                return;
+            }
+            tokens = (Long[])me.inbox.toArray(new Long[me.inbox.size()]);
+            me.inbox.clear();
+        }
+        for(int iter = 0 ; iter < tokens.length ; iter++) {
+            long token = tokens[iter].longValue();
+            long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
+            if(handle == 0) {
+                Runnable task = takeVirtualTask(token);
+                if(task != null) {
+                    Tasks.platform(task);
+                }
+                continue;
+            }
+            me.ringAdd(handle);
+        }
+    }
+
+    /**
+     * Gives a task's virtual thread its turn. A task has no descriptor, so every
+     * answer but FINISHED puts it back on the ring: a yield -- which the VM
+     * reports as parked-on-I/O when nothing says otherwise -- would otherwise
+     * leave it waiting on a poller that will never report it.
+     */
+    private void advanceTask(VtHost me, long handle) {
+        int state = VirtualThread.resume(handle);
+        if(state == VirtualThread.FINISHED) {
+            VirtualThread.free(handle);
+            return;
+        }
+        me.ringAdd(handle);
+    }
+
     /**
      * What a connection's virtual thread runs. Reached from native code only,
      * which is also what keeps it from being dead-code eliminated.
@@ -2570,6 +2779,16 @@ public final class HttpServer {
         long[] ring = new long[256];
         int ringHead = 0;
         int ringCount = 0;
+
+        /**
+         * Tokens of background tasks other threads handed to this host. The one
+         * piece of a host that another thread writes, so it is locked; the host
+         * takes the whole list at once, at the top of its loop.
+         */
+        final java.util.ArrayList inbox = new java.util.ArrayList();
+        /** The wake pipe polled with the connections, or -1 where there is none. */
+        int wakeRead = -1;
+        int wakeWrite = -1;
 
         boolean ringEmpty() {
             return ringCount == 0;
@@ -2873,6 +3092,7 @@ public final class HttpServer {
         int listenFd = listener.getFd();
         boolean owner = (index == 0);       // only one host accepts
         while(running) {
+            drainTaskInbox(me);
             // Runnable virtual threads first: they wait for a turn, not for the
             // network, so polling before running them would delay them by the
             // whole poll timeout.
@@ -2900,6 +3120,11 @@ public final class HttpServer {
             }
             for(int iter = 0 ; iter < n ; iter++) {
                 int fd = ready[iter];
+                if(fd == me.wakeRead && fd >= 0) {
+                    // A task was queued; the top of the loop picks it up.
+                    Reactor.drainWake(fd);
+                    continue;
+                }
                 if(owner && fd == listenFd) {
                     acceptAll();
                     try {
@@ -2926,7 +3151,12 @@ public final class HttpServer {
         while(budget-- > 0 && !me.ringEmpty()) {
             long handle = me.ringTake();
             any = true;
-            advance(me, VirtualThread.descriptorOf(handle), handle);
+            int fd = VirtualThread.descriptorOf(handle);
+            if(fd < 0) {
+                advanceTask(me, handle);
+            } else {
+                advance(me, fd, handle);
+            }
         }
         return any;
     }
@@ -5311,21 +5541,28 @@ public final class HttpServer {
                     java.util.Iterator it = response.extraHeaders.keySet().iterator();
                     while(it.hasNext()) {
                         Object key = it.next();
-                        Object value = response.extraHeaders.get(key);
-                        if(key != null && value != null) {
-                            String name = String.valueOf(key);
-                            String text = String.valueOf(value);
-                            // The native side splits this block on '\n', so a newline
-                            // here is another field exactly as it is over HTTP/1.1.
-                            if(isServerOwnedHeader(name)) {
-                                System.err.println("dropped a response header the "
-                                        + "server owns: " + sanitizeForLog(name));
-                            } else if(isHeaderName(name) && isHeaderSafe(text)) {
-                                extra.add(name + ": " + text);
-                            } else {
-                                System.err.println("dropped a response header whose name "
-                                        + "is not a token or whose value carries a control "
-                                        + "character: " + sanitizeForLog(name));
+                        // A List is several fields of one name -- Set-Cookie is the
+                        // header that needs it, since a cookie cannot share a line.
+                        Object raw = response.extraHeaders.get(key);
+                        List several = raw instanceof List ? (List)raw : null;
+                        int count = several == null ? 1 : several.size();
+                        for(int each = 0 ; each < count ; each++) {
+                            Object value = several == null ? raw : several.get(each);
+                            if(key != null && value != null) {
+                                String name = String.valueOf(key);
+                                String text = String.valueOf(value);
+                                // The native side splits this block on '\n', so a newline
+                                // here is another field exactly as it is over HTTP/1.1.
+                                if(isServerOwnedHeader(name)) {
+                                    System.err.println("dropped a response header the "
+                                            + "server owns: " + sanitizeForLog(name));
+                                } else if(isHeaderName(name) && isHeaderSafe(text)) {
+                                    extra.add(name + ": " + text);
+                                } else {
+                                    System.err.println("dropped a response header whose name "
+                                            + "is not a token or whose value carries a control "
+                                            + "character: " + sanitizeForLog(name));
+                                }
                             }
                         }
                     }
@@ -7323,29 +7560,35 @@ public final class HttpServer {
             java.util.Iterator it = response.extraHeaders.keySet().iterator();
             while(it.hasNext()) {
                 Object key = it.next();
-                Object value = response.extraHeaders.get(key);
-                if(key != null && value != null) {
-                    String name = String.valueOf(key);
-                    String text = String.valueOf(value);
-                    // A CR or LF here ENDS the field and starts another, so a value
-                    // built from request data -- a decoded query parameter reaches a
-                    // handler with real CRLF in it if the client sent %0d%0a -- lets
-                    // the client write its own headers, or a second response. That is
-                    // response splitting, and it is a cache-poisoning primitive.
-                    // Dropped rather than escaped: there is no correct escaping, and a
-                    // header the handler could not have meant is not worth sending.
-                    if(isServerOwnedHeader(name)) {
-                        System.err.println("dropped a response header the server owns: "
-                                + sanitizeForLog(name));
-                    } else if(isHeaderName(name) && isHeaderSafe(text)) {
-                        conn.put("\r\n");
-                        conn.put(name);
-                        conn.put(": ");
-                        conn.put(text);
-                    } else {
-                        System.err.println("dropped a response header whose name is "
-                                + "not a token or whose value carries a control character: "
-                                + sanitizeForLog(name));
+                // A List is several fields of one name; see the HTTP/2 writer.
+                Object raw = response.extraHeaders.get(key);
+                List several = raw instanceof List ? (List)raw : null;
+                int count = several == null ? 1 : several.size();
+                for(int each = 0 ; each < count ; each++) {
+                    Object value = several == null ? raw : several.get(each);
+                    if(key != null && value != null) {
+                        String name = String.valueOf(key);
+                        String text = String.valueOf(value);
+                        // A CR or LF here ENDS the field and starts another, so a value
+                        // built from request data -- a decoded query parameter reaches a
+                        // handler with real CRLF in it if the client sent %0d%0a -- lets
+                        // the client write its own headers, or a second response. That is
+                        // response splitting, and it is a cache-poisoning primitive.
+                        // Dropped rather than escaped: there is no correct escaping, and a
+                        // header the handler could not have meant is not worth sending.
+                        if(isServerOwnedHeader(name)) {
+                            System.err.println("dropped a response header the server owns: "
+                                    + sanitizeForLog(name));
+                        } else if(isHeaderName(name) && isHeaderSafe(text)) {
+                            conn.put("\r\n");
+                            conn.put(name);
+                            conn.put(": ");
+                            conn.put(text);
+                        } else {
+                            System.err.println("dropped a response header whose name is "
+                                    + "not a token or whose value carries a control character: "
+                                    + sanitizeForLog(name));
+                        }
                     }
                 }
             }

@@ -159,6 +159,7 @@ public final class ClassScanner {
                     classAnnotations, methods, fields, source);
             out.setSourceFile(sourceFile);
             out.setSourceName(sourceNameOf(internalName));
+            out.setAccessible(accessibleFromAnywhere(internalName));
             return out;
         }
 
@@ -186,12 +187,39 @@ public final class ClassScanner {
          */
         private final Map<String, String[]> nesting = new LinkedHashMap<String, String[]>();
 
+        /** The access flags each member class in the chain was declared with. */
+        private final Map<String, Integer> innerAccess = new LinkedHashMap<String, Integer>();
+
         @Override
         public void visitInnerClass(String name, String outerName, String innerName,
                                     int innerAccess) {
             if (name != null && outerName != null && innerName != null) {
                 nesting.put(name, new String[] { outerName, innerName });
+                this.innerAccess.put(name, Integer.valueOf(innerAccess));
             }
+        }
+
+        /**
+         * Whether code in ANOTHER package can name this class: it is public, and so
+         * is every class it is nested in. The class file's own flags cannot say
+         * for a member class -- a private one is written package-private -- so
+         * the InnerClasses entries, which keep the declared flags, decide.
+         */
+        private boolean accessibleFromAnywhere(String internal) {
+            String current = internal;
+            while (current != null) {
+                Integer declared = innerAccess.get(current);
+                String[] entry = nesting.get(current);
+                if (declared == null || entry == null) {
+                    return current.equals(internal)
+                            ? (access & Opcodes.ACC_PUBLIC) != 0 : true;
+                }
+                if ((declared.intValue() & Opcodes.ACC_PUBLIC) == 0) {
+                    return false;
+                }
+                current = entry[0];
+            }
+            return true;
         }
 
         /**
@@ -235,6 +263,7 @@ public final class ClassScanner {
             final String mName = name;
             final String mDesc = descriptor;
             final String mSig = signature;
+            final String[] mExceptions = exceptions;
             final Map<String, AnnotationValues> mAnnotations =
                     new LinkedHashMap<String, AnnotationValues>();
             // Parameter-annotation maps are created lazily on first write so
@@ -264,7 +293,7 @@ public final class ClassScanner {
                 @Override
                 public void visitEnd() {
                     methods.add(new MethodInfo(mName, mDesc, mSig, mAccess,
-                            mAnnotations, paramAnnotations));
+                            mAnnotations, paramAnnotations, mExceptions));
                 }
             };
         }

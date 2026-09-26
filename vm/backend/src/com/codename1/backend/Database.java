@@ -779,6 +779,61 @@ public final class Database {
         transactionOwner = Thread.currentThread();
     }
 
+    /**
+     * Begins a transaction like {@link #beginTransaction}, telling the engine
+     * when it will only read.
+     *
+     * <p>A read-only one is a real promise on two of the engines: PostgreSQL and
+     * MySQL refuse a write inside it, and SQLite takes no write lock up front
+     * (BEGIN DEFERRED rather than IMMEDIATE), so it does not queue other writers
+     * behind a transaction that will never write.
+     */
+    public synchronized void beginTransaction(boolean readOnly) throws IOException {
+        if(!readOnly) {
+            beginTransaction();
+            return;
+        }
+        awaitTransactionOwner();
+        if (managedTransaction) throw new IOException("Transaction already active");
+        if(mysql != null) {
+            mysql.beginReadOnly();
+        } else {
+            execute(sqlite == null ? "BEGIN READ ONLY" : "BEGIN DEFERRED", null);
+        }
+        managedTransaction = true;
+        transactionOwner = Thread.currentThread();
+    }
+
+    /**
+     * Marks a savepoint inside the open transaction, which
+     * {@link #rollbackToSavepoint} can return to without ending the transaction.
+     * The name must be a plain identifier; it is written into the statement.
+     */
+    public synchronized void savepoint(String name) throws IOException {
+        savepointControl("SAVEPOINT", name);
+    }
+
+    /** Undoes everything since the savepoint, keeping the transaction open. */
+    public synchronized void rollbackToSavepoint(String name) throws IOException {
+        savepointControl("ROLLBACK TO SAVEPOINT", name);
+    }
+
+    /** Forgets a savepoint, keeping what was done since it. */
+    public synchronized void releaseSavepoint(String name) throws IOException {
+        savepointControl("RELEASE SAVEPOINT", name);
+    }
+
+    private void savepointControl(String verb, String name) throws IOException {
+        awaitTransactionOwner();
+        if (!managedTransaction) throw new IOException("No active transaction");
+        String checked = Dialect.checkIdentifier(name);
+        if(mysql != null) {
+            mysql.savepoint(verb, checked);
+            return;
+        }
+        execute(verb + " " + checked, null);
+    }
+
     /** Commits the transaction opened through this API. */
     public synchronized void commitTransaction() throws IOException {
         awaitTransactionOwner();
