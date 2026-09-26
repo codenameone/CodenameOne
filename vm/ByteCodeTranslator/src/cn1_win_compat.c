@@ -55,7 +55,7 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void)) {
         InterlockedExchange((volatile LONG*)&once_control->state, 2);
     } else {
         while (InterlockedCompareExchange((volatile LONG*)&once_control->state, 2, 2) != 2) {
-            Sleep(0);
+            SwitchToThread();   /* see sched_yield below: Sleep(0) can starve the initializer */
         }
     }
     return 0;
@@ -286,8 +286,25 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 
 /* --- <unistd.h> / <sys/time.h> replacements --- */
 int usleep(unsigned int usec) {
+    if (usec == 0) {
+        /* A yield, not a zero-length sleep: see sched_yield. */
+        SwitchToThread();
+        return 0;
+    }
     /* Millisecond granularity is sufficient for the runtime's polling loops. */
     Sleep((DWORD)((usec + 999) / 1000));
+    return 0;
+}
+
+/* A YIELD THAT CAN REACH A LOWER-PRIORITY THREAD. Sleep(0) gives the processor only to
+   a ready thread of EQUAL OR HIGHER priority, and the collector runs one step below the
+   mutators (it lowers its own priority when it starts). So a mutator spin-yielding while
+   it waits for the collector never let the collector run: with the process on one core
+   it could only progress when Windows' starvation boost fired, every few seconds, and a
+   Bench workload the other platforms finish in a second ran past a 900-second limit.
+   SwitchToThread yields to any thread ready on this processor, whatever its priority. */
+int sched_yield(void) {
+    SwitchToThread();
     return 0;
 }
 

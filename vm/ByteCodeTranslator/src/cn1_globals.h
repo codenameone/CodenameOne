@@ -2139,11 +2139,9 @@ static inline void cn1CpuRelax(void) {
 #endif
 }
 static inline void cn1ThreadYield(void) {
-#ifdef _WIN32
-    usleep(0);          /* the compatibility layer has no sched_yield */
-#else
+    /* On Windows the compatibility layer's sched_yield is SwitchToThread, which unlike
+       Sleep(0) also yields to the lower-priority collector thread. */
     sched_yield();
-#endif
 }
 // The sleeping rung, out of line: usleep is XSI, which a strict -std=c11 build of this
 // header does not declare, and after 640 spins the call costs nothing.

@@ -137,6 +137,7 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 
 /* --- <unistd.h> / <sys/time.h> replacements --- */
 int usleep(unsigned int usec);
+int sched_yield(void);
 int gettimeofday(struct timeval* tv, void* tz);
 
 /* Monotonic microsecond clock (QueryPerformanceCounter), immune to wall-clock
