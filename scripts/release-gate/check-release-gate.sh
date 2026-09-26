@@ -33,19 +33,23 @@ WORK="$(mktemp -d)"
 git tag -l --format='%(contents:body)' "$TAG" > "$WORK/record.json"
 jq -e . "$WORK/record.json" >/dev/null 2>&1 || fail "$TAG does not carry a gate record"
 
+# The two most recent releases before this one, for the week-over-week funnel check.
+VERSIONS="$(git tag -l '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Fxv "${GITHUB_REF_NAME:-}" | head -2 | paste -sd, -)"
+[ "$(tr ',' '\n' <<<"$VERSIONS" | grep -c .)" = 2 ] || fail "cannot find the two previous releases"
+
+# The artifact-size baseline is the PREVIOUS RELEASE's own gate record -- the commit
+# its version tag points at -- not the newest gate tag, which may belong to a candidate
+# that was gated and then abandoned. A release from before the gate has none, and then
+# there is no baseline to compare against.
 PREV_ARGS=()
-PREV="$(git for-each-ref --sort=-creatordate --format='%(refname:short)' 'refs/tags/release-gate/*' \
-        | grep -Fxv "$TAG" | head -1 || true)"
-if [ -n "$PREV" ]; then
-  git tag -l --format='%(contents:body)' "$PREV" > "$WORK/prev.json"
+PREV_VERSION="${VERSIONS%%,*}"
+PREV_COMMIT="$(git rev-parse -q --verify "refs/tags/$PREV_VERSION^{commit}" || true)"
+if [ -n "$PREV_COMMIT" ] && git rev-parse -q --verify "refs/tags/release-gate/$PREV_COMMIT" >/dev/null; then
+  git tag -l --format='%(contents:body)' "release-gate/$PREV_COMMIT" > "$WORK/prev.json"
   if jq -e . "$WORK/prev.json" >/dev/null 2>&1; then
     PREV_ARGS=(--previous-record "$WORK/prev.json")
   fi
 fi
-
-# The two most recent releases before this one, for the week-over-week funnel check.
-VERSIONS="$(git tag -l '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Fxv "${GITHUB_REF_NAME:-}" | head -2 | paste -sd, -)"
-[ "$(tr ',' '\n' <<<"$VERSIONS" | grep -c .)" = 2 ] || fail "cannot find the two previous releases"
 
 NOT_BEFORE="$(( $(git show -s --format=%ct "$COMMIT") * 1000 ))"
 python3 "$HERE/verify_gate.py" \

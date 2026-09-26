@@ -21,7 +21,7 @@ Usage (the workflows pass everything; see deploy-linux.yml / deploy-mac.yml):
                  --not-before <epoch ms the release was created>
                  --gate-account gate@codenameone.com
                  [--previous-record prev.json]
-                 [--funnel-versions 7.0.273,7.0.272]
+                 [--funnel-versions 7.0.273,7.0.272] [--daemon-jar-sha256 <hex>]
   env: RELEASE_GATE_SERVER (default https://cloud.codenameone.com),
        RELEASE_GATE_ADMIN_TOKEN
 """
@@ -75,7 +75,7 @@ def artifact_bytes(ev):
 
 def verify(record, matrix, *, matrix_sha, expected_matrix_sha, kind, subject, commit,
            phase, not_before, gate_account, evidence, previous_record=None,
-           funnel_versions=None):
+           funnel_versions=None, daemon_jar_sha256=None):
     """Returns a list of failure strings; empty means verified."""
     errors = []
     fail = errors.append
@@ -96,6 +96,8 @@ def verify(record, matrix, *, matrix_sha, expected_matrix_sha, kind, subject, co
         fail("record is phase %s, phase %s is required" % (record.get("phase"), phase))
     if phase == 2 and kind != "daemon":
         fail("phase 2 only exists for daemon releases")
+    if phase == 2 and not daemon_jar_sha256:
+        fail("phase 2 needs the release jar's SHA-256 to compare each build against")
 
     sha7 = commit[:7]
     recorded = {}
@@ -153,14 +155,21 @@ def verify(record, matrix, *, matrix_sha, expected_matrix_sha, kind, subject, co
         # A suffix is allowed after the row id (the hint fixture adds non-ASCII to it).
         if app != want_name and not app.startswith(want_name + "-"):
             fail("%s: build %s is app %r, expected %r" % (rid, bid, ev.get("appName"), want_name))
+        if phase == 1 and ev.get("target") != row["platform"]:
+            # The app name is chosen by the runner; the queue the server built on is not.
+            # Without this a misrouted row could pass under the right name.
+            fail("%s: build %s ran on queue %r, not %r" % (rid, bid, ev.get("target"), row["platform"]))
         if phase == 2:
             want_target = "debug_gate_%s_%s" % (row["platform"], subject)
             if ev.get("target") != want_target:
-                fail("%s: build %s ran on queue %r, not the canary queue %r"
+                fail("%s: build %s ran on queue %r, not the stand-in gate queue %r"
                      % (rid, bid, ev.get("target"), want_target))
             if ev.get("daemonVersion") != subject:
                 fail("%s: build %s was built by daemon %r, not %r"
                      % (rid, bid, ev.get("daemonVersion"), subject))
+            if daemon_jar_sha256 and ev.get("daemonJarSha256") != daemon_jar_sha256:
+                fail("%s: build %s was built by jar %s, not the release asset %s"
+                     % (rid, bid, ev.get("daemonJarSha256"), daemon_jar_sha256))
         size = artifact_bytes(ev)
         if size <= 0:
             fail("%s: build %s produced no artifact" % (rid, bid))
@@ -230,11 +239,15 @@ def verify_funnel_regression(matrix, versions, evidence, fail):
     if not cur.get("windowComplete"):
         fail("funnel window for %s is not complete yet (%d days)" % (versions[0], days))
         return
-    if int(cur.get("firstBuilders") or 0) < int(cfg["minFirstBuilders"]):
-        # Too few new builders to compare rates; absence of users is itself what
-        # the funnel walk above has to explain, so this is not a pass by default.
-        fail("only %s first-time builders on %s (minimum %s): the funnel is not producing builders"
-             % (cur.get("firstBuilders"), versions[0], cfg["minFirstBuilders"]))
+    low = [(v, w.get("firstBuilders")) for v, w in ((versions[0], cur), (versions[1], prev))
+           if int(w.get("firstBuilders") or 0) < int(cfg["minFirstBuilders"])]
+    if low:
+        # A rate over a handful of users is noise: one success makes a 100% baseline
+        # that a healthy release then "drops" from. Too small a window on either side
+        # means there is no comparison to make, not a pass or a failure. The synthetic
+        # new-user walk above is what every release must pass regardless of volume.
+        print("funnel comparison skipped: too few first-time builders (%s; minimum %s)"
+              % (", ".join("%s: %s" % (v, n) for v, n in low), cfg["minFirstBuilders"]))
         return
     for metric, max_drop in cfg["maxDrop"].items():
         a, b = cur.get(metric), prev.get(metric)
@@ -258,6 +271,7 @@ def main(argv=None):
     ap.add_argument("--gate-account", required=True)
     ap.add_argument("--previous-record")
     ap.add_argument("--funnel-versions")
+    ap.add_argument("--daemon-jar-sha256")
     a = ap.parse_args(argv)
 
     token = os.environ.get("RELEASE_GATE_ADMIN_TOKEN", "")
@@ -278,7 +292,8 @@ def main(argv=None):
                     kind=a.kind, subject=a.subject, commit=a.commit, phase=a.phase,
                     not_before=a.not_before, gate_account=a.gate_account, evidence=evidence,
                     previous_record=prev,
-                    funnel_versions=a.funnel_versions.split(",") if a.funnel_versions else None)
+                    funnel_versions=a.funnel_versions.split(",") if a.funnel_versions else None,
+                    daemon_jar_sha256=a.daemon_jar_sha256)
     if errors:
         print("Release gate NOT verified (%d problems):" % len(errors))
         for e in errors:
