@@ -115,6 +115,17 @@ public class CollectionSemanticsApp {
         }
     }
 
+    // An addAll that reads the subclass's own state. If the ArrayList(Collection)
+    // constructor dispatched to it, it would run before `log` is assigned.
+    static class FieldDependent extends ArrayList<String> {
+        private final java.util.List<String> log = new java.util.ArrayList<String>();
+        FieldDependent(java.util.Collection<String> source) { super(source); }
+        public boolean addAll(java.util.Collection<? extends String> source) {
+            log.add("addAll");
+            return super.addAll(source);
+        }
+    }
+
     static void bulkCopyCases() {
         for (int capacity : new int[] {0, 30}) {
             for (int index = 0; index <= 4; index++) {
@@ -140,8 +151,9 @@ public class CollectionSemanticsApp {
         emit("bulk.source", ordered);
         ConstructorOverride overridden = new ConstructorOverride(java.util.Arrays.asList("x", "y"));
         emit("bulk.constructorOverride", overridden);
-        // The override call is this JavaAPI constructor's existing behavior;
-        // JDK constructors need not dispatch to it. Its result still matches.
+        // The copy constructor never dispatches to the override, as on the JDK.
+        emit("bulk.constructorOverride.calls", ConstructorOverride.calls);
+        emit("bulk.fieldDependent", new FieldDependent(java.util.Arrays.asList("p", "q")));
         CustomList custom = new CustomList(); custom.add("ignored");
         emit("bulk.override", new ArrayList<String>(custom));
         emit("bulk.empty", destination.addAll(java.util.Collections.<String>emptyList()));

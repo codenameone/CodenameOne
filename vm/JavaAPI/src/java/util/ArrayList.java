@@ -66,10 +66,15 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         int nativeResult = initFromNative(collection);
         if (nativeResult >= 0) return;
         if (nativeResult == -2) throw new OutOfMemoryError();
-        int initial = collection.size();
-        if (initial < 0) throw new IllegalArgumentException();
-        cn1Storage = NativeStorage.references(initial);
-        addAll(collection);
+        // Copied here, never through addAll: a subclass calling super(collection) would
+        // otherwise have its addAll override run before its own fields are initialized.
+        // The array-backed constructor this replaced never dispatched either.
+        Object[] values = collection.toArray();
+        cn1Storage = NativeStorage.references(values.length);
+        for (int i = 0; i < values.length; i++) {
+            NativeStorage.setOwned(this, cn1Storage, i, values[i]);
+        }
+        size = values.length;
     }
 
     private native int initFromNative(Collection<?> collection);
