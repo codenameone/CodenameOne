@@ -1,0 +1,704 @@
+{
+  "schema": 1,
+  "note": "Changing this file changes its SHA-256; the deploy and release workflows refuse any gate record made against a matrix whose hash is not the RELEASE_GATE_MATRIX_SHA256 repo variable.",
+  "maxArtifactGrowth": 0.25,
+  "sources": {
+    "A": "archetype generated at the CN1 SHA being released",
+    "B": "production console starter.zip",
+    "C": "Initializr ZIP (GeneratorModel)",
+    "D": "pinned pre-July legacy project (fixtures/legacy)",
+    "E": "risky-hint fixture (fixtures/hints)"
+  },
+  "rows": [
+    {
+      "id": "A.android",
+      "source": "A",
+      "target": "android",
+      "kind": "cloud",
+      "platform": "android",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.ios",
+      "source": "A",
+      "target": "ios",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.ios_release",
+      "source": "A",
+      "target": "ios_release",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.mac_desktop",
+      "source": "A",
+      "target": "mac_desktop",
+      "kind": "cloud",
+      "platform": "desktop_macosx",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.windows_desktop",
+      "source": "A",
+      "target": "windows_desktop",
+      "kind": "cloud",
+      "platform": "desktop_windows",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.mac_native",
+      "source": "A",
+      "target": "mac_native",
+      "kind": "cloud",
+      "platform": "macos",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.windows_device",
+      "source": "A",
+      "target": "windows_device",
+      "kind": "cloud",
+      "platform": "win32",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.linux_device",
+      "source": "A",
+      "target": "linux_device",
+      "kind": "cloud",
+      "platform": "linux",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.javascript_cloud",
+      "source": "A",
+      "target": "javascript_cloud",
+      "kind": "cloud",
+      "platform": "javascript",
+      "maxArtifactBytes": 104857600,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "A.jar",
+      "source": "A",
+      "target": "jar",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "A.javascript",
+      "source": "A",
+      "target": "javascript",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "A.android_source",
+      "source": "A",
+      "target": "android_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "A.ios_source",
+      "source": "A",
+      "target": "ios_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "B.android",
+      "source": "B",
+      "target": "android",
+      "kind": "cloud",
+      "platform": "android",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.ios",
+      "source": "B",
+      "target": "ios",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.ios_release",
+      "source": "B",
+      "target": "ios_release",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.mac_desktop",
+      "source": "B",
+      "target": "mac_desktop",
+      "kind": "cloud",
+      "platform": "desktop_macosx",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.windows_desktop",
+      "source": "B",
+      "target": "windows_desktop",
+      "kind": "cloud",
+      "platform": "desktop_windows",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.mac_native",
+      "source": "B",
+      "target": "mac_native",
+      "kind": "cloud",
+      "platform": "macos",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.windows_device",
+      "source": "B",
+      "target": "windows_device",
+      "kind": "cloud",
+      "platform": "win32",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.linux_device",
+      "source": "B",
+      "target": "linux_device",
+      "kind": "cloud",
+      "platform": "linux",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.javascript_cloud",
+      "source": "B",
+      "target": "javascript_cloud",
+      "kind": "cloud",
+      "platform": "javascript",
+      "maxArtifactBytes": 104857600,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.jar",
+      "source": "B",
+      "target": "jar",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "B.javascript",
+      "source": "B",
+      "target": "javascript",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "B.android_source",
+      "source": "B",
+      "target": "android_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "B.ios_source",
+      "source": "B",
+      "target": "ios_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "C.android",
+      "source": "C",
+      "target": "android",
+      "kind": "cloud",
+      "platform": "android",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.ios",
+      "source": "C",
+      "target": "ios",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.ios_release",
+      "source": "C",
+      "target": "ios_release",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.mac_desktop",
+      "source": "C",
+      "target": "mac_desktop",
+      "kind": "cloud",
+      "platform": "desktop_macosx",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.windows_desktop",
+      "source": "C",
+      "target": "windows_desktop",
+      "kind": "cloud",
+      "platform": "desktop_windows",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.mac_native",
+      "source": "C",
+      "target": "mac_native",
+      "kind": "cloud",
+      "platform": "macos",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.windows_device",
+      "source": "C",
+      "target": "windows_device",
+      "kind": "cloud",
+      "platform": "win32",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.linux_device",
+      "source": "C",
+      "target": "linux_device",
+      "kind": "cloud",
+      "platform": "linux",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.javascript_cloud",
+      "source": "C",
+      "target": "javascript_cloud",
+      "kind": "cloud",
+      "platform": "javascript",
+      "maxArtifactBytes": 104857600,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "C.jar",
+      "source": "C",
+      "target": "jar",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "C.javascript",
+      "source": "C",
+      "target": "javascript",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "C.android_source",
+      "source": "C",
+      "target": "android_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "C.ios_source",
+      "source": "C",
+      "target": "ios_source",
+      "kind": "local",
+      "phases": [
+        1
+      ]
+    },
+    {
+      "id": "D.android",
+      "source": "D",
+      "target": "android",
+      "kind": "cloud",
+      "platform": "android",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.ios",
+      "source": "D",
+      "target": "ios",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.ios_release",
+      "source": "D",
+      "target": "ios_release",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.mac_desktop",
+      "source": "D",
+      "target": "mac_desktop",
+      "kind": "cloud",
+      "platform": "desktop_macosx",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.windows_desktop",
+      "source": "D",
+      "target": "windows_desktop",
+      "kind": "cloud",
+      "platform": "desktop_windows",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.mac_native",
+      "source": "D",
+      "target": "mac_native",
+      "kind": "cloud",
+      "platform": "macos",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.windows_device",
+      "source": "D",
+      "target": "windows_device",
+      "kind": "cloud",
+      "platform": "win32",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.linux_device",
+      "source": "D",
+      "target": "linux_device",
+      "kind": "cloud",
+      "platform": "linux",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "D.javascript_cloud",
+      "source": "D",
+      "target": "javascript_cloud",
+      "kind": "cloud",
+      "platform": "javascript",
+      "maxArtifactBytes": 104857600,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.android",
+      "source": "E",
+      "target": "android",
+      "kind": "cloud",
+      "platform": "android",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.ios",
+      "source": "E",
+      "target": "ios",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.ios_release",
+      "source": "E",
+      "target": "ios_release",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.mac_desktop",
+      "source": "E",
+      "target": "mac_desktop",
+      "kind": "cloud",
+      "platform": "desktop_macosx",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.windows_desktop",
+      "source": "E",
+      "target": "windows_desktop",
+      "kind": "cloud",
+      "platform": "desktop_windows",
+      "maxArtifactBytes": 262144000,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.mac_native",
+      "source": "E",
+      "target": "mac_native",
+      "kind": "cloud",
+      "platform": "macos",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.windows_device",
+      "source": "E",
+      "target": "windows_device",
+      "kind": "cloud",
+      "platform": "win32",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.linux_device",
+      "source": "E",
+      "target": "linux_device",
+      "kind": "cloud",
+      "platform": "linux",
+      "maxArtifactBytes": 157286400,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "E.javascript_cloud",
+      "source": "E",
+      "target": "javascript_cloud",
+      "kind": "cloud",
+      "platform": "javascript",
+      "maxArtifactBytes": 104857600,
+      "phases": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "B.mac_catalyst",
+      "source": "B",
+      "target": "mac_catalyst",
+      "kind": "cloud",
+      "platform": "iphone",
+      "maxArtifactBytes": 209715200,
+      "phases": [
+        1,
+        2
+      ]
+    }
+  ],
+  "funnel": {
+    "routes": [
+      "starter",
+      "initializr",
+      "archetype"
+    ],
+    "steps": [
+      "signup",
+      "console",
+      "project",
+      "simulator",
+      "default_build",
+      "first_success",
+      "free_tier_touchpoints",
+      "reauth"
+    ],
+    "buildSteps": [
+      "default_build",
+      "first_success"
+    ]
+  },
+  "funnelRegression": {
+    "comparedAfterDays": 7,
+    "minFirstBuilders": 10,
+    "maxDrop": {
+      "firstBuildSuccessRate": 0.1,
+      "handshakeToBuildRate": 0.15,
+      "starterToHandshakeRate": 0.15
+    }
+  }
+}
