@@ -4102,6 +4102,91 @@ public abstract class CodenameOneImplementation {
         return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
     }
 
+    /// True when `#colorMatrixRegion` works on this graphics context. Ports override.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the native graphics
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        return false;
+    }
+
+    /// Recolours the painted region through a colour matrix; see
+    /// `com.codename1.ui.Graphics#colorMatrixRegion`. Ports override; the default does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the native graphics
+    ///
+    /// - `x`: region x
+    ///
+    /// - `y`: region y
+    ///
+    /// - `width`: region width
+    ///
+    /// - `height`: region height
+    ///
+    /// - `matrix`: 12-float colour matrix
+    ///
+    /// - `mask`: optional coverage mask
+    ///
+    /// - `cornerRadius`: corner radius, negative for a capsule
+    ///
+    /// - `amount`: strength 0..1
+    ///
+    /// #### Returns
+    ///
+    /// false when unsupported
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            Image mask, float cornerRadius, float amount) {
+        return false;
+    }
+
+    /// True when `glassLensRegion` works on this graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isGlassLensRegionSupported(Object graphics) {
+        return false;
+    }
+
+    /// See Graphics.glassLensRegion; the default does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: lens left edge (translated)
+    ///
+    /// - `y`: lens top edge (translated)
+    ///
+    /// - `width`: lens width
+    ///
+    /// - `height`: lens height
+    ///
+    /// - `cornerRadius`: corner radius, negative for a capsule
+    ///
+    /// - `optics`: the GlassLensBlend parameters
+    ///
+    /// - `amount`: overall strength 0..1
+    ///
+    /// #### Returns
+    ///
+    /// false when unsupported
+    public boolean glassLensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float[] optics, float amount) {
+        return false;
+    }
+
     /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
     /// dark-&gt;accent tint over the painted content). Default unsupported; the iOS
     /// port overrides it. Returns false so callers can fall back (e.g. to a tint).

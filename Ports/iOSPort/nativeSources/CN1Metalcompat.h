@@ -66,6 +66,13 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
     CN1MetalPipelineMultiStopGradient, // CSS-style multi-stop gradient (linear / radial / conic).
     CN1MetalPipelineLens,              // iOS-26 selection-drop lens (samples a blitted bar
                                        // region on-GPU; warp + tint + light, see cn1_fs_lens).
+    CN1MetalPipelineColorMatrix,       // Graphics.colorMatrixRegion (samples a blitted screen
+                                       // region + optional mask; see cn1_fs_colormatrix).
+    CN1MetalPipelineGlassMaterial,     // Liquid Glass on the GPU: colour material (offscreen,
+    CN1MetalPipelineGlassBoxH,         // no stencil), the two passes of one box-blur
+    CN1MetalPipelineGlassBoxV,         // iteration (offscreen), and the optics drawn on
+    CN1MetalPipelineGlassOptics,       // screen. See CN1MetalGlassEncode.
+    CN1MetalPipelineGlassLens,         // Graphics.glassLensRegion (see cn1_fs_glass_lens).
     CN1MetalPipelineCount
 };
 
@@ -111,6 +118,15 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
 // Called by METALView.presentFramebuffer just before commit. Clears the
 // active encoder reference so subsequent ops no-op until the next frame.
 void CN1MetalEndFrame(void);
+
+// Marks the end of a frame (METALView.presentFramebuffer). Until then, a
+// CN1MetalBeginFrame on a new encoder is a MID-FRAME restart -- the screen
+// effects (blur, glass, lens, colour matrix) end the encoder to read the
+// frame and open another -- and carries the graphics state the Java side
+// already sent (transform, rectangular clip, polygon clip) onto it, since
+// the Java side does not re-send state it believes is still in force. After
+// this call the next CN1MetalBeginFrame starts a fresh frame.
+void CN1MetalFrameFinished(void);
 
 // Returns the active encoder or nil if no frame is in flight. Ops use this
 // to skip drawing when setFramebuffer couldn't acquire a drawable.
@@ -206,6 +222,48 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
 void CN1MetalDrawLens(id<MTLTexture> texture, int x, int y, int w, int h,
                       int fw, int fh, float magnify, float aberration,
                       int tintColor, float tintStrength, float cornerRadiusPx);
+
+// Graphics.colorMatrixRegion: draws a quad at (x,y,w,h) logical coords sampling
+// `texture` (a fw x fh px blitted copy of that screen region) and, when non-nil,
+// `mask` (stretched over the region, sampled the way CN1MetalDrawImage would
+// draw it there). Each pixel becomes mix(p, clamp(M.p + off), k) with
+// k = amount * shape coverage * mask alpha; matrix is row-major 3x4.
+// cornerRadiusPx < 0 = capsule, 0 = the whole rectangle.
+void CN1MetalDrawColorMatrix(id<MTLTexture> texture, id<MTLTexture> mask, int x, int y, int w, int h,
+                             int fw, int fh, const float* matrix, float cornerRadiusPx, float amount);
+
+// Liquid Glass (glassScreenRegion) on the GPU, the same three stages as the CPU
+// glassScreenRegionX path -- colour material, a triple box blur approximating a
+// Gaussian, then the optics (shape, edge refraction, specular rim, outline) -- with
+// the CPU code's integer rounding, so both produce the same patch. Encode runs the
+// offscreen passes on `cb` (no render encoder may be open) and hands back the
+// blurred material and the raw backdrop; Draw then draws the patch on the open
+// screen encoder. Encode returns NO when the pipelines are unavailable.
+typedef struct {
+    id<MTLTexture> blurred;   // bw x bh, the component at (pad, pad)
+    id<MTLTexture> raw;       // the unmodified backdrop around the component
+    int pad;
+    int bw;
+    int bh;
+    int rawX;                 // the component's origin inside `raw`
+    int rawY;
+    int rawW;                 // the part of `raw` holding backdrop pixels
+    int rawH;
+} CN1MetalGlassPatch;
+BOOL CN1MetalGlassEncode(id<MTLCommandBuffer> cb, id<MTLTexture> backdrop, int fx, int fy, int fw, int fh,
+                         float rad, float sat, float scale, float offset, float curve, float curveMid,
+                         CN1MetalGlassPatch *out);
+void CN1MetalDrawGlass(const CN1MetalGlassPatch *patch, int x, int y, int w, int h, int fw, int fh,
+                       float cornerRadius, float s, float refract, float specular, float outline);
+
+// Graphics.glassLensRegion: draws the quad (qx,qy,qw,qh) logical -- the lens plus
+// its margin -- sampling `texture`, a blit of the screen whose pixel (0,0) is the
+// physical pixel (srcX, srcY). The lens rect (lx,ly,lw,lh) and the optics lengths
+// are in physical pixels; s = physical pixels per logical unit.
+void CN1MetalDrawGlassLens(id<MTLTexture> texture, int srcX, int srcY, int srcW, int srcH,
+                           int qx, int qy, int qw, int qh, float s,
+                           float lx, float ly, float lw, float lh, float cornerRadiusPx,
+                           const float* optics, float amount);
 
 // Tile an RGBA image across (x,y,w,h). imageWidth/imageHeight are the
 // natural size of the source UIImage. Issues one textured quad per

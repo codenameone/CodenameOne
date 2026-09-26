@@ -27,7 +27,7 @@ MOBILE_KEYS = {"native", "native_android"}
 DESKTOP_KEYS = {"native_win", "native_mac", "native_gnome"}
 KNOWN_KEYS = MOBILE_KEYS | DESKTOP_KEYS | {
     "id", "cn1_uiid", "text", "backdrop", "material", "states", "platforms", "frames",
-    "tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px",
+    "golden_sets", "motion_checks", "tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px",
 }
 # Use fixture runner IDs, not host names: getNativeKind("linux") resolves a key,
 # but a platforms: linux filter does not match the workflow's "gnome" runner.
@@ -37,6 +37,9 @@ KNOWN_PLATFORMS = set(PLATFORM_NATIVE_KEYS)
 KNOWN_STATES = {"normal", "pressed", "disabled", "selected", "hover", "focus"}
 KNOWN_MATERIALS = {"normal", "glass", "lens"}
 KNOWN_BACKDROPS = {"photo", "gradient", "grouped"}
+# motion_checks selects MorphFrameValidator's property checks for a frames row.
+KNOWN_MOTION_CHECKS = {"monotonic", "distinct"}
+GOLDENS_DIR = REPO / "scripts/fidelity-app/goldens"
 TILE_KEYS = {"tile_width_mm", "tile_height_mm", "tile_width_px", "tile_height_px"}
 
 DEFAULT_KEYS = TILE_KEYS | {"bg", "appearances"}
@@ -200,6 +203,16 @@ def main():
 
         if "frames" in r:
             check_frames(r["frames"], where)
+        for key in ("golden_sets", "motion_checks"):
+            if key in r and "frames" not in r:
+                yield_error(f"{where}: '{key}' only applies to a frames row")
+        for gs in [unquote(g.strip()) for g in r.get("golden_sets", "").split(",") if g.strip()]:
+            # A misspelled set would silently exempt the row from every run.
+            if not (GOLDENS_DIR / gs).is_dir():
+                yield_error(f"{where}: unknown golden set '{gs}' (no goldens/{gs} directory)")
+        if "motion_checks" in r and unquote(r["motion_checks"]) not in KNOWN_MOTION_CHECKS:
+            yield_error(f"{where}: unknown motion_checks '{r['motion_checks']}' "
+                        f"(known: {sorted(KNOWN_MOTION_CHECKS)})")
 
         has_desktop = bool(DESKTOP_KEYS & set(r))
         has_mobile = bool(MOBILE_KEYS & set(r))

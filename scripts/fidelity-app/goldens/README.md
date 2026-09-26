@@ -67,6 +67,13 @@ Worth stating plainly because the neighbouring `-anim` directory IS native:
 tabs. Reading `-frames` as native too leads to preparing an `xcodegen` + XCUITest
 capture for something a single flag produces.
 
+The two iOS generations do not capture the same tab frames. `ios-26-metal-frames`
+holds `TabsMorph`, the progress-based iOS 26 morph. `ios-27-metal-frames` holds
+`TabsGlassMotion`, the time-based iOS 27 motion measured from UIKit
+(`com.codename1.ui.TabGlassMotion`), frozen at value x 10 ms. The rows say which
+set they belong to with `golden_sets:`, and the device runner and
+`MorphFrameValidator --golden-set` both honour it.
+
 **Seeded goldens still have to be looked at**, because whatever CN1 rendered
 becomes the reference. What that check looks like, from seeding `ios-27-metal-frames`:
 the 24 names and sizes matched `ios-26-metal-frames` exactly, none were blank, the

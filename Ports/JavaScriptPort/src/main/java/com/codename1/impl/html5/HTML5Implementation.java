@@ -8845,6 +8845,48 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        // Supported wherever lensRegion is: both ride the same surface command stream and
+        // are replayed by the host over the target surface's own pixels.
+        return graphics instanceof HTML5Graphics;
+    }
+
+    @Override
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            Image mask, float cornerRadius, float amount) {
+        if (!(graphics instanceof HTML5Graphics)) {
+            return false;
+        }
+        if (width <= 0 || height <= 0 || amount <= 0) {
+            return true;
+        }
+        NativeImage nativeMask = null;
+        if (mask != null) {
+            Object peer = mask.getImage();
+            if (!(peer instanceof NativeImage)) {
+                // An image with no native peer of its own (a FontImage, say): rasterize it
+                // into a mutable image, which does have one, so it can cross as a surface.
+                int mw = mask.getWidth();
+                int mh = mask.getHeight();
+                if (mw <= 0 || mh <= 0) {
+                    return true;
+                }
+                Image raster = Image.createImage(mw, mh, 0);
+                raster.getGraphics().drawImage(mask, 0, 0);
+                peer = raster.getImage();
+                if (!(peer instanceof NativeImage)) {
+                    return false;
+                }
+            }
+            nativeMask = (NativeImage) peer;
+        }
+        // The host-side canvas bridge runs com.codename1.ui.plaf.ColorMatrixBlend's math,
+        // float for float, over the surface's own pixels during ordered command replay.
+        g(graphics).colorMatrixRegion(x, y, width, height, matrix, nativeMask, cornerRadius, amount);
+        return true;
+    }
+
+    @Override
     public Image gaussianBlurImage(Image image, float radius) {
         if (image == null) {
             return image;
@@ -12386,6 +12428,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         public void draw(CanvasRenderingContext2D ctx, int x, int y){
             draw(ctx, x, y, getWidth(), getHeight());
             
+        }
+
+        /**
+         * Records a Graphics.colorMatrixRegion that uses this image as its mask. The mask
+         * crosses the way a drawImage source does: a loaded image as its host-ref, a mutable
+         * image by surface id after flushing its pending commands, so the host samples
+         * pixels that are actually there. An image with neither (still loading) records
+         * nothing: the host would have to skip the op anyway, because applying the matrix
+         * unmasked would recolour the whole region.
+         */
+        public void recordColorMatrixRegion(SurfaceCommandRecorder recorder, int x, int y, int w, int h,
+                float[] matrix, float cornerRadius, float amount) {
+            switch (JavaScriptNativeImageAdapter.resolveSurfaceKind(imageModel)) {
+                case LOADED_IMAGE:
+                    recorder.colorMatrixSelfRegion(x, y, w, h, matrix, cornerRadius, amount,
+                            SurfaceCommandRecorder.COLOR_MATRIX_MASK_IMAGE, 0, img);
+                    break;
+                case MUTABLE_SURFACE:
+                    mutableGraphics.flush();
+                    retainBlitSource(NativeImage.this);
+                    recorder.colorMatrixSelfRegion(x, y, w, h, matrix, cornerRadius, amount,
+                            SurfaceCommandRecorder.COLOR_MATRIX_MASK_SURFACE,
+                            mutableGraphics.getSurfaceId(), null);
+                    break;
+                default:
+                    break;
+            }
         }
             
     }

@@ -1022,6 +1022,19 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     @Override
+    public void colorMatrixRegion(int x, int y, int width, int height, float[] matrix,
+            HTML5Implementation.NativeImage mask, float cornerRadius, float amount) {
+        // The matrix recolours what is under it -- vibrant glyphs take their colour from the
+        // glass behind them. Promoted text is not under it, so it would keep its own colour
+        // over the effect instead of being recoloured with the rest. Back to the canvas.
+        noteAlphaIndependentRegion(x, y, width, height, cornerRadius > 0
+                ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
+                : null);
+        addOp(new com.codename1.impl.html5.graphics.ColorMatrixRegion(x, y, width, height,
+                matrix, mask, cornerRadius, amount));
+    }
+
+    @Override
     public void clearRect(int x, int y, int width, int height) {
         // Erasing the canvas erases nothing in the layer above it, so text promoted out of this
         // region would go on showing over pixels that were wiped. Reported whatever the alpha

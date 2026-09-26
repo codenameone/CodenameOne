@@ -82,3 +82,79 @@
     TabsContainerGlassRecipe: "pill27";
     glassRecipeDefault: "panel27";
 }
+
+/* THE iOS 27 TAB BAR, MEASURED FROM A REAL UITabBarController.
+ *
+ * The motion probe (scripts/fidelity-app/ios-native-ref/motion-probe) logs every
+ * layer of a controller-managed tab bar on every display frame of a tap-driven
+ * selection, and screenshots it over backdrops whose pixels are known. What it
+ * found, and what the rules below encode:
+ *
+ * - The selection is a glass LENS that lifts, travels on a spring, squashes on
+ *   arrival and wobbles once more a second later, while the WHOLE BAR pulses in
+ *   scale. Tabs plays those curves from TabGlassMotion when the preset is ios27.
+ * - The accent colour lives in a second copy of the tab content that is only
+ *   visible through the lens, so the blue travels WITH the glass. Tabs paints
+ *   Tab.pressed / TabIcon.pressed through the lens and Tab / TabIcon everywhere
+ *   else, which is why the unselected and selected colours below are the real
+ *   ones and not the lens-keyed dark glyph of the iOS 26 rules. The selected
+   colours are the ACCENT, bound through var() like the shared rules, so an app's
+   own --accent-color recolours the tab bar in both generations. UIKit draws the
+   accent through a vibrancy blend over the glass, which shifts it with the
+   content behind the bar (the default accent reads about #006ad8 light and
+   #4ad8ff dark on the simulator); there is no such blend mode here, so the
+   accent is drawn as-is.
+ * - The bar is tinted clear glass (GlassRecipe.liquidPill27) with no fill of its
+ *   own; the old white wash and dark slab were the fill plus a mis-fitted recipe.
+ * - The lens overshoots the bar ends by up to ~9.5 pt and the bar grows by ~4.4 pt
+ *   a side, so the bar reserves motion SLACK inside its own bounds: the padding
+ *   grows by the slack and the margin shrinks by the same amount, leaving the
+ *   visible pill exactly where it was, and tabsGlassSlack*Mm tells Tabs how much
+ *   of the padding is slack. Everything the motion draws then stays inside the
+ *   component, and inside its repaint region. */
+#Constants {
+    tabsMorphPreset: "ios27";
+    tabsGlassSlackXMm: "2";
+    tabsGlassSlackYMm: "1";
+    /* The native lens rests 4 pt inside the 62 pt bar (54 pt tall). */
+    tabSelInsetMm: "0.66";
+    /* The resting selection platter darkens the glass under it: over a flat 50%
+       grey the bar reads 195 light / 134 dark and the platter 168 / 99, a black
+       overlay of 14% / 26%. */
+    tabSelPillColorInt: 0;
+    tabSelPillAlphaInt: 35;
+    tabSelPillColorDarkInt: 0;
+    tabSelPillAlphaDarkInt: 67;
+    /* The bar's specular rim along its top and bottom edges: white on the
+       outermost row reaching 228 over a 192 interior (light) and 176 over 134
+       (dark), i.e. about 57% and 35%. */
+    tabGlassSpecularAlphaInt: 145;
+    tabGlassSpecularDarkAlphaInt: 90;
+}
+
+TabsContainer {
+    background-color: transparent;
+    backdrop-filter: blur(24px);
+    padding: 1.5mm 3.3mm 1.5mm 3.3mm;
+    margin: 0 5mm 0 5mm;
+}
+/* The native tab titles, measured on the resting bar: "Search" is 32.3 pt of ink
+   wide and 7.0 pt tall at the cap, against 28.7 x 6.7 for the shared rule's
+   regular 1.65mm -- a larger and heavier face. */
+Tab { color: #000000; font-family: "native:MainBold"; font-size: 1.72mm; }
+UnselectedTab { color: #000000; }
+Tab.selected { color: var(--accent-color, #007aff); }
+Tab.pressed { color: var(--accent-color, #007aff); }
+SelectedTab { color: var(--accent-color, #007aff); }
+TabIcon { color: #000000; }
+TabIcon.selected { color: var(--accent-color, #007aff); }
+TabIcon.pressed { color: var(--accent-color, #007aff); }
+
+@media (prefers-color-scheme: dark) {
+    TabsContainer { background-color: transparent; backdrop-filter: blur(24px); }
+    Tab { color: #ffffff; }
+    UnselectedTab { color: #ffffff; }
+    TabIcon { color: #ffffff; }
+    TabIcon.selected { color: var(--accent-color-dark, #0a84ff); }
+    TabIcon.pressed { color: var(--accent-color-dark, #0a84ff); }
+}

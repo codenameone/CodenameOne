@@ -144,6 +144,10 @@
                      curve:(float)curve curveMid:(float)curveMid outline:(float)outline;
 - (void)lensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
                   magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength;
+- (void)colorMatrixScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h matrix:(const float*)matrix
+                            mask:(id<MTLTexture>)mask cornerRadius:(float)cornerRadius amount:(float)amount;
+- (void)glassLensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
+                        optics:(const float*)optics amount:(float)amount;
 /// Reads the finished frame back as an ARGB raster. Used by the screenshot
 /// pipeline and by Window.capture().
 - (BOOL)readbackInto:(unsigned int *)argb width:(int)w height:(int)h;

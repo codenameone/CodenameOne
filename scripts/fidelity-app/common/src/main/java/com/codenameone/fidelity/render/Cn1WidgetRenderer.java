@@ -111,6 +111,7 @@ public final class Cn1WidgetRenderer {
                 || "Dialog".equals(id) || "Spinner".equals(id)
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
                 || "TabsMorph".equals(id)                      // animation-frame validation: same bar, frozen morph
+                || "TabsGlassMotion".equals(id)                // iOS 27 motion frames: same bar, frozen at a time
                 || "SwitchMorph".equals(id)                    // animation-frame validation: frozen droplet slide
                 || "TabOne".equals(id)                         // minimal: one tab with a transparent icon slot
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
@@ -342,7 +343,8 @@ public final class Cn1WidgetRenderer {
             Image blankIcon = Image.createImage(blankWidth, blankHeight, 0);
             tabs.addTab("Tab", blankIcon, new Container());
             c = tabs;
-        } else if ("Tabs".equals(id) || "TabsGeom".equals(id) || "TabsMorph".equals(id)) {
+        } else if ("Tabs".equals(id) || "TabsGeom".equals(id) || "TabsMorph".equals(id)
+                || "TabsGlassMotion".equals(id)) {
             // iOS UITabBar: an icon-over-label bar at the TOP, three items
             // (Featured / Search / More) mirroring the native reference's system
             // tab items; the first is selected (blue), the rest grey. NOT a
@@ -359,9 +361,20 @@ public final class Cn1WidgetRenderer {
             // defines them -- hardcoding the iOS blues here made the Android
             // tile a fake that could never match the honest M3 reference.
             boolean iosTabs = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+            // The iOS 27 bar (tabsMorphPreset ios27) paints every tab as UNSELECTED
+            // content outside the selection lens and as SELECTED content inside it
+            // -- the accent travels with the glass -- so each tab needs both icon
+            // states, in the theme's own TabIcon / TabIcon.pressed colours.
+            boolean glass27 = iosTabs && "ios27".equals(com.codename1.ui.plaf.UIManager.getInstance()
+                    .getThemeConstant("tabsMorphPreset", ""));
             int selColor;
             int unselColor;
-            if (iosTabs) {
+            if (glass27) {
+                selColor = com.codename1.ui.plaf.UIManager.getInstance()
+                        .getComponentCustomStyle("TabIcon", "press").getFgColor();
+                unselColor = com.codename1.ui.plaf.UIManager.getInstance()
+                        .getComponentStyle("TabIcon").getFgColor();
+            } else if (iosTabs) {
                 // Both appearances use the native vivid accent: in light the lens
                 // re-tints the deliberately-dark glyph; in dark the lens tint is
                 // disabled (it flooded the dark bar) and the glyph carries it.
@@ -390,12 +403,22 @@ public final class Cn1WidgetRenderer {
             } catch (NumberFormatException nfe) {
                 tabIconMm = 4.1f;
             }
-            Image star = FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, selS, tabIconMm);
-            Image search = FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, unS, tabIconMm);
-            Image more = FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, tabIconMm);
-            tabs.addTab("Featured", star, star, new Container());
-            tabs.addTab("Search", search, search, new Container());
-            tabs.addTab("More", more, more, new Container());
+            if (glass27) {
+                tabs.addTab("Featured", FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, unS, tabIconMm),
+                        FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, selS, tabIconMm), new Container());
+                tabs.addTab("Search", FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, unS, tabIconMm),
+                        FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, selS, tabIconMm), new Container());
+                tabs.addTab("More", FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, tabIconMm),
+                        FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, selS, tabIconMm),
+                        new Container());
+            } else {
+                Image star = FontImage.createSFOrMaterial(FontImage.MATERIAL_STAR, selS, tabIconMm);
+                Image search = FontImage.createSFOrMaterial(FontImage.MATERIAL_SEARCH, unS, tabIconMm);
+                Image more = FontImage.createSFOrMaterial(FontImage.MATERIAL_MORE_HORIZ, unS, tabIconMm);
+                tabs.addTab("Featured", star, star, new Container());
+                tabs.addTab("Search", search, search, new Container());
+                tabs.addTab("More", more, more, new Container());
+            }
             tabs.setTabTextPosition(Component.BOTTOM);
             c = tabs;
         } else if ("Toolbar".equals(id)) {

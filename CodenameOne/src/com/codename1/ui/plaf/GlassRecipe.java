@@ -181,12 +181,33 @@ public final class GlassRecipe {
                 : new GlassRecipe(Kind.LIQUID_CHROME, 1.1f, 0.85f, 20f, 0f, 0f);
     }
 
-    /// The iOS 27 floating-pill material.
+    /// The iOS 27 floating-pill material: the tab bar of a real
+    /// `UITabBarController`.
     ///
-    /// LIGHT is again measured as unchanged -- the fit returned 1.86 / 0.984 /
-    /// 111.4 against iOS 26's 1.80 / 1.000 / 108.0 -- so the iOS 26 values are
-    /// reused as the MATERIAL. DARK carries the luminance curve, which takes the
-    /// fit from rms 11.4/255 to 4.4/255.
+    /// MEASURED DIRECTLY, pixel against backdrop. The motion probe
+    /// (scripts/fidelity-app/ios-native-ref/motion-probe) puts a controller-managed
+    /// tab bar over three backdrops whose every pixel is known -- the shared
+    /// glass-backdrop.png, a field of sharp 23 pt colour bands with 1 pt rulers and
+    /// a flat 50% grey -- and takes lossless simulator screenshots. The bar interior (clear of the
+    /// ~10 pt refracting rim, the glyphs and the selection) is then fitted as
+    /// `clamp((lum + (c - lum) * sat) * scale + offset)` of the Gaussian-blurred
+    /// backdrop, over all three at once: the bands pin the blur radius down (the
+    /// photo is too smooth to show it) and the grey pins the absolute level, where
+    /// the live bar and the committed bare-UITabBar golden agree to the level (195
+    /// light, 134 dark).
+    ///
+    /// Both fit best with a 24 px blur. LIGHT fits at rms 3.4/255; DARK at rms
+    /// 7.1/255, a luminance curve does not improve it, and what is left is a faint
+    /// unblurred copy of the backdrop mixed back in, which no recipe parameter
+    /// models. The offset is then re-anchored so flat grey lands exactly on the
+    /// measured level. Either way the material keeps the backdrop's colour at
+    /// full strength (sat x scale ~1.0) and only compresses its luminance: the bar
+    /// reads as tinted clear glass, not a frosted or darkened slab. That is the
+    /// whole recipe -- the theme gives the pill no fill of its own.
+    ///
+    /// The earlier recipe here was derived indirectly, by inverting the iOS 26
+    /// constants out of a bare `UITabBar` tile, and rendered dark mode as a flat
+    /// charcoal (luma squeezed into 77..110) and light as milky white.
     ///
     /// Both appearances carry the iOS 27 edge outline (see {@link #getOutline()}),
     /// softer on the pill than on the panel: a 127 backdrop falls to about 85 on
@@ -196,8 +217,8 @@ public final class GlassRecipe {
     /// @return the iOS 27 floating-pill recipe
     public static GlassRecipe liquidPill27(boolean dark) {
         return dark
-                ? new GlassRecipe(Kind.LIQUID_PILL, 5.9f, 0.129f, 77.1f, 0f, 0.2f, 0.065f, 0.85f, 0.55f)
-                : new GlassRecipe(Kind.LIQUID_PILL, 1.8f, 1.0f, 108f, 0f, 0.2f, 0f, 0f, 0.55f);
+                ? new GlassRecipe(Kind.LIQUID_PILL, 1.925f, 0.517f, 67.8f, 0f, 0.2f, 0f, 0f, 0.55f)
+                : new GlassRecipe(Kind.LIQUID_PILL, 2.101f, 0.422f, 141.0f, 0f, 0.2f, 0f, 0f, 0.55f);
     }
 
     /// The iOS 27 glass-panel material, and the recipe that carries the method
