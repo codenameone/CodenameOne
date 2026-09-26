@@ -466,7 +466,7 @@ static inline JAVA_LONG cn1InlDllGet(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT self
     if(__builtin_expect(self != JAVA_NULL &&
             index >= 0 && index < (JAVA_LONG)t->dart_core_DartLongList_len, 1)) {
         JAVA_ARRAY arr = (JAVA_ARRAY)t->dart_core_DartLongList_a;
-        return ((JAVA_ARRAY_LONG*)arr->data)[(JAVA_INT)index];
+        return ((JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(arr))[(JAVA_INT)index];
     }
     return dart_core_DartLongList_getLong___long_R_long(threadStateData, self, index);
 }
@@ -476,7 +476,7 @@ static inline JAVA_LONG cn1InlDllSet(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT self
     if(__builtin_expect(self != JAVA_NULL &&
             index >= 0 && index < (JAVA_LONG)t->dart_core_DartLongList_len, 1)) {
         JAVA_ARRAY arr = (JAVA_ARRAY)t->dart_core_DartLongList_a;
-        ((JAVA_ARRAY_LONG*)arr->data)[(JAVA_INT)index] = value;
+        ((JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(arr))[(JAVA_INT)index] = value;
         return value;
     }
     return dart_core_DartLongList_setLong___long_long_R_long(threadStateData, self, index, value);
