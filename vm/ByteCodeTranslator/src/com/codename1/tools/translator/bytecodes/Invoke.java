@@ -239,6 +239,10 @@ public class Invoke extends Instruction {
                 out.add(g[2]);
             }
         }
+        String single = resolveSingleTarget();
+        if (single != null) {
+            out.add(Util.mangle(single));
+        }
     }
 
     String resolveSingleTarget() {
@@ -273,8 +277,12 @@ public class Invoke extends Instruction {
         ByteCodeClass bc = Parser.getClassObject(Util.mangle(owner));
         String resolved = opcode == Opcodes.INVOKEVIRTUAL
                 ? resolveConcreteInvokeOwner(bc, true) : null;
-        // Same resolver the emitter uses, so whatever it will call directly is kept.
-        if (resolved == null) resolved = resolveSingleTarget();
+        // NOT resolveSingleTarget: the one implementation a closed-world cone holds is
+        // include-only (collectGuardIncludes), exactly like the guard targets. As a
+        // liveness dependency it kept a class nothing instantiates -- a Tracer call
+        // devirtualized to the only Tracer, OtlpTracer, linked the whole OpenTelemetry
+        // exporter into every server that never asked for tracing. The emitter
+        // re-checks the target, so a culled one becomes an ordinary virtual call.
         if (resolved != null) {
             String dependency = unarray(Util.mangle(resolved));
             if (dependency != null && !dependencyList.contains(dependency)) dependencyList.add(dependency);
