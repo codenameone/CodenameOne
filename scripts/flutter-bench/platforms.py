@@ -160,7 +160,7 @@ class Adapter(object):
                 continue
             if benchlib.COMPUTE_DONE in line:
                 return results
-            if "CN1 GC:" in line:
+            if "CN1 GC:" in line or "force-stopped thread" in line:
                 # Diagnostic branch only: the collector's own report of a skipped
                 # sweep and the capture that failed, into the job log.
                 print("    %s %s" % (side, line.rstrip()), flush=True)
