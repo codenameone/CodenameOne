@@ -3444,6 +3444,17 @@ public class Tabs extends Container {
             boolean rtl = parent.isRTL();
             for (int i = 0; i < n; i++) {
                 Component c = parent.getComponentAt(i);
+                if (c instanceof Label) {
+                    // UITabBar never scrolls a title. A ticker started while the
+                    // tab was briefly narrower (focus before this layout ran)
+                    // would otherwise keep running, and the title would drift
+                    // with the clock on every frame.
+                    Label l = (Label) c;
+                    if (l.isTickerRunning()) {
+                        l.stopTicker();
+                    }
+                    l.setTickerEnabled(false);
+                }
                 // Right to left, the first tab sits at the right end (as GridLayout
                 // places it for the other presets).
                 int slot = rtl ? n - 1 - i : i;

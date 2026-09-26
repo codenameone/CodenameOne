@@ -299,6 +299,21 @@ class TabsGlassSelectionTest extends UITestBase {
     }
 
     @FormTest
+    void glassTabTitlesNeverScroll() {
+        // A ticker started on a tab (focus arriving while the tab was narrower)
+        // would drift the title with the clock; UITabBar never scrolls one.
+        Tabs tabs = glassTabs();
+        Button first = (Button) tabs.getTabsContainer().getComponentAt(0);
+        first.setTickerEnabled(true);
+        first.startTicker(50, true);
+        assertTrue(first.isTickerRunning(), "precondition: the ticker runs");
+        tabs.getTabsContainer().setShouldCalcPreferredSize(true);
+        tabs.getComponentForm().revalidate();
+        assertFalse(first.isTickerRunning(), "the glass layout stops it");
+        assertFalse(first.isTickerEnabled(), "and it cannot start again");
+    }
+
+    @FormTest
     void eachTabIsVibrantInItsOwnTint() {
         // A tab with its own colour (a custom UIID, a disabled tab) keeps it: the
         // unselected content splits into one mask per tint, each with its matrix.
