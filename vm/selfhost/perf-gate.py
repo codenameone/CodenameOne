@@ -328,11 +328,13 @@ def render_markdown(report):
             for metric in ('time', 'memory'):
                 e = entry[metric]
                 if e['verdict'] == 'regression':
-                    regressions.append('%s at %s core%s: %s %.2fx against a %.2fx baseline (%+.1f%%)'
+                    regressions.append('%s at %s core%s: %s %.2fx against a %.2fx baseline (%+.1f%%, '
+                                       'tolerance %d%%)'
                                        % (report['labels'][bench_id], cores,
                                           '' if cores == '1' else 's',
                                           'time' if metric == 'time' else 'RAM', e['median'],
-                                          e['baseline'], (e['median'] / e['baseline'] - 1) * 100))
+                                          e['baseline'], (e['median'] / e['baseline'] - 1) * 100,
+                                          round(e.get('tolerance', tol[metric]) * 100)))
     if regressions:
         lines.append('**%d performance regression%s:**' % (len(regressions),
                                                            '' if len(regressions) == 1 else 's'))
@@ -341,7 +343,8 @@ def render_markdown(report):
     lines += ['Ratios are **ParparVM / JDK 25**: below 1.00x ParparVM is faster (time) or '
               'smaller (RAM). Median of %d interleaved, paired rounds; every run\'s output '
               'was verified. A regression is a ratio more than %d%% (time) / %d%% (RAM) above '
-              'its baseline in `vm/selfhost/perf-baseline.json`.'
+              'its baseline in `vm/selfhost/perf-baseline.json` (more, for a row whose '
+              'calibration runs were noisier; the file records it).'
               % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100)), '',
               '| Benchmark | Cores | Time | RAM | Status |', '|---|---:|---|---|---|']
     logical = False
@@ -453,9 +456,13 @@ def main(argv):
                 entry = {'enforced': enforced}
                 for metric, values in (('time', times), ('memory', memories)):
                     median = statistics.median(values)
+                    # A row may carry its own tolerance: where two calibration runs of
+                    # unchanged code already disagreed by more than the global one, the
+                    # global one would fail on noise alone.
+                    row_tolerance = base.get('tolerance', {}).get(metric, tolerance[metric])
                     entry[metric] = dict(paired(values), baseline=base.get(metric),
-                                         verdict=verdict(median, base.get(metric),
-                                                         tolerance[metric]))
+                                         tolerance=row_tolerance,
+                                         verdict=verdict(median, base.get(metric), row_tolerance))
                     if entry[metric]['verdict'] == 'regression':
                         report['regression'] = True
                 report['results'].setdefault(spec['id'], {})[str(cores)] = entry

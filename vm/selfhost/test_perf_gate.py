@@ -56,7 +56,7 @@ class MarkdownTests(unittest.TestCase):
             'quicksort': {'1': (metric(1.3, 1.0, 'regression'), metric(0.9, 0.9, 'ok'))},
             'recursion': {'1': (metric(0.8, 0.8, 'ok'), metric(0.5, 0.5, 'ok'))}},
             regression=True))
-        self.assertIn('quicksort at 1 core: time 1.30x against a 1.00x baseline (+30.0%)', text)
+        self.assertIn('quicksort at 1 core: time 1.30x against a 1.00x baseline (+30.0%, tolerance 10%)', text)
         self.assertIn('| quicksort | 1 | 1.30x (base 1.00x, +30.0%)', text)
         self.assertIn('**REGRESSION** (time +30.0%)', text)
         self.assertIn('**Result: performance regression**', text)

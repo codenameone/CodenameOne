@@ -1,4 +1,403 @@
 {
-  "tolerance": {"time": 0.10, "memory": 0.10},
-  "platforms": {}
+ "tolerance": {
+  "time": 0.15,
+  "memory": 0.15
+ },
+ "platforms": {
+  "linux-x64": {
+   "hello": {
+    "1": {
+     "time": 0.606,
+     "memory": 0.87
+    },
+    "2": {
+     "time": 0.988,
+     "memory": 0.807
+    },
+    "4": {
+     "time": 1.021,
+     "memory": 0.741
+    }
+   },
+   "translator": {
+    "1": {
+     "time": 0.292,
+     "memory": 0.747
+    },
+    "2": {
+     "time": 0.444,
+     "memory": 0.562
+    },
+    "4": {
+     "time": 0.467,
+     "memory": 0.49
+    }
+   },
+   "intArithmetic": {
+    "1": {
+     "time": 1.109,
+     "memory": 0.078,
+     "tolerance": {
+      "memory": 0.5
+     }
+    },
+    "2": {
+     "time": 1.103,
+     "memory": 0.058
+    },
+    "4": {
+     "time": 1.103,
+     "memory": 0.076,
+     "tolerance": {
+      "memory": 0.52
+     }
+    }
+   },
+   "longArithmetic": {
+    "1": {
+     "time": 1.084,
+     "memory": 0.06
+    },
+    "2": {
+     "time": 1.084,
+     "memory": 0.059
+    },
+    "4": {
+     "time": 1.083,
+     "memory": 0.057
+    }
+   },
+   "mathTranscendental": {
+    "1": {
+     "time": 1.084,
+     "memory": 0.061
+    },
+    "2": {
+     "time": 1.083,
+     "memory": 0.059
+    },
+    "4": {
+     "time": 1.084,
+     "memory": 0.059
+    }
+   },
+   "arraySequential": {
+    "1": {
+     "time": 2.169,
+     "memory": 0.367
+    },
+    "2": {
+     "time": 2.197,
+     "memory": 0.362,
+     "tolerance": {
+      "time": 0.18
+     }
+    },
+    "4": {
+     "time": 2.163,
+     "memory": 0.36
+    }
+   },
+   "arrayRandom": {
+    "1": {
+     "time": 0.901,
+     "memory": 0.232,
+     "tolerance": {
+      "time": 0.23
+     }
+    },
+    "2": {
+     "time": 1.082,
+     "memory": 0.228
+    },
+    "4": {
+     "time": 1.071,
+     "memory": 0.229,
+     "tolerance": {
+      "time": 0.24
+     }
+    }
+   },
+   "objectAllocation": {
+    "1": {
+     "time": 7.297,
+     "memory": 0.211
+    },
+    "2": {
+     "time": 11.131,
+     "memory": 0.608,
+     "tolerance": {
+      "time": 0.26
+     }
+    },
+    "4": {
+     "time": 7.264,
+     "memory": 0.662,
+     "tolerance": {
+      "time": 0.23
+     }
+    }
+   },
+   "valueEscape": {
+    "1": {
+     "time": 0.103,
+     "memory": 0.051,
+     "tolerance": {
+      "memory": 0.23
+     }
+    },
+    "2": {
+     "time": 0.102,
+     "memory": 0.045
+    },
+    "4": {
+     "time": 0.103,
+     "memory": 0.056,
+     "tolerance": {
+      "memory": 0.44
+     }
+    }
+   },
+   "hashMapChurn": {
+    "1": {
+     "time": 1.331,
+     "memory": 0.137
+    },
+    "2": {
+     "time": 1.127,
+     "memory": 0.065
+    },
+    "4": {
+     "time": 1.183,
+     "memory": 0.065
+    }
+   },
+   "stringBuilding": {
+    "1": {
+     "time": 1.661,
+     "memory": 0.194
+    },
+    "2": {
+     "time": 1.466,
+     "memory": 0.323
+    },
+    "4": {
+     "time": 1.41,
+     "memory": 0.314
+    }
+   },
+   "recursion": {
+    "1": {
+     "time": 1.232,
+     "memory": 0.061
+    },
+    "2": {
+     "time": 1.233,
+     "memory": 0.058
+    },
+    "4": {
+     "time": 1.232,
+     "memory": 0.077
+    }
+   },
+   "quicksort": {
+    "1": {
+     "time": 1.083,
+     "memory": 0.116
+    },
+    "2": {
+     "time": 1.085,
+     "memory": 0.114
+    },
+    "4": {
+     "time": 1.084,
+     "memory": 0.113
+    }
+   }
+  },
+  "linux-arm64": {
+   "hello": {
+    "1": {
+     "time": 0.652,
+     "memory": 0.804
+    },
+    "2": {
+     "time": 1.135,
+     "memory": 0.78
+    },
+    "4": {
+     "time": 1.17,
+     "memory": 0.776
+    }
+   },
+   "translator": {
+    "1": {
+     "time": 0.303,
+     "memory": 0.719
+    },
+    "2": {
+     "time": 0.576,
+     "memory": 0.565
+    },
+    "4": {
+     "time": 0.681,
+     "memory": 0.513
+    }
+   },
+   "intArithmetic": {
+    "1": {
+     "time": 1.04,
+     "memory": 0.039
+    },
+    "2": {
+     "time": 1.045,
+     "memory": 0.037
+    },
+    "4": {
+     "time": 1.046,
+     "memory": 0.037
+    }
+   },
+   "longArithmetic": {
+    "1": {
+     "time": 0.805,
+     "memory": 0.038
+    },
+    "2": {
+     "time": 0.784,
+     "memory": 0.038
+    },
+    "4": {
+     "time": 0.789,
+     "memory": 0.038
+    }
+   },
+   "mathTranscendental": {
+    "1": {
+     "time": 1.097,
+     "memory": 0.039
+    },
+    "2": {
+     "time": 1.098,
+     "memory": 0.037
+    },
+    "4": {
+     "time": 1.098,
+     "memory": 0.037
+    }
+   },
+   "arraySequential": {
+    "1": {
+     "time": 0.408,
+     "memory": 0.375
+    },
+    "2": {
+     "time": 0.419,
+     "memory": 0.371
+    },
+    "4": {
+     "time": 0.406,
+     "memory": 0.371
+    }
+   },
+   "arrayRandom": {
+    "1": {
+     "time": 0.937,
+     "memory": 0.206
+    },
+    "2": {
+     "time": 0.937,
+     "memory": 0.203
+    },
+    "4": {
+     "time": 0.939,
+     "memory": 0.204
+    }
+   },
+   "objectAllocation": {
+    "1": {
+     "time": 3.897,
+     "memory": 0.224
+    },
+    "2": {
+     "time": 4.957,
+     "memory": 0.306
+    },
+    "4": {
+     "time": 5.164,
+     "memory": 0.304
+    }
+   },
+   "valueEscape": {
+    "1": {
+     "time": 0.508,
+     "memory": 0.037
+    },
+    "2": {
+     "time": 0.508,
+     "memory": 0.033
+    },
+    "4": {
+     "time": 0.508,
+     "memory": 0.033
+    }
+   },
+   "hashMapChurn": {
+    "1": {
+     "time": 0.768,
+     "memory": 0.127
+    },
+    "2": {
+     "time": 0.65,
+     "memory": 0.051
+    },
+    "4": {
+     "time": 0.78,
+     "memory": 0.057
+    }
+   },
+   "stringBuilding": {
+    "1": {
+     "time": 1.817,
+     "memory": 0.179
+    },
+    "2": {
+     "time": 1.398,
+     "memory": 0.324
+    },
+    "4": {
+     "time": 1.344,
+     "memory": 0.321
+    }
+   },
+   "recursion": {
+    "1": {
+     "time": 1.204,
+     "memory": 0.039
+    },
+    "2": {
+     "time": 1.202,
+     "memory": 0.038
+    },
+    "4": {
+     "time": 1.204,
+     "memory": 0.037
+    }
+   },
+   "quicksort": {
+    "1": {
+     "time": 1.003,
+     "memory": 0.099
+    },
+    "2": {
+     "time": 0.998,
+     "memory": 0.097
+    },
+    "4": {
+     "time": 0.996,
+     "memory": 0.097
+    }
+   }
+  }
+ }
 }
