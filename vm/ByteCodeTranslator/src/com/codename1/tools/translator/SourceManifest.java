@@ -186,7 +186,12 @@ public class SourceManifest {
      * source tree.
      */
     public void recordPort(String name, File origin) {
-        record(name, Origin.PORT, origin == null ? "" : origin.getAbsolutePath());
+        // Forward slashes on every host. The JDK's File joins with the platform
+        // separator and ParparVM's with '/', so on Windows the same file was recorded as
+        // C:\a\b\x.c by the JVM translator and C:\a\b/x.c by the self-hosted one: the
+        // one output where the two differed. One spelling also makes the manifest read
+        // the same whichever host wrote it.
+        record(name, Origin.PORT, origin == null ? "" : origin.getAbsolutePath().replace('\\', '/'));
     }
 
     private void record(String name, Origin origin, String source) {
