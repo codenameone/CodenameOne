@@ -155,11 +155,22 @@ class Affinity:
 
 
 def base_env(cores):
+    """cores None is the CI default: every CPU the runner has, and each runtime's own
+    default thread counts -- the configuration an application actually runs in."""
     env = {k: v for k, v in os.environ.items() if not k.startswith('CN1_')}
     env['LC_ALL'] = 'C'
     env['CN1_RESOURCE_PATH'] = str(REPO / 'vm/ByteCodeTranslator/src')
-    env['CN1_GC_MARK_THREADS'] = str(cores)
+    if cores is not None:
+        env['CN1_GC_MARK_THREADS'] = str(cores)
     return env
+
+
+def jvm_cores(cores):
+    return [] if cores is None else ['-XX:ActiveProcessorCount=%d' % cores]
+
+
+def cores_text(cores):
+    return 'all cores' if cores is None else '%d cores' % cores
 
 
 def interleave(cores, rounds, arms, run_one, work, tag):
@@ -173,16 +184,22 @@ def interleave(cores, rounds, arms, run_one, work, tag):
         order = arms if round_index % 2 == 0 else arms[::-1]
         sample = {}
         for name, prefix in order:
-            log = work / ('%s-c%d-r%02d-%s.log' % (tag, cores, round_index, name))
-            with Affinity(cores) as affinity:
+            log = work / ('%s-c%s-r%02d-%s.log' % (tag, 'all' if cores is None else cores,
+                                                   round_index, name))
+            if cores is None:
                 sample[name] = run_one(name, prefix, log)
-                enforced = affinity.enforced
+                enforced = True   # nothing to confine: the whole runner
+            else:
+                with Affinity(cores) as affinity:
+                    sample[name] = run_one(name, prefix, log)
+                    enforced = affinity.enforced
         if round_index == 0:
             continue   # warmup: verified, not measured
         time_ratios.append(sample['parpar'][0] / sample['jdk25'][0])
         memory_ratios.append(sample['parpar'][1] / sample['jdk25'][1])
-        print('  %s, %d cores, round %d: time %.3fx, RAM %.3fx'
-              % (tag, cores, round_index, time_ratios[-1], memory_ratios[-1]), flush=True)
+        print('  %s, %s, round %d: time %.3fx, RAM %.3fx'
+              % (tag, cores_text(cores), round_index, time_ratios[-1], memory_ratios[-1]),
+              flush=True)
     return time_ratios, memory_ratios, enforced
 
 
@@ -191,7 +208,7 @@ def measure_translation(spec, cores, rounds, binary, java, work):
     asm = (REPO / 'vm/ByteCodeTranslator/target/selfhost-asm-classpath.txt').read_text().strip()
     env = base_env(cores)
     arms = [('parpar', [str(binary)]),
-            ('jdk25', [java, '-XX:ActiveProcessorCount=%d' % cores,
+            ('jdk25', [java] + jvm_cores(cores) + [
                        '-cp', str(host) + os.pathsep + asm,
                        'com.codename1.tools.translator.ByteCodeTranslator'])]
     out = work / ('out-' + spec['id'])
@@ -214,8 +231,8 @@ def measure_translation(spec, cores, rounds, binary, java, work):
         elif manifest != expected[0]:
             differing = sorted(k for k in set(manifest) | set(expected[0])
                                if manifest.get(k) != expected[0].get(k))
-            raise RuntimeError('%s: output divergence at %d cores (%s): %s'
-                               % (spec['id'], cores, name, ', '.join(differing[:10])))
+            raise RuntimeError('%s: output divergence at %s (%s): %s'
+                               % (spec['id'], cores_text(cores), name, ', '.join(differing[:10])))
         return result['elapsed_seconds'], result['peak_bytes']
 
     return interleave(cores, rounds, arms, run_one, work, spec['id'])
@@ -226,7 +243,7 @@ def measure_workload(spec, cores, rounds, bench_binary, java, reps, work):
     env = base_env(cores)
     name = spec['id']
     arms = [('parpar', [str(bench_binary), str(reps), name]),
-            ('jdk25', [java, '-XX:ActiveProcessorCount=%d' % cores, '-cp', str(classes),
+            ('jdk25', [java] + jvm_cores(cores) + ['-cp', str(classes),
                        'com.bench.Bench', str(reps), name])]
     system = platform.system()
     expected = spec.setdefault('expected', [None])
@@ -247,8 +264,8 @@ def measure_workload(spec, cores, rounds, bench_binary, java, reps, work):
         if expected[0] is None:
             expected[0] = checksum
         elif checksum != expected[0]:
-            raise RuntimeError('%s: checksum divergence at %d cores (%s): %s against %s'
-                               % (name, cores, arm, checksum, expected[0]))
+            raise RuntimeError('%s: checksum divergence at %s (%s): %s against %s'
+                               % (name, cores_text(cores), arm, checksum, expected[0]))
         return min(int(m.group(3)) for m in lines) / 1e9, result['peak_bytes']
 
     return interleave(cores, rounds, arms, run_one, work, name)
@@ -321,6 +338,21 @@ def status_cell(entry):
     return 'ok'
 
 
+def _where(report, key):
+    """How a row's core count reads in prose."""
+    if key == 'all':
+        return 'on all %d CPUs' % report['available_cores']
+    return 'at %s core%s' % (key, '' if str(key) == '1' else 's')
+
+
+def _cores_cell(report, key):
+    return str(report['available_cores']) if key == 'all' else str(key)
+
+
+def _cores_order(key):
+    return 1 << 30 if key == 'all' else int(key)
+
+
 def render_markdown(report):
     name = PLATFORM_NAMES.get(report['platform'], report['platform'])
     tol = report['tolerance']
@@ -335,10 +367,9 @@ def render_markdown(report):
             for metric in ('time', 'memory'):
                 e = entry[metric]
                 if e['verdict'] == 'regression':
-                    regressions.append('%s at %s core%s: %s %.2fx against a %.2fx baseline (%+.1f%%, '
+                    regressions.append('%s %s: %s %.2fx against a %.2fx baseline (%+.1f%%, '
                                        'tolerance %d%%)'
-                                       % (report['labels'][bench_id], cores,
-                                          '' if cores == '1' else 's',
+                                       % (report['labels'][bench_id], _where(report, cores),
                                           'time' if metric == 'time' else 'RAM', e['median'],
                                           e['baseline'], (e['median'] / e['baseline'] - 1) * 100,
                                           round(e.get('tolerance', tol[metric]) * 100)))
@@ -346,9 +377,8 @@ def render_markdown(report):
     if failures:
         lines.append('**%d benchmark%s failed to run:**' % (len(failures),
                                                             '' if len(failures) == 1 else 's'))
-        lines += ['- %s at %s core%s: %s' % (report['labels'].get(f['benchmark'], f['benchmark']),
-                                             f['cores'], '' if f['cores'] == 1 else 's',
-                                             f['reason']) for f in failures]
+        lines += ['- %s %s: %s' % (report['labels'].get(f['benchmark'], f['benchmark']),
+                                   _where(report, f['cores']), f['reason']) for f in failures]
         lines.append('')
     if regressions:
         lines.append('**%d performance regression%s:**' % (len(regressions),
@@ -360,20 +390,24 @@ def render_markdown(report):
               'was verified. A regression is a ratio more than %d%% (time) / %d%% (RAM) above '
               'its baseline in `vm/selfhost/perf-baseline.json` (more, for a row whose '
               'calibration runs were noisier; the file records it), and for RAM also more '
-              'than 0.05x above it in absolute terms.'
-              % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100)), '',
+              'than 0.05x above it in absolute terms.%s'
+              % (report['rounds'], round(tol['time'] * 100), round(tol['memory'] * 100),
+                 ' Both run unpinned on all of the runner\'s CPUs, with their own default '
+                 'thread counts.' if any('all' in per for per in report['results'].values())
+                 else ''), '',
               '| Benchmark | Cores | Time | RAM | Status |', '|---|---:|---|---|---|']
     logical = False
     for bench_id, per_cores in report['results'].items():
-        for cores, entry in sorted(per_cores.items(), key=lambda kv: int(kv[0])):
+        for cores, entry in sorted(per_cores.items(), key=lambda kv: _cores_order(kv[0])):
             if 'failed' in entry:
                 lines.append('| %s | %s | - | - | **FAILED**: %s |'
-                             % (report['labels'][bench_id], cores, entry['failed']))
+                             % (report['labels'][bench_id], _cores_cell(report, cores),
+                                entry['failed']))
                 continue
             mark = '' if entry['enforced'] else '*'
             logical = logical or bool(mark)
             lines.append('| %s | %s%s | %s | %s | %s |' % (
-                report['labels'][bench_id], cores, mark, fmt_ratio(entry['time']),
+                report['labels'][bench_id], _cores_cell(report, cores), mark, fmt_ratio(entry['time']),
                 fmt_ratio(entry['memory']), status_cell(entry)))
     if report['skipped_cores']:
         lines += ['', 'Not run at %s cores: this runner has %d.'
@@ -394,7 +428,12 @@ def render_markdown(report):
 
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    parser.add_argument('--cores', default='1,2,4')
+    # 'all' in CI: a hosted runner has a fixed handful of CPUs (4 on Linux and Windows,
+    # 3 on macOS), pinning a subset of an x64 runner's vCPUs picks hyperthread siblings
+    # rather than cores, and macOS cannot pin at all -- so a 1/2/4 sweep there measured
+    # the runner's topology, not the VM. A comma list (1,2,4) still sweeps, pinned,
+    # on a machine where that means something.
+    parser.add_argument('--cores', default='all')
     parser.add_argument('--rounds', type=int, default=5)
     # 25, not Bench's default 5. objectAllocation's repetitions last tens of ms, so at 5
     # whether a collection lands inside the window decides the number: identical work
@@ -461,18 +500,24 @@ def main(argv):
         tolerance = baseline['tolerance']
         bases = baseline['platforms'].get(args.platform, {})
         have = report['available_cores']
-        wanted_cores = [int(c) for c in args.cores.split(',')]
-        cores_list = [c for c in wanted_cores if c <= have]
-        report['skipped_cores'] = [c for c in wanted_cores if c > have]
+        if args.cores == 'all':
+            # None = unpinned, all of the runner's CPUs, each runtime's own defaults.
+            cores_list = [None]
+        else:
+            wanted_cores = [int(c) for c in args.cores.split(',')]
+            cores_list = [c for c in wanted_cores if c <= have]
+            report['skipped_cores'] = [c for c in wanted_cores if c > have]
 
         work = TARGET / 'perf-gate' / time.strftime('%Y%m%d-%H%M%S')
         work.mkdir(parents=True)
-        print('perf-gate: %s, %d rounds, cores %s, %d benchmarks'
-              % (args.platform, args.rounds, cores_list, len(specs)), flush=True)
+        print('perf-gate: %s, %d rounds, %s, %d benchmarks (this runner has %d CPUs)'
+              % (args.platform, args.rounds,
+                 ', '.join(cores_text(c) for c in cores_list), len(specs), have), flush=True)
         calibration = {}
         report['failures'] = []
         for spec in specs:
             for cores in cores_list:
+                key = 'all' if cores is None else str(cores)
                 # ONE benchmark failing -- a hang, a crash, a divergent output -- fails
                 # its own row and the gate, and the rest of the table is still measured.
                 # Aborting the whole gate on the first one hid every row after it.
@@ -487,15 +532,15 @@ def main(argv):
                     reason = str(error).strip().splitlines()[0][:200]
                     if isinstance(error, subprocess.TimeoutExpired):
                         reason = 'did not finish within %ds (hung)' % error.timeout
-                    report['failures'].append({'benchmark': spec['id'], 'cores': cores,
+                    report['failures'].append({'benchmark': spec['id'], 'cores': key,
                                                'reason': reason})
-                    report['results'].setdefault(spec['id'], {})[str(cores)] = {
+                    report['results'].setdefault(spec['id'], {})[key] = {
                         'failed': reason}
-                    print('perf-gate: %-20s %d cores  FAILED: %s' % (spec['id'], cores, reason),
+                    print('perf-gate: %-20s %s  FAILED: %s' % (spec['id'], cores_text(cores), reason),
                           flush=True)
                     write()
                     continue
-                base = bases.get(spec['id'], {}).get(str(cores), {})
+                base = bases.get(spec['id'], {}).get(key, {})
                 entry = {'enforced': enforced}
                 for metric, values in (('time', times), ('memory', memories)):
                     median = statistics.median(values)
@@ -510,13 +555,13 @@ def main(argv):
                                                          floor))
                     if entry[metric]['verdict'] == 'regression':
                         report['regression'] = True
-                report['results'].setdefault(spec['id'], {})[str(cores)] = entry
+                report['results'].setdefault(spec['id'], {})[key] = entry
                 if base.get('time') is None or base.get('memory') is None:
-                    calibration.setdefault(spec['id'], {})[str(cores)] = {
+                    calibration.setdefault(spec['id'], {})[key] = {
                         'time': round(entry['time']['median'], 3),
                         'memory': round(entry['memory']['median'], 3)}
-                print('perf-gate: %-20s %d cores  time %s  RAM %s  -> %s'
-                      % (spec['id'], cores, fmt_ratio(entry['time']), fmt_ratio(entry['memory']),
+                print('perf-gate: %-20s %s  time %s  RAM %s  -> %s'
+                      % (spec['id'], cores_text(cores), fmt_ratio(entry['time']), fmt_ratio(entry['memory']),
                          status_cell(entry)), flush=True)
                 write()
         report['calibration'] = calibration

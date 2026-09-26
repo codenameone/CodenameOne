@@ -81,6 +81,14 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('could not complete', text)
         self.assertIn('stale native build', text)
 
+    def test_an_all_cores_row_shows_the_runner_cpu_count(self):
+        text = gate.render_markdown(report({
+            'quicksort': {'all': (metric(1.3, 1.0, 'regression'), metric(0.9, 0.9, 'ok'))}},
+            regression=True))
+        self.assertIn('| quicksort | 4 | 1.30x', text)
+        self.assertIn('quicksort on all 4 CPUs: time 1.30x', text)
+        self.assertIn('unpinned', text)
+
     def test_logical_cores_are_marked(self):
         text = gate.render_markdown(report({
             'hello': {'2': (metric(0.9, 0.9, 'ok'), metric(0.5, 0.5, 'ok'))}}, enforced=False))

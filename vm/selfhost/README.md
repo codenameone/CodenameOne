@@ -93,7 +93,12 @@ builds the self-hosted translator (`build-selfhost.sh -O3`) and the Bench binary
 `perf-gate.py`. It never fails its own step, so a regression cannot stop the screenshots
 and the comment that report it; `verdict` does.
 
-**The benchmarks**, each at 1, 2 and 4 cores:
+**The benchmarks**, each run once, unpinned, on all of the runner's CPUs with both
+runtimes' default thread counts -- the configuration an application runs in. A hosted
+runner has a fixed handful of CPUs (4 on Linux and Windows, 3 on macOS), pinning a subset
+of an x64 runner's vCPUs picks hyperthread siblings rather than cores, and macOS cannot
+pin at all, so a 1/2/4-core sweep there measured the runner, not the VM. `--cores 1,2,4`
+still sweeps, pinned, where that means something:
 
 | Benchmark | ParparVM arm | JDK 25 arm |
 |---|---|---|
@@ -109,12 +114,12 @@ the process, so JVM startup does not count against the JDK. RAM is the process p
 (peak footprint on macOS, maximum RSS on Linux, peak working set on Windows). Every run is
 verified: translation output byte for byte, workload checksums across arms and rounds.
 
-Core counts are pinned with CPU affinity on Linux and Windows. macOS has no affinity
-API, so there the count is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
+In a `--cores` sweep the count is pinned with CPU affinity on Linux and Windows. macOS
+has no affinity API, so there it is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
 `-XX:ActiveProcessorCount`) and neither is confined to it; the table marks those rows.
 
-**The gate compares against `perf-baseline.json`**: a ratio per platform, benchmark and
-core count, and a tolerance per metric. A ratio more than the tolerance above its
+**The gate compares against `perf-baseline.json`**: a ratio per platform and benchmark,
+and a tolerance per metric. A ratio more than the tolerance above its
 baseline fails the build, and the comment names the benchmark, the metric and the size
 of the change.
 
