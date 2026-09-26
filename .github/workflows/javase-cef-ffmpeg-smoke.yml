@@ -158,7 +158,9 @@ jobs:
 
   # The installed app, not the simulator: a desktop_windows cloud build of a BrowserComponent
   # page that loads Google Maps, built with desktop.win.cef=true on zuluFx8-32bit. This runs
-  # the installer, the launch4j exe, the bundled 32-bit JRE and the JCEF natives it ships.
+  # the installer, the launch4j exe, the bundled 32-bit JRE and the JCEF natives it ships,
+  # installed under Program Files (x86) and launched both as the runner's administrator and
+  # as a standard user whose profile path contains a space.
   windows-installer:
     name: windows-latest installer (x86)
     runs-on: windows-latest
