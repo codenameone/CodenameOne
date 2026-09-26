@@ -162,7 +162,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // cloud build slot to discover. See applyIOSProvisioningPreflight.
         applyIOSProvisioningPreflight();
 
-        if (platform.contains("android")) {
+        // stageOnly builds no APK, so it must neither short-circuit on a cached one (it would
+        // then stage nothing) nor, below, stamp that cached APK as matching this configuration.
+        if (platform.contains("android") && !stageOnly) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 File apkFile = androidApkFile();
                 try {
@@ -196,7 +198,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         // Record the hardening outcome this APK was built with, so a later invocation that changes
         // hardening (in either direction) invalidates the timestamp-only up-to-date cache above.
-        if (platform.contains("android") && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+        if (platform.contains("android") && !stageOnly && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
             File marker = androidHardeningCacheMarker();
             if (androidApkFile().exists()) {
                 try {
@@ -883,6 +885,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * The record of what a staged jar was merged from, one absolute path per line in merge
+     * order. Compared, not parsed: any difference means the cached jar is not this build's.
+     */
+    static String describeStagedInputs(List<File> jarsToMerge) {
+        StringBuilder sb = new StringBuilder();
+        for (File f : jarsToMerge) {
+            sb.append(f.getAbsolutePath()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
      * The aggregator that puts the desktop media runtime -- org.bytedeco's ffmpeg,
      * with natives for Android, iOS, Linux, macOS and Windows -- on the simulator
      * and desktop run classpaths.
@@ -1447,104 +1461,111 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             cpElements.add(stringsJar.getAbsolutePath());
         }
         getLog().debug("Classpath Elements: "+cpElements);
+        // Decide what goes into the staged jar BEFORE deciding whether a cached one can be
+        // reused. The decision has side effects the build needs either way (the kotlin-stdlib
+        // version the server must supply), and the cached jar is only reusable when it was
+        // built from exactly this set.
+        List<String> blackListJars = new ArrayList<String>();
+        boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
+        for (Artifact artifact : project.getArtifacts()) {
+            boolean addToBlacklist = isStrippedFromStagedJar(artifact);
+            if (addToBlacklist && !isLocalBuildTarget(buildTarget)
+                    && "org.jetbrains.kotlin".equals(artifact.getGroupId())
+                    && "kotlin-stdlib".equals(artifact.getArtifactId())) {
+                serverMustProvideKotlinVersion = artifact.getVersion();
+                getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
+            }
+            if (addToBlacklist) {
+                File jar = getJar(artifact);
+                if (jar != null) {
+                    blackListJars.add(jar.getAbsolutePath());
+                    blackListJars.add(jar.getPath());
+                    try {
+                        blackListJars.add(jar.getCanonicalPath());
+                        getLog().debug("Added "+jar+" to blacklist");
+                    } catch (Exception ex){
+                        getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
+                    }
+                }
+            }
+        }
+        List<File> jarsToMerge = new ArrayList<File>();
+        for (String element : cpElements) {
+
+            String canonicalEl = element;
+            try {
+                canonicalEl = new File(canonicalEl).getCanonicalPath();
+            } catch (Exception ex){
+                if (getLog().isDebugEnabled()) {
+                    getLog().warn("Failed to resolve canonical path for " + element, ex);
+                }
+            }
+
+            if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
+                getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
+                continue;
+            }
+            if (!new File(element).exists()) {
+                continue;
+            }
+            jarsToMerge.add(new File(element));
+        }
+        if (localJsBuild) {
+            // For local JavaScript builds we need codenameone-core and java-runtime classes
+            // in the staged jar -- the build server normally re-supplies those, but ParparVM's
+            // ByteCodeTranslator runs locally here and resolves everything from the staged class
+            // directory. `provided`-scope deps are not transitive, so a child module that only
+            // depends on a `common` library never sees the project's codenameone-core /
+            // java-runtime jars on its compile classpath. Pull them in explicitly here.
+            for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                File jar = getJar("com.codenameone", bundled);
+                if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
+                    getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
+                    jarsToMerge.add(jar);
+                }
+            }
+        }
+
+        // Each staged jar records the inputs it was merged from. A cached jar is reused only
+        // when those match the current set: timestamps alone cannot see a change in what the
+        // plugin excludes, so a jar staged before an exclusion was added (the ~157 MB of
+        // ffmpeg natives from #5380) would otherwise be reused, and uploaded, forever. A jar
+        // with no record is not reused either -- one written by an older plugin cannot be told
+        // apart from a stale one.
+        File stagedInputsFile = new File(jarWithDependencies.getPath() + ".inputs");
+        String stagedInputs = describeStagedInputs(jarsToMerge);
         if (jarWithDependencies.exists()) {
             getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
-            // Evidently pom.xml file has already built the jar file - we will use that one.  This allows
-            // developers to override what is included in the jar file that is sent to the server.
-
-            for (String artifact : cpElements) {
-                File jar = new File(artifact);
-                if (jar.isDirectory()) {
-                    if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+            // readTextFileOrNull trims, so compare trimmed.
+            if (!stagedInputs.trim().equals(readTextFileOrNull(stagedInputsFile))) {
+                getLog().debug("Jar file was staged from different inputs. "+jarWithDependencies+". Deleting");
+                jarWithDependencies.delete();
+            } else {
+                for (String artifact : cpElements) {
+                    File jar = new File(artifact);
+                    if (jar.isDirectory()) {
+                        if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+                            getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                            jarWithDependencies.delete();
+                            break;
+                        }
+                    } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
+                        // One of the dependency jar files is newer... so we delete the dependencies jar file
+                        // and will generate a new one.
                         getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
                         jarWithDependencies.delete();
                         break;
                     }
-                } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
-                    // One of the dependency jar files is newer... so we delete the dependencies jar file
-                    // and will generate a new one.
-                    getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
-                    jarWithDependencies.delete();
-                    break;
                 }
-
             }
         }
 
-
-
         if (!jarWithDependencies.exists()) {
             getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-
-            // Jars that should be stripped out and not sent to the server
-            List<String> blackListJars = new ArrayList<String>();
-            getLog().info("Project artifacts: "+project.getArtifacts());
-            // For local JavaScript builds we need codenameone-core and java-runtime classes
-            // in the staged jar -- the build server normally re-supplies those, but ParparVM's
-            // ByteCodeTranslator runs locally here and resolves everything from the staged class
-            // directory.
-            boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
-            for (Artifact artifact : project.getArtifacts()) {
-                boolean addToBlacklist = isStrippedFromStagedJar(artifact);
-                if (addToBlacklist && !isLocalBuildTarget(buildTarget)
-                        && "org.jetbrains.kotlin".equals(artifact.getGroupId())
-                        && "kotlin-stdlib".equals(artifact.getArtifactId())) {
-                    serverMustProvideKotlinVersion = artifact.getVersion();
-                    getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
-                }
-                if (addToBlacklist) {
-                    File jar = getJar(artifact);
-                    if (jar != null) {
-                        blackListJars.add(jar.getAbsolutePath());
-                        blackListJars.add(jar.getPath());
-                        try {
-                            blackListJars.add(jar.getCanonicalPath());
-                            getLog().debug("Added "+jar+" to blacklist");
-                        } catch (Exception ex){
-                            getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
-                        }
-                    }
-                }
-
-            }
-            getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
-            List<File> jarsToMerge = new ArrayList<File>();
-            for (String element : cpElements) {
-
-                String canonicalEl = element;
-                try {
-                    canonicalEl = new File(canonicalEl).getCanonicalPath();
-                } catch (Exception ex){
-                    if (getLog().isDebugEnabled()) {
-                        getLog().warn("Failed to resolve canonical path for " + element, ex);
-                    }
-                }
-
-                if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
-                    getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
-                    continue;
-                }
-                if (!new File(element).exists()) {
-                    continue;
-                }
-                getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
-                jarsToMerge.add(new File(element));
-            }
-            if (localJsBuild) {
-                // `provided`-scope deps are not transitive, so a child module that only
-                // depends on a `common` library never sees the project's codenameone-core /
-                // java-runtime jars on its compile classpath. Pull them in explicitly here
-                // so ParparVM has every class available when it translates to JavaScript.
-                for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
-                    File jar = getJar("com.codenameone", bundled);
-                    if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
-                        getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
-                        jarsToMerge.add(jar);
-                    }
-                }
-            }
+            getLog().debug("Merging into jar with dependencies: "+jarsToMerge);
+            stagedInputsFile.delete();
             mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
-
+            writeStringToFile(stagedInputsFile, stagedInputs);
         }
 
         verifyApplicationClassClosure(jarWithDependencies, cpElements);

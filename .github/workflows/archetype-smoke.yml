@@ -127,4 +127,5 @@ jobs:
       - name: Check the staged upload jar of every build target
         run: |
           cd maven/integration-tests
-          bash cn1app-staged-jar-test.sh
+          # The project's CSS compile opens an AWT frame, so it needs a display.
+          xvfb-run -a bash cn1app-staged-jar-test.sh
