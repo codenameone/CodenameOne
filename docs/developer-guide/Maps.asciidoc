@@ -90,6 +90,22 @@ Vector tiles are painted according to a `MapStyle`. The built-in `MapStyle.light
 
 image::img/maps-dark.png[The same vector data rendered with the built-in dark style,scaledwidth=40%]
 
+==== Street names and street-level zoom
+
+Street names are written along the streets themselves, the way a printed street map shows them. A name follows the line of its road, bends with it on a gentle curve and always reads left to right. A long road repeats its name at intervals so a name is in view wherever you look along it. A name is left out rather than scrambled where a corner falls under it, where the road is shorter than the name, or where it would overlap another label. Place names and points of interest stay horizontal.
+
+Labels are drawn above the lines and shapes you add and below the markers. A route drawn with `addPolyline` therefore never hides the names of the streets it follows, while pins stay on top of everything:
+
+image::img/maps-road-labels.png[A route drawn over the vector basemap with the street names laid along the roads and above the route,scaledwidth=40%]
+
+When you draw on the basemap yourself through `getEngine()`, the engine's `paint` method draws the tiles and their labels together. To put your own drawing between the two, call `paintTiles`, draw, then call `paintLabels`.
+
+A vector map zooms further than the deepest level its tile source serves. OpenFreeMap's data stops at zoom 14, yet the map reaches zoom 20: past zoom 14 the map redraws the zoom 14 geometry at the larger scale, so roads and buildings stay sharp instead of turning into a stretched image. `getMaxZoom()` reports the deepest level the camera can reach, six levels past the source's own, and never more than 22. A raster source stops at its own deepest level, since enlarging an image only blurs it.
+
+image::img/maps-street-zoom.png[Street-level zoom on the vector basemap with road names repeated along the streets,scaledwidth=40%]
+
+Line widths, like text sizes, are in logical pixels and scale with the screen density, so a road is as thick on a high-density phone as on a desktop. The built-in styles keep widening roads as you zoom in to street level. At the deepest zooms a street name can sit a little to the side of its road: the name comes from a simplified copy of the road's line in the tile data, and the difference grows as the map enlarges it.
+
 === Native maps and providers
 
 `NativeMap` renders through a native map SDK when the build wires one in:

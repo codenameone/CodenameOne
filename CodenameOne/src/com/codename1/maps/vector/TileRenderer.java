@@ -45,6 +45,18 @@ final class TileRenderer {
     /// Draws the fill and line layers of `tile` into `g` (a buffer of
     /// `tileSize` pixels), honoring the rules in `style` at integer `zoom`.
     static void renderTile(Graphics g, VectorTile tile, MapStyle style, int zoom, int tileSize) {
+        renderTile(g, tile, style, zoom, tileSize, 0, 0, 0);
+    }
+
+    /// Draws one quadrant-of-a-quadrant of `tile`: the sub-tile `subX,subY`
+    /// of the `2^depth` by `2^depth` grid the tile divides into. This is how
+    /// the engine zooms past the source's deepest level ("overzoom") -- the
+    /// deepest tile's vector geometry is drawn again at the larger scale, so
+    /// roads stay sharp instead of being a stretched bitmap. `zoom` is the
+    /// displayed zoom, so line widths keep growing with it. Depth 0 is the
+    /// whole tile.
+    static void renderTile(Graphics g, VectorTile tile, MapStyle style, int zoom, int tileSize,
+                           int subX, int subY, int depth) {
         g.setAntiAliased(true);
         List styleLayers = style.getLayers();
         for (Object slObj : styleLayers) {
@@ -59,17 +71,19 @@ final class TileRenderer {
             if (vl == null) {
                 continue;
             }
-            double scale = (double) tileSize / vl.getExtent();
+            Viewport v = new Viewport(vl.getExtent(), tileSize, subX, subY, depth);
             List features = vl.getFeatures();
             if (sl.getType() == StyleLayer.TYPE_FILL) {
-                renderFills(g, features, sl, scale);
+                renderFills(g, features, sl, v);
             } else {
-                renderLines(g, features, sl, scale, zoom);
+                // Style widths are logical pixels, like text sizes; the buffer
+                // is tileSize device pixels for 256 logical ones.
+                renderLines(g, features, sl, v, sl.lineWidthAt(zoom) * tileSize / WebMercator.TILE_SIZE);
             }
         }
     }
 
-    private static void renderFills(Graphics g, List features, StyleLayer sl, double scale) {
+    private static void renderFills(Graphics g, List features, StyleLayer sl, Viewport v) {
         int argb = sl.getFillColor();
         applyColor(g, argb);
         for (Object featureObj : features) {
@@ -81,18 +95,21 @@ final class TileRenderer {
             if (parts.isEmpty()) {
                 continue;
             }
+            if (!v.touchesAny(parts, 0)) {
+                continue;
+            }
             GeneralPath path = new GeneralPath();
             for (Object partObj : parts) {
                 int[] ring = (int[]) partObj;
-                appendRing(path, ring, scale, true);
+                appendRing(path, ring, v, true);
             }
             g.fillShape(path);
         }
     }
 
-    private static void renderLines(Graphics g, List features, StyleLayer sl, double scale, int zoom) {
+    private static void renderLines(Graphics g, List features, StyleLayer sl, Viewport v, double lineWidth) {
         applyColor(g, sl.getLineColor());
-        float width = (float) sl.lineWidthAt(zoom);
+        float width = (float) lineWidth;
         if (width < 0.5f) {
             width = 0.5f;
         }
@@ -106,20 +123,23 @@ final class TileRenderer {
             List parts = f.getParts();
             for (Object partObj : parts) {
                 int[] line = (int[]) partObj;
+                if (!v.touches(line, width)) {
+                    continue;
+                }
                 GeneralPath path = new GeneralPath();
-                appendRing(path, line, scale, false);
+                appendRing(path, line, v, false);
                 g.drawShape(path, stroke);
             }
         }
     }
 
-    private static void appendRing(GeneralPath path, int[] coords, double scale, boolean close) {
+    private static void appendRing(GeneralPath path, int[] coords, Viewport v, boolean close) {
         if (coords.length < 2) {
             return;
         }
-        path.moveTo((float) (coords[0] * scale), (float) (coords[1] * scale));
+        path.moveTo(v.x(coords[0]), v.y(coords[1]));
         for (int i = 2; i + 1 < coords.length; i += 2) {
-            path.lineTo((float) (coords[i] * scale), (float) (coords[i + 1] * scale));
+            path.lineTo(v.x(coords[i]), v.y(coords[i + 1]));
         }
         if (close) {
             path.closePath();
@@ -167,7 +187,14 @@ final class TileRenderer {
                 if (value == null || String.valueOf(value).trim().length() == 0) {
                     continue;
                 }
-                double[] anchor = anchorOf(f);
+                boolean isLine = f.getGeometryType() == VectorFeature.GEOM_LINESTRING;
+                int[] line = isLine ? longestPart(f.getParts()) : null;
+                double[] anchor;
+                if (isLine) {
+                    anchor = line == null ? null : lineMidpoint(line);
+                } else {
+                    anchor = anchorOf(f);
+                }
                 if (anchor == null) {
                     continue;
                 }
@@ -179,16 +206,25 @@ final class TileRenderer {
                 }
                 double worldX = originX + anchor[0] * scale;
                 double worldY = originY + anchor[1] * scale;
+                double[] path = null;
+                if (line != null) {
+                    path = new double[line.length & ~1];
+                    for (int i = 0; i + 1 < line.length; i += 2) {
+                        path[i] = originX + line[i] * scale;
+                        path[i + 1] = originY + line[i + 1] * scale;
+                    }
+                }
                 out.add(new LabelCandidate(String.valueOf(value), worldX, worldY, zoom,
-                        sl.getTextColor(), sl.getTextHaloColor(), sl.textSizeAt(zoom)));
+                        sl.getTextColor(), sl.getTextHaloColor(), sl.textSizeAt(zoom), path));
             }
         }
         return out;
     }
 
-    // Put road names halfway along the longest line part. Averaging vertices
-    // can put a label far from a curved road, and biases it toward dense bends.
-    private static double[] lineAnchor(List parts) {
+    // A road name follows the longest line part, starting from its midpoint.
+    // Averaging vertices can put a label far from a curved road, and biases it
+    // toward dense bends.
+    private static int[] longestPart(List parts) {
         int[] longest = null;
         double longestLength = 0;
         for (Object part : parts) {
@@ -202,10 +238,18 @@ final class TileRenderer {
                 longestLength = length;
             }
         }
-        if (longest == null) {
+        return longest;
+    }
+
+    private static double[] lineMidpoint(int[] longest) {
+        double remaining = 0;
+        for (int i = 2; i + 1 < longest.length; i += 2) {
+            remaining += segmentLength(longest, i);
+        }
+        if (remaining <= 0) {
             return null;
         }
-        double remaining = longestLength / 2;
+        remaining /= 2;
         for (int i = 2; i + 1 < longest.length; i += 2) {
             double length = segmentLength(longest, i);
             if (length > 0 && remaining <= length) {
@@ -230,9 +274,6 @@ final class TileRenderer {
         List parts = f.getParts();
         if (parts.isEmpty()) {
             return null;
-        }
-        if (f.getGeometryType() == VectorFeature.GEOM_LINESTRING) {
-            return lineAnchor(parts);
         }
         int[] first = (int[]) parts.get(0);
         if (first.length < 2) {
@@ -314,5 +355,66 @@ final class TileRenderer {
             }
         }
         return inside;
+    }
+
+    /// Maps tile-extent coordinates into the buffer for the (sub-)tile being
+    /// drawn, and culls parts that cannot reach it -- at depth 6 all but a
+    /// 64th of the tile falls outside, and would otherwise all be stroked.
+    private static final class Viewport {
+        private final double scale;
+        private final double offsetX;
+        private final double offsetY;
+        private final double minX;
+        private final double minY;
+        private final double maxX;
+        private final double maxY;
+        private final double extentPerPixel;
+
+        Viewport(int extent, int tileSize, int subX, int subY, int depth) {
+            double span = (double) extent / (1 << depth);
+            scale = tileSize / span;
+            minX = subX * span;
+            minY = subY * span;
+            maxX = minX + span;
+            maxY = minY + span;
+            offsetX = -minX * scale;
+            offsetY = -minY * scale;
+            extentPerPixel = span / tileSize;
+        }
+
+        float x(int coord) {
+            return (float) (coord * scale + offsetX);
+        }
+
+        float y(int coord) {
+            return (float) (coord * scale + offsetY);
+        }
+
+        boolean touchesAny(List parts, double marginPx) {
+            for (Object partObj : parts) {
+                if (touches((int[]) partObj, marginPx)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean touches(int[] coords, double marginPx) {
+            if (coords.length < 2) {
+                return false;
+            }
+            double m = (marginPx + 1) * extentPerPixel;
+            double x0 = Double.MAX_VALUE;
+            double y0 = Double.MAX_VALUE;
+            double x1 = -Double.MAX_VALUE;
+            double y1 = -Double.MAX_VALUE;
+            for (int i = 0; i + 1 < coords.length; i += 2) {
+                x0 = Math.min(x0, coords[i]);
+                x1 = Math.max(x1, coords[i]);
+                y0 = Math.min(y0, coords[i + 1]);
+                y1 = Math.max(y1, coords[i + 1]);
+            }
+            return x1 >= minX - m && x0 <= maxX + m && y1 >= minY - m && y0 <= maxY + m;
+        }
     }
 }

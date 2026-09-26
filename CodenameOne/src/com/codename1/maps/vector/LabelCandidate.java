@@ -25,6 +25,10 @@ package com.codename1.maps.vector;
 /// A single label to draw, captured at tile-decode time. Its anchor is stored
 /// in integer-zoom world pixels (256px tiles) so the engine can convert it to
 /// the screen at any fractional camera zoom without re-walking the tile.
+///
+/// A road name also carries the road's geometry in [#path], in the same world
+/// pixels, so the text can be laid along the road the way street maps show it
+/// instead of floating horizontally over it.
 final class LabelCandidate {
 
     final String text;
@@ -34,9 +38,17 @@ final class LabelCandidate {
     final int textColor;
     final int haloColor;
     final double sizePx;
+    /// Interleaved `x,y` world pixels of the line the label follows, or null
+    /// for a label placed at a point. [#worldX]/[#worldY] is its midpoint.
+    final double[] path;
 
     LabelCandidate(String text, double worldX, double worldY, int tileZoom,
                    int textColor, int haloColor, double sizePx) {
+        this(text, worldX, worldY, tileZoom, textColor, haloColor, sizePx, null);
+    }
+
+    LabelCandidate(String text, double worldX, double worldY, int tileZoom,
+                   int textColor, int haloColor, double sizePx, double[] path) {
         this.text = text;
         this.worldX = worldX;
         this.worldY = worldY;
@@ -44,5 +56,6 @@ final class LabelCandidate {
         this.textColor = textColor;
         this.haloColor = haloColor;
         this.sizePx = sizePx;
+        this.path = path;
     }
 }
