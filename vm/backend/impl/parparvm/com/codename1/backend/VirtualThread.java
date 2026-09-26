@@ -54,6 +54,18 @@ public final class VirtualThread {
         return createImpl(fd, stackBytes);
     }
 
+    /**
+     * A virtual thread that runs a background task: when first resumed it calls
+     * {@code Tasks.runVirtual(token)}. It has no descriptor --
+     * {@link #descriptorOf} answers -1 -- so its host runs it from the ring and
+     * never parks it on the poller.
+     *
+     * @return a handle, or 0 if the stack could not be allocated
+     */
+    public static long createTask(long token, int stackBytes) {
+        return createTaskImpl(token, stackBytes);
+    }
+
     /** {@link #resume}: the connection is done and the handle should be freed. */
     public static final int FINISHED = 0;
     /** {@link #resume}: waiting for bytes; its descriptor goes back to the poller. */
@@ -111,6 +123,7 @@ public final class VirtualThread {
     }
 
     private static native long createImpl(int fd, int stackBytes);
+    private static native long createTaskImpl(long token, int stackBytes);
     private static native int resumeImpl(long handle);
     private static native int descriptorImpl(long handle);
     private static native void freeImpl(long handle);

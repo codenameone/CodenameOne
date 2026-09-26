@@ -1,0 +1,174 @@
+[[backend-mcp]]
+== Backend MCP and the agent loop
+
+The Model Context Protocol lets an AI agent call tools on a server. A Codename One
+backend serves it at `/mcp`, for two different readers. In production the agent
+is a user of the application, and the tools are the ones the application chooses
+to publish. In development the agent is the one writing the server, and the tools
+let it look inside the running server and exercise it, the way a developer uses a
+debugger and a database console.
+
+=== Serving MCP
+
+The first reason is the application's own tools. An `@McpTool` method becomes a
+tool an agent can call, with its JSON Schema written by the build from the
+parameter types:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SupportTools.java[tag=backend-mcp-tool,indent=0]
+----
+
+The description is what an agent chooses tools by, so it says when to use the
+tool as well as what it does. A parameter needs `@McpParam` to name it, since a
+Java parameter name doesn't survive compilation. Outside a development profile
+the endpoint refuses to start without `cn1.mcp.token`. It also refuses a browser
+request unless its origin is a loopback address or is listed in
+`cn1.mcp.allowedOrigins`, which keeps a web page from driving it. A page the
+server serves itself has to be listed too.
+
+==== Writing a tool
+
+A tool is an instance method of a bean. Its name is the method's name unless
+`@McpTool(name = ...)` gives one, and a name is letters, digits, `_`, `-` and `.`
+only. Each parameter carries `@McpParam` with the argument's name, an optional
+`description` that goes into the schema, and `required`, true by default. A
+parameter may be a `String`, a number, a boolean, an enum, a `Map` or a `List`;
+the build writes the matching JSON Schema type, and refuses any other type.
+
+When an agent calls the tool, the arguments are converted to the parameter types
+and the method is called directly, with no reflection. A value that doesn't fit --
+text where a number belongs, or a number outside the range of a `short` -- is
+answered as a tool error rather than converted into something the agent didn't
+send. The return value is sent as the call's text: a `String` unchanged, anything
+else as JSON.
+
+A method that throws is answered with a result marked as an error, which an agent
+reads and can correct, rather than with a protocol failure. An
+`IllegalArgumentException` sends its message, so that's the exception to throw for
+arguments the tool can't use, with a message saying what would work.
+
+A program that builds its server itself adds a tool that isn't a bean method by
+implementing `com.codename1.backend.mcp.McpTool` -- a name, a description, an
+input schema and a `call` method -- and passing it to the builder with
+`mcpTool(tool)`, beside `mcp(...)`.
+
+==== The endpoint
+
+The endpoint speaks JSON-RPC 2.0 over MCP's Streamable HTTP transport, and
+negotiates protocol versions 2025-06-18, 2025-03-26 and 2024-11-05. It answers
+`initialize`, `ping`, `tools/list` and `tools/call`, and answers the resource
+and prompt listings with empty lists. It keeps no session and opens no event stream, which
+the transport allows, so each call is one POST with one JSON answer and a GET is
+answered 405.
+
+[cols="2,3", options="header"]
+|===
+| Key | What it sets
+
+| `cn1.mcp.enabled`
+| Whether the endpoint is served. On by default when the application has tools,
+  or when the development tools are available; set `false` to turn it off.
+
+| `cn1.mcp.token`
+| A bearer token every call must carry. Required outside a development profile.
+
+| `cn1.mcp.allowedOrigins`
+| Comma-separated browser origins allowed besides loopback ones, or `*`.
+
+| `cn1.mcp.path`
+| Where the endpoint lives, `/mcp` by default.
+
+| `cn1.mcp.devTools`
+| Whether a development build serves the development tools. On by default on a
+  development profile.
+|===
+
+Each server has its own tools, even with several in one process, so a server
+restarted in a test serves the tools its own beans provide and nothing a previous
+one registered.
+
+=== Tools for developing the server
+
+The second reason is development. When the server runs through `cn1:backend` on a
+development profile, the same endpoint also serves tools for inspecting and
+exercising it, and the server prints the endpoint's address when it starts:
+
+[cols="1,3", options="header"]
+|===
+| Tool | Use it to
+
+| `backend_routes`
+| List every route: method, path and the controller method behind it.
+
+| `backend_beans`
+| List every bean, its scope and what was injected into it, and which conditional
+  beans are active.
+
+| `backend_config`
+| See the active profile and every configured key, with values that look secret
+  masked.
+
+| `backend_call`
+| Send the server a request -- `method`, `path`, `body`, `headers` -- and read the
+  status, headers and body.
+
+| `backend_requests`
+| See the last requests served, newest first, with status and time;
+  `failuresOnly` shows only the ones that failed, with the exception each threw.
+
+| `backend_logs`
+| Read the last lines the server printed.
+
+| `backend_sql`
+| Run SQL against the server's database. Only reading statements run unless
+  `write` is true.
+
+| `backend_schema`
+| List the entities and their tables and columns.
+
+| `backend_jobs`, `backend_run_job`
+| List the scheduled jobs; start one now.
+
+| `backend_metrics`
+| Read every metric's current value, optionally only those with a prefix.
+
+| `backend_managed`, `backend_invoke`
+| List the managed beans; call an operation.
+|===
+
+Claude Code connects to the endpoint with one command:
+
+----
+claude mcp add --transport http cn1-backend http://127.0.0.1:8080/mcp
+----
+
+A host that only speaks stdio runs `com.codename1.backend.mcp.StdioBridge` from
+the backend jar with that address instead, and the bridge relays each message. None
+of these tools are compiled into a server built with `cn1:backend-package`, unless
+`-Dcn1.backend.devTools=true` asks for them.
+
+=== The loop an agent works in
+
+The development tools are meant to be used in a loop that checks each change
+against the running server rather than against the code alone:
+
+. Start the server on the development profile. It gets an in-memory SQLite
+  database with the entity tables created, so it needs nothing installed:
++
+----
+CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
+----
+. Learn the server with `backend_routes`, `backend_beans` and `backend_schema`.
+. Change the code, restart the server, and exercise the endpoint with
+  `backend_call` before touching any UI. A failing endpoint is much cheaper to
+  diagnose here than through a screen.
+. Check what the server saw with `backend_requests`, and what it stored with
+  `backend_sql`.
+. For a change that spans the app as well, run the app in the simulator and drive
+  it through the simulator's own MCP server, described in <<MCP Headless API>>,
+  then check the requests and rows the same way.
+
+There is no hot reload: after a change to backend code, stop the server and start
+it again. That takes seconds, and the build regenerates the wiring on the way.
+

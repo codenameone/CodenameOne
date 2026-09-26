@@ -63,6 +63,10 @@ final class OtlpSchema {
     private static final int BOOL = 8;
     private static final int DOUBLE = 9;
     private static final int MESSAGE = 10;
+    /** A repeated fixed64, packed: the histogram's bucket counts. */
+    private static final int PACKED_FIXED64 = 11;
+    /** A repeated double, packed: the histogram's bucket bounds. */
+    private static final int PACKED_DOUBLE = 12;
 
     /** One field: its JSON name, its number, its kind, and for a message its type. */
     private static final class Field {
@@ -152,6 +156,11 @@ final class OtlpSchema {
     private static final Message RESOURCE_SPANS;
     /** ExportTraceServiceRequest, the body of POST /v1/traces. */
     private static final Message EXPORT;
+    /**
+     * ExportMetricsServiceRequest, the body of POST /v1/metrics. The field
+     * numbers are {@code opentelemetry/proto/metrics/v1/metrics.proto}'s.
+     */
+    private static final Message METRICS_EXPORT;
 
     static {
         Field arrayValue = f("arrayValue", 5, MESSAGE);
@@ -221,6 +230,62 @@ final class OtlpSchema {
         Field resourceSpans = rep("resourceSpans", 1);
         resourceSpans.type = RESOURCE_SPANS;
         EXPORT = new Message(new Field[] {resourceSpans});
+
+        Message numberPoint = new Message(new Field[] {
+            attributes(7), f("startTimeUnixNano", 2, FIXED64), f("timeUnixNano", 3, FIXED64),
+            f("asDouble", 4, DOUBLE), f("flags", 8, VARINT)
+        });
+        // bucket_counts is "repeated fixed64" on HistogramDataPoint in
+        // opentelemetry-proto's metrics.proto, like count -- NOT the "repeated
+        // uint64" (varint) of the exponential histogram's Buckets message. The
+        // two are easy to confuse; OtlpMetricsProtoTest decodes this with the
+        // generated classes to hold it.
+        Message histogramPoint = new Message(new Field[] {
+            attributes(9), f("startTimeUnixNano", 2, FIXED64), f("timeUnixNano", 3, FIXED64),
+            f("count", 4, FIXED64), f("sum", 5, DOUBLE),
+            f("bucketCounts", 6, PACKED_FIXED64), f("explicitBounds", 7, PACKED_DOUBLE),
+            f("flags", 10, VARINT), f("min", 11, DOUBLE), f("max", 12, DOUBLE)
+        });
+        Field gaugePoints = rep("dataPoints", 1);
+        gaugePoints.type = numberPoint;
+        Message gauge = new Message(new Field[] {gaugePoints});
+        Field sumPoints = rep("dataPoints", 1);
+        sumPoints.type = numberPoint;
+        Message sum = new Message(new Field[] {
+            sumPoints, f("aggregationTemporality", 2, VARINT), f("isMonotonic", 3, BOOL)
+        });
+        Field histogramPoints = rep("dataPoints", 1);
+        histogramPoints.type = histogramPoint;
+        Message histogram = new Message(new Field[] {
+            histogramPoints, f("aggregationTemporality", 2, VARINT)
+        });
+        Field gaugeField = f("gauge", 5, MESSAGE);
+        gaugeField.type = gauge;
+        Field sumField = f("sum", 7, MESSAGE);
+        sumField.type = sum;
+        Field histogramField = f("histogram", 9, MESSAGE);
+        histogramField.type = histogram;
+        Message metric = new Message(new Field[] {
+            f("name", 1, STRING), f("description", 2, STRING), f("unit", 3, STRING),
+            gaugeField, sumField, histogramField
+        });
+        Field metricsScope = f("scope", 1, MESSAGE);
+        metricsScope.type = SCOPE;
+        Field metrics = rep("metrics", 2);
+        metrics.type = metric;
+        Message scopeMetrics = new Message(new Field[] {
+            metricsScope, metrics, f("schemaUrl", 3, STRING)
+        });
+        Field metricsResource = f("resource", 1, MESSAGE);
+        metricsResource.type = RESOURCE;
+        Field scopeMetricsField = rep("scopeMetrics", 2);
+        scopeMetricsField.type = scopeMetrics;
+        Message resourceMetrics = new Message(new Field[] {
+            metricsResource, scopeMetricsField, f("schemaUrl", 3, STRING)
+        });
+        Field resourceMetricsField = rep("resourceMetrics", 1);
+        resourceMetricsField.type = resourceMetrics;
+        METRICS_EXPORT = new Message(new Field[] {resourceMetricsField});
     }
 
     private static Field attributes(int number) {
@@ -249,6 +314,13 @@ final class OtlpSchema {
     static byte[] protobuf(Map request) throws IOException {
         ByteSink out = new ByteSink(1024);
         writeMessage(EXPORT, request, out, 0);
+        return copy(out);
+    }
+
+    /** A metrics export request as protobuf. */
+    static byte[] metricsProtobuf(Map request) throws IOException {
+        ByteSink out = new ByteSink(1024);
+        writeMessage(METRICS_EXPORT, request, out, 0);
         return copy(out);
     }
 
@@ -504,6 +576,30 @@ final class OtlpSchema {
                 }
                 tag(out, field.number, 1);
                 fixed64(out, Double.doubleToLongBits(d));
+                return;
+            }
+            case PACKED_FIXED64:
+            case PACKED_DOUBLE: {
+                if(!(value instanceof List)) {
+                    throw new IOException(field.name + " must be a list");
+                }
+                List items = (List)value;
+                if(items.isEmpty()) {
+                    return;
+                }
+                tag(out, field.number, 2);
+                varint(out, items.size() * 8L);
+                for(int iter = 0 ; iter < items.size() ; iter++) {
+                    Object item = items.get(iter);
+                    if(field.kind == PACKED_DOUBLE) {
+                        if(!(item instanceof Number)) {
+                            throw new IOException(field.name + " must hold numbers");
+                        }
+                        fixed64(out, Double.doubleToLongBits(((Number)item).doubleValue()));
+                    } else {
+                        fixed64(out, number(field, item));
+                    }
+                }
                 return;
             }
             default:

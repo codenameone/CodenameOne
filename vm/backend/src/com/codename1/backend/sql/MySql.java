@@ -431,6 +431,25 @@ public final class MySql {
         command("ROLLBACK");
     }
 
+    /** Opens a transaction that refuses writes. */
+    public void beginReadOnly() throws IOException {
+        command("START TRANSACTION READ ONLY");
+    }
+
+    /**
+     * Savepoint control, through the text protocol for the same reason as
+     * {@link #begin}. The name is checked to be a plain identifier here as well
+     * as by the caller, because this is the one text-protocol entry point that
+     * takes a value at all.
+     */
+    public void savepoint(String verb, String name) throws IOException {
+        if(!"SAVEPOINT".equals(verb) && !"ROLLBACK TO SAVEPOINT".equals(verb)
+                && !"RELEASE SAVEPOINT".equals(verb)) {
+            throw new IOException("Not a savepoint statement: " + verb);
+        }
+        command(verb + " " + Dialect.checkIdentifier(name));
+    }
+
     public long lastInsertId() {
         return lastInsertId;
     }

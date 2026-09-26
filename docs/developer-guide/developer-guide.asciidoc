@@ -119,6 +119,22 @@ include::Video-Capture-Constraints.asciidoc[]
 
 include::Backend.asciidoc[]
 
+include::Backend-Web.asciidoc[]
+
+include::Backend-Beans.asciidoc[]
+
+include::Backend-Data.asciidoc[]
+
+include::Backend-Sessions.asciidoc[]
+
+include::Backend-Scheduling.asciidoc[]
+
+include::Backend-Observability.asciidoc[]
+
+include::Backend-MCP.asciidoc[]
+
+include::Backend-Operations.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

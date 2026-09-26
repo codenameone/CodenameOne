@@ -70,6 +70,20 @@ public final class Reactor {
         this.selector = selector;
     }
 
+    /**
+     * Null: this runtime has no virtual-thread hosts to wake. See the packaged
+     * runtime's Reactor.
+     */
+    public static int[] createWakePipe() {
+        return null;
+    }
+
+    public static void wake(int writeFd) {
+    }
+
+    public static void drainWake(int readFd) {
+    }
+
     public static Reactor create() throws IOException {
         return new Reactor(Selector.open());
     }

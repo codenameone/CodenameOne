@@ -1,0 +1,298 @@
+[[backend-observability]]
+== Backend tracing, metrics and management
+
+A server in production has to answer three questions for whoever runs it: what did
+this request do, how's the server doing, and what can be changed without
+redeploying. Traces answer the first, metrics the second, and managed beans the third.
+All three follow the OpenTelemetry conventions, so they reach whatever
+observability stack a deployment already runs, and all three are linked into the
+binary only when the build is asked for them.
+
+=== Tracing with OpenTelemetry
+
+A server can report every request it serves to any OpenTelemetry collector, and
+the reporting needs no code in the handlers. Turn it on at build time with the
+annotation, on any class in the backend module:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-annotation,indent=0]
+----
+
+Without touching the source, set it in `application.properties` instead:
+
+----
+cn1.otel.enabled=true
+----
+
+Either one makes the generated entry point install a tracer. From then on:
+
+* every request is a server span, named after the route that matched
+  (`GET /notes/{id}`), with its status, method and path;
+* every outbound `Web` call is a client span, and sends the W3C `traceparent`
+  and `tracestate` headers so the service it reaches joins the same trace;
+* every `Database` statement is a client span carrying the SQL as the code wrote
+  it, placeholders and all -- the bound values are never recorded;
+* an incoming `traceparent` makes the request part of the caller's trace, which is
+  how a Codename One app's spans connect to the backend's own (see
+  <<opentelemetry-tracing>>).
+
+A WebSocket connection isn't a span. It can stay open for hours and carry any
+number of messages, so it has no single start and end to time, and its upgrade
+request is answered before tracing begins.
+
+Without the annotation or the property, nothing refers to the tracer and the
+translator leaves it out of the binary.
+
+Spans go out over OTLP/HTTP, as binary protobuf by default, batched on a
+thread of their own so a slow collector never holds up a request. A queue that
+fills because the collector is down drops spans and counts them, and
+`HttpServer.getMetrics()` reports those counts. The settings are the standard
+OpenTelemetry environment variables, so a deployment configures this server the
+same way it configures everything else it runs:
+
+[cols="2,2,3"]
+|===
+| Variable | Property | Meaning
+
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `cn1.otel.endpoint` | The collector's base URL; `/v1/traces` is appended. Defaults to `http://localhost:4318`.
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `cn1.otel.traces.endpoint` | The full URL, used as it is.
+| `OTEL_EXPORTER_OTLP_HEADERS` | `cn1.otel.headers` | `name=value` pairs, comma separated, with each value URL-encoded.
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `cn1.otel.protocol` | `http/protobuf` or `http/json`. gRPC isn't supported.
+| `OTEL_SERVICE_NAME` | `cn1.otel.service.name` | Overrides the annotation's `serviceName`.
+| `OTEL_RESOURCE_ATTRIBUTES` | `cn1.otel.resource.attributes` | Extra resource attributes, `key=value` pairs.
+| `OTEL_TRACES_SAMPLER` | `cn1.otel.sampler` | `parentbased_always_on` by default; also `always_on`, `always_off`, `traceidratio` and the other `parentbased_` forms.
+| `OTEL_TRACES_SAMPLER_ARG` | `cn1.otel.sampler.arg` | The ratio for the ratio samplers.
+| `OTEL_SDK_DISABLED` | `cn1.otel.disabled` | `true` turns tracing off at start-up without a rebuild.
+|===
+
+`cn1.otel.attributes.exclude` names attributes never to record, for example
+`db.query.text` in a code base that builds SQL by concatenating values.
+
+Sending spans to Dynatrace, which accepts OTLP over HTTP as protobuf, is a
+matter of pointing the endpoint at the environment's OTLP API and passing an
+ingest token:
+
+----
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://abc12345.live.dynatrace.com/api/v2/otlp/v1/traces
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Api-Token%20dt0c01.XXXX
+----
+
+A server started without the builder -- one that calls `HttpServer.start` or runs
+the Lambda loop itself -- installs the tracer in one line:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-install,indent=0]
+----
+
+Under Lambda, the invocation continues the trace the host passes in its X-Ray
+header, and the loop waits for the export before it polls again, because the host
+freezes the process between invocations.
+
+`Tracing.current()` returns the request's span, for adding an attribute of the
+application's own, and `Tracing.inSpan` times a block of work as a child span.
+
+==== Relaying the app's spans
+
+A mobile app shouldn't carry the collector's credentials: anything inside an app
+package can be read by whoever installs it. With `cn1.otel.relay=true` the backend
+accepts the app's spans at `/otel/v1/traces`, adds its own credentials and
+forwards them to the same collector:
+
+----
+cn1.otel.relay=true
+# Optional: a shared secret the app sends in X-CN1-Telemetry-Token.
+cn1.otel.relay.token=${RELAY_TOKEN}
+# Only for a web app served from another origin.
+cn1.otel.relay.corsOrigin=https://app.example.com
+----
+
+The relay takes OTLP/JSON, rebuilds it against the OTLP schema -- a field the
+schema doesn't name is dropped and a malformed id is refused -- and queues it for
+export in whatever protocol the server exports with. It answers as soon as the
+spans are queued, and answers 503 when the queue is full so the app backs off.
+`cn1.otel.relay.maxBytes` and `cn1.otel.relay.maxSpans` bound a single export.
+
+=== Metrics and management
+
+Traces say what one request did; metrics say how the server is doing. With
+OpenTelemetry turned on, the server exports metrics over OTLP on the same endpoint
+and with the same settings as its traces, every minute by default, with cumulative
+temporality. `cn1.otel.metrics.enabled=false` turns metrics off while leaving
+traces on. The management endpoints described below record and serve the same
+metrics whether anything exports them or not.
+
+==== What the server records
+
+[cols="3,1,2", options="header"]
+|===
+| Instrument | Kind | Attributes
+
+| `http.server.request.duration`, in milliseconds
+| histogram
+| `http.route` (the route template), `http.request.method`,
+  `http.response.status_code`
+
+| `http.server.active_requests`
+| gauge
+|
+
+| `http.server.open_connections`
+| gauge
+|
+
+| `cn1.server.websocket_connections`
+| gauge
+|
+
+| `cn1.server.requests_served`, `cn1.server.connections_refused`
+| gauge
+|
+
+| `db.client.connection.count`, `db.client.connection.idle`
+| gauge
+| (when the server has a database)
+
+| `cn1.task.queue_depth`
+| gauge
+| `cn1.executor`
+
+| `cn1.scheduler.run.duration`, in milliseconds
+| histogram
+| `cn1.job`, `cn1.outcome` (`success` or `failure`)
+
+| `process.runtime.memory.used`, `process.uptime`
+| gauge
+|
+|===
+
+The route attribute is the template -- `GET /notes/{id}` is recorded as
+`/notes/{id}` -- so a server's metric count doesn't grow with the ids its clients
+ask for. A request that fails, whether in a handler or in the session store, is
+recorded with status 500.
+
+==== Managed beans
+
+The application's own metrics follow the JMX model -- attributes to watch and
+operations to call -- with Spring's annotations for it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/PriceCache.java[tag=backend-managed,indent=0]
+----
+
+`@ManagedResource` marks the bean, and `objectName` names it; without one it's
+the simple class name. Each `@ManagedAttribute` is an instance getter with no
+parameters, and a numeric one becomes a gauge named after the resource and the
+attribute -- `prices.size` here -- read each time metrics are collected. Every
+attribute, numeric or not, appears in the management listing. A
+`@ManagedOperation` is a method an operator can call, whose parameters may be
+strings, numbers, booleans, and enums. An operation's parameters are named by
+`@McpParam` when they carry one, and otherwise `arg0`, `arg1`, in order. The build
+checks each of these rules and refuses a managed method on a class with no
+`@ManagedResource`.
+
+`@Timed` records each call's duration as a histogram, and `@Counted` counts calls,
+with a second counter for the failures. Their instruments are named after the class and method
+unless the annotation's `value` names them:
+
+[cols="1,2", options="header"]
+|===
+| Annotation | Instruments
+
+| `@Timed`
+| `<class>.<method>.duration`, a histogram in milliseconds
+
+| `@Counted`
+| `<class>.<method>.calls`, and `<class>.<method>.calls.failures` for calls that threw
+|===
+
+`<class>` is the fully qualified class name. Like `@Transactional`, they're woven
+into the method at build time, so a call through `this` is measured too.
+
+==== Instruments of your own
+
+`Metrics.counter`, `Metrics.histogram` and `Metrics.gauge` create an instrument
+for anything the annotations don't cover:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/OrderMetrics.java[tag=backend-metrics-custom,indent=0]
+----
+
+Asking for the same name twice returns the same instrument, so two classes may
+declare it, and asking for an existing name as a different kind is refused. Keep
+instruments in static fields, so recording a value looks nothing up. A gauge is a
+callback read when metrics are collected, which suits a value that already exists
+somewhere, such as a queue's length. A histogram's second form takes bucket
+boundaries and up to three attribute keys, recorded with
+`record(value, first, second, third)`.
+
+==== Exporting
+
+Metrics use the tracing settings from <<Tracing with OpenTelemetry>> unless a
+metrics-specific one is set, which is the precedence the OpenTelemetry
+specification gives:
+
+[cols="2,2,3"]
+|===
+| Variable | Property | Meaning
+
+| `OTEL_METRIC_EXPORT_INTERVAL` | `cn1.otel.metrics.intervalMillis` | How often to export, in milliseconds. A minute by default.
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | `cn1.otel.metrics.endpoint` | The full URL. By default the tracing endpoint's base with `/v1/metrics` appended.
+| `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | `cn1.otel.metrics.headers` | Headers for the metrics requests; by default the tracing ones.
+| `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | `cn1.otel.metrics.protocol` | `http/protobuf` or `http/json`; by default the tracing protocol.
+| | `cn1.otel.metrics.enabled` | `false` exports traces only.
+|===
+
+When the server stops, it exports once more so the last interval isn't lost, bounded
+by the shutdown timeout.
+
+==== Management endpoints
+
+The management endpoints make the same information available over HTTP, for a
+load balancer and for an operator:
+
+----
+GET  /manage/health        public; 503 while the server drains
+GET  /manage/metrics       every metric, as JSON
+GET  /manage/prometheus    every metric, in the Prometheus text format
+GET  /manage/jobs          the scheduled jobs and their last runs
+GET  /manage/managed       the managed beans and their attributes
+POST /manage/managed/{bean}/{operation}
+----
+
+An operation's body is a JSON object of its arguments by parameter name.
+
+[cols="2,3", options="header"]
+|===
+| Key | What it sets
+
+| `cn1.management.enabled`
+| Whether the endpoints are served. On by default on a development profile, off
+  everywhere else.
+
+| `cn1.management.token`
+| The bearer token every endpoint but health requires. Outside a development
+  profile the server refuses to start with the endpoints on and no token, since
+  the metrics and managed beans would be readable by anyone who can reach the
+  port.
+
+| `cn1.management.path`
+| Where the endpoints live, `/manage` by default.
+|===
+
+On a development profile without a token, the read-only views are open to anyone
+who can reach the port, which is a laptop. An operation needs the token on every
+profile, because it changes the running server.
+
+Health answers 503 while the server drains, so a load balancer stops sending it
+new requests before it stops accepting them. The Prometheus view turns each name
+into a Prometheus one, replacing the dots with underscores and adding `_total` to a
+counter, so `http.server.request.duration` is scraped as
+`http_server_request_duration`.
+
+The management endpoints are served before the application's routes, so a
+catch-all route can't answer them. A running server's managed beans are also
+available to code, from `Backend.getManagedBeans()`.

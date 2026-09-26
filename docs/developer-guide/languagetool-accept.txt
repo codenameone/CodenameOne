@@ -749,7 +749,7 @@ Bodymovin
 keyframes?
 
 # -----------------------------------------------------------------------------
-# Server-side backend (Backend.asciidoc).
+# Server-side backend (Backend*.asciidoc).
 # -----------------------------------------------------------------------------
 # Two of the JVM server frameworks the backend chapter positions itself against.
 # Product names, so the dictionary has neither.
@@ -768,6 +768,12 @@ Testsuite
 # The container runtime, alongside Docker, that the conformance harness accepts.
 # A product name.
 Podman
+# The Unix scheduler whose expression format @Scheduled takes. The standard name
+# for that format, lowercase as every scheduler documents it.
+cron
+# The SQL construct a NESTED transaction rolls back to. SQL's own keyword, and the
+# term every database's documentation uses.
+savepoints?
 
 # -----------------------------------------------------------------------------
 # Attaching an agent to a build on a device (MCP-Headless-API.asciidoc).

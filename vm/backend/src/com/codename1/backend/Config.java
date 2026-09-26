@@ -159,6 +159,10 @@ public final class Config {
         "cn1.otel.queue.size", "OTEL_BSP_MAX_QUEUE_SIZE",
         "cn1.otel.batch.size", "OTEL_BSP_MAX_EXPORT_BATCH_SIZE",
         "cn1.otel.export.delayMillis", "OTEL_BSP_SCHEDULE_DELAY",
+        "cn1.otel.metrics.endpoint", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "cn1.otel.metrics.headers", "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+        "cn1.otel.metrics.protocol", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+        "cn1.otel.metrics.intervalMillis", "OTEL_METRIC_EXPORT_INTERVAL",
     };
 
     private final Properties profileFile;
@@ -318,6 +322,24 @@ public final class Config {
             out.append(iter == 0 ? ", read " : ", ").append(loadedFrom.get(iter));
         }
         return out.toString();
+    }
+
+    /**
+     * Every key the properties files set, sorted, for a development listing.
+     * The environment is not enumerated: it holds far more than this server's
+     * settings, and secrets that are none of its business.
+     */
+    public List keys() {
+        java.util.TreeSet names = new java.util.TreeSet();
+        java.util.Enumeration e = baseFile.propertyNames();
+        while(e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        e = profileFile.propertyNames();
+        while(e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        return new ArrayList(names);
     }
 
     /** The value as written, before any ${} in it is resolved. */

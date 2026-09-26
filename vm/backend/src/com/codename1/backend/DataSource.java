@@ -234,7 +234,25 @@ public final class DataSource {
      * Takes a connection, blocking until one is free. Release it in a finally, or
      * prefer the methods that cannot leak one.
      */
-    public synchronized Database borrow() throws IOException {
+    public Database borrow() throws IOException {
+        // THE THREAD'S TRANSACTION FIRST. A thread inside a @Transactional
+        // method gets that transaction's connection, so every statement it runs
+        // through this pool -- directly, through a dao, through a session --
+        // is part of it. Outside the lock: joining may send a BEGIN, and a
+        // round trip to the database is not something to do while every other
+        // borrower waits on this monitor.
+        Database joined = Transactions.joined(this);
+        if(joined != null) {
+            return joined;
+        }
+        return borrowFromPool();
+    }
+
+    /**
+     * Takes a connection from the pool itself, never the thread's transaction's.
+     * What a transaction borrows its own connection with.
+     */
+    synchronized Database borrowFromPool() throws IOException {
         // Checked before the idle list rather than only when it is empty: close()
         // can run while a borrower still holds a connection, and that borrower's
         // finally releases afterwards, so the list can be non-empty after closing.
@@ -311,7 +329,17 @@ public final class DataSource {
     }
 
     /** Returns a borrowed connection to the pool. */
-    public synchronized void release(Database db) {
+    public void release(Database db) {
+        // The transaction's connection goes back when the transaction ends, not
+        // when one of the statements inside it does.
+        if(Transactions.isJoined(this, db)) {
+            return;
+        }
+        releaseToPool(db);
+    }
+
+    /** {@link #release}, for a connection that is certainly not a transaction's. */
+    synchronized void releaseToPool(Database db) {
         if(db == null) {
             return;
         }
@@ -352,6 +380,13 @@ public final class DataSource {
      * on SQLite it will simply block against the write lock the first one holds.
      */
     public Object inTransaction(final Work body) throws Exception {
+        Database joined = Transactions.joined(this);
+        if(joined != null) {
+            // Already inside the thread's transaction, which every engine refuses
+            // to nest: run as part of it, the way a joined @Transactional method
+            // does.
+            return body.run(joined);
+        }
         return withConnection(new Work() {
             public Object run(final Database db) throws Exception {
                 return db.transaction(new Database.Work() {

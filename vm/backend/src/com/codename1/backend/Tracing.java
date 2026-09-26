@@ -266,6 +266,47 @@ public final class Tracing {
      * A new child of the current span that is NOT made current, for work whose
      * start and end are in different places. The caller must end it.
      */
+    /**
+     * The current span when tracing is on, for handing to work that runs on
+     * another thread; null otherwise.
+     */
+    static Span captureParent() {
+        return tracer == null ? null : currentOrNull();
+    }
+
+    /**
+     * Runs {@code work} on this thread as a span whose parent is {@code parent},
+     * captured on the thread that scheduled it -- an {@code @Async} method's
+     * caller -- or as a root span when that is null, as a scheduled job's run is.
+     */
+    static Object inBackground(String name, Span parent, Work work) throws Exception {
+        Tracer t = tracer;
+        if(t == null || isSuppressed()) {
+            return work.run(NOOP);
+        }
+        Span span = null;
+        try {
+            span = t.startSpan(name, Span.KIND_INTERNAL, parent, null, null);
+            if(span != null) {
+                enter(span);
+            }
+        } catch (RuntimeException err) {
+            failed(err);
+            span = null;
+        }
+        if(span == null) {
+            return work.run(NOOP);
+        }
+        try {
+            return work.run(span);
+        } catch (Exception err) {
+            guardedException(span, err);
+            throw err;
+        } finally {
+            finish(span);
+        }
+    }
+
     public static Span startSpan(String name) {
         Tracer t = tracer;
         if(t == null || isSuppressed()) {
@@ -314,6 +355,9 @@ public final class Tracing {
      * path alone would make every pet id its own operation.
      */
     public static void route(String template) {
+        // The request histogram's label, when metrics are on: one static read
+        // when they are not.
+        com.codename1.backend.metrics.Metrics.route(template);
         // Every generated router calls this on every matched request, traced or
         // not; with no tracer that is this one read and nothing else.
         if(tracer == null) {

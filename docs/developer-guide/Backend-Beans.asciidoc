@@ -1,0 +1,446 @@
+[[backend-beans]]
+== Backend beans and dependency injection
+
+A server that does everything in its controllers turns into classes nobody can
+test. This chapter covers the alternative Spring made standard: split the work
+into beans, let each one declare what it depends on, and have something else
+build them and hand them over. Here that something is the build, which is the
+difference worth keeping in mind throughout: every decision below is made while
+the project compiles, and a decision the build can't make is an error before the
+server ever starts.
+
+=== Services and dependency injection
+
+A controller that does everything itself turns into a class nobody can test.
+The usual split is Spring's: controllers translate HTTP, services hold the logic,
+repositories hold the SQL, and each one receives what it depends on instead of
+building it. The annotations are Spring's too, under
+`com.codename1.backend.annotations`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Signups.java[tag=backend-bean-service,indent=0]
+----
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SignupApi.java[tag=backend-bean-controller,indent=0]
+----
+
+`@Service`, `@Component` and `@Repository` mark a bean; a `@RestController` or
+`@WebSocketMapping` class is one too. A class with one constructor gets that
+constructor; with several, the one marked `@Autowired`. Fields and setters are
+injected only when marked `@Autowired`, and a private field is fine.
+
+What makes this different from Spring is when it happens. The build finds every
+bean, decides which constructor each gets and which bean fills each injection
+point, and writes that down as a class called `BackendWiring` -- a list of `new`
+calls, setter calls and `@PostConstruct` calls in dependency order. At run time
+there is no container, no classpath scan and no reflection, so a server with
+twenty beans starts as fast as one with none, and the translator can still drop
+every class nothing reaches. A dependency that can't be satisfied is a build
+error that names the injection point, rather than a server that fails its first
+request:
+
+----
+constructor parameter 1 of com.example.SignupApi needs a com.example.Signups,
+and no bean has that type. Annotate the implementing class @Component,
+@Service or @Repository, or declare a @Bean method returning one.
+----
+
+Two beans of one type are an error too, until one is marked `@Primary` or the
+injection point names one with `@Qualifier`. Constructors that depend on each
+other in a circle are refused; the same circle through `@Autowired` fields is
+fine, because fields are set after every bean exists.
+
+=== Declaring beans
+
+A bean is a class the build constructs once per server and hands to everything
+that needs it. These annotations make a class one:
+
+[cols="2,3", options="header"]
+|===
+| Annotation | Use it for
+
+| `@Component`
+| Anything the application wires together.
+
+| `@Service`, `@Repository`
+| The same as `@Component`. They exist so a class can say which layer it
+  belongs to, as in Spring.
+
+| `@Configuration`
+| A class whose `@Bean` methods produce beans, described under
+  <<Profiles and factory methods>>. It's a bean itself, so it's injected too.
+
+| `@RestController`, `@WebSocketMapping`
+| A controller or a WebSocket endpoint. Both are beans, and both are always
+  singletons.
+|===
+
+A bean's name is the simple class name with its first letter lowercased --
+`smtpMailer` for `SmtpMailer` -- unless the annotation gives one, as
+`@Component("invoice")` does. Names matter only to `@Qualifier`, and two beans
+with the same name are a build error.
+
+A bean has to be a class the build can construct: concrete, and static if it's
+nested. It also has to be public unless it's in the package the generated entry
+point lives in, since the generated code has to name it.
+
+=== Injection points
+
+A bean receives its dependencies in three places, all resolved by type:
+
+* **The constructor.** A class with one constructor gets that one. With several,
+  the build takes the one marked `@Autowired`, or failing that the one with no
+  arguments; with neither it can't choose and says so. Constructor injection is
+  the one to prefer, because the object is complete the moment it exists and a
+  test builds it with `new`.
+* **A field** marked `@Autowired`. A private field is fine: the build adds a
+  setter to the compiled class and the generated code calls it, so there is no
+  reflection. A `final` field can only be set by the constructor, and marking one
+  `@Autowired` is a build error that says so.
+* **A method** marked `@Autowired`, called once with its parameters resolved like
+  a constructor's.
+
+Injection points and lifecycle methods declared in a superclass count too, and are
+handled before the subclass's own. A method the subclass overrides follows the
+subclass's annotations, not the superclass's. The build can only do this for a
+superclass compiled from the project's sources: a base class from a jar that has
+injected fields, or lifecycle methods that aren't public, is a build error telling
+you to take those dependencies in the subclass instead.
+
+`@Autowired(required = false)` leaves the point `null` when no bean has its type,
+where a required point is a build error. A `List<T>` or `Collection<T>` receives
+every bean of type `T`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Checkout.java[tag=backend-bean-candidates,indent=0]
+----
+
+When several beans have the injected type and the point names none, the build
+takes the one marked `@Primary`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/CardPayments.java[tag=backend-bean-primary,indent=0]
+----
+
+Without one it's an error listing the candidates, and two `@Primary` beans of one
+type are an error too. `@Qualifier("invoice")` names the bean a point wants and
+overrides `@Primary`. The single exception is a set of candidates that are all
+conditional -- a `@Profile("dev")` bean and a `@Profile("!dev")` one -- where at
+most one exists at run time and the generated code picks whichever does.
+
+Some types aren't beans the application declares, but the server provides them
+and they're injected the same way:
+
+[cols="2,3", options="header"]
+|===
+| Type | What it receives
+
+| `Config`
+| The server's configuration, for keys read at run time.
+
+| `DataSource`
+| The connection pool. A bean that takes one makes a database required, and a
+  server with none configured refuses to start with a message naming the bean.
+
+| `orm.EntityManager`
+| The entity manager over that pool, when the module has entities.
+
+| `com.codename1.orm.session.Session`
+| The current transaction's persistence session, described under
+  <<backend-data>>.
+
+| `HttpServer.Request`
+| The current request. Only a `@RequestScope` bean can take it.
+
+| `HttpSession`
+| The current session. Only a `@RequestScope` or `@SessionScope` bean can take it.
+|===
+
+=== Configuration values
+
+`@Value` reads a setting, with a fallback after the colon, and converts it to the
+field's type:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SmtpMailer.java[tag=backend-bean-value,indent=0]
+----
+
+The value comes from the layers described under <<Configuration and profiles>>,
+so `MAIL_HOST` in the environment -- or `CN1_MAIL_HOST` -- overrides the file. A
+key with no fallback that nothing sets stops the server at startup with the key's
+name. `@ConfigurationProperties("mail")` on a bean does the same for every one of
+its setters at once: `setHost` reads `mail.host`, and `setMaxSize` reads
+`mail.maxSize` or `mail.max-size`.
+
+`@Value` converts to a `String`, a primitive or its box, or an enum; a field
+of any other type is a build error. A key that has no fallback and isn't set in
+`application.properties` gets a build warning, since it can still come from the
+environment at run time.
+
+`@ConfigurationProperties` suits a group of related settings better than a
+`@Value` per field, and a bean that holds them is an ordinary bean that others
+inject:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/MailSettings.java[tag=backend-bean-properties,indent=0]
+----
+
+Each setter taking a `String`, a number, a boolean or an enum is bound from the
+prefix plus the property name, in camel case or kebab case. A setter whose key
+isn't set is never called, so the field keeps its initial value -- which is where
+a default belongs. A prefix that binds no setter at all is a build error, since it
+means the class and the prefix disagree.
+
+=== Profiles and factory methods
+
+`@Profile` and `@ConditionalOnProperty` make a bean depend on the deployment:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ConsoleMailer.java[tag=backend-bean-profile,indent=0]
+----
+
+The profile is the one choice the build can't make for you, so it becomes a
+single `if` in the generated startup code. `@ConditionalOnMissingBean` is decided
+entirely at build time: the bean steps aside when the application declares
+another of its type.
+
+A class from a library can't carry annotations. A `@Bean` method in a
+`@Configuration` class makes one:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Limits.java[tag=backend-bean-factory,indent=0]
+----
+
+The build calls the method once, directly. There is no proxy around the
+configuration class, so one `@Bean` method calling another gets a second object;
+take the other bean as a parameter instead, which the build fills like a
+constructor's.
+
+==== Conditions in detail
+
+`@Profile` takes one or more profile names, and the bean exists when any of them
+is active. A name starting with `!` is negated, so `@Profile("!prod")` covers
+every profile but `prod`.
+
+`@ConditionalOnProperty` makes a bean depend on a key:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SearchIndexer.java[tag=backend-bean-on-property,indent=0]
+----
+
+With `havingValue`, the key must equal that value, compared ignoring case.
+Without it, any value but `false` counts. `matchIfMissing = true` makes an unset
+key count as a match, and several keys in `value` must all match. `prefix` is put
+in front of each key with a dot.
+
+Both are evaluated once, at start-up, as one `if` around the bean's construction.
+Because the build sees both branches, it also checks both: every bean that needs a
+conditional one must be covered whichever way the condition goes, by another bean
+of the same type under the other condition or by being conditional itself.
+
+`@ConditionalOnMissingBean` is the one condition decided entirely at build time.
+It marks a default that steps aside when the application declares another bean it
+would compete with, which is how a module offers a fallback:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Defaults.java[tag=backend-bean-on-missing,indent=0]
+----
+
+With no arguments, "another bean it would compete with" means one that has any of
+the types the default can be injected as, apart from the JDK's own: its class, its
+superclasses and its interfaces. On a class, `DefaultMailer implements Mailer`
+steps aside for any other `Mailer`. On a `@Bean` method they're the declared
+return type and the types above it, which is why the method above returns `Audit`
+rather than `LogAudit`. `@ConditionalOnMissingBean(Audit.class)` names the types
+to compete on explicitly, for a class whose default set is too wide or too narrow.
+
+A `@Bean` method inherits the conditions of the `@Configuration` class it's
+declared in, static methods included. A `@Profile("prod")` configuration class
+therefore contributes nothing on any other profile, which is what the annotation on
+the class says.
+
+==== Beans with a lifecycle of their own
+
+A library class often has methods to start and stop it, and no annotations to say
+so. `@Bean` names them:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/SearchConfig.java[tag=backend-bean-init-destroy,indent=0]
+----
+
+`initMethod` runs after the factory method returns, where a class's
+`@PostConstruct` would. `destroyMethod` runs where its `@PreDestroy` would: at
+shutdown for a singleton, at the end of the request for a request-scoped bean, and
+when the session ends for a session-scoped one.
+
+=== Scopes
+
+A bean is a singleton unless it says otherwise. `@Scope("prototype")` gives each
+injection point its own instance. `@RequestScope` and `@SessionScope` give one
+per HTTP request or session; injected into a singleton, such a bean is reached
+through a small generated subclass that finds the current request's instance on
+each call, so the class can't be final and needs a constructor that takes no
+arguments. `@Lazy` builds a bean the first time it's used, through the same kind
+of subclass. That subclass has to run the bean's constructor once at startup to
+exist at all, so the expensive part of setting a bean up belongs in its
+`@PostConstruct` method, which runs only on the real instance.
+
+[cols="2,3", options="header"]
+|===
+| Scope | Instances
+
+| singleton, the default
+| One per server, built at start-up in dependency order.
+
+| `@Scope("prototype")`
+| A new instance for each injection point. Two fields of type `Ticket` in one
+  class get two tickets.
+
+| `@RequestScope`, or `@Scope("request")`
+| One per HTTP request, built the first time the request uses it and destroyed
+  when the request ends.
+
+| `@SessionScope`, or `@Scope("session")`
+| One per HTTP session, kept by the server for as long as the session lives and
+  destroyed when it ends. See <<backend-sessions>>.
+
+| `@Lazy`, on a singleton
+| One per server, built the first time something calls it.
+|===
+
+A request-scoped bean looks like any other to the code that uses it:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/RequestClock.java[tag=backend-bean-request-scope,indent=0]
+----
+
+A controller that injects `RequestClock` gets the generated stand-in, and each
+call on it reaches the instance belonging to the request being served. Two
+requests served at once see two instances.
+
+The stand-in extends the bean's class and overrides its methods, which is where the
+rules for a scoped or lazy bean come from. The class can't be final, a method it
+declares can't be final either -- a call to it would run on the stand-in instead of
+the bean -- and it needs a constructor with no arguments, which may be protected.
+Inject anything else through fields. Each rule is checked by the build.
+
+`@Lazy` suits a bean that's expensive to prepare and not always needed:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ExpensiveIndex.java[tag=backend-bean-lazy,indent=0]
+----
+
+A WebSocket endpoint and a bean with `@Scheduled` methods must be singletons,
+since each serves the whole life of the server rather than one request.
+
+=== Lifecycle
+
+Beans are built in dependency order, and a bean's `@PostConstruct` method runs
+once it and everything it depends on has been built and injected. At shutdown,
+`@PreDestroy` methods run in the reverse order, so a bean's dependencies are still
+there when its own method runs:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Outbox.java[tag=backend-bean-lifecycle,indent=0]
+----
+
+Both methods take no arguments and may have any visibility; the build adds a
+public bridge to reach a private one. Stopping a server goes in this order, which
+is what makes the `flush` above safe:
+
+. Scheduled jobs stop starting, so none begins while the server drains.
+. The server stops accepting and waits, up to
+  `cn1.server.shutdownTimeoutMillis`, for the requests in flight.
+. `@Async` calls and scheduled runs that haven't finished get the same grace.
+. `@PreDestroy` and `destroyMethod` run, in reverse dependency order.
+. The connection pool closes.
+. The last metrics and spans are exported.
+
+A start-up that fails partway runs the destroy methods of the beans already
+built, so a server a supervisor restarts doesn't leak what their constructors
+opened.
+
+=== What the build refuses
+
+Everything a container would discover at start-up is checked while the module
+compiles, and each refusal names the class and member at fault:
+
+[cols="2,3", options="header"]
+|===
+| Message fragment | What to do
+
+| `needs a X, and no bean has that type`
+| Annotate the implementation `@Component`, `@Service` or `@Repository`, or add
+  a `@Bean` method returning one.
+
+| `could receive any of ...`
+| Mark one `@Primary`, or inject with `@Qualifier("name")`.
+
+| `The constructors form a cycle`
+| Inject one side through an `@Autowired` field or setter, which is set after
+  every bean exists.
+
+| `is final, so it can only be set by the constructor`
+| Take the dependency as a constructor parameter.
+
+| `and none is marked @Autowired or takes no arguments`
+| Mark the constructor the build should call.
+
+| `is reached through a class the build generates to stand in for it`
+| A scoped or lazy bean: make the class and its methods non-final and give it a
+  constructor with no arguments.
+
+| `asks for the current request`
+| Only a `@RequestScope` bean can inject the request. Take it as a parameter of
+  the handler method instead.
+
+| `Two beans are named`
+| Give one a name of its own in its annotation.
+|===
+
+=== How this differs from Spring
+
+The annotations mean what they mean in Spring, and most code reads the same. The
+differences all follow from doing the work at build time:
+
+* **No scanning.** A bean is a class in the module, or the result of a `@Bean`
+  method. A jar on the class path contributes nothing unless a `@Bean` method
+  builds something from it.
+* **No proxies for aspects.** `@Transactional`, `@Async`, `@Timed` and `@Counted`
+  rewrite the method itself, so they apply to a call through `this`, to a private
+  method, and to an object built with `new`. In Spring each of those skips the
+  aspect, and nothing says so.
+* **No proxy around `@Configuration`.** One `@Bean` method calling another gets a
+  second object. Take the other bean as a parameter instead.
+* **Errors at build time.** A missing or ambiguous dependency, a constructor
+  cycle, a scoped bean that can't be subclassed and a malformed cron expression
+  all fail the build.
+* **No `ApplicationContext`.** Nothing looks a bean up by name or type at run
+  time. A class that needs a bean declares it as a dependency.
+
+=== Testing beans and the wired server
+
+Constructor injection is a constructor, so a unit test builds the object with
+fakes and needs nothing else. For the wired server -- what `@SpringBootTest`
+does in Spring -- a test in the backend module starts the generated wiring on a
+free port:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/WiringTest.java[tag=backend-wiring-test,indent=0]
+----

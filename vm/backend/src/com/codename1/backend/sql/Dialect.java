@@ -1147,4 +1147,24 @@ public abstract class Dialect {
             return "18446744073709551615";
         }
     }
+
+    /**
+     * The name, if it is a plain SQL identifier: an ASCII letter or underscore,
+     * then letters, digits and underscores. For the few statements that cannot
+     * take a parameter where a name goes -- a savepoint -- so a name reaching the
+     * text of a statement can never carry anything else.
+     */
+    public static String checkIdentifier(String name) throws IOException {
+        if(name == null || name.length() == 0 || name.length() > 63) {
+            throw new IOException("Not an identifier: " + name);
+        }
+        for(int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+            if(!letter && (iter == 0 || c < '0' || c > '9')) {
+                throw new IOException("Not an identifier: " + name);
+            }
+        }
+        return name;
+    }
 }

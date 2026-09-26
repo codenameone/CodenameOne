@@ -76,8 +76,13 @@ public class WebSocketMappingProcessorTest {
     public void registersTheEndpointOnTheBuilder() throws Exception {
         RestControllerAnnotationProcessor processor = run(compile("Chat", ENDPOINT));
         String bootstrap = processor.generateBootstrap("com.example");
-        assertTrue("the endpoint is not registered through the callback:\n" + bootstrap,
-                bootstrap.indexOf("registry.route(\"/chat\", new com.example.Chat())") >= 0);
+        // The endpoint is a bean like any other, so the wiring registers the
+        // instance it built rather than a `new` of its own.
+        String wiring = processor.generateWiring("com.example");
+        assertTrue("the endpoint is not registered through the callback:\n" + wiring,
+                wiring.indexOf("registry.route(\"/chat\", b_chat)") >= 0);
+        assertTrue("the endpoint is not built by the wiring:\n" + wiring,
+                wiring.indexOf("b_chat = new com.example.Chat()") >= 0);
         assertTrue("the entry point no longer goes through the builder:\n" + bootstrap,
                 bootstrap.indexOf("com.codename1.backend.Backend.builder()") >= 0);
         assertTrue("the entry point does not run the server:\n" + bootstrap,
@@ -112,7 +117,7 @@ public class WebSocketMappingProcessorTest {
                 + "    public void onText(WebSocketSession s, String m) { }\n"
                 + "    public void onBinary(WebSocketSession s, byte[] m, int o, int l) { }\n"
                 + "}\n";
-        String bootstrap = run(compile("Scoped", source)).generateBootstrap("com.example");
+        String bootstrap = run(compile("Scoped", source)).generateWiring("com.example");
         assertTrue("the base path was not applied:\n" + bootstrap,
                 bootstrap.indexOf("registry.route(\"/api/chat\"") >= 0);
     }
@@ -155,7 +160,7 @@ public class WebSocketMappingProcessorTest {
         // to learn where the two differ.
         String source = ENDPOINT.replace("@WebSocketMapping(\"/chat\")",
                 "@WebSocketMapping(\"chat\")");
-        String bootstrap = run(compile("Chat", source)).generateBootstrap("com.example");
+        String bootstrap = run(compile("Chat", source)).generateWiring("com.example");
         assertTrue("a bare path should be normalised:\n" + bootstrap,
                 bootstrap.indexOf("registry.route(\"/chat\"") >= 0);
     }
@@ -207,7 +212,7 @@ public class WebSocketMappingProcessorTest {
         sources.put("com.example.Chat", ENDPOINT);
         sources.put("com.example.Alerts", second);
         JavaSourceCompiler.compile(sources, classes, backendClasspath());
-        String bootstrap = run(classes).generateBootstrap("com.example");
+        String bootstrap = run(classes).generateWiring("com.example");
         int alerts = bootstrap.indexOf("registry.route(\"/alerts\"");
         int chat = bootstrap.indexOf("registry.route(\"/chat\"");
         assertTrue("both endpoints should be registered:\n" + bootstrap, alerts >= 0 && chat >= 0);
