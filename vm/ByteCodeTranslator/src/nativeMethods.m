@@ -2279,8 +2279,29 @@ pthread_key_t   threadIdKey = 0;
    reclaimed memory. The once also closes the unsynchronised first-call race the
    iOS debugger's listener thread documents in cn1_debugger.m. */
 static pthread_once_t cn1ThreadIdKeyOnce = PTHREAD_ONCE_INIT;
+extern void markDeadThread(struct ThreadLocalData* d);
+// A thread the VM did not start registers itself the first time it touches Java
+// (getThreadLocalData), and used to stay registered after it EXITED: nothing ever
+// removed it. The collector then went on trying to stop a thread that no longer
+// existed, every cycle, and a cycle that cannot capture a registered thread's roots
+// skips its sweep -- so one callback thread that came and went was enough to stop an
+// application reclaiming memory. The key's destructor runs on the exiting thread,
+// which is exactly where markDeadThread expects to be called from. threadRunner
+// clears the key after its own markDeadThread, so a VM thread is never retired twice.
+static void cn1ForeignThreadExit(void* v) {
+    struct ThreadLocalData* d = (struct ThreadLocalData*)v;
+    if(d != 0 && !d->threadKilled) {
+        markDeadThread(d);
+    }
+}
 static void cn1ThreadIdKeyCreate(void) {
+    // -DCN1_GC_NO_FOREIGN_THREAD_EXIT restores the old, destructor-less key; it is the
+    // ablation arm GcForeignThreadIntegrationTest requires to fail.
+#ifdef CN1_GC_NO_FOREIGN_THREAD_EXIT
     pthread_key_create(&threadIdKey, NULL);
+#else
+    pthread_key_create(&threadIdKey, cn1ForeignThreadExit);
+#endif
 }
 JAVA_LONG threadKeyCounter = 1;
 /**
@@ -2446,6 +2467,17 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         i->gcPthread = pthread_self();
         i->gcPthreadValid = JAVA_TRUE;
         cn1TlsSelf = i;
+#if defined(_WIN32)
+        // Recorded here, on the thread itself, because Windows offers no way to read
+        // another thread's stack bounds and the collector's scan needs them.
+        {
+            void* lo = 0;
+            void* hi = 0;
+            cn1_win_current_stack_limits(&lo, &hi);
+            i->gcOwnStackHigh = (char*)hi;
+            i->gcOwnStackSize = (size_t)((char*)hi - (char*)lo);
+        }
+#endif
     } else {
         // A VIRTUAL thread has no pthread of its own and may run on a different
         // host next time, so binding either of these to whoever happens to be
@@ -3558,6 +3590,8 @@ void* threadRunner(void *x)
     // too. Hopefully we won't spawn too many of those...
     
     markDeadThread(d);
+    // Retired above; the key's destructor must not retire it again.
+    pthread_setspecific(threadIdKey, NULL);
    
     /*free(d->blocks);
     free(d->threadObjectStack);

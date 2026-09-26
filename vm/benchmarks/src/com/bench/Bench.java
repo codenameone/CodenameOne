@@ -57,6 +57,14 @@ public final class Bench {
      * unsettled row at depth without paying the deeper rep count on all eleven. */
     private static String only = null;
 
+    /* Keeps the argv[3] graph reachable for the whole run. */
+    static Object[] ballast;
+
+    static final class Keep {
+        int v;
+        Keep next;
+    }
+
     private static void runBench(String name, BenchFn fn) {
         if (only != null && !only.equals(name)) {
             return;
@@ -80,6 +88,63 @@ public final class Bench {
         if (args != null && args.length > 1) {
             only = args[1];
         }
+        /* Optional argv[2] "threaded": run the workloads on a worker thread while the
+         * main thread stays alive and wakes every 16ms, the shape of an application whose
+         * UI thread idles on a frame timer while a background thread does the work. A
+         * collector that treats the two differently shows up here and not in the
+         * single-threaded default. */
+        /* Optional argv[3]: megabytes of long-lived object graph to hold for the whole
+         * run, the live heap a real application carries while it works. A collector
+         * policy sized from the live set behaves differently with one than without. */
+        if (args != null && args.length > 3) {
+            int mb = Integer.parseInt(args[3]);
+            if (args.length > 4 && "small".equals(args[4])) {
+                /* Ballast in objectAllocation's own size class: an int and a
+                 * reference, the layout of CommonWorkloads' Node. An application's
+                 * framework heap is full of objects this small, and a collector
+                 * policy that is decided per size class sees them as one population
+                 * with the benchmark's garbage. */
+                int count = mb * 1024 * 1024 / 32;
+                Object[] chains = new Object[1024];
+                for (int i = 0; i < count; i++) {
+                    Keep k = new Keep();
+                    k.v = i;
+                    k.next = (Keep) chains[i & 1023];
+                    chains[i & 1023] = k;
+                }
+                ballast = chains;
+            } else {
+            int nodes = mb * 1024 * 1024 / 48;
+            Object[] roots = new Object[1024];
+            for (int i = 0; i < nodes; i++) {
+                int[] payload = new int[4];
+                payload[0] = i;
+                Object[] node = new Object[2];
+                node[0] = payload;
+                node[1] = roots[i & 1023];
+                roots[i & 1023] = node;
+            }
+            ballast = roots;
+            }
+        }
+        if (args != null && args.length > 2 && "threaded".equals(args[2])) {
+            Thread worker = new Thread() {
+                public void run() { runAll(); }
+            };
+            worker.start();
+            while (worker.isAlive()) {
+                try {
+                    Thread.sleep(16);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+            return;
+        }
+        runAll();
+    }
+
+    private static void runAll() {
         runBench("intArithmetic", new BenchFn() {
             public long run() { return CommonWorkloads.intArithmetic(); }
         });

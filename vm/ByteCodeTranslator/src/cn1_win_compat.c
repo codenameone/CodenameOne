@@ -161,9 +161,15 @@ int pthread_cond_broadcast(pthread_cond_t* cond) {
    reads as "uninitialised" (TLS index 0 is itself a valid slot). */
 int pthread_key_create(pthread_key_t* key, void (*destructor)(void*)) {
     DWORD idx;
-    (void)destructor; /* per-key destructors are not supported */
-    idx = TlsAlloc();
-    if (idx == TLS_OUT_OF_INDEXES) {
+    /* Fiber-local rather than thread-local storage, because FLS runs a callback for a
+       non-null value when the thread exits and TLS does not -- so this is what makes a
+       POSIX key destructor happen at all. The runtime relies on one: a thread the VM did
+       not start is unregistered by its key's destructor, and without it such a thread
+       stays registered after it is gone. A thread that never converts to a fiber has
+       exactly one fiber, so the value is per thread as before. The calling conventions
+       agree on both targets (x64 and arm64 have one). */
+    idx = FlsAlloc((PFLS_CALLBACK_FUNCTION)destructor);
+    if (idx == FLS_OUT_OF_INDEXES) {
         return EAGAIN;
     }
     *key = (pthread_key_t)(idx + 1);
@@ -174,21 +180,21 @@ int pthread_key_delete(pthread_key_t key) {
     if (key == 0) {
         return EINVAL;
     }
-    return TlsFree((DWORD)(key - 1)) ? 0 : EINVAL;
+    return FlsFree((DWORD)(key - 1)) ? 0 : EINVAL;
 }
 
 void* pthread_getspecific(pthread_key_t key) {
     if (key == 0) {
         return NULL;
     }
-    return TlsGetValue((DWORD)(key - 1));
+    return FlsGetValue((DWORD)(key - 1));
 }
 
 int pthread_setspecific(pthread_key_t key, const void* value) {
     if (key == 0) {
         return EINVAL;
     }
-    return TlsSetValue((DWORD)(key - 1), (LPVOID)value) ? 0 : EINVAL;
+    return FlsSetValue((DWORD)(key - 1), (PVOID)value) ? 0 : EINVAL;
 }
 
 /* --- threads --- */
@@ -393,6 +399,59 @@ long long cn1_win_available_memory(void) {
 
 int cn1_win_cpu_count(void) {
     return (int) GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+}
+
+void cn1_win_current_stack_limits(void** low, void** high) {
+    ULONG_PTR lo = 0, hi = 0;
+    GetCurrentThreadStackLimits(&lo, &hi);
+    *low = (void*)lo;
+    *high = (void*)hi;
+}
+
+void* cn1_win_suspend_capture(unsigned long threadId, void** handleOut, char* regs,
+                              size_t cap, size_t* lenOut) {
+    HANDLE h;
+    CONTEXT ctx;
+    void* sp;
+    size_t len;
+    *handleOut = NULL;
+    *lenOut = 0;
+    h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION,
+                   FALSE, (DWORD)threadId);
+    if (h == NULL) {
+        return 0;
+    }
+    if (SuspendThread(h) == (DWORD)-1) {
+        CloseHandle(h);
+        return 0;
+    }
+    /* SuspendThread only REQUESTS the suspension; GetThreadContext does not return until
+       the thread has actually stopped, which is what makes the registers read here the
+       ones it is frozen with. */
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
+    if (!GetThreadContext(h, &ctx)) {
+        ResumeThread(h);
+        CloseHandle(h);
+        return 0;
+    }
+#if defined(_M_ARM64) || defined(__aarch64__)
+    sp = (void*)ctx.Sp;
+#else
+    sp = (void*)ctx.Rsp;
+#endif
+    len = sizeof(ctx) < cap ? sizeof(ctx) : cap;
+    memcpy(regs, &ctx, len);
+    *lenOut = len;
+    *handleOut = (void*)h;
+    return sp;
+}
+
+void cn1_win_resume_thread(void* handle) {
+    if (handle != NULL) {
+        ResumeThread((HANDLE)handle);
+        CloseHandle((HANDLE)handle);
+    }
 }
 
 int gettimeofday(struct timeval* tv, void* tz) {

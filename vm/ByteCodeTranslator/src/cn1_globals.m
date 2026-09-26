@@ -14144,6 +14144,20 @@ static char* cn1GcStackBase(pthread_t pt, size_t* outSize) {
 #endif
 }
 
+// A registered thread's stack bounds. Everywhere but Windows they are read from the
+// thread; Windows cannot report another thread's, so there they are the ones the thread
+// recorded for itself at registration. Without that the scan below had no bounds on
+// Windows at all, flagged every thread's roots as incomplete, and every sweep was
+// skipped.
+static char* cn1GcThreadStackBase(struct ThreadLocalData* t, size_t* outSize) {
+#if defined(_WIN32)
+    *outSize = t->gcOwnStackSize;
+    return t->gcOwnStackHigh;
+#else
+    return cn1GcStackBase(t->gcPthread, outSize);
+#endif
+}
+
 // ---- async-signal-safe universal-stop handler ----------------------------------------
 // Only stores + spins. Captures the interrupted SP (from the ucontext when available,
 // else a handler local that is strictly deeper than the interrupted frame -- safe, it
@@ -14253,6 +14267,76 @@ void cn1GcInstallSignalHandler(void) {
    handler, and throttling those retries would leave the collector waiting on
    threadActive for tens of seconds, turning a recoverable timeout into the whole-VM
    pause the escalation exists to prevent. */
+#if defined(__APPLE__) && !defined(CN1_GC_NO_OS_SUSPEND)
+// Stop a thread the stop signal cannot reach, with Mach instead: thread_suspend, then
+// read the same stack pointer and general registers the signal handler would have
+// captured. The scan that follows cannot tell the two apart. A suspended thread is
+// frozen wherever it was, exactly like a signal-parked one, so every rule the signal
+// path imposes -- nothing allocates while it is held, the root snapshots are built
+// first -- applies unchanged. cn1GcSignalReleaseOne resumes it.
+//
+// Used only where pthread_kill answers ENOTSUP, i.e. for libdispatch workers, so the
+// path every other thread takes is exactly what it was.
+static char* cn1GcMachStopOne(struct ThreadLocalData* t) {
+    mach_port_t port = pthread_mach_thread_np(t->gcPthread);
+    if(port == MACH_PORT_NULL || thread_suspend(port) != KERN_SUCCESS) {
+        return 0;
+    }
+    void* sp = 0;
+    kern_return_t kr;
+#if defined(__aarch64__)
+    arm_thread_state64_t state;
+    mach_msg_type_number_t count = ARM_THREAD_STATE64_COUNT;
+    kr = thread_get_state(port, ARM_THREAD_STATE64, (thread_state_t)&state, &count);
+    if(kr == KERN_SUCCESS) {
+        sp = (void*)__darwin_arm_thread_state64_get_sp(state);
+    }
+#elif defined(__x86_64__)
+    x86_thread_state64_t state;
+    mach_msg_type_number_t count = x86_THREAD_STATE64_COUNT;
+    kr = thread_get_state(port, x86_THREAD_STATE64, (thread_state_t)&state, &count);
+    if(kr == KERN_SUCCESS) {
+        sp = (void*)state.__rsp;
+    }
+#else
+    kr = KERN_FAILURE;
+#endif
+    if(kr != KERN_SUCCESS || sp == 0) {
+        thread_resume(port);
+        return 0;
+    }
+    size_t len = sizeof(state);
+    if(len > sizeof(t->gcSigRegs)) {
+        len = sizeof(t->gcSigRegs);
+    }
+    memcpy(t->gcSigRegs, &state, len);
+    t->gcSigRegsLen = (sig_atomic_t)len;
+    t->gcSigStackPointer = sp;
+    t->gcOsSuspended = 1;
+    return (char*)sp;
+}
+#endif
+
+#if defined(_WIN32) && !defined(CN1_GC_NO_OS_SUSPEND)
+// Windows has no stop signal, so the thread is suspended instead, and its registers are
+// read back the way cn1GcMachStopOne reads them on Apple. Every rule of the signal path
+// holds for the same reason: the thread is frozen wherever it was.
+static char* cn1GcWinStopOne(struct ThreadLocalData* t) {
+    void* handle = 0;
+    size_t len = 0;
+    void* sp = cn1_win_suspend_capture(t->gcPthread.id, &handle, t->gcSigRegs,
+                                       sizeof(t->gcSigRegs), &len);
+    if(sp == 0) {
+        return 0;
+    }
+    t->gcSigRegsLen = (sig_atomic_t)len;
+    t->gcSigStackPointer = sp;
+    t->gcSuspendHandle = handle;
+    t->gcOsSuspended = 1;
+    return (char*)sp;
+}
+#endif
+
 static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
 #if !defined(_WIN32)
     if(!t->gcPthreadValid) return 0;
@@ -14283,7 +14367,26 @@ static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
     t->gcSigStackPointer = 0;
     __atomic_thread_fence(__ATOMIC_RELEASE);
     t->gcSigStopRequest = (sig_atomic_t)gen;
-    if(pthread_kill(t->gcPthread, CN1_GC_STOP_SIGNAL) != 0) { t->gcSigStopRequest = 0; return 0; }
+    {
+        int killed = pthread_kill(t->gcPthread, CN1_GC_STOP_SIGNAL);
+        if(killed != 0) {
+            t->gcSigStopRequest = 0;
+#if defined(__APPLE__)
+            // A libdispatch worker cannot be signalled at all: pthread_kill answers
+            // ENOTSUP for a workqueue thread whatever its signal mask. Any GCD block
+            // that called into Java registered its worker here permanently, so without
+            // this every later cycle failed to capture that thread's roots -- and a
+            // cycle with incomplete roots skips its sweep. One such thread was enough
+            // to stop an application reclaiming anything; see cn1GcMachStopOne.
+#ifndef CN1_GC_NO_OS_SUSPEND
+            if(killed == ENOTSUP) {
+                return cn1GcMachStopOne(t);
+            }
+#endif
+#endif
+            return 0;
+        }
+    }
     // bounded wait for the handler to park THIS generation
     int spins = 0;
     while((int)t->gcSigStopped != gen) {
@@ -14305,7 +14408,12 @@ static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
     t->gcStopFailures = 0;      // answered: stop skipping it
     return (char*)t->gcSigStackPointer;
 #else
+    (void)maySkip;
+#ifdef CN1_GC_NO_OS_SUSPEND
     return 0;
+#else
+    return cn1GcWinStopOne(t);
+#endif
 #endif
 }
 
@@ -14320,7 +14428,20 @@ static char* cn1GcSignalStopOneForEscalation(struct ThreadLocalData* t) {
 }
 
 static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
-#if !defined(_WIN32)
+#if defined(_WIN32)
+    if(t->gcOsSuspended) {
+        t->gcOsSuspended = 0;
+        cn1_win_resume_thread(t->gcSuspendHandle);
+        t->gcSuspendHandle = 0;
+    }
+#else
+#if defined(__APPLE__)
+    if(t->gcOsSuspended) {
+        t->gcOsSuspended = 0;
+        thread_resume(pthread_mach_thread_np(t->gcPthread));
+        return;
+    }
+#endif
     t->gcSigRelease = t->gcSigStopGen;   // monotonic: frees this AND any older park
     __atomic_thread_fence(__ATOMIC_RELEASE);
     int spins = 0;
@@ -14351,7 +14472,7 @@ static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
         return JAVA_FALSE;
     }
     size_t ssz = 0;
-    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    char* base = cn1GcThreadStackBase(t, &ssz);
     if(base == 0 || ssz == 0) {
         // No bounds means the conservative scan could not read this thread's native stack
         // even once it was stopped, so freezing it would buy nothing and skip its roots.
@@ -14555,7 +14676,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 #endif
 
     size_t ssz = 0;
-    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    char* base = cn1GcThreadStackBase(t, &ssz);
     if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
 
     // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
@@ -14660,7 +14781,7 @@ static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE) {
     volatile void* spv = (void*)&spv;
     char* sp = (char*)spv;
     size_t ssz = 0;
-    char* base = cn1GcStackBase(threadStateData->gcPthread, &ssz);
+    char* base = cn1GcThreadStackBase(threadStateData, &ssz);
     if(base == 0 || ssz == 0) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
     if(sp < base - (long)ssz || sp >= base) { cn1GcRootsIncomplete = JAVA_TRUE; return; }
     cn1GcBuildRootSnapshots();
