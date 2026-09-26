@@ -259,13 +259,57 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("a handler's own Set-Cookie survives beside the session's")
+    @DisplayName("a handler's own Set-Cookie survives beside the session's, and its Response is not touched")
     void cookiesCoexist() {
         HttpServer.Response r = new HttpServer.Response(200, "text/plain", new byte[0],
                 new LinkedHashMap(java.util.Collections.singletonMap("Set-Cookie", "a=1")));
-        Sessions.withHeader(r, "Set-Cookie", "b=2");
-        Object both = r.extraHeaders.get("Set-Cookie");
+        HttpServer.Response sent = Sessions.withHeader(r, "Set-Cookie", "b=2");
+        Object both = sent.extraHeaders.get("Set-Cookie");
         assertTrue(both instanceof List && ((List)both).size() == 2, String.valueOf(both));
+        // The handler's Response may be a shared constant: a cookie written into
+        // it would reach the next request that returns it.
+        assertTrue(sent != r, "the handler's Response was modified in place");
+        assertEquals("a=1", r.extraHeaders.get("Set-Cookie"));
+        HttpServer.Response bare = new HttpServer.Response(200, "text/plain", new byte[0], null);
+        assertTrue(Sessions.withHeader(bare, "Set-Cookie", "c=3") != bare);
+        assertTrue(bare.extraHeaders == null, "a header-less shared Response gained a cookie");
+    }
+
+    @Test
+    @DisplayName("cn1.session.secure accepts auto, true or false and refuses anything else")
+    void secureSettingIsValidated() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.session.secure", "tru");
+        try {
+            IOException refused = assertThrows(IOException.class,
+                    () -> Sessions.configure(Config.of(p, "test"), true, null));
+            assertTrue(refused.getMessage().contains("auto, true or false"),
+                    refused.getMessage());
+            p.setProperty("cn1.session.secure", "FALSE");
+            Sessions.configure(Config.of(p, "test"), true, null);
+        } finally {
+            // Process-wide settings: put the defaults back for the next test.
+            Sessions.configure(Config.of(new Properties(), "test"), false, null);
+        }
+    }
+
+    @Test
+    @DisplayName("an MCP byte or short argument out of its range is refused, not wrapped")
+    void narrowArgumentsAreRangeChecked() {
+        Map args = new LinkedHashMap();
+        args.put("s", new Long(40000));
+        args.put("b", new Long(-129));
+        args.put("ok", new Long(-128));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.shortValue(args, "s", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.shortObject(args, "s", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.byteValue(args, "b", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.byteObject(args, "b", true));
+        assertEquals(-128, com.codename1.backend.mcp.McpArgs.byteValue(args, "ok", true));
+        assertEquals(-128, com.codename1.backend.mcp.McpArgs.shortValue(args, "ok", true));
     }
 
     // ---------------------------------------------------------------- metrics
@@ -336,27 +380,17 @@ class ApplicationRuntimeTest {
             String bad = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":"
                     + "\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{}}}", null);
             assertTrue(bad.contains("\"isError\":true") && bad.contains("text is required"), bad);
-            // Raw, because HttpURLConnection silently drops a restricted header
-            // like Origin -- the request would arrive without it and pass.
-            String body = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"ping\"}";
-            java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
-            try {
-                socket.getOutputStream().write(("POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:" + port
-                        + "\r\nOrigin: http://evil.example\r\nContent-Type: application/json\r\n"
-                        + "Content-Length: " + body.length() + "\r\nConnection: close\r\n\r\n"
-                        + body).getBytes("UTF-8"));
-                ByteArrayOutputStream raw = new ByteArrayOutputStream();
-                byte[] buffer = new byte[4096];
-                int n;
-                while((n = socket.getInputStream().read(buffer)) > 0) {
-                    raw.write(buffer, 0, n);
-                }
-                String answer = new String(raw.toByteArray(), "UTF-8");
-                assertTrue(answer.startsWith("HTTP/1.1 403"), "a foreign Origin was served: "
-                        + answer);
-            } finally {
-                socket.close();
-            }
+            String answer = rawMcp(port, "127.0.0.1:" + port, "http://evil.example");
+            assertTrue(answer.startsWith("HTTP/1.1 403"), "a foreign Origin was served: "
+                    + answer);
+            // DNS rebinding: the hostile page's name now resolves to 127.0.0.1,
+            // so its Origin and the Host header agree -- and must still be refused.
+            answer = rawMcp(port, "evil.example:" + port, "http://evil.example:" + port);
+            assertTrue(answer.startsWith("HTTP/1.1 403"), "a rebound Origin was served: "
+                    + answer);
+            answer = rawMcp(port, "127.0.0.1:" + port, "http://localhost:" + port);
+            assertTrue(answer.startsWith("HTTP/1.1 200"), "a loopback Origin was refused: "
+                    + answer);
         } finally {
             backend.stop();
         }
@@ -429,6 +463,31 @@ class ApplicationRuntimeTest {
         }
         String body = new String(out.toByteArray(), "UTF-8");
         return status >= 400 ? "HTTP " + status + ": " + body : body;
+    }
+
+    /**
+     * A raw POST of a ping to /mcp, because HttpURLConnection silently drops
+     * restricted headers like Origin and Host -- the request would arrive
+     * without them and pass.
+     */
+    private static String rawMcp(int port, String host, String origin) throws IOException {
+        String body = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"ping\"}";
+        java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
+        try {
+            socket.getOutputStream().write(("POST /mcp HTTP/1.1\r\nHost: " + host
+                    + "\r\nOrigin: " + origin + "\r\nContent-Type: application/json\r\n"
+                    + "Content-Length: " + body.length() + "\r\nConnection: close\r\n\r\n"
+                    + body).getBytes("UTF-8"));
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int n;
+            while((n = socket.getInputStream().read(buffer)) > 0) {
+                raw.write(buffer, 0, n);
+            }
+            return new String(raw.toByteArray(), "UTF-8");
+        } finally {
+            socket.close();
+        }
     }
 
     private static String post(int port, String path, String json, String origin)

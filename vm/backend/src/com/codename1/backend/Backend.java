@@ -834,6 +834,9 @@ public final class Backend {
                                 }
                                 long startedMillis = RequestLog.enabled
                                         ? System.currentTimeMillis() : 0L;
+                                // What the metrics record; stays 500 when a
+                                // handler or the session store throws.
+                                int status = 500;
                                 try {
                                     HttpServer.Response response = null;
                                     try {
@@ -855,11 +858,16 @@ public final class Backend {
                                     if(session != null) {
                                         response = Sessions.finish(session, response);
                                     }
-                                    com.codename1.backend.metrics.Metrics.requestEnded(started,
-                                            request.getMethod(),
-                                            response == null ? 404 : response.getStatus());
+                                    status = response == null ? 404 : response.getStatus();
                                     return response;
                                 } finally {
+                                    // In the finally so a failed request is in
+                                    // the duration histogram too, and so the
+                                    // route label it set is cleared -- left
+                                    // behind, the worker's next unrouted
+                                    // request would be recorded under it.
+                                    com.codename1.backend.metrics.Metrics.requestEnded(started,
+                                            request.getMethod(), status);
                                     if(track) {
                                         CURRENT_REQUEST.set(previous);
                                     }

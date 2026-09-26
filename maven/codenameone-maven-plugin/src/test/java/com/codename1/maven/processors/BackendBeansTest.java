@@ -382,6 +382,70 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aFactoryBeanIsConditionalOnItsConfigurationClass() throws Exception {
+        // A @Profile("prod") configuration's @Bean methods, static or not, exist
+        // only on prod -- as in Spring -- rather than being built on every
+        // profile, the instance one through a configuration object that is null.
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Marker", PKG + "public class Marker { }\n");
+        s.put("com.example.ProdConfig", PKG + "@Configuration @Profile(\"prod\")\n"
+                + "@ConditionalOnProperty(\"prod.enabled\") public class ProdConfig {\n"
+                + "    @Bean public StringBuilder prodThing() { return new StringBuilder(\"p\"); }\n"
+                + "    @Bean public static Marker prodMarker() { return new Marker(); }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired(required = false) private StringBuilder thing;\n"
+                + "    @Autowired(required = false) private Marker marker;\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        return (thing != null) + \",\" + (marker != null);\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend dev = start(classes, port, new Properties());
+        try {
+            assertEquals("false,false", http("GET", port, "/x"));
+        } finally {
+            dev.stop();
+        }
+    }
+
+    @Test
+    public void aRequestScopedFactoryBeanIsDestroyedByItsDestroyMethod() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Handle", PKG + "public class Handle {\n"
+                + "    public static int closed;\n"
+                + "    public void close() { closed++; }\n"
+                + "    public String use() { return \"used\"; }\n"
+                + "}\n");
+        s.put("com.example.Handles", PKG + "@Configuration public class Handles {\n"
+                + "    @Bean(destroyMethod = \"close\") @RequestScope\n"
+                + "    public Handle handle() { return new Handle(); }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Handle handle;\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        handle.use();\n"
+                + "        return String.valueOf(Handle.closed);\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("0", http("GET", port, "/x"));
+            assertEquals("the first request's bean was never closed", "1",
+                    http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

@@ -277,7 +277,9 @@ public final class DevTools implements McpServer.Extension {
             headers.add("Content-Type: application/json");
         }
         int port = backend.getServer().getPort();
-        String scheme = "http";
+        // The server's own scheme: plain HTTP to a TLS listener is answered
+        // with a handshake failure, never with the route's response.
+        String scheme = backend.getServer().isSecure() ? "https" : "http";
         Web.Result result = Web.request(asciiUpper(method), scheme + "://127.0.0.1:" + port
                 + path, headers, body == null ? null : McpServer.utf8(body));
         Map out = new LinkedHashMap();

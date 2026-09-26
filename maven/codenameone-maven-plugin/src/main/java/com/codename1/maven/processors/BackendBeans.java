@@ -234,7 +234,10 @@ final class BackendBeans {
         boolean primary;
         boolean lazy;
         boolean onMissing;
-        String[] profiles;
+        /// Each entry is one @Profile's names, of which one must be active; every
+        /// entry must hold. More than one only for a factory bean, which also
+        /// carries its configuration class's @Profile.
+        final List<String[]> profiles = new ArrayList<String[]>();
         final List<String[]> propertyConditions = new ArrayList<String[]>();
         MethodInfo constructor;
         final List<Point> constructorPoints = new ArrayList<Point>();
@@ -259,7 +262,7 @@ final class BackendBeans {
         String proxyBinary;
 
         boolean isConditional() {
-            return profiles != null || !propertyConditions.isEmpty();
+            return !profiles.isEmpty() || !propertyConditions.isEmpty();
         }
 
         /// Whether it is reached through a generated stand-in rather than held.
@@ -631,7 +634,7 @@ final class BackendBeans {
             if (values.isEmpty()) {
                 ctx.error(where, "@Profile on " + bean.name + " names no profile.");
             }
-            bean.profiles = values.toArray(new String[values.size()]);
+            bean.profiles.add(values.toArray(new String[values.size()]));
         }
         AnnotationValues prop = annotations.get(ON_PROPERTY);
         if (prop != null) {
@@ -725,6 +728,12 @@ final class BackendBeans {
         bean.initMethod = emptyToNull(values.getString("initMethod"));
         bean.destroyMethod = emptyToNull(values.getString("destroyMethod"));
         readModifiers(bean, m.getAnnotations(), cls);
+        // A factory bean exists only when its configuration class does, as in
+        // Spring: otherwise a @Profile("prod") configuration's @Bean would be
+        // built on every profile -- through a null owner if the method is not
+        // static, and against configuration a static one was never meant to see.
+        bean.profiles.addAll(owner.profiles);
+        bean.propertyConditions.addAll(owner.propertyConditions);
         bean.types.addAll(assignableTypes(bean.type));
         Type[] args = Type.getArgumentTypes(m.getDescriptor());
         String[] generics = parameterSignatures(m);

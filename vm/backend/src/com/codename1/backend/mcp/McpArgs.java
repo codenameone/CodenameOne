@@ -104,6 +104,28 @@ public final class McpArgs {
         return (int)v;
     }
 
+    /**
+     * A short argument, refused outside the short range rather than narrowed:
+     * a cast would turn 40000 into -25536 and run the tool with a number
+     * nobody sent.
+     */
+    public static short shortValue(Map args, String name, boolean required) {
+        int v = intValue(args, name, required);
+        if(v < Short.MIN_VALUE || v > Short.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (short)v;
+    }
+
+    /** A byte argument, refused outside the byte range for the same reason. */
+    public static byte byteValue(Map args, String name, boolean required) {
+        int v = intValue(args, name, required);
+        if(v < Byte.MIN_VALUE || v > Byte.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (byte)v;
+    }
+
     public static double doubleValue(Map args, String name, boolean required) {
         Object v = raw(args, name, required);
         return v == null ? 0 : toDouble(v, name);
@@ -150,12 +172,12 @@ public final class McpArgs {
 
     public static Short shortObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Short((short)intValue(args, name, required));
+                : new Short(shortValue(args, name, required));
     }
 
     public static Byte byteObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Byte((byte)intValue(args, name, required));
+                : new Byte(byteValue(args, name, required));
     }
 
     public static Double doubleObject(Map args, String name, boolean required) {

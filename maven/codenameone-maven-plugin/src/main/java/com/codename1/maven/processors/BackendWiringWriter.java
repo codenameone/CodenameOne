@@ -244,14 +244,14 @@ final class BackendWiringWriter {
 
     private String condition(BackendBeans.Bean b) {
         List<String> parts = new ArrayList<String>();
-        if (b.profiles != null) {
+        for (String[] group : b.profiles) {
             StringBuilder p = new StringBuilder("com.codename1.backend.Wiring.profiles(config, "
                     + "new String[] {");
-            for (int i = 0; i < b.profiles.length; i++) {
+            for (int i = 0; i < group.length; i++) {
                 if (i > 0) {
                     p.append(", ");
                 }
-                p.append(BackendSources.quote(b.profiles[i]));
+                p.append(BackendSources.quote(group[i]));
             }
             parts.add(p.append("})").toString());
         }
@@ -654,7 +654,11 @@ final class BackendWiringWriter {
     private void requestEnded(StringBuilder sb) {
         sb.append("    public void requestEnded(Object[] beans) {\n");
         for (BackendBeans.Bean b : model.beans) {
-            if (!BackendBeans.REQUEST.equals(b.scope) || b.preDestroy.isEmpty()) {
+            // A @Bean(destroyMethod = ...) counts as much as @PreDestroy: a
+            // request-scoped factory bean with only a destroyMethod is exactly
+            // the resource (a connection, a stream) that must be closed per request.
+            if (!BackendBeans.REQUEST.equals(b.scope)
+                    || (b.preDestroy.isEmpty() && b.destroyMethod == null)) {
                 continue;
             }
             String type = typeOf(b);
@@ -665,6 +669,10 @@ final class BackendWiringWriter {
             for (MethodInfo m : b.preDestroy) {
                 sb.append("    ");
                 destroyCall(sb, b, "bean." + callName(m) + "()");
+            }
+            if (b.destroyMethod != null) {
+                sb.append("    ");
+                destroyCall(sb, b, "bean." + b.destroyMethod + "()");
             }
             sb.append("        }\n");
         }
@@ -712,8 +720,11 @@ final class BackendWiringWriter {
 
     private static String conditionText(BackendBeans.Bean b) {
         StringBuilder sb = new StringBuilder();
-        if (b.profiles != null) {
-            sb.append("profile ").append(java.util.Arrays.toString(b.profiles));
+        for (String[] group : b.profiles) {
+            if (sb.length() > 0) {
+                sb.append(" and ");
+            }
+            sb.append("profile ").append(java.util.Arrays.toString(group));
         }
         for (String[] c : b.propertyConditions) {
             if (sb.length() > 0) {

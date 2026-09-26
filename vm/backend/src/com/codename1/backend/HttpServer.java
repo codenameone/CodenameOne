@@ -1026,6 +1026,22 @@ public final class HttpServer {
          * the platform has it, so the bytes never enter user space, and CLOSES the
          * descriptor when it is done -- a handler that returned one must not.
          */
+        /**
+         * This response with other extra headers, as a NEW object. For a header
+         * the server adds to one request's answer -- a session cookie -- because
+         * the Response a handler returns may be a constant shared by every
+         * request, and writing into it would hand one client's cookie to the next.
+         * Only one of the two is ever sent, so a file descriptor it carries still
+         * has exactly one owner.
+         */
+        Response withHeaders(Map headers) {
+            Response copy = new Response(status, contentType, body, fileFd, fileOffset,
+                    fileLength, headers);
+            copy.deferredJson = deferredJson;
+            copy.hasDeferredJson = hasDeferredJson;
+            return copy;
+        }
+
         public static Response file(int status, String contentType, int fd,
                                     long offset, long length, Map extraHeaders) {
             return new Response(status, contentType, null, fd, offset, length, extraHeaders);
@@ -2007,6 +2023,11 @@ public final class HttpServer {
         // Last, so a server starting concurrently cannot take the slot while this
         // one is still closing the reactors it claimed with it.
         server.releaseVirtualThreadSlot();
+    }
+
+    /** Whether this server speaks TLS, so a client of it must use https. */
+    public boolean isSecure() {
+        return tls != null;
     }
 
     public int getPort() {

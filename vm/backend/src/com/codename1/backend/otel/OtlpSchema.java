@@ -235,6 +235,11 @@ final class OtlpSchema {
             attributes(7), f("startTimeUnixNano", 2, FIXED64), f("timeUnixNano", 3, FIXED64),
             f("asDouble", 4, DOUBLE), f("flags", 8, VARINT)
         });
+        // bucket_counts is "repeated fixed64" on HistogramDataPoint in
+        // opentelemetry-proto's metrics.proto, like count -- NOT the "repeated
+        // uint64" (varint) of the exponential histogram's Buckets message. The
+        // two are easy to confuse; OtlpMetricsProtoTest decodes this with the
+        // generated classes to hold it.
         Message histogramPoint = new Message(new Field[] {
             attributes(9), f("startTimeUnixNano", 2, FIXED64), f("timeUnixNano", 3, FIXED64),
             f("count", 4, FIXED64), f("sum", 5, DOUBLE),

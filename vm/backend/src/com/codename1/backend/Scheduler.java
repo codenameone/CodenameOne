@@ -391,10 +391,22 @@ public final class Scheduler {
                     + "locked_by) VALUES (?, ?, ?, ?)",
                     new Object[] {job.lock, new Long(until), new Long(now), instance});
             return true;
-        } catch (IOException held) {
-            // The row exists and its claim has not expired: another instance
-            // is running this job.
-            return false;
+        } catch (IOException failed) {
+            // Only a row that exists means another instance holds the claim.
+            // Anything else -- a dropped connection, a missing permission -- is
+            // rethrown so runJob records it as a failure; read as "held", it
+            // would be counted as a skip and the job would silently never run.
+            Map row;
+            try {
+                row = locks.queryOne("SELECT locked_by FROM " + LOCK_TABLE + " WHERE name = ?",
+                        new Object[] {job.lock});
+            } catch (IOException err) {
+                throw failed;
+            }
+            if(row != null) {
+                return false;
+            }
+            throw failed;
         }
     }
 

@@ -76,9 +76,20 @@ public final class Sessions {
                     + "\"; it must be Lax, Strict or None");
         }
         sameSite = site;
-        String secureSetting = config.get("cn1.session.secure", "auto");
-        secure = "auto".equalsIgnoreCase(secureSetting) ? tls
-                : "true".equalsIgnoreCase(secureSetting);
+        String secureSetting = config.get("cn1.session.secure", "auto").trim();
+        if("auto".equalsIgnoreCase(secureSetting)) {
+            secure = tls;
+        } else if("true".equalsIgnoreCase(secureSetting)) {
+            secure = true;
+        } else if("false".equalsIgnoreCase(secureSetting)) {
+            secure = false;
+        } else {
+            // Refused rather than read as false: a typo such as "tru" would
+            // otherwise start a TLS server whose session cookies a browser also
+            // sends over plain HTTP.
+            throw new IOException("cn1.session.secure is \"" + secureSetting
+                    + "\"; it must be auto, true or false");
+        }
         if("None".equalsIgnoreCase(sameSite) && !secure) {
             // Browsers drop a SameSite=None cookie that is not Secure, so the
             // session would silently never come back.
@@ -224,9 +235,11 @@ public final class Sessions {
     }
 
     /**
-     * {@code response} with one more header. The handler's own header map is
-     * never modified -- it may be a constant shared by every response -- and a
-     * header it already sets under the same name is kept beside this one.
+     * {@code response} with one more header, as a NEW Response. Neither the
+     * handler's Response nor its header map is modified: either may be a constant
+     * shared by every request, and a session cookie written into one would be
+     * sent to the next client that got it -- a session handed to a stranger. A
+     * header the handler already sets under the same name is kept beside this one.
      */
     static HttpServer.Response withHeader(HttpServer.Response response, String name,
                                           String value) {
@@ -245,13 +258,11 @@ public final class Sessions {
                 }
                 both.add(value);
                 copy.put(key, both);
-                response.extraHeaders = copy;
-                return response;
+                return response.withHeaders(copy);
             }
         }
         copy.put(name, value);
-        response.extraHeaders = copy;
-        return response;
+        return response.withHeaders(copy);
     }
 
     /** The value of the cookie called {@code name} in a Cookie header, or null. */

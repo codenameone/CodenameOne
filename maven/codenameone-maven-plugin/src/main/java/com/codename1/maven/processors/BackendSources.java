@@ -246,6 +246,15 @@ final class BackendSources {
     /// A lazily created instrument: a static field and the accessor that fills it
     /// the first time. Emitted inside the method body's class, before it.
     private void fieldAccessor(StringBuilder sb, String type, String field, String create) {
+        fieldAccessor(sb, type, field, create, null);
+    }
+
+    /**
+     * @param stale a condition on {@code value} under which the cached object is
+     *        thrown away and fetched again, or null when it never goes stale
+     */
+    private void fieldAccessor(StringBuilder sb, String type, String field, String create,
+                               String stale) {
         // Written as a local class-level member by splicing: the caller is in the
         // middle of a method, so the member goes into a separate buffer that the
         // class writer appends. Kept simple by emitting them as nested holders.
@@ -256,7 +265,8 @@ final class BackendSources {
           .append("() {\n");
         pendingMembers.append("        ").append(type).append(" value = ").append(field)
           .append(";\n");
-        pendingMembers.append("        if (value == null) {\n            value = ").append(create)
+        pendingMembers.append("        if (value == null").append(stale == null ? "" : " || " + stale)
+          .append(") {\n            value = ").append(create)
           .append(";\n            ").append(field).append(" = value;\n        }\n");
         pendingMembers.append("        return value;\n    }\n\n");
     }
@@ -270,7 +280,11 @@ final class BackendSources {
         String thread = BackendBeans.enumName(aspect.async.get("thread"), "PLATFORM");
         fieldAccessor(sb, "com.codename1.backend.TaskExecutor", "E" + index,
                 "com.codename1.backend.Tasks.executor(" + quote(executor)
-                + ", com.codename1.backend.Tasks." + thread + ")");
+                + ", com.codename1.backend.Tasks." + thread + ")",
+                // Tasks.shutdown() stops and forgets every executor when the
+                // server stops, so a server started again in the same process
+                // must not keep submitting to the stopped one it cached.
+                "value.isShutdown()");
         sb.append("    static ").append(retType).append(' ').append(m.getName()).append('(')
           .append(params).append(") throws Throwable {\n");
         sb.append("        ").append(simple(aspect.asyncTaskBinary)).append(" cn1Task = new ")
@@ -452,8 +466,10 @@ final class BackendSources {
         switch (t.getSort()) {
             case Type.BOOLEAN: return helper + "booleanValue(" + args + ")";
             case Type.CHAR: return helper + "charValue(" + args + ")";
-            case Type.BYTE: return "(byte) " + helper + "intValue(" + args + ")";
-            case Type.SHORT: return "(short) " + helper + "intValue(" + args + ")";
+            // Range-checked, never cast: a narrowing cast would run the tool
+            // with a different number than the caller sent.
+            case Type.BYTE: return helper + "byteValue(" + args + ")";
+            case Type.SHORT: return helper + "shortValue(" + args + ")";
             case Type.INT: return helper + "intValue(" + args + ")";
             case Type.LONG: return helper + "longValue(" + args + ")";
             case Type.FLOAT: return "(float) " + helper + "doubleValue(" + args + ")";

@@ -54,8 +54,9 @@ import com.codename1.backend.Json;
  * {@code Authorization: Bearer <cn1.mcp.token>} and the server refuses to start
  * without a token, because a tool anyone can call is a vulnerability. On a
  * development profile the token is optional. Either way a request whose
- * {@code Origin} is not the server's own host, localhost, or one listed in
- * {@code cn1.mcp.allowedOrigins} is refused, which is what the MCP
+ * {@code Origin} is not a loopback address or one listed in
+ * {@code cn1.mcp.allowedOrigins} is refused -- including a page the server
+ * serves itself, which has to be listed -- which is what the MCP
  * specification asks for against DNS rebinding: a web page in the developer's
  * browser must not be able to drive the server.
  *
@@ -376,19 +377,14 @@ public final class McpServer implements HttpServer.Handler {
                 return true;
             }
         }
+        // Loopback origins only, never "the Host this request names": under DNS
+        // rebinding a hostile page's origin and the Host header are BOTH the
+        // attacker's name (evil.example:8080), resolved to 127.0.0.1, so
+        // comparing them lets exactly the page this check exists to stop drive
+        // the server. A page the server itself serves must be listed.
         String host = hostOf(origin);
-        if("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
-                || "[::1]".equals(host)) {
-            return true;
-        }
-        String own = request.getHeader("host");
-        if(own != null) {
-            int colon = own.lastIndexOf(':');
-            String ownHost = colon > 0 && own.indexOf(']') < colon ? own.substring(0, colon)
-                    : own;
-            return ownHost.equalsIgnoreCase(host);
-        }
-        return false;
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+                || "[::1]".equals(host);
     }
 
     private static String hostOf(String origin) {

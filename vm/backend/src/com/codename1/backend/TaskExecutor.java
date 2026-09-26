@@ -96,8 +96,25 @@ public final class TaskExecutor {
         if(task == null) {
             return;
         }
-        if(virtual && HttpServer.submitVirtualTask(new Counted(this, task))) {
-            return;
+        if(virtual) {
+            // Refused and counted BEFORE the hand-off, exactly like a pool task:
+            // a submission after shutdown must fail rather than run on a server
+            // that is stopping, and a task already handed to a host must hold
+            // shutdown()'s drain open from the moment it is accepted -- counting
+            // it only once it starts let shutdown() return while it still sat in
+            // a host's inbox.
+            synchronized(this) {
+                if(shutdown) {
+                    throw new IllegalStateException("Executor " + name + " has been shut down");
+                }
+                active++;
+            }
+            if(HttpServer.submitVirtualTask(new Counted(this, task))) {
+                return;
+            }
+            synchronized(this) {
+                active--;
+            }
         }
         synchronized(this) {
             if(shutdown) {
@@ -172,6 +189,11 @@ public final class TaskExecutor {
         failed++;
     }
 
+    /** Whether {@link #shutdown(long)} has been called; it then refuses tasks. */
+    public synchronized boolean isShutdown() {
+        return shutdown;
+    }
+
     /**
      * Stops taking tasks and waits up to {@code waitMillis} for the queued and
      * running ones to finish.
@@ -197,7 +219,10 @@ public final class TaskExecutor {
         return name + (virtual ? " (virtual)" : " (" + size + " threads)");
     }
 
-    /** A task on a virtual thread, counted like one on the pool. */
+    /**
+     * A task on a virtual thread, counted like one on the pool. execute() has
+     * already counted it active; runCounted's finally is the matching decrement.
+     */
     private static final class Counted implements Runnable {
         private final TaskExecutor owner;
         private final Runnable task;
@@ -208,14 +233,7 @@ public final class TaskExecutor {
         }
 
         public void run() {
-            owner.runCountedVirtual(task);
+            owner.runCounted(task);
         }
-    }
-
-    private void runCountedVirtual(Runnable task) {
-        synchronized(this) {
-            active++;
-        }
-        runCounted(task);
     }
 }
