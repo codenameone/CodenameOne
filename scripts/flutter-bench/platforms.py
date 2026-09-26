@@ -160,6 +160,10 @@ class Adapter(object):
                 continue
             if benchlib.COMPUTE_DONE in line:
                 return results
+            if "CN1 GC:" in line:
+                # Diagnostic branch only: the collector's own report of a skipped
+                # sweep and the capture that failed, into the job log.
+                print("    %s %s" % (side, line.rstrip()), flush=True)
             parsed = benchlib.parse_compute_line(line)
             if parsed:
                 results[parsed[0]] = (parsed[1], parsed[2])
