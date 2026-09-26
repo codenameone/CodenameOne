@@ -232,7 +232,8 @@ def measure_workload(spec, cores, rounds, bench_binary, java, reps, work):
     expected = spec.setdefault('expected', [None])
 
     def run_one(arm, prefix, log):
-        result = bench.run(prefix, env, log, system, timeout=900)
+        # A workload process finishes in seconds; one that runs for minutes is hung.
+        result = bench.run(prefix, env, log, system, timeout=300)
         lines = [m for m in BENCH_LINE.finditer(log.read_text(errors='replace'))
                  if m.group(1) == name]
         if len(lines) != reps:
@@ -329,6 +330,8 @@ def render_markdown(report):
     regressions = []
     for bench_id, per_cores in report['results'].items():
         for cores, entry in per_cores.items():
+            if 'failed' in entry:
+                continue
             for metric in ('time', 'memory'):
                 e = entry[metric]
                 if e['verdict'] == 'regression':
@@ -339,6 +342,14 @@ def render_markdown(report):
                                           'time' if metric == 'time' else 'RAM', e['median'],
                                           e['baseline'], (e['median'] / e['baseline'] - 1) * 100,
                                           round(e.get('tolerance', tol[metric]) * 100)))
+    failures = report.get('failures') or []
+    if failures:
+        lines.append('**%d benchmark%s failed to run:**' % (len(failures),
+                                                            '' if len(failures) == 1 else 's'))
+        lines += ['- %s at %s core%s: %s' % (report['labels'].get(f['benchmark'], f['benchmark']),
+                                             f['cores'], '' if f['cores'] == 1 else 's',
+                                             f['reason']) for f in failures]
+        lines.append('')
     if regressions:
         lines.append('**%d performance regression%s:**' % (len(regressions),
                                                            '' if len(regressions) == 1 else 's'))
@@ -355,6 +366,10 @@ def render_markdown(report):
     logical = False
     for bench_id, per_cores in report['results'].items():
         for cores, entry in sorted(per_cores.items(), key=lambda kv: int(kv[0])):
+            if 'failed' in entry:
+                lines.append('| %s | %s | - | - | **FAILED**: %s |'
+                             % (report['labels'][bench_id], cores, entry['failed']))
+                continue
             mark = '' if entry['enforced'] else '*'
             logical = logical or bool(mark)
             lines.append('| %s | %s%s | %s | %s | %s |' % (
@@ -372,7 +387,8 @@ def render_markdown(report):
                   '```', '', '</details>']
     lines += ['', '**Result: %s**' % (
         'performance regression' if report['regression'] else
-        ('gate did not complete' if report.get('error') else 'no regression'))]
+        ('gate did not complete' if report.get('error') else
+         ('benchmark failed' if report.get('failures') else 'no regression')))]
     return '\n'.join(lines) + '\n'
 
 
@@ -454,14 +470,31 @@ def main(argv):
         print('perf-gate: %s, %d rounds, cores %s, %d benchmarks'
               % (args.platform, args.rounds, cores_list, len(specs)), flush=True)
         calibration = {}
+        report['failures'] = []
         for spec in specs:
             for cores in cores_list:
-                if spec['kind'] == 'translation':
-                    times, memories, enforced = measure_translation(
-                        spec, cores, args.rounds, binary, java, work)
-                else:
-                    times, memories, enforced = measure_workload(
-                        spec, cores, args.rounds, bench_binary, java, args.reps, work)
+                # ONE benchmark failing -- a hang, a crash, a divergent output -- fails
+                # its own row and the gate, and the rest of the table is still measured.
+                # Aborting the whole gate on the first one hid every row after it.
+                try:
+                    if spec['kind'] == 'translation':
+                        times, memories, enforced = measure_translation(
+                            spec, cores, args.rounds, binary, java, work)
+                    else:
+                        times, memories, enforced = measure_workload(
+                            spec, cores, args.rounds, bench_binary, java, args.reps, work)
+                except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+                    reason = str(error).strip().splitlines()[0][:200]
+                    if isinstance(error, subprocess.TimeoutExpired):
+                        reason = 'did not finish within %ds (hung)' % error.timeout
+                    report['failures'].append({'benchmark': spec['id'], 'cores': cores,
+                                               'reason': reason})
+                    report['results'].setdefault(spec['id'], {})[str(cores)] = {
+                        'failed': reason}
+                    print('perf-gate: %-20s %d cores  FAILED: %s' % (spec['id'], cores, reason),
+                          flush=True)
+                    write()
+                    continue
                 base = bases.get(spec['id'], {}).get(str(cores), {})
                 entry = {'enforced': enforced}
                 for metric, values in (('time', times), ('memory', memories)):
@@ -495,8 +528,10 @@ def main(argv):
         return 2
     write()
     print(render_markdown(report))
-    print('perf-gate: %s' % ('REGRESSION' if report['regression'] else 'OK'))
-    return 1 if report['regression'] else 0
+    failed = bool(report.get('failures'))
+    print('perf-gate: %s' % ('REGRESSION' if report['regression'] else
+                             ('FAILED' if failed else 'OK')))
+    return 1 if report['regression'] or failed else 0
 
 
 if __name__ == '__main__':

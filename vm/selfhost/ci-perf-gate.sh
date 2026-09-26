@@ -35,6 +35,11 @@ if not path.is_file():
 report = json.loads(path.read_text())
 if report.get('error'):
     sys.exit('ParparVM performance gate could not complete: %s' % report['error'])
+if report.get('failures'):
+    print('ParparVM performance gate: benchmarks failed to run on %s:' % report['platform'])
+    for f in report['failures']:
+        print('  %s at %s cores: %s' % (f['benchmark'], f['cores'], f['reason']))
+    sys.exit(1)
 if report.get('regression'):
     lines = []
     for bench, per_cores in report['results'].items():
