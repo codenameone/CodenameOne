@@ -22,6 +22,8 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.util.MathUtil;
+
 /// Reference implementation of Graphics.glassLensRegion: the optics of a raised
 /// Liquid Glass lens (the lifted iOS 27 tab selection) laid over what is already
 /// painted. Ports without a native path run this; the Metal shader
@@ -184,7 +186,7 @@ public final class GlassLensBlend {
                     float past = s - optics[OUTLINE_WIDTH];
                     if (optics[RIM_WIDTH] > 0 && past >= 0) {
                         rim = (optics[RIM_LIGHT] + optics[RIM_LIGHT_VERTICAL] * Math.abs(ny))
-                                * (float) Math.exp(-past / optics[RIM_WIDTH]);
+                                * (float) MathUtil.exp(-past / optics[RIM_WIDTH]);
                     }
                     float inR = rgb[0] * shade + lum + rim;
                     float inG = rgb[1] * shade + lum + rim;
@@ -196,7 +198,7 @@ public final class GlassLensBlend {
                     outB = outB + (inB - outB) * cov;
                 } else if (optics[SHADOW] > 0 && optics[SHADOW_WIDTH] > 0 && ny > 0) {
                     float t = (sdf - optics[SHADOW_WIDTH]) / optics[SHADOW_WIDTH];
-                    float f = optics[SHADOW] * ny * (float) Math.exp(-t * t);
+                    float f = optics[SHADOW] * ny * (float) MathUtil.exp(-t * t);
                     outR *= 1 - f;
                     outG *= 1 - f;
                     outB *= 1 - f;

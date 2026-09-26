@@ -56,6 +56,26 @@ REST_LENS_H = 54.0
 RELEASE_PT = 3.5
 LIFT_SNAP = 0.975
 
+def read_text(path, newline=None):
+    with open(path, newline=newline) as f:
+        return f.read()
+
+
+def write_text(path, text, newline=None):
+    with open(path, "w", newline=newline) as f:
+        f.write(text)
+
+
+def read_json(path):
+    with open(path) as f:
+        return json.load(f)
+
+
+def write_json(obj, path):
+    with open(path, "w") as f:
+        json.dump(obj, f)
+
+
 # --------------------------------------------------------------------------- log
 
 LRE = re.compile(r"L (\d+) d=(\d+) (\S+) win=\(([^)]*)\) b=\(([^)]*)\) pos=\(([^)]*)\) "
@@ -64,7 +84,7 @@ LRE = re.compile(r"L (\d+) d=(\d+) (\S+) win=\(([^)]*)\) b=\(([^)]*)\) pos=\(([^
 
 def load_log(path):
     frames, touches, cur = [], [], None
-    for line in open(path):
+    for line in read_text(path).splitlines(True):
         if line.startswith("FRAME"):
             cur = {"t": float(line.split()[1][2:]), "L": {}}
             frames.append(cur)
@@ -315,10 +335,10 @@ def java_tables(tpl):
 
 
 def write_java(tpl, path):
-    s = open(path).read()
+    s = read_text(path)
     a = s.index("    /// Normalized lens-centre travel")
     b = s.index("    // ---- outputs ----")
-    open(path, "w").write(s[:a] + java_tables(tpl) + s[b:])
+    write_text(path, s[:a] + java_tables(tpl) + s[b:])
 
 
 # --------------------------------------------------------------------------- fixture
@@ -327,8 +347,7 @@ def fixture(taps, path):
     rows = ["# Native iOS 27 UITabBarController selection motion, one row per display frame.",
             "# Captured by scripts/probe-ios-tab-motion.sh and exported by",
             "# scripts/fidelity-app/tools/tab-motion/tabmotion.py fixture.",
-            "# set,tap,travelPt,liftRegime,tSec,position,liftPt,scaleX,scaleY,leadPt,platterOpacity,"
-            "contentScale,barGrowPt",
+            "# set,tap,travelPt,liftRegime,tSec,position,liftPt,scaleX,scaleY,leadPt,platterOpacity,contentScale,barGrowPt",
             "# Every tap is a quick ~66 ms touch: a longer press grows the bar pulse further.",
             "# liftRegime: fast = the lift curve every 3-tab tap uses; slow = the slower rise UIKit",
             "# sometimes plays on the 5-tab bar (position/deformation still hold, lift is not asserted)."]
@@ -342,7 +361,7 @@ def fixture(taps, path):
             rows.append("%s,%d,%.2f,%s,%.4f,%.5f,%.3f,%.4f,%.4f,%.3f,%.4f,%.4f,%.3f" % (
                 name, tp["k"], tp["D"], regime, t, tp["p"][i], c["lh"][i] - REST_LENS_H, c["sx"][i], c["sy"][i],
                 c["tx"][i], c["platOp"][i], c["cs"][i], (c["bs"][i] - 1) * c["bw"][-1]))
-    open(path, "w").write("\n".join(rows) + "\n")
+    write_text(path, "\n".join(rows) + "\n")
 
 
 # --------------------------------------------------------------------------- material
@@ -359,7 +378,8 @@ def material(shot_dir):
         H, W, _ = F.shape
         s = W / 393.0
         if kind == "photo":
-            return np.array(Image.open(backdrop_png).convert("RGB").resize((W, H), Image.BICUBIC)).astype(float)
+            with Image.open(backdrop_png) as im:
+                return np.array(im.convert("RGB").resize((W, H), Image.BICUBIC)).astype(float)
         if kind == "grey":
             return np.full_like(F, 128.0)
         B = np.zeros_like(F)
@@ -377,8 +397,8 @@ def material(shot_dir):
         # and the committed golden agree there to the level); the bands pin the
         # blur and the photo the colour response.
         for kind in ("stripes", "photo", "grey"):
-            F = np.array(Image.open(os.path.join(shot_dir, "live-%s-%s.png" % (appearance, kind)))
-                         .convert("RGB")).astype(float)
+            with Image.open(os.path.join(shot_dir, "live-%s-%s.png" % (appearance, kind))) as im:
+                F = np.array(im.convert("RGB")).astype(float)
             s = F.shape[1] / 393.0
             regs = [(slice(int(781 * s), int(823 * s)), slice(int(x0 * s), int(x1 * s)))
                     for x0, x1 in ((236, 254), (298, 324))]
@@ -684,12 +704,12 @@ def gesture_tables(W, S, K):
 
 def splice(path, begin, block):
     """Replaces what lies between the begin marker line and the end marker line."""
-    s = open(path, newline="").read()
+    s = read_text(path, newline="")
     if begin not in s:
         sys.exit("%s has no line %r: add the markers around the generated tables first" % (path, begin.strip()))
     a = s.index(begin) + len(begin)
     b = s.index(TABLES_END, a)
-    open(path, "w", newline="").write(s[:a] + block + s[b:])
+    write_text(path, s[:a] + block + s[b:], newline="")
 
 
 def gesture_fixture(logs, path):
@@ -734,7 +754,7 @@ def gesture_fixture(logs, path):
             for r in seg:
                 out.append("F,%d,%.4f,%.3f,%.4f,%.5f,%.5f,%.4f,%.3f" % (eid, r[0] - t0, *r[1:]))
             eid += 1
-    open(path, "w").write("# kind,episode,... see TabGlassGestureTest\n" + "\n".join(out) + "\n")
+    write_text(path, "# kind,episode,... see TabGlassGestureTest\n" + "\n".join(out) + "\n")
     print("%d episodes, %d lines" % (eid, len(out)), file=sys.stderr)
 
 
@@ -801,7 +821,7 @@ def load_tints(path):
     """(hex, tint 0..1, distinct 4x5 matrices) per TINT line of a PROBE_TINTSWEEP log.
     The first matrix is the selected item's."""
     out = []
-    for line in open(path):
+    for line in read_text(path).splitlines(True):
         if not line.startswith("TINT "):
             continue
         parts = line.split()
@@ -964,7 +984,7 @@ def vibrancy_fixture(dark, light, grey_dark, grey_light, path, count=300):
         rows += [row(app, h, mats[0]) for h, t, mats in load_tints(log)[:count]]
     for app, log in (("dark", grey_dark), ("light", grey_light)):
         rows += [row(app, h, mats[0]) for h, t, mats in load_tints(log) if t.max() == t.min()]
-    open(path, "w").write("\n".join(rows) + "\n")
+    write_text(path, "\n".join(rows) + "\n")
 
 
 # --------------------------------------------------------------------------- cli
@@ -1016,21 +1036,21 @@ def main():
     if args.cmd == "fit":
         clean = [tp for tp in all_taps(args.logs) if is_clean(tp)]
         print("fitting %d clean taps" % len(clean), file=sys.stderr)
-        json.dump(fit(clean), open(args.o, "w"))
+        write_json(fit(clean), args.o)
     elif args.cmd == "java":
-        write_java(json.load(open(args.templates)), args.java)
+        write_java(read_json(args.templates), args.java)
     elif args.cmd == "fixture":
         taps = [tp for tp in all_taps(args.logs) if tp["k"] != 0 and tp["up"] is not None and tp["up"] <= 0.075
                 and tp["dt"].max() <= 25]
         fixture(taps, args.o)
     elif args.cmd == "check":
-        check(json.load(open(args.templates)), all_taps(args.logs))
+        check(read_json(args.templates), all_taps(args.logs))
     elif args.cmd == "material":
         material(args.shots)
     elif args.cmd == "gesture":
         drags = [(log, finger_offset(log)) for log in args.drags]
         W = wobble(args.hold)
-        S = settle(drags, np.array(json.load(open(args.templates))["P"]))
+        S = settle(drags, np.array(read_json(args.templates)["P"]))
         K = scrub_kernels(args.drags, W)
         splice(args.o, GESTURE_BEGIN, gesture_tables(W, S, K))
     elif args.cmd == "gesture-fixture":

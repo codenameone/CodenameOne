@@ -711,7 +711,7 @@ by `TabGlassMotion`:
   arrival in proportion to the distance, then settles with a second, smaller
   wobble;
 * the whole bar -- glass, content and lens -- pulses in scale, and a soft glow
-  spreads from the touch point.
+  spreads from where the finger touched.
 
 The motion follows the gesture, not just the tap, the way UIKit's does:
 
