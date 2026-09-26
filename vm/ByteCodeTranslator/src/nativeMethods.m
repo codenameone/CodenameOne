@@ -2467,6 +2467,9 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         i->gcPthread = pthread_self();
         i->gcPthreadValid = JAVA_TRUE;
         cn1TlsSelf = i;
+#if !defined(_WIN32)
+        { extern void cn1GcUnblockStopSignal(void); cn1GcUnblockStopSignal(); }
+#endif
 #if defined(_WIN32)
         // Recorded here, on the thread itself, because Windows offers no way to read
         // another thread's stack bounds and the collector's scan needs them.

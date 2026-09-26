@@ -12545,6 +12545,24 @@ void cn1RefreshFreeMemCache(void) {
 
 // SIGUSR2 is used so SIGUSR1 stays free for app/JNI use.
 #define CN1_GC_STOP_SIGNAL SIGUSR2
+// Called by every thread as it registers with the VM (cn1CreateThreadLocalData). A new
+// thread inherits its creator's signal mask, and in an AppKit application the code that
+// starts the VM's threads can run where every signal is blocked. Each thread created
+// from there then ignored the stop signal for its whole life: the collector waited out
+// its budget on it every cycle and, with incomplete roots, skipped every sweep -- the
+// VM's OWN threads, which is what the per-capture report showed in a real gallery app
+// (site=5 lightweight=1 stopErr=-1 on four threads, eight skipped sweeps per run). Only
+// the stop signal is unblocked; the rest of the inherited mask is the caller's business.
+// -DCN1_GC_NO_STOP_SIGNAL_UNBLOCK restores the inherited mask, for
+// GcForeignThreadIntegrationTest's ablation arm.
+void cn1GcUnblockStopSignal(void) {
+#if !defined(_WIN32) && !defined(CN1_GC_NO_STOP_SIGNAL_UNBLOCK)
+    sigset_t stop;
+    sigemptyset(&stop);
+    sigaddset(&stop, CN1_GC_STOP_SIGNAL);
+    pthread_sigmask(SIG_UNBLOCK, &stop, 0);
+#endif
+}
 
 // =========================================================================
 // CONSERVATIVE ROOT RESOLVER -- architecture + perf notes
