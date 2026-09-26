@@ -77,7 +77,10 @@ TRANSLATOR_PKG = 'com.codename1.tools.translator'
 WORKLOADS = ['intArithmetic', 'longArithmetic', 'mathTranscendental', 'arraySequential',
              'arrayRandom', 'objectAllocation', 'valueEscape', 'hashMapChurn',
              'stringBuilding', 'recursion', 'quicksort']
-BENCH_LINE = re.compile(r'^BENCH (\S+) rep (\d+) ns=(\d+) checksum=(-?\d+)\s*$', re.M)
+# Not anchored to the line start: the run log carries stdout AND stderr, and on Windows a
+# runtime diagnostic can land on the same line ahead of a BENCH record, which an anchored
+# pattern then silently dropped (24 of 25 repetitions found).
+BENCH_LINE = re.compile(r'BENCH (\S+) rep (\d+) ns=(\d+) checksum=(-?\d+)')
 PLATFORM_NAMES = {'linux-x64': 'Linux x64', 'linux-arm64': 'Linux arm64',
                   'macos-arm64': 'macOS arm64', 'windows-x64': 'Windows x64',
                   'windows-arm64': 'Windows arm64'}
@@ -254,8 +257,16 @@ def measure_workload(spec, cores, rounds, bench_binary, java, reps, work):
         lines = [m for m in BENCH_LINE.finditer(log.read_text(errors='replace'))
                  if m.group(1) == name]
         if len(lines) != reps:
-            raise RuntimeError('%s (%s): expected %d measured repetitions, found %d; see %s'
-                               % (name, arm, reps, len(lines), log))
+            # Say what the log held instead: the run directory is not an artifact, so the
+            # message is the only evidence a CI failure leaves.
+            text = log.read_text(errors='replace')
+            seen = sorted(int(m.group(2)) for m in lines)
+            missing = [i for i in range(reps) if i not in seen]
+            odd = [l.strip()[:120] for l in text.splitlines()
+                   if name in l and not BENCH_LINE.search(l)][:3]
+            raise RuntimeError('%s (%s): expected %d measured repetitions, found %d '
+                               '(missing %s)%s' % (name, arm, reps, len(lines), missing,
+                                                  ('; unparsed: ' + ' | '.join(odd)) if odd else ''))
         checksums = {m.group(4) for m in lines}
         if len(checksums) != 1:
             raise RuntimeError('%s (%s): repetitions disagree on the checksum: %s'
