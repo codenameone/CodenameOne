@@ -30,7 +30,10 @@ import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
+import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -38,6 +41,11 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
+import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.artifact.ArtifactTypeRegistry;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.collection.CollectResult;
+import org.eclipse.aether.graph.DependencyNode;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -101,6 +109,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     @Parameter(property = "codename1.stageOnly", defaultValue = "false")
     private boolean stageOnly;
+
+    /**
+     * Maven's own resolver, to ask what the application needs without the desktop runtime
+     * aggregator (see {@link #neededWithoutDesktopRuntime()}).
+     */
+    @Component
+    private org.eclipse.aether.RepositorySystem resolverSystem;
 
     /**
      * Flag of whether to open the xcode/android studio project.
@@ -880,8 +895,129 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     private boolean isStrippedFromStagedJar(Artifact artifact) {
-        return isDesktopRuntimeBinary(artifact.getGroupId(), artifact.getArtifactId(), artifact.getDependencyTrail())
+        return isStrippedAsDesktopRuntime(artifact)
                 || isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+    }
+
+    private boolean isStrippedAsDesktopRuntime(Artifact artifact) {
+        if (!isDesktopRuntimeBinary(artifact.getGroupId(), artifact.getArtifactId(), artifact.getDependencyTrail())) {
+            return false;
+        }
+        if (isDesktopRuntimeAggregator(artifact.getGroupId(), artifact.getArtifactId())) {
+            return true;
+        }
+        return isStrippedAsDesktopRuntime(dependencyKey(artifact.getGroupId(), artifact.getArtifactId(),
+                artifact.getClassifier()), neededWithoutDesktopRuntime());
+    }
+
+    /**
+     * Whether an artifact reached through the desktop runtime aggregator is left out of the
+     * staged jar: only when nothing else the application ships needs it.
+     *
+     * <p>The dependency trail cannot answer that on its own. Maven keeps one resolved
+     * artifact and one winning trail per coordinate, so when an application library also
+     * needs an ffmpeg artifact but the aggregator's path is the nearer one, the trail names
+     * only the aggregator. Stripping on the trail alone would then leave the library without
+     * classes it needs.</p>
+     *
+     * @param neededElsewhere the dependency keys the application's own compile dependencies
+     *                        need with the aggregator removed, or {@code null} when that could
+     *                        not be determined, in which case nothing is stripped
+     */
+    static boolean isStrippedAsDesktopRuntime(String dependencyKey, Set<String> neededElsewhere) {
+        return neededElsewhere != null && !neededElsewhere.contains(dependencyKey);
+    }
+
+    /** groupId:artifactId:classifier, the identity {@link #isStrippedAsDesktopRuntime} compares. */
+    static String dependencyKey(String groupId, String artifactId, String classifier) {
+        return groupId + ":" + artifactId + ":" + (classifier == null ? "" : classifier);
+    }
+
+    private Set<String> neededWithoutDesktopRuntime;
+    private boolean neededWithoutDesktopRuntimeComputed;
+
+    /**
+     * What the application's compile dependencies need once the desktop runtime aggregator is
+     * taken away, collected (poms only, nothing downloaded) the same way Maven resolved the
+     * project. Only compile scope counts, because only compile scope reaches the staged jar.
+     * {@code null} when the collection fails: nothing is then stripped as desktop runtime,
+     * since an upload that is too large fails loudly and one missing classes does not.
+     */
+    private Set<String> neededWithoutDesktopRuntime() {
+        if (neededWithoutDesktopRuntimeComputed) {
+            return neededWithoutDesktopRuntime;
+        }
+        neededWithoutDesktopRuntimeComputed = true;
+        try {
+            RepositorySystemSession repoSession = getSession().getRepositorySession();
+            ArtifactTypeRegistry types = repoSession.getArtifactTypeRegistry();
+            CollectRequest request = new CollectRequest();
+            request.setRootArtifact(RepositoryUtils.toArtifact(project.getArtifact()));
+            request.setRepositories(project.getRemoteProjectRepositories());
+            for (Dependency dependency : project.getDependencies()) {
+                String scope = dependency.getScope();
+                if (isDesktopRuntimeAggregator(dependency.getGroupId(), dependency.getArtifactId())
+                        || (scope != null && scope.length() > 0 && !"compile".equals(scope))) {
+                    continue;
+                }
+                request.addDependency(RepositoryUtils.toDependency(dependency, types));
+            }
+            DependencyManagement management = project.getDependencyManagement();
+            if (management != null) {
+                for (Dependency dependency : management.getDependencies()) {
+                    request.addManagedDependency(RepositoryUtils.toDependency(dependency, types));
+                }
+            }
+            CollectResult result = resolverSystem.collectDependencies(repoSession, request);
+            Set<String> keys = new HashSet<String>();
+            addDependencyKeys(result.getRoot(), keys);
+            neededWithoutDesktopRuntime = keys;
+        } catch (Exception ex) {
+            getLog().warn("Could not determine which dependencies need the desktop runtime binaries ("
+                    + DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID + ") for another reason, so none of them are "
+                    + "left out of the staged jar. The upload may be too large: " + ex);
+            neededWithoutDesktopRuntime = null;
+        }
+        return neededWithoutDesktopRuntime;
+    }
+
+    private static void addDependencyKeys(DependencyNode node, Set<String> keys) {
+        if (node == null) {
+            return;
+        }
+        org.eclipse.aether.artifact.Artifact a = node.getArtifact();
+        if (a != null && node.getDependency() != null) {
+            keys.add(dependencyKey(a.getGroupId(), a.getArtifactId(), a.getClassifier()));
+        }
+        for (DependencyNode child : node.getChildren()) {
+            addDependencyKeys(child, keys);
+        }
+    }
+
+    private static boolean isDesktopRuntimeAggregator(String groupId, String artifactId) {
+        return GROUP_ID.equals(groupId) && DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID.equals(artifactId);
+    }
+
+    /**
+     * Whether an existing staged jar may be used instead of merging a new one (before the
+     * timestamp check, which still applies).
+     *
+     * <p>With a record, only when it names exactly the current inputs. Without one, the jar
+     * was not written by this mojo -- or was written by a plugin older than the record, which
+     * is indistinguishable from a stale one. A project may deliberately produce this jar from
+     * its own pom to control what is uploaded, and that is still honoured: such a jar is
+     * written during the current Maven run, while a stale one predates it.</p>
+     *
+     * @param recorded the recorded inputs, trimmed, or {@code null} if there is no record
+     * @param current the inputs this build would merge
+     * @param jarModified the staged jar's modification time
+     * @param sessionStart when the current Maven run started
+     */
+    static boolean mayReuseStagedJar(String recorded, String current, long jarModified, long sessionStart) {
+        if (recorded == null) {
+            return jarModified >= sessionStart;
+        }
+        return recorded.equals(current.trim());
     }
 
     /**
@@ -904,20 +1040,21 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     static final String DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID = "cn1-binaries-javase";
 
     /**
-     * Whether the artifact is the desktop runtime aggregator or was pulled in
-     * only through it. These are never sent to a build, whatever their scope.
+     * Whether the artifact is the desktop runtime aggregator or was resolved
+     * through it: the candidates for leaving out of the staged jar, whatever
+     * their scope. The aggregator itself is always left out; anything it pulled
+     * in is left out only when nothing else needs it
+     * ({@link #isStrippedAsDesktopRuntime(String, Set)}).
      *
      * <p>Projects generated from the archetype between #5380 and the fix for it
      * declare the aggregator at compile scope, and no profile re-scopes it, so
      * by scope alone it lands in the staged jar: about 300 MB of ffmpeg natives
      * that the build client refuses to upload, failing every desktop build of
-     * every such project. Deciding by the dependency trail rather than the scope
-     * repairs those projects without asking anyone to edit a pom. An app that
-     * declares an org.bytedeco artifact itself reaches it by its own, shorter
-     * trail, which Maven prefers, so that dependency is still sent.</p>
+     * every such project. Deciding by the dependency graph rather than the scope
+     * repairs those projects without asking anyone to edit a pom.</p>
      */
     static boolean isDesktopRuntimeBinary(String groupId, String artifactId, List<String> dependencyTrail) {
-        if (GROUP_ID.equals(groupId) && DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID.equals(artifactId)) {
+        if (isDesktopRuntimeAggregator(groupId, artifactId)) {
             return true;
         }
         if (dependencyTrail == null) {
@@ -1526,19 +1663,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
 
-        // Each staged jar records the inputs it was merged from. A cached jar is reused only
-        // when those match the current set: timestamps alone cannot see a change in what the
-        // plugin excludes, so a jar staged before an exclusion was added (the ~157 MB of
-        // ffmpeg natives from #5380) would otherwise be reused, and uploaded, forever. A jar
-        // with no record is not reused either -- one written by an older plugin cannot be told
-        // apart from a stale one.
+        // Each staged jar this mojo writes records the inputs it was merged from. Timestamps
+        // alone cannot see a change in what the plugin excludes, so a jar staged before an
+        // exclusion was added (the ~157 MB of ffmpeg natives from #5380) would otherwise be
+        // reused, and uploaded, for as long as nothing on the classpath was rebuilt.
         File stagedInputsFile = new File(jarWithDependencies.getPath() + ".inputs");
         String stagedInputs = describeStagedInputs(jarsToMerge);
         if (jarWithDependencies.exists()) {
             getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
-            // readTextFileOrNull trims, so compare trimmed.
-            if (!stagedInputs.trim().equals(readTextFileOrNull(stagedInputsFile))) {
-                getLog().debug("Jar file was staged from different inputs. "+jarWithDependencies+". Deleting");
+            long sessionStart = getSession() != null && getSession().getRequest() != null
+                    && getSession().getRequest().getStartTime() != null
+                    ? getSession().getRequest().getStartTime().getTime() : Long.MAX_VALUE;
+            if (!mayReuseStagedJar(readTextFileOrNull(stagedInputsFile), stagedInputs,
+                    jarWithDependencies.lastModified(), sessionStart)) {
+                getLog().debug("Jar file was not staged from these inputs. "+jarWithDependencies+". Deleting");
                 jarWithDependencies.delete();
             } else {
                 for (String artifact : cpElements) {

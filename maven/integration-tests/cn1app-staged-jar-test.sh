@@ -124,30 +124,37 @@ EOF
 done <<< "$PAIRS"
 
 # A cached staged jar from before a fix must not be reused. Projects hit by #5380
-# already hold a ffmpeg-filled jar from their failed build, newer than every
-# classpath entry, and a plugin update changes no classpath entry -- so a
-# timestamp-only cache would upload it again. Plant such a jar (no record of its
-# inputs, newest file in the tree) and require restaging to replace it.
+# already hold a ffmpeg-filled jar from their failed build, and a plugin update
+# changes nothing on their classpath, so a timestamp-only cache would upload it
+# again. Reproduce that faithfully: install the parent and common, plant a stale
+# jar newer than all of them with no record of its inputs, then invoke cn1:build
+# directly -- no package phase, so nothing is rebuilt and the timestamp check
+# cannot be what replaces it. Only the record of the jar's inputs can.
 STALE_TARGET=mac-os-x-desktop
 STALE_JAR=$(find . -path "*/target/*-$STALE_TARGET-jar-with-dependencies.jar" | head -1)
 if [ -z "$STALE_JAR" ]; then
   echo "FAIL: no $STALE_TARGET jar to plant a stale copy over."
   FAILED=1
+elif ! mvn -B -ntp -q -pl .,common install -DskipTests -Dcodename1.platform=javase \
+    < /dev/null > "$SCRIPTPATH/build/$APP-install-common.log" 2>&1; then
+  echo "FAIL: could not install the parent and common for the stale-jar check. See $APP-install-common.log."
+  FAILED=1
 else
+  # Mtime resolution is a second on some filesystems: be strictly newer than the install.
+  sleep 1
   rm -f "$STALE_JAR.inputs"
   python3 - "$STALE_JAR" <<'EOF2'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1], "w") as z:
     z.writestr("org/bytedeco/ffmpeg/linux-x86_64/libavcodec.so", b"stale")
 EOF2
-  # Newer than anything this run can produce. A plain touch is not enough:
-  # package rewrites theme.res, the common jar comes out newer, and the
-  # timestamp check alone would replace the jar -- passing without ever
-  # exercising the case where nothing was rebuilt.
-  touch -t 209901010000 "$STALE_JAR"
-  mvn -B -ntp package -DskipTests -Dcodename1.platform=javase -Dcodename1.buildTarget=$STALE_TARGET \
-    -Dcodename1.stageOnly=true < /dev/null > "$SCRIPTPATH/build/$APP-stage-stale.log" 2>&1 || true
-  if python3 -c 'import sys, zipfile; sys.exit(0 if any(n.endswith(".so") for n in zipfile.ZipFile(sys.argv[1]).namelist()) else 1)' "$STALE_JAR"; then
+  sleep 1
+  STALE_LOG="$SCRIPTPATH/build/$APP-stage-stale.log"
+  if ! mvn -B -ntp -pl javase -Dcodename1.platform=javase -Dcodename1.buildTarget=$STALE_TARGET \
+      -Dcodename1.stageOnly=true cn1:build < /dev/null > "$STALE_LOG" 2>&1; then
+    echo "FAIL: restaging $STALE_TARGET over a stale jar did not complete. See $STALE_LOG."
+    FAILED=1
+  elif python3 -c 'import sys, zipfile; sys.exit(0 if any(n.endswith(".so") for n in zipfile.ZipFile(sys.argv[1]).namelist()) else 1)' "$STALE_JAR"; then
     echo "FAIL: a stale staged jar was reused; restaging must replace a jar it did not record."
     FAILED=1
   else

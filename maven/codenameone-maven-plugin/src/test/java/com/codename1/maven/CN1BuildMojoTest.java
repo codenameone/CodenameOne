@@ -28,8 +28,10 @@ import org.junit.Test;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -134,6 +136,39 @@ public class CN1BuildMojoTest {
         // Another com.codenameone artifact whose name merely starts the same way.
         assertFalse(CN1BuildMojo.isDesktopRuntimeBinary("com.codenameone", "cn1-binaries-javase-extra",
                 Arrays.asList("com.codenameone:cn1-binaries-javase-extra:jar:1.0")));
+    }
+
+    @Test
+    public void keepsADesktopRuntimeArtifactSomethingElseNeeds() {
+        // Maven kept the aggregator's trail for ffmpeg, but an application library needs
+        // the same artifact through a longer path: it must stay in the upload.
+        String ffmpeg = CN1BuildMojo.dependencyKey("org.bytedeco", "ffmpeg", "windows-x86_64");
+        Set<String> needed = new HashSet<String>(Arrays.asList(ffmpeg));
+        assertFalse(CN1BuildMojo.isStrippedAsDesktopRuntime(ffmpeg, needed));
+        // Needed by nothing else: stripped.
+        String linux = CN1BuildMojo.dependencyKey("org.bytedeco", "ffmpeg", "linux-x86_64");
+        assertTrue(CN1BuildMojo.isStrippedAsDesktopRuntime(linux, needed));
+        // Classifier is part of the identity.
+        assertTrue(CN1BuildMojo.isStrippedAsDesktopRuntime(
+                CN1BuildMojo.dependencyKey("org.bytedeco", "ffmpeg", null), needed));
+        // Unknown: keep everything rather than risk shipping without needed classes.
+        assertFalse(CN1BuildMojo.isStrippedAsDesktopRuntime(linux, null));
+    }
+
+    @Test
+    public void reusesAStagedJarOnlyWhenItsInputsMatch() {
+        long start = 1000000L;
+        assertTrue(CN1BuildMojo.mayReuseStagedJar("/a.jar\n/b.jar", "/a.jar\n/b.jar\n", 5, start));
+        assertFalse(CN1BuildMojo.mayReuseStagedJar("/a.jar\n/ffmpeg.jar", "/a.jar\n", start + 5, start));
+    }
+
+    @Test
+    public void honoursAnUnrecordedJarOnlyWhenThisRunProducedIt() {
+        long start = 1000000L;
+        // The project's own pom wrote it during this run: a deliberate override.
+        assertTrue(CN1BuildMojo.mayReuseStagedJar(null, "/a.jar\n", start + 1, start));
+        // Left over from before this run, e.g. by a failed build on an older plugin.
+        assertFalse(CN1BuildMojo.mayReuseStagedJar(null, "/a.jar\n", start - 1, start));
     }
 
     @Test
