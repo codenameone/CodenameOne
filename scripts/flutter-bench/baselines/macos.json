@@ -1,0 +1,20 @@
+{
+  "codenameone": {
+    "code_bytes": 73212360,
+    "cold_start_ms": 465.0571346282959,
+    "idle_memory_bytes": 106220748,
+    "install_bytes": 168810517,
+    "wire_bytes": 109700753
+  },
+  "generated_at": "2026-09-22T21:44:43Z",
+  "notes": "cold_start_ms is recorded but deliberately NOT gated: it has no tolerance, which check_regressions reads as ungated. On the hosted macOS runner one run spread Codename One's start-up from 465 to 2588 ms at a host load of 12-32, so any band wide enough not to fire on that noise would catch nothing. Sizes and memory at rest (101.3-111.3 MB in the same run) are stable and gated.",
+  "platform": "macos",
+  "recorded_from": "flutter-bench run 35778830308 (commit 991df0b889)",
+  "schema_version": 1,
+  "tolerances": {
+    "code_bytes": 0.0,
+    "idle_memory_bytes": 0.15,
+    "install_bytes": 0.0,
+    "wire_bytes": 0.0
+  }
+}

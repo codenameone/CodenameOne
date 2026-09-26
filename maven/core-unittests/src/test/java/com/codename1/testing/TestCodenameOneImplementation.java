@@ -1634,6 +1634,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         incomingConnections.clear();
         resourceAsStreams.clear();
         deviceDensity = Display.DENSITY_MEDIUM;
+        // Restored for the same reason the density above is, and it is the one
+        // device-shape flag whose leak is SILENT. A test that leaves this false
+        // does not fail; the next test asking for COMMAND_BEHAVIOR_BUTTON_BAR is
+        // rewritten to COMMAND_BEHAVIOR_SOFTKEY by
+        // CodenameOneImplementation.setCommandBehavior, its commands are drawn as
+        // soft buttons, and it fails on a missing button bar with nothing naming
+        // the cause. That is exactly how MenuBarDialogSideMenuTest failed in CI
+        // and passed on every developer machine: surefire's filesystem run order
+        // differs per checkout, so whether the leaking test ran first was luck.
+        touchDevice = true;
         displayWidth = 1080;
         displayHeight = 1920;
         desktopSize = new Dimension(displayWidth, displayHeight);

@@ -1,0 +1,73 @@
+{
+ "schema_version": 1,
+ "what": "The same application, built by two toolchains, measured on the same machine.",
+ "why_not_public": "The Port Status page is contractually free of competitor comparisons; scripts/website/validate_port_status.mjs fails the site build on the mention. This dataset is project evidence, gated in CI, and never rendered.",
+ "method": "Release/AOT on both sides. Runs are interleaved and best-of-N, with the machine's load average recorded, because a ratio taken under different load twice is not a ratio. The start-up clock runs OUTSIDE both processes: each build prints one marker on its first painted frame and the harness times from launch to that line. Every metric is recorded, including the ones Codename One loses.",
+ "harness": "benchcn1/tools/bench_compare.py",
+ "metrics": {
+  "install_bytes": "Bytes the installed application occupies. Lower is better.",
+  "code_bytes": "Bytes of executable payload — binaries and frameworks, excluding the artwork both builds bundle identically. Lower is better.",
+  "wire_bytes": "Bytes a user downloads: the application compressed. Lower is better.",
+  "cold_start_ms": "Milliseconds from launching the process to its first painted frame. Lower is better.",
+  "idle_rss_bytes": "Physical footprint once the application has settled -- vmmap's `Physical footprint:`, the figure Apple's own memory limits are enforced against. NOT `ps rss`: RSS counts clean, shared, file-backed framework pages, and reported 151MB, 207MB and 219MB for one unchanged binary in one afternoon. Lower is better."
+ },
+ "platforms": {
+  "macos": {
+   "status": "measured",
+   "competitor": "Flutter 3.35.4, AOT, release",
+   "app": "the Flutter Gallery (dev/integration_tests/new_gallery) — the same 159 Dart files on both sides",
+   "configuration": "Codename One: ParparVM compiled to a native arm64 Mac Catalyst binary at -O3, no JVM. Flutter: flutter build macos --release. Both windows pinned to 1024x768 — window area drives GPU surface memory, so a memory comparison across different window sizes is meaningless. Codename One is on Mac CATALYST (UIKit for Mac); the Flutter build is native AppKit. A startup profile shows a third of the sampled main-thread start-up inside UIKitCore's _initiateIOSMacConnections -- system appearance bridging, CoreUI theme stores, key-command handler installation -- which an AppKit process never pays. That is a target difference, not a Codename One inefficiency, and it is a reason to treat iOS (both sides on UIKit) as the like-for-like comparison.",
+   "host": "Darwin 25.5.0 arm64",
+   "load_average": "{ 11.41 33.61 27.53 }",
+   "runs": 7,
+   "measured_at": "2026-08-23T19:21:02Z",
+   "harness": "benchcn1/tools/bench_compare.py",
+   "metrics": {
+    "install_bytes": {
+     "codenameone": 111599786,
+     "competitor": 146100418
+    },
+    "code_bytes": {
+     "codenameone": 35571432,
+     "competitor": 50212416
+    },
+    "wire_bytes": {
+     "codenameone": 80594389,
+     "competitor": 97936527
+    },
+    "cold_start_ms": {
+     "codenameone": 186,
+     "competitor": 161
+    },
+    "idle_rss_bytes": {
+     "codenameone": 121739673,
+     "competitor": 91855257
+    }
+   },
+   "losses": "Codename One is behind on cold start (272ms vs 186ms) and level on memory (144.3MB vs 139.5MB, a 3% gap). Both were far worse before a Codename One core fix landed: caching the prefixed (pressed/disabled) component styles in UIManager, which every component had been re-parsing from the theme. That took component creation from 131ms to 17ms and resident memory from 247MB to 144MB.",
+   "cold_start_decomposition": "Timed to a COMPLETE first screen on both sides, not to Flutter's warm-up frame: runApp schedules a frame before the root widget attaches, so Flutter's literal first frame paints 26 elements in ~10ms and comparing against it measures nothing. The reference build prints FIRSTCONTENT once its element tree stops growing (3003 elements) and that is what is timed. Codename One builds synchronously, so its first frame is already its content frame.",
+   "memory_note": "Physical footprint, not RSS -- the metric changed on 2026-08-23 and the change flips nothing: Codename One loses on memory under either. RSS was abandoned because it was not reproducible (151/207/219MB for one unchanged binary in one afternoon), while footprint for that state read 169.7MB every time.\\n\\nThe run-to-run BIMODALITY that made these numbers unquotable for most of this work is gone. It was the rounded image copies: the runtime rounded a picture's corners by reading it back with getRGB, clearing the alpha outside the arcs and uploading a SECOND image, 32 times during the first frame. That churn drove the start-up peak to ~660MB, and since libmalloc here never returns the pages a peak touched, where a run's peak landed decided what it kept -- anywhere from 121MB to 274MB. Rounding in the fragment shader instead removed the copies entirely (createImageFromARGBImpl: 32 calls -> 0, the CG raster region gone from the process, MALLOC_SMALL (empty) 46MB -> 464KB), took the peak to ~546MB, and four consecutive launches now settle at 154.9, 160.0, 160.0, 160.5MB.\\n\\nWhat remains is graphics buffering: an offscreen screenTexture for partial repaint blitted into CAMetalLayer drawables, against a competing toolchain that renders into one surface it owns.",
+   "note": "Codename One wins all three size measures and loses cold start and memory. Memory went from 0.45x of the competitor's figure to 0.76x across this work, on the tree AFTER merging origin/master (four collector commits under issue #5537); every macOS figure recorded before that merge is void.\\n\\nLanded against the two losses: a LAZY string constant pool in ParparVM (initConstantPool was materialising every string literal before main -- 38,238 of 113,824 live objects were Strings; invokeMain 119ms -> 46ms); a fix for an unbounded leak in the collector's force-visited side table, and a second fix keeping that table's sweep out of the allocator after it cost 36% of the objectAllocation benchmark; an image LOCK so an EncodedImage on screen is not decoded, collected and decoded again frame after frame; dropping the platform's decoded copy of every EncodedImage, which the encoded bytes already make recoverable; and rounding image corners in the fragment shader rather than building a rounded copy of the bitmap.\\n\\niOS is deliberately NOT measured: the competitor's iOS build is always debug-built, so a release-vs-debug comparison would be meaningless in Codename One's favour."
+  },
+  "ios": {
+   "status": "pending",
+   "blocked_on": "needs the iOS build rebuilt and driven on a device or simulator"
+  },
+  "android": {
+   "status": "pending",
+   "blocked_on": "needs an APK and a Flutter AOT build measured on the same device"
+  },
+  "windows": {
+   "status": "pending",
+   "blocked_on": "cannot be built on this machine; needs a CI runner"
+  },
+  "linux": {
+   "status": "pending",
+   "blocked_on": "cannot be built on this machine; needs a CI runner"
+  },
+  "web": {
+   "status": "pending",
+   "blocked_on": "the JavaScript port is measured for the record but is not gated; a loss here is expected and accepted"
+  }
+ }
+}

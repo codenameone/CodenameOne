@@ -57,7 +57,13 @@ def stamp(value):
     return parsed
 
 
-def publish(report, repo):
+def publish(report, repo, target=None, message=None):
+    """Writes `report` to `target` on the data branch, newest generated_at wins.
+
+    `target` defaults to the per-port file, ports/<port>.json. Other data the
+    website reads from the same branch (the Flutter benchmark) passes its own
+    path and reuses this compare-and-swap rather than a second copy of it.
+    """
     branch = "port-status-data"
     root = f"repos/{repo}"
     ref = f"{root}/git/ref/heads/{branch}"
@@ -75,11 +81,14 @@ def publish(report, repo):
                 raise
             api(ref)  # A concurrent creator must actually have created the branch.
 
-    target = f"ports/{report['port']}.json"
+    if target is None:
+        target = f"ports/{report['port']}.json"
+    if message is None:
+        message = f"Update {report['port']} compliance status"
     endpoint = f"{root}/contents/{target}"
     generated = stamp(report["generated_at"])
     for attempt in range(3):
-        payload = {"message": f"Update {report['port']} compliance status", "branch": branch,
+        payload = {"message": message, "branch": branch,
                    "content": base64.b64encode(json.dumps(report).encode()).decode()}
         try:
             existing = api(f"{endpoint}?ref={branch}")

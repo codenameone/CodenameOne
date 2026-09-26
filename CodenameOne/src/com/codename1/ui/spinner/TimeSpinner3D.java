@@ -36,13 +36,24 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/// Allows selecting a time of day either in 24 hour batches or AM/PM format.
+/// Hour and minute wheels selecting a time of day, in either 24 hour or AM/PM
+/// form according to `#setShowMeridiem(boolean)`.
 ///
-/// If `#setDurationMode(boolean)` is true then this will allow
-/// users to set a duration in hours and minutes.
+/// The body of a lightweight [Picker][com.codename1.ui.spinner.Picker] of type
+/// time, and usable on its own as an ordinary `Container`. The minute wheel
+/// can step by more than one minute, which is what a picker offering quarter
+/// hours uses.
+///
+/// With `#setDurationMode(boolean)` set it selects a LENGTH of time instead,
+/// and the meridiem is not shown; prefer
+/// [DurationSpinner3D][com.codename1.ui.spinner.DurationSpinner3D] for that,
+/// which also offers a day wheel.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
+/// the time as minutes since midnight, as an `Integer`.
 ///
 /// @author Steve Hannah
-class TimeSpinner3D extends Container implements InternalPickerWidget {
+public class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     static final int DEFAULT_MINUTE_STEP = 5;
     private Spinner3D hour;

@@ -48,6 +48,7 @@ public class Motion {
     private static final int COLOR_LINEAR = 5;
     private static final int EXPONENTIAL_DECAY = 6;
     private static final int CRITICAL_DAMPED_SPRING = 7;
+    private static final int THREE_POINT_CUBIC = 8;
     private static boolean slowMotion;
     private final int[] previousLastReturnedValue = new int[3];
     private final long[] previousLastReturnedValueTime = new long[3];
@@ -62,6 +63,14 @@ public class Motion {
     private int lastReturnedValue;
     private long currentMotionTime = -1;
     private long previousCurrentMotionTime = -1;
+    /// The joint and the second segment's control points of a three-point cubic.
+    private float midX;
+    private float midY;
+    private float q0;
+    private float q1;
+    private float q2;
+    private float q3;
+
     private float p0;
     private float p1;
     private float p2;
@@ -162,6 +171,53 @@ public class Motion {
         m.p1 = p1;
         m.p2 = p2;
         m.p3 = p3;
+        return m;
+    }
+
+    /// A curve made of TWO cubic beziers joined at a point, which a single cubic cannot
+    /// express.
+    ///
+    /// A plain `cubic-bezier` is monotonic in a way some motion is not: it cannot
+    /// accelerate hard, ease, and then ease out again, because it has only two control
+    /// points to spend. Curves that do this are specified as a pair of beziers meeting at
+    /// a midpoint, each with its own controls, and the joint is where the character of
+    /// the motion changes.
+    ///
+    /// The segments are evaluated in their own normalized space and rescaled, so each
+    /// half is an ordinary CSS cubic-bezier and the two meet exactly at the midpoint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the initial value
+    ///
+    /// - `destinationValue`: the value at the end of the motion
+    ///
+    /// - `duration`: the motion duration in milliseconds
+    ///
+    /// - `a1X`, `a1Y`, `b1X`, `b1Y`: control points of the first segment
+    ///
+    /// - `midX`, `midY`: the point the two segments meet at
+    ///
+    /// - `a2X`, `a2Y`, `b2X`, `b2Y`: control points of the second segment
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createThreePointCubicMotion(int sourceValue, int destinationValue,
+            int duration, float a1X, float a1Y, float b1X, float b1Y,
+            float midX, float midY, float a2X, float a2Y, float b2X, float b2Y) {
+        Motion m = new Motion(sourceValue, destinationValue, duration);
+        m.motionType = THREE_POINT_CUBIC;
+        m.p0 = a1X;
+        m.p1 = a1Y;
+        m.p2 = b1X;
+        m.p3 = b1Y;
+        m.midX = midX;
+        m.midY = midY;
+        m.q0 = a2X;
+        m.q1 = a2Y;
+        m.q2 = b2X;
+        m.q3 = b2Y;
         return m;
     }
 
@@ -485,6 +541,73 @@ public class Motion {
         return x;
     }
 
+    private int getThreePointCubicValue() {
+        if (isFinished()) {
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = Math.min((int) getCurrentMotionTime(), (int) totalTime);
+        if (currentTime < 0f) {
+            currentTime = 0f;
+        }
+        float t = currentTime / totalTime;
+
+        // Each segment is solved in its OWN normalized space: the controls are expressed
+        // relative to the segment's start and divided by its extent, so the solver below
+        // sees an ordinary cubic-bezier from (0,0) to (1,1). The result is then scaled
+        // back, which is what makes the two halves meet exactly at the midpoint instead
+        // of stepping there.
+        boolean first = t < midX;
+        float scaleX = first ? midX : 1f - midX;
+        float scaleY = first ? midY : 1f - midY;
+        float value;
+        if (scaleX <= 0f) {
+            // A segment with no duration is only ever reached at its end.
+            value = first ? midY : 1f;
+        } else if (scaleY <= 0f) {
+            // No vertical extent -- the midpoint lies on the top or bottom edge -- so the
+            // Y axis cannot be normalized. Substituting linear progress here made the
+            // value run toward t and then jump back at the join. X still normalizes, so
+            // solve for the curve parameter as usual and evaluate this segment's Y cubic
+            // from its real endpoints and controls.
+            float scaledT = (t - (first ? 0f : midX)) / scaleX;
+            float x1 = first ? p0 / scaleX : (q0 - midX) / scaleX;
+            float x2 = first ? p2 / scaleX : (q2 - midX) / scaleX;
+            float u = solveBezierForT(scaledT, x1, x2);
+            float y0 = first ? 0f : midY;
+            float y3 = first ? midY : 1f;
+            float c1 = first ? p1 : q1;
+            float c2 = first ? p3 : q3;
+            float inv = 1f - u;
+            value = inv * inv * inv * y0 + 3f * inv * inv * u * c1 + 3f * inv * u * u * c2 + u * u * u * y3;
+        } else {
+            float scaledT = (t - (first ? 0f : midX)) / scaleX;
+            float x1;
+            float y1;
+            float x2;
+            float y2;
+            if (first) {
+                x1 = p0 / scaleX;
+                y1 = p1 / scaleY;
+                x2 = p2 / scaleX;
+                y2 = p3 / scaleY;
+            } else {
+                x1 = (q0 - midX) / scaleX;
+                y1 = (q1 - midY) / scaleY;
+                x2 = (q2 - midX) / scaleX;
+                y2 = (q3 - midY) / scaleY;
+            }
+            float u = solveBezierForT(scaledT, x1, x2);
+            value = bezierAxis(u, y1, y2) * scaleY + (first ? 0f : midY);
+        }
+
+        float dis = Math.abs(destinationValue - sourceValue);
+        if (destinationValue > sourceValue) {
+            return sourceValue + (int) (value * dis);
+        }
+        return sourceValue - (int) (value * dis);
+    }
+
     private int getCubicValue() {
         //make sure we reach the destination value.
         if (isFinished()) {
@@ -630,6 +753,9 @@ public class Motion {
                 break;
             case CUBIC:
                 lastReturnedValue = getCubicValue();
+                break;
+            case THREE_POINT_CUBIC:
+                lastReturnedValue = getThreePointCubicValue();
                 break;
             case FRICTION:
                 lastReturnedValue = getFriction();

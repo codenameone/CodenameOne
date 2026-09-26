@@ -1,0 +1,12 @@
+2
+true
+true
+3.0
+3
+true
+1.5
+ababab
+abab
+fixed length
+fixed length
+2

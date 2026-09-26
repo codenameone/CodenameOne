@@ -190,3 +190,8 @@ cn1-build-hints.json
 # Concatenated CSS the native-theme build feeds the compiler. Regenerated on
 # every run; the parts under native-themes/<theme>/*.css are the source.
 native-themes/*/target/
+
+# Resolved from the port-status-data branch during the website build
+# (scripts/website/sync_port_status_reports.sh); never committed, because
+# there is no checked-in fallback for it.
+docs/website/data/port_status_flutter_benchmark.json

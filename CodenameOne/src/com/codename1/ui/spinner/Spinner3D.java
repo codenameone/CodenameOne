@@ -1,8 +1,26 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
+
 package com.codename1.ui.spinner;
 
 import com.codename1.l10n.DateFormat;
@@ -27,12 +45,28 @@ import java.util.Date;
 
 import static com.codename1.ui.ComponentSelector.$;
 
-/// A spinner widget that tries to look and feel like the iOS picker.
+/// A scrolling wheel of values styled after the iOS picker, and the body of a
+/// lightweight [Picker][com.codename1.ui.spinner.Picker].
 ///
-/// This is used by the Picker widget when in lightweight mode.
+/// Rows come from a [ListModel][com.codename1.ui.list.ListModel], so the
+/// contents can be anything a model can produce; the selection is whatever
+/// that model holds at the selected index. `Spinner3D` is the plain-list
+/// member of the family, beside
+/// [DateSpinner3D][com.codename1.ui.spinner.DateSpinner3D],
+/// [TimeSpinner3D][com.codename1.ui.spinner.TimeSpinner3D],
+/// [DateTimeSpinner3D][com.codename1.ui.spinner.DateTimeSpinner3D] and
+/// [DurationSpinner3D][com.codename1.ui.spinner.DurationSpinner3D].
+///
+/// It is an ordinary `Container`, so it can be added to a form directly rather
+/// than shown through a picker dialog -- which is why it is public. Use
+/// `Picker` instead when you want the platform's native picker where one
+/// exists, because a `Picker` falls back to this only in lightweight mode.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
+/// the selected model element.
 ///
 /// @author Steve Hannah
-class Spinner3D extends Container implements InternalPickerWidget {
+public class Spinner3D extends Container implements InternalPickerWidget {
     private final SpinnerNode root;
 
     private final ScrollingContainer scroller;

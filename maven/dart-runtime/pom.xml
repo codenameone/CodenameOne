@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-dart-runtime</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-dart-runtime</name>
+    <description>
+        Java implementation of dart:core / dart:math semantics used by Dart
+        code transpiled to Java by the Codename One Dart transpiler. App-grade
+        code: depends only on codenameone-core and compiles to Java 17
+        bytecode, which all Codename One targets accept.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- source/target are set explicitly, not just release: the parent's
+                         pluginManagement pins an explicit <source>1.8</source>, and an
+                         inherited explicit value beats this module's maven.compiler.*
+                         properties, so release alone leaves javac on -source 8. -->
+                    <source>17</source>
+                    <target>17</target>
+                    <release>17</release>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- The framework reactor conventionally runs on JDK 8; when
+             JAVA17_HOME is set (tools/env.sh) fork compilation and test
+             execution out to it so this Java 17 module still builds. -->
+        <profile>
+            <id>java17-fork</id>
+            <activation>
+                <property>
+                    <name>env.JAVA17_HOME</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <!-- source/target are set explicitly, not just release: the parent's
+                         pluginManagement pins an explicit <source>1.8</source>, and an
+                         inherited explicit value beats this module's maven.compiler.*
+                         properties, so release alone leaves javac on -source 8. -->
+                    <source>17</source>
+                    <target>17</target>
+                    <release>17</release>
+                            <fork>true</fork>
+                            <executable>${env.JAVA17_HOME}/bin/javac</executable>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <jvm>${env.JAVA17_HOME}/bin/java</jvm>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

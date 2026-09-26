@@ -371,6 +371,20 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void intArithmeticWrapsAt32BitsLikeJava(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsIntOverflowApp.java", "JsIntOverflowApp");
+
+        // 127 = every check in the fixture. A missing bit names the operation:
+        // 1 IMUL past 2^53, 2/4 IADD/ISUB overflow compared, 8 widened, 16 printed,
+        // 32 an exact 2^32 product, 64 vm/benchmarks' intArithmetic loop.
+        assertEquals(127, result.result,
+                "int arithmetic must wrap at 32 bits as Java's does. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
     @Test
     void newArrayUsesJavaDefaultsForPrimitiveReferenceAndNestedArrays() throws Exception {
         Path runtime = Paths.get("..", "ByteCodeTranslator", "src", "javascript", "parparvm_runtime.js")

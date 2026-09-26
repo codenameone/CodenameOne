@@ -154,6 +154,9 @@ public final class RoundBorder extends Border {
     /// square. This is ignored when the rectangle mode is false
     private boolean onlyRightRounded;
     private boolean uiid;
+    /// True when the shape is drawn straight onto the Graphics rather than
+    /// through a cached offscreen image. Off by default; see `directPaint`.
+    private boolean directPaint;
 
     /// This is useful for showing an Uber like stroke effect progress bar
     private int strokeAngle = 360;
@@ -525,6 +528,44 @@ public final class RoundBorder extends Border {
         return onlyRightRounded;
     }
 
+    /// Draws the shape straight onto the Graphics instead of through a cached
+    /// offscreen image.
+    ///
+    /// OFF by default, and that default is a compatibility decision rather
+    /// than a preference. Drawing directly anti-aliases the outline against
+    /// whatever is really behind it; the image path anti-aliases against
+    /// transparency and then composites the result, so alpha is quantised
+    /// twice. The two agree to within a fraction of a pixel along the edge --
+    /// invisible to a person, and still a difference a screenshot test
+    /// measures. Turning it on everywhere would move pixels in the UI of every
+    /// application that already uses this border.
+    ///
+    /// Turn it on for a shape whose SIZE ANIMATES, which is where the image
+    /// path is not merely slower but unusable: the cache is keyed by size, so
+    /// a growing circle misses it on every frame and allocates, fills and
+    /// discards a surface as large as the component each time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `directPaint`: true to draw without an offscreen image
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
+    public RoundBorder directPaint(boolean directPaint) {
+        this.directPaint = directPaint;
+        return this;
+    }
+
+    /// Whether this border draws without an offscreen image.
+    ///
+    /// #### Returns
+    ///
+    /// True when direct painting is enabled.
+    public boolean isDirectPaint() {
+        return directPaint;
+    }
+
 
     private Image createTargetImage(Component c, int w, int h, boolean fast) {
         Image target = ImageFactory.createImage(c, w, h, 0);
@@ -618,12 +659,67 @@ public final class RoundBorder extends Border {
         return target;
     }
 
+    /// Whether this border can be drawn straight onto the Graphics instead of
+    /// through an offscreen image.
+    ///
+    /// Two configurations genuinely need the image and are excluded. A shadow is
+    /// built by overdrawing the shape once per spread step and then blurring the
+    /// result, which is a read-back of what has been drawn so far and therefore
+    /// has to own its surface. The `uiid` mode paints the COMPONENT's background
+    /// painter through a shape clip, swapping the component's border out while it
+    /// does so, and that re-entry is only safe against a surface of its own.
+    ///
+    /// Everything else is a fill and an optional stroke of a circle or a pill in
+    /// this border's own colours -- `fillShape` never reads the destination -- so
+    /// drawing it directly produces the same pixels without allocating anything.
+    private boolean canPaintDirectly(Graphics g) {
+        return directPaint && shadowOpacity <= 0 && !uiid && g.isAntiAliasingSupported();
+    }
+
+    /// Draws the shape onto `g` with the same geometry `createTargetImage` would
+    /// have drawn into an image of the component's size.
+    ///
+    /// The clip reproduces the one the image gave for free: a stroke is centred
+    /// on the outline, so half of it falls outside the box and used to be cropped
+    /// by the image's own bounds.
+    private void paintDirectly(Graphics g, int x, int y, int w, int h) {
+        int priorColor = g.getColor();
+        int priorAlpha = g.getAlpha();
+        boolean priorAntiAliased = g.isAntiAliased();
+        g.pushClip();
+        try {
+            g.clipRect(x, y, w, h);
+            g.translate(x, y);
+            try {
+                g.setAntiAliased(true);
+                fillShape(g, color, opacity, w, h, true);
+            } finally {
+                g.translate(-x, -y);
+            }
+        } finally {
+            g.popClip();
+            g.setAntiAliased(priorAntiAliased);
+            g.setColor(priorColor);
+            g.setAlpha(priorAlpha);
+        }
+    }
+
     @Override
     public void paintBorderBackground(Graphics g, final Component c) {
         final int w = c.getWidth();
         final int h = c.getHeight();
         int x = c.getX();
         int y = c.getY();
+        if (w > 0 && h > 0 && canPaintDirectly(g)) {
+            // NO IMAGE, when the caller has asked for it. The cached path
+            // allocates a mutable image the size of the component and rebuilds
+            // it on every size change, which is ruinous for a shape that
+            // ANIMATES its size: a coach-mark circle growing to 1618x1618 over
+            // half a second throws away a 10MB surface per frame and queues a
+            // refinement pass behind each one. A flat fill needs none of that.
+            paintDirectly(g, x, y, w, h);
+            return;
+        }
         if (w > 0 && h > 0) {
             Object k = c.getClientProperty(CACHE_KEY + instanceVal);
             if (k instanceof CacheValue) {

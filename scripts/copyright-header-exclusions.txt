@@ -24,6 +24,7 @@ Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.js | videojs-
 Ports/JavaScriptPort/src/main/webapp/sw.js | Codename One service-worker adapter containing the UpUp 1.0.0 MIT-licensed service worker
 vm/JavaAPI/src/java/util/TimeZone.java | Apache Harmony source retaining its original Apache-2.0 notice
 CodenameOne/src/com/codename1/maps/MapComponent.java | Itiner.pl contribution retaining its original copyright line above the standard GPLv2 + Classpath Exception text
+CodenameOne/src/com/codename1/l10n/SimpleDateFormat.java | Eric Coolman contribution retaining its original copyright line above the standard GPLv2 + Classpath Exception text
 vm/ByteCodeTranslator/src/cn1_sqlite3.h | SQLite3 Multiple Ciphers public header, upstream MIT notice over public-domain SQLite
 vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h | SQLite3 Multiple Ciphers amalgamation, upstream MIT notice over public-domain SQLite
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers WebAssembly loader, Emscripten generated, MIT over public-domain SQLite
@@ -44,3 +45,19 @@ CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman co
 CodenameOne/src/com/codename1/processing/TextEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/ContainsEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/XMLContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+
+# The transpiler's golden fixtures are its EXPECTED OUTPUT, compared byte for
+# byte against what a run emits. A header here is not a licence statement about
+# the fixture, it is an assertion that the transpiler emits one -- and it does
+# not, because the file it emits is generated into a build directory and is
+# nobody's source. Adding one breaks the comparison it exists to make.
+maven/dart-transpiler/src/test/resources/golden/counter/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/MyHomePage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/counter/expected/_MyHomePageState.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoApp.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/DemoPage.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
+maven/dart-transpiler/src/test/resources/golden/m2demo/expected/_DemoPageState.java | Transpiler golden fixture: expected generated output, compared byte for byte

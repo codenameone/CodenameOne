@@ -119,6 +119,8 @@ public class SimpleDateFormat extends DateFormat {
     private String pattern;
     /// The parsed pattern
     private List<String> patternTokens;
+    /// The zone fields are formatted in; null means the device's default zone.
+    private TimeZone timeZone;
 
     /// Construct a SimpleDateFormat with no pattern.
     public SimpleDateFormat() {
@@ -242,7 +244,31 @@ public class SimpleDateFormat extends DateFormat {
     public Object clone() {
         SimpleDateFormat sdf = new SimpleDateFormat(pattern);
         sdf.setDateFormatSymbols(dateFormatSymbols);
+        sdf.timeZone = timeZone;
         return sdf;
+    }
+
+    /// Sets the time zone the date's fields are formatted in, as `java.text.DateFormat`
+    /// does. Without one the device's default zone is used.
+    ///
+    /// A formatter fixed to the device zone cannot print an instant's fields in any other:
+    /// a UTC time had to be moved onto a local one first, and inside a daylight-saving gap
+    /// that local time does not exist, so its hour came out shifted.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zone`: the zone, or null for the device's default
+    public void setTimeZone(TimeZone zone) {
+        this.timeZone = zone;
+    }
+
+    /// The zone set with `setTimeZone`, or the device's default when none was.
+    ///
+    /// #### Returns
+    ///
+    /// the zone fields are formatted in
+    public TimeZone getTimeZone() {
+        return timeZone != null ? timeZone : TimeZone.getDefault();
     }
 
     /*
@@ -274,8 +300,8 @@ public class SimpleDateFormat extends DateFormat {
         if (pattern == null) {
             return super.format(source, toAppendTo);
         }
-        // format based on local timezone
-        Calendar calendar = Calendar.getInstance(TimeZone.getDefault());
+        // format in the configured zone, the device's by default
+        Calendar calendar = Calendar.getInstance(getTimeZone());
         calendar.setTime(source);
         List<String> pattern = getPatternTokens();
         for (String token : pattern) {

@@ -3495,6 +3495,13 @@ public abstract class Executor {
         return false;
     }
 
+    /// True for an application-archive entry that exists only for the build and must
+    /// not reach the installed application. See unzip().
+    static boolean isBuildTimeOnlyEntry(String entryName) {
+        String n = entryName.startsWith("/") ? entryName.substring(1) : entryName;
+        return n.startsWith("META-INF/dart/");
+    }
+
     public void unzip(InputStream source, File classesDir, File resDir, File sourceDir, File libsDir, File xmlDir) throws IOException {
         try {
             BufferedOutputStream dest = null;
@@ -3577,6 +3584,16 @@ public abstract class Executor {
                     while ((count = zis.read(data, 0, data.length)) != -1) {
                         libTos.write(data, 0, count);
                     }
+                    continue;
+                }
+
+                // Build-time metadata, never shipped. META-INF/dart/*.dart are the
+                // Dart API declarations a runtime jar (flutter-runtime) carries for
+                // the transpiler, which reads them from the jar on its own classpath
+                // long before this point. The application jar merges every
+                // dependency, so without this they were copied into every bundle on
+                // every platform -- 22 files of Dart source in a Flutter app.
+                if (isBuildTimeOnlyEntry(entryName)) {
                     continue;
                 }
 

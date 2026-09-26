@@ -89,6 +89,19 @@
         <module>css-compiler</module>
         <module>svg-transcoder</module>
         <module>lottie-transcoder</module>
+        <!--
+          dart-runtime and flutter-runtime are NOT here: they compile at
+          release 17 and the framework's own build runs on JDK 8, so a JDK 8
+          reactor cannot build them at all ("Fatal error compiling"). They are
+          in the flutter-modules profile below, which activates on JDK 17 and
+          newer.
+
+          dart-transpiler stays in the default reactor deliberately. It targets
+          1.8, and codenameone-maven-plugin has a compile dependency on it for
+          the transcode-flutter goal, so removing it would break the plugin on
+          exactly the JDK the plugin is built with.
+        -->
+        <module>dart-transpiler</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>
@@ -667,6 +680,24 @@
                     </dependency>
                 </dependencies>
             </dependencyManagement>
+        </profile>
+
+        <!--
+          The Flutter runtime and its Dart support library, which compile at
+          release 17. Guarded by JDK rather than listed unconditionally because
+          the framework itself is built on JDK 8: with these in the default
+          reactor every JDK 8 leg fails while compiling them, and the failure
+          names a module that has nothing to do with whatever the change was.
+        -->
+        <profile>
+            <id>flutter-modules</id>
+            <activation>
+                <jdk>[17,)</jdk>
+            </activation>
+            <modules>
+                <module>dart-runtime</module>
+                <module>flutter-runtime</module>
+            </modules>
         </profile>
 
         <profile>

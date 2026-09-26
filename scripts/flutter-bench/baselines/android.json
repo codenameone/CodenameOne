@@ -1,0 +1,24 @@
+{
+  "codenameone": {
+    "code_bytes": 4720336,
+    "cold_start_ms": 418.0,
+    "idle_memory_bytes": 50436505,
+    "install_bytes": 91589516,
+    "wire_bytes": 91589516
+  },
+  "flutter_reference": {
+    "cold_start_ms": 1505.0
+  },
+  "generated_at": "2026-09-22T19:37:15Z",
+  "notes": "Start-up and memory are the UPPER edge of what normal runs produced, not one run's best: a single run's best-of-five moved between 282 and 418 ms across six runs of unchanged code, and the first baseline, taken from a low one (331 ms), fired on noise. Memory is from the compiled-steady-state method (cmd package compile -m speed), whose mapped compiled code PSS counts -- 40.4 to 48.1 MB in its first run, against 34-37 MB before it. To be tightened as runs under the current method accumulate. flutter_reference is the runner-speed yardstick for start-up (see runner_slowdown_discount): the upper edge of Flutter's pinned-SDK best-of-five on normal runs (1031-1505 ms through run 35948270531); a run where the emulator is slower than that discounts Codename One's time by the same ratio.",
+  "platform": "android",
+  "recorded_from": "sizes: flutter-bench run 35772357318; start-up and memory: the envelope of the runs through 35793506968 (commit fb8880b96d)",
+  "schema_version": 1,
+  "tolerances": {
+    "code_bytes": 0.0,
+    "cold_start_ms": 0.25,
+    "idle_memory_bytes": 0.15,
+    "install_bytes": 0.0,
+    "wire_bytes": 0.0
+  }
+}

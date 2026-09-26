@@ -1,0 +1,466 @@
+name: Flutter benchmark
+
+# Measures ONE application built two ways -- Flutter's own release build and
+# the identical Dart source transpiled by Codename One -- and publishes the
+# comparison to the pull request and to port status.
+#
+# Neither application is vendored. `scripts/flutter-bench/app/prepare.sh` takes
+# the gallery from the Flutter SDK this workflow installs
+# ($FLUTTER_ROOT/dev/integration_tests/new_gallery) and copies the SAME 159
+# files into both sides, so the comparison cannot drift: there is no second
+# copy for an edit to land on. The Codename One side is generated from the
+# SHIPPING archetype, which means a change that breaks the documented Flutter
+# wiring breaks this workflow too instead of passing unnoticed.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/flutter-runtime/**'
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/cn1app-archetype/**'
+      - 'scripts/flutter-bench/**'
+      - '.github/workflows/flutter-bench.yml'
+  schedule:
+    # Nightly, so port status carries a current number and the PR runs have a
+    # trend to sit against rather than a single point.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Comma separated platform ids, or "all"'
+        default: 'all'
+
+concurrency:
+  group: flutter-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Flutter release this benchmark measures against, PINNED rather than
+  # tracking stable.
+  #
+  # A benchmark whose reference moves on its own is not one: the gallery, its
+  # dependency resolution and Flutter's own code generation all change between
+  # releases, so a number from last week and a number from today would differ
+  # for reasons that have nothing to do with this repository. Tracking stable
+  # also broke outright -- 3.47.5's tree resolved google_fonts to a version
+  # without robotoCondensed and three studies stopped compiling.
+  #
+  # Bumping this is a deliberate act that re-baselines the comparison: expect
+  # every number to move, and re-record the baselines under
+  # scripts/flutter-bench/baselines in the same change.
+  FLUTTER_REF: '3.35.4'
+
+permissions:
+  contents: read
+  pull-requests: write
+  # The framework job runs in the pr-ci-container image on ghcr, and pulling it
+  # needs this. Without it the job dies in "Initialize containers" with a bare
+  # "Error response from daemon: denied", which reads like the image is missing
+  # rather than like the token cannot see it.
+  packages: read
+
+jobs:
+  # The framework is built ONCE, here, and the platform jobs consume the
+  # artifacts. Two reasons it cannot be built per platform:
+  #
+  #   * It needs JDK 8. codenameone-javase imports javafx.*, which no JDK after
+  #     8 carries, so a JDK 17 build of the reactor fails compiling the JavaSE
+  #     port. An earlier version of this workflow set up JDK 8 and then JDK 17,
+  #     and since the last setup-java wins it silently built everything on 17.
+  #   * macOS arm64 runners have no Temurin 8 at all -- setup-java reports
+  #     "Could not find satisfied version for SemVer 8", the oldest offered
+  #     being 11.
+  #
+  # The container is the same one pr.yml uses, which bakes JDK 8 and a
+  # cn1-binaries snapshot.
+  framework:
+    name: framework
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link cn1-binaries
+        run: ln -s /opt/cn1-binaries ../cn1-binaries
+
+      # The container supplies JAVA_HOME_8 and JAVA_HOME_17; this is how pr.yml
+      # selects between them. Not setup-java, which would download a second JDK
+      # into an image that already has the right ones, and not a hard-coded
+      # path -- an earlier version of this guessed
+      # /usr/lib/jvm/java-8-openjdk-amd64 and the build died on "The JAVA_HOME
+      # environment variable is not defined correctly", which says nothing
+      # about which JDK was wanted or what was there.
+      - name: Check the container's JDKs
+        run: |
+          for var in JAVA_HOME_8 JAVA_HOME_17; do
+            eval "path=\${$var:-}"
+            if [ -z "$path" ] || [ ! -x "$path/bin/javac" ]; then
+              echo "$var is unset or has no javac: '${path:-<unset>}'" >&2
+              exit 1
+            fi
+            echo "$var=$path"
+          done
+
+      # JDK 8 for everything that targets it. The flutter modules are NOT in
+      # this reactor: maven/pom.xml puts them behind a profile that activates
+      # on JDK 17 and newer, precisely because they cannot compile here.
+      - name: Build the framework on JDK 8
+        run: |
+          cd maven
+          # -Plocal-dev-javase is required to build the JavaSE port, which
+          # -am pulls in. Without it the build dies in javase's
+          # cn1-generate-build-hint-data execution, which is a long way from
+          # anything this workflow is about.
+          # Through retry.sh, like every other Maven step in this repository: Central
+          # throttles runners with 403/429, and a bare mvn failed this job twice in
+          # one day at resolving org.junit:junit-bom before compiling anything.
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl core,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
+
+      # Without -am: everything these depend on was installed by the pass
+      # above, and re-resolving it here would rebuild core on the wrong JDK.
+      - name: Build the Flutter runtime on JDK 17
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl dart-runtime,flutter-runtime
+
+      - name: Pack the repository
+        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2
+
+      - name: Upload the repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-bench-framework
+          path: framework-m2.tgz
+          retention-days: 1
+
+  # The platforms to measure. Every one on a pull request or the nightly run; on a
+  # manual dispatch, the ones its `platforms` input names. The input used to be
+  # read by nothing, so asking to re-run one platform launched all six -- several
+  # of them two-hour native builds.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.pick.outputs.include }}
+    steps:
+      - id: pick
+        env:
+          REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'all' }}
+        shell: python3 {0}
+        run: |
+          import json, os, sys
+          ALL = [
+              {"platform": "macos", "runner": "macos-latest"},
+              {"platform": "ios", "runner": "macos-latest"},
+              {"platform": "android", "runner": "ubuntu-latest"},
+              {"platform": "linux", "runner": "ubuntu-latest"},
+              # PINNED, like FLUTTER_REF and for the same reason. windows-latest
+              # is Server 2025 and its Visual Studio has moved to 2026 (major
+              # 18), which Flutter 3.35.4 predates: it detects that install and
+              # reports it healthy, then maps it to no generator it knows and
+              # emits "Visual Studio 16 2019" instead. Pinning Flutter without
+              # pinning the toolchain it has to drive only moved the moving part.
+              {"platform": "windows", "runner": "windows-2022"},
+              {"platform": "javascript", "runner": "ubuntu-latest"},
+          ]
+          requested = os.environ.get("REQUESTED", "").strip().lower()
+          if requested in ("", "all"):
+              chosen = ALL
+          else:
+              names = [n.strip() for n in requested.split(",") if n.strip()]
+              known = {p["platform"] for p in ALL}
+              unknown = [n for n in names if n not in known]
+              if unknown or not names:
+                  # Loud, not an empty matrix: a typo must not "succeed" by measuring nothing.
+                  sys.exit("unknown platform(s) %s; choose from %s, or all"
+                           % (", ".join(unknown) or "<none>", ", ".join(sorted(known))))
+              chosen = [p for p in ALL if p["platform"] in names]
+          print("measuring: " + ", ".join(p["platform"] for p in chosen))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("include=" + json.dumps(chosen) + "\n")
+
+  measure:
+    name: ${{ matrix.platform }}
+    needs: [framework, plan]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      # One platform failing must not hide the others: a benchmark that
+      # publishes nothing because a single runner broke is worse than one that
+      # publishes five platforms and says the sixth did not run.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.include) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 17 only. Nothing here builds the framework, so nothing here needs
+      # the JDK 8 that is unavailable on an arm64 macOS runner anyway.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Download the framework
+        uses: actions/download-artifact@v4
+        with:
+          name: flutter-bench-framework
+
+      - name: Unpack the framework
+        shell: bash
+        run: tar -xzf framework-m2.tgz
+
+      # A full SDK CHECKOUT, not a release archive. The benchmark's application
+      # is dev/integration_tests/new_gallery inside the SDK, and the published
+      # release archives do not carry dev/ at all -- so the usual setup actions,
+      # which unpack a release, leave prepare.sh with nothing to copy. Cloning
+      # the SDK is also what pins the reference: the revision is recorded in
+      # every result, so a number can be traced to the Flutter that produced it.
+      - name: Check out the Flutter SDK
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_REF" \
+              https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          echo "FLUTTER_ROOT=$RUNNER_TEMP/flutter" >> "$GITHUB_ENV"
+
+      - name: Report the toolchain, and prove the gallery is present
+        shell: bash
+        run: |
+          flutter --version
+          flutter precache
+          test -d "$FLUTTER_ROOT/dev/integration_tests/new_gallery/lib" || {
+            echo "this Flutter checkout has no gallery; prepare.sh cannot run" >&2
+            exit 1; }
+          echo "gallery Dart files: $(find "$FLUTTER_ROOT/dev/integration_tests/new_gallery/lib" -name '*.dart' | wc -l)"
+          test -f "$FLUTTER_ROOT/pubspec.lock" || {
+            echo "the SDK checkout has no root pubspec.lock; prepare.sh needs it" >&2
+            echo "to hold the gallery's unpinned dependencies at tested versions" >&2
+            exit 1; }
+
+      # A benchmark records the toolchain it measured with; on Windows it also
+      # has to CHECK it. Flutter picks the CMake generator from the Visual
+      # Studio it detects and falls back to "Visual Studio 16 2019" when it
+      # detects NONE -- so an undetected Visual Studio does not say so. It fails
+      # minutes later inside CMake, claiming VS 2019 could not be found, which
+      # is true and is not the problem. vswhere's own view is printed beside
+      # Flutter's so the two can be compared: a Visual Studio that vswhere lists
+      # and Flutter does not is a different fault from one that is simply absent.
+      - name: Report the Windows toolchain, and prove Flutter can see it
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: |
+          VS_VERSION=""
+          VSWHERE="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          if [ -x "$VSWHERE" ]; then
+            echo "== vswhere sees:"
+            VS_VERSION="$("$VSWHERE" -products '*' -prerelease -format value \
+                -property installationVersion 2>/dev/null | head -1)"
+            echo "${VS_VERSION:-<none>}"
+            "$VSWHERE" -products '*' -prerelease -format value \
+                -property installationPath || true
+          else
+            echo "== vswhere is not installed at the usual path"
+          fi
+          echo "== flutter doctor:"
+          flutter doctor -v 2>&1 | tee /tmp/doctor.txt || true
+          # Checking that Flutter can MAP the install, not that it can see one.
+          # Presence is the wrong question: doctor reported
+          # "[OK] Visual Studio - develop Windows apps (Visual Studio Enterprise
+          # 2026 18.9.2)" on the very run this replaces, and the build then died
+          # in CMake. flutter_tools/lib/src/windows/visual_studio.dart maps major
+          # 17 and nothing else; every other major, detected or not, silently
+          # becomes the "Visual Studio 16 2019" generator. Update SUPPORTED_VS
+          # when FLUTTER_REF moves, and note that it is the CMake generator
+          # mapping that decides, not what doctor is willing to tick.
+          SUPPORTED_VS=17
+          MAJOR="$(printf '%s' "$VS_VERSION" | cut -d. -f1)"
+          if [ -z "$MAJOR" ] || [ "$MAJOR" != "$SUPPORTED_VS" ]; then
+            echo "This runner's Visual Studio is major '${MAJOR:-none}', and Flutter" >&2
+            echo "$FLUTTER_REF only maps major $SUPPORTED_VS to a CMake generator." >&2
+            echo "It would fall back to 'Visual Studio 16 2019' and fail inside" >&2
+            echo "CMake rather than here -- naming a version nobody asked for." >&2
+            echo "Pin the runner image to one carrying Visual Studio" >&2
+            echo "$SUPPORTED_VS, or move FLUTTER_REF and re-record baselines." >&2
+            exit 1
+          fi
+
+      # Flutter's own Linux build and Codename One's native Linux port both
+      # BOTH sides need a native toolchain here, and they need different
+      # things. Flutter's desktop build wants clang and a C++ standard library;
+      # the Codename One side compiles the native Linux port, whose CMakeLists
+      # resolves the whole GTK/GStreamer/WebKit stack through pkg_check_modules
+      # and stops at the first one missing. The shared script is that stack --
+      # an ad-hoc subset here configured far enough to fail on libcurl, several
+      # minutes into a build that had already transpiled and compiled.
+      - name: Install the Linux desktop toolchain
+        if: ${{ matrix.platform == 'linux' }}
+        run: bash scripts/ci/install-linux-native-deps.sh clang libstdc++-12-dev
+
+      # The Codename One build opens an AWT window (its CSS compiler), so a
+      # headless runner fails inside `cn1:css` after the transpile has already
+      # succeeded. build_apps.sh wraps Maven in xvfb-run on Linux and refuses
+      # to run without it rather than failing later and less legibly. The
+      # helper short-circuits when the image already ships xvfb, which these
+      # usually do.
+      - name: Install xvfb
+        if: ${{ runner.os == 'Linux' }}
+        run: bash scripts/ci/apt-get-install.sh xvfb
+
+      - name: Prepare both applications from one source
+        shell: bash
+        run: |
+          scripts/flutter-bench/app/prepare.sh \
+              --work "${RUNNER_TEMP}/fbench" \
+              --maven-repo "${GITHUB_WORKSPACE}/m2"
+
+      - name: Build both applications
+        id: build
+        shell: bash
+        run: |
+          scripts/flutter-bench/app/build_apps.sh \
+              --work "${RUNNER_TEMP}/fbench" \
+              --platform "${{ matrix.platform }}" \
+              --maven-repo "${GITHUB_WORKSPACE}/m2" | tee "${RUNNER_TEMP}/paths.txt"
+          grep '^cn1='     "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
+          grep '^flutter=' "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
+
+      # Every leg runs the same measure.sh; the legs differ only in what wraps it.
+      #
+      # Linux runs under Xvfb because both applications are GTK programs that
+      # need a display. build_apps.sh's xvfb-run does not help here: it lives
+      # exactly as long as the Maven build it wraps, so the Measure step started
+      # with no display at all and the adapter reported the platform
+      # unavailable after both applications had built.
+      - name: Measure
+        if: ${{ matrix.platform != 'android' }}
+        shell: bash
+        run: |
+          prefix=""
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            prefix="xvfb-run -a"
+          fi
+          $prefix scripts/flutter-bench/app/measure.sh "${{ matrix.platform }}" \
+              "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" \
+              "${RUNNER_TEMP}/bench-out"
+
+      # Android needs a device. A hosted runner has none, so the adapter found no
+      # emulator and recorded the whole platform as unavailable after building
+      # both APKs. Same emulator, API level and image as the Android port's own
+      # instrumentation leg (scripts-android.yml).
+      - name: Enable KVM for the Android emulator
+        if: ${{ matrix.platform == 'android' }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Measure on an Android emulator
+        if: ${{ matrix.platform == 'android' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 4096M
+          # One line: the action runs each line of `script` in its own shell.
+          script: scripts/flutter-bench/app/measure.sh android "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" "${{ runner.temp }}/bench-out"
+
+      # The result and the baseline recorded from it. The baseline is what a
+      # human commits to arm the gate, so it travels with the result rather than
+      # having to be re-derived.
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-bench-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/bench-out/result-${{ matrix.platform }}.json
+            ${{ runner.temp }}/bench-out/baseline-${{ matrix.platform }}.json
+          if-no-files-found: warn
+
+  publish:
+    name: Publish
+    needs: measure
+    # always(), so a platform that regressed still gets its numbers in front of
+    # a reviewer. The `measure` jobs already carry the red status; hiding the
+    # comment as well would leave the failure with no explanation attached.
+    if: always()
+    runs-on: ubuntu-latest
+    # Write access for the scheduled publication to the port-status-data
+    # branch. Job-scoped, and job permissions replace the workflow's, so the
+    # comment's permission is restated.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect every platform's result
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-bench-*
+          path: results
+          merge-multiple: true
+
+      - name: Render the comment
+        run: |
+          python3 scripts/flutter-bench/run_bench.py \
+              --render 'results/result-*.json' \
+              --markdown flutter-benchmark.md
+          cat flutter-benchmark.md
+
+      - name: Publish the benchmark comment
+        if: ${{ github.event_name == 'pull_request' && hashFiles('flutter-benchmark.md') != '' }}
+        uses: actions/github-script@v9
+        with:
+          retries: 3
+          script: |
+            const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+            await publishQualityComment({
+              github, context, core,
+              marker: '<!-- flutter-benchmark -->',
+              reportPath: 'flutter-benchmark.md',
+            });
+
+      # Published to the data branch the website build reads, the way every
+      # port's own status is. Writing it into docs/website in this job's
+      # checkout, as this step used to, put it where nothing would ever see it:
+      # the checkout is discarded when the job ends and nothing committed it.
+      # Master-only, like the port reports, so a branch's numbers never reach
+      # the public page.
+      - name: Publish the benchmark to the port status data
+        # Only a run of every platform: port status shows all of them, and a dispatch
+        # for a subset would publish a table missing the rest.
+        if: >-
+          github.ref == 'refs/heads/master' &&
+          (github.event_name == 'schedule' ||
+           (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/flutter-bench/port_status.py \
+              --results 'results/result-*.json' \
+              --out "${RUNNER_TEMP}/port-status"
+          python3 scripts/flutter-bench/publish_benchmark.py \
+              "${RUNNER_TEMP}/port-status/flutter_benchmark.json" "${{ github.repository }}"
+
+      - name: Upload the rendered report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-benchmark-report
+          path: flutter-benchmark.md

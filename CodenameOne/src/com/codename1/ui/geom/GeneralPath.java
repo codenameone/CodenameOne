@@ -535,11 +535,27 @@ public final class GeneralPath implements Shape {
             return true;
         }
         if (shape instanceof Rectangle) {
+            // A path equals a rectangle only when it IS that rectangle. Comparing bounds
+            // alone made EVERY non-rectangular path equal to its own bounding box, and
+            // the clip bookkeeping asks exactly this question before deciding that a
+            // setClip changes nothing and can be skipped.
+            //
+            // That is a silent, total failure of shaped clipping wherever the shape fills
+            // its own component, which is the usual case: a component's clip has just been
+            // narrowed to its bounds, so a circle or rounded rectangle inscribed in it
+            // arrives with bounds equal to the current clip, compares EQUAL, and is
+            // DISCARDED. The subtree then paints square with nothing reported. Only ports
+            // whose clip state goes through this comparison are affected, which is why it
+            // could be reproduced on a device and never in the desktop simulator.
+            //
+            // isRectangle() walks the path, so it is asked only once the bounds have
+            // already matched -- the rare case. A clip that genuinely changed is rejected
+            // on the bounds alone, as before.
             Rectangle r = (Rectangle) shape;
             Rectangle tmpRect = createRectFromPool();
             try {
                 getBounds(tmpRect);
-                return r.equals(tmpRect);
+                return r.equals(tmpRect) && isRectangle();
             } finally {
                 recycle(tmpRect);
             }

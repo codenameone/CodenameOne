@@ -1,0 +1,19 @@
+SLOT displayLarge present
+SLOT displayMedium present
+SLOT displaySmall present
+SLOT headlineLarge present
+SLOT headlineMedium present
+SLOT headlineSmall present
+SLOT titleLarge present
+SLOT titleMedium present
+SLOT titleSmall present
+SLOT bodyLarge present
+SLOT bodyMedium present
+SLOT bodySmall present
+SLOT labelLarge present
+SLOT labelMedium present
+SLOT labelSmall present
+NONNULL 15 of 15
+COPYWITH kept_size true kept_weight true
+OVERRIDE 9900
+OVERRIDE_KEEPS present

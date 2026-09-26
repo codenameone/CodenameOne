@@ -59,6 +59,7 @@ mvn archetype:generate \
   -DgroupId=com.codename1.androidnativetest1 \
   -Dversion=1.0-SNAPSHOT \
   -DmainName=AndroidNativeTest \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DinteractiveMode=false
 
 cp ../androidnativetest/common/codenameone_settings.properties androidnativetest/common/codenameone_settings.properties

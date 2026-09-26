@@ -1334,6 +1334,31 @@ public final class Display extends CN1Constants {
         return false;
     }
 
+    /// The form transition currently being painted, or null when there is none.
+    ///
+    /// The companion to [isInTransition()][#isInTransition()], for code that needs the
+    /// transition itself rather than the fact of one. A transition paints the frame
+    /// BETWEEN two forms, so neither form can be asked what is on screen while one is
+    /// running - painting the destination gives the finished state and painting the
+    /// source gives the state before it began. Handing back the transition lets a caller
+    /// paint the frame that is actually being shown, which is what capturing a transition
+    /// for comparison needs, and pairs with
+    /// [AnimationTime][com.codename1.ui.animations.AnimationTime] to step one frame by
+    /// frame.
+    ///
+    /// #### Returns
+    ///
+    /// the running transition, or null
+    public Transition getRunningTransition() {
+        if (animationQueue != null && !animationQueue.isEmpty()) {
+            Animation a = animationQueue.get(0);
+            if (a instanceof Transition) {
+                return (Transition) a;
+            }
+        }
+        return null;
+    }
+
     // Seems to be a false positive on this rule
     @SuppressWarnings({"PMD.SimplifyConditional", "PMD.AvoidBranchingStatementAsLastInLoop"})
     private void paintTransitionAnimation() {

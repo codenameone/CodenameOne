@@ -1,0 +1,20 @@
+{
+  "codenameone": {
+    "code_bytes": 18958610,
+    "cold_start_ms": 259.28735733032227,
+    "idle_memory_bytes": 169488384,
+    "install_bytes": 119594984,
+    "wire_bytes": 95706942
+  },
+  "generated_at": "2026-09-22T19:38:42Z",
+  "platform": "linux",
+  "recorded_from": "flutter-bench run 35772357318 (commit b3a601fcc8)",
+  "schema_version": 1,
+  "tolerances": {
+    "code_bytes": 0.0,
+    "cold_start_ms": 0.25,
+    "idle_memory_bytes": 0.15,
+    "install_bytes": 0.0,
+    "wire_bytes": 0.0
+  }
+}

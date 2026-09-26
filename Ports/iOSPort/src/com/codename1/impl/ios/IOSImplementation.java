@@ -9189,6 +9189,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         return scale > 0 ? scale : super.getDevicePixelRatio();
     }
 
+
     @Override
     public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
@@ -11291,6 +11292,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             if("native:MainRegular".equals(fontName)) {
                 return "HelveticaNeue-Medium";
             }
+            // native:MainNormal is the system font at its TRUE regular weight.
+            //
+            // native:MainRegular has meant HelveticaNeue-Medium since the alias
+            // was introduced, and on iOS 8.2+ that resolves to the system font
+            // at UIFontWeightMedium -- one step heavier than the platform's own
+            // body weight. Changing it would restyle every existing app, so the
+            // honest regular gets a name of its own. Note the macOS branch
+            // already maps native:MainRegular to NSFontWeightRegular, so the two
+            // platforms disagree about the same alias; this name means the same
+            // thing on both.
+            if("native:MainNormal".equals(fontName)) {
+                return "CN1SystemRegular";
+            }
+
             
             if("native:MainBold".equals(fontName)) {
                 return "HelveticaNeue-Bold";

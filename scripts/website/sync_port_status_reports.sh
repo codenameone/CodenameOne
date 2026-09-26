@@ -110,3 +110,21 @@ if git -C "${REPO_ROOT}" show "FETCH_HEAD:evidence/environment.json" > "${enviro
 else
   echo "No valid persisted browser evidence; using the checked-in first-run snapshot." >&2
 fi
+
+# The Flutter benchmark, published nightly by flutter-bench.yml. There is no
+# checked-in fallback: without a published run the page simply omits the
+# section, rather than presenting numbers nobody measured.
+benchmark_candidate="${tmp_dir}/flutter_benchmark.json"
+benchmark_target="${REPO_ROOT}/docs/website/data/port_status_flutter_benchmark.json"
+if git -C "${REPO_ROOT}" show "FETCH_HEAD:benchmarks/flutter.json" > "${benchmark_candidate}" 2>/dev/null && \
+   jq -e '
+      .schema_version == 1 and
+      (.generated_at | type == "string") and
+      (.platforms | type == "object") and
+      any(.platforms[]; .status == "measured")
+   ' "${benchmark_candidate}" >/dev/null; then
+  cp "${benchmark_candidate}" "${benchmark_target}"
+  echo "Resolved the Flutter benchmark from ${DATA_REF}."
+else
+  echo "No published Flutter benchmark; the page omits that section." >&2
+fi

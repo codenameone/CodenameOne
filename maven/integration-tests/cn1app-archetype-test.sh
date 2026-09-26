@@ -23,10 +23,12 @@ mvn archetype:generate \
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DmainName=MyApp \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DinteractiveMode=false
 
 cd myapp1
 chmod 755 build.sh
+
 ./build.sh jar
 if [ -d /Applications/Xcode.app ]; then
   "mvn" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=ios-source" -Dopen=false

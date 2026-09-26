@@ -1176,6 +1176,7 @@ public abstract class CodenameOneImplementation {
         drawImage(graphics, img, x, y, w, h);
     }
 
+
     /// Returns the width of a native image
     ///
     /// #### Parameters
@@ -5308,6 +5309,19 @@ public abstract class CodenameOneImplementation {
     /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
     /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
     /// platform-logical units (density-independent pixels) has to ask this question, not the
+    /// density one, or it renders every dimension off by the ratio between them.
+    ///
+    /// #### Returns
+    ///
+    /// The platform's own logical-pixel scale factor: device pixels per logical pixel,
+    /// the number iOS calls `UIScreen.scale` and Android calls `density`.
+    ///
+    /// This is NOT the same question as [#getDeviceDensity], even though the two are
+    /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
+    /// things in physical units. The scale factor is what the platform itself uses to
+    /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
+    /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
+    /// platform-logical units (a Flutter-style `dp`) has to ask this question, not the
     /// density one, or it renders every dimension off by the ratio between them.
     ///
     /// #### Returns

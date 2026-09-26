@@ -1,0 +1,21 @@
+[9, 2]
+range checked eagerly
+true
+true
+https://x/a%20b
+/a%20b
+https://x/a%2Fb~A%25zz
+https://x/p?q=a%20b#f%20g
+https://x.com/~user
+https://x/caf%C3%A9
+https://x/a/b?c%5Cd
+[a b]
+predicate error completes the future
+1582-10-10 -12219724800000 7
+1582-10-05 00:00:00.000Z
+-62135596800000
+2024-03-01 00:00:00.000Z
+2023-12-01 00:00:00.000Z
+-0001-12-31 23:59:59.999Z
+0000-12-31 23:59:59.999Z
+3

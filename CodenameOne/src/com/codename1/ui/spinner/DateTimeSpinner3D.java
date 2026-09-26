@@ -36,12 +36,19 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/// The date and time spinner extends the time spinner by allowing to pick a specific day as well
+/// A date and a time of day on one row of wheels: a day wheel beside the hour
+/// and minute wheels of [TimeSpinner3D][com.codename1.ui.spinner.TimeSpinner3D].
 ///
-/// Used by Picker in lightweight mode.
+/// The body of a lightweight [Picker][com.codename1.ui.spinner.Picker] of type
+/// date and time, and usable on its own as an ordinary `Container`. The day
+/// wheel spans the configured range and shows each day by name rather than by
+/// number, which is what the iOS picker it follows does.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry a
+/// `java.util.Date` in which both the date and the time components are used.
 ///
 /// @author Steve Hannah
-class DateTimeSpinner3D extends Container implements InternalPickerWidget {
+public class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private final Date today = new Date();
     private final int off;
     private final Container wrapper = new Container(BoxLayout.x());

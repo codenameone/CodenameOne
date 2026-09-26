@@ -37,12 +37,22 @@ import java.util.Date;
 
 import static com.codename1.ui.CN.convertToPixels;
 
-/// A date spinner allows selecting a date value within the given date range
+/// Three wheels -- day, month and year -- that together select one date inside
+/// a configured range.
 ///
-/// This is used by the Picker when in lightweight mode.
+/// The body of a lightweight [Picker][com.codename1.ui.spinner.Picker] of type
+/// date, and usable on its own as an ordinary `Container` when a form wants
+/// the wheels inline rather than in a dialog. The range is set with
+/// `#setStartYear(int)` and `#setEndYear(int)`; a value outside it is clamped.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry a
+/// `java.util.Date`. The wheels select only the date, but the time of day of
+/// whatever was last passed to `setValue` is remembered and handed back by
+/// `getValue`, so a round trip through this widget does not silently move a
+/// timestamp to midnight.
 ///
 /// @author Steve Hannah
-class DateSpinner3D extends Container implements InternalPickerWidget {
+public class DateSpinner3D extends Container implements InternalPickerWidget {
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());
     private final Calendar tmpCal = Calendar.getInstance();

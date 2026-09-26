@@ -63,6 +63,15 @@ class PublishTests(unittest.TestCase):
             publisher.publish(self.report, "owner/repo")
             self.assertEqual("fresh", api.call_args.args[2]["sha"])
 
+    def test_other_data_can_name_its_own_path_on_the_branch(self):
+        # The Flutter benchmark shares this compare-and-swap but is not a port
+        # report, so it is written beside ports/ rather than into it.
+        with patch.object(publisher, "api", side_effect=[{}, publisher.ApiError("missing", 404), {}]) as api:
+            publisher.publish(self.report, "owner/repo", target="benchmarks/flutter.json",
+                              message="Update the Flutter benchmark")
+            self.assertTrue(api.call_args.args[0].endswith("/contents/benchmarks/flutter.json"))
+            self.assertEqual("Update the Flutter benchmark", api.call_args.args[2]["message"])
+
     def test_only_404_allows_creating_a_report(self):
         with patch.object(publisher, "api", side_effect=[{}, publisher.ApiError("missing", 404), {}]) as api:
             publisher.publish(self.report, "owner/repo")

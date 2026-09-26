@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui.animations;
 
 import com.codename1.junit.UITestBase;
@@ -119,5 +142,21 @@ class CubicBezierMotionTest extends UITestBase {
         }
         assertEquals(1000, sample(m, 0));
         assertEquals(0, sample(m, 1000));
+    }
+
+    @Test
+    void aThreePointMotionWithAFlatSegmentStaysContinuousAtTheJoin() {
+        // Midpoint on the bottom edge: the first segment has no vertical extent. Its Y
+        // cannot be normalized, and substituting linear progress there made the value run
+        // up toward t -- about 499 of 1000 just before the join -- and then drop to 0 at
+        // it. The segment's own cubic is flat at 0 all the way.
+        Motion m = Motion.createThreePointCubicMotion(0, 1000, 1000,
+                0.1f, 0f, 0.4f, 0f,
+                0.5f, 0f,
+                0.6f, 0.3f, 0.9f, 1f);
+        assertEquals(0, sample(m, 499), 20, "the flat first segment stays at its level");
+        assertEquals(0, sample(m, 250), 20);
+        int atJoin = sample(m, 500);
+        assertTrue(Math.abs(atJoin - sample(m, 499)) <= 20, "no jump at the join");
     }
 }

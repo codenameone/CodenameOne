@@ -3900,6 +3900,16 @@ public class Dialog extends Form implements AbstractDialog {
     }
 
     private boolean isTimedOut() {
+        // Disposing is EDT work, and this is reached from off it: invokeAndBlock's
+        // waiting thread polls isDisposed() while a modal show blocks, and it used to
+        // dispose the dialog and deregister its animation from that thread, while the
+        // EDT was walking the same animation list -- an ArrayIndexOutOfBoundsException
+        // out of ArrayList.remove. Off the EDT the deadline is left alone; the EDT's own
+        // poll (animate) and the timeout clock, which calls back onto the EDT, dispose
+        // it, and the waiting thread sees it disposed on its next check.
+        if (!Display.getInstance().isEdt()) {
+            return false;
+        }
         if (time != 0 && System.currentTimeMillis() >= time) {
             time = 0;
             cancelTimeoutClock();

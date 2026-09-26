@@ -27,6 +27,7 @@ mvn archetype:generate \
   -DgroupId="$PACKAGE_NAME" \
   -Dversion=1.0-SNAPSHOT \
   -DmainName="$APP_NAME" \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DinteractiveMode=false
 
 cat > "$SOURCE_PROJECT/generate-app-project.rpf" <<EOF
@@ -45,6 +46,7 @@ mvn "com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-projec
   -Dversion=1.0-SNAPSHOT \
   -DmainName="${APP_NAME}" \
   -DpackageName="${PACKAGE_NAME}" \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DinteractiveMode=false \
   -DsourceProject="$SOURCE_PROJECT"
 

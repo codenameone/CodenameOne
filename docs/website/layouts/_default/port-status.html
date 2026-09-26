@@ -4,6 +4,7 @@
 {{- $supplement := site.Data.port_status_supplement -}}
 {{- $support := site.Data.port_status_support -}}
 {{- $environment := site.Data.port_status_environment -}}
+{{- $flutterBench := site.Data.port_status_flutter_benchmark -}}
 {{- $snapshotTime := now.UTC -}}
 <article class="post-single cn1-port-status" data-port-status>
   <header class="post-header cn1-port-status__header">
@@ -318,6 +319,58 @@
       <a href="https://github.com/codenameone/CodenameOne/blob/master/vm/benchmarks/common/src/main/java/com/bench/CommonWorkloads.java" target="_blank" rel="noopener">ParparVM common-workload benchmark source</a>
     </p>
   </section>
+
+  {{- with $flutterBench }}
+  <section class="cn1-port-status__performance cn1-port-status__flutter-benchmark" data-flutter-benchmark aria-labelledby="flutter-benchmark-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Flutter compared</p>
+      <h2 id="flutter-benchmark-title">One Flutter application, built by Flutter and by Codename One</h2>
+      <p>
+        {{ .app }}. Lower is better for every metric, so a ratio above 1.00x means Codename One is ahead by that factor.
+        {{- with .generated_at }} Measured {{ . }}{{ end }}{{ with .commit }} from commit <code>{{ substr . 0 10 }}</code>{{ end }}.
+      </p>
+    </header>
+    {{- range $id, $platform := .platforms }}
+    <h3 data-flutter-benchmark-platform="{{ $id }}">{{ $id }}</h3>
+    {{- if eq $platform.status "measured" }}
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance" aria-label="{{ $id }}: Codename One and Flutter">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Metric</th>
+            <th scope="col">Codename One</th>
+            <th scope="col">Flutter</th>
+            <th scope="col">Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $key, $metric := $platform.metrics }}
+          {{- if $metric.label }}
+          <tr data-flutter-benchmark-row="{{ $id }}-{{ $key }}">
+            <th scope="row">{{ $metric.label }}</th>
+            {{- if eq $metric.unit "bytes" }}
+            <td>{{ printf "%.1f MB" (div (float $metric.codenameone) 1048576.0) }}</td>
+            <td>{{ printf "%.1f MB" (div (float $metric.flutter) 1048576.0) }}</td>
+            {{- else }}
+            <td>{{ printf "%.0f ms" (float $metric.codenameone) }}</td>
+            <td>{{ printf "%.0f ms" (float $metric.flutter) }}</td>
+            {{- end }}
+            <td>{{ printf "%.2fx" (float $metric.ratio) }}</td>
+          </tr>
+          {{- end }}
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    {{- else }}
+    <p data-flutter-benchmark-unmeasured="{{ $id }}">Not measured: {{ $platform.reason }}</p>
+    {{- end }}
+    {{- end }}
+    <p class="cn1-port-status__source-note">
+      <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/flutter-bench" target="_blank" rel="noopener">Benchmark harness and method</a>
+    </p>
+  </section>
+  {{- end }}
 
   <footer class="cn1-port-status__method">
     <h2>How to read this page</h2>

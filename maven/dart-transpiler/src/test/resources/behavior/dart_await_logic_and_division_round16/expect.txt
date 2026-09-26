@@ -1,0 +1,13 @@
+aXcabc
+abcaXc
+abcabY
+both true
+right side skipped: true
+or reached the right side
+42
+null
+int ~/ 0 is an UnsupportedError
+int % 0 is an UnsupportedError
+double ~/ 0 is an UnsupportedError
+Future.wait returned
+the future carried true
