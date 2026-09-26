@@ -279,7 +279,10 @@ jobs:
             # Single-quote the -D args: PowerShell otherwise mangles the dotted
             # property name (splitting it at the '.').
             # Tee-Object keeps the log on the console AND gives us something to match.
-            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+            # GcForeignThreadIntegrationTest runs here because Windows is where most of what it
+            # guards lives: no stop signal and no cross-thread stack bounds, so without the
+            # suspend fallback every sweep was skipped. No other Windows job reaches it.
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest,GcForeignThreadIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
               Tee-Object -Variable mvnOutput
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
             if (-not ($mvnOutput -match $resolutionFailure)) {

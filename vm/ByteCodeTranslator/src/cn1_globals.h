@@ -2077,6 +2077,15 @@ struct ThreadLocalData {
     size_t       gcSigStackSize;
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
+    // Set while this thread is held by an OS suspend -- Mach thread_suspend on Apple,
+    // SuspendThread on Windows -- instead of parked in the stop-signal handler; see
+    // cn1GcMachStopOne / cn1GcWinStopOne. Release must resume it, not signal it.
+    volatile int gcOsSuspended;
+    void*        gcSuspendHandle;       // Windows: the handle the suspend opened
+    // Windows only: this thread's own stack, recorded when it registers, because
+    // Windows cannot report another thread's bounds. [gcOwnStackHigh - size, high).
+    char*        gcOwnStackHigh;
+    size_t       gcOwnStackSize;
     // Set while the MARK LOOP owns a signal freeze it took because this thread would
     // not reach a safepoint (see CN1_GC_CAN_FORCE_STOP). It tells
     // cn1GcScanThreadNativeStack to reuse that freeze rather than take its own: a

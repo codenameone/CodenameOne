@@ -155,6 +155,18 @@ long long cn1_win_available_memory(void);
    every group), or 0 when the call fails. Sizes the collector's mark pool. */
 int cn1_win_cpu_count(void);
 
+/* The calling thread's own stack, as [*low, *high). Windows has no way to ask for
+   another thread's bounds, so each thread records its own when it registers. */
+void cn1_win_current_stack_limits(void** low, void** high);
+
+/* Suspend the thread with this id and copy its general registers into regs (at most
+   cap bytes, *lenOut set to what was written). Returns its stack pointer, or 0 when it
+   could not be stopped; on success *handleOut must be passed to cn1_win_resume_thread.
+   The counterpart of the POSIX stop signal, which Windows does not have. */
+void* cn1_win_suspend_capture(unsigned long threadId, void** handleOut, char* regs,
+                              size_t cap, size_t* lenOut);
+void cn1_win_resume_thread(void* handle);
+
 /* --- IANA time zone offsets ---
    Answers the total offset (zone plus daylight) in milliseconds for an IANA
    zone identifier at an instant, writing the offset to offsetOut and whether
