@@ -89,11 +89,11 @@ def run_windows(command, env, log, timeout):
     """Windows has no /usr/bin/time. The peak working set and CPU times are read off the
     process handle after exit -- still open, because Popen keeps it until the object is
     collected -- which is the same quantity GNU time reports as the maximum RSS."""
-    import ctypes
-    from ctypes import wintypes
+    # One import form: the submodule is not loaded by `import ctypes`, and this binds both.
+    import ctypes.wintypes
 
     class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
-        _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD),
+        _fields_ = [('cb', ctypes.wintypes.DWORD), ('PageFaultCount', ctypes.wintypes.DWORD),
                     ('PeakWorkingSetSize', ctypes.c_size_t), ('WorkingSetSize', ctypes.c_size_t),
                     ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
                     ('QuotaPagedPoolUsage', ctypes.c_size_t),
@@ -113,13 +113,13 @@ def run_windows(command, env, log, timeout):
             process.wait()
             raise
         elapsed = time.monotonic() - start
-        handle = wintypes.HANDLE(int(process._handle))
+        handle = ctypes.wintypes.HANDLE(int(process._handle))
         counters = PROCESS_MEMORY_COUNTERS()
         counters.cb = ctypes.sizeof(counters)
         if not ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters),
                                                         counters.cb):
             raise RuntimeError('GetProcessMemoryInfo failed; see the run log')
-        created, exited, kernel, user = (wintypes.FILETIME() for _ in range(4))
+        created, exited, kernel, user = (ctypes.wintypes.FILETIME() for _ in range(4))
         if not ctypes.windll.kernel32.GetProcessTimes(handle, ctypes.byref(created),
                                                       ctypes.byref(exited),
                                                       ctypes.byref(kernel),

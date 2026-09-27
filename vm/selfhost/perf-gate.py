@@ -106,15 +106,16 @@ def _kernel32():
     """kernel32 with its signatures DECLARED. ctypes defaults every result to a 32-bit
     int, so GetCurrentProcess's pseudo-handle (-1) came back truncated and
     GetProcessAffinityMask then failed on an invalid 64-bit handle."""
-    from ctypes import wintypes
+    # The submodule is not loaded by `import ctypes`; this form binds both names.
+    import ctypes.wintypes
     kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
     kernel32.GetCurrentProcess.argtypes = []
-    kernel32.GetProcessAffinityMask.restype = wintypes.BOOL
-    kernel32.GetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_size_t),
+    kernel32.GetProcessAffinityMask.restype = ctypes.wintypes.BOOL
+    kernel32.GetProcessAffinityMask.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(ctypes.c_size_t),
                                                 ctypes.POINTER(ctypes.c_size_t)]
-    kernel32.SetProcessAffinityMask.restype = wintypes.BOOL
-    kernel32.SetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
+    kernel32.SetProcessAffinityMask.restype = ctypes.wintypes.BOOL
+    kernel32.SetProcessAffinityMask.argtypes = [ctypes.wintypes.HANDLE, ctypes.c_size_t]
     return kernel32
 
 
@@ -426,7 +427,7 @@ def render_markdown(report):
                   % (','.join(map(str, report['skipped_cores'])), report['available_cores'])]
     if logical:
         lines += ['', '\\* No CPU affinity on this platform: both arms are told the core count '
-                  '(`CN1_GC_MARK_THREADS`, `-XX:ActiveProcessorCount`) but neither is confined to it.']
+                  + '(`CN1_GC_MARK_THREADS`, `-XX:ActiveProcessorCount`) but neither is confined to it.']
     if report.get('calibration'):
         lines += ['', '<details><summary>Baseline entry for %s</summary>' % report['platform'], '',
                   '```json', json.dumps({report['platform']: report['calibration']}, indent=1),
