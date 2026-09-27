@@ -163,6 +163,7 @@ public class Font extends CN {
     }
     private static Font defaultFont = new Font(null);
     private static boolean enableBitmapFont = true;
+    private static float fontReturnedHeight;
     private Object font;
     private boolean ttf;
     private float pixelSize = -1;    // for derived fonts only, the size that was requested
@@ -347,12 +348,7 @@ public class Font extends CN {
     ///
     /// the font object created or null if true type fonts aren't supported on this platform
     public static Font createTrueTypeFont(String fontName, String fileName) {
-        // Keyed by what was loaded, not by the height of whichever font was loaded
-        // last. The old key appended fontReturnedHeight -- the previous load's height --
-        // so any other font loaded in between made the lookup miss, and a theme that
-        // alternates regular and bold entries reloaded the native font for nearly every
-        // entry: 319 identical loads of the same font on a Linux launch.
-        String alreadyLoaded = "ttf:" + fontName + '|' + fileName;
+        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_" + STYLE_PLAIN;
         Font f = derivedFontCache.get(alreadyLoaded);
         if (f != null) {
             return f;
@@ -373,7 +369,9 @@ public class Font extends CN {
         f = new Font(font);
         f.ttf = true;
         f.fontUniqueId = fontName;
-        derivedFontCache.put(alreadyLoaded, f);
+        float h = f.getHeight();
+        fontReturnedHeight = h;
+        derivedFontCache.put(fileName + "_" + h + "_" + Font.STYLE_PLAIN, f);
         return f;
     }
 

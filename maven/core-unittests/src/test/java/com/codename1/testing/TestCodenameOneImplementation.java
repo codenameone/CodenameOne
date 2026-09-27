@@ -3012,11 +3012,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                 fileName != null && fileName.toLowerCase().contains("missing")) {
             return null;
         }
-        if (fontName != null && fontName.startsWith("Tall")) {
-            // A font whose loaded height differs from the default, for tests that
-            // need two loads to disagree about height.
-            return new TestFont(defaultFont.charWidth, defaultFont.height * 2);
-        }
         return new TestFont(defaultFont.charWidth, defaultFont.height);
     }
 
