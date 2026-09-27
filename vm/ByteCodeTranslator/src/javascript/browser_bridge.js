@@ -6888,6 +6888,51 @@
   }
   try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
 
+  // An open HTML menu closes on a press anywhere else -- the app's canvas, the title bar, a
+  // native text field, a DOM peer such as a BrowserComponent. Listening on the canvas alone
+  // missed all but the first: peer routing sets the canvas to pointer-events: none over peers,
+  // and the rest are not the canvas at all. Main thread and capture phase, so nothing the app
+  // does with the press can stop it; closing a <details> fires its toggle, which is how the
+  // port's menu state follows.
+  function installMenuDismissal() {
+    document.addEventListener('pointerdown', function(e) {
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      var open = chrome.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        if (!open[i].contains(e.target)) {
+          open[i].removeAttribute('open');
+        }
+      }
+    }, true);
+    // An opened panel starts under its menu title; one that would cross the window's right
+    // edge is shifted left until it fits (or reaches the left edge, where max-width keeps it
+    // inside). Measured here, on the main thread, because that is where layout is.
+    document.addEventListener('toggle', function(e) {
+      var details = e.target;
+      if (!details || !details.open || !details.classList
+          || !details.classList.contains('cn1-chrome-menu')) {
+        return;
+      }
+      var panel = details.querySelector('.cn1-chrome-menu-items');
+      if (!panel) {
+        return;
+      }
+      panel.style.left = '';
+      var rect = panel.getBoundingClientRect();
+      var limit = document.documentElement.clientWidth - 4;
+      if (rect.right > limit) {
+        var shift = Math.min(rect.right - limit, rect.left - 4);
+        if (shift > 0) {
+          panel.style.left = (-shift) + 'px';
+        }
+      }
+    }, true);
+  }
+  try { installMenuDismissal(); } catch (e) { /* non-fatal */ }
+
   global.startParparVmApp = function() {
     log('startParparVmApp');
     diag('INIT', 'startParparVmApp', 'entered');

@@ -4925,7 +4925,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (!"html".equals(asciiLower(Display.getInstance().getProperty("javascript.titleBar", null)))) {
             return;
         }
-        desktopChrome = new JavaScriptDesktopChrome((HTMLDocument) doc(), outputCanvas, desktopOs_(),
+        desktopChrome = new JavaScriptDesktopChrome((HTMLDocument) doc(), desktopOs_(),
                 new JavaScriptDesktopChrome.CommandSink() {
                     public void commandChosen(final Command cmd) {
                         Display.getInstance().callSerially(new Runnable() {
@@ -4936,9 +4936,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                     public Object renderIcon(HTMLElement into, Command cmd) {
-                        Image icon = cmd.getIcon();
+                        // A material command is drawn from its glyph even when it also carries
+                        // an image: Toolbar pre-renders that image in the side menu's or title's
+                        // style, colours that belong to the canvas, not to this menu. Only an
+                        // application-supplied image is used as is.
+                        Image icon = cmd.getMaterialIcon() != 0 ? null : cmd.getIcon();
                         if (icon == null && cmd.getMaterialIcon() != 0) {
+                            // The glyph sits on the HTML menu, whose colours come from style.css
+                            // and follow the browser's colour scheme -- not on a themed component
+                            // -- so it takes that menu's text colour rather than the theme's
+                            // "Command" foreground (which has no dark variant in the desktop
+                            // themes and would draw a near-black glyph on the dark menu).
                             Style st = UIManager.getInstance().getComponentStyle("Command");
+                            st.setFgColor(matchesMediaQuery(DARK_SCHEME_QUERY) ? 0xf0f0f0 : 0x1f1f1f);
                             float size = cmd.getMaterialIconSize();
                             icon = size > 0 ? FontImage.createMaterial(cmd.getMaterialIcon(), st, size)
                                     : FontImage.createMaterial(cmd.getMaterialIcon(), st);
@@ -5002,8 +5012,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void setNativeCommands(java.util.Vector commands) {
+        lastNativeCommands = commands;
         if (desktopChrome != null) {
             desktopChrome.setCommands(commands);
+        }
+    }
+
+    /// The commands the HTML menu bar was last built from, so it can be rebuilt when what its
+    /// icons were rendered from changes.
+    private java.util.Vector lastNativeCommands;
+
+    /// Menu icons are rendered once, into images, from the theme's "Command" style at the
+    /// density of the moment. A colour-scheme or density change re-resolves the styles but
+    /// leaves those images as they were -- light-scheme glyphs on a dark menu -- so the menu bar
+    /// is rebuilt from the same commands whenever the theme generation moves.
+    private void rerenderDesktopChromeIcons() {
+        if (desktopChrome != null && lastNativeCommands != null) {
+            desktopChrome.setCommands(lastNativeCommands);
         }
     }
 
@@ -5230,6 +5255,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 themeGeneration++;
                 refreshThemeIfStale(getCurrentForm());
+                rerenderDesktopChromeIcons();
             }
         } catch (Throwable ignored) {
             // Keep whatever was resolved at start-up.
@@ -14754,6 +14780,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // is shown.
                     themeGeneration++;
                     refreshThemeIfStale(current);
+                    rerenderDesktopChromeIcons();
                 }
                 current.repaint();
             }

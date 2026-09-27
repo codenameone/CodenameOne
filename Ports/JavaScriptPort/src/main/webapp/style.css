@@ -362,6 +362,10 @@ div#cn1-video-capture > video {
     left: 0;
     top: 100%;
     min-width: 200px;
+    /* Never wider than the window; browser_bridge.js also moves a panel that would run off
+       the right edge (a menu near the end of a wide menu bar in a narrow window). */
+    max-width: calc(100vw - 8px);
+    box-sizing: border-box;
     /* A long menu scrolls inside the window: the body is fixed with overflow hidden, so a
        panel taller than the viewport would put its last commands out of reach. */
     max-height: calc(100vh - 70px);
@@ -431,6 +435,8 @@ div#cn1-video-capture > video {
     border-radius: 12px;
 }
 
+/* The menu text colours below (#1f1f1f, #f0f0f0) are also the colours HTML5Implementation
+   draws material command icons in; change them together. */
 @media (prefers-color-scheme: dark) {
     #cn1-desktop-chrome {
         color: #f0f0f0;

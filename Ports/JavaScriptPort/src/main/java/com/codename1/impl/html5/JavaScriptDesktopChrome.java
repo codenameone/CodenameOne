@@ -98,7 +98,7 @@ final class JavaScriptDesktopChrome {
     /// host surface is released when the Java image is collected.
     private final List<Object> iconImages = new ArrayList<Object>();
 
-    JavaScriptDesktopChrome(HTMLDocument document, HTMLElement appSurface, String os, CommandSink sink) {
+    JavaScriptDesktopChrome(HTMLDocument document, String os, CommandSink sink) {
         this.document = document;
         this.sink = sink;
         this.mac = "mac".equals(os);
@@ -141,17 +141,9 @@ final class JavaScriptDesktopChrome {
                 }
             }
         });
-        // A press on the app closes an open menu. Capture phase, so the app's own handling of
-        // the press cannot stop it first. The canvas is the whole app surface, so listening
-        // there -- rather than on the document and working out whether the target lies inside
-        // the chrome -- needs no DOM walk per press.
-        appSurface.addEventListener("pointerdown", new EventListener() {
-            public void handleEvent(Event evt) {
-                if (!openMenus.isEmpty()) {
-                    closeMenus();
-                }
-            }
-        }, true);
+        // A press outside an open menu closes it; browser_bridge.js does that on the main
+        // thread for every press on the page, and the toggle listener above keeps openMenus in
+        // step.
     }
 
     /// The height the chrome takes from the top of the page, in CSS pixels.
