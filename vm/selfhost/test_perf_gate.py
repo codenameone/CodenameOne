@@ -105,5 +105,61 @@ class MarkdownTests(unittest.TestCase):
                 self.assertTrue(number.endswith(('x', '%')), line)
 
 
+
+calibrate = load('calibrate_perf_baseline', 'calibrate-perf-baseline.py')
+
+
+class CalibrationTest(unittest.TestCase):
+    """calibrate-perf-baseline.py: medians as baselines, spread-driven tolerances."""
+
+    def run_calibration(self, runs):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'baseline.json'
+            out.write_text(json.dumps({'tolerance': {'time': 0.15, 'memory': 0.15},
+                                       'floor': {'time': 0.0, 'memory': 0.05},
+                                       'platforms': {}}))
+            files = []
+            for i, (platform, per_bench) in enumerate(runs):
+                results = {b: {'all': {'time': {'median': t}, 'memory': {'median': m}}}
+                           for b, (t, m) in per_bench.items()}
+                f = Path(tmp) / ('run%d.json' % i)
+                f.write_text(json.dumps({'platform': platform, 'results': results}))
+                files.append(str(f))
+            calibrate.main(['--out', str(out)] + files)
+            return json.loads(out.read_text())
+
+    def test_median_baseline_and_global_tolerance_for_a_steady_row(self):
+        b = self.run_calibration([('linux-x64', {'quicksort': (1.00, 0.10)}),
+                                  ('linux-x64', {'quicksort': (1.02, 0.10)}),
+                                  ('linux-x64', {'quicksort': (1.01, 0.10)})])
+        row = b['platforms']['linux-x64']['quicksort']['all']
+        self.assertEqual(row['time'], 1.01)
+        self.assertNotIn('tolerance', row)  # 1% spread: the global 15% already covers it
+        self.assertEqual(row['runs'], 3)
+
+    def test_noisy_row_gets_a_wider_tolerance_that_covers_every_run(self):
+        runs = [('linux-x64', {'objectAllocation': (v, 0.4)}) for v in (5.0, 5.5, 6.5)]
+        b = self.run_calibration(runs)
+        row = b['platforms']['linux-x64']['objectAllocation']['all']
+        self.assertEqual(row['time'], 5.5)
+        tol = row['tolerance']['time']
+        self.assertGreater(tol, 0.15)
+        for _, per in runs:
+            self.assertNotEqual(gate.verdict(per['objectAllocation'][0], row['time'], tol), 'regression')
+        # ...and it still bites: well past the observed spread is a regression.
+        self.assertEqual(gate.verdict(row['time'] * (1 + tol) * 1.01, row['time'], tol), 'regression')
+
+    def test_single_run_platform_borrows_the_widest_tolerance_seen_elsewhere(self):
+        runs = [('linux-x64', {'objectAllocation': (v, 0.4)}) for v in (5.0, 5.5, 6.5)]
+        runs.append(('macos-arm64', {'objectAllocation': (3.0, 0.3)}))
+        b = self.run_calibration(runs)
+        linux = b['platforms']['linux-x64']['objectAllocation']['all']['tolerance']['time']
+        mac = b['platforms']['macos-arm64']['objectAllocation']['all']
+        self.assertEqual(mac['runs'], 1)
+        self.assertEqual(mac['tolerance']['time'], linux)
+
+
 if __name__ == '__main__':
     unittest.main()
