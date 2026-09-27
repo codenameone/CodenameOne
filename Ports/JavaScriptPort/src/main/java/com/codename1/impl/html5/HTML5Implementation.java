@@ -4663,6 +4663,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private String resolveNativeThemeResource() {
         Display d = Display.getInstance();
         String explicit = d.getProperty("javascript.native.theme", null);
+        // Trimmed, exactly as the build's theme pruning reads it (JavaScriptBuildHints): the two
+        // must agree on the path, or the build keeps a theme the runtime then fails to open.
+        explicit = explicit == null ? null : explicit.trim();
         if (explicit != null && explicit.length() > 0) {
             return explicit;
         }
@@ -14223,7 +14226,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
-        lastPortCopyTime = System.currentTimeMillis();
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
         obj = request.content;
         super.copyToClipboard(obj);
@@ -14332,9 +14334,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return selectedText;
     }
     
-    /** When this port last copied, so copyListener can tell its own fallback's event apart. */
-    private long lastPortCopyTime;
-
     EventListener copyListener = new EventListener() {
         @SuppressSyncErrors
         public void handleEvent(Event evt) {
@@ -14348,9 +14347,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // A copy event this port caused itself. When the async clipboard API is missing or
             // refuses, copyToClipboard falls back to execCommand("copy") on the main thread, and
             // that fires a copy event of its own; answering it would copy again, fall back again
-            // and cycle. It reaches this listener after copyToClipboard has returned, hence a
-            // short window rather than a flag held across the call.
-            if (System.currentTimeMillis() - lastPortCopyTime < 1000) {
+            // and cycle. The bridge marks exactly that event (its target is the fallback's own
+            // textarea), so a user copying twice in a row is never mistaken for it.
+            if (((JSOImplementations.CopyEventInfo) evt).getCn1SelfCopy()) {
                 return;
             }
             // Not through the event. This listener runs in the worker, after the browser has

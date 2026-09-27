@@ -683,6 +683,13 @@ public class JSOImplementations {
     
     /// The part of a PointerEvent the port reads to tell a finger from a mouse. A plain mouse
     /// event has no such property and answers null.
+    /// A copy event as browser_bridge.js forwards it; cn1SelfCopy is true when the event came
+    /// from this port's own execCommand("copy") fallback rather than from the user.
+    public interface CopyEventInfo extends Event {
+        @JSProperty
+        public boolean getCn1SelfCopy();
+    }
+
     public interface PointerTypeEvent extends Event {
         @JSProperty
         public String getPointerType();

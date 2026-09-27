@@ -376,6 +376,19 @@ public class JavaScriptBuilder extends Executor {
             return;
         }
         Set<String> keep = JavaScriptBuildHints.themesToShip(request, themeReferences);
+        boolean anyKeptPresent = false;
+        for (String theme : keep) {
+            if (new File(assets, theme + ".res").isFile()) {
+                anyKeptPresent = true;
+                break;
+            }
+        }
+        if (!anyKeptPresent) {
+            // None of the themes the app can reach is here, so pruning would leave it with none
+            // at all -- not even the legacy pair the runtime falls back to. Ship what there is.
+            log("WARNING: none of the native themes " + keep + " is in the port bundle; not pruning");
+            return;
+        }
         for (String theme : JavaScriptBuildHints.ALL_THEMES) {
             if (keep.contains(theme)) {
                 continue;
@@ -386,6 +399,36 @@ public class JavaScriptBuilder extends Executor {
             }
         }
         debug("Native themes shipped: " + keep);
+    }
+
+    /**
+     * Copies the native themes from the checkout's {@code Themes/} directory into a source-built
+     * port's assets, the way maven/parparvm assembles {@code JavaScriptPort.jar}. The webapp in
+     * the tree carries only the committed legacy themes -- the modern and desktop ones are
+     * gitignored build outputs -- so without this a source build pruned to "the themes the app
+     * can reach" was left with none of them.
+     */
+    private void stageCanonicalThemes(File portSources, File assets) {
+        File dir = portSources;
+        for (int i = 0; i < 8 && dir != null; i++) {
+            File themes = new File(dir, "Themes");
+            if (new File(themes, "iOS7Theme.res").isFile()) {
+                assets.mkdirs();
+                for (String theme : JavaScriptBuildHints.ALL_THEMES) {
+                    File src = new File(themes, theme + ".res");
+                    if (src.isFile()) {
+                        try {
+                            Files.copy(src.toPath(), new File(assets, theme + ".res").toPath(),
+                                    StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException ex) {
+                            log("WARNING: could not stage " + src + ": " + ex.getMessage());
+                        }
+                    }
+                }
+                return;
+            }
+            dir = dir.getParentFile();
+        }
     }
 
     private File locateJavaScriptPortSources(BuildRequest request) {
@@ -510,6 +553,7 @@ public class JavaScriptBuilder extends Executor {
             }
             copyTree(srcWebApp, dest);
             jsPortWebApp = dest;
+            stageCanonicalThemes(portSources, new File(dest, "assets"));
             pruneOptionalPortAssets(dest, request);
         }
         return stageClasses;

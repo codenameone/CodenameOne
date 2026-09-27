@@ -82,6 +82,15 @@ final class JavaScriptDesktopChrome {
     private final boolean mac;
     private final List<HTMLElement> openMenus = new ArrayList<HTMLElement>();
 
+    // What the current menus hold, rebuilt by setCommands. The DOM refers to these by index and
+    // id only: the listeners are two delegated ones on the menu bar, installed once. A listener
+    // per item would be a worker callback per item, which the worker bridge keeps for the life of
+    // the page -- every rebuild on every form change would have retained its commands forever.
+    private final List<HTMLElement> menus = new ArrayList<HTMLElement>();
+    private final List<List<Object[]>> itemsByMenu = new ArrayList<List<Object[]>>();
+    private final Map<String, Command> commandsById = new HashMap<String, Command>();
+    private int nextCommandId;
+
     JavaScriptDesktopChrome(HTMLDocument document, HTMLElement appSurface, String os, CommandSink sink) {
         this.document = document;
         this.sink = sink;
@@ -99,6 +108,23 @@ final class JavaScriptDesktopChrome {
         menuBar.setAttribute("aria-label", "Application menu");
         root.appendChild(menuBar);
         document.getBody().appendChild(root);
+
+        menuBar.addEventListener("click", new EventListener() {
+            public void handleEvent(Event evt) {
+                Command c = commandForTarget(evt.getTarget());
+                if (c != null) {
+                    closeMenus();
+                    sink.commandChosen(c);
+                }
+            }
+        });
+        // toggle does not bubble, but it does run the capture phase, so one capturing listener
+        // on the menu bar sees every menu open and close.
+        menuBar.addEventListener("toggle", new EventListener() {
+            public void handleEvent(Event evt) {
+                menuToggled(evt.getTarget());
+            }
+        }, true);
 
         // Escape closes an open menu, as it does in every native menu bar.
         root.addEventListener("keydown", new EventListener() {
@@ -133,7 +159,9 @@ final class JavaScriptDesktopChrome {
     /// Replaces the menus with `commands`, grouped by [Command#getDesktopMenu()].
     void setCommands(Vector commands) {
         closeMenus();
-        menuItems.clear();
+        menus.clear();
+        itemsByMenu.clear();
+        commandsById.clear();
         menuBar.setInnerHTML("");
         Map<String, List<Command>> groups = group(commands);
         for (Map.Entry<String, List<Command>> e : groups.entrySet()) {
@@ -210,6 +238,10 @@ final class JavaScriptDesktopChrome {
     private HTMLElement buildMenu(String menuTitle, List<Command> commands) {
         final HTMLElement details = document.createElement("details");
         details.setAttribute("class", "cn1-chrome-menu");
+        List<Object[]> items = new ArrayList<Object[]>();
+        details.setAttribute("data-cn1-menu", String.valueOf(menus.size()));
+        menus.add(details);
+        itemsByMenu.add(items);
         HTMLElement summary = document.createElement("summary");
         summary.setTextContent(menuTitle);
         details.appendChild(summary);
@@ -226,7 +258,10 @@ final class JavaScriptDesktopChrome {
             // enabled again. The look is refreshed each time the menu opens, and a click on a
             // command that is disabled by then is refused by dispatchNativeMenuCommand.
             markEnabled(item, c);
-            itemsOf(details).add(new Object[]{item, c});
+            items.add(new Object[]{item, c});
+            String id = String.valueOf(nextCommandId++);
+            commandsById.put(id, c);
+            item.setAttribute("data-cn1-cmd", id);
             HTMLElement label = document.createElement("span");
             label.setTextContent(c.getCommandName());
             item.appendChild(label);
@@ -244,34 +279,9 @@ final class JavaScriptDesktopChrome {
                 accel.setTextContent(shortcut);
                 item.appendChild(accel);
             }
-            item.addEventListener("click", new EventListener() {
-                public void handleEvent(Event evt) {
-                    closeMenus();
-                    sink.commandChosen(c);
-                }
-            });
             list.appendChild(item);
         }
         details.appendChild(list);
-        // Opening one menu closes the others, as in a native menu bar.
-        details.addEventListener("toggle", new EventListener() {
-            public void handleEvent(Event evt) {
-                if (details.hasAttribute("open")) {
-                    for (Object[] entry : itemsOf(details)) {
-                        markEnabled((HTMLElement) entry[0], (Command) entry[1]);
-                    }
-                    for (HTMLElement other : new ArrayList<HTMLElement>(openMenus)) {
-                        if (other != details) { //NOPMD CompareObjectsWithEquals
-                            other.removeAttribute("open");
-                        }
-                    }
-                    openMenus.clear();
-                    openMenus.add(details);
-                } else {
-                    openMenus.remove(details);
-                }
-            }
-        });
         return details;
     }
 
@@ -298,15 +308,46 @@ final class JavaScriptDesktopChrome {
         return sb.toString();
     }
 
-    private final Map<HTMLElement, List<Object[]>> menuItems = new HashMap<HTMLElement, List<Object[]>>();
-
-    private List<Object[]> itemsOf(HTMLElement menu) {
-        List<Object[]> list = menuItems.get(menu);
-        if (list == null) {
-            list = new ArrayList<Object[]>();
-            menuItems.put(menu, list);
+    /// The command a click landed on: the item, or the label or shortcut span inside it.
+    private Command commandForTarget(Object target) {
+        Object node = target;
+        for (int depth = 0; node != null && depth < 4; depth++) {
+            com.codename1.html5.js.dom.Element el = (com.codename1.html5.js.dom.Element) node;
+            String id = el.getAttribute("data-cn1-cmd");
+            if (id != null && id.length() > 0) {
+                return commandsById.get(id);
+            }
+            node = el.getParentNode();
         }
-        return list;
+        return null;
+    }
+
+    /// Opening one menu closes the others, as in a native menu bar, and refreshes its items'
+    /// enabled look: Command.setEnabled() does not republish the menu.
+    private void menuToggled(Object target) {
+        String index = ((com.codename1.html5.js.dom.Element) target).getAttribute("data-cn1-menu");
+        if (index == null || index.length() == 0) {
+            return;
+        }
+        int i = Integer.parseInt(index);
+        if (i < 0 || i >= menus.size()) {
+            return;
+        }
+        HTMLElement details = menus.get(i);
+        if (details.hasAttribute("open")) {
+            for (Object[] entry : itemsByMenu.get(i)) {
+                markEnabled((HTMLElement) entry[0], (Command) entry[1]);
+            }
+            for (HTMLElement other : new ArrayList<HTMLElement>(openMenus)) {
+                if (other != details) { //NOPMD CompareObjectsWithEquals
+                    other.removeAttribute("open");
+                }
+            }
+            openMenus.clear();
+            openMenus.add(details);
+        } else {
+            openMenus.remove(details);
+        }
     }
 
     private static void markEnabled(HTMLElement item, Command c) {

@@ -1883,6 +1883,10 @@
     if (evt.target && typeof storeHostRef === 'function') {
       out.target = storeHostRef(evt.target);
     }
+    if (evt.type === 'copy' && evt.target && typeof evt.target.getAttribute === 'function'
+        && evt.target.getAttribute('data-cn1-self-copy') === '1') {
+      out.cn1SelfCopy = true;
+    }
     if (evt.currentTarget && typeof storeHostRef === 'function') {
       out.currentTarget = storeHostRef(evt.currentTarget);
     }
@@ -3695,6 +3699,10 @@
     }
     var textArea = doc.createElement('textarea');
     textArea.setAttribute('readonly', '');
+    // Marks the copy event execCommand raises below as ours: serializeEventForWorker reports it
+    // as cn1SelfCopy, and the port's document copy listener leaves it alone instead of copying
+    // again -- which would fall back here again and cycle.
+    textArea.setAttribute('data-cn1-self-copy', '1');
     textArea.style.position = 'fixed';
     textArea.style.top = '-1000px';
     textArea.style.left = '0';
@@ -6860,7 +6868,10 @@
       }
       var binding = 'primary' + (e.altKey ? '+alt' : '') + (e.shiftKey ? '+shift' : '') + '+' + key;
       var item = chrome.querySelector('[data-cn1-accel="' + binding + '"]');
-      if (!item || item.getAttribute('aria-disabled') === 'true') {
+      // Not rejected on aria-disabled: that marker is refreshed when the menu opens, so it can
+      // be stale after Command.setEnabled(). dispatchNativeMenuCommand checks the command's
+      // CURRENT state when the click arrives, which is the authority.
+      if (!item) {
         return;
       }
       e.preventDefault();
