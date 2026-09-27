@@ -1531,8 +1531,41 @@ static void cn1A11yBeginMain(void* ignored) {
     }
 }
 
+/* One tree publication is queued on the calling thread and applied in a single
+ * hop to the GTK thread by accessibilityEnd. Each node and action used to make
+ * its own cn1LinuxRunOnMainAndWait, so publishing the gallery's tree was hundreds
+ * of synchronous round trips between the event dispatch thread and the GTK loop,
+ * each one waiting for the loop to come round. Begin, node, action and end are
+ * always called in that order from the one thread that publishes the tree, and
+ * the queue is only read on the GTK thread while that thread waits, so it needs
+ * no lock. */
+typedef struct {
+    int action; /* 0 = node, 1 = action */
+    void* data;
+} CN1A11yOp;
+static CN1A11yOp* cn1A11yOps = 0;
+static int cn1A11yOpCount = 0;
+static int cn1A11yOpCapacity = 0;
+
+static void cn1A11yQueue(int action, void* data) {
+    if (cn1A11yOpCount == cn1A11yOpCapacity) {
+        int capacity = cn1A11yOpCapacity == 0 ? 256 : cn1A11yOpCapacity * 2;
+        CN1A11yOp* grown = (CN1A11yOp*) realloc(cn1A11yOps, (size_t) capacity * sizeof(CN1A11yOp));
+        if (grown == 0) {
+            return;
+        }
+        cn1A11yOps = grown;
+        cn1A11yOpCapacity = capacity;
+    }
+    cn1A11yOps[cn1A11yOpCount].action = action;
+    cn1A11yOps[cn1A11yOpCount].data = data;
+    cn1A11yOpCount++;
+}
+
 JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityBegin__(CODENAME_ONE_THREAD_STATE) {
-    cn1LinuxRunOnMainAndWait(cn1A11yBeginMain, 0);
+    /* Nothing reaches GTK yet; see accessibilityEnd. A publication that never
+     * reached its end leaves ops behind, and they are applied with this one. */
+    (void) threadStateData;
 }
 
 typedef struct {
@@ -1602,7 +1635,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityNode___long_long_jav
     call->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
     call->description = description == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, description));
     call->value = value == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, value));
-    cn1LinuxRunOnMainAndWait(cn1A11yNodeMain, call);
+    cn1A11yQueue(0, call);
 }
 
 static void cn1A11yActionActivated(GtkWidget* widget, gpointer pointer) {
@@ -1650,11 +1683,21 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityAction___long_java_l
     action->nodeId = nodeId; action->actionHash = actionHash;
     action->actionId = actionId == JAVA_NULL ? strdup("") : strdup(stringToUTF8(threadStateData, actionId));
     action->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
-    cn1LinuxRunOnMainAndWait(cn1A11yActionMain, action);
+    cn1A11yQueue(1, action);
 }
 
 static void cn1A11yEndMain(void* pointer) {
+    int i;
     (void) pointer;
+    cn1A11yBeginMain(0);
+    for (i = 0; i < cn1A11yOpCount; i++) {
+        if (cn1A11yOps[i].action) {
+            cn1A11yActionMain(cn1A11yOps[i].data);
+        } else {
+            cn1A11yNodeMain(cn1A11yOps[i].data);
+        }
+    }
+    cn1A11yOpCount = 0;
     if (cn1AccessibilityFixed) gtk_widget_show_all(cn1AccessibilityFixed);
 }
 
