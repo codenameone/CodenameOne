@@ -550,15 +550,73 @@ public class ByteCodeClass {
     /// subclassed another port's (MacImplementation extends IOSImplementation),
     /// because the ~1,200 inherited methods -- Graphics primitives among them --
     /// silently fell back to full virtual dispatch.
+    ///
+    /// Goes through selectVirtualDeclaringClass, so a declaration that does not override
+    /// the method in the JVM's sense is never bound; see there.
     public static ByteCodeClass findConcreteDeclaringClass(ByteCodeClass concrete, String name, String desc) {
-        ByteCodeClass c = concrete;
-        while (c != null) {
-            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
-                return c;
+        return selectVirtualDeclaringClass(concrete, name, desc);
+    }
+
+    private static ByteCodeClass superclassOf(ByteCodeClass c) {
+        String base = c.getBaseClass();
+        return base == null ? null : Parser.getClassObject(base.replace('/', '_').replace('$', '_'));
+    }
+
+    private static String packageOf(ByteCodeClass c) {
+        String n = c.getOriginalClassName();
+        int slash = n == null ? -1 : n.lastIndexOf('/');
+        return slash < 0 ? "" : n.substring(0, slash);
+    }
+
+    /// THE DECLARATION A VIRTUAL CALL RUNS FOR A RECEIVER OF CLASS {@code receiver}, or null
+    /// when the translator should not bind it directly.
+    ///
+    /// Every place that names a receiver's implementation directly -- the guarded call sites
+    /// (Invoke.buildGuards), the interface-thunk switches (thunkCasesFor), the @Concrete
+    /// binding and the interface target sets -- asks this, so the JVM's selection rule
+    /// (JVMS 5.4.6) is applied once. The rule they used to apply was "the first non-abstract
+    /// declaration up the superclass chain", which is not the JVM's: a declaration only
+    /// counts if it OVERRIDES the method, and a package-private method is overridden only
+    /// from its own package. With A.m() package-private in p and B extends A declaring m()
+    /// in q, a B receiver runs A.m(), while the old walk bound B.m().
+    ///
+    /// Null is always a safe answer -- the callers fall back to ordinary virtual dispatch --
+    /// so this declines rather than modelling the rarer cases exactly: a private or static
+    /// declaration of the same signature on the way up, or ANY package-private declaration
+    /// above the candidate in a different package (including the transitive-override case,
+    /// where the answer would be the candidate after all).
+    ///
+    /// KNOWN GAP BELOW THIS: the vtable. fillVirtualMethodTable replaces a slot by name and
+    /// descriptor alone, so B.m() takes over A.m()'s slot in the case above, and the indirect
+    /// dispatch these callers fall back to has the same error on every target. Giving a
+    /// non-overriding declaration its own slot is the real fix, and it touches every
+    /// consumer of virtualMethodList.indexOf; until then this keeps the direct paths from
+    /// ADDING a second way to be wrong, and they stay correct once the table is fixed.
+    public static ByteCodeClass selectVirtualDeclaringClass(ByteCodeClass receiver, String name, String desc) {
+        ByteCodeClass d = receiver;
+        while (d != null) {
+            BytecodeMethod m = d.findDeclaredMethod(name, desc);
+            if (m != null) {
+                if (m.isStatic() || m.isPrivate()) {
+                    return null;
+                }
+                if (!m.isAbstract()) {
+                    break;
+                }
             }
-            c = c.getBaseClassObject();
+            d = superclassOf(d);
         }
-        return null;
+        if (d == null) {
+            return null;
+        }
+        String pkg = packageOf(d);
+        for (ByteCodeClass a = superclassOf(d); a != null; a = superclassOf(a)) {
+            BytecodeMethod m = a.findDeclaredMethod(name, desc);
+            if (m != null && m.isPackagePrivate() && !packageOf(a).equals(pkg)) {
+                return null;
+            }
+        }
+        return d;
     }
 
     public void unmark() {
@@ -847,14 +905,11 @@ public class ByteCodeClass {
         StringBuilder sig = new StringBuilder("__");
         BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sig, new ArrayList<String>());
         for (ByteCodeClass c : cone) {
-            ByteCodeClass d = c;
-            while (d != null && !d.hasDeclaredNonAbstractMethod(name, desc)) {
-                String base = d.getBaseClass();
-                d = base == null ? null : Parser.getClassObject(base.replace('/', '_').replace('$', '_'));
-            }
+            ByteCodeClass d = selectVirtualDeclaringClass(c, name, desc);
             if (d == null || d.isEliminated()) {
                 // One implementor whose body cannot be named here -- a default method on
-                // the interface itself, or something the dead code pass removed. SKIP
+                // the interface itself, a declaration selectVirtualDeclaringClass will not
+                // bind, or something the dead code pass removed. SKIP
                 // it rather than abandoning the table: the default arm below is the
                 // original indirect dispatch, so a receiver with no case still reaches
                 // the right implementation. Refusing the whole table for one such
@@ -1270,7 +1325,8 @@ public class ByteCodeClass {
                     }
 
                     // Static object fields may interact with heap bookkeeping, so they keep thread context.
-                    b.append("void set_static_");
+                    // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
+                    b.append("CN1_SETTER_INLINE void set_static_");
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
@@ -1404,7 +1460,8 @@ public class ByteCodeClass {
             }
 
             // Instance field setters don't use thread context directly.
-            b.append("void set_field_");
+            // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
+            b.append("CN1_SETTER_INLINE void set_field_");
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());

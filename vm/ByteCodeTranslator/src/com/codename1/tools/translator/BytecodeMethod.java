@@ -102,6 +102,8 @@ public class BytecodeMethod implements SignatureSet {
     private boolean constructor;
     private boolean staticMethod;
     private boolean privateMethod;
+    // Neither public, protected nor private: overridable only from the same package.
+    private boolean packagePrivateMethod;
     private boolean nativeMethod;
     private boolean abstractMethod;
     private List<String> dependentClasses = new ArrayList<String>();
@@ -920,6 +922,7 @@ public class BytecodeMethod implements SignatureSet {
         this.clsName = clsName;
         this.desc = desc;
         privateMethod = (access & Opcodes.ACC_PRIVATE) == Opcodes.ACC_PRIVATE;
+        packagePrivateMethod = (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED | Opcodes.ACC_PRIVATE)) == 0;
         nativeMethod = (access & Opcodes.ACC_NATIVE) == Opcodes.ACC_NATIVE;
         staticMethod = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalMethod = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
@@ -2691,6 +2694,11 @@ public class BytecodeMethod implements SignatureSet {
 
     public boolean isPrivate() {
         return privateMethod;
+    }
+
+    /** Neither public, protected nor private, so only a same-package subclass overrides it. */
+    public boolean isPackagePrivate() {
+        return packagePrivateMethod;
     }
     
     /*public boolean isVirtualBlockedDueToFinal() {

@@ -15736,10 +15736,14 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
 // First stamp of a class: publish its descriptor under its header index. The full fence
 // orders the entry before any later store -- in particular before the store that makes
 // the object reachable from another thread -- so a reader that loaded the object's class
-// index finds the descriptor (its load of the entry depends on the index it read). Racing
-// first stamps of one class write the same pointer, which is harmless.
+// index finds the descriptor (its load of the entry depends on the index it read).
+// Racing first stamps of one class write the same pointer, but two plain writes of even
+// the same value, or a plain write against a reader, are still a data race in C -- so the
+// slot is written with an atomic store and every reader (CN1_OBJ_CLASS, cn1ObjSetClass)
+// loads it atomically. The descriptor itself is static data, fully formed at link time,
+// so there is nothing further for the store to publish.
 void cn1ClazzRegister(uint16_t index, struct clazz* c) {
-    cn1ClazzById[index] = c;
+    __atomic_store_n(&cn1ClazzById[index], c, __ATOMIC_RELEASE);
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
@@ -17246,7 +17250,9 @@ static void gcMarkProducerEnd(CODENAME_ONE_THREAD_STATE) {
 // it, passing it as a transient call argument, or returning copies is fine.
 JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struct clazz* cls) {
 #ifndef CN1_DISABLE_BIBOP
-    if(totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0
+    // totalSize > 0 as well: a caller's size arithmetic that wrapped arrives negative, and
+    // a negative size passes the upper bound.
+    if(totalSize > 0 && totalSize <= CN1_BIBOP_MAX_OBJECT && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        && !threadStateData->nativeAllocationMode
 #endif
@@ -18013,15 +18019,30 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
  */
 struct clazz class__java_lang_String_i8;
 struct clazz class__java_lang_String_i16;
+// 0 = not started, 1 = one thread is copying, 2 = ready.
 static _Atomic int cn1StringTwinReady = 0;
 
 void cn1InitStringTwin(void) {
-    if(atomic_load_explicit(&cn1StringTwinReady, memory_order_acquire)) {
+    if(atomic_load_explicit(&cn1StringTwinReady, memory_order_acquire) == 2) {
         return;
     }
-    // Racy by construction and safe for it: every writer copies the SAME bytes from
-    // the same fully initialised source, so a second thread either sees the finished
-    // copy or redoes it identically. The release store is what publishes it.
+    // ONE WRITER. It used to be racy on the theory that every writer copies the same
+    // bytes, but a writer does not copy them in one step: the memcpy below restores
+    // cn1HeaderIndex (and cn1ClazzRegistered) to String's values before the lines
+    // after it set the twin's own. A second thread arriving late would redo that
+    // memcpy while a first one had already published ready, and a String stamped
+    // with the twin in that window would read back as plain String -- with its
+    // characters inline and a null value, which String then treats as array-backed.
+    // So the first thread to claim the copy does it and every other one waits for it.
+    int expected = 0;
+    if(!atomic_compare_exchange_strong_explicit(&cn1StringTwinReady, &expected, 1,
+            memory_order_acq_rel, memory_order_acquire)) {
+        int spins = 0;
+        while(atomic_load_explicit(&cn1StringTwinReady, memory_order_acquire) != 2) {
+            cn1GcHandshakeBackoff(&spins);
+        }
+        return;
+    }
     // memcpy, not assignment: struct clazz declares isArray and baseInterfaceCount
     // const, which blocks whole-struct assignment. The TWIN itself is not const, so
     // copying into it is well defined; the const is on how the members are declared,
@@ -18049,7 +18070,7 @@ void cn1InitStringTwin(void) {
     class__java_lang_String_i16.cn1AllocCount = 0;
     class__java_lang_String_i16.cn1AllocBytes = 0;
 #endif
-    atomic_store_explicit(&cn1StringTwinReady, 1, memory_order_release);
+    atomic_store_explicit(&cn1StringTwinReady, 2, memory_order_release);
 }
 
 JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
@@ -18060,6 +18081,12 @@ JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_B
         // No JavaArrayPrototype: the characters follow the fields directly. length is
         // count, dimensions is 1, the coder is the twin class and dataOffset is this
         // constant, so the 24 bytes that used to carry them are gone.
+        // len is bounded before it is added to: callers pass summed lengths (concat), which
+        // can already have wrapped negative, and off + len wraps near INT_MAX -- either way a
+        // size that passes the upper bound below. Out of range means the ordinary path.
+        if(len < 0 || len > CN1_BIBOP_MAX_OBJECT) {
+            return JAVA_NULL;
+        }
         int total = off + len;
         // Full BiBOP alloc (handles freeList / bump / page-acquire) so the fused path stays effective
         // for the WHOLE run. The no-zero fast path only bump-allocates FRESH pages and degrades to the

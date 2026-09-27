@@ -425,7 +425,9 @@ extern const int cn1ClazzByIdCount;
 extern void cn1ClazzRegister(uint16_t index, struct clazz* c);
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c);
-#define CN1_OBJ_CLASS(o)            (cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId])
+// Every slot is read atomically (relaxed, which is an ordinary load on every target) because
+// cn1ClazzRegister writes slots while other threads read the table; see there.
+#define CN1_OBJ_CLASS(o)            (__atomic_load_n(&cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId], __ATOMIC_RELAXED))
 #define CN1_OBJ_SET_CLASS(o, c)     cn1ObjSetClass((struct JavaObjectPrototype*)(o), (c))
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c) {
     if(c == 0) {
@@ -439,7 +441,7 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
 // hold an object whose class index resolves to nothing.
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c) {
     uint16_t index = cn1ClazzIndexOf(c);
-    if(__builtin_expect(index != 0 && cn1ClazzById[index] == 0, 0)) {
+    if(__builtin_expect(index != 0 && __atomic_load_n(&cn1ClazzById[index], __ATOMIC_RELAXED) == 0, 0)) {
         cn1ClazzRegister(index, (struct clazz*)c);
     }
     o->__cn1ClassId = index;
@@ -1581,11 +1583,33 @@ extern JAVA_CHAR cn1StrCharAtRaw(JAVA_OBJECT s, JAVA_INT i);
                 && cn1IsStringClass(CN1_OBJ_CLASS(cn1__io))) ? 1 : 0; \
     }
 
-#define BC_INSTANCEOF_LEAF(clsSymbol) { \
+// Compares the HEADER'S CLASS INDEX with the constant for the class (its classId + 1),
+// not the class word with &class__X. The answer is the same -- only the String twins
+// carry a different index for their class, and String has its own form,
+// BC_INSTANCEOF_STRING -- but naming &class__X is a reference to the class descriptor,
+// and the descriptor references the class's constructor (__NEW_INSTANCE_) and mark
+// function. An `instanceof Table` in code that never creates a Table therefore kept all
+// of Table in the binary, and whatever it reaches: on a Linux gallery app, the spinner,
+// table and validation packages. It also saves the table load.
+// THE GENERATED FIELD SETTERS ARE FORCED INLINE UNDER GCC. Every putfield/putstatic
+// calls set_field_X / set_static_X, defined in the class's own .c. clang builds use ThinLTO
+// and inline them freely; the GCC builds (Linux) have no LTO, so only GCC's own per-file
+// heuristic decides -- and once the write barrier made a reference setter ~220 bytes
+// instead of ~110, it stopped inlining them. Every setter then survived as a function and
+// every store in the program became a call: ~1MB of extra code on a Linux gallery app.
+// Forcing it restores the old shape. The header keeps a plain declaration, so under C99's
+// rules each definition is still an EXTERNAL one and cross-file callers link as before.
+#if defined(__GNUC__) && !defined(__clang__)
+#define CN1_SETTER_INLINE inline __attribute__((always_inline))
+#else
+#define CN1_SETTER_INLINE
+#endif
+#define BC_INSTANCEOF_LEAF(classIdConst) { \
         JAVA_OBJECT cn1__io = SP[-1].data.o; \
         SP[-1].type = CN1_TYPE_INT; \
         SP[-1].data.i = (cn1__io != JAVA_NULL && !CN1_IS_TAGGED(cn1__io) \
-                && CN1_OBJ_CLASS(cn1__io) == &(clsSymbol)) ? 1 : 0; \
+                && ((const struct JavaObjectPrototype*)cn1__io)->__cn1ClassId \
+                    == (uint16_t)((classIdConst) + 1)) ? 1 : 0; \
     }
 
 #define BC_INSTANCEOF_FAST(typeTestIdx, typeOfInstanceOf) { \

@@ -1864,6 +1864,22 @@ JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_T
 #define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)cn1StrChars((JAVA_OBJECT)(s)))
 #define CN1_SB_LEN(s) (((struct obj__java_lang_String*)(s))->java_lang_String_count)
 
+// The combined length, or OutOfMemoryError when it does not fit a Java int -- what the JDK
+// throws for a concatenation that long. Summed in 64 bits: an int sum wraps negative, and
+// while cn1FusedLatin1Begin refuses a negative length, cn1ConcatFallback would then have
+// handed the same wrapped value to allocArray.
+static int cn1ConcatLength(CODENAME_ONE_THREAD_STATE, const int* lens, int n) {
+    int64_t total = 0;
+    for(int i = 0 ; i < n ; i++) {
+        total += lens[i];
+    }
+    if(total > INT_MAX) {
+        CN1_THROW_OOM();
+        return 0;
+    }
+    return (int)total;
+}
+
 static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE* const* parts, const int* lens, int n, int total) {
     enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
@@ -1882,7 +1898,7 @@ static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE*
 JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b) {
     JAVA_ARRAY_BYTE* p[2] = { CN1_SB_PTR(a), CN1_SB_PTR(b) };
     int l[2] = { CN1_SB_LEN(a), CN1_SB_LEN(b) };
-    int total = l[0] + l[1];
+    int total = cn1ConcatLength(threadStateData, l, 2);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1897,7 +1913,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c) {
     JAVA_ARRAY_BYTE* p[3] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c) };
     int l[3] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c) };
-    int total = l[0] + l[1] + l[2];
+    int total = cn1ConcatLength(threadStateData, l, 3);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1912,7 +1928,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d) {
     JAVA_ARRAY_BYTE* p[4] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d) };
     int l[4] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d) };
-    int total = l[0] + l[1] + l[2] + l[3];
+    int total = cn1ConcatLength(threadStateData, l, 4);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1927,7 +1943,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat5___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d, JAVA_OBJECT e) {
     JAVA_ARRAY_BYTE* p[5] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d), CN1_SB_PTR(e) };
     int l[5] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d), CN1_SB_LEN(e) };
-    int total = l[0] + l[1] + l[2] + l[3] + l[4];
+    int total = cn1ConcatLength(threadStateData, l, 5);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -4484,19 +4500,37 @@ JAVA_INT java_util_ArrayList_initFromNative___java_util_Collection_R_int(
 // HashMap.java. These are the Java-visible handles; the collector reaches the reference
 // blocks through the generated __GC_MARK_ (ByteCodeClass.NATIVE_BLOCKS) and frees all
 // three from the generated __FINALIZER_.
+// The Java-visible allocators THROW on failure. The C kernels (addAllNative, the HashSet
+// natives) check the 0 the block allocators return, but Java callers take the handle as
+// valid -- ArrayList.resize copies into it at once, ArrayDeque writes through it later --
+// so a refused allocation (native memory exhausted, or past the allocator's size limit)
+// reported as 0 became a native null dereference instead of OutOfMemoryError. A zero-size
+// request legitimately yields 0 and is not a failure.
 JAVA_LONG java_util_NativeStorage_allocateTable___int_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n, JAVA_BOOLEAN ordered) {
-    return cn1TableAlloc(n, ordered);
+    JAVA_LONG table = cn1TableAlloc(n, ordered);
+    if(table == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return table;
 }
 JAVA_LONG java_util_NativeStorage_part___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part) {
     return cn1TablePart(table, part);
 }
 
 JAVA_LONG java_util_NativeStorage_allocateReferences___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
-    return cn1RefBlockAlloc(n);
+    JAVA_LONG block = cn1RefBlockAlloc(n);
+    if(block == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return block;
 }
 
 JAVA_LONG java_util_NativeStorage_allocateIntegers___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
-    return cn1IntBlockAlloc(n);
+    JAVA_LONG block = cn1IntBlockAlloc(n);
+    if(block == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return block;
 }
 
 JAVA_INT java_util_NativeStorage_capacity___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {
@@ -5499,7 +5533,12 @@ JAVA_CHAR java_lang_String_cn1InlineCharAt___int_R_char(CODENAME_ONE_THREAD_STAT
 
 JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT off, JAVA_INT n) {
     struct obj__java_lang_String* me = (struct obj__java_lang_String*)__cn1ThisObject;
-    if(n < 0) {
+    // A length that cannot fit a fused block is refused BEFORE any size arithmetic: n is
+    // bounded only by the parent's length, and n * esz in int wraps for a UTF-16
+    // substring past INT_MAX / 2, which the allocator would then accept as a small size
+    // and the memcpy below overrun. Past the largest BiBOP object the fused path could
+    // never be taken anyway, so this changes which path runs, never the result.
+    if(n < 0 || n > CN1_BIBOP_MAX_OBJECT) {
         return JAVA_NULL;
     }
     // NOT "value == NULL means no source": a NULL store is now the INLINE marker,
@@ -5576,6 +5615,15 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
         return fallback;
     }
 
+    // Same guard as cn1SubstringFused: CN1_FUSED_ARR_BYTES narrows to int, so a builder
+    // past INT_MAX / 2 characters wraps to a negative total -- which CN1_BIBOP_CIDX files
+    // under the SMALLEST size class. Too large for a fused block in any case, so it takes
+    // the ordinary copy.
+    if(count > CN1_BIBOP_MAX_OBJECT) {
+        JAVA_OBJECT r = cn1BuilderStringCopy(threadStateData, __cn1ThisObject, latin1);
+        finishedNativeAllocations();
+        return r;
+    }
     int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
     int total = off + CN1_FUSED_ARR_BYTES(count, sizeof(JAVA_ARRAY_CHAR));
     // Inline no-zero bump path (init-before-publish, same discipline as the

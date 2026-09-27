@@ -137,7 +137,7 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
         return NULL;
     }
     if (classIndex == 0 || classIndex >= (uint16_t)cn1ClazzByIdCount) return NULL;
-    struct clazz* cls = cn1ClazzById[classIndex];
+    struct clazz* cls = __atomic_load_n(&cn1ClazzById[classIndex], __ATOMIC_RELAXED);
     if (cls == NULL) return NULL;
     // Copied into raw bytes rather than a "struct clazz" local because the
     // struct has const-qualified members, which a local cannot be filled in

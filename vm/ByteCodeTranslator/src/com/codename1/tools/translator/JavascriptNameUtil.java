@@ -234,7 +234,8 @@ final class JavascriptNameUtil {
         stack.push(start);
         while (!stack.isEmpty()) {
             String current = stack.pop();
-            if (current == null || !seen.add(current)) {
+            // An ArrayDeque holds no nulls (push throws), so current is never null.
+            if (!seen.add(current)) {
                 continue;
             }
             ByteCodeClass cls = idx.get(current);

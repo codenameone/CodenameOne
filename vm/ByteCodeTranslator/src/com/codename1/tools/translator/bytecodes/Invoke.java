@@ -198,14 +198,13 @@ public class Invoke extends Instruction {
         }
         java.util.List<String[]> guards = new java.util.ArrayList<String[]>(cone.size());
         for (ByteCodeClass c : cone) {
-            ByteCodeClass d = c;
-            while (d != null && !d.hasDeclaredNonAbstractMethod(name, desc)) {
-                String b = d.getBaseClass();
-                d = b == null ? null : Parser.getClassObject(b.replace('/', '_').replace('$', '_'));
-            }
+            // JVMS selection, not "first non-abstract declaration": see
+            // ByteCodeClass.selectVirtualDeclaringClass.
+            ByteCodeClass d = ByteCodeClass.selectVirtualDeclaringClass(c, name, desc);
             if (d == null || d.isEliminated()) {
                 // A receiver whose implementation cannot be named here: a default
-                // interface method, or a target the dead code pass removed. The site is
+                // interface method, a declaration the JVM would not select, or a target
+                // the dead code pass removed. The site is
                 // then left alone entirely rather than partially guarded.
                 return null;
             }
