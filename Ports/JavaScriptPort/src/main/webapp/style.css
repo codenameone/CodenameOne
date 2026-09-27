@@ -379,10 +379,10 @@ div#cn1-video-capture > video {
     text-align: left;
     cursor: default;
 }
-#cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([disabled]) {
+#cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
     background: rgba(0, 0, 0, 0.07);
 }
-#cn1-desktop-chrome .cn1-chrome-menu-item[disabled] {
+#cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
     opacity: 0.45;
 }
 #cn1-desktop-chrome .cn1-chrome-shortcut {
@@ -398,7 +398,7 @@ div#cn1-video-capture > video {
     text-align: center;
     font-weight: 600;
 }
-#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-menu-item:hover:not([disabled]) {
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
     background: #0a64d8;
     color: #fff;
 }
@@ -430,7 +430,7 @@ div#cn1-video-capture > video {
     }
     #cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
     #cn1-desktop-chrome .cn1-chrome-menu[open] > summary,
-    #cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([disabled]) {
+    #cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
         background: rgba(255, 255, 255, 0.1);
     }
     #cn1-desktop-chrome .cn1-chrome-menu-items {

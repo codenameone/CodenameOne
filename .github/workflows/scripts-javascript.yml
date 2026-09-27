@@ -60,6 +60,8 @@ on:
       - 'scripts/ci/retry.sh'
       - '.github/workflows/scripts-javascript.yml'
       - 'scripts/run-javascript-browser-tests.sh'
+      - 'scripts/test-javascript-composited-rendering.mjs'
+      - 'scripts/javascript/composited-app/**'
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'

@@ -137,6 +137,43 @@ class JavaScriptBuildHintsTest {
     }
 
     @Test
+    void anApplicationThatSetsAThemeHintItselfKeepsEveryTheme() {
+        // Display.setProperty("and.themeMode", "modern") in init() picks at run time what the
+        // build hints did not, so pruning by the hints would delete the theme it asks for.
+        Set<String> refs = new LinkedHashSet<String>();
+        JavaScriptBuildHints.scanBytes(utf8Constant("and.themeMode"), refs);
+        assertTrue(refs.contains(JavaScriptBuildHints.RUNTIME_THEME_CHOICE), refs.toString());
+        assertEquals(new HashSet<String>(JavaScriptBuildHints.ALL_THEMES),
+                JavaScriptBuildHints.themesToShip(request(), refs));
+    }
+
+    @Test
+    void aLongerNameContainingAHintIsNotAThemeChoice() {
+        Set<String> refs = new LinkedHashSet<String>();
+        JavaScriptBuildHints.scanBytes(utf8Constant("nativeThemeResourceName"), refs);
+        assertFalse(refs.contains(JavaScriptBuildHints.RUNTIME_THEME_CHOICE), refs.toString());
+    }
+
+    @Test
+    void frameworkClassesAreNotScanned() {
+        assertTrue(JavaScriptBuildHints.isFrameworkPath("com/codename1/annotations/buildhints/Android.class"));
+        assertFalse(JavaScriptBuildHints.isFrameworkPath("com/example/app/Main.class"));
+    }
+
+    /// The bytes of a CONSTANT_Utf8 entry, as a class file stores a string constant.
+    private static byte[] utf8Constant(String value) {
+        byte[] v = value.getBytes(StandardCharsets.UTF_8);
+        byte[] out = new byte[v.length + 5];
+        out[0] = 7;
+        out[1] = 1;
+        out[2] = (byte) (v.length >> 8);
+        out[3] = (byte) v.length;
+        System.arraycopy(v, 0, out, 4, v.length);
+        out[out.length - 1] = 12;
+        return out;
+    }
+
+    @Test
     void everyShippedNameIsAKnownTheme() {
         String[][] combos = {
             {}, {"nativeTheme", "native"}, {"nativeTheme", "modern"}, {"nativeTheme", "legacy"},

@@ -193,6 +193,28 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelOverAnEmbeddedFormStillMovesThePageAroundIt() {
+        // The walk stops at the ROOT top level only. An embedded Form answers isScrollableY()
+        // for its own content pane just like the root, so it must never be moved itself -- but
+        // the page hosting it still takes the wheel.
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        Form embedded = new Form("embedded", new BorderLayout());
+        embedded.add(BorderLayout.CENTER, new Label("body"));
+        embedded.setPreferredH(px(40));
+        page.addComponent(0, embedded);
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        int x = embedded.getAbsoluteX() + embedded.getWidth() / 2;
+        int y = embedded.getAbsoluteY() + embedded.getHeight() / 2;
+        wheelAt(x, y, 0, -px(20));
+
+        assertTrue(page.getScrollY() > 0, "the page around the embedded form scrolls");
+        assertEquals(0, embedded.getScrollY(), "and the embedded form itself does not");
+    }
+
+    @FormTest
     void aWheelPastTheEndOfAnInnerScrollerMovesThePage() {
         Form f = scrollingForm();
         Container page = f.getContentPane();

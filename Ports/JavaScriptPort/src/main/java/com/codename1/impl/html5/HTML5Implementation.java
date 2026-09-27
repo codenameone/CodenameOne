@@ -4580,8 +4580,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // undefined StatusBar UIID would also paint an opaque strip there).
             tp.put("@paintsTitleBarBool", "false");
 
-            UIManager.getInstance().setThemeProps(tp);
+            // Before the theme applies: a desktop theme sets commandBehavior Native, and
+            // setCommandBehavior normalises that to the default for good when the port reports no
+            // native menu bar at that moment -- which it does until the HTML chrome exists. Forms
+            // without a Toolbar then never published their MenuBar to it.
             installDesktopChromeIfRequested();
+            UIManager.getInstance().setThemeProps(tp);
             return;
     	} catch (IOException ex){
             Log.e(ex);

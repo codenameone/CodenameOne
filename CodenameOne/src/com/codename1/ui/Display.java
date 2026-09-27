@@ -9594,7 +9594,14 @@ public final class Display extends CN1Constants {
             // paints: the Toolbar scrolled off with the content, and the space it left was blank
             // (issue #5910). Reaching the top level means the page is already at its edge.
             if (c instanceof TopLevelContainer) {
-                return false;
+                if (c.getParent() == null) {
+                    return false;
+                }
+                // An embedded Form -- in a Window's layered pane, in an EmbeddedContainer --
+                // has the same delegating isScrollableY() and must not be moved either, but a
+                // scrollable host above it can still take the wheel.
+                c = c.getParent();
+                continue;
             }
             // A disabled component takes no wheel, exactly as it took no synthetic drag:
             // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop

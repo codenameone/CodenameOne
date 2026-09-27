@@ -77,6 +77,18 @@ public final class JavaScriptBuildHints {
     /// reads it can open either modern theme, so an application naming it keeps both.
     static final String MODERN_THEME_PROPERTY = "cn1.modernThemeResource";
 
+    /// Marker [#scanThemeReferences(File)] records when the application's own code names one of
+    /// the theme hints as a string: it can set them with `Display.setProperty` before the native
+    /// theme is installed, choosing at run time what the build hints did not say.
+    static final String RUNTIME_THEME_CHOICE = "runtime theme choice";
+
+    /// The theme hints an application can also set itself at run time; the runtime resolver
+    /// reads each of them through `Display.getProperty`.
+    static final String[] THEME_PROPERTIES = {
+        "nativeTheme", "cn1.nativeTheme", "ios.themeMode", "and.themeMode", "cn1.androidTheme",
+        "javascript.native.theme", "javascript.desktopTheme"
+    };
+
     private JavaScriptBuildHints() {
     }
 
@@ -133,6 +145,12 @@ public final class JavaScriptBuildHints {
     ///   in the application's own classes; an application that opens a theme itself keeps it
     static Set<String> themesToShip(BuildRequest request, Set<String> referencedByApp) {
         Set<String> out = new LinkedHashSet<String>();
+        if (referencedByApp.contains(RUNTIME_THEME_CHOICE)) {
+            // The application picks the theme itself, so the hints do not say which one it
+            // will open. Keep them all rather than delete the one it asks for.
+            out.addAll(ALL_THEMES);
+            return out;
+        }
         for (String name : ALL_THEMES) {
             if (referencedByApp.contains(name)) {
                 out.add(name);
@@ -246,27 +264,36 @@ public final class JavaScriptBuildHints {
     }
 
     /// Scans the application's classes -- loose, or inside jars -- for the theme names in
-    /// [#ALL_THEMES] (as `Name.res`) and for [#MODERN_THEME_PROPERTY]. A class that names a
-    /// resource stores the string verbatim in its constant pool, so a byte search finds it.
+    /// [#ALL_THEMES] (as `Name.res`), for [#MODERN_THEME_PROPERTY], and for the
+    /// [#THEME_PROPERTIES] (recorded as [#RUNTIME_THEME_CHOICE]). A class that names a resource
+    /// or a property stores the string verbatim in its constant pool, so a byte search finds it.
     ///
-    /// Call this on the application tree BEFORE the port is merged into it: the port names
-    /// every theme, and would keep them all.
+    /// Framework classes (`com/codename1/`) are skipped: the tree is the application merged
+    /// with the framework, and the framework's build-hint annotations spell the hint names too.
+    /// Call this BEFORE the port is merged in, for the same reason: the port names every theme.
     static Set<String> scanThemeReferences(File classesDir) throws IOException {
         Set<String> found = new LinkedHashSet<String>();
         if (classesDir != null && classesDir.isDirectory()) {
-            scanDirectory(classesDir, found);
+            scanDirectory(classesDir, "", found);
         }
         return found;
     }
 
-    private static void scanDirectory(File dir, Set<String> found) throws IOException {
+    static boolean isFrameworkPath(String relativePath) {
+        return relativePath.startsWith("com/codename1/");
+    }
+
+    private static void scanDirectory(File dir, String relativePath, Set<String> found) throws IOException {
         File[] children = dir.listFiles();
         if (children == null) {
             return;
         }
         for (File child : children) {
+            String childPath = relativePath.length() == 0 ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
-                scanDirectory(child, found);
+                if (!isFrameworkPath(childPath + "/")) {
+                    scanDirectory(child, childPath, found);
+                }
             } else if (child.getName().endsWith(".class")) {
                 InputStream in = new FileInputStream(child);
                 try {
@@ -279,7 +306,7 @@ public final class JavaScriptBuildHints {
                 try {
                     ZipEntry e;
                     while ((e = zin.getNextEntry()) != null) {
-                        if (!e.isDirectory() && e.getName().endsWith(".class")) {
+                        if (!e.isDirectory() && e.getName().endsWith(".class") && !isFrameworkPath(e.getName())) {
                             scanBytes(readAll(zin), found);
                         }
                     }
@@ -301,6 +328,31 @@ public final class JavaScriptBuildHints {
         }
         if (text.indexOf(MODERN_THEME_PROPERTY) >= 0) {
             found.add(MODERN_THEME_PROPERTY);
+        }
+        for (String property : THEME_PROPERTIES) {
+            if (containsConstant(text, property)) {
+                found.add(RUNTIME_THEME_CHOICE);
+                break;
+            }
+        }
+    }
+
+    /// Whether `text` holds `value` as a whole constant-pool string: a CONSTANT_Utf8 entry is a
+    /// tag byte 1 and a two-byte length before its bytes. "nativeTheme" must not match inside
+    /// "nativeThemeResource" or another longer name.
+    private static boolean containsConstant(String text, String value) {
+        int len = value.length();
+        int from = 0;
+        while (true) {
+            int at = text.indexOf(value, from);
+            if (at < 0) {
+                return false;
+            }
+            if (at >= 3 && text.charAt(at - 3) == 1 && text.charAt(at - 2) == (char) ((len >> 8) & 0xff)
+                    && text.charAt(at - 1) == (char) (len & 0xff)) {
+                return true;
+            }
+            from = at + 1;
         }
     }
 

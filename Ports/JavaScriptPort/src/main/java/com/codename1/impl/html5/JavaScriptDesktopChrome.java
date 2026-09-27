@@ -133,6 +133,7 @@ final class JavaScriptDesktopChrome {
     /// Replaces the menus with `commands`, grouped by [Command#getDesktopMenu()].
     void setCommands(Vector commands) {
         closeMenus();
+        menuItems.clear();
         menuBar.setInnerHTML("");
         Map<String, List<Command>> groups = group(commands);
         for (Map.Entry<String, List<Command>> e : groups.entrySet()) {
@@ -220,9 +221,12 @@ final class JavaScriptDesktopChrome {
             item.setAttribute("type", "button");
             item.setAttribute("role", "menuitem");
             item.setAttribute("class", "cn1-chrome-menu-item");
-            if (!c.isEnabled()) {
-                item.setAttribute("disabled", "disabled");
-            }
+            // Not the disabled attribute: Command.setEnabled() does not republish the menu, so an
+            // item disabled when the menu was built would stay unclickable after the command was
+            // enabled again. The look is refreshed each time the menu opens, and a click on a
+            // command that is disabled by then is refused by dispatchNativeMenuCommand.
+            markEnabled(item, c);
+            itemsOf(details).add(new Object[]{item, c});
             HTMLElement label = document.createElement("span");
             label.setTextContent(c.getCommandName());
             item.appendChild(label);
@@ -246,6 +250,9 @@ final class JavaScriptDesktopChrome {
         details.addEventListener("toggle", new EventListener() {
             public void handleEvent(Event evt) {
                 if (details.hasAttribute("open")) {
+                    for (Object[] entry : itemsOf(details)) {
+                        markEnabled((HTMLElement) entry[0], (Command) entry[1]);
+                    }
                     for (HTMLElement other : new ArrayList<HTMLElement>(openMenus)) {
                         if (other != details) { //NOPMD CompareObjectsWithEquals
                             other.removeAttribute("open");
@@ -282,6 +289,25 @@ final class JavaScriptDesktopChrome {
         }
         sb.append(Character.toUpperCase((char) key));
         return sb.toString();
+    }
+
+    private final Map<HTMLElement, List<Object[]>> menuItems = new HashMap<HTMLElement, List<Object[]>>();
+
+    private List<Object[]> itemsOf(HTMLElement menu) {
+        List<Object[]> list = menuItems.get(menu);
+        if (list == null) {
+            list = new ArrayList<Object[]>();
+            menuItems.put(menu, list);
+        }
+        return list;
+    }
+
+    private static void markEnabled(HTMLElement item, Command c) {
+        if (c.isEnabled()) {
+            item.removeAttribute("aria-disabled");
+        } else {
+            item.setAttribute("aria-disabled", "true");
+        }
     }
 
     void closeMenus() {
