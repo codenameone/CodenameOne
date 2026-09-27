@@ -483,7 +483,14 @@ public class Resources {
     }
 
     private void openFileImpl(InputStream input) throws IOException {
-        this.input = new DataInputStream(input);
+        // Parsing is thousands of two- and four-byte reads, and the stream a port
+        // hands back for a bundled resource is usually com.codename1.io's
+        // BufferedInputStream, whose every read is synchronized and stamps the
+        // clock three times for its network idle timeout. A 3463-key theme took
+        // 5-6ms to open on macOS, much of it in gettimeofday. A plain private
+        // buffer in front of it makes each small read an array index.
+        this.input = new DataInputStream(input instanceof ByteArrayInputStream
+                ? input : new ParseBuffer(input));
         int resourceCount = this.input.readShort();
         if (resourceCount < 0) {
             throw new IOException("Invalid resource file!");
@@ -2225,5 +2232,88 @@ public class Resources {
         int bestMatchScore;
         String rawKey;
         String translatedKey;
+    }
+
+    /// An unsynchronized read buffer for parsing; see openFileImpl.
+    private static final class ParseBuffer extends InputStream {
+        private final InputStream in;
+        private final byte[] buf = new byte[8192];
+        private int pos;
+        private int count;
+
+        ParseBuffer(InputStream in) {
+            this.in = in;
+        }
+
+        private boolean fill() throws IOException {
+            pos = 0;
+            count = in.read(buf, 0, buf.length);
+            if (count < 0) {
+                count = 0;
+                return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int read() throws IOException {
+            while (pos >= count) {
+                if (!fill()) {
+                    return -1;
+                }
+            }
+            return buf[pos++] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            int n = 0;
+            int avail = count - pos;
+            if (avail > 0) {
+                n = Math.min(avail, len);
+                System.arraycopy(buf, pos, b, off, n);
+                pos += n;
+                if (n == len) {
+                    return n;
+                }
+            }
+            if (len - n >= buf.length) {
+                // A large read (an image) goes straight to the source.
+                int r = in.read(b, off + n, len - n);
+                if (r < 0) {
+                    return n == 0 ? -1 : n;
+                }
+                return n + r;
+            }
+            if (!fill()) {
+                return n == 0 ? -1 : n;
+            }
+            int m = Math.min(count - pos, len - n);
+            System.arraycopy(buf, pos, b, off + n, m);
+            pos += m;
+            return n + m;
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            if (n <= 0) {
+                return 0;
+            }
+            int avail = count - pos;
+            if (avail > 0) {
+                int k = (int) Math.min(avail, n);
+                pos += k;
+                return k;
+            }
+            return in.skip(n);
+        }
+
+        @Override
+        public int available() throws IOException {
+            return (count - pos) + in.available();
+        }
     }
 }
