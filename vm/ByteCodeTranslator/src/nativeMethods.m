@@ -4484,19 +4484,37 @@ JAVA_INT java_util_ArrayList_initFromNative___java_util_Collection_R_int(
 // HashMap.java. These are the Java-visible handles; the collector reaches the reference
 // blocks through the generated __GC_MARK_ (ByteCodeClass.NATIVE_BLOCKS) and frees all
 // three from the generated __FINALIZER_.
+// The Java-visible allocators THROW on failure. The C kernels (addAllNative, the HashSet
+// natives) check the 0 the block allocators return, but Java callers take the handle as
+// valid -- ArrayList.resize copies into it at once, ArrayDeque writes through it later --
+// so a refused allocation (native memory exhausted, or past the allocator's size limit)
+// reported as 0 became a native null dereference instead of OutOfMemoryError. A zero-size
+// request legitimately yields 0 and is not a failure.
 JAVA_LONG java_util_NativeStorage_allocateTable___int_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n, JAVA_BOOLEAN ordered) {
-    return cn1TableAlloc(n, ordered);
+    JAVA_LONG table = cn1TableAlloc(n, ordered);
+    if(table == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return table;
 }
 JAVA_LONG java_util_NativeStorage_part___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG table, JAVA_INT part) {
     return cn1TablePart(table, part);
 }
 
 JAVA_LONG java_util_NativeStorage_allocateReferences___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
-    return cn1RefBlockAlloc(n);
+    JAVA_LONG block = cn1RefBlockAlloc(n);
+    if(block == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return block;
 }
 
 JAVA_LONG java_util_NativeStorage_allocateIntegers___int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
-    return cn1IntBlockAlloc(n);
+    JAVA_LONG block = cn1IntBlockAlloc(n);
+    if(block == 0 && n > 0) {
+        CN1_THROW_OOM();
+    }
+    return block;
 }
 
 JAVA_INT java_util_NativeStorage_capacity___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG block) {

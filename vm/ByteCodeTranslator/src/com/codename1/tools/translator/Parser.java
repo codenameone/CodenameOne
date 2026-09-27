@@ -342,16 +342,10 @@ public class Parser extends ClassVisitor {
         java.util.List<ByteCodeClass> targets = new java.util.ArrayList<ByteCodeClass>(4);
         if (impls != null) {
             for (ByteCodeClass c : impls) {
-                ByteCodeClass d = c;
-                while (d != null) {
-                    if (d.hasDeclaredNonAbstractMethod(name, desc)) {
-                        if (!targets.contains(d)) {
-                            targets.add(d);
-                        }
-                        break;
-                    }
-                    String b = d.getBaseClass();
-                    d = b == null ? null : getClassObject(b.replace('/', '_').replace('$', '_'));
+                // JVMS selection: see ByteCodeClass.selectVirtualDeclaringClass.
+                ByteCodeClass d = ByteCodeClass.selectVirtualDeclaringClass(c, name, desc);
+                if (d != null && !targets.contains(d)) {
+                    targets.add(d);
                 }
                 if (d == null) {
                     // Inherited from the interface as a default method, or not found at
