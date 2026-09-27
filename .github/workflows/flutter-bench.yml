@@ -379,6 +379,29 @@ jobs:
           # One line: the action runs each line of `script` in its own shell.
           script: scripts/flutter-bench/app/measure.sh android "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" "${{ runner.temp }}/bench-out"
 
+      # Diagnostic branch only: the Linux executable's symbol companion, for a
+      # per-function size comparison between VM branches.
+      - name: Upload Linux symbols
+        if: ${{ always() && matrix.platform == 'linux' }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/syms"
+          find "${RUNNER_TEMP}/fbench/cn1/linux/target" -name 'Bench.debug' -o -name 'Bench' -type f | while read f; do
+            echo "$f $(stat -c %s "$f")"
+          done
+          dbg=$(find "${RUNNER_TEMP}/fbench/cn1/linux/target" -name 'Bench.debug' | head -1)
+          test -n "$dbg"
+          cp "$dbg" "${RUNNER_TEMP}/syms/Bench.debug"
+          nm -S --size-sort "$dbg" > "${RUNNER_TEMP}/syms/nm-size-sort.txt"
+          size -A "$dbg" > "${RUNNER_TEMP}/syms/sections.txt" || true
+          wc -l "${RUNNER_TEMP}/syms/nm-size-sort.txt"
+      - name: Upload Linux symbols artifact
+        if: ${{ always() && matrix.platform == 'linux' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-symbols
+          path: ${{ runner.temp }}/syms/
+          if-no-files-found: error
+
       # The result and the baseline recorded from it. The baseline is what a
       # human commits to arm the gate, so it travels with the result rather than
       # having to be re-derived.
