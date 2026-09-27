@@ -419,6 +419,23 @@ class TabsGlassSelectionTest extends UITestBase {
     }
 
     @FormTest
+    void tallTabContentGrowsTheBarInsteadOfBeingClipped() {
+        // The bar is UITabBar's 62 pt, but a tab whose content is taller than a
+        // native one (a large icon) must fit: the bar grows rather than clip it.
+        Tabs tabs = glassTabs();
+        Container tc = tabs.getTabsContainer();
+        int before = tc.getHeight();
+        tabs.addTab("Tall", Image.createImage(24, before * 2, 0xff0000ff), new Label("tall"));
+        tabs.getComponentForm().revalidate();
+        assertTrue(tc.getHeight() > before, "the bar grows for the taller tab (" + before + " -> " + tc.getHeight() + ")");
+        for (int i = 0; i < tc.getComponentCount(); i++) {
+            Component c = tc.getComponentAt(i);
+            assertTrue(c.getHeight() >= c.getPreferredH(),
+                    "tab " + i + " is clipped: " + c.getHeight() + " < " + c.getPreferredH());
+        }
+    }
+
+    @FormTest
     void glassTabTitlesNeverScroll() {
         // A ticker started on a tab (focus arriving while the tab was narrower)
         // would drift the title with the clock; UITabBar never scrolls one.

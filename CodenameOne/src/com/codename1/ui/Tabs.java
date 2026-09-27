@@ -3513,7 +3513,7 @@ public class Tabs extends Container {
         @Override
         public Dimension getPreferredSize(Container parent) {
             return new Dimension(Math.round(glassNaturalPillWidth(parent.getComponentCount())) + 2 * glassSlackXPx(),
-                    Math.round(glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT))) + 2 * glassSlackYPx());
+                    Math.round(glassBarHeightPx()) + 2 * glassSlackYPx());
         }
     }
 
@@ -3521,6 +3521,23 @@ public class Tabs extends Container {
     /// and places the pill the way UITabBar does (centred, as wide as its tabs,
     /// its lower edge a fixed distance above the bottom -- inside the home
     /// indicator's safe area, as native draws it); otherwise it is a BorderLayout.
+    /// The floating bar's height: UITabBar's 62 pt, or taller when a tab's content
+    /// needs more (icons or text larger than the native ones), so the glass never
+    /// clips a tab. Native-sized tabs keep the native geometry exactly.
+    private float glassBarHeightPx() {
+        float bar = glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT));
+        if (tabsContainer == null) {
+            return bar;
+        }
+        float inset = glassPx(glassConstantPt("tabsGlassInsetPt", GLASS_INSET_PT));
+        int tallest = 0;
+        int n = tabsContainer.getComponentCount();
+        for (int i = 0; i < n; i++) {
+            tallest = Math.max(tallest, tabsContainer.getComponentAt(i).getPreferredH());
+        }
+        return Math.max(bar, tallest + 2 * inset);
+    }
+
     class GlassHostLayout extends BorderLayout {
         @Override
         public void layoutContainer(Container parent) {
@@ -3531,7 +3548,7 @@ public class Tabs extends Container {
             int sx = glassSlackXPx();
             int sy = glassSlackYPx();
             float edge = glassPx(glassConstantPt("tabsGlassEdgePt", GLASS_EDGE_PT));
-            float barH = glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT));
+            float barH = glassBarHeightPx();
             float pillW = Math.min(glassNaturalPillWidth(tabsContainer.getComponentCount()),
                     parent.getWidth() - 2 * edge);
             int w = Math.round(pillW) + 2 * sx;
@@ -3548,7 +3565,7 @@ public class Tabs extends Container {
                 return super.getPreferredSize(parent);
             }
             float edge = glassPx(glassConstantPt("tabsGlassEdgePt", GLASS_EDGE_PT));
-            float barH = glassPx(glassConstantPt("tabsGlassBarPt", GLASS_BAR_PT));
+            float barH = glassBarHeightPx();
             return new Dimension(tabsContainer.getPreferredW(), Math.round(barH + edge) + glassSlackYPx());
         }
     }
