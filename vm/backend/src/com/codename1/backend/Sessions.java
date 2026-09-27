@@ -151,19 +151,6 @@ public final class Sessions {
         return out;
     }
 
-    private static Sessions standalone;
-
-    /**
-     * The sessions of a bare HttpServer that no Backend started, which has no
-     * per-server settings to read. A Backend always hands its requests its own.
-     */
-    static synchronized Sessions standalone() {
-        if(standalone == null) {
-            standalone = new Sessions();
-        }
-        return standalone;
-    }
-
     /** Whether {@code name} is an RFC 6265 cookie-name: an HTTP token. */
     static boolean isToken(String name) {
         if(name == null || name.length() == 0) {
@@ -264,13 +251,14 @@ public final class Sessions {
                 return;
             }
             lastPurge = now;
+            java.util.Set busy = idsInUse();
             Iterator it = beans.entrySet().iterator();
             while(it.hasNext()) {
                 Map.Entry e = (Map.Entry)it.next();
                 Held h = (Held)e.getValue();
                 if(h.maxInactiveSeconds > 0
                         && now - h.lastAccessed > h.maxInactiveSeconds * 1000L
-                        && !inUse.containsKey(e.getKey())) {
+                        && !busy.contains(e.getKey())) {
                     it.remove();
                     if(expired == null) {
                         expired = new ArrayList();
@@ -402,42 +390,61 @@ public final class Sessions {
     }
 
     /**
-     * Requests using each session right now, by session id: its beans are never
-     * expired while any is -- a request can outlast the inactivity timeout, and
-     * destroying its session's beans under it would hand it closed resources.
+     * Sessions requests are using right now -- the HttpSession object, with how
+     * many requests hold it: the in-memory store hands concurrent requests one
+     * object, the database store each its own copy. Their beans are never
+     * expired while any is in use: a request can outlast the inactivity
+     * timeout, and destroying its session's beans under it would hand it closed
+     * resources. By object, not id, so a session rotated or replaced during the
+     * request is still covered: the purge reads each one's CURRENT id.
      */
     private final Map inUse = new HashMap();
 
     /** A request has resolved {@code session}; counted until {@link #leave}. */
     synchronized void enter(HttpServer.Request request, HttpSession session) {
-        if(request.sessionInUse != null) {
+        if(request.sessionsInUse == null) {
+            request.sessionsInUse = new ArrayList(1);
+        } else if(request.sessionsInUse.contains(session)) {
             return;
         }
-        String id = session.getId();
-        int[] count = (int[])inUse.get(id);
+        request.sessionsInUse.add(session);
+        int[] count = (int[])inUse.get(session);
         if(count == null) {
             count = new int[1];
-            inUse.put(id, count);
+            inUse.put(session, count);
         }
         count[0]++;
-        request.sessionInUse = id;
     }
 
-    /** The request is over; its session's beans may expire again. */
+    /** The request is over; the sessions it used may expire again. */
     synchronized void leave(HttpServer.Request request) {
-        String id = request.sessionInUse;
-        if(id == null) {
+        List used = request.sessionsInUse;
+        if(used == null) {
             return;
         }
-        request.sessionInUse = null;
-        int[] count = (int[])inUse.get(id);
-        if(count != null && --count[0] <= 0) {
-            inUse.remove(id);
+        request.sessionsInUse = null;
+        long now = System.currentTimeMillis();
+        for(int iter = 0 ; iter < used.size() ; iter++) {
+            HttpSession session = (HttpSession)used.get(iter);
+            int[] count = (int[])inUse.get(session);
+            if(count != null && --count[0] <= 0) {
+                inUse.remove(session);
+            }
+            Held held = (Held)beans.get(session.getId());
+            if(held != null) {
+                held.lastAccessed = now;
+            }
         }
-        Held held = (Held)beans.get(id);
-        if(held != null) {
-            held.lastAccessed = System.currentTimeMillis();
+    }
+
+    /** The current ids of the sessions in use. Under this lock. */
+    private java.util.Set idsInUse() {
+        java.util.Set ids = new java.util.HashSet();
+        Iterator it = inUse.keySet().iterator();
+        while(it.hasNext()) {
+            ids.add(((HttpSession)it.next()).getId());
         }
+        return ids;
     }
 
     private Held holderFor(HttpSession session) {
@@ -685,7 +692,11 @@ public final class Sessions {
          */
         public void save(HttpSession session, String previousId) throws IOException {
             prepare();
-            if(session.isNew() || previousId != null) {
+            if(previousId != null && !session.isNew()) {
+                rotate(session, previousId);
+                return;
+            }
+            if(session.isNew()) {
                 // A new id: nobody else can have written this row yet.
                 pool.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
                         + "max_inactive, attributes, version) VALUES (?, ?, ?, ?, ?, 0)",
@@ -743,6 +754,64 @@ public final class Sessions {
             }
             throw new IOException("Session changes could not be saved: other requests "
                     + "kept changing it (" + SAVE_ATTEMPTS + " attempts)");
+        }
+
+        /**
+         * Moves an existing session to its new id -- changeSessionId() at sign-in
+         * -- in one transaction, and only while the old row still exists. Done
+         * as an unconditional insert, a request holding a stale copy would
+         * recreate a session another request had just invalidated, under a fresh
+         * id it then hands the client: a logout undone. The old row is locked
+         * where the engine can, so an invalidation and a rotation of one session
+         * happen one after the other, and this request's changes are merged onto
+         * the row as it stands, as a plain save does.
+         */
+        private void rotate(final HttpSession session, final String previousId)
+                throws IOException {
+            final String lock = "sqlite".equals(pool.dialect().getName()) ? "" : " FOR UPDATE";
+            final java.util.Set changed = session.changedNames();
+            final Map mine = session.attributesCopy();
+            try {
+                pool.inTransaction(new DataSource.Work() {
+                    public Object run(Database db) throws Exception {
+                        Map row = db.queryOne("SELECT created, max_inactive, attributes FROM "
+                                + TABLE + " WHERE id = ?" + lock, new Object[] {previousId});
+                        if(row == null) {
+                            return null;            // invalidated meanwhile: stays gone
+                        }
+                        Map merged = new LinkedHashMap();
+                        Object text = row.get("attributes");
+                        if(text instanceof String && ((String)text).length() > 0) {
+                            merged.putAll(Json.parseObject((String)text));
+                        }
+                        java.util.Iterator names = changed.iterator();
+                        while(names.hasNext()) {
+                            Object name = names.next();
+                            if(mine.containsKey(name)) {
+                                merged.put(name, mine.get(name));
+                            } else {
+                                merged.remove(name);
+                            }
+                        }
+                        int maxInactive = session.isMaxInactiveChanged()
+                                ? session.getMaxInactiveInterval()
+                                : (int)number(row.get("max_inactive"));
+                        db.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
+                                + "max_inactive, attributes, version) VALUES (?, ?, ?, ?, ?, 0)",
+                                new Object[] {session.getId(), new Long(number(row.get("created"))),
+                                new Long(session.getLastAccessedTime()),
+                                new Integer(maxInactive), Json.write(merged)});
+                        db.execute("DELETE FROM " + TABLE + " WHERE id = ?",
+                                new Object[] {previousId});
+                        return null;
+                    }
+                });
+            } catch (IOException err) {
+                throw err;
+            } catch (Exception err) {
+                throw new IOException("Could not rotate the session: " + err.getMessage());
+            }
+            session.storedAccessed = session.getLastAccessedTime();
         }
 
         void touchIfStale(HttpSession session) throws IOException {

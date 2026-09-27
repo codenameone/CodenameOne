@@ -191,7 +191,10 @@ bad one stops the server.
 `zone` is the time zone the expression is read in: a zone ID such as
 `Europe/Berlin`, a fixed offset such as `+02:00`, or `UTC`. Without one it's UTC,
 which is what a server's clock should be set to regardless. The build checks the name,
-and a zone on a job that isn't a cron job is an error.
+and a zone on a job that isn't a cron job is an error. A zone that comes from
+configuration is checked when the schedule is made -- against the host's time-zone
+database where it has one -- so a misspelled name stops the server instead of
+running the job on UTC without a word.
 
 In a zone with daylight saving time, a time the clocks skip doesn't exist, and a
 job due then doesn't run that day: `0 30 2 * * *` in `America/New_York` skips the
@@ -236,7 +239,10 @@ Before each run the instance tries to claim the named row in a table called
 instance holds it. The claim expires after `lockAtMostFor` milliseconds -- ten
 minutes when it isn't set -- so an instance that dies mid-run doesn't hold the job
 forever. Set it longer than the job's longest run, or two instances can end up
-running it at once. A job with a lock needs a database, which the build checks.
+running it at once. The claim's times come from the database server's clock, which
+every instance shares, so an instance whose own clock runs ahead can't take a claim
+another still holds. With SQLite, which runs in the server's process, it's that
+host's clock. A job with a lock needs a database, which the build checks.
 
 A skipped run isn't a failure. A lock that can't be claimed for any other reason --
 the database refusing the statement -- is recorded as one, so a broken lock table

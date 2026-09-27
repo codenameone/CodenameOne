@@ -126,8 +126,8 @@ public final class HttpServer {
         Sessions sessions;
         /** See {@link #endedSessions}. */
         private java.util.List endedSessions;
-        /** The id of the session this request counts as using; see Sessions.enter. */
-        String sessionInUse;
+        /** The sessions this request counts as using; see Sessions.enter. */
+        java.util.List sessionsInUse;
         /** This request's session once looked up; see {@link #getSession(boolean)}. */
         private HttpSession session;
         private boolean sessionResolved;
@@ -592,7 +592,7 @@ public final class HttpServer {
             this.scopedBeans = null;
             this.sessions = null;
             this.endedSessions = null;
-            this.sessionInUse = null;
+            this.sessionsInUse = null;
         }
 
         /** The session of this request, creating one if it has none. */
@@ -621,7 +621,14 @@ public final class HttpServer {
             if(sessionResolved && (session != null || !create)) {
                 return session;
             }
-            Sessions owner = sessions != null ? sessions : Sessions.standalone();
+            if(sessions == null) {
+                // Sessions are stored, and their cookie sent, when a Backend
+                // finishes the request; a bare HttpServer has nothing that would,
+                // so a session here would silently never persist.
+                throw new IllegalStateException("Sessions need a server started with "
+                        + "Backend.builder(), which stores them and sends their cookie");
+            }
+            Sessions owner = sessions;
             try {
                 session = owner.find(sessionResolved ? null
                         : Sessions.cookieValue(getHeader("cookie"), owner.getCookieName()),
@@ -631,8 +638,7 @@ public final class HttpServer {
                         + err.getMessage());
             }
             sessionResolved = true;
-            if(session != null && sessions != null) {
-                // Counted for a Backend's sessions only: it is what ends the count.
+            if(session != null) {
                 owner.enter(this, session);
             }
             return session;
@@ -713,7 +719,7 @@ public final class HttpServer {
             this.scopedBeans = null;
             this.sessions = null;
             this.endedSessions = null;
-            this.sessionInUse = null;
+            this.sessionsInUse = null;
         }
 
         /**
@@ -2722,6 +2728,14 @@ public final class HttpServer {
             return false;
         }
         synchronized(host.inbox) {
+            // Rechecked under the lock releaseTaskInbox takes: a shutdown that won
+            // the race has already drained this inbox and closed its wake pipe,
+            // and a token added after that would sit there with no host to run
+            // it -- its executor's count stuck, its Future never done.
+            if(host.inboxClosed) {
+                takeVirtualTask(token);
+                return false;
+            }
             host.inbox.add(new Long(token));
         }
         if(host.wakeWrite >= 0) {
@@ -2739,6 +2753,7 @@ public final class HttpServer {
         synchronized(host.inbox) {
             tokens = (Long[])host.inbox.toArray(new Long[host.inbox.size()]);
             host.inbox.clear();
+            host.inboxClosed = true;
         }
         for(int iter = 0 ; iter < tokens.length ; iter++) {
             Runnable task = takeVirtualTask(tokens[iter].longValue());
@@ -2891,6 +2906,9 @@ public final class HttpServer {
 
         /** Set, under the inbox lock, once a stopping host has finished its tasks. */
         boolean tasksDrained;
+
+        /** Set, under the inbox lock, once shutdown has drained it for good. */
+        boolean inboxClosed;
 
         /**
          * The task each background virtual thread on this host runs, by handle.

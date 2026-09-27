@@ -486,6 +486,16 @@ class ApplicationRuntimeTest {
             assertEquals("en", merged.getAttribute("lang"));
             assertEquals(now + 5000, merged.getLastAccessedTime(),
                     "a slower request moved the last use back");
+            // A stale copy rotating after another request invalidated the session
+            // must not bring it back under the new id.
+            HttpSession live = new HttpSession("rot", now, now, 1800);
+            live.markNew();
+            store.save(live, null);
+            HttpSession stale = store.load("rot");
+            store.delete("rot");                               // a logout elsewhere
+            String rotated = stale.changeSessionId();
+            store.save(stale, "rot");
+            assertNull(store.load(rotated), "a stale rotation recreated a logged-out session");
             two.removeAttribute("lang");
             store.save(two, null);
             assertNull(store.load("merge").getAttribute("lang"));
@@ -530,6 +540,88 @@ class ApplicationRuntimeTest {
         sessions.leave(request);
         sessions.purgeIfDue(sessions.getStore(), now + 240000);
         assertEquals(1, ended.size(), "the idle session's beans were never destroyed");
+
+        // A request that ends its session and starts another: the replacement's
+        // beans are in use too.
+        HttpSession first = new HttpSession("first", now, now, 1);
+        first.owner = sessions;
+        HttpServer.Request switching = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(switching, first);
+        HttpSession replacement = new HttpSession("second", now, now, 1);
+        replacement.owner = sessions;
+        sessions.enter(switching, replacement);
+        replacement.scopedBeans(1)[0] = "new cart";
+        sessions.purgeIfDue(sessions.getStore(), now + 360000);
+        assertEquals(1, ended.size(), "the replacement session's beans were destroyed in use");
+        sessions.leave(switching);
+    }
+
+    @Test
+    @DisplayName("a bare HttpServer refuses sessions it could never store")
+    void standaloneSessionsRefused() {
+        HttpServer.Request request = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> request.getSession(true));
+        assertTrue(e.getMessage().contains("Backend.builder()"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("a cron zone the runtime does not know is refused, not read as UTC")
+    void unknownCronZone() {
+        assertThrows(IllegalArgumentException.class,
+                () -> CronSchedule.parse("0 0 0 * * *", "Europe/Berli"));
+        CronSchedule.parse("0 0 0 * * *", "Europe/Berlin");
+    }
+
+    @Test
+    @DisplayName("an Error from the application's stopping hook does not abandon the shutdown")
+    void stopSurvivesAnError() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public void stopping() {
+                        throw new AssertionError("broken hook");
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        backend.stop();
+        ServerSocket again = new ServerSocket(port);          // the listener is gone
+        again.close();
+    }
+
+    @Test
+    @DisplayName("a websocket callback carries its own server's executors")
+    void websocketCallbacksCarryTheirTasks() throws Exception {
+        final Tasks.Registry mine = Tasks.open(null);
+        final TaskExecutor[] seen = new TaskExecutor[1];
+        WebSocket endpoint = new WebSocket() {
+            public void onOpen(WebSocketSession session) {
+            }
+
+            public void onText(WebSocketSession session, String message) {
+                seen[0] = Tasks.executor("ws", Tasks.PLATFORM);
+            }
+
+            public void onBinary(WebSocketSession session, byte[] m, int o, int l) {
+            }
+        };
+        Tasks.Registry other = Tasks.open(null);           // started later: the fallback
+        try {
+            new Backend.TaskBound(endpoint, mine).onText(null, "hi");
+            assertTrue(seen[0] == Tasks.executor(mine, "ws", Tasks.PLATFORM),
+                    "the callback used another server's executors");
+        } finally {
+            Tasks.shutdown(mine, 0);
+            Tasks.shutdown(other, 0);
+        }
     }
 
     @Test

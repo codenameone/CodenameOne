@@ -23,7 +23,10 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 `getSession(true)` returns the client's session, creating one if the request
 carried no valid cookie. Nothing is stored and no cookie is sent until something
 calls it, so a server that never uses sessions -- an API authenticated with
-bearer tokens, say -- pays nothing for them and sets no cookie.
+bearer tokens, say -- pays nothing for them and sets no cookie. Sessions need a
+server started through `Backend.builder()`, which stores them and sends their
+cookie; on a bare `HttpServer`, `getSession` throws rather than hand out a
+session that would never be kept.
 
 The call to `changeSessionId()` isn't optional at sign-in. It gives the session a
 new id, keeps its attributes, and sends the client the new cookie. Without it a

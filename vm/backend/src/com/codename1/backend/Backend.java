@@ -276,7 +276,7 @@ public final class Backend {
         if(application != null) {
             try {
                 application.stopping();
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 System.err.println("Stopping the application failed: " + err);
             }
         }
@@ -300,7 +300,7 @@ public final class Backend {
         if(application != null) {
             try {
                 application.stopped();
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 System.err.println("Destroying the application's beans failed: " + err);
             }
         }
@@ -437,6 +437,114 @@ public final class Backend {
      */
     public static HttpServer.Request currentRequest() {
         return (HttpServer.Request)CURRENT_REQUEST.get();
+    }
+
+    /**
+     * {@code registry}, with every endpoint it is handed wrapped so its callbacks
+     * run carrying {@code tasks}. A websocket callback runs inside HttpServer,
+     * outside the request wrapper that sets the executors, so with two servers in
+     * one process an @Async call from onText would otherwise go to whichever
+     * server started last -- and be stopped with it.
+     */
+    static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
+                                                  final Tasks.Registry tasks) {
+        return new HttpServer.WebSocketRegistry() {
+            public void route(String path, WebSocket endpoint) {
+                registry.route(path, endpoint == null ? null : new TaskBound(endpoint, tasks));
+            }
+
+            public void fallback(final HttpServer.WebSocketHandler router) {
+                registry.fallback(router == null ? null : new HttpServer.WebSocketHandler() {
+                    public WebSocket open(HttpServer.Request request) throws Exception {
+                        Object previous = Tasks.enter(tasks);
+                        try {
+                            WebSocket endpoint = router.open(request);
+                            return endpoint == null ? null : new TaskBound(endpoint, tasks);
+                        } finally {
+                            Tasks.leave(previous);
+                        }
+                    }
+                });
+            }
+        };
+    }
+
+    /** An endpoint whose every callback runs carrying its server's executors. */
+    static final class TaskBound implements WebSocket {
+        private final WebSocket endpoint;
+        private final Tasks.Registry tasks;
+
+        TaskBound(WebSocket endpoint, Tasks.Registry tasks) {
+            this.endpoint = endpoint;
+            this.tasks = tasks;
+        }
+
+        public void onOpen(WebSocketSession session) throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onOpen(session);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onText(WebSocketSession session, String message) throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onText(session, message);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onBinary(WebSocketSession session, byte[] message, int offset, int length)
+                throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onBinary(session, message, offset, length);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onPing(WebSocketSession session, byte[] payload, int offset, int length)
+                throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onPing(session, payload, offset, length);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onPong(WebSocketSession session, byte[] payload, int offset, int length)
+                throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onPong(session, payload, offset, length);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onClose(WebSocketSession session, int code, String reason)
+                throws Exception {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onClose(session, code, reason);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
+
+        public void onError(WebSocketSession session, Exception error) {
+            Object previous = Tasks.enter(tasks);
+            try {
+                endpoint.onError(session, error);
+            } finally {
+                Tasks.leave(previous);
+            }
+        }
     }
 
     /** What an {@link Application} is built from. */
@@ -1226,8 +1334,12 @@ public final class Backend {
                             }
                         }, context, webSocketEndpoints == null && application == null ? null
                                 : new HttpServer.WebSocketRoutes() {
-                            public void register(HttpServer.WebSocketRegistry registry)
+                            public void register(HttpServer.WebSocketRegistry direct)
                                     throws Exception {
+                                // Every endpoint's callbacks carry this server's
+                                // executors, as its HTTP requests do.
+                                HttpServer.WebSocketRegistry registry =
+                                        withTasks(direct, tasks);
                                 // The same two arguments a Handlers factory gets,
                                 // and for the same reason: an endpoint that needs
                                 // the database declares it rather than reaching

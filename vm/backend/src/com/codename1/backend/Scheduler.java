@@ -407,8 +407,12 @@ public final class Scheduler {
         }
     }
 
-    private boolean claim(Job job, long now) throws IOException {
+    private boolean claim(Job job, long localNow) throws IOException {
         prepareLockTable();
+        // The DATABASE's clock, which every replica shares: with each replica's
+        // own, one running ahead by more than the remaining lease would take a
+        // lock another still legitimately holds, and run the job beside it.
+        long now = databaseNow();
         long until = now + job.lockAtMostFor;
         int updated = locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ?, locked_at = ?, "
                 + "locked_by = ? WHERE name = ? AND lock_until <= ?",
@@ -443,13 +447,33 @@ public final class Scheduler {
     private void release(Job job) {
         try {
             locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ? WHERE name = ? AND "
-                    + "locked_by = ?", new Object[] {new Long(System.currentTimeMillis()),
+                    + "locked_by = ?", new Object[] {new Long(databaseNow()),
                     job.lock, instance});
         } catch (IOException err) {
             // The claim expires by itself; the only cost is that the next run on
             // another instance waits for it.
             System.err.println("Could not release scheduler lock " + job.lock + ": " + err);
         }
+    }
+
+    /** Milliseconds since the epoch by the database server's clock. */
+    long databaseNow() throws IOException {
+        String name = locks.dialect().getName();
+        String sql;
+        if("postgresql".equals(name)) {
+            sql = "SELECT CAST(EXTRACT(EPOCH FROM clock_timestamp()) * 1000 AS BIGINT) AS db_now";
+        } else if("mysql".equals(name)) {
+            sql = "SELECT CAST(ROUND(UNIX_TIMESTAMP(NOW(3)) * 1000) AS SIGNED) AS db_now";
+        } else {
+            // SQLite runs in this process: its clock is this host's anyway.
+            return System.currentTimeMillis();
+        }
+        Map row = locks.queryOne(sql, null);
+        Object value = row == null ? null : row.get("db_now");
+        if(!(value instanceof Number)) {
+            throw new IOException("The database did not report its time: " + value);
+        }
+        return ((Number)value).longValue();
     }
 
     private synchronized void prepareLockTable() throws IOException {

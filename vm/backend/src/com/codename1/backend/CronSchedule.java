@@ -104,11 +104,43 @@ public final class CronSchedule {
         } else {
             fixedOffset = 0;
             timeZone = TimeZone.getTimeZone(this.zone);
+            if(!knownZone(this.zone, timeZone)) {
+                // A misspelt zone is not an error to TimeZone: the JDK answers
+                // GMT, and the job would fire at UTC times instead of local ones
+                // with nothing said. The build checks a literal zone; this is the
+                // check for one from configuration or code.
+                throw new IllegalArgumentException("Unknown time zone \"" + this.zone
+                        + "\" for cron expression " + expression);
+            }
         }
         if(seconds == 0 || minutes == 0 || hours == 0 || months == 0 || daysOfWeek == 0
                 || (daysOfMonth == 0 && !lastDayOfMonth)) {
             throw new IllegalArgumentException("A cron field allows no value: " + expression);
         }
+    }
+
+    /**
+     * Whether {@code id} names a zone this runtime knows. The JDK falls back to
+     * GMT for an id it does not know, which is detectable; where a tz database
+     * is installed the id must name one of its files, which also covers the
+     * packaged runtime, whose platform lookup cannot say "unknown". With neither
+     * to consult, the id is taken as given.
+     */
+    static boolean knownZone(String id, TimeZone tz) {
+        if("UTC".equals(id) || "GMT".equalsIgnoreCase(id)) {
+            return true;
+        }
+        if(id.indexOf("..") >= 0 || id.startsWith("/")) {
+            return false;
+        }
+        if("GMT".equals(tz.getID())) {
+            return false;
+        }
+        java.io.File database = new java.io.File("/usr/share/zoneinfo");
+        if(database.isDirectory()) {
+            return new java.io.File(database, id).isFile();
+        }
+        return true;
     }
 
     /** The expression this was made from, for a listing. */

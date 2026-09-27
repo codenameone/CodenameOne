@@ -90,6 +90,42 @@ class OtlpMetricsProtoTest {
     }
 
     @Test
+    @DisplayName("an up-down counter below zero encodes as a signed as_int")
+    void negativeUpDownCounter() throws Exception {
+        com.codename1.backend.metrics.Counter c = Metrics.upDownCounter("test.proto.negative",
+                "", "");
+        c.add(-5);
+        Map request = OtlpMetricExporter.request(new LinkedHashMap(),
+                Collections.singletonList(c), System.currentTimeMillis());
+        ExportMetricsServiceRequest decoded = ExportMetricsServiceRequest.parseFrom(
+                OtlpSchema.metricsProtobuf(request));
+        assertEquals(-5L, decoded.getResourceMetrics(0).getScopeMetrics(0).getMetrics(0)
+                .getSum().getDataPoints(0).getAsInt());
+    }
+
+    @Test
+    @DisplayName("a second metrics exporter with another identity is refused")
+    void oneMetricsIdentityPerProcess() throws Exception {
+        java.util.Properties a = new java.util.Properties();
+        a.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:9/v1/metrics");
+        a.setProperty(OtlpTracer.SERVICE_NAME, "service-a");
+        java.util.Properties b = new java.util.Properties(a);
+        b.setProperty(OtlpTracer.SERVICE_NAME, "service-b");
+        OtlpMetricExporter first = new OtlpMetricExporter("x");
+        OtlpMetricExporter second = new OtlpMetricExporter("x");
+        OtlpMetricExporter same = new OtlpMetricExporter("x");
+        first.open(com.codename1.backend.Config.of(a, "test"));
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                    () -> second.open(com.codename1.backend.Config.of(b, "test")));
+            same.open(com.codename1.backend.Config.of(a, "test"));
+            same.shutdown(0);
+        } finally {
+            first.shutdown(0);
+        }
+    }
+
+    @Test
     @DisplayName("an exporter opened again after a shutdown exports periodically again")
     void reopenedExporterKeepsExporting() throws Exception {
         java.net.ServerSocket probe = new java.net.ServerSocket(0);

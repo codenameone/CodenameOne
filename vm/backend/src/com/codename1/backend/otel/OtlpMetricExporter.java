@@ -77,6 +77,8 @@ public final class OtlpMetricExporter implements MetricReader {
      * being revived by the new ones.
      */
     private Run run;
+    /** Exporters open in this process; see open(). */
+    private static final List OPEN = new ArrayList();
     private long exports;
     private long failures;
     private String lastError;
@@ -115,6 +117,27 @@ public final class OtlpMetricExporter implements MetricReader {
         OtlpTracer.parseHeaders(own != null ? own : config.get(OtlpTracer.HEADERS), headers);
         intervalMillis = OtlpTracer.positive(config, INTERVAL, 60000);
         resource = OtlpTracer.resource(config, defaultServiceName);
+        synchronized(OPEN) {
+            // The instruments are the process's -- every server's requests, jobs
+            // and gauges in one set -- so two exporters with different resources
+            // would each send the SAME numbers under their own service name, or
+            // to their own collector, and both would be wrong. One process, one
+            // metrics identity; the same one twice is fine.
+            for(int iter = 0 ; iter < OPEN.size() ; iter++) {
+                OtlpMetricExporter other = (OtlpMetricExporter)OPEN.get(iter);
+                if(other != this && (!other.resource.equals(resource)
+                        || !other.endpoint.equals(endpoint))) {
+                    throw new IOException("Another server in this process already exports "
+                            + "metrics as a different service or to a different collector. "
+                            + "Metrics are per process, so they would be reported twice "
+                            + "under two names; give both servers the same OpenTelemetry "
+                            + "service and endpoint, or set " + ENABLED + "=false on one.");
+                }
+            }
+            if(!OPEN.contains(this)) {
+                OPEN.add(this);
+            }
+        }
         final Run mine = new Run();
         synchronized(lock) {
             run = mine;
@@ -194,6 +217,9 @@ public final class OtlpMetricExporter implements MetricReader {
     }
 
     public void shutdown(int timeoutMillis) {
+        synchronized(OPEN) {
+            OPEN.remove(this);
+        }
         Thread exporter;
         synchronized(lock) {
             if(run == null || run.stopping) {

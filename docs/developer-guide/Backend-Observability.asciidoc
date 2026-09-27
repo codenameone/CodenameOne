@@ -120,7 +120,10 @@ Traces say what one request did; metrics say how the server is doing. With
 OpenTelemetry turned on, the server exports metrics over OTLP on the same endpoint
 and with the same settings as its traces, every minute by default, with cumulative
 temporality. `cn1.otel.metrics.enabled=false` turns metrics off while leaving
-traces on. The management endpoints described below record and serve the same
+traces on. The metrics are the process's, so with several servers in one process
+their exporters must report as the same service to the same collector; a second
+exporter that would report the same numbers under another name is refused at
+start-up. The management endpoints described below record and serve the same
 metrics whether anything exports them or not.
 
 ==== What the server records
