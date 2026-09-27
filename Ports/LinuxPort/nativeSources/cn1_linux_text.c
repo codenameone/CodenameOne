@@ -75,7 +75,7 @@ static void cn1FontMetrics(CN1Font* f) {
     clock_gettime(CLOCK_MONOTONIC, &q1);
     {
         char* d = pango_font_description_to_string(f->desc);
-        fprintf(stdout, "BENCH:FONTMETRICS %.3fms %s\n", (q1.tv_sec - q0.tv_sec) * 1e3 + (q1.tv_nsec - q0.tv_nsec) / 1e6, d);
+        if (0) fprintf(stdout, "BENCH:FONTMETRICS %.3fms %s\n", (q1.tv_sec - q0.tv_sec) * 1e3 + (q1.tv_nsec - q0.tv_nsec) / 1e6, d);
         fflush(stdout);
         g_free(d);
     }

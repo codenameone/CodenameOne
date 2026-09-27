@@ -357,18 +357,25 @@ public final class FlutterUI {
      * it to avoid restyling the host app.
      */
     private static void installMaterialBaseTheme() {
+        long q0 = System.currentTimeMillis(), q1 = 0, q2 = 0, q3 = 0;
         try {
             com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(
                     "/CN1FlutterMaterialTheme.res");
+            q1 = System.currentTimeMillis();
             String[] names = r.getThemeResourceNames();
             if (names.length > 0) {
-                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+                java.util.Hashtable th = r.getTheme(names[0]);
+                q2 = System.currentTimeMillis();
+                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(th);
             }
         } catch (Throwable t) {
             com.codename1.io.Log.p("Flutter runtime: could not install Material base theme: " + t);
         }
+        q3 = System.currentTimeMillis();
         installFlutterUiidDerives();
+        long q4 = System.currentTimeMillis();
         installFlutterScrollPhysics();
+        System.out.println("BENCH:THEME open=" + (q1 - q0) + " getTheme=" + (q2 - q1) + " setThemeProps=" + (q3 - q2) + " derives=" + (q4 - q3) + " physics=" + (System.currentTimeMillis() - q4));
     }
 
     /**
