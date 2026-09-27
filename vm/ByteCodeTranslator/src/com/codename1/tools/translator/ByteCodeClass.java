@@ -3146,6 +3146,96 @@ public class ByteCodeClass {
         }
     }
 
+    /// Classes the program can hold an instance of, or null before the scan has run (in
+    /// which case every class counts).
+    private static java.util.Set<String> instantiatedClasses;
+
+    /// Whether an instance of {@code c} can exist at run time, as far as the translator can
+    /// tell. Answers true for any class when the question is not settled.
+    static boolean mayBeInstantiated(ByteCodeClass c) {
+        java.util.Set<String> s = instantiatedClasses;
+        return s == null || s.contains(c.getClsName());
+    }
+
+    /// ONLY A CLASS THE PROGRAM INSTANTIATES GETS A DIRECT ARM IN A DISPATCH SWITCH.
+    ///
+    /// The interface-thunk switch and the guarded call sites (see thunkCasesFor and
+    /// Invoke.buildGuards) name each receiver's implementation DIRECTLY, and a direct call is
+    /// a reference the linker must honour. The indirect dispatch they sit in front of goes
+    /// through the vtable, and a vtable is filled by the class's own static initializer,
+    /// which only code that uses the class reaches -- so, indirectly, an implementor nobody
+    /// creates is dead code the linker drops. Naming it in a switch arm kept it alive, and
+    /// with it its class, its initializer and whatever that reached: on a Linux gallery app
+    /// (GCC, --gc-sections, no LTO) the health, spinner, table and validation packages the
+    /// app never touches, the bulk of 2.4MB of code over the same app built without these
+    /// switches.
+    ///
+    /// Dropping an arm is always safe: every switch and guard chain falls through to the
+    /// ordinary indirect dispatch, so a receiver without an arm still reaches its method.
+    /// That is also why this scan may be approximate, provided it errs toward "instantiated":
+    ///
+    /// - A NEW in surviving bytecode, from any other class, or from any of the class's own
+    ///   methods except its static initializer.
+    /// - A NEW in the class's own static initializer (enum constants, a singleton) only
+    ///   when some OTHER class refers to it, since only then can that initializer run.
+    /// - Any mention of the class's allocator or struct in a native source, which is how
+    ///   natives create objects.
+    ///
+    /// A class created only by reflection loses its arm and keeps working through the
+    /// vtable. Run on the raw bytecode, before fusion turns NEWs into stack allocations.
+    static void computeInstantiated(List<ByteCodeClass> classes, String[] nativeSources) {
+        java.util.Set<String> result = new java.util.HashSet<String>();
+        java.util.Set<String> selfClinitOnly = new java.util.HashSet<String>();
+        java.util.Set<String> referencedFromOutside = new java.util.HashSet<String>();
+        for (ByteCodeClass c : classes) {
+            String self = c.getClsName();
+            for (BytecodeMethod m : c.methods) {
+                boolean clinit = m.getMethodName().indexOf("_CLINIT_") > -1
+                        || "<clinit>".equals(m.getMethodName());
+                for (Instruction i : m.getInstructions()) {
+                    String owner = null;
+                    if (i instanceof TypeInstruction) {
+                        owner = ((TypeInstruction) i).getTypeName();
+                    } else if (i instanceof Field) {
+                        owner = ((Field) i).getOwner();
+                    } else if (i instanceof Invoke) {
+                        owner = ((Invoke) i).getOwner();
+                    }
+                    if (owner == null) {
+                        continue;
+                    }
+                    String mangled = owner.replace('/', '_').replace('$', '_');
+                    boolean isNew = i.getOpcode() == Opcodes.NEW;
+                    if (!mangled.equals(self)) {
+                        referencedFromOutside.add(mangled);
+                        if (isNew) {
+                            result.add(mangled);
+                        }
+                    } else if (isNew) {
+                        if (clinit) {
+                            selfClinitOnly.add(mangled);
+                        } else {
+                            result.add(mangled);
+                        }
+                    }
+                }
+            }
+        }
+        for (String c : selfClinitOnly) {
+            if (referencedFromOutside.contains(c)) {
+                result.add(c);
+            }
+        }
+        NativeSymbolIndex natives = Parser.getNativeSymbolIndex(nativeSources);
+        for (ByteCodeClass c : classes) {
+            String n = c.getClsName();
+            if (!result.contains(n) && (natives.contains("__NEW_" + n) || natives.contains("class__" + n))) {
+                result.add(n);
+            }
+        }
+        instantiatedClasses = result;
+    }
+
     public boolean hasClinit() {
         for (BytecodeMethod m : methods) {
             if (m.getMethodName().indexOf("_CLINIT_") > -1) {

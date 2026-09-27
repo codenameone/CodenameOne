@@ -302,7 +302,7 @@ public class Parser extends ClassVisitor {
             java.util.List<ByteCodeClass> impls = cn1ImplementorIndex.get(owner.getClsName());
             if (impls != null) {
                 for (ByteCodeClass c : impls) {
-                    if (!c.isEliminated() && !c.isIsAbstract()) {
+                    if (!c.isEliminated() && !c.isIsAbstract() && ByteCodeClass.mayBeInstantiated(c)) {
                         cone.add(c);
                     }
                 }
@@ -315,7 +315,7 @@ public class Parser extends ClassVisitor {
         stack.add(owner);
         while (!stack.isEmpty()) {
             ByteCodeClass c = stack.pop();
-            if (!c.isEliminated() && !c.isIsAbstract()) {
+            if (!c.isEliminated() && !c.isIsAbstract() && ByteCodeClass.mayBeInstantiated(c)) {
                 cone.add(c);
             }
             java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(c.getClsName());
@@ -1461,6 +1461,9 @@ public class Parser extends ClassVisitor {
             // On the raw bytecode, before any fusion pass below rewrites instructions:
             // see ByteCodeClass.isEagerInitEligible.
             ByteCodeClass.computeInitReferences(classes);
+            ByteCodeClass.computeInstantiated(classes, nativeSources);
+            // Cones memoised before the scan above included classes nothing creates.
+            cn1InvalidateDevirtMemo();
             ByteCodeClass.computePureClinits(classes);
             // Also on the raw bytecode, where every field access is still a plain
             // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
