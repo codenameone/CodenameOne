@@ -299,6 +299,57 @@ class TabsGlassSelectionTest extends UITestBase {
     }
 
     @FormTest
+    void theIos26DropMayBulgePastTheBarInFlight() {
+        // The iOS 26 selection drop is taller than the bar mid-flight, as UIKit's
+        // is. Its lens must be drawn with a clip that lets it past the bar's edges;
+        // on Metal the bulge used to show only because an encoder restart dropped
+        // the clip, and it vanished once the clip was honoured.
+        Hashtable props = new Hashtable();
+        props.put("@tabsMorphPreset", "ios26");
+        props.put("@tabsSelectionCapsuleBool", "true");
+        props.put("@glassMaterialBool", "true");
+        UIManager.getInstance().addThemeProps(props);
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setLayout(new BorderLayout());
+        Tabs tabs = new Tabs(Component.BOTTOM);
+        tabs.addTab("One", new Label("1"));
+        tabs.addTab("Two", new Label("2"));
+        tabs.addTab("Three", new Label("3"));
+        form.add(BorderLayout.CENTER, tabs);
+        form.revalidate();
+        assertFalse(tabs.isGlassMotion(), "precondition: the iOS 26 morph, not the iOS 27 glass");
+        Container tc = tabs.getTabsContainer();
+        tabs.setMorphTestState(0, 2, 50);
+        Image img = Image.createImage(form.getWidth(), form.getHeight(), 0xffffffff);
+        form.paintComponent(img.getGraphics());
+        java.util.List<com.codename1.testing.TestCodenameOneImplementation.LensCall> calls =
+                implementation.getLensCalls();
+        assertFalse(calls.isEmpty(), "precondition: the drop is drawn through lensRegion");
+        com.codename1.testing.TestCodenameOneImplementation.LensCall drop = calls.get(calls.size() - 1);
+        int barTop = tc.getAbsoluteY();
+        int barBottom = barTop + tc.getHeight();
+        assertTrue(drop.y < barTop || drop.y + drop.height > barBottom,
+                "precondition: mid-flight the drop is taller than the bar (" + drop.y + ".." + (drop.y + drop.height)
+                + " vs " + barTop + ".." + barBottom + ")");
+        // The clip reaches past the bar wherever the drop bulges, as far as the Tabs
+        // itself (the area its morph repaints every frame) -- never beyond it.
+        int tabsTop = tabs.getAbsoluteY();
+        int tabsBottom = tabsTop + tabs.getHeight();
+        int clipTop = drop.clipY;
+        int clipBottom = drop.clipY + drop.clipHeight;
+        String where = " (clip " + clipTop + ".." + clipBottom + ", drop " + drop.y + ".." + (drop.y + drop.height)
+                + ", bar " + barTop + ".." + barBottom + ", tabs " + tabsTop + ".." + tabsBottom + ")";
+        if (drop.y + drop.height > barBottom) {
+            assertTrue(clipBottom >= Math.min(drop.y + drop.height, tabsBottom), "the bulge below the bar is clipped" + where);
+        }
+        if (drop.y < barTop) {
+            assertTrue(clipTop <= Math.max(drop.y, tabsTop), "the bulge above the bar is clipped" + where);
+        }
+        assertTrue(clipTop >= tabsTop && clipBottom <= tabsBottom, "the clip stays inside the Tabs" + where);
+    }
+
+    @FormTest
     void glassTabTitlesNeverScroll() {
         // A ticker started on a tab (focus arriving while the tab was narrower)
         // would drift the title with the clock; UITabBar never scrolls one.

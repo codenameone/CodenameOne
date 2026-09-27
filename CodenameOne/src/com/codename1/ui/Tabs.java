@@ -2869,7 +2869,28 @@ public class Tabs extends Container {
             // glyphs carry the accent directly (theme) and the lens keeps only its
             // magnify/aberration optics.
             int tint = getUIManager().getThemeConstant("tabSelLensTintColorInt", 0x0a84ff);
-            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, dark ? 0f : m.tintStrength);
+            // In flight the drop is taller than the bar and bulges past its edges,
+            // as UIKit's does, but this paint is clipped to the bar. Widen the clip
+            // to the whole Tabs for the drop: while the morph runs, animate() has
+            // the whole Tabs repainted every frame, so nothing is left behind. At
+            // rest the drop is inside the bar and the clip is left alone.
+            int ocx = g.getClipX();
+            int ocy = g.getClipY();
+            int ocw = g.getClipWidth();
+            int och = g.getClipHeight();
+            boolean widen = m.flight > 0;
+            if (widen) {
+                g.setClip(tabsContainer.getX() + getAbsoluteX() - tabsContainer.getAbsoluteX(),
+                        tabsContainer.getY() + getAbsoluteY() - tabsContainer.getAbsoluteY(), getWidth(), getHeight());
+            }
+            try {
+                g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint,
+                        dark ? 0f : m.tintStrength);
+            } finally {
+                if (widen) {
+                    g.setClip(ocx, ocy, ocw, och);
+                }
+            }
             return;
         }
         // Non-glass platforms: a translucent rounded capsule.

@@ -1515,6 +1515,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         touchDevice = true;
         colorMatrixRegionSupported = false;
         colorMatrixCalls.clear();
+        lensCalls.clear();
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;
@@ -1969,6 +1970,51 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void clearColorMatrixCalls() {
         colorMatrixCalls.clear();
+    }
+
+    private final java.util.List<LensCall> lensCalls =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<LensCall>());
+
+    /// One recorded Graphics.lensRegion call: the region and the clip in force when
+    /// it was made, both in the same (translated) coordinates.
+    public static final class LensCall {
+        public final int x;
+        public final int y;
+        public final int width;
+        public final int height;
+        public final int clipX;
+        public final int clipY;
+        public final int clipWidth;
+        public final int clipHeight;
+
+        LensCall(int x, int y, int width, int height, int clipX, int clipY, int clipWidth, int clipHeight) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.clipX = clipX;
+            this.clipY = clipY;
+            this.clipWidth = clipWidth;
+            this.clipHeight = clipHeight;
+        }
+    }
+
+    public java.util.List<LensCall> getLensCalls() {
+        synchronized (lensCalls) {
+            return new java.util.ArrayList<LensCall>(lensCalls);
+        }
+    }
+
+    /// Records the call (painting nothing) and reports it unsupported, like the base.
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float magnify, float aberration, int tintColor, float tintStrength) {
+        if (graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            lensCalls.add(new LensCall(x + g.translateX, y + g.translateY, width, height, g.clipX, g.clipY,
+                    g.clipWidth, g.clipHeight));
+        }
+        return false;
     }
 
     /// Clears to transparent on mutable images, the way the real ports do (the
