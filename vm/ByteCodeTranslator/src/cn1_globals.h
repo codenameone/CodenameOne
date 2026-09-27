@@ -566,6 +566,14 @@ static inline __attribute__((always_inline)) int cn1GcMarkDecode(int raw) {
 #define CN1_OBJ_SET_MARK(o, v)      (((struct JavaObjectPrototype*)(o))->__codenameOneGcMark = cn1GcMarkEncode(v))
 #define CN1_OBJ_MARK_LOAD(o, ord)   cn1GcMarkDecode(__atomic_load_n(CN1_OBJ_MARK_PTR(o), (ord)))
 #define CN1_OBJ_MARK_STORE(o, v, ord) __atomic_store_n(CN1_OBJ_MARK_PTR(o), cn1GcMarkEncode(v), (ord))
+// Two questions the write barriers ask at every reference store, answered on the RAW byte.
+// Both are exact without a decode: a sentinel is stored as itself, so raw -1 is fresh and
+// nothing else is; a positive raw word always decodes to a real cycle (>= 1) and a
+// non-positive one to a sentinel. Going through CN1_OBJ_MARK_LOAD instead inlines the
+// whole epoch decode (a currentGcMarkValue load and ~15 ALU ops) at every putfield and
+// aastore, twice -- 2.4MB of __text on the HelloCodenameOne test app for no semantic gain.
+#define CN1_OBJ_MARK_IS_FRESH(o, ord) (__atomic_load_n(CN1_OBJ_MARK_PTR(o), (ord)) == CN1_GC_MARK_FRESH)
+#define CN1_OBJ_MARK_IS_EPOCH(o, ord) (__atomic_load_n(CN1_OBJ_MARK_PTR(o), (ord)) > 0)
 
 // THE ARRAY HEADER IS 32 BYTES, AND EIGHT OF THOSE WERE PURE PADDING PLUS SLACK.
 //
@@ -1776,7 +1784,7 @@ struct TryBlock {
 // were allocated before the cycle began, so there a fresh reference is logged like any
 // other; cn1GcFreshFilter is set once, at the first collection, and never changes.
 extern JAVA_BOOLEAN cn1GcFreshFilter;
-#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_LOAD((o), __ATOMIC_RELAXED) == -1)
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_IS_FRESH((o), __ATOMIC_RELAXED))
 #endif
 // Two halves share the gate. The SATB half runs only while a mark is in progress. The
 // GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
@@ -1789,13 +1797,13 @@ extern void cn1GcRememberBlock(JAVA_LONG block);
 #define CN1_GEN_REMEMBER_BLOCK(block, v) \
     do { JAVA_OBJECT cn1__bv = (JAVA_OBJECT)(v); \
          if(__builtin_expect(cn1GcGenBarrier, 0) && cn1__bv != JAVA_NULL && !CN1_IS_TAGGED(cn1__bv) \
-            && CN1_OBJ_MARK_LOAD(cn1__bv, __ATOMIC_RELAXED) == -1) \
+            && CN1_OBJ_MARK_IS_FRESH(cn1__bv, __ATOMIC_RELAXED)) \
              cn1GcRememberBlock(block); } while(0)
 #define CN1_GEN_REMEMBER(target, v) \
     do { JAVA_OBJECT cn1__gt = (JAVA_OBJECT)(target); \
          if(cn1__gt != JAVA_NULL \
-            && CN1_OBJ_MARK_LOAD((v), __ATOMIC_RELAXED) == -1 \
-            && CN1_OBJ_MARK_LOAD(cn1__gt, __ATOMIC_RELAXED) > 0) \
+            && CN1_OBJ_MARK_IS_FRESH((v), __ATOMIC_RELAXED) \
+            && CN1_OBJ_MARK_IS_EPOCH(cn1__gt, __ATOMIC_RELAXED)) \
              cn1GcRememberSlow(cn1__gt); } while(0)
 #ifdef CN1_GC_GEN_CHECK2
 extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
