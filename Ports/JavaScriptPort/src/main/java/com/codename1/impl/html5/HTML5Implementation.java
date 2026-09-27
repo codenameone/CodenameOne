@@ -12049,6 +12049,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
+        // The cached selection belongs to the form it was made on. The document copy listener
+        // takes it as is, so a selection left behind on the previous screen would be copied from
+        // one that shows none of it.
+        selectedText = null;
         if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
             desktopChrome.setTitle(f.getTitle());
         }

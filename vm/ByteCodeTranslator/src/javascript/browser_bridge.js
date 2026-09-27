@@ -6862,6 +6862,13 @@
       if (!chrome) {
         return;
       }
+      // The primary modifier is Command on a Mac and Control everywhere else, as the menu
+      // displays it (the chrome's class names the OS). Accepting either would claim Ctrl+S on a
+      // Mac, or Win+S on Windows, for a command shown as the other.
+      var mac = (' ' + chrome.className + ' ').indexOf(' cn1-chrome-mac ') >= 0;
+      if (mac ? (!e.metaKey || e.ctrlKey) : (!e.ctrlKey || e.metaKey)) {
+        return;
+      }
       var key = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
       if (!key || key === '"' || key === '\\') {
         return;
