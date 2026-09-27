@@ -191,7 +191,8 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 ----
 
 `@ManagedResource` marks the bean, and `objectName` names it; without one it's
-the simple class name. Each `@ManagedAttribute` is an instance getter with no
+the simple class name. The name is a segment of the management URL, so it's made
+of letters, digits, `_`, `-` and `.` only. Each `@ManagedAttribute` is an instance getter with no
 parameters, and a numeric one becomes a gauge named after the resource and the
 attribute -- `prices.size` here -- read each time metrics are collected. Every
 attribute, numeric or not, appears in the management listing. A

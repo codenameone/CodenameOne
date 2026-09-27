@@ -246,12 +246,13 @@ public final class Sessions {
      */
     void purgeIfDue(SessionStore s, long now) {
         List expired = null;
+        java.util.Set busy;
         synchronized(this) {
             if(now - lastPurge < PURGE_INTERVAL) {
                 return;
             }
             lastPurge = now;
-            java.util.Set busy = idsInUse();
+            busy = idsInUse();
             Iterator it = beans.entrySet().iterator();
             while(it.hasNext()) {
                 Map.Entry e = (Map.Entry)it.next();
@@ -273,7 +274,18 @@ public final class Sessions {
             }
         }
         try {
-            s.purgeExpired(now);
+            // The store's own entries too spare the sessions in use: a request
+            // that outlasts the timeout would otherwise lose its session -- the
+            // memory store does not save it again unless it changed, and the
+            // database store's touch and save find no row. A store of the
+            // application's own sees the plain call.
+            if(s instanceof Memory) {
+                ((Memory)s).purgeExpired(now, busy);
+            } else if(s instanceof Jdbc) {
+                ((Jdbc)s).purgeExpired(now, busy);
+            } else {
+                s.purgeExpired(now);
+            }
         } catch (IOException err) {
             System.err.println("Could not purge expired sessions: " + err.getMessage());
         }
@@ -606,11 +618,20 @@ public final class Sessions {
             sessions.remove(id);
         }
 
-        public synchronized int purgeExpired(long now) {
+        public int purgeExpired(long now) {
+            return purgeExpired(now, java.util.Collections.EMPTY_SET);
+        }
+
+        /** {@link #purgeExpired(long)}, sparing the sessions whose ids are in {@code busy}. */
+        synchronized int purgeExpired(long now, java.util.Set busy) {
             int purged = 0;
-            Iterator it = sessions.values().iterator();
+            Iterator it = sessions.entrySet().iterator();
             while(it.hasNext()) {
-                HttpSession s = (HttpSession)it.next();
+                Map.Entry e = (Map.Entry)it.next();
+                HttpSession s = (HttpSession)e.getValue();
+                if(busy.contains(e.getKey()) && s.isValid()) {
+                    continue;
+                }
                 if(s.isExpired(now) || !s.isValid()) {
                     it.remove();
                     purged++;
@@ -848,10 +869,30 @@ public final class Sessions {
         }
 
         public int purgeExpired(long now) throws IOException {
+            return purgeExpired(now, java.util.Collections.EMPTY_SET);
+        }
+
+        /** {@link #purgeExpired(long)}, sparing the sessions whose ids are in {@code busy}. */
+        int purgeExpired(long now, java.util.Set busy) throws IOException {
             prepare();
             // The same grace load() allows: the timeout plus the touch interval,
             // min(a minute, a quarter of the timeout).
             Long at = new Long(now);
+            // One placeholder per session in use -- as many as requests running,
+            // never the table.
+            StringBuilder spare = new StringBuilder();
+            List params = new ArrayList();
+            params.add(at);
+            params.add(at);
+            if(!busy.isEmpty()) {
+                spare.append(" AND id NOT IN (");
+                Iterator ids = busy.iterator();
+                for(int iter = 0 ; ids.hasNext() ; iter++) {
+                    spare.append(iter == 0 ? "?" : ", ?");
+                    params.add(ids.next());
+                }
+                spare.append(')');
+            }
             //
             // Decimal multipliers, never integer ones: max_inactive is an INTEGER
             // column, and PostgreSQL multiplies INTEGER by an integer literal in
@@ -861,8 +902,8 @@ public final class Sessions {
             // double's exact range on SQLite.
             return pool.execute("DELETE FROM " + TABLE + " WHERE max_inactive > 0 AND "
                     + "(last_accessed + max_inactive * 1250.0 < ? OR "
-                    + "last_accessed + max_inactive * 1000.0 + " + TOUCH_INTERVAL + " < ?)",
-                    new Object[] {at, at});
+                    + "last_accessed + max_inactive * 1000.0 + " + TOUCH_INTERVAL + " < ?)"
+                    + spare.toString(), params.toArray());
         }
 
         public int size() {

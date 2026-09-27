@@ -58,7 +58,11 @@ public final class Management implements HttpServer.Handler {
     private final String path;
     private final byte[] token;
     private final boolean development;
-    private Backend backend;
+    /**
+     * Volatile: attached after the listener's workers are running, and a plain
+     * write need never reach them -- health would read STARTING for good.
+     */
+    private volatile Backend backend;
 
     private Management(String path, String token, boolean development) {
         this.path = path;

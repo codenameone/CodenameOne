@@ -538,17 +538,19 @@ final class BackendBeans {
         if (props != null) {
             bindProperties(bean, props, cls);
         }
-        if (REQUEST.equals(bean.scope)) {
+        if (REQUEST.equals(bean.scope) || SESSION.equals(bean.scope)) {
             for (MethodInfo m : cls.getMethods()) {
                 if (m.getAnnotation(ASYNC) != null
                         || (cls.getClassAnnotation(ASYNC) != null && m.isPublic()
                         && !m.isConstructor() && !m.isStatic())) {
-                    // The task would hold the request's instance after the request
-                    // ended and destroyed it.
+                    // The task would hold the scoped instance after its request or
+                    // session ended and destroyed it.
+                    String scope = REQUEST.equals(bean.scope) ? "request" : "session";
                     ctx.error(cls, "@Async method " + cls.getSourceName() + "." + m.getName()
-                            + " is on a @RequestScope bean, which is destroyed when its "
-                            + "request ends -- possibly before the task runs. Move the "
-                            + "method to a singleton and pass it what it needs.");
+                            + " is on a @" + (REQUEST.equals(bean.scope) ? "Request" : "Session")
+                            + "Scope bean, which is destroyed when its " + scope + " ends -- "
+                            + "possibly before the task runs. Move the method to a singleton "
+                            + "and pass it what it needs.");
                     break;
                 }
             }
@@ -1367,6 +1369,15 @@ final class BackendBeans {
         managed.objectName = objectName.length() > 0 ? objectName
                 : RestClientAnnotationProcessor.simpleName(cls.getBinaryName().replace('$', '.'));
         managed.description = resource.getStringOrDefault("description", "");
+        if (!managed.objectName.matches("[A-Za-z0-9_.-]{1,128}")) {
+            // It is one segment of /manage/managed/{bean}/{operation}, matched
+            // without decoding: a '/' makes two segments, and anything escaped
+            // never matches -- listed, and never invocable.
+            ctx.error(cls, "@ManagedResource on " + cls.getSourceName() + " is named \""
+                    + managed.objectName + "\"; an objectName is letters, digits, _, - and . "
+                    + "only, since it is a segment of the management URL.");
+            return;
+        }
         for (MethodInfo m : inheritedMembers(cls)) {
             String where = cls.getSourceName() + "." + m.getName();
             AnnotationValues attr = m.getAnnotation(MANAGED_ATTRIBUTE);

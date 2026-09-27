@@ -597,6 +597,20 @@ public final class Backend {
 
         /** Registers a managed bean with this server. Generated code calls this. */
         public void registerManaged(ManagedBean bean) {
+            String objectName = bean.getObjectName();
+            if(objectName == null || objectName.length() == 0 || objectName.length() > 128) {
+                throw new IllegalArgumentException("A managed bean needs a name of 1 to 128 "
+                        + "characters");
+            }
+            for(int iter = 0 ; iter < objectName.length() ; iter++) {
+                char c = objectName.charAt(iter);
+                if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                        || c == '_' || c == '.' || c == '-')) {
+                    // One URL segment, matched undecoded; see the build's check.
+                    throw new IllegalArgumentException("Managed bean \"" + objectName
+                            + "\": a name is letters, digits, _, - and . only");
+                }
+            }
             for(int iter = 0 ; iter < managed.size() ; iter++) {
                 if(((ManagedBean)managed.get(iter)).getObjectName()
                         .equals(bean.getObjectName())) {
@@ -1204,6 +1218,44 @@ public final class Backend {
             try {
                 server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
                         new HttpServer.Handler() {
+                            /**
+                             * What a request that threw still owes: its request beans
+                             * destroyed, and the sessions it ended or changed stored.
+                             */
+                            private void failed(HttpServer.Request request,
+                                                boolean sessionFinished, long startedMillis,
+                                                Throwable err) {
+                                endRequestBeans(request);
+                                List ended = request.endedSessions();
+                                for(int e = 0 ; ended != null && !sessionFinished
+                                        && e < ended.size() ; e++) {
+                                    try {
+                                        sessions.finish((HttpSession)ended.get(e),
+                                                null);
+                                    } catch (Exception storeErr) {
+                                        System.err.println("Could not end the "
+                                                + "session of a failed request: "
+                                                + storeErr);
+                                    }
+                                }
+                                HttpSession session = request.resolvedSession();
+                                if(session != null && !sessionFinished) {
+                                    // The handler threw, but what it did to
+                                    // the session stands, as in a servlet
+                                    // container -- and a session-scoped bean
+                                    // it built must be kept or destroyed, not
+                                    // dropped with the request unreleased.
+                                    try {
+                                        sessions.finish(session, null);
+                                    } catch (Exception storeErr) {
+                                        System.err.println("Could not store the "
+                                                + "session of a failed request: "
+                                                + storeErr);
+                                    }
+                                }
+                                requestLog.record(request, 500, startedMillis, err);
+                            }
+
                             /** Destroys the request's scoped beans, once. */
                             private void endRequestBeans(HttpServer.Request request) {
                                 if(app != null) {
@@ -1270,35 +1322,13 @@ public final class Backend {
                                             response = sessions.finish(session, response);
                                         }
                                     } catch (Exception err) {
-                                        endRequestBeans(request);
-                                        List ended = request.endedSessions();
-                                        for(int e = 0 ; ended != null && !sessionFinished
-                                                && e < ended.size() ; e++) {
-                                            try {
-                                                sessions.finish((HttpSession)ended.get(e),
-                                                        null);
-                                            } catch (Exception storeErr) {
-                                                System.err.println("Could not end the "
-                                                        + "session of a failed request: "
-                                                        + storeErr);
-                                            }
-                                        }
-                                        HttpSession session = request.resolvedSession();
-                                        if(session != null && !sessionFinished) {
-                                            // The handler threw, but what it did to
-                                            // the session stands, as in a servlet
-                                            // container -- and a session-scoped bean
-                                            // it built must be kept or destroyed, not
-                                            // dropped with the request unreleased.
-                                            try {
-                                                sessions.finish(session, null);
-                                            } catch (Exception storeErr) {
-                                                System.err.println("Could not store the "
-                                                        + "session of a failed request: "
-                                                        + storeErr);
-                                            }
-                                        }
-                                        requestLog.record(request, 500, startedMillis, err);
+                                        failed(request, sessionFinished, startedMillis, err);
+                                        throw err;
+                                    } catch (Error err) {
+                                        // The same clean-up: an invalidated session
+                                        // must still be deleted, or the client's old
+                                        // cookie keeps its signed-in state.
+                                        failed(request, sessionFinished, startedMillis, err);
                                         throw err;
                                     }
                                     // Null is a 404 from here, which is what a

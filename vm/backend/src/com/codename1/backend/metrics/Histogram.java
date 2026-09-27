@@ -83,11 +83,25 @@ public final class Histogram extends Instrument {
             }
         }
         this.labels = labels == null ? new String[0] : (String[])labels.clone();
+        java.util.Set exported = new java.util.HashSet();
         for(int iter = 0 ; iter < this.labels.length ; iter++) {
             // Null is an unused slot of the three; an empty name is a mistake.
-            if(this.labels[iter] != null && this.labels[iter].length() == 0) {
+            if(this.labels[iter] == null) {
+                continue;
+            }
+            if(this.labels[iter].length() == 0) {
                 throw new IllegalArgumentException("Histogram " + name + ": a label key "
                         + "is empty");
+            }
+            // As Prometheus will see them: folded to its alphabet, and beside the
+            // "le" every bucket sample carries. Two that fold alike, or one that
+            // IS le, repeat a label name in a sample, and the scrape is rejected.
+            String folded = Metrics.promName(this.labels[iter]);
+            if("le".equals(folded) || !exported.add(folded)) {
+                throw new IllegalArgumentException("Histogram " + name + ": label key "
+                        + this.labels[iter] + " is exported to Prometheus as " + folded
+                        + ", which " + ("le".equals(folded) ? "the bucket boundary uses"
+                        : "another key of this histogram already is"));
             }
         }
         this.plain = new Series(null, this.bounds.length + 1);

@@ -532,11 +532,16 @@ class ApplicationRuntimeTest {
         session.scopedBeans(1)[0] = "cart";
         HttpServer.Request request = new HttpServer.Request("GET", "/", "HTTP/1.1",
                 new LinkedHashMap(), null);
+        session.markNew();
+        sessions.getStore().save(session, null);
         sessions.enter(request, session);
         // Two minutes on -- long past the timeout and the purge interval -- and
-        // the request is still running: its beans must survive.
+        // the request is still running: its beans, and the session itself in the
+        // store, must survive.
         sessions.purgeIfDue(sessions.getStore(), now + 120000);
         assertTrue(ended.isEmpty(), "a running request's session beans were destroyed");
+        assertNotNull(sessions.getStore().load("busy"),
+                "a running request's session was purged from the store");
         sessions.leave(request);
         sessions.purgeIfDue(sessions.getStore(), now + 240000);
         assertEquals(1, ended.size(), "the idle session's beans were never destroyed");
@@ -555,6 +560,73 @@ class ApplicationRuntimeTest {
         sessions.purgeIfDue(sessions.getStore(), now + 360000);
         assertEquals(1, ended.size(), "the replacement session's beans were destroyed in use");
         sessions.leave(switching);
+    }
+
+    @Test
+    @DisplayName("histogram label keys may not collide in Prometheus, nor be its le")
+    void histogramLabelKeysChecked() {
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.lbl.a",
+                "", "ms", null, new String[] {"a.b", "a_b", null}));
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.lbl.b",
+                "", "ms", null, new String[] {"le", null, null}));
+    }
+
+    @Test
+    @DisplayName("a scheduler refuses two jobs of one name")
+    void duplicateJobNames() {
+        Scheduler scheduler = new Scheduler(null);
+        Runnable body = new Runnable() {
+            public void run() {
+            }
+        };
+        scheduler.fixedDelay("same", 1000, 1000, null, Tasks.PLATFORM, null, -1, body);
+        assertThrows(IllegalArgumentException.class, () -> scheduler.fixedDelay("same", 1000,
+                1000, null, Tasks.PLATFORM, null, -1, body));
+    }
+
+    @Test
+    @DisplayName("a handler that invalidates its session and then throws an Error still logs out")
+    void errorAfterInvalidateStillEndsTheSession() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        if(request.getTarget().startsWith("/in")) {
+                            request.getSession(true).setAttribute("user", "ada");
+                            return request.respond(200, "text/plain", "in".getBytes("UTF-8"));
+                        }
+                        if(request.getTarget().startsWith("/out")) {
+                            request.getSession(true).invalidate();
+                            throw new AssertionError("after the logout");
+                        }
+                        HttpSession s = request.getSession(false);
+                        return request.respond(200, "text/plain", String.valueOf(
+                                s == null ? null : s.getAttribute("user")).getBytes("UTF-8"));
+                    }
+                }).start();
+        try {
+            HttpURLConnection in = open(port, "/in");
+            assertEquals("in", read(in));
+            String pair = in.getHeaderField("Set-Cookie");
+            pair = pair.substring(0, pair.indexOf(';'));
+            HttpURLConnection out = open(port, "/out");
+            out.setRequestProperty("Cookie", pair);
+            try {
+                // An Error drops the connection rather than answering 500.
+                out.getResponseCode();
+            } catch (IOException dropped) {
+                // expected either way
+            }
+            HttpURLConnection me = open(port, "/me");
+            me.setRequestProperty("Cookie", pair);
+            assertEquals("null", read(me), "the logout was lost when the handler threw an Error");
+        } finally {
+            backend.stop();
+        }
     }
 
     @Test

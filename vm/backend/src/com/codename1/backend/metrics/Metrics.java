@@ -327,12 +327,24 @@ public final class Metrics {
         gauge("cn1.task.queue_depth", "Tasks waiting for a thread, by executor", "{task}",
                 new Gauge.MultiSource() {
             public List read() {
-                List out = new ArrayList();
+                // Summed by name: two servers in the process each have a
+                // "default" executor, and two points with one label set are one
+                // series twice -- duplicate samples a scrape rejects.
+                Map byName = new LinkedHashMap();
                 List all = com.codename1.backend.Tasks.executors();
                 for(int iter = 0 ; iter < all.size() ; iter++) {
                     com.codename1.backend.TaskExecutor e =
                             (com.codename1.backend.TaskExecutor)all.get(iter);
-                    out.add(Gauge.point("cn1.executor", e.getName(), e.getQueueDepth()));
+                    Long sum = (Long)byName.get(e.getName());
+                    byName.put(e.getName(), new Long((sum == null ? 0 : sum.longValue())
+                            + e.getQueueDepth()));
+                }
+                List out = new ArrayList();
+                java.util.Iterator names = byName.entrySet().iterator();
+                while(names.hasNext()) {
+                    Map.Entry entry = (Map.Entry)names.next();
+                    out.add(Gauge.point("cn1.executor", (String)entry.getKey(),
+                            ((Long)entry.getValue()).longValue()));
                 }
                 return out;
             }

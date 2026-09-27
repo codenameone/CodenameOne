@@ -212,6 +212,15 @@ public final class Scheduler {
             throw new IllegalStateException("Scheduled job " + job.name + " takes lock \""
                     + job.lock + "\", which needs a database, and this server has none");
         }
+        for(int iter = 0 ; iter < jobs.size() ; iter++) {
+            if(((Job)jobs.get(iter)).name.equals(job.name)) {
+                // A job is triggered, listed and measured by name: a second one
+                // with it could not be triggered, and the two could overlap while
+                // reported as one.
+                throw new IllegalArgumentException("A scheduled job named \"" + job.name
+                        + "\" is already registered");
+            }
+        }
         jobs.add(job);
     }
 

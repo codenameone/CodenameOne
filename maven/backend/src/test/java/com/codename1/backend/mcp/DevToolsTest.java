@@ -43,4 +43,19 @@ class DevToolsTest {
         assertFalse(DevTools.readOnlyPragma("PRAGMA writable_schema(ON)"));
         assertFalse(DevTools.readOnlyPragma("PRAGMA optimize"));
     }
+
+    @Test
+    @DisplayName("with the backend down, the bridge answers under the request's own id")
+    void bridgeAnswersUnderTheTopLevelId() throws Exception {
+        java.net.ServerSocket probe = new java.net.ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        java.net.URL url = new java.net.URL("http://127.0.0.1:" + closed + "/mcp");
+        String answer = StdioBridge.post(url, null, "{\"jsonrpc\":\"2.0\",\"method\":"
+                + "\"tools/call\",\"params\":{\"arguments\":{\"id\":\"nested\"}},\"id\":7}");
+        assertTrue(answer != null && answer.contains("\"id\":7") && !answer.contains("nested"),
+                String.valueOf(answer));
+        assertTrue(StdioBridge.post(url, null, "{\"jsonrpc\":\"2.0\",\"method\":\"note\","
+                + "\"params\":{\"id\":1}}") == null, "a notification got an answer");
+    }
 }

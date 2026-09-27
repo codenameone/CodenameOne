@@ -1045,9 +1045,18 @@ public class BackendBeansTest {
         s.put("com.example.Jobs", PKG + "@Component public class Jobs {\n"
                 + "    @Scheduled(fixedRate = 1000) @Async public void tick() { }\n"
                 + "}\n");
+        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+                + "    @Async public void recount() { }\n"
+                + "}\n");
+        s.put("com.example.Stats", PKG + "@Component @ManagedResource(objectName = \"cache/main\")\n"
+                + "public class Stats {\n"
+                + "    @ManagedAttribute public int getN() { return 1; }\n"
+                + "}\n");
         ProcessorContext ctx = process(compile(s));
         String errors = String.valueOf(ctx.getErrors());
         assertTrue(errors, errors.contains("is on a @RequestScope bean"));
+        assertTrue(errors, errors.contains("is on a @SessionScope bean"));
+        assertTrue(errors, errors.contains("is a segment of the management URL"));
         assertTrue(errors, errors.contains("is also @Async"));
     }
 

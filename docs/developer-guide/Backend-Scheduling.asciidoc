@@ -48,9 +48,9 @@ A `synchronized` `@Async` method holds its monitor while the body runs on the
 executor's thread, not merely while it hands the task over, so two calls still
 never run the body at once.
 
-Two combinations are build errors. `@Async` on a `@RequestScope` bean would hand
-the task an instance that's destroyed when the request ends, possibly before the
-task runs. `@Async` on a `@Scheduled` method would end the run as soon as the work
+Two combinations are build errors. `@Async` on a `@RequestScope` or
+`@SessionScope` bean would hand the task an instance that's destroyed when its
+request or session ends, possibly before the task runs. `@Async` on a `@Scheduled` method would end the run as soon as the work
 was queued, so runs could overlap and a lock be released early; `@Scheduled`
 already runs off the request thread, on the thread its `thread` attribute picks.
 

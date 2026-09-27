@@ -69,7 +69,8 @@ public final class StdioBridge {
         }
     }
 
-    private static String post(URL url, String token, String body) {
+    /** Forwards one line; package-private for the test of the unreachable path. */
+    static String post(URL url, String token, String body) {
         try {
             HttpURLConnection c = (HttpURLConnection)url.openConnection();
             c.setRequestMethod("POST");
@@ -94,15 +95,27 @@ public final class StdioBridge {
             return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
         } catch (Exception err) {
             // The backend is not up: answer the host rather than hang it, under
-            // the id it asked with -- and not at all for a notification.
-            java.util.regex.Matcher id = java.util.regex.Pattern
-                    .compile("\"id\"\\s*:\\s*(\"[^\"]*\"|-?[0-9]+)").matcher(body);
-            if(!id.find()) {
+            // the id it asked with -- and not at all for a notification. The
+            // TOP-LEVEL id, parsed: a pattern took the first "id" anywhere, so a
+            // tool argument named id got the answer and the host waited forever.
+            Object request;
+            try {
+                request = com.codename1.backend.Json.parse(body);
+            } catch (Exception parseErr) {
                 return null;
             }
-            return "{\"jsonrpc\":\"2.0\",\"id\":" + id.group(1) + ",\"error\":{\"code\":-32000,"
-                    + "\"message\":\"backend unreachable: "
-                    + String.valueOf(err.getMessage()).replace('"', '\'') + "\"}}";
+            if(!(request instanceof java.util.Map)
+                    || !((java.util.Map)request).containsKey("id")) {
+                return null;
+            }
+            java.util.Map error = new java.util.LinkedHashMap();
+            error.put("code", Integer.valueOf(-32000));
+            error.put("message", "backend unreachable: " + err.getMessage());
+            java.util.Map response = new java.util.LinkedHashMap();
+            response.put("jsonrpc", "2.0");
+            response.put("id", ((java.util.Map)request).get("id"));
+            response.put("error", error);
+            return com.codename1.backend.Json.write(response);
         }
     }
 }

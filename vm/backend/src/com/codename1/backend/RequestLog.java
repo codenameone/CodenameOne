@@ -38,10 +38,10 @@ public final class RequestLog {
     /**
      * Per server, never per process: with two servers in one process, the one
      * running the development tools must not show the other's request targets
-     * and exceptions. Plain, not volatile: a request that misses the switch by
-     * a moment is simply not logged.
+     * and exceptions. Volatile: the development tools switch it on after the
+     * workers are running, and a plain write need never become visible to them.
      */
-    boolean enabled;
+    volatile boolean enabled;
     private Map[] ring = new Map[0];
     private int next;
     private int size;
