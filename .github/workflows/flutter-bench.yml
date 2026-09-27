@@ -405,6 +405,10 @@ jobs:
             "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --no-children --sort symbol --percent-limit 0.3 -g none 2>/dev/null | grep -v "^$" | head -70 > "$RUNNER_TEMP/prof/self$i.txt"
             "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --children --sort symbol --percent-limit 0.8 -g none 2>/dev/null | grep -v "^$" | head -120 > "$RUNNER_TEMP/prof/incl$i.txt"
           done
+          for sym in cn1FontMetrics cn1MeasureUtf8 FcFontSetSort pango_font_map_load_fontset cn1A11yNodeMain gtk_css_provider_load_from_resource loadTrueTypeFontFromMemory; do
+            "$PERF" report -i "$RUNNER_TEMP/prof/perf2.data" --stdio --no-children -S "$sym" -G --percent-limit 0 2>/dev/null | grep -v "^$\|^#" | head -60 > "$RUNNER_TEMP/prof/callers-$sym.txt" || true
+            "$PERF" report -i "$RUNNER_TEMP/prof/perf2.data" --stdio --children --sort symbol -g caller,0.5,callee,function,percent --percent-limit 0.5 2>/dev/null | awk -v s="$sym" 'index($0,s)&&/%/{p=1} p{print} /^$/{if(p)exit}' | head -80 > "$RUNNER_TEMP/prof/tree-$sym.txt" || true
+          done
           echo "== self (run 2)"; cat "$RUNNER_TEMP/prof/self2.txt"
           echo "== inclusive (run 2)"; cat "$RUNNER_TEMP/prof/incl2.txt"
       - name: Upload the Linux profile
