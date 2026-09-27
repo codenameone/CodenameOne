@@ -68,6 +68,8 @@ public class Bench extends Lifecycle {
         com.codename1.ui.Display.getInstance().setProperty(
                 com.codename1.flutter.foundation.FoundationLib.PLATFORM_PROPERTY,
                 platform == null ? "ios" : platform);
+        com.codename1.ui.Display.getInstance().setProperty("cn1.flutter.startupTrace", "true");
+        System.out.println("BENCH:T init=" + System.currentTimeMillis() + " size=" + com.codename1.ui.Display.getInstance().getDisplayWidth() + "x" + com.codename1.ui.Display.getInstance().getDisplayHeight());
         com.codename1.ui.CN.updateNetworkThreadCount(2);
         com.codename1.ui.Toolbar.setGlobalToolbar(true);
         com.codename1.io.Log.bindCrashProtection(true);
@@ -212,11 +214,13 @@ public class Bench extends Lifecycle {
             return;
         }
         long t0 = System.currentTimeMillis();
+        System.out.println("BENCH:T runApp=" + System.currentTimeMillis() + " size=" + com.codename1.ui.Display.getInstance().getDisplayWidth() + "x" + com.codename1.ui.Display.getInstance().getDisplayHeight());
         com.codename1.flutter.FlutterErrorReport.install();
         long t1 = System.currentTimeMillis();
         markFirstFrame();
         com.codename1.generated.flutter.FlutterRegistry.invokeMain();
         long t2 = System.currentTimeMillis();
+        System.out.println("BENCH:T mainDone=" + System.currentTimeMillis() + " size=" + com.codename1.ui.Display.getInstance().getDisplayWidth() + "x" + com.codename1.ui.Display.getInstance().getDisplayHeight());
         // Phase timings, so a slow start can be attributed instead of guessed
         // at. The harness's own clock still owns the headline number; these say
         // which part of the app owns the milliseconds.
@@ -273,6 +277,7 @@ public class Bench extends Lifecycle {
                     System.out.flush();
                     return;
                 }
+                System.out.println("BENCH:T marker=" + System.currentTimeMillis() + " size=" + com.codename1.ui.Display.getInstance().getDisplayWidth() + "x" + com.codename1.ui.Display.getInstance().getDisplayHeight());
                 System.out.println("BENCH:FIRSTFRAME after="
                         + (System.currentTimeMillis() - start) + "ms edtPasses=" + passes);
                 System.out.flush();
