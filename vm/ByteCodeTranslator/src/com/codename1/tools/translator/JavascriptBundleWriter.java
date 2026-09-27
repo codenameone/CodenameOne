@@ -1667,7 +1667,11 @@ final class JavascriptBundleWriter {
     ///
     /// The viewport is unconditional: without it every mobile browser lays the page out on a
     /// ~980px virtual viewport and scales it down, so the app starts as a shrunken desktop page.
-    /// It deliberately leaves zoom enabled.
+    /// It carries no `user-scalable=no` or `maximum-scale`, so the page does not forbid scaling
+    /// -- browser zoom and accessibility zoom still work. It does not make PINCH zoom available
+    /// over the app, and is not meant to: the canvas claims every touch gesture
+    /// (`touch-action: none` in the port's style.css) so an application's own two-finger
+    /// gestures -- an image viewer, a map -- reach it instead of zooming the page.
     static String applyPageSettings(String index, String title, boolean allowTranslation, boolean darkReaderLock) {
         StringBuilder meta = new StringBuilder();
         meta.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");

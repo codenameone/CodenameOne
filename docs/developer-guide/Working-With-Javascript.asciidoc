@@ -558,7 +558,7 @@ The browser tab title is the application's display name in both modes.
 The generated `index.html` sets up the page for the application:
 
 * The page title is the application's display name, `codename1.displayName`.
-* A `viewport` meta tag gives mobile browsers the device's width, so the app starts at the phone's own scale rather than as a shrunken desktop page. Pinch zoom stays available.
+* A `viewport` meta tag gives mobile browsers the device's width, so the app starts at the phone's own scale rather than as a shrunken desktop page. The tag doesn't forbid scaling, so browser and accessibility zoom still work, but touch gestures over the app go to the app, including two-finger ones, so the page itself doesn't pinch-zoom.
 * Browser translation is off: the page carries `<meta name="google" content="notranslate">` and `translate="no"`. The app draws its own text, and a browser translating the page under it, or loading it through a translation site, breaks it. Set `javascript.allowBrowserTranslation=true` to let the browser offer translation.
 * The page carries `<meta name="darkreader-lock">`, which asks the Dark Reader extension to leave the app's own colors alone. Dark Reader honors it in its default Dynamic mode only; its Filter, Filter+ and Static modes ignore it. Set `javascript.darkreaderLock=false` to omit it.
 

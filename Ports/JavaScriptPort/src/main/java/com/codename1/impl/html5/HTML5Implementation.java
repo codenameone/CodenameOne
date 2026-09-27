@@ -309,11 +309,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * The press a release belongs to. Read synchronously at the release handler's entry, before
+     * any JSO yield: read later, a quick second tap could already have replaced it, and the first
+     * release would be parked on the second press while the first press never got one.
+     */
+    private PressSlot pressForRelease() {
+        synchronized (pointerEventOrderLock) {
+            return lastPress;
+        }
+    }
+
     /** Runs a release now, or parks it on its press if that press has not been dispatched yet. */
-    private void dispatchRelease(Runnable release) {
+    private void dispatchRelease(PressSlot slot, Runnable release) {
         boolean now;
         synchronized (pointerEventOrderLock) {
-            PressSlot slot = lastPress;
             if (slot != null && !slot.done) {
                 slot.release = release;
                 now = false;
@@ -2158,6 +2168,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         onMouseUp = new EventListener(){
             @Override
             public void handleEvent(Event evt) {
+                final PressSlot press = pressForRelease();
                 if (isTouchPointer(evt)) {
                     return;
                 }
@@ -2219,7 +2230,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // run it. Otherwise queue the release immediately. Avoids
                 // blocking the worker's listener thread, which would starve
                 // subsequent pointerdown invocations during a Dialog modal.
-                dispatchRelease(releaseDispatch);
+                dispatchRelease(press, releaseDispatch);
 
             }
         };
@@ -2336,6 +2347,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @SuppressSyncErrors
             @Override
             public void handleEvent(Event evt) {
+                final PressSlot press = pressForRelease();
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2383,7 +2395,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // A tap's touchend can overtake its touchstart, which is still suspended on a
                 // host call and has not pressed yet. Releasing first would leave the press
                 // without its release, so the release waits for the press, as onMouseUp does.
-                dispatchRelease(releaseDispatch);
+                dispatchRelease(press, releaseDispatch);
                 if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), pointerState.getTouchStartTime(), currentTimeMillisecondsJS(), pointerState.getTouchStartX(), pointerState.getTouchStartY(), pointerState.getTouchesX()[0], pointerState.getTouchesY()[0])) {
                     // Hack for iOS only to anticipate clicking on a text field
                     createAndFocusTextFieldPreemptively(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
@@ -4800,6 +4812,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         TextSelection.setDefaultSelectable(true);
+        // Only a form that is its own root. TextSelection wires its listeners to the TOP LEVEL,
+        // so enabling it on a Dialog hosted inside another surface (a desktop dialog shown in a
+        // window's layered pane) registered them on the host, and nothing removes them when the
+        // dialog goes -- each dialog opened would leave its selection behind, still receiving
+        // the host's pointer events. A root form's listeners live and die with the form itself.
+        if (f.getParent() != null || f.getTopLevelContainer() != f) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
         TextSelection sel = f.getTextSelection();
         if (!sel.isEnabled()) {
             sel.setEnabled(true);
@@ -14203,6 +14223,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
+        lastPortCopyTime = System.currentTimeMillis();
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
         obj = request.content;
         super.copyToClipboard(obj);
@@ -14311,6 +14332,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return selectedText;
     }
     
+    /** When this port last copied, so copyListener can tell its own fallback's event apart. */
+    private long lastPortCopyTime;
+
     EventListener copyListener = new EventListener() {
         @SuppressSyncErrors
         public void handleEvent(Event evt) {
@@ -14319,6 +14343,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             // A copy while a native field is being edited is that field's copy.
             if (isEditing) {
+                return;
+            }
+            // A copy event this port caused itself. When the async clipboard API is missing or
+            // refuses, copyToClipboard falls back to execCommand("copy") on the main thread, and
+            // that fires a copy event of its own; answering it would copy again, fall back again
+            // and cycle. It reaches this listener after copyToClipboard has returned, hence a
+            // short window rather than a flag held across the call.
+            if (System.currentTimeMillis() - lastPortCopyTime < 1000) {
                 return;
             }
             // Not through the event. This listener runs in the worker, after the browser has
