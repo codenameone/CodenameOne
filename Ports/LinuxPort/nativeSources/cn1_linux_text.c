@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <fontconfig/fontconfig.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -68,7 +69,16 @@ PangoContext* cn1LinuxPangoContext(void) {
 
 /* Snapshots ascent/height for the description into the CN1Font. */
 static void cn1FontMetrics(CN1Font* f) {
+    struct timespec q0, q1;
+    clock_gettime(CLOCK_MONOTONIC, &q0);
     PangoFontMetrics* m = pango_context_get_metrics(cn1LinuxPangoContext(), f->desc, 0);
+    clock_gettime(CLOCK_MONOTONIC, &q1);
+    {
+        char* d = pango_font_description_to_string(f->desc);
+        fprintf(stdout, "BENCH:FONTMETRICS %.3fms %s\n", (q1.tv_sec - q0.tv_sec) * 1e3 + (q1.tv_nsec - q0.tv_nsec) / 1e6, d);
+        fflush(stdout);
+        g_free(d);
+    }
     if (m != 0) {
         f->ascent = pango_font_metrics_get_ascent(m) / PANGO_SCALE;
         f->height = (pango_font_metrics_get_ascent(m) + pango_font_metrics_get_descent(m)) / PANGO_SCALE;
