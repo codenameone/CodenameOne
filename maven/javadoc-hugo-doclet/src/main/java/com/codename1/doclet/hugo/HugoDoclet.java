@@ -105,6 +105,15 @@ public final class HugoDoclet implements Doclet {
      * A shared type links to its own page there.
      */
     private String counterpartRoot;
+    /**
+     * Source trees whose every type is shared by both references. The core
+     * marks a shared class with {@link #SHARED_WITH_BACKEND}, but the java.*
+     * classes the framework ships (Ports/CLDC11/src) cannot carry an annotation
+     * from a package they are compiled without, and they are shared as a whole:
+     * the backend's class library, vm/JavaAPI, provides every public member of
+     * every one of them.
+     */
+    private final List<Path> sharedSourceRoots = new ArrayList<>();
 
     private DocletEnvironment environment;
     private Elements elements;
@@ -150,7 +159,16 @@ public final class HugoDoclet implements Doclet {
                         value -> audience = Audience.parse(value)),
                 new SimpleOption("--counterpart-root", "<path>",
                         "Site path of the other reference, for linking shared types to it",
-                        value -> counterpartRoot = Refs.normalizeRoot(value)));
+                        value -> counterpartRoot = Refs.normalizeRoot(value)),
+                new SimpleOption("--shared-sources", "<dir>[" + java.io.File.pathSeparator + "<dir>...]",
+                        "Source trees whose every type is part of both references",
+                        value -> {
+                            for (String dir : value.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
+                                if (!dir.isBlank()) {
+                                    sharedSourceRoots.add(Path.of(dir).toAbsolutePath().normalize());
+                                }
+                            }
+                        }));
     }
 
     /** The two references the site publishes. */
@@ -430,7 +448,7 @@ public final class HugoDoclet implements Doclet {
      * <p>Read off the outermost type, because the marker sits on the top level
      * declaration and a nested type is shared along with it.
      */
-    private static boolean isShared(TypeElement type) {
+    private boolean isShared(TypeElement type) {
         Element outermost = type;
         while (outermost.getEnclosingElement() instanceof TypeElement outer) {
             outermost = outer;
@@ -438,6 +456,28 @@ public final class HugoDoclet implements Doclet {
         for (javax.lang.model.element.AnnotationMirror mirror : outermost.getAnnotationMirrors()) {
             if (mirror.getAnnotationType().asElement() instanceof TypeElement annotation
                     && annotation.getQualifiedName().contentEquals(SHARED_WITH_BACKEND)) {
+                return true;
+            }
+        }
+        return isInSharedSources(outermost);
+    }
+
+    /** Whether the type was read from one of the {@code --shared-sources} trees. */
+    private boolean isInSharedSources(Element type) {
+        if (sharedSourceRoots.isEmpty()) {
+            return false;
+        }
+        com.sun.source.util.TreePath path = environment.getDocTrees().getPath(type);
+        if (path == null) {
+            return false;
+        }
+        java.net.URI uri = path.getCompilationUnit().getSourceFile().toUri();
+        if (!"file".equals(uri.getScheme())) {
+            return false;
+        }
+        Path file = Path.of(uri).toAbsolutePath().normalize();
+        for (Path root : sharedSourceRoots) {
+            if (file.startsWith(root)) {
                 return true;
             }
         }

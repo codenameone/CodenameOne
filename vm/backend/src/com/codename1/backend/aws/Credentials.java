@@ -233,8 +233,8 @@ public final class Credentials {
         // 169.254.170.2 is the ECS task metadata address and 169.254.170.23 the
         // EKS pod identity one; both are link-local, so they are this host by
         // definition.
-        if (isLoopbackAddress(host) || "169.254.170.2".equals(host)
-                || "169.254.170.23".equals(host)) {
+        if (isLoopbackAddress(host) || "169.254.170.2".equals(host) //NOPMD AvoidUsingHardCodedIP - AWS's fixed ECS metadata address, recognised not dialled
+                || "169.254.170.23".equals(host)) { //NOPMD AvoidUsingHardCodedIP - AWS's fixed EKS pod identity address, recognised not dialled
             return;
         }
         throw new IOException("A container credential endpoint that is not this "
@@ -244,7 +244,7 @@ public final class Credentials {
 
     /// True for ::1, for localhost, and for a dotted quad in 127.0.0.0/8.
     private static boolean isLoopbackAddress(String host) {
-        if ("::1".equals(host) || "localhost".equalsIgnoreCase(host)) {
+        if ("::1".equals(host) || "localhost".equalsIgnoreCase(host)) { //NOPMD AvoidUsingHardCodedIP - IPv6 loopback, recognised not dialled
             return true;
         }
         int octets = 0;

@@ -91,16 +91,24 @@ class HugoDocletAudienceTest {
         write(src, "b/package-info.java",
                 "/// Server-only package.",
                 "package b;");
+        // A separate source tree whose every type is shared, the way the java.*
+        // classes under Ports/CLDC11/src are: no annotation, just where it lives.
+        Path lib = workspace.resolve("lib");
+        write(lib, "l/Lib.java",
+                "package l;",
+                "/// Part of the class library both halves compile against.",
+                "public class Lib {}");
 
         backend = workspace.resolve("backend");
         client = workspace.resolve("client");
         backendIndex = workspace.resolve("backend-javadoc-search.json");
 
-        run(src, List.of("s/Shared.java", "b/Server.java", "s/package-info.java", "b/package-info.java"),
+        run(src, lib, List.of("s/Shared.java", "b/Server.java", "s/package-info.java",
+                        "b/package-info.java", "../lib/l/Lib.java"),
                 backend, backendIndex,
                 "--audience", "backend", "--url-root", "/backend/javadoc/",
-                "--counterpart-root", "/javadoc/");
-        run(src, List.of("s/Shared.java", "s/package-info.java"),
+                "--counterpart-root", "/javadoc/", "--shared-sources", lib.toString());
+        run(src, lib, List.of("s/Shared.java", "s/package-info.java", "../lib/l/Lib.java"),
                 client, workspace.resolve("javadoc-search.json"),
                 "--audience", "client", "--counterpart-root", "backend/javadoc");
     }
@@ -111,8 +119,8 @@ class HugoDocletAudienceTest {
         Files.writeString(file, String.join("\n", lines) + "\n", StandardCharsets.UTF_8);
     }
 
-    private static void run(Path src, List<String> files, Path out, Path index, String... extra)
-            throws IOException {
+    private static void run(Path src, Path lib, List<String> files, Path out, Path index,
+                            String... extra) throws IOException {
         DocumentationTool tool = ToolProvider.getSystemDocumentationTool();
         try (StandardJavaFileManager manager = tool.getStandardFileManager(null, null, null)) {
             List<Path> paths = new ArrayList<>();
@@ -122,7 +130,8 @@ class HugoDocletAudienceTest {
             Iterable<? extends JavaFileObject> units = manager.getJavaFileObjectsFromPaths(paths);
             List<String> options = new ArrayList<>(List.of("-d", out.toString(),
                     "--search-index", index.toString(),
-                    "-sourcepath", src.toString(), "-protected", "-quiet"));
+                    "-sourcepath", src + java.io.File.pathSeparator + lib,
+                    "-protected", "-quiet"));
             options.addAll(List.of(extra));
             assertTrue(tool.getTask(null, manager, null, HugoDoclet.class, options, units).call(),
                     "the doclet run failed");
@@ -198,6 +207,19 @@ class HugoDocletAudienceTest {
         // The option was written without slashes; it must still come out as a
         // site path, or the switch would be a relative link.
         assertTrue(clientOverview.contains("\"counterpartRoot\": \"/backend/javadoc/\""), clientOverview);
+    }
+
+    @Test
+    void marksEveryTypeFromASharedSourceTreeAsShared() throws IOException {
+        // The backend run names the tree; its type is shared and defers to the
+        // client page.
+        String onBackend = read(backend, "l/Lib.md");
+        assertTrue(onBackend.contains("\"shared\": true"), onBackend);
+        assertTrue(onBackend.contains("\"canonicalURL\": \"/javadoc/l/Lib/\""), onBackend);
+        // The client run does not, so the same type is its own there. The
+        // option is what decides, not the file's location on disk.
+        String onClient = read(client, "l/Lib.md");
+        assertTrue(onClient.contains("\"shared\": false"), onClient);
     }
 
     @Test

@@ -165,9 +165,17 @@ while IFS= read -r shared; do
   fi
 done < <("$BACKEND_DIR/shared-sources.sh")
 
+# The java.* classes the framework ships (Ports/CLDC11/src) are documented
+# here too, read in place exactly as the client run reads them. They are shared:
+# the backend compiles against vm/JavaAPI, which provides every public class and
+# member of every one of them (it is a superset), so each page is as true for a
+# server as for an app. The website's doclet marks the whole tree shared with
+# --shared-sources.
 BACKEND_SOURCES_ARGFILE="$CN1_DIR/build/backend-javadoc-sources.txt"
-find "$BACKEND_STAGE" -name "*.java" \
-  | grep -v '/com/codename1/impl/' | LC_ALL=C sort > "$BACKEND_SOURCES_ARGFILE"
+{
+  find "$BACKEND_STAGE" -name "*.java" | grep -v '/com/codename1/impl/'
+  find "$ROOT_DIR/Ports/CLDC11/src" -name "*.java"
+} | LC_ALL=C sort > "$BACKEND_SOURCES_ARGFILE"
 
 # Held to the same doclint as the client API above. --release 8 matches the backend module's
 # source level, and the JDK is the class library it compiles against.
@@ -177,7 +185,7 @@ find "$BACKEND_STAGE" -name "*.java" \
   --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
   --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
   --release 8 \
-  -sourcepath "$BACKEND_STAGE" \
+  -sourcepath "$BACKEND_STAGE:$ROOT_DIR/Ports/CLDC11/src" \
   -Xdoclint:all,-missing \
   -Xmaxerrs 10000 \
   -Xmaxwarns 10000 \

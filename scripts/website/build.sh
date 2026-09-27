@@ -229,6 +229,7 @@ build_javadocs_for_site() {
     --audience client \
     --url-root /javadoc/ \
     --counterpart-root /backend/javadoc/ \
+    --shared-sources "${REPO_ROOT}/Ports/CLDC11/src" \
     -sourcepath "${temp_sources}:${REPO_ROOT}/Ports/CLDC11/src" \
     -quiet \
     -protected \
@@ -271,7 +272,8 @@ build_javadocs_for_site() {
     --audience backend \
     --url-root /backend/javadoc/ \
     --counterpart-root /javadoc/ \
-    -sourcepath "${backend_sources}" \
+    --shared-sources "${REPO_ROOT}/Ports/CLDC11/src" \
+    -sourcepath "${backend_sources}:${REPO_ROOT}/Ports/CLDC11/src" \
     -quiet \
     -protected \
     "@${backend_argfile}"

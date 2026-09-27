@@ -348,7 +348,14 @@ templates:
 - **Backend API** at `/backend/javadoc/` (and `backend-javadocs.zip`):
   `vm/backend/src`, the production `vm/backend/impl/parparvm` classes (not the
   `impl/javase` twins, whose comments describe how they differ from production),
-  and the core classes marked `@SharedWithBackend`.
+  the core classes marked `@SharedWithBackend`, and the CLDC `java.*` classes.
+
+The `java.*` classes are shared whole rather than annotated (they compile
+without the `com.codename1` packages): the backend's class library,
+`vm/JavaAPI`, provides every public class and member of `Ports/CLDC11/src`, and
+the doclet's `--shared-sources` marks every type read from that tree. Keep that
+superset true -- a CLDC API that JavaAPI lacks would be documented as working on
+a server where it does not.
 
 A shared class is documented in **both**, badged "Client and backend" on each, and
 its backend page declares the client page canonical. Every other page carries a

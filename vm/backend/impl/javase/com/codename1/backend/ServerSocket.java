@@ -67,7 +67,7 @@ public final class ServerSocket {
         ServerSocketChannel channel = ServerSocketChannel.open();
         try {
             channel.setOption(StandardSocketOptions.SO_REUSEADDR, Boolean.TRUE);
-            channel.bind(host == null || "0.0.0.0".equals(host)
+            channel.bind(host == null || "0.0.0.0".equals(host) //NOPMD AvoidUsingHardCodedIP - recognises the "every interface" wildcard, connects to nothing
                     ? new InetSocketAddress(port)
                     : new InetSocketAddress(host, port), backlog);
             return new ServerSocket(channel, Descriptors.add(channel));

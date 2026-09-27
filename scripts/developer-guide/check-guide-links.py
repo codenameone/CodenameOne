@@ -264,8 +264,10 @@ JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
 # implementation classes, and the core classes marked @SharedWithBackend (the ORM
 # session API and the entity annotations), which are documented in both
 # references. Only the marked core classes count on this side; the rest of
-# CodenameOne/src has no page there.
-BACKEND_JAVADOC_SOURCE_ROOTS = ("vm/backend/src", "vm/backend/impl/parparvm", "CodenameOne/src")
+# CodenameOne/src has no page there. The CLDC java.* classes are shared whole:
+# the backend's class library provides every public member of every one.
+BACKEND_JAVADOC_SOURCE_ROOTS = ("vm/backend/src", "vm/backend/impl/parparvm", "CodenameOne/src",
+                                "Ports/CLDC11/src")
 SHARED_CORE_ROOT = "CodenameOne/src"
 SHARED_WITH_BACKEND_RE = re.compile(r"^@(?:com\.codename1\.impl\.)?SharedWithBackend\s*$", re.M)
 BACKEND_PREFIX = "/backend/javadoc/"
