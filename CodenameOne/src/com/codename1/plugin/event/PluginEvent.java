@@ -38,12 +38,9 @@ import com.codename1.ui.events.ActionEvent;
 /// with the return value.  `#setPluginEventResponse(Object)` calls `#consume()`, so you do not need
 /// to call both of these methods.
 ///
-/// @author Steve Hannah
-///
 /// #### Parameters
 ///
 /// - `The`: type of the response to the event. If the event does not require a response, this should be `Void`.
-///
 public abstract class PluginEvent<T> extends ActionEvent {
 
     private T pluginEventResponse;

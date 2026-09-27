@@ -53,8 +53,6 @@ import java.util.Vector;
 /// hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class SliderBridge extends Slider {
     private ConnectionRequest[] sources;
 

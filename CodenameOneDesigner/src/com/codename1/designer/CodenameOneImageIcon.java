@@ -31,8 +31,6 @@ import javax.swing.Icon;
 
 /**
  * An icon that renders a CodenameOne image at 16x16 for renderers
- *
- * @author Shai Almog
  */
 public class CodenameOneImageIcon implements Icon {
     private com.codename1.ui.Image img;

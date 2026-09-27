@@ -46,7 +46,6 @@ import com.google.android.gms.location.LocationServices;
  * where the playServicesVersion is 10.0.  Then the build server would delete PlayServices_12_0_0.java before compiling,
  * and would use the PlayServices_9_0_3 class as the PlayServices instance, which is set
  * inside the {@link AndroidImplementation#init(java.lang.Object) } method using {@link #setInstance(com.codename1.impl.android.PlayServices) }.
- * @author shannah
  */
 public class PlayServices {
     

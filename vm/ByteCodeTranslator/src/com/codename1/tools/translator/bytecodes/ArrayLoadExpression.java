@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -25,10 +25,6 @@ package com.codename1.tools.translator.bytecodes;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author shannah
- */
 public class ArrayLoadExpression extends Instruction implements AssignableExpression {
     private Instruction targetArrayInstruction;
     private Instruction indexInstruction;

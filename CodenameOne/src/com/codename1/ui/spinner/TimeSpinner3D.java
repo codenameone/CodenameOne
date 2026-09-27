@@ -40,8 +40,6 @@ import static com.codename1.ui.CN.convertToPixels;
 ///
 /// If `#setDurationMode(boolean)` is true then this will allow
 /// users to set a duration in hours and minutes.
-///
-/// @author Steve Hannah
 class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     static final int DEFAULT_MINUTE_STEP = 5;

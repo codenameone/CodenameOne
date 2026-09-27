@@ -24,8 +24,6 @@ package com.codename1.impl.javase;
 
 /**
  * Simple data object for the network monitor
- *
- * @author Shai Almog
  */
 public class NetworkRequestObject {
 

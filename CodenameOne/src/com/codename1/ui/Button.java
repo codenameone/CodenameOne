@@ -67,8 +67,6 @@ import java.util.Vector;
 /// hi.add(b);
 /// b.addActionListener((e) -> Log.p("Clicked"));
 /// ```
-///
-/// @author Chen Fishbein
 public class Button extends Label implements ReleasableComponent, ActionSource<ActionEvent>, SelectableIconHolder {
     /// Indicates the rollover state of a button which is equivalent to focused for
     /// most uses

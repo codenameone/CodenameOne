@@ -26,8 +26,6 @@ import com.codename1.ui.layouts.BorderLayout;
 
 /// A spinner class that allows picking a number
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

@@ -26,10 +26,6 @@ package com.codename1.designer;
 
 import javax.swing.SpinnerNumberModel;
 
-/**
- *
- * @author Shai
- */
 public class TableLayoutConstraintEditor extends javax.swing.JPanel {
     private static final int[] ALIGN = {-1, com.codename1.ui.Component.LEFT,
         com.codename1.ui.Component.CENTER, com.codename1.ui.Component.RIGHT};

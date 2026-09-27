@@ -66,7 +66,6 @@ import java.util.Comparator;
 /// The maximum number of simulataneous Geofences allowed will vary by platform.  iOS currently has a maximum of 20, and Android has a maximum of 100.  If you need to
 /// track more than 20 at a time, consider using the `GeofenceManager` class to manage your Geofences, as it will allow you to
 /// effectively track an unlimited number of regions.
-/// @author Chen
 ///
 /// #### See also
 ///

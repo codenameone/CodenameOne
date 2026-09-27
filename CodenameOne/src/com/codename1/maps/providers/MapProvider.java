@@ -26,8 +26,6 @@ import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
 
 /// This is a generic map provider.
-///
-/// @author Roman Kamyk
 public abstract class MapProvider {
 
     private final Projection _projection;

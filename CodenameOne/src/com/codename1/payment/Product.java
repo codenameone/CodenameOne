@@ -23,8 +23,6 @@
 package com.codename1.payment;
 
 /// Represents a product within the system
-///
-/// @author Shai Almog
 public class Product {
     private String displayName;
     private String description;

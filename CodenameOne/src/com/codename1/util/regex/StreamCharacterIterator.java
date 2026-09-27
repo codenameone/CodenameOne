@@ -21,9 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /// Encapsulates java.io.InputStream as CharacterIterator.
-///
-/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
-/// @version CVS $Id: StreamCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class StreamCharacterIterator implements CharacterIterator {
     /// Underlying is
     private final InputStream is;

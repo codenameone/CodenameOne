@@ -29,10 +29,6 @@ import com.codename1.tools.translator.Parser;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class TypeInstruction extends Instruction {
     private String type;
     private String actualType;

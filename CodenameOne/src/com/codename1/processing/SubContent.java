@@ -30,8 +30,6 @@ import java.util.Vector;
 /// Internal class, do not use.
 ///
 /// An accessor implementation for working with subset of data.
-///
-/// @author Eric Coolman
 class SubContent implements StructuredContent {
 
     private final List<StructuredContent> root;

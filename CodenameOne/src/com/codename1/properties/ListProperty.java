@@ -30,8 +30,6 @@ import java.util.Iterator;
 import java.util.List;
 
 /// Base class for a property as a list which can contain multiple elements within
-///
-/// @author Shai Almog
 public class ListProperty<T, K> extends CollectionProperty<T, K> {
     private final ArrayList<T> value = new ArrayList<T>();
 

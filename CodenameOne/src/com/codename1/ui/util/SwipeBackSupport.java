@@ -38,8 +38,6 @@ import com.codename1.util.LazyValue;
 
 /// Allows binding a swipe listener to the form that enables the user to swipe back to the previous
 /// form.
-///
-/// @author Shai Almog
 public class SwipeBackSupport {
     boolean sideSwipePotential;
     int initialDragY;

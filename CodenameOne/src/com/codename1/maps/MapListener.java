@@ -26,8 +26,6 @@ package com.codename1.maps;
 import com.codename1.ui.Component;
 
 /// Invoked when the map is panned or zoomed
-///
-/// @author Shai Almog
 public interface MapListener {
     /// Invoked when the map is zoomed or panned
     ///

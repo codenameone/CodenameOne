@@ -67,8 +67,6 @@ import java.util.Vector;
 /// cld.addActionListener((e) -> Log.p("You picked: " + new Date(cld.getSelectedDay())));
 /// hi.add(BorderLayout.CENTER, cld);
 /// ```
-///
-/// @author Iddo Ari, Shai Almog
 public class Calendar extends Container implements ActionSource {
 
     private static final String[] MONTHS = new String[]{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};

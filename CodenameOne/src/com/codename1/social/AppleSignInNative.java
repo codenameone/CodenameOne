@@ -25,10 +25,11 @@ package com.codename1.social;
 
 /// Service-provider interface for native `Sign in with Apple`. The iOS port
 /// supplies a class `com.codename1.social.AppleSignInNativeImpl` that wraps
-/// `ASAuthorizationAppleIDProvider`; [AppleSignIn] loads it via
-/// `Class.forName` at first use. Cn1libs that want to plug in their own
-/// implementation can register one with [AppleSignIn#setNative(AppleSignInNative)]
-/// -- this interface does not extend
+/// `ASAuthorizationAppleIDProvider` and registers it at start-up through
+/// [AppleSignIn#setProvider(AppleSignInNative)] -- an instance rather than a
+/// class name, because class names are obfuscated. Cn1libs that want to plug
+/// in their own implementation register one the same way -- this interface
+/// does not extend
 /// [com.codename1.system.NativeInterface] because [AppleSignIn] is part of
 /// the core framework and the iOS impl talks to native code via
 /// `IOSImplementation.nativeInstance`, not through `NativeLookup`.

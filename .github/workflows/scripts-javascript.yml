@@ -106,7 +106,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log

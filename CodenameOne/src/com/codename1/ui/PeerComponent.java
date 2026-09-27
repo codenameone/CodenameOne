@@ -32,8 +32,6 @@ import com.codename1.ui.geom.Rectangle;
 /// Codename One features such as glass pane, z-ordering, dialogs & menus might not work
 /// as expected in all situations where peer components are involved. E.g. a peer component
 /// might hide itself when a menu/dialog is shown and recreate itself when it is hidden/disposed.
-///
-/// @author Shai Almog
 public class PeerComponent extends Component {
     private final Rectangle lastPos = new Rectangle(-1, -1, -1, -1);
     private Object nativePeer;

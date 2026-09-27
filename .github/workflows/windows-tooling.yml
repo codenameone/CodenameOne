@@ -20,6 +20,7 @@ on:
       - 'scripts/windows/**'
       - 'scripts/javase/lib/**'
       - 'scripts/settings/**'
+      - 'scripts/certificatewizard/**'
       - 'Ports/JavaSE/**'
       - '!Ports/JavaSE/**/*.md'
       - 'maven/javase/**'
@@ -34,6 +35,7 @@ on:
       - 'scripts/windows/**'
       - 'scripts/javase/lib/**'
       - 'scripts/settings/**'
+      - 'scripts/certificatewizard/**'
       - 'Ports/JavaSE/**'
       - '!Ports/JavaSE/**/*.md'
       - 'maven/javase/**'
@@ -90,6 +92,14 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
         run: |
           cd scripts/settings
+          bash ../../scripts/ci/retry.sh mvn -B install -Pexecutable-jar -Dcodename1.platform=javase -Dmaven.test.skip=true
+
+      - name: Build standalone Certificate Wizard (JDK 17)
+        shell: bash
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          cd scripts/certificatewizard
           bash ../../scripts/ci/retry.sh mvn -B install -Pexecutable-jar -Dcodename1.platform=javase -Dmaven.test.skip=true
 
       - name: Run Windows simulator and tooling screenshot tests

@@ -30,7 +30,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 /// is an edge. A joint edge belongs to a doubly linked list
 /// maintained in each attached body. Each joint has two joint
 /// nodes, one for each attached body.
-/// @author Daniel
 public class JointEdge {
 	
 	/// Provides quick access to the other body attached

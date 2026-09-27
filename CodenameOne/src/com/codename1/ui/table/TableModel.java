@@ -28,8 +28,6 @@ import com.codename1.ui.events.DataChangedListener;
 /// The table and table model class are complimentry classes allowing the quick construction
 /// of tabular data controls. The table model represents the data source according to which
 /// the table is constructed.
-///
-/// @author Shai Almog
 public interface TableModel {
     /// Returns the number of rows in the table
     ///

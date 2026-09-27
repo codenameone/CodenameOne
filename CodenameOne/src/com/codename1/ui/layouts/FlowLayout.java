@@ -71,8 +71,6 @@ import com.codename1.ui.plaf.Style;
 ///
 /// There are quite a few additional combinations that are possible with these API's.
 ///
-/// @author Nir Shabi
-///
 /// #### See also
 ///
 /// - BoxLayout see the box layout X which is often a better choice than flow layout.

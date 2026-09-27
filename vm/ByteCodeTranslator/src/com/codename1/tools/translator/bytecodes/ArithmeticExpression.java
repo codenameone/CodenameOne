@@ -27,10 +27,6 @@ import java.util.List;
 import org.objectweb.asm.Opcodes;
 
 
-/**
- *
- * @author shannah
- */
 public class ArithmeticExpression extends Instruction implements AssignableExpression{
 
     public static final int OPCODE=-2;

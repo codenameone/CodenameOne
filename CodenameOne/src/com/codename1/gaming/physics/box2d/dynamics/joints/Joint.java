@@ -32,8 +32,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 // updated to rev 100
 /// The base joint class. Joints are used to constrain two bodies together in various fashions. Some
 /// joints also feature limits and motors.
-///
-/// @author Daniel Murphy
 public abstract class Joint {
 
   public static Joint create(World world, JointDef def) {
@@ -141,18 +139,18 @@ public abstract class Joint {
 
   /// get the anchor point on bodyA in world coordinates.
   ///
-  /// @return
+  /// @param out receives the anchor point
   public abstract void getAnchorA(Vec2 out);
 
   /// get the anchor point on bodyB in world coordinates.
   ///
-  /// @return
+  /// @param out receives the anchor point
   public abstract void getAnchorB(Vec2 out);
 
   /// get the reaction force on body2 at the joint anchor in Newtons.
   ///
-  /// @param inv_dt
-  /// @return
+  /// @param inv_dt the inverse of the time step
+  /// @param out receives the reaction force
   public abstract void getReactionForce(float inv_dt, Vec2 out);
 
   /// get the reaction torque on body2 in N*m.
@@ -196,8 +194,8 @@ public abstract class Joint {
 
   /// This returns true if the position errors are within tolerance.
   ///
-  /// @param baumgarte
-  /// @return
+  /// @param data the solver state for this step
+  /// @return true if the position errors are within tolerance
   public abstract boolean solvePositionConstraints(SolverData data);
 
   /// Override to handle destruction of joint

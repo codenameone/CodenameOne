@@ -43,7 +43,6 @@ import com.codename1.io.ConnectionRequest;
 /// should migrate to the {@link Analytics} API and call
 /// {@link Analytics#setConsent(AnalyticsConsent)}.
 ///
-/// @author Shai Almog
 /// @deprecated use {@link Analytics} and an {@link AnalyticsProvider}
 @Deprecated
 public class AnalyticsService {

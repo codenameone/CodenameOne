@@ -71,8 +71,6 @@ import java.util.Set;
  * <p>The class never reads back from the DOM. Structure, ordering and previously applied
  * attribute values are tracked worker-side so that every bridge call remains a fire-and-forget
  * write, preserving the port's no-barrier-reads invariant.</p>
- *
- * @author Codename One
  */
 public final class JavaScriptSemanticOverlay {
 

@@ -25,8 +25,6 @@ package com.codename1.ui.util.xml;
 
 /**
  * Parsed XML data
- *
- * @author Shai Almog
  */
 public class Ui {
     private String name;

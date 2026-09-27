@@ -50,8 +50,6 @@ import javax.swing.text.DocumentFilter;
 /**
  * UI to edit a specific font entry, a font entry can be a bitmap, native font or 
  * system font
- *
- * @author  Shai Almog
  */
 public class FontEditor extends BaseForm {
     //private EditFontAction editFontAction = new EditFontAction();

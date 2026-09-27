@@ -26,10 +26,6 @@ package com.codename1.teavm.jso.io;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.JSProperty;
 
-/**
- *
- * @author shannah
- */
 public interface FileList extends JSObject {
     public Blob item(int index);
     

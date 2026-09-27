@@ -33,8 +33,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.rewriteValue;
 
 /**
  * JDOM implementation of POM plugins {@code configuration} element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomConfiguration extends Xpp3Dom implements JDomBacked {
 

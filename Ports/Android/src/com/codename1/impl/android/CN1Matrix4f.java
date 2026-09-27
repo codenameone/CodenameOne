@@ -40,7 +40,6 @@ import java.util.Arrays;
  * your 3x3 affine transformation, and the 4th row and 4th columns will be zeroes, except in the lower-right most
  * column, which will be a {@literal 1}.</p>
  * 
- * @author shannah
  * @see com.codename1.ui.Graphics#setTransform
  * @see com.codename1.ui.Graphics#getTransform
  */

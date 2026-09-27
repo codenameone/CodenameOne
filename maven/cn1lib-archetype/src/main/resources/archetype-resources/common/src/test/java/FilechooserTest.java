@@ -10,10 +10,6 @@ package ${package};
 
 import com.codename1.testing.AbstractTest;
 
-/**
- *
- * @author shannah
- */
 public class FilechooserTest  extends AbstractTest {
 
     @Override

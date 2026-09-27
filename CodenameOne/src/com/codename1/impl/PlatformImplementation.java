@@ -26,8 +26,6 @@ package com.codename1.impl;
 
 /// The actual implementation classes should bare this name to allow the IO implementation
 /// class to seamlessly create them
-///
-/// @author Shai Almog
 class PlatformImplementation {
     public PlatformImplementation() {
         throw new RuntimeException("You must include the IO platform port before the IO in the classpath");

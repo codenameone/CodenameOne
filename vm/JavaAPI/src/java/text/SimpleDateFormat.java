@@ -33,7 +33,6 @@ import java.util.Vector;
  * with the Java 6 API.
  * 
  * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
- * @author Eric Coolman
  * @deprecated this class has many issues in iOS and other platforms, please use the L10NManager
  */
 public class SimpleDateFormat extends DateFormat {

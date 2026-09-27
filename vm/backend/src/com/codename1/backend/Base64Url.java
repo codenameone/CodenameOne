@@ -22,11 +22,9 @@
  */
 package com.codename1.backend;
 
-/**
- * Base64url without padding, as JSON Web Tokens use it. Separate from any general
- * base64 because the alphabet differs ('-' and '_' for '+' and '/') and a token
- * encoded with the wrong one is rejected by every other implementation.
- */
+/// Base64url without padding, as JSON Web Tokens use it. Separate from any general
+/// base64 because the alphabet differs ('-' and '_' for '+' and '/') and a token
+/// encoded with the wrong one is rejected by every other implementation.
 public final class Base64Url {
     private static final char[] ALPHABET =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".toCharArray();
@@ -35,22 +33,22 @@ public final class Base64Url {
     }
 
     public static String encode(byte[] data) {
-        if(data == null) {
+        if (data == null) {
             return null;
         }
         StringBuilder out = new StringBuilder((data.length + 2) / 3 * 4);
         int iter = 0;
-        while(iter + 2 < data.length) {
+        while (iter + 2 < data.length) {
             int n = ((data[iter] & 0xff) << 16) | ((data[iter + 1] & 0xff) << 8) | (data[iter + 2] & 0xff);
             out.append(ALPHABET[(n >>> 18) & 63]).append(ALPHABET[(n >>> 12) & 63])
                .append(ALPHABET[(n >>> 6) & 63]).append(ALPHABET[n & 63]);
             iter += 3;
         }
         int remaining = data.length - iter;
-        if(remaining == 1) {
+        if (remaining == 1) {
             int n = (data[iter] & 0xff) << 16;
             out.append(ALPHABET[(n >>> 18) & 63]).append(ALPHABET[(n >>> 12) & 63]);
-        } else if(remaining == 2) {
+        } else if (remaining == 2) {
             int n = ((data[iter] & 0xff) << 16) | ((data[iter + 1] & 0xff) << 8);
             out.append(ALPHABET[(n >>> 18) & 63]).append(ALPHABET[(n >>> 12) & 63])
                .append(ALPHABET[(n >>> 6) & 63]);
@@ -58,15 +56,15 @@ public final class Base64Url {
         return out.toString();
     }
 
-    /** Null for anything that is not valid base64url, rather than a partial result. */
+    /// Null for anything that is not valid base64url, rather than a partial result.
     public static byte[] decode(String value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
         int length = value.length();
         int fullGroups = length / 4;
         int remaining = length % 4;
-        if(remaining == 1) {
+        if (remaining == 1) {
             return null; // no valid encoding leaves a single character over
         }
         int size = fullGroups * 3 + (remaining == 0 ? 0 : remaining - 1);
@@ -74,19 +72,19 @@ public final class Base64Url {
         int outPos = 0;
         int buffer = 0;
         int bits = 0;
-        for(int iter = 0 ; iter < length ; iter++) {
+        for (int iter = 0 ; iter < length ; iter++) {
             int v = valueOf(value.charAt(iter));
-            if(v < 0) {
+            if (v < 0) {
                 return null;
             }
             buffer = (buffer << 6) | v;
             bits += 6;
-            if(bits >= 8) {
+            if (bits >= 8) {
                 bits -= 8;
-                if(outPos >= size) {
+                if (outPos >= size) {
                     return null;
                 }
-                out[outPos++] = (byte)((buffer >>> bits) & 0xff);
+                out[outPos++] = (byte) ((buffer >>> bits) & 0xff);
             }
         }
         // The leftover bits of the final character must be zero. Accepting a
@@ -94,26 +92,26 @@ public final class Base64Url {
         // bytes -- for a JWT that is token malleability: an attacker can hand back
         // a different-looking token that still verifies, which breaks anything
         // keyed on the token string, a revocation list most of all.
-        if(bits > 0 && (buffer & ((1 << bits) - 1)) != 0) {
+        if (bits > 0 && (buffer & ((1 << bits) - 1)) != 0) {
             return null;
         }
         return outPos == size ? out : null;
     }
 
     private static int valueOf(char c) {
-        if(c >= 'A' && c <= 'Z') {
+        if (c >= 'A' && c <= 'Z') {
             return c - 'A';
         }
-        if(c >= 'a' && c <= 'z') {
+        if (c >= 'a' && c <= 'z') {
             return c - 'a' + 26;
         }
-        if(c >= '0' && c <= '9') {
+        if (c >= '0' && c <= '9') {
             return c - '0' + 52;
         }
-        if(c == '-') {
+        if (c == '-') {
             return 62;
         }
-        if(c == '_') {
+        if (c == '_') {
             return 63;
         }
         return -1;

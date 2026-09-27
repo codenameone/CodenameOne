@@ -34,10 +34,6 @@ import java.util.TreeSet;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class LabelInstruction extends Instruction {
     private Label parent;
     static class Pair {

@@ -27,7 +27,6 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 /// Gear joint definition. This definition requires two existing
 /// revolute or prismatic joints (any combination will work).
 /// The provided joints must attach a dynamic body to a static body.
-/// @author Daniel Murphy
 public class GearJointDef extends JointDef {
 	/// The first revolute/prismatic joint attached to the gear joint.
 	public Joint joint1;

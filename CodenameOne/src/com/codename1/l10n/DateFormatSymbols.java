@@ -26,7 +26,6 @@ import java.util.Calendar;
 import java.util.Hashtable;
 import java.util.TimeZone;
 
-/// @author Eric Coolman
 public class DateFormatSymbols implements Cloneable {
     public static final int ZONE_ID = 0;
     public static final int ZONE_LONGNAME = 1;

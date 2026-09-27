@@ -22,44 +22,40 @@
  */
 package com.codename1.backend;
 
-/**
- * The AWS Lambda custom-runtime loop.
- *
- * Why this is the first server-side target: the Lambda Runtime API is a
- * CLIENT-side HTTP/1.1 poll over plaintext loopback, and the host serialises
- * invocations one per instance. So a runtime needs no listening socket, no
- * event loop, no TLS and no virtual threads - exactly the four things a general
- * server runtime needs and this VM does not yet have. What it does need is fast
- * start-up, which is what a translated binary is good at.
- *
- * Protocol (2018-06-01): long-poll GET .../invocation/next, which blocks until an
- * invocation arrives and returns the payload plus a Lambda-Runtime-Aws-Request-Id
- * header; then POST the result to .../invocation/{id}/response, or the failure to
- * .../invocation/{id}/error.
- */
+/// The AWS Lambda custom-runtime loop.
+///
+/// Why this is the first server-side target: the Lambda Runtime API is a
+/// CLIENT-side HTTP/1.1 poll over plaintext loopback, and the host serialises
+/// invocations one per instance. So a runtime needs no listening socket, no
+/// event loop, no TLS and no virtual threads - exactly the four things a general
+/// server runtime needs and this VM does not yet have. What it does need is fast
+/// start-up, which is what a translated binary is good at.
+///
+/// Protocol (2018-06-01): long-poll GET .../invocation/next, which blocks until an
+/// invocation arrives and returns the payload plus a Lambda-Runtime-Aws-Request-Id
+/// header; then POST the result to .../invocation/{id}/response, or the failure to
+/// .../invocation/{id}/error.
 public final class LambdaRuntime {
     private static final String API_VERSION = "/2018-06-01/runtime";
     private static final String REQUEST_ID_HEADER = "Lambda-Runtime-Aws-Request-Id";
-    /** The invocation's X-Ray trace, which is how the host passes the caller's trace on. */
+    /// The invocation's X-Ray trace, which is how the host passes the caller's trace on.
     private static final String TRACE_ID_HEADER = "Lambda-Runtime-Trace-Id";
 
     private LambdaRuntime() {
     }
 
-    /**
-     * Runs the invocation loop until the process is killed, which is how a Lambda
-     * runtime is supposed to end - the host freezes or terminates the instance.
-     */
+    /// Runs the invocation loop until the process is killed, which is how a Lambda
+    /// runtime is supposed to end - the host freezes or terminates the instance.
     public static void run(Handler handler) {
         String endpoint = System.getenv("AWS_LAMBDA_RUNTIME_API");
-        if(endpoint == null) {
+        if (endpoint == null) {
             System.err.println("AWS_LAMBDA_RUNTIME_API is not set; not running under a Lambda host");
             return;
         }
         String host = endpoint;
         int port = 80;
         int colon = endpoint.indexOf(':');
-        if(colon > 0) {
+        if (colon > 0) {
             host = endpoint.substring(0, colon);
             try {
                 port = Integer.parseInt(endpoint.substring(colon + 1));
@@ -68,18 +64,16 @@ public final class LambdaRuntime {
                 return;
             }
         }
-        while(true) {
-            if(!pumpOnce(handler, host, port)) {
+        while (true) {
+            if (!pumpOnce(handler, host, port)) {
                 return;
             }
         }
     }
 
-    /**
-     * One poll/dispatch/report cycle. Returns false when the loop should stop,
-     * which currently means the control connection itself failed - there is no
-     * useful recovery from that, and spinning would burn the instance's budget.
-     */
+    /// One poll/dispatch/report cycle. Returns false when the loop should stop,
+    /// which currently means the control connection itself failed - there is no
+    /// useful recovery from that, and spinning would burn the instance's budget.
     static boolean pumpOnce(Handler handler, String host, int port) {
         Http.Response next;
         try {
@@ -89,7 +83,7 @@ public final class LambdaRuntime {
             return false;
         }
         String requestId = next.getHeader(REQUEST_ID_HEADER);
-        if(requestId == null) {
+        if (requestId == null) {
             System.err.println("Invocation carried no " + REQUEST_ID_HEADER + "; cannot report a result");
             return false;
         }
@@ -101,7 +95,7 @@ public final class LambdaRuntime {
         try {
             return answer(handler, host, port, next, requestId, span);
         } finally {
-            if(span != null) {
+            if (span != null) {
                 Tracing.flush(2000);
             }
         }
@@ -129,7 +123,7 @@ public final class LambdaRuntime {
             // that is true just strands them one after the next. If the failure
             // could not even be reported, nothing this process says is reaching
             // the host, so it stops rather than collecting more.
-            if(!reported) {
+            if (!reported) {
                 System.err.println("The runtime API is unreachable, so this runtime is "
                         + "stopping rather than collecting invocations it cannot answer.");
                 return false;
@@ -152,10 +146,10 @@ public final class LambdaRuntime {
                 // anywhere saying why.
                 Http.Response posted = Http.post(host, port,
                         API_VERSION + "/invocation/" + requestId + "/response", payload);
-                if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
+                // Http.post answers or throws; it never returns null.
+                if (posted.getStatus() < 200 || posted.getStatus() >= 300) {
                     System.err.println("The Lambda runtime API refused the response for "
-                            + requestId + " with status "
-                            + (posted == null ? "none" : String.valueOf(posted.getStatus()))
+                            + requestId + " with status " + posted.getStatus()
                             + "; the result of " + payload.length + " byte(s) was not "
                             + "delivered. Reporting it as an error so the invocation "
                             + "does not simply hang.");
@@ -166,9 +160,9 @@ public final class LambdaRuntime {
                     // invocation can end without the host being told.
                     java.io.IOException refused = new java.io.IOException(
                             "the runtime API refused the response with status "
-                            + (posted == null ? "none" : String.valueOf(posted.getStatus())));
+                            + posted.getStatus());
                     delivery = refused;
-                    if(!reportError(host, port, requestId, refused)) {
+                    if (!reportError(host, port, requestId, refused)) {
                         reporting = unreported();
                         System.err.println("The runtime API is unreachable, so this runtime is "
                                 + "stopping rather than collecting invocations it cannot answer.");
@@ -185,7 +179,7 @@ public final class LambdaRuntime {
                 System.err.println("Failed to post the response for " + requestId + ": " + err
                         + "; reporting it as an error so the invocation is resolved rather "
                         + "than left outstanding.");
-                if(!reportError(host, port, requestId, err)) {
+                if (!reportError(host, port, requestId, err)) {
                     reporting = unreported();
                     // Not even the error reached the host, so nothing this process
                     // says is getting through. Stop polling: collecting further
@@ -202,16 +196,14 @@ public final class LambdaRuntime {
         return true;
     }
 
-    /**
-     * Recorded on an invocation span when not even the error report reached the
-     * host: the invocation is left unresolved, which is why the runtime stops.
-     */
+    /// Recorded on an invocation span when not even the error report reached the
+    /// host: the invocation is left unresolved, which is why the runtime stops.
     private static java.io.IOException unreported() {
         return new java.io.IOException(
                 "the runtime API did not accept the error report; the invocation is unresolved");
     }
 
-    /** @return whether the host accepted the report, so a caller can stop. */
+    /// @return whether the host accepted the report, so a caller can stop.
     private static boolean reportError(String host, int port, String requestId, Exception cause) {
         try {
             // The host parses this shape; a plain string body is reported as a
@@ -223,21 +215,25 @@ public final class LambdaRuntime {
                     json.getBytes("UTF-8"));
             // Nothing left to escalate to if even this is refused, but a silent
             // failure here is how an invocation disappears without a trace.
-            if(posted == null || posted.getStatus() < 200 || posted.getStatus() >= 300) {
+            if (posted.getStatus() < 200 || posted.getStatus() >= 300) {
                 System.err.println("The Lambda runtime API refused the error report for "
-                        + requestId + " with status "
-                        + (posted == null ? "none" : String.valueOf(posted.getStatus())));
+                        + requestId + " with status " + posted.getStatus());
                 return false;
             }
             return true;
-        } catch (Exception err) {
+        } catch (java.io.IOException err) {
+            System.err.println("Failed to report the error for " + requestId + ": " + err);
+            return false;
+        } catch (RuntimeException err) {
+            // Any failure at all means the host was not told, which is the answer
+            // the caller acts on; it must not escape and kill the loop instead.
             System.err.println("Failed to report the error for " + requestId + ": " + err);
             return false;
         }
     }
 
     private static String quote(String value) {
-        if(value == null) {
+        if (value == null) {
             return "null";
         }
         return "\"" + escape(value) + "\"";
@@ -245,9 +241,9 @@ public final class LambdaRuntime {
 
     private static String escape(String value) {
         StringBuilder out = new StringBuilder();
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            switch(c) {
+            switch (c) {
                 case '"':
                     out.append("\\\"");
                     break;
@@ -264,7 +260,7 @@ public final class LambdaRuntime {
                     out.append("\\t");
                     break;
                 default:
-                    if(c < 0x20) {
+                    if (c < 0x20) {
                         out.append("\\u").append(hex(c));
                     } else {
                         out.append(c);
@@ -277,7 +273,7 @@ public final class LambdaRuntime {
     private static String hex(char c) {
         String h = Integer.toHexString(c);
         StringBuilder out = new StringBuilder();
-        for(int iter = h.length() ; iter < 4 ; iter++) {
+        for (int iter = h.length() ; iter < 4 ; iter++) {
             out.append('0');
         }
         return out.append(h).toString();

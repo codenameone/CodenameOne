@@ -47,8 +47,6 @@ package com.codename1.javascript;
 ///
 /// `````java camera.capture(function(url){ if ( url == null ){ // No image was captured return; } // Fetch the preview  tag. var image = document.getElementById('preview-image'); // Set the preview URL to the image that was taken. image.src = url; }); `````
 ///
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// Use `com.codename1.util.SuccessCallback)`

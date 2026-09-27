@@ -51,10 +51,6 @@ import org.objectweb.asm.commons.JSRInlinerAdapter;
 
 import com.codename1.tools.translator.bytecodes.LabelInstruction;
 
-/**
- *
- * @author Shai Almog
- */
 public class Parser extends ClassVisitor {
     private static final String DISABLE_DEBUG_INFO_ANNOTATION = "Lcom/codename1/annotations/DisableDebugInfo;";
     private static final String DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION =

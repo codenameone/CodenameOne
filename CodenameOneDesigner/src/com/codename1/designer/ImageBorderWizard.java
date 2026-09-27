@@ -67,8 +67,6 @@ import javax.swing.text.JTextComponent;
 
 /**
  * Part of the image border wizard in the theme
- *
- * @author Shai Almog
  */
 public class ImageBorderWizard extends javax.swing.JPanel {
     private JColorChooser colorChooser;

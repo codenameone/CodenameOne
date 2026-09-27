@@ -39,8 +39,6 @@ import java.sql.SQLException;
  * simulator the same random access the device ports provide; previously first(), last(), prev()
  * and position() all threw here, which meant cursor code could not be developed in the simulator
  * at all.
- *
- * @author Chen
  */
 public class SECursor extends AbstractDBCursor {
 

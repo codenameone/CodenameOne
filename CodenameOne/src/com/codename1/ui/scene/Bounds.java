@@ -24,8 +24,6 @@ package com.codename1.ui.scene;
 
 /// Encapsulates bounds in a 3D space.
 ///
-/// @author Steve Hannah
-///
 /// #### Deprecated
 ///
 /// For Internal use only

@@ -78,7 +78,6 @@ import java.util.List;
 /// a blank white square.  In such cases you can provide an alternate image to be displayed instead.
 /// Place a 24x24 image named "ic_stat_notify.png" in your project's native/android
 /// directory, and this image will be used instead.
-/// @author shannah
 ///
 /// #### See also
 ///

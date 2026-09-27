@@ -29,8 +29,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.util.StringUtil;
 
 /// This Tile brings the tile image from a given http url.
-///
-/// @author Roman Kamyk
 public class ProxyHttpTile extends Tile {
 
     private Tile _tile;

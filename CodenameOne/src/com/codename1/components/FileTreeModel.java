@@ -34,8 +34,6 @@ import java.util.Vector;
 /// file names which would result in an unreadable tree. To fix this you can create a Tree object
 /// and override functionality such as the childToDisplayLabel method like this:
 /// `Tree fileTree = new Tree(new FileTreeModel(true)) { protected String childToDisplayLabel(Object child) { if (((String) child).endsWith("/")) { return ((String) child).substring(((String) child).lastIndexOf('/', ((String) child).length() - 2)); } return ((String) child).substring(((String) child).lastIndexOf('/')); } };`
-///
-/// @author Shai Almog
 public class FileTreeModel implements TreeModel {
 
     private final boolean showFiles;

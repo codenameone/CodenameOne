@@ -27,9 +27,6 @@ import java.util.Arrays;
 import java.util.List;
 
 /// Creates a validation constraint to ensure input value exists in a list of items
-///
-/// @author Diamond Mubaarak
-///
 public class ExistInConstraint implements Constraint {
 
     private final List<String> items;

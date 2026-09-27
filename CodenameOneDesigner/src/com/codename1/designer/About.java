@@ -33,8 +33,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * The About dialog
- *
- * @author Shai Almog
  */
 public class About extends javax.swing.JDialog {
 

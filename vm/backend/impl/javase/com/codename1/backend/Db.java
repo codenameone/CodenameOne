@@ -36,18 +36,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Java SE twin of Db, over JDBC.
- *
- * The native runtime links SQLite directly; the JVM reaches the same file through
- * the sqlite-jdbc driver. Row values are normalised to the SAME Java types the
- * native side produces -- Long, Double, String, byte[], null -- so a handler that
- * reads a column cannot behave differently between the two targets, which is the
- * whole point of having a local dev loop at all.
- *
- * A path that already looks like a JDBC URL is passed through untouched, so the
- * same code can point at MySQL or Postgres locally without a second API.
- */
+/// Java SE twin of Db, over JDBC.
+///
+/// The native runtime links SQLite directly; the JVM reaches the same file through
+/// the sqlite-jdbc driver. Row values are normalised to the SAME Java types the
+/// native side produces -- Long, Double, String, byte\[\], null -- so a handler that
+/// reads a column cannot behave differently between the two targets, which is the
+/// whole point of having a local dev loop at all.
+///
+/// A path that already looks like a JDBC URL is passed through untouched, so the
+/// same code can point at MySQL or Postgres locally without a second API.
 public final class Db {
     private Connection connection;
     private long lastInsertId;
@@ -68,7 +66,7 @@ public final class Db {
         // the other two recognised "JDBC:SQLITE:" made the same string an
         // in-memory database on one arm and a file named after the URL on the
         // other.
-        if(path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
+        if (path != null && path.regionMatches(true, 0, "jdbc:", 0, 5)
                 && !path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             throw new IOException("Db opens SQLite only, and the translated build "
                     + "would hand " + path + " to sqlite3_open. Use Database.open for "
@@ -87,7 +85,7 @@ public final class Db {
             connection.setAutoCommit(true);
             return new Db(connection);
         } catch (SQLException err) {
-            if(url.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+            if (url.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
                 // IGNORING CASE like the two tests above it. This one was left
                 // exact when they were relaxed, so a mixed-case URL that failed
                 // for the usual reason got the generic message instead of the
@@ -95,15 +93,15 @@ public final class Db {
                 // The usual cause is a dev classpath without the driver, and
                 // "No suitable driver" on its own does not say which one.
                 throw new IOException("Could not open " + url + " -- is sqlite-jdbc on "
-                        + "the classpath? (" + err.getMessage() + ")");
+                        + "the classpath? (" + err.getMessage() + ")", err);
             }
-            throw new IOException("Could not open " + url + ": " + err.getMessage());
+            throw new IOException("Could not open " + url + ": " + err.getMessage(), err);
         }
     }
 
-    /** See the call sites: a statement holding a NUL means two things on two arms. */
+    /// See the call sites: a statement holding a NUL means two things on two arms.
     private static void requireNoNulInStatement(String sql) throws IOException {
-        if(sql != null && sql.indexOf(0) >= 0) {
+        if (sql != null && sql.indexOf(0) >= 0) {
             throw new IOException("An SQL statement cannot hold a NUL: sqlite "
                     + "reads it as the end of the statement, and what is left "
                     + "may still be a valid one that means something else");
@@ -118,9 +116,9 @@ public final class Db {
         // here, which is the worse half of a divergence: the development loop
         // accepts a statement the packaged build silently rewrites.
         requireNoNulInStatement(sql);
-        Connection c = live();
+        Connection c = live(); //NOPMD CloseResource - the Db owns its connection; close() releases it
         try {
-            if((params == null || params.length == 0) && sql.indexOf('?') < 0) {
+            if ((params == null || params.length == 0) && sql.indexOf('?') < 0) {
                 // PRAGMA and the transaction verbs are not all preparable on every
                 // driver, so a parameterless statement goes through Statement.
                 //
@@ -158,7 +156,7 @@ public final class Db {
                 statement.close();
             }
         } catch (SQLException err) {
-            throw new IOException("Statement failed: " + err.getMessage() + " [" + sql + "]");
+            throw new IOException("Statement failed: " + err.getMessage() + " [" + sql + "]", err);
         }
     }
 
@@ -170,7 +168,7 @@ public final class Db {
         // here, which is the worse half of a divergence: the development loop
         // accepts a statement the packaged build silently rewrites.
         requireNoNulInStatement(sql);
-        Connection c = live();
+        Connection c = live(); //NOPMD CloseResource - the Db owns its connection; close() releases it
         try {
             PreparedStatement statement = c.prepareStatement(sql);
             try {
@@ -185,27 +183,25 @@ public final class Db {
                 statement.close();
             }
         } catch (SQLException err) {
-            throw new IOException("Query failed: " + err.getMessage() + " [" + sql + "]");
+            throw new IOException("Query failed: " + err.getMessage() + " [" + sql + "]", err);
         }
     }
 
-    /**
-     * Synchronized because a TRANSACTION is not one call.
-     *
-     * SQLite serializes each API call on a connection, which is what made "one
-     * shared connection is correct, and SQLite serializes it" look true. It
-     * serializes the calls, not the BEGIN/body/COMMIT sequence around them: a
-     * second handler sharing this Db can execute between another's BEGIN and
-     * COMMIT and have its write committed -- or rolled back -- by a request that
-     * knows nothing about it, or meet "cannot start a transaction within a
-     * transaction" and fail for a reason its own code cannot explain.
-     *
-     * The monitor is reentrant, which is what makes this work: transaction() holds
-     * it for the whole callback and the execute() calls inside it re-enter freely.
-     * A pooled connection is used by one thread at a time anyway, so the cost
-     * there is an uncontended lock; a shared one is serialized, which is exactly
-     * what correctness requires of it.
-     */
+    /// Synchronized because a TRANSACTION is not one call.
+    ///
+    /// SQLite serializes each API call on a connection, which is what made "one
+    /// shared connection is correct, and SQLite serializes it" look true. It
+    /// serializes the calls, not the BEGIN/body/COMMIT sequence around them: a
+    /// second handler sharing this Db can execute between another's BEGIN and
+    /// COMMIT and have its write committed -- or rolled back -- by a request that
+    /// knows nothing about it, or meet "cannot start a transaction within a
+    /// transaction" and fail for a reason its own code cannot explain.
+    ///
+    /// The monitor is reentrant, which is what makes this work: transaction() holds
+    /// it for the whole callback and the execute() calls inside it re-enter freely.
+    /// A pooled connection is used by one thread at a time anyway, so the cost
+    /// there is an uncontended lock; a shared one is serialized, which is exactly
+    /// what correctness requires of it.
     public synchronized Object transaction(Work body) throws Exception {
         // BEGIN IMMEDIATE, not setAutoCommit(false), because that is what the
         // PACKAGED arm does and the two must not disagree about concurrency.
@@ -225,7 +221,7 @@ public final class Db {
             committed = true;
             return result;
         } finally {
-            if(!committed) {
+            if (!committed) {
                 try {
                     execute("ROLLBACK", null);
                 } catch (Exception err) {
@@ -236,7 +232,7 @@ public final class Db {
         }
     }
 
-    /** A unit of work run inside {@link #transaction}. */
+    /// A unit of work run inside [#transaction].
     public interface Work {
         Object run(Db db) throws Exception;
     }
@@ -250,25 +246,23 @@ public final class Db {
         execute("PRAGMA busy_timeout=" + millis, null);
     }
 
-    /** Synchronized with close for the reason the translated arm gives. */
+    /// Synchronized with close for the reason the translated arm gives.
     public synchronized long lastInsertId() {
         return lastInsertId;
     }
 
-    /**
-     * SYNCHRONIZED, like execute, query and transaction on this class, so a
-     * DbPool.close() arriving while a borrowed connection is mid-query waits for
-     * it rather than closing underneath it.
-     *
-     * <p>The packaged arm keeps its handle when the close does not take, because
-     * sqlite3_close answers SQLITE_BUSY and leaves the connection open. There is
-     * no equivalent here: JDBC's close releases the connection's resources
-     * whatever the driver reports, so nulling the field cannot strand one.
-     */
+    /// SYNCHRONIZED, like execute, query and transaction on this class, so a
+    /// DbPool.close() arriving while a borrowed connection is mid-query waits for
+    /// it rather than closing underneath it.
+    ///
+    /// The packaged arm keeps its handle when the close does not take, because
+    /// sqlite3_close answers SQLITE_BUSY and leaves the connection open. There is
+    /// no equivalent here: JDBC's close releases the connection's resources
+    /// whatever the driver reports, so nulling the field cannot strand one.
     public synchronized void close() {
-        Connection c = connection;
+        Connection c = connection; //NOPMD CloseResource - closed just below
         connection = null;
-        if(c != null) {
+        if (c != null) {
             try {
                 c.close();
             } catch (SQLException ignored) {
@@ -279,7 +273,7 @@ public final class Db {
 
     private Connection live() throws IOException {
         Connection c = connection;
-        if(c == null) {
+        if (c == null) {
             throw new IOException("Database is closed");
         }
         return c;
@@ -288,9 +282,9 @@ public final class Db {
     private void captureInsertId(Statement statement) {
         try {
             ResultSet keys = statement.getGeneratedKeys();
-            if(keys != null) {
+            if (keys != null) {
                 try {
-                    if(keys.next()) {
+                    if (keys.next()) {
                         lastInsertId = keys.getLong(1);
                     }
                 } finally {
@@ -307,12 +301,12 @@ public final class Db {
         ResultSetMetaData meta = results.getMetaData();
         int columns = meta.getColumnCount();
         String[] names = new String[columns];
-        for(int iter = 0 ; iter < columns ; iter++) {
+        for (int iter = 0 ; iter < columns ; iter++) {
             names[iter] = meta.getColumnLabel(iter + 1);
         }
-        while(results.next()) {
+        while (results.next()) {
             Map row = new LinkedHashMap();
-            for(int iter = 0 ; iter < columns ; iter++) {
+            for (int iter = 0 ; iter < columns ; iter++) {
                 row.put(names[iter], value(results, iter + 1));
             }
             rows.add(row);
@@ -320,32 +314,30 @@ public final class Db {
         return rows;
     }
 
-    /**
-     * Normalises to the four types the native runtime hands back. Anything the
-     * driver gives us as some other class -- a java.sql.Timestamp, a BigDecimal --
-     * becomes its string form, which is what SQLite's text affinity would have
-     * produced for the same column.
-     */
+    /// Normalises to the four types the native runtime hands back. Anything the
+    /// driver gives us as some other class -- a java.sql.Timestamp, a BigDecimal --
+    /// becomes its string form, which is what SQLite's text affinity would have
+    /// produced for the same column.
     private static Object value(ResultSet results, int index) throws SQLException {
         Object raw = results.getObject(index);
-        if(raw == null || results.wasNull()) {
+        if (raw == null || results.wasNull()) {
             return null;
         }
-        if(raw instanceof byte[]) {
+        if (raw instanceof byte[]) {
             return raw;
         }
-        if(raw instanceof Number) {
-            if(raw instanceof Double || raw instanceof Float) {
-                return Double.valueOf(((Number)raw).doubleValue());
+        if (raw instanceof Number) {
+            if (raw instanceof Double || raw instanceof Float) {
+                return Double.valueOf(((Number) raw).doubleValue());
             }
-            if(raw instanceof Integer || raw instanceof Long
+            if (raw instanceof Integer || raw instanceof Long
                     || raw instanceof Short || raw instanceof Byte) {
-                return Long.valueOf(((Number)raw).longValue());
+                return Long.valueOf(((Number) raw).longValue());
             }
-            return Double.valueOf(((Number)raw).doubleValue());
+            return Double.valueOf(((Number) raw).doubleValue());
         }
-        if(raw instanceof Boolean) {
-            return Long.valueOf(((Boolean)raw).booleanValue() ? 1 : 0);
+        if (raw instanceof Boolean) {
+            return Long.valueOf(((Boolean) raw).booleanValue() ? 1 : 0);
         }
         return String.valueOf(raw);
     }
@@ -363,29 +355,29 @@ public final class Db {
         // already refused here, by the driver's own range check.
         int expected = statement.getParameterMetaData().getParameterCount();
         int supplied = params == null ? 0 : params.length;
-        if(supplied != expected) {
+        if (supplied != expected) {
             throw new SQLException("the statement has " + expected + " parameter"
                     + (expected == 1 ? "" : "s") + " and " + supplied + " were supplied");
         }
-        if(params == null) {
+        if (params == null) {
             return;
         }
-        for(int iter = 0 ; iter < params.length ; iter++) {
+        for (int iter = 0 ; iter < params.length ; iter++) {
             Object value = params[iter];
             int index = iter + 1;
-            if(value == null) {
+            if (value == null) {
                 statement.setNull(index, Types.NULL);
-            } else if(value instanceof String) {
-                statement.setString(index, (String)value);
-            } else if(value instanceof Integer || value instanceof Long
+            } else if (value instanceof String) {
+                statement.setString(index, (String) value);
+            } else if (value instanceof Integer || value instanceof Long
                     || value instanceof Short || value instanceof Byte) {
-                statement.setLong(index, ((Number)value).longValue());
-            } else if(value instanceof Double || value instanceof Float) {
-                statement.setDouble(index, ((Number)value).doubleValue());
-            } else if(value instanceof byte[]) {
-                statement.setBytes(index, (byte[])value);
-            } else if(value instanceof Boolean) {
-                statement.setLong(index, ((Boolean)value).booleanValue() ? 1 : 0);
+                statement.setLong(index, ((Number) value).longValue());
+            } else if (value instanceof Double || value instanceof Float) {
+                statement.setDouble(index, ((Number) value).doubleValue());
+            } else if (value instanceof byte[]) {
+                statement.setBytes(index, (byte[]) value);
+            } else if (value instanceof Boolean) {
+                statement.setLong(index, ((Boolean) value).booleanValue() ? 1 : 0);
             } else {
                 statement.setString(index, String.valueOf(value));
             }

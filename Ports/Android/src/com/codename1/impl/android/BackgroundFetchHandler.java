@@ -29,10 +29,6 @@ import android.util.Log;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.ui.Display;
 
-/**
- *
- * @author shannah
- */
 public class BackgroundFetchHandler extends IntentService {
 
     private boolean shouldStopContext=false;

@@ -52,8 +52,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * left. The pair reads as a minimize followed by a restore, and in the show-then-hide
  * order the window ends up hidden while still marked iconified -- the state
  * {@code showModal()} waits on.</p>
- *
- * @author Shai Almog
  */
 @CodenameOneTest
 class WindowVisibilityEventCorrelationTest {

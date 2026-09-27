@@ -25,10 +25,10 @@ package com.codename1.ai;
 import java.util.Random;
 
 /// Decides whether and how long to wait before retrying a failed
-/// [LlmClient] call. Default policy retries [LlmRateLimitException]
-/// (honouring `Retry-After`) and [LlmModelOverloadedException] with
-/// exponential backoff + jitter; other failures are surfaced
-/// immediately.
+/// [LlmClient] call. The default policy retries an [LlmException] whose
+/// [LlmException#getType()] is `RATE_LIMIT` (honouring `Retry-After`),
+/// `MODEL_OVERLOADED`, `SERVER` or `NETWORK`, with exponential backoff +
+/// jitter; other failures are surfaced immediately.
 ///
 /// Wire a policy onto a request like this:
 ///

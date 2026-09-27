@@ -26,10 +26,6 @@ package com.codename1.impl.html5.graphics;
 import com.codename1.impl.html5.HTML5Graphics;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class FillPolygon implements ExecutableOp {
 
     final int[] xPoints, yPoints;

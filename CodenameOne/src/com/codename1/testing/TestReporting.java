@@ -32,8 +32,6 @@ import java.util.Hashtable;
 /// Test reports can be overriden to provide custom test reporting options
 /// you can replace the test reporter on the device by sending the build
 /// argument build.testReporter='com.x.MyTestReporterClass'.
-///
-/// @author Shai Almog
 public class TestReporting {
     private static TestReporting instanceOverride;
     private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();

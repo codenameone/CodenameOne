@@ -169,7 +169,6 @@ import com.codename1.ui.events.SelectionListener;
 /// iv.setImageList(imodel);
 /// hi.add(BorderLayout.CENTER, iv);
 /// ```
-/// @author Chen Fishbein
 public interface ListModel<T> {
 
     /// Returns the item at the given offset

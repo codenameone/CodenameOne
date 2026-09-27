@@ -121,8 +121,6 @@ import java.io.OutputStream;
 /// }
 /// hi.show();
 /// ```
-///
-/// @author Chen
 public abstract class Capture {
 
     /// Returns true if the device has camera false otherwise.

@@ -25,8 +25,6 @@ package com.codename1.system;
 /// In platforms that support opening an application via URL this interface can be implemented
 /// by the main class to support such functionality. Notice that build argument must also
 /// include some information, for more details check out this issue: http://code.google.com/p/codenameone/issues/detail?id=379
-///
-/// @author Shai Almog
 public interface URLCallback {
     /// Indicates whether the application should handle the given URL, defaults to true
     ///

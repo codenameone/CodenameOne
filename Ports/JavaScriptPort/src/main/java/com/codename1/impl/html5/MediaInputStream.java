@@ -27,10 +27,6 @@ import com.codename1.teavm.io.ArrayBufferInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- *
- * @author shannah
- */
 public class MediaInputStream extends InputStream{
     
     private final String src;

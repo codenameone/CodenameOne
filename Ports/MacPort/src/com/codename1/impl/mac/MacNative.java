@@ -35,8 +35,6 @@ package com.codename1.impl.mac;
 /// Windows are addressed by an `int` slot rather than by a pointer, so no native
 /// address ever crosses into Java and a stale slot fails as a bounds check
 /// instead of as a wild pointer.
-///
-/// @author Shai Almog
 class MacNative {
 
     /// Creates a window and returns its slot, or a negative number on failure.

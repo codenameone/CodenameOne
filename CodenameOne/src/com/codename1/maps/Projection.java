@@ -22,8 +22,6 @@ package com.codename1.maps;
 /// This class represents a projection type.
 /// a Projection has the ability to translate a WGS84 Coordinate to a
 /// projected Coordinate.
-///
-/// @author Roman Kamyk
 public abstract class Projection {
 
     private final BoundingBox extent;

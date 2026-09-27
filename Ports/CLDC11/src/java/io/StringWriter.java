@@ -16,7 +16,6 @@
  */
 package java.io;
 
-/// @author shannah
 public class StringWriter extends Writer implements Appendable {
     
     private StringBuffer buf;

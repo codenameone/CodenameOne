@@ -57,8 +57,6 @@ import java.util.Date;
 ///
 /// f.show();
 /// ```
-///
-/// @author Shai Almog
 public class PickerComponent extends InputComponent {
     private final Picker picker = createPickerInstance();
 

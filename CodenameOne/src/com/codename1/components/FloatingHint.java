@@ -52,8 +52,6 @@ import com.codename1.ui.Window;
 ///
 /// The animation effect
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// this class is superceded by `com.codename1.ui.TextComponent` which includes a more thorough implementation of the functionality and improved API

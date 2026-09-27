@@ -63,7 +63,7 @@ jobs:
   gnome-ref:
     if: ${{ inputs.targets == 'all' || inputs.targets == 'gnome' }}
     name: GNOME (GTK4 + libadwaita)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       CN1SS_FIDELITY_GOLDEN_SET: gnome-adwaita

@@ -32,8 +32,6 @@ import javax.swing.JOptionPane;
 
 /**
  * Part of the image border wizard in the theme
- *
- * @author Shai Almog
  */
 public class ImageBorderAppliesToWizard extends javax.swing.JPanel {
     private EditableResources res;

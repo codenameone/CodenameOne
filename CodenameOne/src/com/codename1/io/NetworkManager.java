@@ -76,8 +76,6 @@ import java.util.Vector;
 ///     }
 /// }
 /// ```
-///
-/// @author Shai Almog
 public final class NetworkManager {
     /// Indicates an unknown access point type
     public static final int ACCESS_POINT_TYPE_UNKNOWN = 1;

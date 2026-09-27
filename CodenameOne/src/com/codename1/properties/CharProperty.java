@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the char specific version of numeric property
-///
-/// @author Shai Almog
 public class CharProperty<K> extends NumericProperty<Character, K> {
 
     /// Creates a char property with the given name.

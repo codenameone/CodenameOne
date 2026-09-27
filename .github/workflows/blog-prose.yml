@@ -34,7 +34,7 @@ jobs:
   gate:
     name: Blog prose gate
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -202,7 +202,7 @@ jobs:
   # --------------------------------------------------------------------------- #
   report:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v6

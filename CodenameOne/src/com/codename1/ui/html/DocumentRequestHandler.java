@@ -30,8 +30,6 @@ import java.io.InputStream;
 /// Concrete classes should handle in its single method all necessary networking and IO issues.
 ///
 /// Implementations of this interface are used by HTMLComponent to obtain links and form results
-///
-/// @author Ofir Leitner
 public interface DocumentRequestHandler {
 
     /// Implementations should return the document in the requested url as an InputStream

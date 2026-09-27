@@ -33,8 +33,6 @@ import org.apache.tools.ant.BuildException;
 
 /**
  * Task to create a bitmap font file
- *
- * @author Shai Almog
  */
 public class FontTask extends ResourceTask {
     private String charset = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!@/\\*()[]{}|#$%^&<>?'\"";

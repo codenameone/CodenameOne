@@ -24,8 +24,6 @@ package com.codename1.ui.geom;
 
 /// This interface provides a directed path over the boundary of a shape. The path can contain 1st through 3rd order Bezier curves (lines, and quadratic and cubic splines). A shape can have multiple disjoint paths via the `#SEG_MOVETO` directive, and can close a circular path back to the previous `#SEG_MOVETO` via the `#SEG_CLOSE` directive.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - GeneralPath

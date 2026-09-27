@@ -37,8 +37,6 @@ package com.codename1.processing;
 ///  Get all long name of the address component where the short name contains "ny"
 ///
 ///  /results/address_components[short_name % ny]/long_name`
-///
-/// @author Eric Coolman
 class ContainsEvaluator extends AbstractEvaluator {
     /// Construct with a full predicate expression.
     ///

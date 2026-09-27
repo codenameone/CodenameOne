@@ -32,8 +32,6 @@ import org.apache.tools.ant.Task;
 
 /**
  * Abstract base class for resources that allows us to reuse code in the builder task
- *
- * @author Shai Almog
  */
 public abstract class ResourceTask extends Task {
     private String name;

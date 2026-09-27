@@ -43,8 +43,6 @@ import com.codename1.ui.geom.Rectangle;
 /// A border can optionally paint the background of the component, this depends on
 /// the border type and is generally required for rounded borders that "know" the area
 /// that should be filled.
-///
-/// @author Shai Almog
 public class Border {
     private static final int TYPE_EMPTY = 0;
     private static final int TYPE_LINE = 1;

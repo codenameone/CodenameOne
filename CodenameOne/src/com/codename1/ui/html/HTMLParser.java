@@ -33,8 +33,6 @@ import java.io.Reader;
 /// The HTMLParser class is used to parse an XHTML-MP 1.0 document into a DOM object (Element).
 /// Unsupported tags and attributes as well as comments are dropped in the parsing process.
 /// The parser is also makes use of CSSParser for external CSS files, embedded CSS segments and CSS within the 'style' attribute.
-///
-/// @author Ofir Leitner
 public class HTMLParser extends XMLParser {
     private final boolean preserveUnsupportedAttributes;
 

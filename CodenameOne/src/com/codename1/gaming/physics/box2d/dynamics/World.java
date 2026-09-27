@@ -65,8 +65,6 @@ import com.codename1.gaming.physics.box2d.pooling.normal.DefaultWorldPool;
 
 /// The world class manages all physics entities, dynamic simulation, and asynchronous queries. The
 /// world also contains efficient memory management facilities.
-///
-/// @author Daniel Murphy
 public class World {
   public static final int WORLD_POOL_SIZE = 100;
   public static final int WORLD_POOL_CONTAINER_SIZE = 10;
@@ -443,7 +441,7 @@ public class World {
   /// destroy a joint. This may cause the connected bodies to begin colliding.
   ///
   /// @warning This function is locked during callbacks.
-  /// @param joint
+  /// @param j the joint to destroy
   public void destroyJoint(Joint j) {
     assert (isLocked() == false);
     if (isLocked()) {
@@ -533,7 +531,7 @@ public class World {
 
   /// Take a time step. This performs collision detection, integration, and constraint solution.
   ///
-  /// @param timeStep the amount of time to simulate, this should not vary.
+  /// @param dt the amount of time to simulate, this should not vary.
   /// @param velocityIterations for the velocity constraint solver.
   /// @param positionIterations for the position constraint solver.
   public void step(float dt, int velocityIterations, int positionIterations) {

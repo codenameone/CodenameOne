@@ -20,7 +20,6 @@ import com.codename1.io.FileSystemStorage;
 
 import java.io.IOException;
 
-/// @author Kamran
 public final class TarUtils {
     private TarUtils() {}
 

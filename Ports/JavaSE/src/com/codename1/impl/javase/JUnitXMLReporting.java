@@ -36,8 +36,6 @@ import java.nio.file.Files;
  * tools that consume JUnit test case results see http://code.google.com/p/codenameone/issues/detail?id=446
  * for more details.<br>
  * See https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd for the schema
- *
- * @author Shai Almog
  */
 public class JUnitXMLReporting extends TestReporting {
     private String testCases = "";

@@ -30,8 +30,6 @@ import javax.swing.event.DocumentListener;
 
 /**
  * Allows editing input modes for the text field
- *
- * @author Shai Almog
  */
 public class InputModeKeyEditor extends javax.swing.JPanel {
     private boolean lock;

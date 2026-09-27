@@ -29,8 +29,6 @@ import java.util.Date;
 /// dates is not implemented in this class since the localization pattern is not
 /// exposed.
 ///
-/// @author Eric Coolman
-///
 /// #### See also
 ///
 /// - [http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html](http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html)

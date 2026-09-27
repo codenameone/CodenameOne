@@ -24,8 +24,6 @@
 package com.codename1.util;
 
 /// A Runnable like interface that can return a result synchronously
-///
-/// @author Shai Almog
 public interface RunnableWithResultSync<T> {
     /// Similar to the runnable interface but can return a result
     ///

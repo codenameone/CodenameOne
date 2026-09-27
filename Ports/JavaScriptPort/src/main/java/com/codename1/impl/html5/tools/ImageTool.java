@@ -31,10 +31,6 @@ import com.codename1.html5.js.JSFunctor;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 
-/**
- *
- * @author shannah
- */
 public class ImageTool {
     @JSFunctor
     private static interface ImageOrientationCallback extends JSObject {

@@ -31,13 +31,11 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
-/**
- * Java SE twin of ServerSocket, over NIO channels behind synthetic descriptors.
- *
- * Blocking mode is real here, as it is on the translated side: the reactor runs a
- * Selector over non-blocking channels, and a worker that takes a connection flips
- * it to blocking so request parsing is a read loop rather than a state machine.
- */
+/// Java SE twin of ServerSocket, over NIO channels behind synthetic descriptors.
+///
+/// Blocking mode is real here, as it is on the translated side: the reactor runs a
+/// Selector over non-blocking channels, and a worker that takes a connection flips
+/// it to blocking so request parsing is a read loop rather than a state machine.
 public final class ServerSocket {
     private final ServerSocketChannel channel;
     private final int fd;
@@ -47,7 +45,7 @@ public final class ServerSocket {
         this.fd = fd;
     }
 
-    /** Thrown when a read or write deadline expires. */
+    /// Thrown when a read or write deadline expires.
     public static final class TimeoutException extends IOException {
         TimeoutException(String message) {
             super(message);
@@ -63,19 +61,19 @@ public final class ServerSocket {
         // GIVEN has to survive the crossing intact. The Java SE arm fails such a
         // name at resolution, so without this the two arms disagreed about which
         // interfaces a configured host means.
-        if(host != null) {
+        if (host != null) {
             Urls.requireHostName(host);
         }
         ServerSocketChannel channel = ServerSocketChannel.open();
         try {
             channel.setOption(StandardSocketOptions.SO_REUSEADDR, Boolean.TRUE);
-            channel.bind(host == null || "0.0.0.0".equals(host)
+            channel.bind(host == null || "0.0.0.0".equals(host) //NOPMD AvoidUsingHardCodedIP - recognises the "every interface" wildcard, connects to nothing
                     ? new InetSocketAddress(port)
                     : new InetSocketAddress(host, port), backlog);
             return new ServerSocket(channel, Descriptors.add(channel));
         } catch (IOException err) {
             channel.close();
-            throw new IOException("Could not bind " + (host == null ? "*" : host) + ":" + port);
+            throw new IOException("Could not bind " + (host == null ? "*" : host) + ":" + port, err);
         }
     }
 
@@ -85,7 +83,7 @@ public final class ServerSocket {
 
     public int getPort() {
         try {
-            return ((InetSocketAddress)channel.getLocalAddress()).getPort();
+            return ((InetSocketAddress) channel.getLocalAddress()).getPort();
         } catch (IOException err) {
             return -1;
         }
@@ -93,11 +91,18 @@ public final class ServerSocket {
 
     public int accept() {
         try {
-            SocketChannel client = channel.accept();
-            if(client == null) {
+            SocketChannel client = channel.accept(); //NOPMD CloseResource - handed to the descriptor table, or closed below
+            if (client == null) {
                 return -1;
             }
-            client.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+            try {
+                client.setOption(StandardSocketOptions.TCP_NODELAY, Boolean.TRUE);
+            } catch (IOException err) {
+                // Accepted and then refused an option: nothing holds this channel
+                // yet, so the -1 below would leak an open connection.
+                client.close();
+                throw err;
+            }
             return Descriptors.add(client);
         } catch (IOException err) {
             return -1;
@@ -115,65 +120,39 @@ public final class ServerSocket {
 
     public static void setBlocking(int fd, boolean blocking) throws IOException {
         Object entry = Descriptors.get(fd);
-        if(entry instanceof SocketChannel) {
-            ((SocketChannel)entry).configureBlocking(blocking);
+        if (entry instanceof SocketChannel) {
+            ((SocketChannel) entry).configureBlocking(blocking);
             return;
         }
-        if(entry instanceof ServerSocketChannel) {
-            ((ServerSocketChannel)entry).configureBlocking(blocking);
+        if (entry instanceof ServerSocketChannel) {
+            ((ServerSocketChannel) entry).configureBlocking(blocking);
             return;
         }
         throw new IOException("Not a socket: " + fd);
     }
 
-    /**
-     * A read deadline. NIO channels have no SO_RCVTIMEO, so the deadline is
-     * enforced by the reader below; without one a silent client would hold a
-     * worker for as long as it liked, and the pool is bounded.
-     */
+    /// A read deadline. NIO channels have no SO_RCVTIMEO, so the deadline is
+    /// enforced by the reader below; without one a silent client would hold a
+    /// worker for as long as it liked, and the pool is bounded.
     public static void setTimeout(int fd, int millis) throws IOException {
         Deadlines.set(fd, millis);
     }
 
-    /**
-     * Java SE twin of the readiness wait. See the translated version for why the
-     * shared code asks for this rather than juggling deadlines.
-     *
-     * A Selector is heavier than the single poll the translated side makes, which
-     * is acceptable here: this arm is the development loop, and its job is to
-     * behave the same, not to match the deployed binary's syscall count.
-     */
-    /**
-     * A reusable per-thread read buffer of at least {@code capacity} bytes.
-     *
-     * The same array comes back on every call for a thread, so a server that reads
-     * through it allocates nothing per request. Its contents belong to the current
-     * callback only -- the next read on this thread overwrites them, so nothing may
-     * retain it or hand it to code that might.
-     *
-     * On the translated target the storage is a C buffer that the collector never
-     * allocated and never sweeps, so the read path contributes nothing at all to
-     * the allocation rate that paces the GC. Java SE cannot do that and returns an
-     * ordinary cached array; the observable contract is the same, which is the
-     * point -- only the allocation accounting differs.
-     */
-    /**
-     * Read from {@code fd} into this thread's reusable buffer and return an array
-     * whose length is exactly the number of bytes read, or null at end of stream.
-     *
-     * On the translated target this allocates nothing and copies nothing: the array
-     * header and its storage are C memory the collector never touches, and the
-     * length is set per read so the caller can scan to {@code array.length}. Java SE
-     * cannot resize an array and returns a right-sized copy instead -- same
-     * contract, different allocation accounting.
-     *
-     * The bytes belong to the current callback on the current thread. Anything that
-     * must outlive either has to be copied out first.
-     */
+    /// Read from `fd` into this thread's reusable buffer and return an array
+    /// whose length is exactly the number of bytes read, or null at end of stream.
+    ///
+    /// On the translated target this allocates nothing and copies nothing: the array
+    /// header and its storage are C memory the collector never touches, and the
+    /// length is set per read so the caller can scan to `array.length`. Java SE
+    /// cannot resize an array and returns a right-sized copy instead -- same
+    /// contract, different allocation accounting.
+    ///
+    /// The bytes belong to the current callback on the current thread. Anything that
+    /// must outlive either has to be copied out first.
     public static byte[] readIntoThreadBuffer(int fd, int capacity) throws IOException {
         byte[] scratch = threadReadBuffer(capacity);
         int n = read(fd, scratch, 0, capacity);
-        if(n <= 0) {
+        if (n <= 0) {
             return null;
         }
         byte[] exact = new byte[n];
@@ -181,9 +160,21 @@ public final class ServerSocket {
         return exact;
     }
 
+    /// A reusable per-thread read buffer of at least `capacity` bytes.
+    ///
+    /// The same array comes back on every call for a thread, so a server that reads
+    /// through it allocates nothing per request. Its contents belong to the current
+    /// callback only -- the next read on this thread overwrites them, so nothing may
+    /// retain it or hand it to code that might.
+    ///
+    /// On the translated target the storage is a C buffer that the collector never
+    /// allocated and never sweeps, so the read path contributes nothing at all to
+    /// the allocation rate that paces the GC. Java SE cannot do that and returns an
+    /// ordinary cached array; the observable contract is the same, which is the
+    /// point -- only the allocation accounting differs.
     public static byte[] threadReadBuffer(int capacity) {
-        byte[] cached = (byte[])THREAD_READ_BUFFER.get();
-        if(cached == null || cached.length < capacity) {
+        byte[] cached = (byte[]) THREAD_READ_BUFFER.get();
+        if (cached == null || cached.length < capacity) {
             cached = new byte[capacity];
             THREAD_READ_BUFFER.set(cached);
         }
@@ -192,12 +183,18 @@ public final class ServerSocket {
 
     private static final ThreadLocal THREAD_READ_BUFFER = new ThreadLocal();
 
+    /// Java SE twin of the readiness wait. See the translated version for why the
+    /// shared code asks for this rather than juggling deadlines.
+    ///
+    /// A Selector is heavier than the single poll the translated side makes, which
+    /// is acceptable here: this arm is the development loop, and its job is to
+    /// behave the same, not to match the deployed binary's syscall count.
     public static boolean awaitReadable(int fd, int timeoutMillis) throws IOException {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof SocketChannel)) {
+        if (!(entry instanceof SocketChannel)) {
             throw new IOException("Not a socket: " + fd);
         }
-        SocketChannel channel = (SocketChannel)entry;
+        SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
         boolean wasBlocking = channel.isBlocking();
         Selector selector = null;
         try {
@@ -212,18 +209,18 @@ public final class ServerSocket {
             // the same question the same way. Negative is the other end of the
             // same mapping: poll(-1) waits without a deadline, and select() is how
             // that is spelled here.
-            if(timeoutMillis == 0) {
+            if (timeoutMillis == 0) {
                 return selector.selectNow() > 0;
             }
-            if(timeoutMillis < 0) {
+            if (timeoutMillis < 0) {
                 return selector.select() > 0;
             }
             return selector.select(timeoutMillis) > 0;
         } finally {
-            if(selector != null) {
+            if (selector != null) {
                 selector.close();
             }
-            if(wasBlocking && channel.isOpen()) {
+            if (wasBlocking && channel.isOpen()) {
                 channel.configureBlocking(true);
             }
         }
@@ -231,26 +228,25 @@ public final class ServerSocket {
 
     public static int read(int fd, byte[] buffer, int offset, int length) throws IOException {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof SocketChannel)) {
+        if (!(entry instanceof SocketChannel)) {
             throw new IOException("Not a socket: " + fd);
         }
-        SocketChannel channel = (SocketChannel)entry;
+        SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
         ByteBuffer target = ByteBuffer.wrap(buffer, offset, length);
-        if(channel.isBlocking()) {
+        if (channel.isBlocking()) {
             // A blocking channel read cannot be interrupted by a timer, so the
             // deadline is applied with a selector around it.
             return Deadlines.readWithDeadline(fd, channel, target);
         }
-        int n = channel.read(target);
-        return n;
+        return channel.read(target);
     }
 
     public static void write(int fd, byte[] buffer, int offset, int length) throws IOException {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof SocketChannel)) {
+        if (!(entry instanceof SocketChannel)) {
             throw new IOException("Not a socket: " + fd);
         }
-        SocketChannel channel = (SocketChannel)entry;
+        SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
         // Through the deadline, as reads are. A client that stops reading otherwise
         // parks this worker in write() indefinitely.
         Deadlines.writeWithDeadline(fd, channel, ByteBuffer.wrap(buffer, offset, length));
@@ -262,45 +258,43 @@ public final class ServerSocket {
         Descriptors.closeQuietly(entry);
     }
 
-    /**
-     * Breaks a descriptor in both directions without closing it.
-     *
-     * For the one case a close cannot serve: a thread is parked inside a write to
-     * a peer that has stopped reading, and the connection has to go NOW. A close
-     * would free the number while that thread still holds it, and the number is
-     * reused immediately -- so the write lands in whatever connection was handed
-     * it next. shutdown(2) makes the parked write fail instead, and the close
-     * follows once the writer has left.
-     *
-     * Quiet about failure on purpose: every reason it can fail (the peer already
-     * went, the descriptor was already shut) is a state the caller wanted anyway.
-     */
-    /**
-     * The receive deadline alone. See the note on the ParparVM twin.
-     *
-     * Declared to throw even though this arm never does: the two implementations
-     * are compiled against the same callers, so a signature that differs between
-     * them builds on one and fails on the other.
-     */
+    /// The receive deadline alone. See the note on the ParparVM twin.
+    ///
+    /// Declared to throw even though this arm never does: the two implementations
+    /// are compiled against the same callers, so a signature that differs between
+    /// them builds on one and fails on the other.
     public static void setReceiveTimeout(int fd, int millis) throws IOException {
         Deadlines.setReceive(fd, millis);
     }
 
+    /// Breaks a descriptor in both directions without closing it.
+    ///
+    /// For the one case a close cannot serve: a thread is parked inside a write to
+    /// a peer that has stopped reading, and the connection has to go NOW. A close
+    /// would free the number while that thread still holds it, and the number is
+    /// reused immediately -- so the write lands in whatever connection was handed
+    /// it next. shutdown(2) makes the parked write fail instead, and the close
+    /// follows once the writer has left.
+    ///
+    /// Quiet about failure on purpose: every reason it can fail (the peer already
+    /// went, the descriptor was already shut) is a state the caller wanted anyway.
     public static void shutdown(int fd) {
         Object entry = Descriptors.get(fd);
-        if(entry instanceof java.nio.channels.SocketChannel) {
-            java.nio.channels.SocketChannel channel = (java.nio.channels.SocketChannel)entry;
+        if (entry instanceof SocketChannel) {
+            SocketChannel channel = (SocketChannel) entry; //NOPMD CloseResource - owned by the descriptor table
             try {
                 channel.shutdownInput();
-            } catch (Exception ignored) {
+            } catch (IOException | RuntimeException ignored) {
+                // Already shut, closed, or never connected: see above.
             }
             try {
                 channel.shutdownOutput();
-            } catch (Exception ignored) {
+            } catch (IOException | RuntimeException ignored) {
+                // Already shut, closed, or never connected: see above.
             }
         }
     }
-    /** Cores available to this process. */
+    /// Cores available to this process.
     public static int availableProcessors() {
         return Runtime.getRuntime().availableProcessors();
     }

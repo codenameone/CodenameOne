@@ -26,8 +26,6 @@ import com.codename1.ui.Component;
 
 /// Allows binding arbitrary components to data storage
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// this mapped to an older iteration of properties that is no longer used

@@ -26,8 +26,6 @@ import com.codename1.ui.Display;
 
 /// Encapsulates the content of a Push message.  Use this class inside the `PushCallback#push(java.lang.String)`
 /// method to retrieve details of the push, including title, body, image URL, category, type, and metadata if available.
-///
-/// @author Steve Hannah
 public final class PushContent {
     private static final String PROP_PREFIX = "com.codename1.push.prop.";
 

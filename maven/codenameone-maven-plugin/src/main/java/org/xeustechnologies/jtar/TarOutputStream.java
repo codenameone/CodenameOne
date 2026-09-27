@@ -21,10 +21,6 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/**
- * @author Kamran Zafar
- * 
- */
 public class TarOutputStream extends FilterOutputStream {
     private long bytesWritten;
     private long currentFileSize;

@@ -30,8 +30,6 @@ package com.codename1.gaming.physics.box2d.dynamics;
 /// static: zero mass, zero velocity, may be manually moved
 /// kinematic: zero mass, non-zero velocity set by user, moved by solver
 /// dynamic: positive mass, non-zero velocity determined by forces, moved by solver
-///
-/// @author daniel
 public enum BodyType {
 	STATIC, KINEMATIC, DYNAMIC
 }

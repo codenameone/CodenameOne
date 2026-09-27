@@ -28,8 +28,6 @@ import android.text.TextPaint;
 
 /**
  * A version of paint that caches font height for performance
- *
- * @author Shai Almog
  */
 public class CodenameOneTextPaint extends TextPaint {
     int fontHeight = -1;

@@ -30,8 +30,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /// Cached data class for use with the cached data service
-///
-/// @author Shai Almog
 public class CachedData implements Externalizable {
     private byte[] data;
     private String url;

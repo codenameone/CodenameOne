@@ -44,8 +44,6 @@ import java.io.IOException;
 import java.util.Hashtable;
 
 /// SMS Sharing service
-///
-/// @author Chen
 public class SMSShare extends ShareService {
 
     /// Default Constructor

@@ -1738,8 +1738,6 @@ class CharFlow {
  * <p>We divide 93 by 2 for the following trick. Representing integers takes 5 bytes in Base93. However,
  * we often need smaller integers that might be represented by one or two bytes. By each Base93 digit we
  * can encode both part of the number and a flag indicating whether the number contains one more digit.</p>
- *
- * @author Alexey Andreev
  */
 final class Base46 {
     private Base46() {

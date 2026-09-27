@@ -25,8 +25,6 @@ package com.codename1.ui.events;
 
 /// Event callback interface invoked when a component action occurs
 ///
-/// @author Chen Fishbein
-///
 /// #### Parameters
 ///
 /// - `subclass`: of ActionEvent e..g `com.codename1.io.NetworkEvent`

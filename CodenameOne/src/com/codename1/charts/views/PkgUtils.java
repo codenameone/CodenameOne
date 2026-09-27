@@ -24,7 +24,6 @@ package com.codename1.charts.views;
 
 import com.codename1.ui.geom.Rectangle2D;
 
-/// @author shannah
 final class PkgUtils {
     private PkgUtils() {}
     static Rectangle2D makeRect(double x1, double y1, double x2, double y2) {

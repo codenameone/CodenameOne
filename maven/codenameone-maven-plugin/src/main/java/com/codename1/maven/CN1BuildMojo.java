@@ -30,7 +30,10 @@ import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.PatternFileSelector;
 import org.apache.commons.vfs2.VFS;
+import org.apache.maven.RepositoryUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
@@ -38,6 +41,12 @@ import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.ZipFileSet;
+import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.artifact.ArtifactTypeRegistry;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.collection.CollectResult;
+import org.eclipse.aether.graph.DependencyNode;
+import org.eclipse.aether.graph.Exclusion;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -91,6 +100,23 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     @Parameter(property = "automated", defaultValue = "false")
     private boolean automated;
+
+    /**
+     * Stop once the jar the build would send has been assembled and checked,
+     * without submitting anything or building locally. The jar is left at
+     * target/&lt;finalName&gt;-&lt;buildTarget&gt;-jar-with-dependencies.jar. This is
+     * what lets CI inspect the real upload for every target with no account
+     * and no network: maven/integration-tests/cn1app-staged-jar-test.sh.
+     */
+    @Parameter(property = "codename1.stageOnly", defaultValue = "false")
+    private boolean stageOnly;
+
+    /**
+     * Maven's own resolver, to ask what the application needs without the desktop runtime
+     * aggregator (see {@link #neededWithoutDesktopRuntime()}).
+     */
+    @Component
+    private org.eclipse.aether.RepositorySystem resolverSystem;
 
     /**
      * Flag of whether to open the xcode/android studio project.
@@ -152,7 +178,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // cloud build slot to discover. See applyIOSProvisioningPreflight.
         applyIOSProvisioningPreflight();
 
-        if (platform.contains("android")) {
+        // stageOnly builds no APK, so it must neither short-circuit on a cached one (it would
+        // then stage nothing) nor, below, stamp that cached APK as matching this configuration.
+        if (platform.contains("android") && !stageOnly) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 File apkFile = androidApkFile();
                 try {
@@ -186,7 +214,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         // Record the hardening outcome this APK was built with, so a later invocation that changes
         // hardening (in either direction) invalidates the timestamp-only up-to-date cache above.
-        if (platform.contains("android") && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+        if (platform.contains("android") && !stageOnly && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
             File marker = androidHardeningCacheMarker();
             if (androidApkFile().exists()) {
                 try {
@@ -868,7 +896,216 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     private boolean isStrippedFromStagedJar(Artifact artifact) {
-        return isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+        return isStrippedAsDesktopRuntime(artifact)
+                || isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+    }
+
+    private boolean isStrippedAsDesktopRuntime(Artifact artifact) {
+        if (!isDesktopRuntimeBinary(artifact.getGroupId(), artifact.getArtifactId(), artifact.getDependencyTrail())) {
+            return false;
+        }
+        if (isDesktopRuntimeAggregator(artifact.getGroupId(), artifact.getArtifactId())) {
+            return true;
+        }
+        return isStrippedAsDesktopRuntime(dependencyKey(artifact.getGroupId(), artifact.getArtifactId(),
+                artifact.getClassifier()), neededWithoutDesktopRuntime());
+    }
+
+    /**
+     * Whether an artifact reached through the desktop runtime aggregator is left out of the
+     * staged jar: only when nothing else the application ships needs it.
+     *
+     * <p>The dependency trail cannot answer that on its own. Maven keeps one resolved
+     * artifact and one winning trail per coordinate, so when an application library also
+     * needs an ffmpeg artifact but the aggregator's path is the nearer one, the trail names
+     * only the aggregator. Stripping on the trail alone would then leave the library without
+     * classes it needs.</p>
+     *
+     * @param neededElsewhere the dependency keys the application's own compile dependencies
+     *                        need with the aggregator removed, or {@code null} when that could
+     *                        not be determined, in which case nothing is stripped
+     */
+    static boolean isStrippedAsDesktopRuntime(String dependencyKey, Set<String> neededElsewhere) {
+        return neededElsewhere != null && !neededElsewhere.contains(dependencyKey);
+    }
+
+    /** groupId:artifactId:classifier, the identity {@link #isStrippedAsDesktopRuntime} compares. */
+    static String dependencyKey(String groupId, String artifactId, String classifier) {
+        return groupId + ":" + artifactId + ":" + (classifier == null ? "" : classifier);
+    }
+
+    private Set<String> neededWithoutDesktopRuntime;
+    private boolean neededWithoutDesktopRuntimeComputed;
+
+    /**
+     * What the application's compile dependencies need once the desktop runtime aggregator is
+     * taken away, collected (poms only, nothing downloaded) the same way Maven resolved the
+     * project. The roots are the compile scope dependencies, because only compile scope
+     * reaches the staged jar. {@code null} when the collection fails: nothing is then stripped
+     * as desktop runtime, since an upload that is too large fails loudly and one missing
+     * classes does not.
+     *
+     * <p>Known limit, left deliberately: nodes below the roots are not filtered by scope, so
+     * an artifact a library needs only at runtime counts as needed. That can only keep an
+     * artifact that could have been stripped -- an upload too large, which the build client
+     * refuses loudly -- never drop one the application needs.</p>
+     */
+    private Set<String> neededWithoutDesktopRuntime() {
+        if (neededWithoutDesktopRuntimeComputed) {
+            return neededWithoutDesktopRuntime;
+        }
+        neededWithoutDesktopRuntimeComputed = true;
+        try {
+            RepositorySystemSession repoSession = getSession().getRepositorySession();
+            ArtifactTypeRegistry types = repoSession.getArtifactTypeRegistry();
+            CollectRequest request = new CollectRequest();
+            request.setRootArtifact(RepositoryUtils.toArtifact(project.getArtifact()));
+            request.setRepositories(project.getRemoteProjectRepositories());
+            for (Dependency dependency : project.getDependencies()) {
+                String scope = dependency.getScope();
+                if (isDesktopRuntimeAggregator(dependency.getGroupId(), dependency.getArtifactId())
+                        || (scope != null && scope.length() > 0 && !"compile".equals(scope))) {
+                    continue;
+                }
+                request.addDependency(withoutDesktopRuntime(RepositoryUtils.toDependency(dependency, types)));
+            }
+            DependencyManagement management = project.getDependencyManagement();
+            if (management != null) {
+                for (Dependency dependency : management.getDependencies()) {
+                    request.addManagedDependency(RepositoryUtils.toDependency(dependency, types));
+                }
+            }
+            CollectResult result = resolverSystem.collectDependencies(repoSession, request);
+            Set<String> keys = new HashSet<String>();
+            addDependencyKeys(result.getRoot(), keys);
+            neededWithoutDesktopRuntime = keys;
+        } catch (Exception ex) {
+            getLog().warn("Could not determine which dependencies need the desktop runtime binaries ("
+                    + DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID + ") for another reason, so none of them are "
+                    + "left out of the staged jar. The upload may be too large: " + ex);
+            neededWithoutDesktopRuntime = null;
+        }
+        return neededWithoutDesktopRuntime;
+    }
+
+    /**
+     * The dependency with the desktop runtime aggregator excluded from everything below it.
+     * Skipping the aggregator where the project declares it is not enough: a library can
+     * bring it in transitively, and the collection would then find it again through that
+     * library and report all of ffmpeg as needed. Exclusions apply at every depth.
+     */
+    static org.eclipse.aether.graph.Dependency withoutDesktopRuntime(org.eclipse.aether.graph.Dependency dependency) {
+        List<Exclusion> exclusions = new ArrayList<Exclusion>(dependency.getExclusions());
+        exclusions.add(new Exclusion(GROUP_ID, DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID, "*", "*"));
+        return dependency.setExclusions(exclusions);
+    }
+
+    private static void addDependencyKeys(DependencyNode node, Set<String> keys) {
+        if (node == null) {
+            return;
+        }
+        org.eclipse.aether.artifact.Artifact a = node.getArtifact();
+        if (a != null && node.getDependency() != null) {
+            keys.add(dependencyKey(a.getGroupId(), a.getArtifactId(), a.getClassifier()));
+        }
+        for (DependencyNode child : node.getChildren()) {
+            addDependencyKeys(child, keys);
+        }
+    }
+
+    private static boolean isDesktopRuntimeAggregator(String groupId, String artifactId) {
+        return GROUP_ID.equals(groupId) && DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID.equals(artifactId);
+    }
+
+    /**
+     * Whether an existing staged jar may be used instead of merging a new one (before the
+     * timestamp check, which still applies).
+     *
+     * <p>With a record, only when it names exactly the current inputs. Without one, the jar
+     * was not written by this mojo -- or was written by a plugin older than the record, which
+     * is indistinguishable from a stale one. A project may deliberately produce this jar from
+     * its own pom to control what is uploaded, and that is still honoured: such a jar is
+     * written during the current Maven run, while a stale one predates it.</p>
+     *
+     * <p>Known limit, left deliberately: a record wins over the current-run exception. A
+     * project that once let this mojo stage the jar, then starts producing it from its own
+     * pom without cleaning target, and whose dependencies changed in between, has its jar
+     * replaced by a merged one. That customization is undocumented and used by nothing in
+     * the tree or the archetypes; the fix is to clean target once.</p>
+     *
+     * @param recorded the recorded inputs, trimmed, or {@code null} if there is no record
+     * @param current the inputs this build would merge
+     * @param jarModified the staged jar's modification time
+     * @param sessionStart when the current Maven run started
+     */
+    static boolean mayReuseStagedJar(String recorded, String current, long jarModified, long sessionStart) {
+        if (recorded == null) {
+            return jarModified >= sessionStart;
+        }
+        return recorded.equals(current.trim());
+    }
+
+    /**
+     * Deletes a staged jar that must not be reused, and fails if it is still there. Ignoring
+     * a failed delete (a jar held open on Windows, a read-only target) would skip the merge
+     * and upload the very jar that was just found stale.
+     */
+    static void discardStagedJar(File jar) throws MojoExecutionException {
+        if (!jar.delete() && jar.exists()) {
+            throw new MojoExecutionException("Could not delete the out of date staged jar " + jar
+                    + ", so it cannot be rebuilt and would be uploaded as it is. Close anything that"
+                    + " has it open (an IDE, an antivirus scanner) or delete it by hand, then build again.");
+        }
+    }
+
+    /**
+     * The record of what a staged jar was merged from, one absolute path per line in merge
+     * order. Compared, not parsed: any difference means the cached jar is not this build's.
+     */
+    static String describeStagedInputs(List<File> jarsToMerge) {
+        StringBuilder sb = new StringBuilder();
+        for (File f : jarsToMerge) {
+            sb.append(f.getAbsolutePath()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The aggregator that puts the desktop media runtime -- org.bytedeco's ffmpeg,
+     * with natives for Android, iOS, Linux, macOS and Windows -- on the simulator
+     * and desktop run classpaths.
+     */
+    static final String DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID = "cn1-binaries-javase";
+
+    /**
+     * Whether the artifact is the desktop runtime aggregator or was resolved
+     * through it: the candidates for leaving out of the staged jar, whatever
+     * their scope. The aggregator itself is always left out; anything it pulled
+     * in is left out only when nothing else needs it
+     * ({@link #isStrippedAsDesktopRuntime(String, Set)}).
+     *
+     * <p>Projects generated from the archetype between #5380 and the fix for it
+     * declare the aggregator at compile scope, and no profile re-scopes it, so
+     * by scope alone it lands in the staged jar: about 300 MB of ffmpeg natives
+     * that the build client refuses to upload, failing every desktop build of
+     * every such project. Deciding by the dependency graph rather than the scope
+     * repairs those projects without asking anyone to edit a pom.</p>
+     */
+    static boolean isDesktopRuntimeBinary(String groupId, String artifactId, List<String> dependencyTrail) {
+        if (isDesktopRuntimeAggregator(groupId, artifactId)) {
+            return true;
+        }
+        if (dependencyTrail == null) {
+            return false;
+        }
+        // Trail entries are Artifact.getId(): groupId:artifactId:type:version.
+        String aggregator = GROUP_ID + ":" + DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID + ":";
+        for (String node : dependencyTrail) {
+            if (node != null && node.startsWith(aggregator)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1399,107 +1636,121 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             cpElements.add(stringsJar.getAbsolutePath());
         }
         getLog().debug("Classpath Elements: "+cpElements);
-        if (jarWithDependencies.exists()) {
-            getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
-            // Evidently pom.xml file has already built the jar file - we will use that one.  This allows
-            // developers to override what is included in the jar file that is sent to the server.
-
-            for (String artifact : cpElements) {
-                File jar = new File(artifact);
-                if (jar.isDirectory()) {
-                    if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
-                        getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
-                        jarWithDependencies.delete();
-                        break;
+        // Decide what goes into the staged jar BEFORE deciding whether a cached one can be
+        // reused. The decision has side effects the build needs either way (the kotlin-stdlib
+        // version the server must supply), and the cached jar is only reusable when it was
+        // built from exactly this set.
+        List<String> blackListJars = new ArrayList<String>();
+        boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
+        for (Artifact artifact : project.getArtifacts()) {
+            boolean addToBlacklist = isStrippedFromStagedJar(artifact);
+            if (addToBlacklist && !isLocalBuildTarget(buildTarget)
+                    && "org.jetbrains.kotlin".equals(artifact.getGroupId())
+                    && "kotlin-stdlib".equals(artifact.getArtifactId())) {
+                serverMustProvideKotlinVersion = artifact.getVersion();
+                getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
+            }
+            if (addToBlacklist) {
+                File jar = getJar(artifact);
+                if (jar != null) {
+                    blackListJars.add(jar.getAbsolutePath());
+                    blackListJars.add(jar.getPath());
+                    try {
+                        blackListJars.add(jar.getCanonicalPath());
+                        getLog().debug("Added "+jar+" to blacklist");
+                    } catch (Exception ex){
+                        getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
                     }
-                } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
-                    // One of the dependency jar files is newer... so we delete the dependencies jar file
-                    // and will generate a new one.
-                    getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
-                    jarWithDependencies.delete();
-                    break;
                 }
-
             }
         }
+        List<File> jarsToMerge = new ArrayList<File>();
+        for (String element : cpElements) {
 
+            String canonicalEl = element;
+            try {
+                canonicalEl = new File(canonicalEl).getCanonicalPath();
+            } catch (Exception ex){
+                if (getLog().isDebugEnabled()) {
+                    getLog().warn("Failed to resolve canonical path for " + element, ex);
+                }
+            }
 
-
-        if (!jarWithDependencies.exists()) {
-            getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
-
-            // Jars that should be stripped out and not sent to the server
-            List<String> blackListJars = new ArrayList<String>();
-            getLog().info("Project artifacts: "+project.getArtifacts());
+            if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
+                getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
+                continue;
+            }
+            if (!new File(element).exists()) {
+                continue;
+            }
+            jarsToMerge.add(new File(element));
+        }
+        if (localJsBuild) {
             // For local JavaScript builds we need codenameone-core and java-runtime classes
             // in the staged jar -- the build server normally re-supplies those, but ParparVM's
             // ByteCodeTranslator runs locally here and resolves everything from the staged class
-            // directory.
-            boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
-            for (Artifact artifact : project.getArtifacts()) {
-                boolean addToBlacklist = isStrippedFromStagedJar(artifact);
-                if (addToBlacklist && !isLocalBuildTarget(buildTarget)
-                        && "org.jetbrains.kotlin".equals(artifact.getGroupId())
-                        && "kotlin-stdlib".equals(artifact.getArtifactId())) {
-                    serverMustProvideKotlinVersion = artifact.getVersion();
-                    getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
+            // directory. `provided`-scope deps are not transitive, so a child module that only
+            // depends on a `common` library never sees the project's codenameone-core /
+            // java-runtime jars on its compile classpath. Pull them in explicitly here.
+            for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                File jar = getJar("com.codenameone", bundled);
+                if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
+                    getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
+                    jarsToMerge.add(jar);
                 }
-                if (addToBlacklist) {
-                    File jar = getJar(artifact);
-                    if (jar != null) {
-                        blackListJars.add(jar.getAbsolutePath());
-                        blackListJars.add(jar.getPath());
-                        try {
-                            blackListJars.add(jar.getCanonicalPath());
-                            getLog().debug("Added "+jar+" to blacklist");
-                        } catch (Exception ex){
-                            getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
+            }
+        }
+
+        // Each staged jar this mojo writes records the inputs it was merged from. Timestamps
+        // alone cannot see a change in what the plugin excludes, so a jar staged before an
+        // exclusion was added (the ~157 MB of ffmpeg natives from #5380) would otherwise be
+        // reused, and uploaded, for as long as nothing on the classpath was rebuilt.
+        File stagedInputsFile = new File(jarWithDependencies.getPath() + ".inputs");
+        String stagedInputs = describeStagedInputs(jarsToMerge);
+        if (jarWithDependencies.exists()) {
+            getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
+            long sessionStart = getSession() != null && getSession().getRequest() != null
+                    && getSession().getRequest().getStartTime() != null
+                    ? getSession().getRequest().getStartTime().getTime() : Long.MAX_VALUE;
+            if (!mayReuseStagedJar(readTextFileOrNull(stagedInputsFile), stagedInputs,
+                    jarWithDependencies.lastModified(), sessionStart)) {
+                getLog().debug("Jar file was not staged from these inputs. "+jarWithDependencies+". Deleting");
+                discardStagedJar(jarWithDependencies);
+            } else {
+                for (String artifact : cpElements) {
+                    File jar = new File(artifact);
+                    if (jar.isDirectory()) {
+                        if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+                            getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                            discardStagedJar(jarWithDependencies);
+                            break;
                         }
-                    }
-                }
-
-            }
-            getLog().debug("Merging compile classpath elements into jar with dependencies: "+cpElements);
-            List<File> jarsToMerge = new ArrayList<File>();
-            for (String element : cpElements) {
-
-                String canonicalEl = element;
-                try {
-                    canonicalEl = new File(canonicalEl).getCanonicalPath();
-                } catch (Exception ex){
-                    if (getLog().isDebugEnabled()) {
-                        getLog().warn("Failed to resolve canonical path for " + element, ex);
-                    }
-                }
-
-                if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
-                    getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
-                    continue;
-                }
-                if (!new File(element).exists()) {
-                    continue;
-                }
-                getLog().debug("Adding jar " + element + " to " + jarWithDependencies + " Jar file="+element);
-                jarsToMerge.add(new File(element));
-            }
-            if (localJsBuild) {
-                // `provided`-scope deps are not transitive, so a child module that only
-                // depends on a `common` library never sees the project's codenameone-core /
-                // java-runtime jars on its compile classpath. Pull them in explicitly here
-                // so ParparVM has every class available when it translates to JavaScript.
-                for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
-                    File jar = getJar("com.codenameone", bundled);
-                    if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
-                        getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
-                        jarsToMerge.add(jar);
+                    } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
+                        // One of the dependency jar files is newer... so we delete the dependencies jar file
+                        // and will generate a new one.
+                        getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                        discardStagedJar(jarWithDependencies);
+                        break;
                     }
                 }
             }
+        }
+
+        if (!jarWithDependencies.exists()) {
+            getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
+            getLog().debug("Merging into jar with dependencies: "+jarsToMerge);
+            stagedInputsFile.delete();
             mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
-
+            writeStringToFile(stagedInputsFile, stagedInputs);
         }
 
         verifyApplicationClassClosure(jarWithDependencies, cpElements);
+
+        if (stageOnly) {
+            getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
+                    + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
+            return;
+        }
 
         try {
             updateCodenameOne(false);

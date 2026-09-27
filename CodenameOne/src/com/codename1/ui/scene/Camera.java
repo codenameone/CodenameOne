@@ -27,8 +27,6 @@ import com.codename1.ui.Transform;
 
 /// Encapsulates a camera.
 ///
-/// @author Steve Hannah
-///
 /// #### Deprecated
 ///
 /// For internal use only.

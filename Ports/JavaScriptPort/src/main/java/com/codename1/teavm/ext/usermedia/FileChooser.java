@@ -41,10 +41,6 @@ import static com.codename1.impl.html5.HTML5Implementation.scaleCoord;
 import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.FontImage;
-/**
- *
- * @author shannah
- */
 public class FileChooser {
 
     

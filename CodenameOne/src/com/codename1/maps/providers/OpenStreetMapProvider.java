@@ -23,8 +23,6 @@ import com.codename1.maps.Mercator;
 import com.codename1.ui.geom.Dimension;
 
 /// This is an OpenStreetMap Provider http://www.openstreetmap.org/
-///
-/// @author Roman Kamyk
 public class OpenStreetMapProvider extends TiledProvider {
 
     /// Empty Constructor

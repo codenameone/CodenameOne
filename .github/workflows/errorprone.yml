@@ -1,7 +1,8 @@
 name: Error Prone checks
 
 # Runs the framework's custom Error Prone BugCheckers (currently just
-# BanClassForName) over CodenameOne/src. The check fails the build when
+# BanClassForName) over CodenameOne/src and over the backend runtime
+# (vm/backend), which ParparVM translates the same way. The check fails the build when
 # someone adds a Class.forName(...) call, which silently breaks on
 # ParparVM (iOS) because the iOS port cannot resolve classes by string
 # name at runtime.
@@ -19,6 +20,12 @@ on:
       - 'CodenameOne/src/**/*.java'
       - 'maven/errorprone-checks/**'
       - 'maven/core/pom.xml'
+      - 'vm/backend/src/**/*.java'
+      - 'vm/backend/impl/javase/**/*.java'
+      - 'vm/backend/impl/parparvm/**/*.java'
+      - 'maven/backend-parparvm/pom.xml'
+      - 'vm/backend/shared-sources.sh'
+      - 'maven/backend/pom.xml'
       - 'maven/pom.xml'
       - '.github/workflows/errorprone.yml'
   push:
@@ -29,12 +36,18 @@ on:
       - 'CodenameOne/src/**/*.java'
       - 'maven/errorprone-checks/**'
       - 'maven/core/pom.xml'
+      - 'vm/backend/src/**/*.java'
+      - 'vm/backend/impl/javase/**/*.java'
+      - 'vm/backend/impl/parparvm/**/*.java'
+      - 'maven/backend-parparvm/pom.xml'
+      - 'vm/backend/shared-sources.sh'
+      - 'maven/backend/pom.xml'
       - 'maven/pom.xml'
       - '.github/workflows/errorprone.yml'
 
 jobs:
   errorprone:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -62,3 +75,10 @@ jobs:
       - name: Run Error Prone over the core module
         working-directory: maven
         run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Perrorprone -pl core -am install -DskipTests
+
+      # Both implementations: maven/backend compiles impl/javase, and
+      # backend-parparvm (activated by -DbackendAnalysis) compiles impl/parparvm,
+      # the one a server binary is actually built from.
+      - name: Run Error Prone over the backend runtime
+        working-directory: maven
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -Perrorprone -DbackendAnalysis -pl backend,backend-parparvm -am install -DskipTests

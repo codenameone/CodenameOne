@@ -56,8 +56,6 @@ import javax.swing.text.DocumentFilter;
 
 /**
  * Edits the border entry type from the "add theme entry form"
- *
- * @author  Shai Almog
  */
 public class BorderEditor extends javax.swing.JPanel {
     private JColorChooser colorChooser;

@@ -30,8 +30,6 @@ import java.util.Date;
 /// dates is not implemented in this class since the localization pattern is not
 /// exposed.
 ///
-/// @author Eric Coolman
-///
 /// #### Deprecated
 ///
 /// this class has many issues in iOS and other platforms, please use the L10NManager

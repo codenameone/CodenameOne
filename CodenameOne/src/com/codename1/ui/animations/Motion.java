@@ -36,8 +36,6 @@ import com.codename1.util.MathUtil;
 /// type of motion feel from parabolic motion to spline and linear motion. The default
 /// implementation provides a simple algorithm giving the feel of acceleration and
 /// deceleration.
-///
-/// @author Shai Almog
 public class Motion {
     // package protected for the resource editor
     static final int LINEAR = 0;

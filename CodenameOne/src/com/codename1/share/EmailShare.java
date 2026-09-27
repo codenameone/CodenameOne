@@ -43,8 +43,6 @@ import com.codename1.ui.util.Resources;
 import java.util.Hashtable;
 
 /// Email sharing service.
-///
-/// @author Chen
 public class EmailShare extends ShareService {
 
     /// Default Constructor

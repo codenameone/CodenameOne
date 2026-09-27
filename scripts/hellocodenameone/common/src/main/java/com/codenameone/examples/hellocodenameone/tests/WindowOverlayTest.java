@@ -37,8 +37,6 @@ import com.codename1.ui.layouts.BoxLayout;
  * puts content into that pane directly, which is the same attachment point those
  * components use, so a window whose layered pane was mis-sized or mis-stacked shows up as
  * a pixel difference here.</p>
- *
- * @author Shai Almog
  */
 public class WindowOverlayTest extends WindowHostTest {
 

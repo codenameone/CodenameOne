@@ -35,8 +35,6 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 
 /// Wraps a text field so it will have an X to clear its content on the right hand side
-///
-/// @author Shai Almog
 public final class ClearableTextField extends Container {
     private ClearableTextField() {
         super(new BorderLayout());

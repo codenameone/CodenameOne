@@ -23,10 +23,6 @@
 
 package com.codename1.impl.html5;
 
-/**
- *
- * @author shannah
- */
 public interface URLProxifier {
     public String proxifyURL(String url);
 }

@@ -27,8 +27,6 @@ import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
 
 /// A transition to animate the values of a MultipleSeriesDataset (used by BarChart).
-///
-/// @author shannah
 public class XYMultiSeriesTransition extends SeriesTransition {
 
     /// The data set whose values are to be animated.

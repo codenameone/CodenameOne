@@ -23,10 +23,6 @@
 
 package com.codename1.tools.translator.bytecodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class LineNumber extends Instruction {
     private String sourceFile;
     private int line;

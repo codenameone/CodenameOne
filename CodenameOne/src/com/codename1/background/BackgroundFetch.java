@@ -141,8 +141,6 @@ import com.codename1.util.Callback;
 ///         //recordsContainer.setScrollableY(true);
 ///         hi.addComponent(recordsContainer);
 ///
-///
-///
 ///         hi.addComponent(supported);
 ///         updateRecords();
 ///         hi.show();
@@ -194,7 +192,6 @@ import com.codename1.util.Callback;
 ///
 /// }
 /// ```
-/// @author shannah
 public interface BackgroundFetch {
 
     /// A callback that may be periodically called by the platform to allow the app to

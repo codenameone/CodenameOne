@@ -22,10 +22,6 @@ package com.codename1.util.regex;
 /// a regular expression during development.
 /// If you are making regular expresion programs dynamically then you can catch it
 /// if you wish. But should not be forced to.
-///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @author Michael McCallum
-/// @version $Id: RESyntaxException.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public class RESyntaxException extends RuntimeException {
     /// Constructor.
     ///

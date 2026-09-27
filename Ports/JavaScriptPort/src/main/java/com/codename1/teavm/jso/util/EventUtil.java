@@ -30,10 +30,6 @@ import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.core.JSFunction;
 import com.codename1.html5.js.dom.EventListener;
 
-/**
- *
- * @author shannah
- */
 public class EventUtil {
     @JSBody(params={"functor"}, script="return functor")
     private native static JSFunction _getFunctorFunc(JSObject o);

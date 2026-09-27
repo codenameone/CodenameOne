@@ -32,8 +32,6 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 
 /// Delegate of World.
-///
-/// @author Daniel Murphy
 public class ContactManager implements PairCallback {
 
   public BroadPhase m_broadPhase;

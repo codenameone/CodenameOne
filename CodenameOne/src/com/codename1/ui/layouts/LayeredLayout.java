@@ -227,8 +227,6 @@ import java.util.Set;
 /// to the same side as the inset.  This is why we used 0 in the subsequent call to `.setReferenceComponentTop(btn, searchField, 0);`,
 /// because we want to anchor the "top" inset of button to the "top" edge of searchField.
 ///
-/// @author Shai Almog
-///
 /// #### See also
 ///
 /// - com.codename1.ui.Form#getLayeredPane()

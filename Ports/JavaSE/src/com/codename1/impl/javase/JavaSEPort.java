@@ -218,8 +218,6 @@ import static com.codename1.impl.javase.util.MavenUtils.isRunningInMaven;
 
 /**
  * An implementation of Codename One based on Java SE
- *
- * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
 

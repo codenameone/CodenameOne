@@ -27,10 +27,6 @@ import com.codename1.tools.translator.ByteCodeClass;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class MultiArray extends Instruction {
     private String desc;
     private int dims;

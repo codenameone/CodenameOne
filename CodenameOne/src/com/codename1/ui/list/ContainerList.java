@@ -50,8 +50,6 @@ import java.util.Vector;
 /// the ability to leverage elaborate CodenameOne layouts such as Grid, Table & flow layout
 /// to provide other ways of rendering the content of a list model.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// @deprecated the performance of ContainerList is worse than the performance of List or Container. The API/behaviors

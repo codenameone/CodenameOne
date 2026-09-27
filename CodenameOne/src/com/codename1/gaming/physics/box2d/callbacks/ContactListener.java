@@ -36,7 +36,6 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.Contact;
 /// You should strive to make your callbacks efficient because there may be
 /// many callbacks per time step.
 /// @warning You cannot create/destroy Box2D entities inside these callbacks.
-/// @author Daniel Murphy
 public interface ContactListener {
 
 	/// Called when two fixtures begin to touch.

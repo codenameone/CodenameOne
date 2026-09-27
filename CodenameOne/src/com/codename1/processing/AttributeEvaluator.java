@@ -46,8 +46,6 @@ package com.codename1.processing;
 ///  Get the tax charged on all items under $5
 ///
 ///  //lineitem[@total < 5]/tax`
-///
-/// @author Eric Coolman
 class AttributeEvaluator extends AbstractEvaluator {
 
     /// Construct with the full predicate expression.

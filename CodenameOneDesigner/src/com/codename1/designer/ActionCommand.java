@@ -27,8 +27,6 @@ package com.codename1.designer;
 /**
  * Command instance with additional fields and information which is used within the
  * UI builder to allow easier command mutation
- * 
- * @author Shai Almog
  */
 public class ActionCommand extends com.codename1.ui.Command {
     private static int commandUniqueId = 1;

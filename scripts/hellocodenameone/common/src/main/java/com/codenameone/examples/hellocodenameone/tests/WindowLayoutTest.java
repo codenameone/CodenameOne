@@ -43,8 +43,6 @@ import com.codename1.ui.layouts.GridLayout;
  * the same content at 400x300, 900x700 and a deliberately non-square 1000x400 has to
  * reflow, and a window that was still measuring itself against the main display would
  * produce three near-identical goldens.</p>
- *
- * @author Shai Almog
  */
 public class WindowLayoutTest extends WindowHostTest {
 

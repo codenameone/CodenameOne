@@ -45,8 +45,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 /// Various utility classes to automate UI testing
-///
-/// @author Shai Almog
 public final class TestUtils {
     private static boolean verbose;
 

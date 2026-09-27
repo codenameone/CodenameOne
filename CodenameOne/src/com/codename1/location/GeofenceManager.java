@@ -78,8 +78,6 @@ import java.util.Map;
 /// for the "bubble" region, and "reload" the GeofenceManager with new regions related to the device's current location.
 /// You might load the new locations from a web-service, for example.  Use the `#isBubble(java.lang.String)` method
 /// to check if the id parameter is for the bubble region, and act accordintly.
-///
-/// @author shannah
 public final class GeofenceManager implements Iterable<Geofence> {
     //private GeoStreamerAsyncDataSource dataSource;
     private static final String STORAGE_KEY = "$AsyncGeoStreamer.geofences$";

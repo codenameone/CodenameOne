@@ -95,8 +95,6 @@ import java.util.Vector;
 ///     }
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class ConnectionRequest implements IOProgressListener {
 
     /// A critical priority request will "push" through the queue to the highest point

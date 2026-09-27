@@ -71,8 +71,6 @@ import org.xeustechnologies.jtar.TarOutputStream;
 /**
  * This interface represents a build for a specific platform using the daemon,
  * this interface should be implemented to build to every platform type
- *
- * @author Shai Almog
  */
 public abstract class Executor {
     public static final String BUILD_TARGET_XCODE_PROJECT = "ios-source";

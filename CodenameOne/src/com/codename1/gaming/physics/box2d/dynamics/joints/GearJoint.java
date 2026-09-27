@@ -59,7 +59,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 /// @warning The revolute and prismatic joints must be attached to fixed bodies (which must be body1
 ///          on those joints).
 /// @warning You have to manually destroy the gear joint if joint1 or joint2 is destroyed.
-/// @author Daniel Murphy
 public class GearJoint extends Joint {
 
   private final Joint m_joint1;

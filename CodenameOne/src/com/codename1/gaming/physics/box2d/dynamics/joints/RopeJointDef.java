@@ -4,8 +4,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 
 /// Rope joint definition. This requires two body anchor points and a maximum lengths. Note: by
 /// default the connected objects will not collide. see collideConnected in b2JointDef.
-///
-/// @author Daniel Murphy
 public class RopeJointDef extends JointDef {
 
   /// The local anchor point relative to bodyA's origin.

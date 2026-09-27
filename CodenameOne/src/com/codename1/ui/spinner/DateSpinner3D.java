@@ -40,8 +40,6 @@ import static com.codename1.ui.CN.convertToPixels;
 /// A date spinner allows selecting a date value within the given date range
 ///
 /// This is used by the Picker when in lightweight mode.
-///
-/// @author Steve Hannah
 class DateSpinner3D extends Container implements InternalPickerWidget {
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());

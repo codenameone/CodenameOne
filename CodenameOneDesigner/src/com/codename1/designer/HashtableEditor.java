@@ -40,8 +40,6 @@ import javax.swing.table.TableModel;
 /**
  * Allows us to edit a hashtable of values or a string, similarly to the array editor.
  * This is useful for the ui builder.
- *
- * @author Shai Almog
  */
 public class HashtableEditor extends javax.swing.JPanel {
     private EditableResources res;

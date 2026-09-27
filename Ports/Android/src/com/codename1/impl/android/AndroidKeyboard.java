@@ -28,10 +28,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.impl.VirtualKeyboardInterface;
 
-/**
- *
- * @author cf130546
- */
 public class AndroidKeyboard implements VirtualKeyboardInterface {
 
     private AndroidImplementation impl;

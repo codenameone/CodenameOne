@@ -26,10 +26,6 @@ import org.cef.CefClient;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefRequestContext;
 
-/**
- *
- * @author shannah
- */
 public final class CN1CefBrowserFactory {
     private CN1CefBrowserFactory() {
     }

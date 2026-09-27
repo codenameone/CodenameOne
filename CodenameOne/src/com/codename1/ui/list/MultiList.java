@@ -67,8 +67,6 @@ import java.util.Hashtable;
 ///   return entry;
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class MultiList extends List {
     private final MultiButton sel;
     private final MultiButton unsel;

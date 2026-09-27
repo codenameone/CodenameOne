@@ -36,8 +36,6 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 import com.codename1.gaming.physics.box2d.dynamics.joints.JointEdge;
 
 /// A rigid body. These are created via World.createBody.
-///
-/// @author Daniel Murphy
 public class Body {
   public static final int e_islandFlag = 0x0001;
   public static final int e_awakeFlag = 0x0002;
@@ -375,7 +373,7 @@ public class Body {
 
   /// Set the angular velocity.
   ///
-  /// @param omega the new angular velocity in radians/second.
+  /// @param w the new angular velocity in radians/second.
   public final void setAngularVelocity(float w) {
     if (m_type == BodyType.STATIC) {
       return;
@@ -528,7 +526,7 @@ public class Body {
 
   /// Get the mass data of the body. The rotational inertia is relative to the center of mass.
   ///
-  /// @return a struct containing the mass, inertia and center of the body.
+  /// @param data receives the mass, inertia and center of the body.
   public final void getMassData(MassData data) {
     // data.mass = m_mass;
     // data.I = m_I + m_mass * Vec2.dot(m_sweep.localCenter, m_sweep.localCenter);
@@ -709,7 +707,7 @@ public class Body {
 
   /// Gets a local point relative to the body's origin given a world point.
   ///
-  /// @param a point in world coordinates.
+  /// @param worldPoint a point in world coordinates.
   /// @return the corresponding local point relative to the body's origin.
   public final Vec2 getLocalPoint(Vec2 worldPoint) {
     Vec2 out = new Vec2();
@@ -723,7 +721,7 @@ public class Body {
 
   /// Gets a local vector given a world vector.
   ///
-  /// @param a vector in world coordinates.
+  /// @param worldVector a vector in world coordinates.
   /// @return the corresponding local vector.
   public final Vec2 getLocalVector(Vec2 worldVector) {
     Vec2 out = new Vec2();
@@ -741,7 +739,7 @@ public class Body {
 
   /// Get the world linear velocity of a world point attached to this body.
   ///
-  /// @param a point in world coordinates.
+  /// @param worldPoint a point in world coordinates.
   /// @return the world velocity of a point.
   public final Vec2 getLinearVelocityFromWorldPoint(Vec2 worldPoint) {
     Vec2 out = new Vec2();
@@ -757,7 +755,7 @@ public class Body {
 
   /// Get the world velocity of a local point.
   ///
-  /// @param a point in local coordinates.
+  /// @param localPoint a point in local coordinates.
   /// @return the world velocity of a point.
   public final Vec2 getLinearVelocityFromLocalPoint(Vec2 localPoint) {
     Vec2 out = new Vec2();
@@ -879,7 +877,6 @@ public class Body {
   /// Set the sleep state of the body. A sleeping body has very low CPU cost.
   ///
   /// @param flag set to true to put body to sleep, false to wake it.
-  /// @param flag
   public void setAwake(boolean flag) {
     if (flag) {
       if ((m_flags & e_awakeFlag) == 0) {

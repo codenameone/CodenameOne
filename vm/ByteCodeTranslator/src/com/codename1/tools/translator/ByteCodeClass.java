@@ -51,8 +51,6 @@ import org.objectweb.asm.Opcodes;
 
 /**
  * Parsed class file
- *
- * @author Shai Almog
  */
 public class ByteCodeClass {
 

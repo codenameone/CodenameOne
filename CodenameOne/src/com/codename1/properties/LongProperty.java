@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the long specific version of numeric property
-///
-/// @author Shai Almog
 public class LongProperty<K> extends NumericProperty<Long, K> {
 
     /// Creates a long property with the given name.

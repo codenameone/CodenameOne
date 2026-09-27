@@ -33,8 +33,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Allows executing platform files to upload files to devices
- *
- * @author Shai Almog
  */
 public class RunOnDevice extends javax.swing.JPanel {
     private Process currentProcess;

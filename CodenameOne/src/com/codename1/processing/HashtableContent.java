@@ -38,8 +38,6 @@ import java.util.Vector;
 /// Internal class do not use.
 ///
 /// A DOM accessor implementation for working with Map data.
-///
-/// @author Eric Coolman
 class MapContent implements StructuredContent {
 
     private final Object root;

@@ -28,8 +28,6 @@ package com.codename1.ui;
 ///
 /// Positions are 1-based: line `1` is the first line and column `1` is the first character of a line,
 /// matching the convention used by most compilers and language servers.
-///
-/// @author Shai Almog
 public class CodeDiagnostic {
     /// Severity for a problem that should block / is an error.
     public static final String ERROR = "error";

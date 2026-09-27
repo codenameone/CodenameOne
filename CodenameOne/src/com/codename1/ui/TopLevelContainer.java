@@ -45,8 +45,6 @@ import com.codename1.ui.plaf.UIManager;
 /// reach them through `#asContainer()` instead. So are the parts of `Form` that model
 /// mobile navigation, such as form transitions, the back command and the menu bar;
 /// those have no meaning for a desktop window.
-///
-/// @author Shai Almog
 public interface TopLevelContainer {
 
     /// Returns this top level as a `Container`.

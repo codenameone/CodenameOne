@@ -32,8 +32,6 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /// Class implementing the socket API
-///
-/// @author Shai Almog
 public final class Socket {
     private Socket() {
     }

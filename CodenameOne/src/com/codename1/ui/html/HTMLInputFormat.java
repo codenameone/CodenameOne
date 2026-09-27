@@ -33,8 +33,6 @@ import java.util.Vector;
 /// This class implements HTML's input format restrictions.
 /// These restrictions can be provided in the FORMAT attribute of the INPUT tag and are relevant for textfields.
 /// However as the FORMAT tag was deprectaed it is more standard to supply them in the '-wap-input-format' of the input field CSS or Style.
-///
-/// @author Ofir Leitner
 final class HTMLInputFormat {
 
     /// The allowed literals in an input format defintion
@@ -382,8 +380,6 @@ final class HTMLInputFormat {
     /// Each constraint is represented by a type and a count.
     /// The type indicated which typs of characters are allows and can be one or more of the TYPE_* constants ORed together.
     /// The count is either a number that indicates we allow up to this count or one of the COUNT_* constants (See below)
-    ///
-    /// @author Ofir Leitner
     static class FormatConstraint {
 
         /// All lowercase english letters are allowed

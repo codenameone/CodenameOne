@@ -28,10 +28,6 @@ import com.codename1.tools.translator.SignatureSet;
 
 import java.util.List;
 
-/**
- *
- * @author Shai Almog
- */
 public abstract class Instruction implements SignatureSet
 {
     static boolean hasInstructions;

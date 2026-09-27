@@ -26,8 +26,6 @@ import java.util.HashMap;
 
 /**
  * Implementation class required to compile enums
- *
- * @author Shai Almog
  */
 public class Enum<E extends Enum<E>> implements Comparable<E> {
 

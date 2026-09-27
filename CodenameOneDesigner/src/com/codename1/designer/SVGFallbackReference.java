@@ -28,10 +28,6 @@ import com.codename1.designer.ResourceEditorView;
 import java.util.prefs.Preferences;
 import javax.swing.SpinnerNumberModel;
 
-/**
- *
- * @author Shai Almog
- */
 public class SVGFallbackReference extends javax.swing.JPanel {
 
     /** Creates new form SVGFallbackReference */

@@ -30,8 +30,6 @@ import com.codename1.ui.list.MultipleSelectionListModel;
 
 /// A list of checkboxes.
 ///
-/// @author Steve Hannah
-///
 /// #### See also
 ///
 /// - ButtonList for code samples.

@@ -47,8 +47,6 @@ import com.codename1.ui.layouts.BorderLayout;
  * <p>Ports with no windowing system report that through {@link Desktop#isSupported()};
  * those skip without emitting a golden, so their baselines never contain a picture of
  * something the platform cannot do.</p>
- *
- * @author Shai Almog
  */
 public abstract class WindowHostTest extends BaseTest {
 

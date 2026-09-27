@@ -22,15 +22,13 @@
  */
 package com.codename1.backend;
 
-/**
- * The one date format HTTP/1.1 requires on the wire ("Sun, 06 Nov 1994 08:49:37
- * GMT"), formatted and parsed from epoch milliseconds directly.
- *
- * Done arithmetically rather than through Calendar and TimeZone: the format is
- * fixed and always GMT, and going through a calendar would make a header depend on
- * the process's default time zone, which is how Last-Modified ends up hours off on
- * a machine that is not in UTC.
- */
+/// The one date format HTTP/1.1 requires on the wire ("Sun, 06 Nov 1994 08:49:37
+/// GMT"), formatted and parsed from epoch milliseconds directly.
+///
+/// Done arithmetically rather than through Calendar and TimeZone: the format is
+/// fixed and always GMT, and going through a calendar would make a header depend on
+/// the process's default time zone, which is how Last-Modified ends up hours off on
+/// a machine that is not in UTC.
 public final class Http1Date {
     private static final String[] DAYS = {"Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"};
     private static final String[] MONTHS = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -43,7 +41,7 @@ public final class Http1Date {
     // truncates toward zero -- which for a pre-1970 timestamp gives the wrong day.
     private static long floorDiv(long x, long y) {
         long q = x / y;
-        if((x % y != 0) && ((x < 0) != (y < 0))) {
+        if ((x % y != 0) && ((x < 0) != (y < 0))) {
             q--;
         }
         return q;
@@ -56,9 +54,9 @@ public final class Http1Date {
     public static String format(long millis) {
         long seconds = floorDiv(millis, 1000L);
         long days = floorDiv(seconds, 86400L);
-        int secondOfDay = (int)floorMod(seconds, 86400L);
+        int secondOfDay = (int) floorMod(seconds, 86400L);
         // 1970-01-01 was a Thursday, which is why DAYS starts there.
-        int dayOfWeek = (int)floorMod(days, 7L);
+        int dayOfWeek = (int) floorMod(days, 7L);
         int[] civil = civilFromDays(days);
         StringBuilder out = new StringBuilder(29);
         out.append(DAYS[dayOfWeek]).append(", ");
@@ -70,9 +68,9 @@ public final class Http1Date {
         return out.toString();
     }
 
-    /** Epoch millis, or -1 when the value is not a date this understands. */
+    /// Epoch millis, or -1 when the value is not a date this understands.
     public static long parse(String value) {
-        if(value == null) {
+        if (value == null) {
             return -1;
         }
         String v = value.trim();
@@ -86,7 +84,7 @@ public final class Http1Date {
         // "newer than the file" and answered 304 -- a conditional request served
         // no content because its date was nonsense. A malformed date has to be
         // no date at all.
-        if(v.length() != 29 || v.charAt(3) != ',' || v.charAt(4) != ' '
+        if (v.length() != 29 || v.charAt(3) != ',' || v.charAt(4) != ' '
                 || v.charAt(7) != ' ' || v.charAt(11) != ' ' || v.charAt(16) != ' '
                 || v.charAt(19) != ':' || v.charAt(22) != ':' || v.charAt(25) != ' '
                 || !"GMT".equals(v.substring(26))) {
@@ -96,13 +94,13 @@ public final class Http1Date {
             int day = digits(v, 5, 2);
             String monthName = v.substring(8, 11);
             int month = -1;
-            for(int iter = 0 ; iter < MONTHS.length ; iter++) {
-                if(MONTHS[iter].equals(monthName)) {
+            for (int iter = 0 ; iter < MONTHS.length ; iter++) {
+                if (MONTHS[iter].equals(monthName)) {
                     month = iter + 1;
                     break;
                 }
             }
-            if(month < 0) {
+            if (month < 0) {
                 return -1;
             }
             int year = digits(v, 12, 4);
@@ -125,7 +123,7 @@ public final class Http1Date {
             // readily as for day 9, and the answer is a different date than the
             // one written. A second of 60 is allowed because a leap second is
             // spelled that way.
-            if(day < 1 || year < 1 || hour < 0 || minute < 0 || second < 0
+            if (day < 1 || year < 1 || hour < 0 || minute < 0 || second < 0
                     || day > daysInMonth(year, month) || hour > 23 || minute > 59
                     || second > 60) {
                 return -1;
@@ -141,7 +139,7 @@ public final class Http1Date {
             // response rather than a 304, and every date this file emits is
             // consistent by construction, so a client echoing our own
             // Last-Modified back can never trip it.
-            if(!DAYS[(int)(((days % 7) + 7) % 7)].equals(v.substring(0, 3))) {
+            if (!DAYS[(int) (((days % 7) + 7) % 7)].equals(v.substring(0, 3))) {
                 return -1;
             }
             return ((days * 86400L) + hour * 3600L + minute * 60L + second) * 1000L;
@@ -154,17 +152,15 @@ public final class Http1Date {
         }
     }
 
-    /**
-     * The {@code len} characters at {@code from} as a number, or -1 unless every
-     * one of them is an ASCII digit. Written out rather than deferring to
-     * Integer.parseInt, which accepts a sign and whose failure is an exception on
-     * a path that takes one per malformed request.
-     */
+    /// The `len` characters at `from` as a number, or -1 unless every
+    /// one of them is an ASCII digit. Written out rather than deferring to
+    /// Integer.parseInt, which accepts a sign and whose failure is an exception on
+    /// a path that takes one per malformed request.
     private static int digits(String v, int from, int len) {
         int out = 0;
-        for(int iter = from ; iter < from + len ; iter++) {
+        for (int iter = from ; iter < from + len ; iter++) {
             char c = v.charAt(iter);
-            if(c < '0' || c > '9') {
+            if (c < '0' || c > '9') {
                 return -1;
             }
             out = out * 10 + (c - '0');
@@ -172,9 +168,9 @@ public final class Http1Date {
         return out;
     }
 
-    /** Days in a month, so a date that does not exist is not silently moved. */
+    /// Days in a month, so a date that does not exist is not silently moved.
     private static int daysInMonth(int year, int month) {
-        switch(month) {
+        switch (month) {
             case 2:
                 boolean leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
                 return leap ? 29 : 28;
@@ -186,7 +182,7 @@ public final class Http1Date {
     }
 
     private static StringBuilder two(StringBuilder out, int value) {
-        if(value < 10) {
+        if (value < 10) {
             out.append('0');
         }
         return out.append(value);
@@ -208,7 +204,7 @@ public final class Http1Date {
         long mp = (5 * doy + 2) / 153;
         long d = doy - (153 * mp + 2) / 5 + 1;
         long m = mp < 10 ? mp + 3 : mp - 9;
-        return new int[]{(int)(m <= 2 ? y + 1 : y), (int)m, (int)d};
+        return new int[]{(int) (m <= 2 ? y + 1 : y), (int) m, (int) d};
     }
 
     private static long daysFromCivil(int year, int month, int day) {

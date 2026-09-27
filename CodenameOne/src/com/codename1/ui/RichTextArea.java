@@ -56,8 +56,6 @@ import com.codename1.util.SuccessCallback;
 /// // later, read the edited content back:
 /// editor.getHtml(html -> Log.p("User wrote: " + html));
 /// ```
-///
-/// @author Shai Almog
 public class RichTextArea extends AbstractEditorComponent {
     private String placeholderText = "";
 

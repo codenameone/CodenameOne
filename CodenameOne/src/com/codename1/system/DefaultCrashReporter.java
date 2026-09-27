@@ -39,8 +39,6 @@ import java.util.TimerTask;
 
 /// A default implementation of the crash reporter that instantly sends the crash
 /// data to the server.
-///
-/// @author Shai Almog
 public final class DefaultCrashReporter implements CrashReport {
     private static String errorText = "The application encountered an error, do you wish to report it?";
     private static String sendButtonText = "Send";

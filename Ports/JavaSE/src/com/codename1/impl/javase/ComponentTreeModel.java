@@ -33,10 +33,6 @@ import java.util.LinkedList;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreePath;
 
-/**
- *
- * @author Shai Almog
- */
 class ComponentTreeModel implements javax.swing.tree.TreeModel {
     private Form root;
 

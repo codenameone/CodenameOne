@@ -61,10 +61,6 @@ import java.util.TreeSet;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class BytecodeMethod implements SignatureSet {
     // Initial native stack buffer in bytes; API-visible capacity remains unchanged.
     private static final int SB_STACK_FLOOR_UNITS = 128;

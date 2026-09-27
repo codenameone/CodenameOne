@@ -33,8 +33,6 @@ import javax.swing.JLabel;
 
 /**
  * The ui for changing the renderer of a list within the gui builder
- *
- * @author Shai Almog
  */
 public class ListRendererEditor extends javax.swing.JPanel {
     private com.codename1.ui.Component parentList;

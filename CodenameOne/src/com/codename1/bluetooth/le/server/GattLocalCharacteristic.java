@@ -29,7 +29,7 @@ import java.util.List;
 
 /// A characteristic definition of a local [GattLocalService] served by
 /// this device's [GattServer]. Properties use the
-/// [GattCharacteristic]`.PROPERTY_*` bits; access permissions use the
+/// [GattCharacteristic][com.codename1.bluetooth.gatt.GattCharacteristic]`.PROPERTY_*` bits; access permissions use the
 /// `PERMISSION_*` bits defined here.
 public class GattLocalCharacteristic {
 
@@ -52,7 +52,7 @@ public class GattLocalCharacteristic {
             new ArrayList<GattLocalDescriptor>();
 
     /// Creates a characteristic definition. `properties` uses
-    /// [GattCharacteristic]`.PROPERTY_*` bits; `permissions` uses the
+    /// [GattCharacteristic][com.codename1.bluetooth.gatt.GattCharacteristic]`.PROPERTY_*` bits; `permissions` uses the
     /// `PERMISSION_*` bits of this class.
     public GattLocalCharacteristic(BluetoothUuid uuid, int properties,
             int permissions) {
@@ -82,7 +82,7 @@ public class GattLocalCharacteristic {
         return uuid;
     }
 
-    /// The [GattCharacteristic]`.PROPERTY_*` bitmask.
+    /// The [GattCharacteristic][com.codename1.bluetooth.gatt.GattCharacteristic]`.PROPERTY_*` bitmask.
     public int getProperties() {
         return properties;
     }

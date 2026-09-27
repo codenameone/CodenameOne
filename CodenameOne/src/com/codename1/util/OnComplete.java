@@ -25,8 +25,6 @@ package com.codename1.util;
 
 /// Invoked when a process is completed, this is a generic interface designed to
 /// replace the `SuccessCallback` interface.
-///
-/// @author Shai Almog
 public interface OnComplete<T> {
     /// Invoked to indicate the process was completed
     ///

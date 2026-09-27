@@ -50,8 +50,6 @@ import java.util.Map;
 /// boolean success = m.sendMessageViaCloudSync("Codename One", "destination@domain.com", "Name Of User", "Message Subject",
 ///                             "Check out Codename One at https://www.codenameone.com/");
 /// ```
-///
-/// @author Chen
 public class Message {
 
     public static final String MIME_TEXT = "text/plain";

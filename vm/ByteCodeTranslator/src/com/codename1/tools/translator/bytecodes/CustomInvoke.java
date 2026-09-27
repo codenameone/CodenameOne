@@ -32,10 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author shannah
- */
 public class CustomInvoke extends Instruction {
     private String owner;
     private final String name;

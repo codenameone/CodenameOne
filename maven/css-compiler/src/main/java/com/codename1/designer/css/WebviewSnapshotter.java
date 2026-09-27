@@ -34,10 +34,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
-/**
- *
- * @author shannah
- */
 public class WebviewSnapshotter {
     private int x, y, w, h;
     private BrowserComponent web;

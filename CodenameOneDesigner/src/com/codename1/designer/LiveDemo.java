@@ -50,8 +50,6 @@ import com.codename1.ui.layouts.FlowLayout;
 /**
  * Quick and dirty demo of the main components within the framework allowing 
  * designers to customize the UI of the application even when no GUI is present.
- *
- * @author Shai Almog
  */
 public class LiveDemo {
     public void init(Object context) {

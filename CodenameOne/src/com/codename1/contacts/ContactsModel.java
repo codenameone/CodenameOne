@@ -30,8 +30,6 @@ import java.util.Hashtable;
 
 /// This Contacts model is responsible for querying Contacts from the device
 /// and to cache the data for faster usage
-///
-/// @author Chen
 public class ContactsModel extends DefaultListModel {
 
     private final Hashtable contactsCache = new Hashtable();

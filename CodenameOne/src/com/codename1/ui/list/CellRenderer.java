@@ -60,8 +60,6 @@ import com.codename1.ui.Component;
 /// reasons, otherwise every change made to the component might trigger a repaint that
 /// wouldn't do anything but still cost in terms of processing.
 ///
-/// @author Chen Fishbein, Shai Almog
-///
 /// #### Deprecated
 ///
 /// @deprecated this interface was added for ContainerList which is now deprecated. Use GenericListCellRenderer
