@@ -126,6 +126,33 @@ final class JavascriptReachability {
         }
     }
 
+    /**
+     * Read-only: when set, the analysis never un-eliminates a method. The C targets use
+     * RTA only to learn which classes are instantiated ({@link #instantiatedClasses}), and
+     * a method resurrected there would be emitted while the callees the conservative pass
+     * culled with it are not, which does not compile.
+     */
+    private boolean analysisOnly;
+
+    /**
+     * The classes RTA finds instantiated, without eliminating or resurrecting anything.
+     * For targets other than JavaScript, where the answer is used only to decide which
+     * receivers get a direct arm in a dispatch switch, so an under-approximation costs a
+     * fast path and never correctness.
+     *
+     * @param classes the surviving classes
+     * @param nativeSources the native sources, for their roots
+     * @return the instantiated class names
+     */
+    static Set<String> instantiatedClasses(List<ByteCodeClass> classes, String[] nativeSources) {
+        JavascriptReachability rta = new JavascriptReachability();
+        rta.analysisOnly = true;
+        rta.index(classes);
+        rta.seedRoots(classes, nativeSources);
+        rta.propagate();
+        return rta.instantiated;
+    }
+
     static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
             String[] nativeSources) {
         JavascriptReachability rta = new JavascriptReachability();
@@ -681,7 +708,9 @@ final class JavascriptReachability {
         if (cls == null) {
             return;
         }
-        cls.restoreEliminatedClass();
+        if (!analysisOnly) {
+            cls.restoreEliminatedClass();
+        }
         // Static-initialiser fires implicitly on first touch.
         for (BytecodeMethod m : cls.getMethods()) {
             if ("__CLINIT__".equals(m.getMethodName())) {
@@ -723,7 +752,7 @@ final class JavascriptReachability {
         Set<String> ancestorChain = new HashSet<String>();
         collectTransitiveAncestors(clsName, ancestorChain);
         for (String ancestor : ancestorChain) {
-            resolvePendingFor(ancestor);
+            resolvePendingFor(ancestor, clsName);
         }
     }
 
@@ -747,7 +776,20 @@ final class JavascriptReachability {
         }
     }
 
-    private void resolvePendingFor(String receiverType) {
+    /**
+     * Resolves the calls pending on {@code receiverType} against ONE newly instantiated
+     * class, {@code newlyInstantiated}.
+     *
+     * Only that class is new. Every other instantiated subtype of the receiver was already
+     * resolved against each of these calls: either when the call was first seen
+     * (dispatchVirtualFromInstantiated walks the whole subtree once) or when that subtype
+     * was itself instantiated, through this same method. Re-walking the receiver's entire
+     * subtree here, as this used to, gave the same answer at a cost of subtree size times
+     * pending calls on every instantiation -- quadratic on a C corpus, where Object and the
+     * collection interfaces have thousands of subtypes and the analysis ran for tens of
+     * minutes.
+     */
+    private void resolvePendingFor(String receiverType, String newlyInstantiated) {
         List<VirtualCall> pending = pendingByReceiver.get(receiverType);
         if (pending == null) {
             return;
@@ -755,7 +797,7 @@ final class JavascriptReachability {
         // Snapshot so re-entrant adds don't break iteration.
         VirtualCall[] snapshot = pending.toArray(new VirtualCall[0]);
         for (VirtualCall call : snapshot) {
-            dispatchVirtualFromInstantiated(call);
+            enqueueResolved(newlyInstantiated, call.methodName, call.desc, false);
         }
     }
 
@@ -875,8 +917,12 @@ final class JavascriptReachability {
             case Opcodes.INVOKEINTERFACE: {
                 VirtualCall call = new VirtualCall(owner, inv.getName(), inv.getDesc(),
                         inv.getOpcode() == Opcodes.INVOKEINTERFACE);
-                recordPending(call);
-                dispatchVirtualFromInstantiated(call);
+                // A call already recorded is already resolved against every
+                // instantiated subtype and will be against every later one, since
+                // resolution reads only receiver, name and descriptor.
+                if (recordPending(call)) {
+                    dispatchVirtualFromInstantiated(call);
+                }
                 break;
             }
             default:
@@ -884,13 +930,20 @@ final class JavascriptReachability {
         }
     }
 
-    private void recordPending(VirtualCall call) {
+    private final Set<String> pendingKeys = new HashSet<String>();
+
+    /** @return true when the call is new, false when an identical one is already pending */
+    private boolean recordPending(VirtualCall call) {
+        if (!pendingKeys.add(call.receiver + '#' + call.methodName + call.desc)) {
+            return false;
+        }
         List<VirtualCall> list = pendingByReceiver.get(call.receiver);
         if (list == null) {
             list = new ArrayList<VirtualCall>();
             pendingByReceiver.put(call.receiver, list);
         }
         list.add(call);
+        return true;
     }
 
     private void dispatchVirtualFromInstantiated(VirtualCall call) {
@@ -985,7 +1038,7 @@ final class JavascriptReachability {
                 // dropped, ``done.notifyAll()`` never fires, and the
                 // calling Java thread waits on ``done.wait()``
                 // forever.
-                if (m.isEliminated()) {
+                if (m.isEliminated() && !analysisOnly) {
                     m.setEliminated(false);
                 }
                 enqueue(m);

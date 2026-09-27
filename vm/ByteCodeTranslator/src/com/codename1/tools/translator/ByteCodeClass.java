@@ -3170,62 +3170,21 @@ public class ByteCodeClass {
     /// app never touches, the bulk of 2.4MB of code over the same app built without these
     /// switches.
     ///
+    /// The set comes from Rapid Type Analysis (JavascriptReachability, run read-only), not
+    /// from "some surviving method NEWs it": the conservative culler keys calls by name and
+    /// descriptor, so it keeps DateSpinner's constructor alive whenever any no-arg
+    /// constructor is called, and DateSpinner NEWs DateTimeRenderer. A bytecode scan
+    /// therefore called nearly every class instantiated and changed nothing on that app.
+    /// Classes a native source names by allocator or struct are added, since RTA's view of
+    /// the C runtime is limited to the natives' method roots.
+    ///
     /// Dropping an arm is always safe: every switch and guard chain falls through to the
     /// ordinary indirect dispatch, so a receiver without an arm still reaches its method.
-    /// That is also why this scan may be approximate, provided it errs toward "instantiated":
-    ///
-    /// - A NEW in surviving bytecode, from any other class, or from any of the class's own
-    ///   methods except its static initializer.
-    /// - A NEW in the class's own static initializer (enum constants, a singleton) only
-    ///   when some OTHER class refers to it, since only then can that initializer run.
-    /// - Any mention of the class's allocator or struct in a native source, which is how
-    ///   natives create objects.
-    ///
-    /// A class created only by reflection loses its arm and keeps working through the
-    /// vtable. Run on the raw bytecode, before fusion turns NEWs into stack allocations.
+    /// That is why an approximate answer is acceptable here, and why this set must never
+    /// be used to eliminate anything.
     static void computeInstantiated(List<ByteCodeClass> classes, String[] nativeSources) {
-        java.util.Set<String> result = new java.util.HashSet<String>();
-        java.util.Set<String> selfClinitOnly = new java.util.HashSet<String>();
-        java.util.Set<String> referencedFromOutside = new java.util.HashSet<String>();
-        for (ByteCodeClass c : classes) {
-            String self = c.getClsName();
-            for (BytecodeMethod m : c.methods) {
-                boolean clinit = m.getMethodName().indexOf("_CLINIT_") > -1
-                        || "<clinit>".equals(m.getMethodName());
-                for (Instruction i : m.getInstructions()) {
-                    String owner = null;
-                    if (i instanceof TypeInstruction) {
-                        owner = ((TypeInstruction) i).getTypeName();
-                    } else if (i instanceof Field) {
-                        owner = ((Field) i).getOwner();
-                    } else if (i instanceof Invoke) {
-                        owner = ((Invoke) i).getOwner();
-                    }
-                    if (owner == null) {
-                        continue;
-                    }
-                    String mangled = owner.replace('/', '_').replace('$', '_');
-                    boolean isNew = i.getOpcode() == Opcodes.NEW;
-                    if (!mangled.equals(self)) {
-                        referencedFromOutside.add(mangled);
-                        if (isNew) {
-                            result.add(mangled);
-                        }
-                    } else if (isNew) {
-                        if (clinit) {
-                            selfClinitOnly.add(mangled);
-                        } else {
-                            result.add(mangled);
-                        }
-                    }
-                }
-            }
-        }
-        for (String c : selfClinitOnly) {
-            if (referencedFromOutside.contains(c)) {
-                result.add(c);
-            }
-        }
+        java.util.Set<String> result = new java.util.HashSet<String>(
+                JavascriptReachability.instantiatedClasses(classes, nativeSources));
         NativeSymbolIndex natives = Parser.getNativeSymbolIndex(nativeSources);
         for (ByteCodeClass c : classes) {
             String n = c.getClsName();
@@ -3234,6 +3193,11 @@ public class ByteCodeClass {
             }
         }
         instantiatedClasses = result;
+    }
+
+    /// Forgets the previous translation's answer; see computeInstantiated.
+    static void resetInstantiated() {
+        instantiatedClasses = null;
     }
 
     public boolean hasClinit() {
