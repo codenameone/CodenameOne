@@ -122,8 +122,6 @@ import com.codename1.util.LazyValue;
 /// Cover/Uncover
 ///
 /// Fade
-///
-/// @author Shai Almog, Chen Fishbein
 public final class CommonTransitions extends Transition {
     /// Slide the transition horizontally
     ///

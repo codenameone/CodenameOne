@@ -70,8 +70,6 @@ import java.util.List;
 /// }
 /// form.add(BorderLayout.CENTER, sticky);
 /// ```
-///
-/// @author Shai Almog
 public class StickyHeaderContainer extends Container {
     /// Replace the pinned header without any visible movement of the
     /// pinned header. The rising section's header stays hidden behind

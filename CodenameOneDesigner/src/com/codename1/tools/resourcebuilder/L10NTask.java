@@ -36,8 +36,6 @@ import org.apache.tools.ant.BuildException;
 
 /**
  * Adds a localization resource bundle for a set of languages
- *
- * @author Shai Almog
  */
 public class L10NTask extends ResourceTask {
     private List<LocaleTask> locales = new ArrayList<LocaleTask>();

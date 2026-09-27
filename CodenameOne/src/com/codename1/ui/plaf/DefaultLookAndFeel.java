@@ -60,8 +60,6 @@ import com.codename1.ui.list.ListModel;
 
 /// Used to render the default look of Codename One
 ///
-/// @author Chen Fishbein
-///
 /// #### Deprecated
 ///
 /// @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate

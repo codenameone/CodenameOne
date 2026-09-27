@@ -27,8 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Base class for property types
-///
-/// @author Shai Almog
 public class PropertyBase<T, K> {
     /// Used internally to detect if a property was read by a user
     static PropertyChangeListener onGlobalGetProperty;

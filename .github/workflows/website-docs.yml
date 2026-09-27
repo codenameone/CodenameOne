@@ -40,6 +40,11 @@ on:
       # maven reactor and built only by this workflow, so nothing else would
       # catch a change to it.
       - 'maven/javadoc-hugo-doclet/**'
+      # The backend API reference is generated from the server runtime, so a
+      # change there changes published pages just as CodenameOne/src does.
+      - 'vm/backend/src/**'
+      - 'vm/backend/impl/**'
+      - 'vm/backend/shared-sources.sh'
       - '.github/workflows/website-docs.yml'
   push:
     branches: [main, master]
@@ -69,6 +74,10 @@ on:
       # maven reactor and built only by this workflow, so nothing else would
       # catch a change to it.
       - 'maven/javadoc-hugo-doclet/**'
+      # As above: the backend API reference is generated from these.
+      - 'vm/backend/src/**'
+      - 'vm/backend/impl/**'
+      - 'vm/backend/shared-sources.sh'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
     inputs:
@@ -245,6 +254,37 @@ jobs:
           # either: they are what broke dark mode.
           test ! -e docs/website/static/javadoc
           test ! -e docs/website/assets/js/cn1-javadoc.js
+
+      - name: Validate backend API reference output
+        run: |
+          set -euo pipefail
+          public=docs/website/public
+          test -f "$public/backend/javadoc/index.html"
+          test -f "$public/backend/javadoc/com/codename1/backend/HttpServer/index.html"
+          test -f "$public/backend/javadoc/com/codename1/backend/package-summary/index.html"
+          test -f "$public/backend-javadoc-search.json"
+          test -f "$public/files/backend-javadocs.zip"
+          # The split is the point: no server class in the client reference.
+          test ! -e "$public/javadoc/com/codename1/backend"
+          # Every page says which reference it belongs to, in words a reader
+          # arriving from a search engine sees before anything else. Class
+          # names without quotes as well, because --minify drops them.
+          backend_page="$public/backend/javadoc/com/codename1/backend/HttpServer/index.html"
+          grep -Eq 'class="?cn1-api-audience cn1-api-audience--backend' "$backend_page"
+          grep -q 'HttpServer (Backend API)' "$backend_page"
+          client_page="$public/javadoc/com/codename1/ui/Component/index.html"
+          grep -Eq 'class="?cn1-api-audience cn1-api-audience--client' "$client_page"
+          grep -q 'Component (Client API)' "$client_page"
+          # A class compiled into both halves is labelled as shared in both,
+          # and its backend copy names the client page as the canonical one.
+          shared_backend="$public/backend/javadoc/com/codename1/orm/session/Session/index.html"
+          shared_client="$public/javadoc/com/codename1/orm/session/Session/index.html"
+          grep -Eq 'cn1-api-audience--shared' "$shared_backend"
+          grep -Eq 'cn1-api-audience--shared' "$shared_client"
+          grep -Eq 'rel="?canonical"? href="?/javadoc/com/codename1/orm/session/Session/' "$shared_backend"
+          # And every page offers the switch to the other reference.
+          grep -Eq 'href="?/backend/javadoc/' "$client_page"
+          grep -Eq 'href="?/javadoc/' "$backend_page"
 
       - name: Validate API URLs on the Pages runtime
         run: |

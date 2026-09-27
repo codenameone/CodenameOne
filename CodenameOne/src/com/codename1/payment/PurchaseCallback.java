@@ -25,8 +25,6 @@ package com.codename1.payment;
 /// Callback interface that the main class must implement in order for in-app-purchasing
 /// to work. Once the main class implements this interface the methods within it
 /// are invoked to indicate the various purchase states.
-///
-/// @author Shai Almog
 public interface PurchaseCallback {
     /// Indicates a the given SKU was purchased by a user. When purchasing multiple
     /// SKU's at once multiple calls to this method will be performed.

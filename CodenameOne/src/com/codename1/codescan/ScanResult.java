@@ -27,8 +27,6 @@ package com.codename1.codescan;
 /// Callback for the code scanner indicating the result of a scan operation,
 /// the methods of this call will always be invoked on the EDT!
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// Use the cn1-codescanner cn1lib.

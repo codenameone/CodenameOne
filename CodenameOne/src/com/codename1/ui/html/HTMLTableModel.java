@@ -43,8 +43,6 @@ import java.util.Vector;
 /// - When a row ends, the commitRow method is called which results in creating a new empty row.
 ///
 /// - Since a cell in an HTML table can be practically everthing (From a simple string to a whole document), the objects added to the table are in fact Codename One components.
-///
-/// @author Ofir Leitner
 class HTMLTableModel implements TableModel {
 
     static final int SEGMENT_THEAD = 0;

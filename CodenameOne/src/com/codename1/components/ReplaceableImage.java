@@ -28,8 +28,6 @@ import com.codename1.ui.EncodedImage;
 /// Allows the image data to be replaced at runtime when a different image is
 /// available. The only limitation is that the image width/height must be identical and
 /// opacity status can't change (an opaque image can't be made translucent and visa versa).
-///
-/// @author Shai Almog
 public final class ReplaceableImage extends EncodedImage {
     private final boolean opaque;
     private boolean replaced;

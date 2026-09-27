@@ -26,7 +26,6 @@ package com.codename1.gaming.physics.box2d.collision;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
 /// Output for Distance.
-/// @author Daniel
 public class DistanceOutput {
 	/// Closest point on shapeA
 	public final Vec2 pointA = new Vec2();

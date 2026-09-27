@@ -41,8 +41,6 @@ import java.util.Vector;
 
 /// Simple RSS read and parse request, to handle errors just subclass this and override
 /// parsingError.
-///
-/// @author Shai Almog
 public class RSSService extends ConnectionRequest implements ParserCallback {
     private Vector results;
     private int limit = -1;

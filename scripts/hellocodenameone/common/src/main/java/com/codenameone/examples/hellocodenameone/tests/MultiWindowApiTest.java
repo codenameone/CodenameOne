@@ -40,8 +40,6 @@ import com.codename1.ui.layouts.BorderLayout;
  * asserts against state the <em>port</em> reports rather than against pixels. On a
  * platform with no windowing system it asserts the opposite: that the capability query
  * says so and that constructing a window throws rather than silently degrading.</p>
- *
- * @author Shai Almog
  */
 public class MultiWindowApiTest extends BaseTest {
 

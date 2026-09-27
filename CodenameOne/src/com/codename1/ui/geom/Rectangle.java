@@ -29,8 +29,6 @@ import java.util.ArrayList;
 
 /// Represents a Rectangle position (x, y) and `Dimension` (width, height),
 /// this is useful for measuring coordinates within the application.
-///
-/// @author Chen Fishbein
 public class Rectangle implements Shape {
 
     private static final int MAX_POOL_SIZE = 20;

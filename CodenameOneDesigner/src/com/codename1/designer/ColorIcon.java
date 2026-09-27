@@ -43,8 +43,6 @@ import javax.swing.text.JTextComponent;
 
 /**
  * Represents the color icon on a button that pops up the color chooser
- * 
- * @author Shai Almog
  */
 class ColorIcon implements Icon {
     private static JColorChooser colorChooser;

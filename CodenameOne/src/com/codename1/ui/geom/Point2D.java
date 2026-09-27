@@ -23,8 +23,6 @@
 package com.codename1.ui.geom;
 
 /// Utility class that holds x,y
-///
-/// @author Chen Fishbein
 public class Point2D {
 
     private double x;

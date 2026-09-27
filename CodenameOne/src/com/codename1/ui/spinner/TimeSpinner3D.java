@@ -51,8 +51,6 @@ import static com.codename1.ui.CN.convertToPixels;
 ///
 /// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
 /// the time as minutes since midnight, as an `Integer`.
-///
-/// @author Steve Hannah
 public class TimeSpinner3D extends Container implements InternalPickerWidget {
 
     static final int DEFAULT_MINUTE_STEP = 5;

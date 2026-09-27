@@ -26,8 +26,6 @@ package com.codename1.ui.events;
 import com.codename1.ui.plaf.Style;
 
 /// Invoked to indicate a change in a `Style` property
-///
-/// @author Chen Fishbein
 public interface StyleListener {
 
     /// Invoked to indicate a change in a propertyName of a Style

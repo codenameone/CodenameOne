@@ -63,8 +63,6 @@ import java.util.Set;
 /// `form.getContentPane().add(cmp)`. Normally this shouldn't matter, however in some cases such as
 /// animation we need to use the content pane directly e.g. `form.getContentPane().animateLayout(200)`
 /// will work whereas `form.animateLayout(200)` will fail.
-///
-/// @author Chen Fishbein
 public class Form extends Container implements TopLevelContainer {
     static int activePeerCount;
     static int rippleX;

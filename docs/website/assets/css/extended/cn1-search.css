@@ -185,6 +185,9 @@
 .cn1-search-api__kind {
   grid-column: 2;
   grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;

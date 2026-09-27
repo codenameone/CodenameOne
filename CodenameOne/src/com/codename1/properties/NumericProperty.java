@@ -25,8 +25,6 @@ package com.codename1.properties;
 
 /// This is the base class to all number properties, it introduces nullability and the ability to convert to all
 /// number types.
-///
-/// @author Shai Almog
 public abstract class NumericProperty<T, K> extends Property<T, K> {
     private boolean nullable;
 

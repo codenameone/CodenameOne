@@ -90,8 +90,6 @@ import java.util.ArrayList;
 ///                 add(GridLayout.encloseIn(4, num1, num2, num3, num4)).
 ///         add(cn, submit);
 /// ```
-///
-/// @author Chen Fishbein
 public class TextArea extends Component implements ActionSource, TextHolder {
     /// Allows any type of input into a text field, if a constraint is not supported
     /// by an underlying implementation this will be the default.

@@ -21,10 +21,6 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * @author Kamran Zafar
- * 
- */
 public class TarInputStream extends FilterInputStream {
 
     private static final int SKIP_BUFFER_SIZE = 2048;

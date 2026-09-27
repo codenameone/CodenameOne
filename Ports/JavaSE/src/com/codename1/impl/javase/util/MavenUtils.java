@@ -34,10 +34,6 @@ import java.net.URL;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- *
- * @author shannah
- */
 public class MavenUtils {
     private static boolean isRunningInJDK;
     private static boolean isRunningInMaven;

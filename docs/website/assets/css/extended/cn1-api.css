@@ -477,3 +477,121 @@ a.cn1-api-type,
   background: none;
   padding: 0;
 }
+
+/*
+ * Which reference a page belongs to. Two references share these templates --
+ * the client API at /javadoc/ and the backend API at /backend/javadoc/ -- and a
+ * reader arriving from a search engine sees a single page, so the audience is
+ * stated in words and in colour above every title. Blue is the client (the
+ * site's accent), green the backend, violet a class compiled into both.
+ */
+:root {
+  --cn1-api-client: var(--cn1-accent);
+  --cn1-api-backend: #11775a;
+  --cn1-api-backend-soft: #e3f5ee;
+  --cn1-api-shared: #6a43c7;
+  --cn1-api-shared-soft: #efe9fc;
+}
+
+body.dark {
+  --cn1-api-backend: #6fd6b0;
+  --cn1-api-backend-soft: #0f3a33;
+  --cn1-api-shared: #b9a1ff;
+  --cn1-api-shared-soft: #2a2257;
+}
+
+.cn1-api-audience {
+  --cn1-api-tone: var(--cn1-api-client);
+  --cn1-api-tone-soft: var(--cn1-accent-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  border-left: 4px solid var(--cn1-api-tone);
+  background: var(--cn1-api-tone-soft);
+  border-radius: 0 var(--cn1-radius-sm) var(--cn1-radius-sm) 0;
+  padding: 0.6rem 0.9rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.92rem;
+}
+
+.cn1-api-audience--backend {
+  --cn1-api-tone: var(--cn1-api-backend);
+  --cn1-api-tone-soft: var(--cn1-api-backend-soft);
+}
+
+.cn1-api-audience--shared {
+  --cn1-api-tone: var(--cn1-api-shared);
+  --cn1-api-tone-soft: var(--cn1-api-shared-soft);
+}
+
+.cn1-api-audience__text {
+  flex: 1 1 18rem;
+  margin: 0;
+  color: var(--cn1-text);
+}
+
+.cn1-api-audience__text strong {
+  color: var(--cn1-api-tone);
+}
+
+/* A two-way segmented switch: the current reference filled, the other a link. */
+.cn1-api-audience__switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--cn1-border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--cn1-surface);
+}
+
+.cn1-api-audience__switch a {
+  padding: 0.25rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cn1-muted);
+  text-decoration: none;
+}
+
+.cn1-api-audience__switch a + a {
+  border-left: 1px solid var(--cn1-border-strong);
+}
+
+.cn1-api-audience__switch a:hover,
+.cn1-api-audience__switch a:focus-visible {
+  color: var(--cn1-text);
+  background: var(--cn1-surface-soft);
+}
+
+.cn1-api-audience__switch a.is-active {
+  color: var(--cn1-surface);
+  background: var(--cn1-api-tone);
+}
+
+.cn1-api-badge {
+  display: inline-block;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-family: var(--cn1-font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: middle;
+}
+
+.cn1-api-badge--client {
+  color: var(--cn1-api-client);
+  background: var(--cn1-accent-soft);
+}
+
+.cn1-api-badge--backend {
+  color: var(--cn1-api-backend);
+  background: var(--cn1-api-backend-soft);
+}
+
+.cn1-api-badge--shared {
+  color: var(--cn1-api-shared);
+  background: var(--cn1-api-shared-soft);
+}

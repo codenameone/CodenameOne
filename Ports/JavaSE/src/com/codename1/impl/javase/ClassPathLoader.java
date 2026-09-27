@@ -33,8 +33,6 @@ import java.util.jar.JarFile;
 
 /**
  * Class loader for the given classpath
- *
- * @author Shai Almog
  */
 class ClassPathLoader extends ClassLoader {
 

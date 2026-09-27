@@ -29,10 +29,6 @@ import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 
-/**
- *
- * @author shannah
- */
 public class FillArc implements ExecutableOp {
 
     final int x, y, w, h, startAngle, arcAngle, color, alpha;

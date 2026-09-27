@@ -57,8 +57,6 @@ import com.codename1.ui.List;
 /// f.addComponent(BorderLayout.CENTER, lst);
 /// f.show();
 /// ```
-///
-/// @author Chen Fishbein
 public interface ListCellRenderer<T> {
     /// Returns a component instance that is already set to render "value". While it is not a requirement
     /// many renderes often derive from a component (such as a label) and return "this".

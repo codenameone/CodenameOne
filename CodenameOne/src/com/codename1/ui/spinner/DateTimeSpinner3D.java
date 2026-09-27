@@ -46,8 +46,6 @@ import static com.codename1.ui.CN.convertToPixels;
 ///
 /// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry a
 /// `java.util.Date` in which both the date and the time components are used.
-///
-/// @author Steve Hannah
 public class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private final Date today = new Date();
     private final int off;

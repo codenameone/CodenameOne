@@ -26,8 +26,6 @@ package com.codename1.ui.html;
 /// DocumentInfo holds important information about a document that is loading.
 /// This class is constructed internally by HTMLComponent and HTMLForm and is sent to the RequestHandler.
 /// It is intended for the RequestHandler to use and update (For example update encoding according to the HTTP response, update URL in case of a redirect etc.)
-///
-/// @author Ofir Leitner
 public class DocumentInfo {
 
     /// ISO-8859-1 encoding, the default one

@@ -33,10 +33,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSFunctor;
 import com.codename1.html5.js.JSObject;
 
-/**
- *
- * @author shannah
- */
 public class HTML5Keyboard implements VirtualKeyboardInterface {
     private static boolean virtualKeyboardOpen;
     

@@ -27,8 +27,6 @@ import java.util.Hashtable;
 
 /// This class represents a Facebook Photo Object
 /// http://developers.facebook.com/docs/reference/api/album
-///
-/// @author Chen Fishbein
 public class Album extends FBObject {
 
     private final User from = new User();

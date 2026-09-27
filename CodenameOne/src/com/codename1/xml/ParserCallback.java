@@ -24,8 +24,6 @@
 package com.codename1.xml;
 
 /// A callback used to dispatch errors encountered while parsing XML resources
-///
-/// @author Ofir Leitner
 public interface ParserCallback {
 
     /// Error code denoting that an unsupported tag was found in the XML

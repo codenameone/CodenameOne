@@ -24,8 +24,6 @@
 package com.codename1.gaming.physics.box2d.common;
 
 /// Orientated bounding box viewport transform
-///
-/// @author Daniel Murphy
 public class OBBViewportTransform implements IViewportTransform {
 
   public static class OBB {

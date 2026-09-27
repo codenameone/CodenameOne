@@ -38,9 +38,6 @@ import java.util.Map;
  * is used in the implementation of some bsh commands.</p>
  *
  * <p>See the note in LHS.java about wrapping objects.</p>
- *
- * @author Pat Niemeyer
- * @author Daniel Leuck
  */
 public final class Primitive implements Serializable {
     /*

@@ -49,7 +49,6 @@ import java.util.Vector;
 ///
 /// The combo box defines the following UIID's by default:
 ///
-///
 /// - `ComboBox`
 ///
 /// - `ComboBoxItem`
@@ -63,7 +62,6 @@ import java.util.Vector;
 /// - `PopupFocus`
 ///
 /// This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
-///
 ///
 /// - popupTitleBool - shows the "label for" value as the title of the popup dialog
 ///
@@ -104,8 +102,6 @@ import java.util.Vector;
 ///     return entry;
 /// }
 /// ```
-///
-/// @author Chen Fishbein
 ///
 /// #### See also
 ///

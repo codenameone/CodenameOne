@@ -66,8 +66,6 @@ import java.util.Set;
  * <p>Runs are pooled per owning component and reused across repaints, because a scrolling list
  * repaints continuously and creating an element per run per frame would swamp the worker
  * bridge. Nothing is ever read back from the DOM.</p>
- *
- * @author Codename One
  */
 public final class JavaScriptTextLayer {
 

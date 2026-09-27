@@ -23,7 +23,6 @@ import com.codename1.maps.providers.MapProvider;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.util.WeakHashMap;
 
-/// @author Roman Kamyk
 class CacheProviderProxy extends MapProvider {
 
     private final MapProvider provider;

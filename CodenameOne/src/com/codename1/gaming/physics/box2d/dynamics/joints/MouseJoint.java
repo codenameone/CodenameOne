@@ -36,8 +36,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 /// constraint with a maximum force. This allows the constraint to stretch and without applying huge
 /// forces. NOTE: this joint is not documented in the manual because it was developed to be used in
 /// the testbed. If you want to learn how to use the mouse joint, look at the testbed.
-///
-/// @author Daniel
 public class MouseJoint extends Joint {
 
   private final Vec2 m_localAnchorB = new Vec2();

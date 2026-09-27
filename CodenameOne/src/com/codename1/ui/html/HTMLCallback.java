@@ -32,8 +32,6 @@ import com.codename1.xml.ParserCallback;
 
 /// HTMLCallback is used to dispatch document lifecycle events.
 /// Most methods are called on the EDT thread, except parsingError, getAutoComplete and getLinkProperties
-///
-/// @author Ofir Leitner
 public interface HTMLCallback extends ParserCallback, CSSParserCallback {
 
 

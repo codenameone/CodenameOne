@@ -28,8 +28,6 @@ import java.util.Vector;
 
 /// This class represents a Facebook Photo Object
 /// http://developers.facebook.com/docs/reference/api/photo/
-///
-/// @author Chen Fishbein
 public class Photo extends FBObject {
 
     private final User from = new User();

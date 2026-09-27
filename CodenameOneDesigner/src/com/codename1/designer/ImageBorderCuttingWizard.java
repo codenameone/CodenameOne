@@ -46,8 +46,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * Part of the image border wizard in the theme
- *
- * @author Shai Almog
  */
 public class ImageBorderCuttingWizard extends javax.swing.JPanel {
     private EditableResources res;

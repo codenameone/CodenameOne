@@ -28,8 +28,6 @@ import com.codename1.ui.table.Table;
 import com.codename1.ui.table.TableLayout.Constraint;
 
 /// HTMLTable extends Codename One's Table and overrides some it's rendering and constaints methods do adapt to HTMLTableModel
-///
-/// @author Ofir Leitner
 class HTMLTable extends Table {
 
     /// Constant denoting that only inner borders rows should be drawn, only when seperating between table segments

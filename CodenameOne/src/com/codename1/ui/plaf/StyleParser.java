@@ -62,7 +62,6 @@ import java.util.Map;
 ///
 /// The following keys are supported:
 ///
-///
 /// - fgColor - The foreground color as a hex string.  E.g. ff0000.
 ///
 /// - bgColor - The background color as a hex string. E.g. ff0000.
@@ -169,8 +168,6 @@ import java.util.Map;
 /// - , , ,  - The insets along which  is sliced to generate the 9-subimages.  These values are
 /// expressed as a floating point number between 0.0 and 1.0, where 1.0 is the full width or height of the image depending on the orientation (horizontal or vertical) or the inset.  If image
 /// is 100 pixels by 100 pixels, then a top inset of 0.4 would cause a slice to occur at 40 pixels from the top of the image (i.e. the top-left, top, and top-right slices would each be 40 pixels high.
-///
-/// @author shannah
 public abstract class StyleParser {
 
     public static final byte UNIT_INHERIT = 99;

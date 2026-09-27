@@ -29,7 +29,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 // update to rev 100
 /// Callback class for AABB queries.
 /// See World.query
-/// @author Daniel Murphy
 public interface QueryCallback {
 
 	/// Called for each fixture found in the query AABB.

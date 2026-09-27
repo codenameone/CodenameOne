@@ -78,8 +78,6 @@ import java.util.Vector;
 /// was used in the GUI that is not a part of the com.codename1.ui package (even a
 /// Component from sub packages such as table or tree) it MUST be registered
 /// before loading a GUI!
-///
-/// @author Shai Almog
 public class UIBuilder { //implements Externalizable {
     /// A key in the form state hashtable used in the back command navigation
     public static final String FORM_STATE_KEY_NAME = "$name";

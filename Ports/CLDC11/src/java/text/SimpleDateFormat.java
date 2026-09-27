@@ -31,8 +31,6 @@ import java.util.Vector;
 /// A class for parsing and formatting dates with a given pattern, compatible
 /// with the Java 6 API.
 ///
-/// @author Eric Coolman
-///
 /// #### Deprecated
 ///
 /// this class has many issues in iOS and other platforms, please use the L10NManager

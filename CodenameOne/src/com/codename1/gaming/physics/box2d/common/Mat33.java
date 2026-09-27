@@ -25,8 +25,6 @@ package com.codename1.gaming.physics.box2d.common;
 
 
 /// A 3-by-3 matrix. Stored in column-major order.
-///
-/// @author Daniel Murphy
 public class Mat33 {
 
   public static final Mat33 IDENTITY = new Mat33(new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(0,
@@ -103,8 +101,8 @@ public class Mat33 {
   /// Solve A * x = b, where b is a column vector. This is more efficient than computing the inverse
   /// in one-shot cases.
   ///
-  /// @param b
-  /// @return
+  /// @param b the column vector
+  /// @param out receives the solution `x`
   public final void solve22ToOut(Vec2 b, Vec2 out) {
     final float a11 = ex.x, a12 = ey.x, a21 = ex.y, a22 = ey.y;
     float det = a11 * a22 - a12 * a21;

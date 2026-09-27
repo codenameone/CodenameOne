@@ -33,8 +33,6 @@ import com.codename1.ui.list.DefaultListModel;
 
 /**
  * Helper method for textfield onscreen keyboard (editStringAt)
- *
- * @author jaanus.hansen@nowinnovations.com
  */
 public class TextEditUtil {
 

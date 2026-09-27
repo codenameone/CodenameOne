@@ -55,8 +55,6 @@ import org.jdesktop.swingx.VerticalLayout;
 /**
  * Simple abstraction for elements within the resource editor as a horizontal list
  * with the appropriate preview
- *
- * @author Shai Almog
  */
 public class HorizontalList extends JPanel {
     private static boolean blockRefeshWhileLoading;

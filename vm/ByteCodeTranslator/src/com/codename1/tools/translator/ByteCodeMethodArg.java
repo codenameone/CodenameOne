@@ -26,10 +26,6 @@ package com.codename1.tools.translator;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- *
- * @author Shai Almog
- */
 public class ByteCodeMethodArg {
     private final int arrayDimensions;
     private String type;

@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the integer specific version of numeric property
-///
-/// @author Shai Almog
 public class IntProperty<K> extends NumericProperty<Integer, K> {
 
     /// Creates an integer property with the given name.

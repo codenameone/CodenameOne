@@ -32,8 +32,6 @@ import com.codename1.ui.animations.Motion;
 
 /// Static utility class useful for simple visual effects that don't quite fit
 /// anywhere else in the core API.
-///
-/// @author Shai Almog
 public final class Effects {
     private Effects() {
     }

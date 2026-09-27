@@ -25,10 +25,6 @@ package com.codename1.impl.javase.cef;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- *
- * @author shannah
- */
 public class StreamRegistry {
     
     private long nextId = 1;

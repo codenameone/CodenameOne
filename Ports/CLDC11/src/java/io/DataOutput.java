@@ -26,10 +26,10 @@ package java.io;
 /// For all the methods in this interface that write bytes, it is generally true that if a byte cannot be written for any reason, an IOException is thrown.
 /// Since: JDK1.0, CLDC 1.0 See Also:DataInput, DataOutputStream
 public interface DataOutput extends AutoCloseable {
-    /// Writes to the output stream all the bytes in array b. If b is null, a NullPointerException is thrown. If b.length is zero, then no bytes are written. Otherwise, the byte b[0] is written first, then b[1], and so on; the last byte written is b[b.length-1].
+    /// Writes to the output stream all the bytes in array b. If b is null, a NullPointerException is thrown. If b.length is zero, then no bytes are written. Otherwise, the byte `b[0]` is written first, then `b[1]`, and so on; the last byte written is `b[b.length-1]`.
     public abstract void write(byte[] b) throws java.io.IOException;
 
-    /// Writes len bytes from array b, in order, to the output stream. If b is null, a NullPointerException is thrown. If off is negative, or len is negative, or off+len is greater than the length of the array b, then an IndexOutOfBoundsException is thrown. If len is zero, then no bytes are written. Otherwise, the byte b[off] is written first, then b[off+1], and so on; the last byte written is b[off+len-1].
+    /// Writes len bytes from array b, in order, to the output stream. If b is null, a NullPointerException is thrown. If off is negative, or len is negative, or off+len is greater than the length of the array b, then an IndexOutOfBoundsException is thrown. If len is zero, then no bytes are written. Otherwise, the byte `b[off]` is written first, then `b[off+1]`, and so on; the last byte written is `b[off+len-1]`.
     public abstract void write(byte[] b, int off, int len) throws java.io.IOException;
 
     /// Writes to the output stream the eight low-order bits of the argument b. The 24 high-order bits of b are ignored.
@@ -46,7 +46,7 @@ public interface DataOutput extends AutoCloseable {
     /// The bytes written by this method may be read by the readChar method of interface DataInput, which will then return a char equal to (char)v.
     public abstract void writeChar(int v) throws java.io.IOException;
 
-    /// Writes every character in the string s, to the output stream, in order, two bytes per character. If s is null, a NullPointerException is thrown. If s.length is zero, then no characters are written. Otherwise, the character s[0] is written first, then s[1], and so on; the last character written is s[s.length-1]. For each character, two bytes are actually written, high-order byte first, in exactly the manner of the writeChar method.
+    /// Writes every character in the string s, to the output stream, in order, two bytes per character. If s is null, a NullPointerException is thrown. If s.length is zero, then no characters are written. Otherwise, the character `s[0]` is written first, then `s[1]`, and so on; the last character written is `s[s.length-1]`. For each character, two bytes are actually written, high-order byte first, in exactly the manner of the writeChar method.
     public abstract void writeChars(java.lang.String s) throws java.io.IOException;
 
     /// Writes a double value, which is comprised of eight bytes, to the output stream. It does this as if it first converts this double value to a long in exactly the manner of the Double.doubleToLongBits method and then writes the long value in exactly the manner of the writeLong method. The bytes written by this method may be read by the readDouble method of interface DataInput, which will then return a double equal to v.

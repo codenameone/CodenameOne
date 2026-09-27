@@ -32,10 +32,6 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-/**
- *
- * @author Shai Almog
- */
 public class Ldc extends Instruction implements AssignableExpression {
     private Object cst;
     public Ldc(Object o) {

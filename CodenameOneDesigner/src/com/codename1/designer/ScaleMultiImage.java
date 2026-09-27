@@ -28,10 +28,6 @@ import com.codename1.ui.util.EditableResources;
 import java.util.Vector;
 import javax.swing.SpinnerNumberModel;
 
-/**
- *
- * @author Shai Almog
- */
 public class ScaleMultiImage extends javax.swing.JPanel {
     private boolean changeLock;
     private static final int[] DPIS = {

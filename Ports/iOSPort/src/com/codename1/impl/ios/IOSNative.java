@@ -34,8 +34,6 @@ import java.util.Vector;
 
 /**
  * Abstraction of the underlying native API's
- *
- * @author Shai Almog
  */
 public final class IOSNative {
 

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Static analysis of the backend's PRODUCTION implementation. Nothing is published
+  from here, and the module is not in the default reactor: it is activated with
+  -DbackendAnalysis (see the backend-analysis profile in maven/pom.xml).
+
+  maven/backend compiles vm/backend/src with impl/javase, the Java SE twins the
+  local runtime runs on. The binary a server ships is built from impl/parparvm,
+  which Maven never compiles there, so a gate that works on compiled sources
+  (Error Prone's BanClassForName) or on the project's compile source roots (PMD)
+  could not see it. This module compiles the same shared tree with impl/parparvm
+  instead, against the JDK: those classes declare nothing outside java.*, and
+  their natives are just native methods to javac.
+
+  It analyses only impl/parparvm. The shared tree is maven/backend's, and
+  reporting it twice would only duplicate findings.
+
+  No double dash inside these comments: XML forbids one.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-backend-parparvm-analysis</artifactId>
+    <packaging>jar</packaging>
+    <name>Codename One Backend ParparVM Analysis</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <backend.dir>${project.basedir}/../../vm/backend</backend.dir>
+        <core.src.dir>${project.basedir}/../../CodenameOne/src</core.src.dir>
+        <backend.shared.dir>${project.build.directory}/generated-sources/backend-shared</backend.shared.dir>
+    </properties>
+
+    <build>
+        <sourceDirectory>${backend.dir}/src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-parparvm-implementation</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${backend.dir}/impl/parparvm</source>
+                                <source>${backend.shared.dir}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!-- The same selection maven/backend makes: core sources
+                             marked @com.codename1.impl.SharedWithBackend on a line
+                             of their own. See that pom for why they are copied. -->
+                        <id>copy-shared-core-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete dir="${backend.shared.dir}"/>
+                                <copy todir="${backend.shared.dir}">
+                                    <fileset dir="${core.src.dir}" includes="**/*.java">
+                                        <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
+                                    </fileset>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.21.0</version>
+                <configuration>
+                    <failOnViolation>false</failOnViolation>
+                    <printFailingErrors>false</printFailingErrors>
+                    <targetJdk>1.8</targetJdk>
+                    <rulesets>
+                        <ruleset>${project.basedir}/../core-unittests/pmd.xml</ruleset>
+                    </rulesets>
+                    <excludeRoots>
+                        <excludeRoot>${backend.dir}/src</excludeRoot>
+                        <excludeRoot>${backend.shared.dir}</excludeRoot>
+                    </excludeRoots>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>pmd</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Error Prone over the production implementation; see maven/backend. -->
+        <profile>
+            <id>errorprone</id>
+            <properties>
+                <errorprone.version>2.27.1</errorprone.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>1.8</source>
+                            <target>1.8</target>
+                            <encoding>UTF-8</encoding>
+                            <showWarnings>true</showWarnings>
+                            <!--
+                                Fork the compiler so the -J flags below
+                                reach a fresh javac JVM. Without forking,
+                                javac runs in the Maven process and the
+                                module exports never apply, leaving
+                                Error Prone's BaseErrorProneJavaCompiler
+                                unable to access jdk.compiler internals.
+                            -->
+                            <fork>true</fork>
+                            <compilerArgs combine.children="append">
+                                <arg>-XDcompilePolicy=simple</arg>
+                                <!--
+                                    -XepDisableAllChecks turns off Error
+                                    Prone's built-in rules so only the
+                                    checks we explicitly enable run. The
+                                    framework targets Java 1.5/1.8 idioms
+                                    and many built-in checks would fire on
+                                    legacy code we have no intention of
+                                    rewriting today.
+                                -->
+                                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:BanClassForName:ERROR</arg>
+                                <!-- JDK 16+ closes javac internals; Error
+                                     Prone needs these to introspect the
+                                     AST. The -J prefix routes each flag to
+                                     the forked javac JVM. -->
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                            </compilerArgs>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>com.google.errorprone</groupId>
+                                    <artifactId>error_prone_core</artifactId>
+                                    <version>${errorprone.version}</version>
+                                </path>
+                                <path>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>errorprone-checks</artifactId>
+                                    <version>${project.version}</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

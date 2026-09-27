@@ -33,8 +33,6 @@ import java.io.IOException;
 
 /**
  * Allows us to package a generic data file into the resource
- *
- * @author Shai Almog
  */
 public class DataTask extends ResourceTask {
     private File file;

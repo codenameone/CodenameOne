@@ -99,7 +99,6 @@ import java.util.Vector;
 ///         String n = (String)child;
 ///         int pos = n.lastIndexOf("/");
 ///         if(pos
-/// @author Shai Almog
 public interface TreeModel {
     /// Returns the child objects representing the given parent, null should return
     /// the root objects

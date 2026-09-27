@@ -59,8 +59,6 @@ import java.util.NoSuchElementException;
 /// Maps the properties that are in a class/object and provides access to them so tools such as ORM
 /// can implicitly access them for us. This class also holds the class level meta-data for a specific property
 /// or class. It also provides utility level tools e.g. toString implementation etc.
-///
-/// @author Shai Almog
 public class PropertyIndex implements Iterable<PropertyBase> {
     private static final Map<String, HashMap<String, Object>> metadata = new LinkedHashMap<String, HashMap<String, Object>>();
     private final PropertyBase[] properties;

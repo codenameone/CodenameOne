@@ -25,9 +25,6 @@ package com.codename1.plugin.event;
 import com.codename1.ui.events.ActionListener;
 
 /// Event triggered when `int)` is called.
-///
-/// @author Steve Hannah
-///
 public class OpenGalleryEvent extends PluginEvent<Void> {
     private final ActionListener response;
 

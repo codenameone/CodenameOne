@@ -26,8 +26,6 @@ import java.util.Date;
 
 /// The date and time spinner extends the time spinner by allowing to pick a specific day as well
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

@@ -68,7 +68,7 @@ public abstract class KeyHandle {
     /// several keys can pick the right one without trying each.
     public abstract String getKeyId();
 
-    /// The rotation counter. Incremented by [Vault#rotateDataKey()]; envelopes record the version
+    /// The rotation counter. Incremented by [Vault#rotateDataKey]; envelopes record the version
     /// that sealed them, so an old envelope can still be opened after a rotation and can be
     /// identified as needing a rewrite.
     public abstract int getVersion();

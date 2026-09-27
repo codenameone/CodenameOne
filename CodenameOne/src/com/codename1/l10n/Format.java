@@ -24,8 +24,6 @@ package com.codename1.l10n;
 
 /// An abstract class for parsing and formatting localisation sensitive information, compatible with JDK 6.
 ///
-/// @author Eric Coolman
-///
 /// #### See also
 ///
 /// - [http://docs.oracle.com/javase/6/docs/api/java/text/Format.html](http://docs.oracle.com/javase/6/docs/api/java/text/Format.html)

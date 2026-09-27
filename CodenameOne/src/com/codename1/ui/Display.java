@@ -108,8 +108,6 @@ import java.util.TimerTask;
 /// should normally be manipulated on the EDT as well (hence the `Display#callSerially` &
 /// `Display#callSeriallyAndWait` methods). Theoretically, it should be possible to manipulate
 /// some Codename One features from other threads, but this can't be guaranteed to work for all use cases.
-///
-/// @author Chen Fishbein, Shai Almog
 public final class Display extends CN1Constants {
     /// A common sound type that can be used with playBuiltinSound
     public static final String SOUND_TYPE_ALARM = "alarm";

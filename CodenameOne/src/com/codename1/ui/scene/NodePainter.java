@@ -27,8 +27,6 @@ import com.codename1.ui.geom.Rectangle;
 
 /// Interface for painting the content of a node in the Scene graph.
 ///
-/// @author Steve Hannah
-///
 /// #### Deprecated
 ///
 /// For internal use only

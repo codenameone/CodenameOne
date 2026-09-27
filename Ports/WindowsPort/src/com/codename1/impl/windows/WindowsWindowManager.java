@@ -35,8 +35,6 @@ import com.codename1.ui.Image;
  * {@code ID2D1HwndRenderTarget} and its own {@code CN1Graphics}. The application's
  * main window is deliberately not part of that table -- it stays in {@code cn1Win}
  * exactly as before -- so nothing about the single-window path changes.</p>
- *
- * @author Shai Almog
  */
 public class WindowsWindowManager extends WindowManager {
 

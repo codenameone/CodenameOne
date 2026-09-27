@@ -22,45 +22,40 @@
  */
 package com.codename1.backend;
 
-/**
- * Turns SIGTERM into an ordinary blocking call, so a server can shut down cleanly
- * when its container asks it to.
- *
- * The handler itself does one async-signal-safe write() to a pipe, and this class
- * turns that into an ordinary blocking read. Calling into the VM from a handler --
- * allocating, taking a monitor, touching the collector -- is undefined, and
- * blocking the signals and calling sigwait() does not work either: ParparVM starts
- * its collector thread before main(), so that thread never inherits the mask and
- * dies on the default action.
- */
+/// Turns SIGTERM into an ordinary blocking call, so a server can shut down cleanly
+/// when its container asks it to.
+///
+/// The handler itself does one async-signal-safe write() to a pipe, and this class
+/// turns that into an ordinary blocking read. Calling into the VM from a handler --
+/// allocating, taking a monitor, touching the collector -- is undefined, and
+/// blocking the signals and calling sigwait() does not work either: ParparVM starts
+/// its collector thread before main(), so that thread never inherits the mask and
+/// dies on the default action.
 public final class Signals {
     private Signals() {
     }
 
-    /**
-     * Installs the shutdown handlers and ignores SIGPIPE. Safe to call more than
-     * once. Writing to a socket whose peer has gone is routine for a server, and
-     * SIGPIPE's default action is to kill the process; ignored, the write returns
-     * an error like any other.
-     */
+    /// Installs the shutdown handlers and ignores SIGPIPE. Safe to call more than
+    /// once. Writing to a socket whose peer has gone is routine for a server, and
+    /// SIGPIPE's default action is to kill the process; ignored, the write returns
+    /// an error like any other.
     public static boolean installShutdownHandler() {
         return blockImpl() == 0;
     }
 
-    /** Blocks until SIGINT or SIGTERM arrives. Returns the signal number, or -1. */
+    /// Blocks until SIGINT or SIGTERM arrives. Returns the signal number, or -1.
     public static int awaitShutdownSignal() {
         return awaitImpl();
     }
 
-    /**
-     * Runs body on a dedicated thread when a shutdown signal arrives.
-     * blockShutdownSignals must already have been called.
-     */
+    /// Runs body on a dedicated thread when a shutdown signal arrives.
+    /// blockShutdownSignals must already have been called.
     public static void onShutdown(final Runnable body) {
         Thread t = new Thread(new Runnable() {
+            @Override
             public void run() {
                 int signo = awaitShutdownSignal();
-                if(signo > 0) {
+                if (signo > 0) {
                     System.out.println("signal " + signo + " received, shutting down");
                 } else {
                     // NOT a signal: the wait failed, which means the handler was

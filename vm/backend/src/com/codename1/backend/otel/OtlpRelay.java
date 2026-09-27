@@ -30,29 +30,27 @@ import com.codename1.backend.Tracing;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Accepts the app's spans and forwards them to the collector this server
- * exports to.
- *
- * <p>This is what lets a mobile app report spans without shipping the
- * collector's credentials in its binary -- anything inside an app package is
- * public -- and without the collector having to answer a browser's CORS
- * preflight. The app posts OTLP/JSON to its own backend, the way it already
- * talks to it, and the backend adds the ingest token on the way out.
- *
- * <p>JSON in, because the server hands a handler its request body as text and a
- * binary protobuf body would not survive that. What goes out is re-encoded, in
- * whichever protocol this server exports with, from a tree rebuilt against the
- * OTLP schema: a field the schema does not name is dropped, a malformed id is
- * refused, and only then does the payload join the export queue. The relay is a
- * public endpoint, so it treats what it receives as input, not as a message to
- * pass along.
- *
- * <p>It answers as soon as the payload is queued. Forwarding inside the request
- * would block the connection's host thread on the collector (see
- * {@link BatchExporter}), and the client does not need to wait for the collector
- * to hear about its own spans.
- */
+/// Accepts the app's spans and forwards them to the collector this server
+/// exports to.
+///
+/// This is what lets a mobile app report spans without shipping the
+/// collector's credentials in its binary -- anything inside an app package is
+/// public -- and without the collector having to answer a browser's CORS
+/// preflight. The app posts OTLP/JSON to its own backend, the way it already
+/// talks to it, and the backend adds the ingest token on the way out.
+///
+/// JSON in, because the server hands a handler its request body as text and a
+/// binary protobuf body would not survive that. What goes out is re-encoded, in
+/// whichever protocol this server exports with, from a tree rebuilt against the
+/// OTLP schema: a field the schema does not name is dropped, a malformed id is
+/// refused, and only then does the payload join the export queue. The relay is a
+/// public endpoint, so it treats what it receives as input, not as a message to
+/// pass along.
+///
+/// It answers as soon as the payload is queued. Forwarding inside the request
+/// would block the connection's host thread on the collector (see
+/// [BatchExporter]), and the client does not need to wait for the collector
+/// to hear about its own spans.
 final class OtlpRelay implements HttpServer.Handler {
     private final byte[] path;
     private final String pathText;
@@ -62,7 +60,7 @@ final class OtlpRelay implements HttpServer.Handler {
     private final String corsOrigin;
     private final BatchExporter exporter;
 
-    /** The header a client puts the relay token in. */
+    /// The header a client puts the relay token in.
     static final String TOKEN_HEADER = "x-cn1-telemetry-token";
 
     OtlpRelay(String path, String token, int maxBytes, int maxSpans, String corsOrigin,
@@ -76,8 +74,9 @@ final class OtlpRelay implements HttpServer.Handler {
         this.exporter = exporter;
     }
 
+    @Override
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-        if(!request.pathIs(path)) {
+        if (!request.pathIs(path)) {
             return null;
         }
         // The relay's own request is not a trace anyone asked for: a client
@@ -85,57 +84,57 @@ final class OtlpRelay implements HttpServer.Handler {
         // with the exports themselves.
         Tracing.current().discard();
         String method = request.getMethod();
-        if("OPTIONS".equals(method)) {
+        if ("OPTIONS".equals(method)) {
             return preflight();
         }
-        if(!"POST".equals(method)) {
+        if (!"POST".equals(method)) {
             return answer(405, "POST OTLP/JSON to " + pathText);
         }
-        if(token != null) {
+        if (token != null) {
             String offered = request.getHeader(TOKEN_HEADER);
             // UTF-8 on both sides, not the ASCII folding used for fixed replies:
             // that mapped every non-ASCII character to '?', so distinct tokens
             // compared equal: "s?cret" opened a relay whose token had an accented e.
-            if(offered == null || !Crypto.equalsConstantTime(utf8(offered), utf8(token))) {
+            if (offered == null || !Crypto.equalsConstantTime(utf8(offered), utf8(token))) {
                 return answer(401, "missing or wrong " + TOKEN_HEADER);
             }
         }
         String type = request.getHeader("content-type");
-        if(type == null || !type.regionMatches(true, 0, "application/json", 0, 16)) {
+        if (type == null || !type.regionMatches(true, 0, "application/json", 0, 16)) {
             return answer(415, "the relay accepts application/json");
         }
         String body = request.getBody();
-        if(body == null || body.length() == 0) {
+        if (body == null || body.length() == 0) {
             return answer(400, "empty export");
         }
         // Measured in UTF-8 bytes, as the setting is. Counting characters let a
         // body of three-byte characters through at three times the ceiling.
-        if(utf8Length(body, maxBytes) > maxBytes) {
+        if (utf8Length(body, maxBytes) > maxBytes) {
             return answer(413, "export larger than " + maxBytes + " bytes");
         }
         byte[] encoded;
         try {
             Object parsed = Json.parse(body);
-            if(!(parsed instanceof Map)) {
+            if (!(parsed instanceof Map)) {
                 return answer(400, "an export is a JSON object");
             }
             // Counted on what was PARSED, before the sanitized copy is built: a body
             // under the byte cap can still hold thousands of tiny spans, and
             // validating and deep-copying all of them only to refuse the export
             // spent the memory the span cap is there to bound.
-            if(OtlpSchema.countSpans((Map)parsed) > maxSpans) {
+            if (OtlpSchema.countSpans((Map) parsed) > maxSpans) {
                 return answer(413, "export holds more than " + maxSpans + " spans");
             }
-            Map clean = OtlpSchema.sanitize((Map)parsed);
+            Map clean = OtlpSchema.sanitize((Map) parsed);
             int spans = OtlpSchema.countSpans(clean);
-            if(spans == 0) {
+            if (spans == 0) {
                 return ok();
             }
             encoded = exporter.isProtobuf() ? OtlpSchema.protobuf(clean) : OtlpSchema.json(clean);
         } catch (Exception err) {
             return answer(400, "not an OTLP trace export: " + err.getMessage());
         }
-        if(!exporter.addRelayed(encoded,
+        if (!exporter.addRelayed(encoded,
                 exporter.isProtobuf() ? "application/x-protobuf" : "application/json")) {
             // OTLP/HTTP's own signal for "try again later", and what a client's
             // exporter already backs off on.
@@ -145,7 +144,7 @@ final class OtlpRelay implements HttpServer.Handler {
     }
 
     private HttpServer.Response preflight() {
-        if(corsOrigin == null) {
+        if (corsOrigin == null) {
             return answer(405, "cross-origin export is not enabled on this relay");
         }
         Map headers = cors();
@@ -155,7 +154,7 @@ final class OtlpRelay implements HttpServer.Handler {
         return HttpServer.Response.empty(204, "text/plain", headers);
     }
 
-    /** An empty ExportTraceServiceResponse: success, nothing rejected. */
+    /// An empty ExportTraceServiceResponse: success, nothing rejected.
     private HttpServer.Response ok() {
         return new HttpServer.Response(200, "application/json", ascii("{}"), cors());
     }
@@ -166,33 +165,31 @@ final class OtlpRelay implements HttpServer.Handler {
 
     private Map cors() {
         Map headers = new LinkedHashMap();
-        if(corsOrigin != null) {
+        if (corsOrigin != null) {
             headers.put("Access-Control-Allow-Origin", corsOrigin);
             headers.put("Vary", "Origin");
         }
         return headers;
     }
 
-    /**
-     * The UTF-8 length of {@code value}, counted without encoding it, and given up
-     * on as soon as it passes {@code limit}. An unpaired surrogate counts as the
-     * three bytes of the replacement character an encoder writes for it.
-     */
+    /// The UTF-8 length of `value`, counted without encoding it, and given up
+    /// on as soon as it passes `limit`. An unpaired surrogate counts as the
+    /// three bytes of the replacement character an encoder writes for it.
     static long utf8Length(String value, long limit) {
         // Every character is at least one byte, so a long body is refused without
         // walking it.
-        if(value.length() > limit) {
+        if (value.length() > limit) {
             return value.length();
         }
         long bytes = 0;
         int n = value.length();
-        for(int iter = 0 ; iter < n && bytes <= limit ; iter++) {
+        for (int iter = 0 ; iter < n && bytes <= limit ; iter++) {
             char c = value.charAt(iter);
-            if(c < 0x80) {
+            if (c < 0x80) {
                 bytes++;
-            } else if(c < 0x800) {
+            } else if (c < 0x800) {
                 bytes += 2;
-            } else if(Character.isHighSurrogate(c) && iter + 1 < n
+            } else if (Character.isHighSurrogate(c) && iter + 1 < n
                     && Character.isLowSurrogate(value.charAt(iter + 1))) {
                 bytes += 4;
                 iter++;
@@ -209,9 +206,9 @@ final class OtlpRelay implements HttpServer.Handler {
 
     private static byte[] ascii(String value) {
         byte[] out = new byte[value.length()];
-        for(int iter = 0 ; iter < out.length ; iter++) {
+        for (int iter = 0 ; iter < out.length ; iter++) {
             char c = value.charAt(iter);
-            out[iter] = (byte)(c < 0x80 ? c : '?');
+            out[iter] = (byte) (c < 0x80 ? c : '?');
         }
         return out;
     }

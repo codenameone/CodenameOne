@@ -43,8 +43,6 @@ import com.codename1.ui.layouts.BorderLayout;
  *
  * <p>The background window is captured while the modal is open, which is exactly the
  * state that would be blank if the second property regressed.</p>
- *
- * @author Shai Almog
  */
 public class WindowModalTest extends BaseTest {
 

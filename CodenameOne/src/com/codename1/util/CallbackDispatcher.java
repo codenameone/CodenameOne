@@ -25,8 +25,6 @@ package com.codename1.util;
 import com.codename1.ui.Display;
 
 /// A utility class for calling `Callback`s on the EDT.
-///
-/// @author shannah
 public final class CallbackDispatcher<T> implements Runnable {
     private SuccessCallback<T> success;
     private FailureCallback<T> failure;

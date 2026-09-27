@@ -24,9 +24,6 @@ package com.codename1.plugin.event;
 
 /// Plugin event fired when `Display#isGalleryTypeSupported(int)` method is called to give
 /// plugins an opportunity to answer this question.
-///
-/// @author Steve Hannah
-///
 public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
     private final int type;
 

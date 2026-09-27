@@ -49,8 +49,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
 /// A weld joint essentially glues two bodies together. A weld joint may distort somewhat because the
 /// island constraint solver is approximate.
-///
-/// @author Daniel Murphy
 public class WeldJoint extends Joint {
 
   private float m_frequencyHz;

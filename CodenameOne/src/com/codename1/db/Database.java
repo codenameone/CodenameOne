@@ -71,8 +71,6 @@ import java.io.InputStream;
 /// Pass a `DatabaseConfig` to `#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`
 /// to encrypt the database at rest. Check `#isEncryptionSupported()` first, and read the security
 /// notes on `DatabaseConfig` before choosing how to key it.
-///
-/// @author Chen
 public abstract class Database {
 
     /// The first 16 bytes of every unencrypted SQLite database file.

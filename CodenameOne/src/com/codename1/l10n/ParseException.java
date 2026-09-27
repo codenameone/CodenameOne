@@ -23,8 +23,6 @@
 package com.codename1.l10n;
 
 /// An error occurred during parsing.
-///
-/// @author Eric Coolman
 public class ParseException extends Exception {
     private final int errorOffset;
     private Throwable causedBy;

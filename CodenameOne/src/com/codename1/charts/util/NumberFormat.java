@@ -29,8 +29,6 @@ import com.codename1.l10n.ParseException;
 import com.codename1.ui.Display;
 
 
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// this is an internal implementation class

@@ -29,7 +29,6 @@ import org.cef.browser.UIPlatform;
 /**
  * A class that allows us to abstract platform-specific functionality, such as running on the UI thread, and
  * converting between dips and pixels.
- * @author shannah
  */
 public class CEFUIPlatform implements UIPlatform {
 

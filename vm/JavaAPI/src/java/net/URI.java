@@ -47,8 +47,6 @@ import java.util.StringTokenizer;
  * TODO: finish this list
  * </pre>
  *
- * @author Eric Coolman
- *
  * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/net/URI.html">http://docs.oracle.com/javase/6/docs/api/java/net/URI.html</a>
  * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_identifier">http://en.wikipedia.org/wiki/Uniform_resource_identifier</a>
  * @see <a href="http://en.wikipedia.org/wiki/Uniform_resource_name">http://en.wikipedia.org/wiki/Uniform_resource_name</a>

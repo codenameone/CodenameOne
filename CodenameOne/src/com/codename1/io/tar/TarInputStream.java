@@ -21,7 +21,6 @@ import com.codename1.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-/// @author Kamran Zafar
 public class TarInputStream extends BufferedInputStream {
 
     private static final int SKIP_BUFFER_SIZE = 2048;

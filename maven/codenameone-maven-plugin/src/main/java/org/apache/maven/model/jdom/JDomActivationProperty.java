@@ -26,8 +26,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.rewriteElement;
 
 /**
  * JDOM implementation of POMs {@code property} element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomActivationProperty extends ActivationProperty implements JDomBacked {
 

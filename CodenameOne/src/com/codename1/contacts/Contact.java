@@ -63,8 +63,6 @@ import java.util.Hashtable;
 ///     });
 /// });
 /// ```
-///
-/// @author Chen
 public class Contact {
 
     private String id;

@@ -36,7 +36,6 @@ import java.util.Vector;
 /// A specialized version of `com.codename1.ui.TextArea` with some minor deviations from the original
 /// specifically:
 ///
-///
 /// - Blinking cursor is rendered on `TextField` only
 ///
 /// - `com.codename1.ui.events.DataChangeListener` is only available in `TextField`.
@@ -120,8 +119,6 @@ import java.util.Vector;
 ///     hi.getContentPane().animateLayout(250);
 /// });
 /// ```
-///
-/// @author Shai Almog
 public class TextField extends TextArea {
     private static final char[] DEFAULT_SYMBOL_TABLE = new char[]{
             '.', ',', '?', '!', '$', '@', '\'', '-',

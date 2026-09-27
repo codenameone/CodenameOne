@@ -32,10 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class Util {
 
     public static String getCType(PrimitiveType type) {

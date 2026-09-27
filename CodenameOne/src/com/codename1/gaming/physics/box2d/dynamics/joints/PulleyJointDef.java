@@ -30,8 +30,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 
 /// Pulley joint definition. This requires two ground anchors, two dynamic body anchor points, and a
 /// pulley ratio.
-///
-/// @author Daniel Murphy
 public class PulleyJointDef extends JointDef {
 
   /// The first ground anchor in world coordinates. This point never moves.

@@ -30,7 +30,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 // updated to rev 100
 /// Implement this class to provide collision filtering. In other words, you can implement
 /// this class if you want finer control over contact creation.
-/// @author Daniel Murphy
 public class ContactFilter {
 
 	/// Return true if contact calculations should be performed between these two shapes.

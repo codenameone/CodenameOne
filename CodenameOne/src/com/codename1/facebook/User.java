@@ -27,8 +27,6 @@ import java.util.Hashtable;
 
 /// This class represents a Facebook User objject
 /// http://developers.facebook.com/docs/reference/api/user/
-///
-/// @author Chen Fishbein
 public class User extends FBObject {
 
     private String username;

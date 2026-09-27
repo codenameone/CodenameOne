@@ -30,7 +30,6 @@ import com.codename1.ui.util.EventDispatcher;
 
 /**
  * A base class for JavaSE browser window implementations.
- * @author shannah
  * @since 7.0
  */
 public abstract class AbstractBrowserWindowSE {

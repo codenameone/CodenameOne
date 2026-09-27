@@ -39,8 +39,6 @@ import javax.swing.event.ListSelectionListener;
 
 /**
  * Allows viewing network activity from the executing application
- *
- * @author Shai Almog
  */
 public class NetworkMonitor extends javax.swing.JPanel implements Scrollable {
 

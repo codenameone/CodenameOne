@@ -42,8 +42,6 @@ import com.codename1.ui.plaf.UIManager;
 /// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
 /// the duration in MILLISECONDS, as a `Long`, so that it can be added to a
 /// timestamp without unit conversion at the call site.
-///
-/// @author Steve Hannah
 public class DurationSpinner3D extends Container implements InternalPickerWidget {
     public static final int FIELD_YEAR = 0;
     public static final int FIELD_MONTH = 1;

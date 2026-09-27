@@ -50,8 +50,6 @@ import java.util.Timer;
 /// terse code. However, its chief purpose is simplification by hiding some of the more esoteric methods of
 /// these underlying classes and bringing to the front the commonly used important methods.
 /// This class includes code from Display, NetworkManager, Log and other important classes
-///
-/// @author Shai Almog
 public class CN extends CN1Constants {
     /// Constant for the name of the main thin native font.
     public static final String NATIVE_MAIN_THIN = "native:MainThin";

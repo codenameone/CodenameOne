@@ -41,8 +41,6 @@ import java.util.Vector;
 ///     String[][] data = parser.parse(r);
 ///     String[] columnNames = new String[data[0].length];
 ///     for(int iter=  0 ; iter
-///
-/// @author Shai Almog
 public class CSVParser {
     private final char separatorChar;
     private final char[] buffer = new char[8192];

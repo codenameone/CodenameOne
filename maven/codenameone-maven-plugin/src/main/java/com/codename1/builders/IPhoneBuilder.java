@@ -59,11 +59,6 @@ import java.util.Set;
 import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
-/**
- *
- * @author Shai Almog
- * @author Steve Hannah
- */
 public class IPhoneBuilder extends Executor {
 
     // macNative.enabled=true switches this iOS build to also emit a native Mac

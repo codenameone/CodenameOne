@@ -24,8 +24,6 @@
 package com.codename1.ui.events;
 
 /// Invoked to indicate a scroll change events
-///
-/// @author Chen
 public interface ScrollListener {
 
     /// Indicates the scroll changed events

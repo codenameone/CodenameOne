@@ -31,8 +31,6 @@ import java.util.Map;
 import java.util.Set;
 
 /// Helper weak hash map substitute
-///
-/// @author Shai Almog
 public class WeakHashMap<K, V> implements Map<K, V> {
     private final HashMap<K, Object> map = new HashMap<K, Object>();
 

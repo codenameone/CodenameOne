@@ -47,8 +47,6 @@ import java.util.Hashtable;
 /// implementation provided by the port (see `Ports/iOSPort` and
 /// `Ports/Android`). On other platforms the legacy path also now goes
 /// through `OidcClient` instead of the deprecated [Oauth2] in-app WebView.
-///
-/// @author Chen
 public class GoogleConnect extends Login {
 
     /// Google's well-known OIDC issuer.

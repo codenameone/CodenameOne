@@ -73,8 +73,6 @@ import javax.swing.text.JTextComponent;
 
 /**
  * UI and logic for adding a new entry to the theme within the theme editor
- *
- * @author  Shai Almog
  */
 public class AddThemeEntry extends javax.swing.JPanel {
     private boolean disableRefresh = true;

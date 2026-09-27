@@ -32,10 +32,6 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 
-/**
- *
- * @author shannah
- */
 public class MediaStyleHelper {
     /**
      * Build a notification using the information from the given media session. Makes heavy use

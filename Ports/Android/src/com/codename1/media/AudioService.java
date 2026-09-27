@@ -48,8 +48,6 @@ import java.io.OutputStream;
 
 /**
  * This class is used when the media is been requested to run on the background
- *
- * @author Chen
  */
 public class AudioService extends Service  {
 

@@ -29,9 +29,6 @@ import java.io.IOException;
 /// UWP, and Android ports.  Use `Database#supportsWasNull(com.codename1.db.Row)` to check
 /// whether a row supports wasNull(), and use `Database#wasNull(com.codename1.db.Row)` as
 /// an abstraction to avoid needing to cast a Row to RowExt.
-///
-/// @author shannah
-///
 public interface RowExt extends Row {
     // PMD Fix (UnnecessaryModifier): Interface methods inherit public visibility.
     boolean wasNull() throws IOException;

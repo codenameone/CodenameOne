@@ -32,8 +32,6 @@ import java.util.TreeSet;
 
 /**
  * Parsed class file
- *
- * @author Shai Almog
  */
 public class ByteCodeClass {
 

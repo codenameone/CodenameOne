@@ -41,8 +41,6 @@ import javax.swing.event.ChangeListener;
  * sliders set the simulated device orientation (which the accelerometer
  * reflects) while the buttons inject the transient motion needed to fire the
  * shake, flip, pick up and free fall gestures.
- *
- * @author Codename One
  */
 public class MotionSimulation extends JFrame {
     private final JSlider pitchSlider = new JSlider(-90, 90, 0);

@@ -23,9 +23,6 @@
 package com.codename1.ui.list;
 
 /// Events `ListModel` to support multiple selection.
-///
-/// @author Steve Hannah
-///
 public interface MultipleSelectionListModel<T> extends ListModel<T> {
     /// Adds indices to set of selected indices.
     ///

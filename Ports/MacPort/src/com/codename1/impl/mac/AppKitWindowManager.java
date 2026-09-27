@@ -39,8 +39,6 @@ import com.codename1.ui.Image;
 /// `setAlwaysOnTop`, `setUtilityWindow`, `minimize`, `restore`,
 /// `toggleMaximize`, `setModal` and a real undecorated window -- are all
 /// ordinary AppKit and are implemented here.
-///
-/// @author Shai Almog
 class AppKitWindowManager extends WindowManager {
 
     // setCommands is deliberately still the SPI's no-op, and this is the note

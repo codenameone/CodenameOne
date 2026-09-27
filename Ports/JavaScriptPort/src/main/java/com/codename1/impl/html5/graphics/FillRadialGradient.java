@@ -27,10 +27,6 @@ import com.codename1.impl.html5.HTML5Graphics;
 import com.codename1.html5.js.canvas.CanvasGradient;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class FillRadialGradient implements ExecutableOp {
     final int x, y, w, h, startColor, endColor, alpha, startAngle, arcAngle;
     

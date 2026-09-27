@@ -32,7 +32,7 @@ import java.util.Comparator;
 /// Here are some more examples of how strings can be used:
 /// The class String includes methods for examining individual characters of the sequence, for comparing strings, for searching strings, for extracting substrings, and for creating a copy of a string with all characters translated to uppercase or to lowercase.
 /// The Java language provides special support for the string concatenation operator (+), and for conversion of other objects to strings. String concatenation is implemented through the StringBuffer class and its append method. String conversions are implemented through the method toString, defined by Object and inherited by all classes in Java. For additional information on string concatenation and conversion, see Gosling, Joy, and Steele, The Java Language Specification.
-/// Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
+/// Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(`char[]`), StringBuffer.append(`char[]`, int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
 public final class String implements CharSequence, Comparable<String> {
     
     public static final Comparator<String> CASE_INSENSITIVE_ORDER = new Comparator<String>() {
@@ -197,7 +197,7 @@ public final class String implements CharSequence, Comparable<String> {
         return; //TODO codavaj!!
     }
 
-    /// Returns a hashcode for this string. The hashcode for a String object is computed as s[0]*31^(n-1) + s[1]*31^(n-2) + ... + s[n-1] using int arithmetic, where s[i] is the
+    /// Returns a hashcode for this string. The hashcode for a String object is computed as `s[0]*31^(n-1)` + `s[1]*31^(n-2)` + ... + `s[n-1]` using int arithmetic, where `s[i]` is the
     /// th character of the string, n is the length of the string, and ^ indicates exponentiation. (The hash value of the empty string is zero.)
     public int hashCode(){
         return 0; //TODO codavaj!!

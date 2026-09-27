@@ -30,8 +30,6 @@ package com.codename1.notifications;
 /// *IMPORTANT:  THIS CALLBACK IS CALLED OFF THE EDT.  ANY UPDATES TO THE UI
 /// WILL NEED TO OCCUR INSIDE A `callSerially()` block.*
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - LocalNotification

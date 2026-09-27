@@ -24,8 +24,6 @@
 package com.codename1.ui;
 
 /// Common constants for Display and CN
-///
-/// @author Shai Almog
 public class CN1Constants {
     /// Very Low Density 176x220 And Smaller
     public static final int DENSITY_VERY_LOW = 10;

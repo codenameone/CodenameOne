@@ -33,8 +33,6 @@ import com.codename1.ui.Image;
  * {@code cn1_linux_desktopwindow.c}, with its own GtkWindow, drawing area, peer
  * overlay and cairo back buffer. The application's main window keeps its own file
  * statics and is not part of that table, so the single-window path is unchanged.</p>
- *
- * @author Shai Almog
  */
 public class LinuxWindowManager extends WindowManager {
 

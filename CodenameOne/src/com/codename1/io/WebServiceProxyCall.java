@@ -34,8 +34,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /// Utility class used by the webservice proxy code to invoke server code
-///
-/// @author Shai Almog
 public abstract class WebServiceProxyCall {
     /// Web protocol argument/return type
     public static final int TYPE_VOID = 0;

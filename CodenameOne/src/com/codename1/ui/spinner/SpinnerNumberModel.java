@@ -31,8 +31,6 @@ import com.codename1.ui.util.EventDispatcher;
 
 /// Represents a numeric model for the spinner
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

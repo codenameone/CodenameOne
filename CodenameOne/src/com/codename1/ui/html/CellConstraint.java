@@ -30,8 +30,6 @@ package com.codename1.ui.html;
 /// This is needed because:
 /// 1. Once a TableLayout.Constraint is used to draw a table it is assigned a parent and can't be reused again (See TableLayout.addLayoutComponent)
 /// 2. TableLayout.Constraint does not allow reading its values, so cloning the constraint (without the parent) is impossible
-///
-/// @author Ofir Leitner
 class CellConstraint {
     int width = -1; //defaultColumnWidth;
     int height = -1; //defaultRowHeight;

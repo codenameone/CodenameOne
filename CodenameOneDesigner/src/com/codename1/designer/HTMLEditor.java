@@ -44,8 +44,6 @@ import javax.swing.text.html.HTMLEditorKit;
 /**
  * Tool allowing editing of HTML, this is leveraged by the localization and the
  * UI builder code.
- *
- * @author Shai Almog
  */
 public class HTMLEditor extends javax.swing.JPanel {
     private com.codename1.ui.html.HTMLComponent htmlComponent;

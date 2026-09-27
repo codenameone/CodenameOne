@@ -78,7 +78,6 @@ import java.util.Collections;
 /// hi.add(BorderLayout.CENTER, table);
 /// hi.show();
 /// ```
-/// @author Shai Almog
 public class DefaultTableModel extends AbstractTableModel {
     private final EventDispatcher dispatcher = new EventDispatcher();
     ArrayList<Object[]> data = new ArrayList<Object[]>();

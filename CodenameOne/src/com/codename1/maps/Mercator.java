@@ -22,8 +22,6 @@ package com.codename1.maps;
 import com.codename1.util.MathUtil;
 
 /// Represents a Mercator projection http://en.wikipedia.org/wiki/Mercator_projection
-///
-/// @author Roman Kamyk
 public class Mercator extends Projection {
     // http://wiki.osgeo.org/wiki/WMS_Tiling_Client_Recommendation
 

@@ -26,8 +26,6 @@ package com.codename1.io;
 
 /// The event based parser allows parsing without creating an object tree by
 /// receiving callbacks to this class.
-///
-/// @author Shai Almog
 public interface JSONParseCallback {
     /// Indicates that the parser ran into an opening bracket event {
     void startBlock(String blockName);

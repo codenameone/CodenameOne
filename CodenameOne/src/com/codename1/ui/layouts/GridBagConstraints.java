@@ -17,8 +17,6 @@
 package com.codename1.ui.layouts;
 
 /// Port of the GridBag code from Apache's Harmony
-///
-/// @author Michael Danilov
 public class GridBagConstraints {
     public static final int RELATIVE = -1;
     public static final int REMAINDER = 0;

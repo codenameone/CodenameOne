@@ -45,8 +45,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * Editor for the standard CodenameOne RGB images allowing us to pick images 
- *
- * @author Shai Almog
  */
 public class ImageRGBEditor extends BaseForm {
     private EditableResources res;

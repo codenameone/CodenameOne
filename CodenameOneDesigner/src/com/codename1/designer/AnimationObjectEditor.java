@@ -36,8 +36,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * Editor to edit an individual animation entry within the timeline editor
- *
- * @author Shai Almog
  */
 public class AnimationObjectEditor extends javax.swing.JPanel {
     private EditableResources res;

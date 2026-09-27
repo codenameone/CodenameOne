@@ -26,10 +26,6 @@ package com.codename1.tools.translator.bytecodes;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class LocalVariable extends Instruction {
     private String name;
     private String desc;

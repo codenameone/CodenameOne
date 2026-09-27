@@ -35,8 +35,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Allows adding a new theme to the resource editor and basing it on a template
- *
- * @author Shai Almog
  */
 public class AddThemeResource extends javax.swing.JDialog {
     private boolean okPressed;

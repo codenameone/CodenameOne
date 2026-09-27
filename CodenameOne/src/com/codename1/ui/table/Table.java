@@ -102,7 +102,6 @@ import java.util.Date;
 /// hi.add(BorderLayout.CENTER, table);
 /// hi.show();
 /// ```
-/// @author Shai Almog
 public class Table extends Container {
 
     /// Constant denoting that inner borders should not be drawn at all

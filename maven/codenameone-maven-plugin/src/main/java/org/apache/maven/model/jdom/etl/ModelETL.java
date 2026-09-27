@@ -25,9 +25,6 @@ import org.jdom2.JDOMException;
 import java.io.File;
 import java.io.IOException;
 
-/**
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
- */
 public interface ModelETL {
 
   void extract(File pomFile) throws IOException, JDOMException;

@@ -30,10 +30,6 @@ import java.io.InputStream;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 
 
-/**
- *
- * @author shannah
- */
 public class ArrayBufferInputStream extends InputStream {
     private Uint8Array buf;
     private String type;

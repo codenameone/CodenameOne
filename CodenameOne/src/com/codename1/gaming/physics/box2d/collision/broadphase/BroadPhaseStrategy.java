@@ -34,8 +34,8 @@ public interface BroadPhaseStrategy {
   /// Query an AABB for overlapping proxies. The callback class is called for each proxy that
   /// overlaps the supplied AABB.
   ///
-  /// @param callback
-  /// @param araabbgAABB
+  /// @param callback called for each overlapping proxy
+  /// @param aabb the box to query
   void query(TreeCallback callback, AABB aabb);
 
   /// Ray-cast against the proxies in the tree. This relies on the callback to perform a exact

@@ -23,7 +23,6 @@
  */
 package java.lang;
 
-/// @author shai
 public class AssertionError extends Error {
     public AssertionError() {
         super();

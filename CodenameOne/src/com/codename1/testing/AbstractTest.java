@@ -29,8 +29,6 @@ import com.codename1.ui.TextArea;
 
 /// A unit test class that simplifies the process of writing test cases
 /// for Codename One.
-///
-/// @author Shai Almog
 public abstract class AbstractTest implements UnitTest {
     /// {@inheritDoc}
     @Override

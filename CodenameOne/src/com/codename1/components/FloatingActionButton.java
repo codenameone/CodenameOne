@@ -65,8 +65,6 @@ import java.util.List;
 /// fab.createSubFAB(FontImage.MATERIAL_IMPORT_CONTACTS, "");
 /// fab.bindFabToContainer(hi.getContentPane());
 /// ```
-///
-/// @author Chen
 public class FloatingActionButton extends Button {
 
     /// The FloatingActionButton tries to size/pad itself automatically but

@@ -19,10 +19,6 @@ package org.xeustechnologies.jtar;
 
 import java.io.File;
 
-/**
- * @author Kamran
- * 
- */
 public class TarUtils {
     /**
      * Determines the tar file size of the given folder/file path

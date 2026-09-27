@@ -27,18 +27,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A minimal HTTP/1.1 client over [Tcp]. Enough to speak a host runtime's control
- * protocol - the AWS Lambda Runtime API, for instance - without pulling in a
- * platform layer or a TLS stack. Plaintext only: the Lambda Runtime API is
- * plaintext on the loopback interface, and anything facing the public internet
- * terminates TLS in front of the process.
- */
+/// A minimal HTTP/1.1 client over [Tcp]. Enough to speak a host runtime's control
+/// protocol - the AWS Lambda Runtime API, for instance - without pulling in a
+/// platform layer or a TLS stack. Plaintext only: the Lambda Runtime API is
+/// plaintext on the loopback interface, and anything facing the public internet
+/// terminates TLS in front of the process.
 public final class Http {
     private Http() {
     }
 
-    /** One HTTP response: status line, headers and body. */
+    /// One HTTP response: status line, headers and body.
     public static final class Response {
         private final int status;
         private final List headerNames;
@@ -61,35 +59,32 @@ public final class Http {
         }
 
         public String getBodyAsString() {
-            try {
-                return new String(body, "UTF-8");
-            } catch (IOException err) {
-                return new String(body);
-            }
+            // UTF-8 explicitly. The fallback this had decoded with the platform's
+            // default charset, which on the JVM arm is whatever the host's locale
+            // says; UTF-8 is mandatory on both arms, so it was unreachable anyway.
+            return Utf8.decode(body, 0, body.length);
         }
 
-        /** Case-insensitive, because header case is not guaranteed by anything. */
+        /// Case-insensitive, because header case is not guaranteed by anything.
         public String getHeader(String name) {
-            for(int iter = 0 ; iter < headerNames.size() ; iter++) {
-                if(((String)headerNames.get(iter)).equalsIgnoreCase(name)) {
-                    return (String)headerValues.get(iter);
+            for (int iter = 0 ; iter < headerNames.size() ; iter++) {
+                if (((String) headerNames.get(iter)).equalsIgnoreCase(name)) {
+                    return (String) headerValues.get(iter);
                 }
             }
             return null;
         }
     }
 
-    /**
-     * The Host field's value: "[::1]:8080" for an IPv6 literal, "host:8080"
-     * otherwise.
-     *
-     * An address literal with colons in it has to be bracketed -- RFC 3986 gives
-     * the authority no other way to say where the address ends and the port
-     * begins -- and Tcp.connect accepts "::1" quite happily, so an otherwise
-     * valid request over IPv6 went out as "Host: ::1:8080" and a conforming
-     * server refused it. A colon cannot appear in a registered name, so it is
-     * what tells the two apart.
-     */
+    /// The Host field's value: "\[::1\]:8080" for an IPv6 literal, "host:8080"
+    /// otherwise.
+    ///
+    /// An address literal with colons in it has to be bracketed -- RFC 3986 gives
+    /// the authority no other way to say where the address ends and the port
+    /// begins -- and Tcp.connect accepts "::1" quite happily, so an otherwise
+    /// valid request over IPv6 went out as "Host: ::1:8080" and a conforming
+    /// server refused it. A colon cannot appear in a registered name, so it is
+    /// what tells the two apart.
     static String authority(String host, int port) {
         String named = host != null && host.indexOf(':') >= 0
                 && host.charAt(0) != '[' ? "[" + host + "]" : host;
@@ -129,7 +124,7 @@ public final class Http {
             head.append("\r\n");
             byte[] headBytes = head.toString().getBytes("UTF-8");
             socket.write(headBytes, 0, headBytes.length);
-            if(body != null && body.length > 0) {
+            if (body != null && body.length > 0) {
                 socket.write(body, 0, body.length);
             }
             return readResponse(socket, verb);
@@ -138,19 +133,17 @@ public final class Http {
         }
     }
 
-    /**
-     * How much of one response this client will hold, head and body together.
-     *
-     * <p>Mirrors CN1_WEB_MAX_RESPONSE_MB on the other client, including its
-     * default of 64, so the two agree about what is too much to read.
-     */
+    /// How much of one response this client will hold, head and body together.
+    ///
+    /// Mirrors CN1_WEB_MAX_RESPONSE_MB on the other client, including its
+    /// default of 64, so the two agree about what is too much to read.
     private static final long MAX_RESPONSE_BYTES =
-            (long)envMegabytes("CN1_HTTP_MAX_RESPONSE_MB", 64) * 1024L * 1024L;
+            (long) envMegabytes("CN1_HTTP_MAX_RESPONSE_MB", 64) * 1024L * 1024L;
 
-    /** 1..2047 MB, as the other client's reader bounds the same setting. */
+    /// 1..2047 MB, as the other client's reader bounds the same setting.
     private static int envMegabytes(String name, int fallback) {
         String value = System.getenv(name);
-        if(value == null || value.length() == 0) {
+        if (value == null || value.length() == 0) {
             return fallback;
         }
         try {
@@ -198,10 +191,10 @@ public final class Http {
         int[] chunkCursor = new int[1];
         int frameStart = 0;
         int headerScan = 0;
-        while(true) {
-            if(!framingKnown) {
+        while (true) {
+            if (!framingKnown) {
                 int headerEnd = indexOfHeaderEnd(buffer, headerScan, size);
-                if(headerEnd < 0) {
+                if (headerEnd < 0) {
                     // Resume three bytes back, because the terminator can straddle
                     // two reads. Never before the block being examined.
                     headerScan = Math.max(frameStart, size - 3);
@@ -210,7 +203,7 @@ public final class Http {
                             headerEnd - frameStart, "UTF-8");
                     String[] lines = split(headerText, "\r\n");
                     int status = lines.length == 0 ? -1 : parseStatus(lines[0]);
-                    if(status >= 100 && status < 200) {
+                    if (status >= 100 && status < 200) {
                         // An interim response frames nothing; the real one follows
                         // it on the same connection. frameStart only moves forward.
                         frameStart = headerEnd + 4;
@@ -219,37 +212,37 @@ public final class Http {
                     }
                     List headNames = new ArrayList();
                     List headValues = new ArrayList();
-                    for(int iter = 1 ; iter < lines.length ; iter++) {
+                    for (int iter = 1 ; iter < lines.length ; iter++) {
                         int colon = lines[iter].indexOf(':');
-                        if(colon > 0) {
+                        if (colon > 0) {
                             headNames.add(lines[iter].substring(0, colon).trim());
                             headValues.add(lines[iter].substring(colon + 1).trim());
                         }
                     }
                     int bodyStart = headerEnd + 4;
                     framingKnown = true;
-                    if(!carriesBody(verb, status)) {
+                    if (!carriesBody(verb, status)) {
                         total = bodyStart;
-                    } else if(joinedHeader(headNames, headValues,
+                    } else if (joinedHeader(headNames, headValues,
                             "Transfer-Encoding") != null) {
                         chunked = true;
                         chunkCursor[0] = bodyStart;
                     } else {
                         int declared = declaredLength(headNames, headValues);
-                        total = declared >= 0 ? (long)bodyStart + (long)declared : -1;
+                        total = declared >= 0 ? (long) bodyStart + (long) declared : -1;
                     }
                 }
             }
-            if(total >= 0 && size >= total) {
+            if (total >= 0 && size >= total) {
                 break;
             }
-            if(chunked) {
+            if (chunked) {
                 int end = chunkedEnd(buffer, size, chunkCursor);
-                if(end >= 0) {
+                if (end >= 0) {
                     break;
                 }
             }
-            if(size == buffer.length) {
+            if (size == buffer.length) {
                 // DOUBLING, BUT NOT PAST THE CEILING. The byte count below refuses
                 // a response over MAX_RESPONSE_BYTES -- after this ran, so the
                 // buffer had already doubled to twice the configured limit to hold
@@ -265,25 +258,25 @@ public final class Http {
                 // there has nowhere left to go, and the response is over the limit
                 // by definition, so it is refused here in the same words.
                 long ceiling = MAX_RESPONSE_BYTES + 1;
-                if(ceiling > Integer.MAX_VALUE - 8) {
+                if (ceiling > Integer.MAX_VALUE - 8) {
                     ceiling = Integer.MAX_VALUE - 8;
                 }
-                long want = (long)buffer.length * 2L;
-                if(want > ceiling) {
+                long want = (long) buffer.length * 2L;
+                if (want > ceiling) {
                     want = ceiling;
                 }
-                if(want <= buffer.length) {
+                if (want <= buffer.length) {
                     throw new IOException("The response passed the "
                             + (MAX_RESPONSE_BYTES / (1024 * 1024)) + " MB this client "
                             + "will read; set CN1_HTTP_MAX_RESPONSE_MB higher if the "
                             + "endpoint really answers that much");
                 }
-                byte[] grown = new byte[(int)want];
+                byte[] grown = new byte[(int) want];
                 System.arraycopy(buffer, 0, grown, 0, size);
                 buffer = grown;
             }
             int n = socket.read(buffer, size, buffer.length - size);
-            if(n <= 0) {
+            if (n <= 0) {
                 break;
             }
             // BOUNDED WHILE IT IS READ, not judged once it is over. This reads to
@@ -298,7 +291,7 @@ public final class Http {
             // the transfer past CN1_WEB_MAX_RESPONSE_MB, default 64. This is the
             // same bound with the name its own family uses, so the two clients
             // answer alike.
-            if(size + n > MAX_RESPONSE_BYTES) {
+            if (size + n > MAX_RESPONSE_BYTES) {
                 throw new IOException("The response passed the "
                         + (MAX_RESPONSE_BYTES / (1024 * 1024)) + " MB this client "
                         + "will read; set CN1_HTTP_MAX_RESPONSE_MB higher if the "
@@ -308,7 +301,7 @@ public final class Http {
         }
         byte[] all = new byte[size];
         System.arraycopy(buffer, 0, all, 0, size);
-        if(all.length == 0) {
+        if (all.length == 0) {
             // The peer closed without sending anything. Reporting this as malformed
             // HTTP sent every "the host went away" shutdown to the wrong diagnosis.
             throw new IOException("Connection closed before any response was sent");
@@ -325,18 +318,18 @@ public final class Http {
         int headerEnd;
         String[] lines;
         int status;
-        while(true) {
+        while (true) {
             headerEnd = indexOfHeaderEnd(all, blockStart);
-            if(headerEnd < 0) {
+            if (headerEnd < 0) {
                 throw new IOException("Malformed HTTP response: no header terminator");
             }
             String headerText = new String(all, blockStart, headerEnd - blockStart, "UTF-8");
             lines = split(headerText, "\r\n");
-            if(lines.length == 0) {
+            if (lines.length == 0) {
                 throw new IOException("Malformed HTTP response: empty");
             }
             status = parseStatus(lines[0]);
-            if(status < 100 || status >= 200) {
+            if (status < 100 || status >= 200) {
                 break;
             }
             // blockStart only ever moves forward, so a peer sending nothing but
@@ -346,9 +339,9 @@ public final class Http {
         }
         List names = new ArrayList();
         List values = new ArrayList();
-        for(int iter = 1 ; iter < lines.length ; iter++) {
+        for (int iter = 1 ; iter < lines.length ; iter++) {
             int colon = lines[iter].indexOf(':');
-            if(colon > 0) {
+            if (colon > 0) {
                 names.add(lines[iter].substring(0, colon).trim());
                 values.add(lines[iter].substring(colon + 1).trim());
             }
@@ -383,7 +376,7 @@ public final class Http {
         boolean coded = joinedHeader(names, values, "Transfer-Encoding") != null;
         int declared = carriesBody(verb, status) && !coded
                 ? declaredLength(names, values) : -1;
-        if(declared >= 0 && bodyBytes.length < declared) {
+        if (declared >= 0 && bodyBytes.length < declared) {
             throw new IOException("The response body stopped after " + bodyBytes.length
                     + " of the " + declared + " byte(s) its Content-Length declared, so "
                     + "the connection failed part way through it");
@@ -396,7 +389,7 @@ public final class Http {
         // is reported above; a long one is the peer contradicting its own framing,
         // and the framed answer is still perfectly readable, so this keeps exactly
         // what was declared rather than refusing what was asked for.
-        if(declared >= 0 && bodyBytes.length > declared) {
+        if (declared >= 0 && bodyBytes.length > declared) {
             byte[] framed = new byte[declared];
             System.arraycopy(bodyBytes, 0, framed, 0, declared);
             bodyBytes = framed;
@@ -414,26 +407,22 @@ public final class Http {
                                           : framedBody);
     }
 
-    /**
-     * Whether a response with this status, to this verb, is one whose
-     * Content-Length describes bytes that follow the header block.
-     *
-     * <p>RFC 9110 6.4.1, and the list is exhaustive: a response to HEAD, and any
-     * 1xx, 204 or 304, is terminated by the first empty line after the header
-     * fields regardless of the fields present.
-     */
+    /// Whether a response with this status, to this verb, is one whose
+    /// Content-Length describes bytes that follow the header block.
+    ///
+    /// RFC 9110 6.4.1, and the list is exhaustive: a response to HEAD, and any
+    /// 1xx, 204 or 304, is terminated by the first empty line after the header
+    /// fields regardless of the fields present.
     private static boolean carriesBody(String verb, int status) {
-        if("HEAD".equals(verb)) {
+        if ("HEAD".equals(verb)) {
             return false;
         }
         return !(status >= 100 && status < 200) && status != 204 && status != 304;
     }
 
-    /**
-     * The Content-Length the peer declared, or -1 when it declared none or the
-     * value is not a number. A chunked response has no Content-Length, so the
-     * check above simply does not apply to one.
-     */
+    /// The Content-Length the peer declared, or -1 when it declared none or the
+    /// value is not a number. A chunked response has no Content-Length, so the
+    /// check above simply does not apply to one.
     private static int declaredLength(List names, List values) throws IOException {
         // EVERY occurrence, and they have to agree. Taking the first and treating
         // an unparseable one as absent made the framing depend on field ORDER:
@@ -447,8 +436,8 @@ public final class Http {
         // response with no Content-Length is ordinary (chunked, or ended by the
         // close), and only the ones that make a claim are held to it.
         int declared = -1;
-        for(int iter = 0 ; iter < names.size() ; iter++) {
-            if(!"content-length".equalsIgnoreCase(String.valueOf(names.get(iter)))) {
+        for (int iter = 0 ; iter < names.size() ; iter++) {
+            if (!"content-length".equalsIgnoreCase(String.valueOf(names.get(iter)))) {
                 continue;
             }
             String raw = String.valueOf(values.get(iter)).trim();
@@ -458,13 +447,13 @@ public final class Http {
             } catch (NumberFormatException err) {
                 throw new IOException("The response declares a Content-Length that "
                         + "is not a number, so where its body ends cannot be known: "
-                        + raw);
+                        + raw, err);
             }
-            if(parsed < 0) {
+            if (parsed < 0) {
                 throw new IOException("The response declares a negative "
                         + "Content-Length: " + raw);
             }
-            if(declared >= 0 && declared != parsed) {
+            if (declared >= 0 && declared != parsed) {
                 throw new IOException("The response declares two different "
                         + "Content-Lengths, " + declared + " and " + parsed
                         + ", so where its body ends depends on which is believed");
@@ -474,35 +463,33 @@ public final class Http {
         return declared;
     }
 
-    /**
-     * Strips whatever Transfer-Encoding the peer applied, which is usually none.
-     *
-     * Reading to EOF is not the same as reading the body: `Connection: close` ends
-     * the message but does not remove chunk framing, so a server that answers
-     * chunked hands back size lines and terminators mixed into the payload. The
-     * Lambda Runtime API sends Content-Length today, which is the reason to handle
-     * this rather than a reason not to -- nothing here fails until the day it does.
-     *
-     * A coding this client cannot undo is an error rather than a pass-through. The
-     * one outcome worth ruling out is returning framed bytes as though they were
-     * the body, because the handler then parses garbage and blames its own input.
-     */
+    /// Strips whatever Transfer-Encoding the peer applied, which is usually none.
+    ///
+    /// Reading to EOF is not the same as reading the body: `Connection: close` ends
+    /// the message but does not remove chunk framing, so a server that answers
+    /// chunked hands back size lines and terminators mixed into the payload. The
+    /// Lambda Runtime API sends Content-Length today, which is the reason to handle
+    /// this rather than a reason not to -- nothing here fails until the day it does.
+    ///
+    /// A coding this client cannot undo is an error rather than a pass-through. The
+    /// one outcome worth ruling out is returning framed bytes as though they were
+    /// the body, because the handler then parses garbage and blames its own input.
     private static byte[] decodeBody(byte[] body, List names, List values) throws IOException {
         String encoding = joinedHeader(names, values, "Transfer-Encoding");
-        if(encoding == null) {
+        if (encoding == null) {
             return body;
         }
         String[] codings = split(encoding, ",");
         boolean chunked = false;
-        for(int iter = 0 ; iter < codings.length ; iter++) {
+        for (int iter = 0 ; iter < codings.length ; iter++) {
             String coding = codings[iter].trim();
-            if(coding.length() == 0 || coding.equalsIgnoreCase("identity")) {
+            if (coding.length() == 0 || "identity".equalsIgnoreCase(coding)) {
                 continue;
             }
             // Case folding a protocol token with toLowerCase() is locale sensitive and
             // wrong on a Turkish device; equalsIgnoreCase compares character by
             // character and is not.
-            if(coding.equalsIgnoreCase("chunked") && iter == codings.length - 1) {
+            if ("chunked".equalsIgnoreCase(coding) && iter == codings.length - 1) {
                 chunked = true;
                 continue;
             }
@@ -511,41 +498,39 @@ public final class Http {
         return chunked ? dechunk(body) : body;
     }
 
-    /**
-     * Every value sent under one header name, joined the way a single line would
-     * have read. A field may legally arrive split across repeated lines.
-     */
+    /// Every value sent under one header name, joined the way a single line would
+    /// have read. A field may legally arrive split across repeated lines.
     private static String joinedHeader(List names, List values, String name) {
         StringBuilder joined = null;
-        for(int iter = 0 ; iter < names.size() ; iter++) {
-            if(((String)names.get(iter)).equalsIgnoreCase(name)) {
-                if(joined == null) {
+        for (int iter = 0 ; iter < names.size() ; iter++) {
+            if (((String) names.get(iter)).equalsIgnoreCase(name)) {
+                if (joined == null) {
                     joined = new StringBuilder();
                 } else {
                     joined.append(',');
                 }
-                joined.append((String)values.get(iter));
+                joined.append((String) values.get(iter));
             }
         }
         return joined == null ? null : joined.toString();
     }
 
-    /** Reassembles a chunked body, dropping the framing and any trailer section. */
+    /// Reassembles a chunked body, dropping the framing and any trailer section.
     private static byte[] dechunk(byte[] data) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int pos = 0;
-        while(true) {
+        while (true) {
             int eol = indexOfCrLf(data, pos);
-            if(eol < 0) {
+            if (eol < 0) {
                 throw new IOException("Truncated chunked response: no chunk size line");
             }
             int end = pos;
-            while(end < eol && data[end] != ';') {
+            while (end < eol && data[end] != ';') {
                 end++;
             }
             int size = parseChunkSize(data, pos, end);
             pos = eol + 2;
-            if(size == 0) {
+            if (size == 0) {
                 // AND THE MESSAGE ENDS WHERE THE FRAMING SAYS. RFC 9112 7.1:
                 // last-chunk, then the trailer section, then a final CRLF. Returning
                 // here as soon as the zero-size line arrived accepted a response
@@ -559,33 +544,33 @@ public final class Http {
                 // fields, and this client has no caller that reads them. What
                 // changes is that they have to BE header fields, and the section
                 // has to be terminated.
-                while(true) {
+                while (true) {
                     int lineEnd = indexOfCrLf(data, pos);
-                    if(lineEnd < 0) {
+                    if (lineEnd < 0) {
                         throw new IOException("Truncated chunked response: the last "
                                 + "chunk is not followed by a terminated trailer "
                                 + "section, so the message stopped part way through");
                     }
-                    if(lineEnd == pos) {
+                    if (lineEnd == pos) {
                         return out.toByteArray();       // the empty line ends it
                     }
                     int colon = pos;
-                    while(colon < lineEnd && data[colon] != ':') {
+                    while (colon < lineEnd && data[colon] != ':') {
                         colon++;
                     }
-                    if(colon == pos || colon == lineEnd) {
+                    if (colon == pos || colon == lineEnd) {
                         throw new IOException("Malformed chunked response: the trailer "
                                 + "section holds a line that is not a header field");
                     }
                     pos = lineEnd + 2;
                 }
             }
-            if(size > data.length - pos) {
+            if (size > data.length - pos) {
                 throw new IOException("Truncated chunked response: chunk runs past the body");
             }
             out.write(data, pos, size);
             pos += size;
-            if(pos + 2 > data.length || data[pos] != '\r' || data[pos + 1] != '\n') {
+            if (pos + 2 > data.length || data[pos] != '\r' || data[pos + 1] != '\n') {
                 throw new IOException("Malformed chunked response: chunk not terminated");
             }
             pos += 2;
@@ -596,101 +581,93 @@ public final class Http {
         return indexOfCrLf(data, from, data.length);
     }
 
-    /** The same search, bounded by how much of a partly filled buffer is real. */
+    /// The same search, bounded by how much of a partly filled buffer is real.
     private static int indexOfCrLf(byte[] data, int from, int limit) {
-        for(int iter = Math.max(from, 0) ; iter + 1 < limit ; iter++) {
-            if(data[iter] == '\r' && data[iter + 1] == '\n') {
+        for (int iter = Math.max(from, 0) ; iter + 1 < limit ; iter++) {
+            if (data[iter] == '\r' && data[iter + 1] == '\n') {
                 return iter;
             }
         }
         return -1;
     }
 
-    /**
-     * A chunk size is hexadecimal and unsigned. Parsed by hand because the sizes
-     * this guards against are exactly the ones that overflow a signed parse.
-     */
+    /// A chunk size is hexadecimal and unsigned. Parsed by hand because the sizes
+    /// this guards against are exactly the ones that overflow a signed parse.
     private static int parseChunkSize(byte[] data, int from, int to) throws IOException {
         int size = 0;
         int digits = 0;
-        for(int iter = from ; iter < to ; iter++) {
+        for (int iter = from ; iter < to ; iter++) {
             int c = data[iter] & 0xff;
             int digit;
-            if(c >= '0' && c <= '9') {
+            if (c >= '0' && c <= '9') {
                 digit = c - '0';
-            } else if(c >= 'a' && c <= 'f') {
+            } else if (c >= 'a' && c <= 'f') {
                 digit = c - 'a' + 10;
-            } else if(c >= 'A' && c <= 'F') {
+            } else if (c >= 'A' && c <= 'F') {
                 digit = c - 'A' + 10;
-            } else if((c == ' ' || c == '\t') && digits > 0) {
+            } else if ((c == ' ' || c == '\t') && digits > 0) {
                 break;
             } else {
                 throw new IOException("Malformed chunk size");
             }
-            if(size > (Integer.MAX_VALUE - digit) / 16) {
+            if (size > (Integer.MAX_VALUE - digit) / 16) {
                 throw new IOException("Chunk size out of range");
             }
             size = size * 16 + digit;
             digits++;
         }
-        if(digits == 0) {
+        if (digits == 0) {
             throw new IOException("Malformed chunk size: empty");
         }
         return size;
-    }
-
-    private static int indexOfHeaderEnd(byte[] data) {
-        return indexOfHeaderEnd(data, 0);
     }
 
     private static int indexOfHeaderEnd(byte[] data, int from) {
         return indexOfHeaderEnd(data, from, data.length);
     }
 
-    /** The same search, bounded by how much of a partly filled buffer is real. */
+    /// The same search, bounded by how much of a partly filled buffer is real.
     private static int indexOfHeaderEnd(byte[] data, int from, int limit) {
-        for(int iter = Math.max(from, 0) ; iter + 3 < limit ; iter++) {
-            if(data[iter] == '\r' && data[iter + 1] == '\n' && data[iter + 2] == '\r' && data[iter + 3] == '\n') {
+        for (int iter = Math.max(from, 0) ; iter + 3 < limit ; iter++) {
+            if (data[iter] == '\r' && data[iter + 1] == '\n' && data[iter + 2] == '\r' && data[iter + 3] == '\n') {
                 return iter;
             }
         }
         return -1;
     }
 
-    /**
-     * Walks chunk framing from the cursor, returning the index one past the end of
-     * the message once the last chunk and its trailer section have arrived, or -1
-     * while the message is still coming.
-     *
-     * <p>The cursor only ever moves forward, to the last chunk boundary this has
-     * fully parsed, so a body delivered in a thousand reads is walked once rather
-     * than a thousand times. What it does NOT do is decode: dechunk() does that
-     * afterwards, from the start, and this only has to agree with it about where
-     * the message stops.
-     */
+    /// Walks chunk framing from the cursor, returning the index one past the end of
+    /// the message once the last chunk and its trailer section have arrived, or -1
+    /// while the message is still coming.
+    ///
+    /// The cursor only ever moves forward, to the last chunk boundary this has
+    /// fully parsed, so a body delivered in a thousand reads is walked once rather
+    /// than a thousand times. What it does NOT do is decode: dechunk() does that
+    /// afterwards, from the start, and this only has to agree with it about where
+    /// the message stops.
     private static int chunkedEnd(byte[] data, int size, int[] cursor)
             throws IOException {
         int pos = cursor[0];
-        while(true) {
+        while (true) {
             int eol = indexOfCrLf(data, pos, size);
-            if(eol < 0) {
+            if (eol < 0) {
                 return -1;
             }
             int end = pos;
-            while(end < eol && data[end] != ';') {
+            while (end < eol && data[end] != ';') {
                 end++;
             }
             int chunk = parseChunkSize(data, pos, end);
             int after = eol + 2;
-            if(chunk == 0) {
+            if (chunk == 0) {
                 // last-chunk, then a trailer section ending at an empty line.
                 int scan = after;
-                while(true) {
+                while (true) {
                     int lineEnd = indexOfCrLf(data, scan, size);
-                    if(lineEnd < 0) {
+                    if (lineEnd < 0) {
                         return -1;
                     }
-                    if(lineEnd == scan) {
+                    if (lineEnd == scan) {
                         return scan + 2;
                     }
                     scan = lineEnd + 2;
@@ -710,18 +687,18 @@ public final class Http {
             // long cannot wrap here, and a chunk that big simply never fits, so
             // this answers "not yet" until the read loop's response ceiling
             // refuses it.
-            long next = (long)after + (long)chunk + 2L;   // the chunk and its CRLF
-            if(next > size) {
+            long next = (long) after + (long) chunk + 2L;   // the chunk and its CRLF
+            if (next > size) {
                 return -1;
             }
-            pos = (int)next;
+            pos = (int) next;
             cursor[0] = pos;
         }
     }
 
     private static int parseStatus(String statusLine) throws IOException {
         int first = statusLine.indexOf(' ');
-        if(first < 0) {
+        if (first < 0) {
             throw new IOException("Malformed status line: " + statusLine);
         }
         int second = statusLine.indexOf(' ', first + 1);
@@ -729,16 +706,16 @@ public final class Http {
         try {
             return Integer.parseInt(code.trim());
         } catch (NumberFormatException err) {
-            throw new IOException("Malformed status code: " + statusLine);
+            throw new IOException("Malformed status code: " + statusLine, err);
         }
     }
 
     private static String[] split(String value, String separator) {
         List parts = new ArrayList();
         int pos = 0;
-        while(true) {
+        while (true) {
             int next = value.indexOf(separator, pos);
-            if(next < 0) {
+            if (next < 0) {
                 parts.add(value.substring(pos));
                 break;
             }
@@ -746,8 +723,8 @@ public final class Http {
             pos = next + separator.length();
         }
         String[] result = new String[parts.size()];
-        for(int iter = 0 ; iter < result.length ; iter++) {
-            result[iter] = (String)parts.get(iter);
+        for (int iter = 0 ; iter < result.length ; iter++) {
+            result[iter] = (String) parts.get(iter);
         }
         return result;
     }

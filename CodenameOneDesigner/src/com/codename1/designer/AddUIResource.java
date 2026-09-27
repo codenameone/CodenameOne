@@ -35,8 +35,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Allows adding a GUI builder entry to the resource editor and basing it on a template
- *
- * @author Shai Almog
  */
 public class AddUIResource extends javax.swing.JDialog {
     private boolean okPressed;

@@ -43,8 +43,6 @@ package com.codename1.ui.spinner;
 /// on their own -- embedded in a form rather than shown in a picker dialog.
 /// The name is retained for source compatibility with the releases in which it
 /// was package private.
-///
-/// @author shannah
 public interface InternalPickerWidget {
     /// The currently selected value.
     ///

@@ -35,8 +35,6 @@ import com.codename1.ui.events.ActionEvent;
 /// Java/Javascript interop is to use `BrowserComponent#execute(java.lang.String)`, `com.codename1.util.SuccessCallback)`,
 /// `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these work asynchronously (except in the XXXAndWait() variants, which
 /// use invokeAndBlock() to make the calls synchronously.
-///
-/// @author shannah
 class JavascriptEvent extends ActionEvent {
 
     Object[] args;

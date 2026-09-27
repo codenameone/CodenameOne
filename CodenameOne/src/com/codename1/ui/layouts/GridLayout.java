@@ -67,8 +67,6 @@ import com.codename1.ui.plaf.Style;
 ///     new Label("Fourth"),
 ///     new Label("Fifth"));
 /// ```
-///
-/// @author Chen Fishbein
 public class GridLayout extends Layout {
     private boolean fillLastRow;
     private int portraitRows;

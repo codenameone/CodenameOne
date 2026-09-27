@@ -30,8 +30,6 @@ package com.codename1.processing;
 /// ie:
 ///
 /// `[0] = IndexEvaluator [last()] = IndexEvaluator [@ponum=3] = AttributeEvaluator [lastname='Coolman'] = TextEvaluator`
-///
-/// @author Eric Coolman
 abstract class EvaluatorFactory {
     /// Construct an evaluator for a given predicate expression.
     ///

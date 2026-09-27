@@ -28,8 +28,6 @@ import com.codename1.ui.events.ActionEvent;
 /// The NavigationCommand is a Command that navigates to a given Form.
 /// The NavigationCommand calls the show() on the Form object that is returned from
 /// getNextForm().
-///
-/// @author Chen
 public class NavigationCommand extends Command {
 
     private Form nextForm;

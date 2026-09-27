@@ -35,8 +35,6 @@ import java.util.Vector;
 ///
 /// To localize the formatted dates, see the discussion
 /// [Format a localized date in Codename One](https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one).
-///
-/// @author Eric Coolman
 public class SimpleDateFormat extends DateFormat {
 
     /// Pattern character for ERA (ie. BC, AD).

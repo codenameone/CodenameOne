@@ -33,8 +33,6 @@ import com.codename1.ui.events.ActionListener;
 ///
 /// WARNING: You can't use any concurrency (wait, sleep, etc..) in the action listener
 /// or it will break Javascript.  Only use this class if you know what you're doing.
-///
-/// @author shannah
 class HeavyButton extends Button {
     Object peer;
 

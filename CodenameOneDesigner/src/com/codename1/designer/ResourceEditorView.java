@@ -136,8 +136,6 @@ import org.jdesktop.swingx.JXComboBox;
 
 /**
  * The application's main frame UI modeled around the app framework logic
- *
- * @author Shai Almog
  */
 public class ResourceEditorView extends FrameView {
     //private final static Hashtable<String, String> TYPE_MAPPING;

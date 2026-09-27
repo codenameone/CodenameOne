@@ -30,8 +30,6 @@ import java.util.prefs.Preferences;
 /**
  * Allows changing the background checkerboard of the images wshown in the preview
  * UI's through ImagePanel and CodenameOneImageRenderer
- *
- * @author Shai Almog
  */
 public class CheckerBoardColorCalibration extends javax.swing.JDialog {
 

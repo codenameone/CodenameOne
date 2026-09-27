@@ -58,8 +58,6 @@ import java.util.Map;
 /// A resource is loaded entirely into memory since random file access is not supported
 /// in all platforms. Any other approach would be inefficient. This means that memory must
 /// be made available to accommodate the resource file.
-///
-/// @author Shai Almog
 public class Resources {
 
     /// Magic numbers to prevent data corruption

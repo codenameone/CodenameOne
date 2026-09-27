@@ -29,7 +29,6 @@ import org.cef.browser.PixelBuffer;
 /**
  * An implementation of PixelBuffer that is backed by a Codename One PeerComponent.  This 
  * allows CEF to render onto a CN1 component.
- * @author shannah
  */
 public class CEFPeerComponentBuffer extends PeerComponentBuffer implements PixelBuffer {
 

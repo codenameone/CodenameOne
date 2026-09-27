@@ -58,8 +58,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
 /// hi.show();
 /// ```
-///
-/// @author Chen Fishbein
 public class RadioButton extends Button {
 
     private boolean unselectAllowed;

@@ -36,8 +36,6 @@ import java.io.IOException;
  * access cursor, so re-deriving navigation from a forward-only primitive would make seeking
  * slower rather than faster. The externally visible behaviour is the same either way, and the
  * portable conformance suite checks that.
- *
- * @author Chen
  */
 public class AndroidCursor implements Cursor, CursorExt, RowExt {
 

@@ -22,8 +22,6 @@
  */
 package java.lang;
 
-/// @author shannah
-///
 /// THE VALUES LIVE ON THE THREAD, under a WEAK key, and both halves of that are
 /// load bearing.
 ///

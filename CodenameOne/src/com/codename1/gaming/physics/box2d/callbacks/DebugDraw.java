@@ -34,7 +34,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 /// automatically draw your physics for debugging purposes.
 /// Not intended to replace your own custom rendering
 /// routines!
-/// @author Daniel Murphy
 public abstract class DebugDraw {
 
 	public static final int e_shapeBit				= 0x0001; ///< draw shapes

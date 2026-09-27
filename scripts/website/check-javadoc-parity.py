@@ -15,12 +15,20 @@ Nothing about that is checkable by reading the generator. This compares the two
 renderings of the same sources, so a divergence fails a build rather than
 turning into a dead link nobody reports.
 
+The site publishes two references from the same doclet, the client API at
+`/javadoc/` and the backend API at `/backend/javadoc/`, and this checks either:
+`--url-root` names the one being compared, and `--search-index` its index when
+that is not `javadoc-search.json` beside the tree.
+
 Usage:
-  scripts/website/check-javadoc-parity.py <standard-doclet-dir> <hugo-public-javadoc-dir>
+  scripts/website/check-javadoc-parity.py [--url-root /javadoc/]
+      [--search-index FILE] [--min-pages N] [--min-fragments N]
+      <standard-doclet-dir> <hugo-public-javadoc-dir>
 """
 
 from __future__ import annotations
 
+import argparse
 import collections
 import html
 import json
@@ -52,9 +60,17 @@ CHROME_PAGES = {
 
 CHROME_DIRS = ("legal/", "resource-files/", "script-dir/", "resources/")
 
-# Floors that make a vacuous pass impossible. See the check in main().
+# Floors that make a vacuous pass impossible. See the check in main(). These are
+# the client API's; the backend reference is a tenth of the size and passes its
+# own with --min-pages and --min-fragments.
 MINIMUM_PAGES = 1000
 MINIMUM_FRAGMENTS = 10000
+
+# The site path of the reference being compared. Set from --url-root in main();
+# a module global because every pass below reads it, and a link into the OTHER
+# reference (the client/backend switch, a shared type's counterpart) must not be
+# resolved against this tree.
+URL_ROOT = "/javadoc/"
 
 # Per-package class hierarchy pages. Not generated: the type pages carry the
 # inheritance chain and the known subtypes, which is what a reader wanted from
@@ -160,7 +176,7 @@ def collect(path: pathlib.Path) -> tuple[set[str], list[str]]:
         if identifier:
             ids.add(html.unescape(identifier))
         href = attributes.get("href")
-        if tag == "a" and href and href.startswith("/javadoc/"):
+        if tag == "a" and href and href.startswith(URL_ROOT):
             hrefs.append(html.unescape(href))
     return ids, hrefs
 
@@ -188,9 +204,9 @@ def check_search_index(hugo: pathlib.Path, index: pathlib.Path) -> int:
     checked = 0
     for entry in payload.get("types", []):
         url = entry.get("u", "")
-        if not url.startswith("/javadoc/"):
+        if not url.startswith(URL_ROOT):
             continue
-        target = url[len("/javadoc/"):] or "index.html"
+        target = url[len(URL_ROOT):] or "index.html"
         # Same normalisation the link pass does: a directory URL is served by the
         # index.html inside it. Without this every entry looked broken.
         if target.endswith("/") or not target:
@@ -238,7 +254,7 @@ def check_internal_links(hugo: pathlib.Path) -> int:
     for _, hrefs in parsed.values():
         for href in hrefs:
             path_part, _, fragment = href.partition("#")
-            target = path_part[len("/javadoc/"):] or "index.html"
+            target = path_part[len(URL_ROOT):] or "index.html"
             if target.endswith("/"):
                 target += "index.html"
             if target not in pages:
@@ -260,11 +276,11 @@ def check_internal_links(hugo: pathlib.Path) -> int:
     if missing_pages:
         print(f"{sum(missing_pages.values())} link(s) to a page that does not exist:")
         for target, count in missing_pages.most_common(15):
-            print(f"  {count:5d}  /javadoc/{target}")
+            print(f"  {count:5d}  {URL_ROOT}{target}")
     if missing_anchors:
         print(f"{sum(missing_anchors.values())} link(s) to an id that does not exist:")
         for target, count in missing_anchors.most_common(15):
-            print(f"  {count:5d}  /javadoc/{target}")
+            print(f"  {count:5d}  {URL_ROOT}{target}")
     return 1
 
 
@@ -315,12 +331,19 @@ def anchors(path: pathlib.Path) -> set[str]:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print(__doc__.strip(), file=sys.stderr)
-        return 2
+    global URL_ROOT
+    parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
+    parser.add_argument("--url-root", default="/javadoc/")
+    parser.add_argument("--search-index", default=None)
+    parser.add_argument("--min-pages", type=int, default=MINIMUM_PAGES)
+    parser.add_argument("--min-fragments", type=int, default=MINIMUM_FRAGMENTS)
+    parser.add_argument("standard")
+    parser.add_argument("hugo")
+    args = parser.parse_args(argv[1:])
+    URL_ROOT = "/" + args.url_root.strip("/") + "/"
 
-    standard = pathlib.Path(argv[1])
-    hugo = pathlib.Path(argv[2])
+    standard = pathlib.Path(args.standard)
+    hugo = pathlib.Path(args.hugo)
     for root in (standard, hugo):
         if not root.is_dir():
             print(f"check-javadoc-parity: not a directory: {root}", file=sys.stderr)
@@ -336,7 +359,7 @@ def main(argv: list[str]) -> int:
         failures += len(missing_pages)
         print(f"{len(missing_pages)} API page(s) the standard doclet publishes and the site does not:")
         for page in missing_pages[:40]:
-            print(f"  - /javadoc/{page}")
+            print(f"  - {URL_ROOT}{page}")
         if len(missing_pages) > 40:
             print(f"  ... and {len(missing_pages) - 40} more")
 
@@ -350,7 +373,7 @@ def main(argv: list[str]) -> int:
         if not gap:
             continue
         missing_anchors += len(gap)
-        print(f"/javadoc/{page}: {len(gap)} fragment(s) missing")
+        print(f"{URL_ROOT}{page}: {len(gap)} fragment(s) missing")
         for anchor in gap[:10]:
             print(f"  - #{anchor}")
         if len(gap) > 10:
@@ -365,9 +388,9 @@ def main(argv: list[str]) -> int:
     # which is precisely what a quotes-only id pattern did against the minified
     # build, silently on the passing side.
     compared = len(standard_pages & hugo_pages)
-    if compared < MINIMUM_PAGES or checked_anchors < MINIMUM_FRAGMENTS:
+    if compared < args.min_pages or checked_anchors < args.min_fragments:
         print(f"only {compared} page(s) and {checked_anchors} fragment(s) were compared; "
-              f"expected at least {MINIMUM_PAGES} and {MINIMUM_FRAGMENTS}. "
+              f"expected at least {args.min_pages} and {args.min_fragments}. "
               "One side did not generate, or nothing was parsed out of it.")
         return 1
 
@@ -384,7 +407,9 @@ def main(argv: list[str]) -> int:
         return 1
 
     print()
-    return check_search_index(hugo, hugo.parent / "javadoc-search.json")
+    index = (pathlib.Path(args.search_index) if args.search_index
+             else hugo.parent / "javadoc-search.json")
+    return check_search_index(hugo, index)
 
 
 if __name__ == "__main__":

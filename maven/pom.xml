@@ -783,6 +783,23 @@
                 <module>errorprone-checks</module>
             </modules>
         </profile>
+        <!--
+            Analysis of the backend's production implementation (impl/parparvm),
+            which maven/backend never compiles. Built only when asked for, by PR CI
+            and the Error Prone workflow, and never published: a profile keeps it
+            out of the release reactor altogether.
+            -->
+        <profile>
+            <id>backend-analysis</id>
+            <activation>
+                <property>
+                    <name>backendAnalysis</name>
+                </property>
+            </activation>
+            <modules>
+                <module>backend-parparvm</module>
+            </modules>
+        </profile>
         <!-- The Game Builder editor is published by the release workflow as a
              separate Java-17 pass over scripts/gamebuilder (its gamebuilder-central
              profile), not from this reactor: it is a CN1 app that depends on the

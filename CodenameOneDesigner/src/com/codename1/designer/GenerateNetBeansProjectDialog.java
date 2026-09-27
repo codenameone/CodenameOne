@@ -28,10 +28,6 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
-/**
- *
- * @author Shai Almog
- */
 public class GenerateNetBeansProjectDialog extends javax.swing.JDialog {
     private boolean canceled = true;
     

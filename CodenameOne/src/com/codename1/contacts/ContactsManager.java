@@ -59,8 +59,6 @@ import com.codename1.ui.Display;
 ///     });
 /// });
 /// ```
-///
-/// @author Chen
 public class ContactsManager {
 
     /// This method returns all contacts IDs

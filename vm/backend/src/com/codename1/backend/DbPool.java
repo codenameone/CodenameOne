@@ -26,19 +26,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A fixed pool of connections to one SQLite database.
- *
- * Why a pool at all, when SQLite is compiled SQLITE_THREADSAFE=1 and a single
- * connection is already safe to share: serialized mode makes concurrent use SAFE
- * by serializing it, which means one connection gives no read concurrency at all.
- * Several connections against a WAL database do, because WAL lets readers proceed
- * while a writer is active.
- *
- * The pool is deliberately fixed-size and blocking rather than growing on demand:
- * an unbounded pool against a single file just moves the contention into SQLite
- * and makes the busy-timeout the thing that fails.
- */
+/// A fixed pool of connections to one SQLite database.
+///
+/// Why a pool at all, when SQLite is compiled SQLITE_THREADSAFE=1 and a single
+/// connection is already safe to share: serialized mode makes concurrent use SAFE
+/// by serializing it, which means one connection gives no read concurrency at all.
+/// Several connections against a WAL database do, because WAL lets readers proceed
+/// while a writer is active.
+///
+/// The pool is deliberately fixed-size and blocking rather than growing on demand:
+/// an unbounded pool against a single file just moves the contention into SQLite
+/// and makes the busy-timeout the thing that fails.
 public final class DbPool {
     private final List idle = new ArrayList();
     private final List all = new ArrayList();
@@ -47,24 +45,22 @@ public final class DbPool {
     private DbPool() {
     }
 
-    /**
-     * Opens `size` connections to `path` and puts the database in WAL mode.
-     *
-     * A ":memory:" database cannot be pooled - each connection would get its OWN
-     * private database - so that is rejected rather than silently giving every
-     * caller a different empty database.
-     */
+    /// Opens `size` connections to `path` and puts the database in WAL mode.
+    ///
+    /// A ":memory:" database cannot be pooled - each connection would get its OWN
+    /// private database - so that is rejected rather than silently giving every
+    /// caller a different empty database.
     public static DbPool open(String path, int size, int busyTimeoutMillis) throws IOException {
-        if(path == null || ":memory:".equals(path)) {
+        if (path == null || ":memory:".equals(path)) {
             throw new IOException("An in-memory database cannot be pooled: each connection "
                     + "would get its own. Use Db.open(\":memory:\") directly.");
         }
-        if(size < 1) {
+        if (size < 1) {
             throw new IOException("Pool size must be at least 1");
         }
         DbPool pool = new DbPool();
         try {
-            for(int iter = 0 ; iter < size ; iter++) {
+            for (int iter = 0 ; iter < size ; iter++) {
                 Db db = Db.open(path);
                 // REGISTERED before it is configured. setBusyTimeout or
                 // enableWriteAheadLog can throw -- WAL is refused on some
@@ -76,7 +72,7 @@ public final class DbPool {
                 pool.all.add(db);
                 pool.idle.add(db);
                 db.setBusyTimeout(busyTimeoutMillis);
-                if(iter == 0) {
+                if (iter == 0) {
                     // WAL is a property of the database file, not of the connection,
                     // so it only needs setting once - but every connection needs its
                     // own busy timeout.
@@ -90,41 +86,39 @@ public final class DbPool {
         return pool;
     }
 
-    /**
-     * Takes a connection, blocking until one is free. Always release it in a
-     * finally, or prefer {@link #withConnection}, which cannot leak one.
-     */
+    /// Takes a connection, blocking until one is free. Always release it in a
+    /// finally, or prefer [#withConnection], which cannot leak one.
     public synchronized Db borrow() throws IOException {
         // Checked before the idle list, not only when it is empty. close() can run
         // while a borrower still holds a connection, and that borrower's finally
         // releases afterwards -- so the list can be non-empty after closing, and a
         // check that only guards the empty case hands out a closed connection.
-        if(closed) {
+        if (closed) {
             throw new IOException("Pool is closed");
         }
-        while(idle.isEmpty()) {
-            if(closed) {
+        while (idle.isEmpty()) {
+            if (closed) {
                 throw new IOException("Pool is closed");
             }
             try {
                 wait();
             } catch (InterruptedException err) {
                 Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while waiting for a connection");
+                throw new IOException("Interrupted while waiting for a connection", err);
             }
         }
-        return (Db)idle.remove(idle.size() - 1);
+        return (Db) idle.remove(idle.size() - 1);
     }
 
     public synchronized void release(Db db) {
-        if(db == null) {
+        if (db == null) {
             return;
         }
         // A release that arrives after close() belongs to a borrower that was still
         // running when the pool shut down. close() has already closed every
         // connection, so putting this one back would repopulate an idle list nobody
         // may draw from again.
-        if(closed) {
+        if (closed) {
             db.close();
             return;
         }
@@ -132,7 +126,7 @@ public final class DbPool {
         notifyAll();
     }
 
-    /** Borrows a connection, runs body, and returns it however body ends. */
+    /// Borrows a connection, runs body, and returns it however body ends.
     public Object withConnection(Db.Work body) throws Exception {
         Db db = borrow();
         try {
@@ -142,19 +136,30 @@ public final class DbPool {
         }
     }
 
-    /** Convenience: one transaction on a pooled connection. */
-    public Object inTransaction(final Db.Work body) throws Exception {
-        return withConnection(new Db.Work() {
-            public Object run(Db db) throws Exception {
-                return db.transaction(body);
-            }
-        });
+    /// Convenience: one transaction on a pooled connection.
+    public Object inTransaction(Db.Work body) throws Exception {
+        return withConnection(new TransactionWork(body));
+    }
+
+    /// [#inTransaction]'s body, run inside a transaction on the borrowed
+    /// connection.
+    private static final class TransactionWork implements Db.Work {
+        private final Db.Work body;
+
+        TransactionWork(Db.Work body) {
+            this.body = body;
+        }
+
+        @Override
+        public Object run(Db db) throws Exception {
+            return db.transaction(body);
+        }
     }
 
     public synchronized void close() {
         closed = true;
-        for(int iter = 0 ; iter < all.size() ; iter++) {
-            ((Db)all.get(iter)).close();
+        for (Object db : all) {
+            ((Db) db).close();
         }
         all.clear();
         idle.clear();

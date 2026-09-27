@@ -103,8 +103,6 @@ import java.util.Map;
 /// dlg.show(h /8 * 7, 0, 0, 0);
 /// ```
 ///
-/// @author Shai Almog
-///
 /// #### See also
 ///
 /// - Display#invokeAndBlock(java.lang.Runnable)
@@ -2754,7 +2752,7 @@ public class Dialog extends Form implements AbstractDialog {
         dispose();
     }
 
-    /// @inheritDoc
+    /// {@inheritDoc}
     ///
     /// Escape closes a dialog, which is what its window's close control already means. An
     /// anchored popup is included: it is the one surface where Escape is the ONLY way out that

@@ -37,8 +37,6 @@ import com.codename1.ui.layouts.BoxLayout;
  * itself with that top level's internal animation registry. A window that failed to
  * resolve either would render this content unscrolled and clipped rather than throwing,
  * which is exactly why it earns a golden.
- *
- * @author Shai Almog
  */
 public class WindowScrollTest extends WindowHostTest {
 

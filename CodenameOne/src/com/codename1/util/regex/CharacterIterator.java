@@ -19,9 +19,6 @@ package com.codename1.util.regex;
 
 /// Encapsulates different types of character sources - String, InputStream, ...
 /// Defines a set of common methods
-///
-/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
-/// @version CVS $Id: CharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public interface CharacterIterator {
     /// #### Returns
     ///

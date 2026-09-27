@@ -41,7 +41,7 @@ import java.util.Map;
 /// `error`.
 ///
 /// Each `next` payload's `data` object is mapped to `T` and delivered
-/// to [Handler#onNext(Object)]. All handler callbacks are dispatched on
+/// to [Handler#onNext(GraphQLResponse)]. All handler callbacks are dispatched on
 /// the Codename One EDT (matching the `OnComplete` semantics the query
 /// and mutation paths use), even though the underlying WebSocket fires
 /// on a background thread.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -64,8 +64,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
 /// the selected model element.
-///
-/// @author Steve Hannah
 public class Spinner3D extends Container implements InternalPickerWidget {
     private final SpinnerNode root;
 

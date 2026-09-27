@@ -28,10 +28,6 @@ import java.util.Set;
 import com.codename1.html5.js.browser.Window;
 import com.codename1.html5.js.dom.HTMLLinkElement;
 
-/**
- *
- * @author shannah
- */
 public class CSSTool {
     private Set<String> loaded = new HashSet<String>();
     private CSSTool(){

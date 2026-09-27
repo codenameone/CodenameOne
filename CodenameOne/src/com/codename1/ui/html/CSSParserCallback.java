@@ -24,8 +24,6 @@
 package com.codename1.ui.html;
 
 /// A callback used to dispatch errors encountered while parsing CSS resources
-///
-/// @author Ofir Leitner
 interface CSSParserCallback {
 
     /// Error code denoting that an unsupported CSS attribute (by XHTML-MP 1.0 standards) was found in the HTML or external CSS files

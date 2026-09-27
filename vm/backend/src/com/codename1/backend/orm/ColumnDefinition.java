@@ -22,19 +22,16 @@
  */
 package com.codename1.backend.orm;
 
-/**
- * One persisted field of an entity: what it is called in Java, what it is called
- * in the database, and what kind of value it holds.
- *
- * <p>Built by the generated code at class-initialization time and never changed,
- * so one instance is shared by every request that touches the entity.
- *
- * <p>The SQL type is deliberately NOT here. It is the {@link
- * com.codename1.backend.sql.Dialect} that turns a kind into a type name, because
- * the same entity has to declare TEXT on SQLite, TEXT on PostgreSQL and VARCHAR
- * on MySQL. {@link #getDeclaredType()} is the escape hatch for the schema that
- * needs a specific one, and it carries the cost of naming an engine.
- */
+/// One persisted field of an entity: what it is called in Java, what it is called
+/// in the database, and what kind of value it holds.
+///
+/// Built by the generated code at class-initialization time and never changed,
+/// so one instance is shared by every request that touches the entity.
+///
+/// The SQL type is deliberately NOT here. It is the [com.codename1.backend.sql.Dialect] that turns a kind into a type name, because
+/// the same entity has to declare TEXT on SQLite, TEXT on PostgreSQL and VARCHAR
+/// on MySQL. [#getDeclaredType()] is the escape hatch for the schema that
+/// needs a specific one, and it carries the cost of naming an engine.
 public final class ColumnDefinition {
     private final String field;
     private final String column;
@@ -56,41 +53,42 @@ public final class ColumnDefinition {
         this.generated = generated;
     }
 
-    /** The Java field name, which is how a query names it. */
+    /// The Java field name, which is how a query names it.
     public String getField() {
         return field;
     }
 
-    /** The column name, from @Column(name) or the field name. */
+    /// The column name, from @Column(name) or the field name.
     public String getColumn() {
         return column;
     }
 
-    /** One of the kind constants on {@link com.codename1.backend.sql.Dialect}. */
+    /// One of the kind constants on [com.codename1.backend.sql.Dialect].
     public int getKind() {
         return kind;
     }
 
-    /** Whether the column is declared without NOT NULL. */
+    /// Whether the column is declared without NOT NULL.
     public boolean isNullable() {
         return nullable;
     }
 
-    /** An explicit SQL type from @Column(type), or null to let the dialect name it. */
+    /// An explicit SQL type from @Column(type), or null to let the dialect name it.
     public String getDeclaredType() {
         return declaredType;
     }
 
-    /** Whether this is the primary key. */
+    /// Whether this is the primary key.
     public boolean isId() {
         return id;
     }
 
-    /** Whether the DATABASE assigns this key rather than the application. */
+    /// Whether the DATABASE assigns this key rather than the application.
     public boolean isGenerated() {
         return generated;
     }
 
+    @Override
     public String toString() {
         return field + " -> " + column;
     }

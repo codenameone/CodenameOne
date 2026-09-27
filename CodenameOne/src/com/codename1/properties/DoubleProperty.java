@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the double specific version of numeric property
-///
-/// @author Shai Almog
 public class DoubleProperty<K> extends NumericProperty<Double, K> {
 
     /// Creates a double property with the given name.

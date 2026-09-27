@@ -52,8 +52,6 @@ import java.util.Vector;
 /// A List implementing an RSS reader that automatically populates itself with content
 /// from the RSS chanel. When clicking an article it displays the HTML content of said
 /// article in a new Form.
-///
-/// @author Shai Almog
 public class RSSReader extends List {
     private static final Hashtable MORE = new Hashtable();
 

@@ -24,8 +24,6 @@
 package java.io;
 
 /// Here to simplify porting, won't actually work...
-///
-/// @author Shai Almog
 public interface Serializable {
     
 }

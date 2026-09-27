@@ -32,8 +32,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 /// can violate the constraint slightly. The joint translation is zero when the local anchor points
 /// coincide in world space. Using local anchors and a local axis helps when saving and loading a
 /// game.
-///
-/// @author Daniel Murphy
 public class WheelJointDef extends JointDef {
 	
 	/// The local anchor point relative to body1's origin.

@@ -22,10 +22,6 @@
  */
 package org.cef.browser;
 
-/**
- *
- * @author shannah
- */
 public interface ComponentDelegate {
     public void boundsChanged(int x, int y, int width, int height);
     public void createBrowserIfRequired(boolean b);

@@ -28,8 +28,6 @@ import com.codename1.ui.layouts.BorderLayout;
 import java.util.Date;
 
 /// A Calendar Picker widget.  Used by the picker.
-///
-/// @author Steve Hannah
 class CalendarPicker extends Container implements InternalPickerWidget {
     private com.codename1.ui.Calendar calendar;
 

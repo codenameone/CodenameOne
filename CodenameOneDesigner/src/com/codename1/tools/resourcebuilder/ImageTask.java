@@ -34,8 +34,6 @@ import java.io.InputStream;
 
 /**
  * Represents both the standard PNG image and a packed image
- *
- * @author Shai Almog
  */
 public class ImageTask extends ResourceTask {
     private File file;

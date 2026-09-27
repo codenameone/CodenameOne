@@ -45,8 +45,6 @@ import java.util.Vector;
 /// keys, back key, clear key, etc...
 /// This class can be overridden and replaced in the LookAndFeel
 ///
-/// @author Chen Fishbein
-///
 /// #### See also
 ///
 /// - LookAndFeel#setMenuBarClass(java.lang.Class)

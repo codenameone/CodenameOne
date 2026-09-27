@@ -23,9 +23,6 @@
 package com.codename1.util.promise;
 
 /// Promise API functor `com.codename1.util.promise.Promise`
-///
-/// @author shannah
-///
 public interface Functor<T, V> {
 
     /// Calls the function.

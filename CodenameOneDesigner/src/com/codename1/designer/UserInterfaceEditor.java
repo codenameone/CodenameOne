@@ -133,8 +133,6 @@ import org.jdesktop.swingx.tree.DefaultXTreeCellRenderer;
 
 /**
  * Editor implementing the GUI builder functionality
- *
- * @author Shai Almog
  */
 public class UserInterfaceEditor extends BaseForm {
     public static boolean exportToNewGuiBuilderMode = false;

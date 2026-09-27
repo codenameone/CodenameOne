@@ -41,8 +41,6 @@ import com.codename1.ui.Image;
 /// on a 1125px screen, the old page belongs 270px to the left and ours had it 855px to
 /// the left, so the visible strip showed its far edge where the reference shows its
 /// middle.
-///
-/// @author Shai Almog
 public final class CupertinoPageTransition extends Transition {
 
     /// The arriving page's curve: fast ease in to slow ease out, a three-point cubic.

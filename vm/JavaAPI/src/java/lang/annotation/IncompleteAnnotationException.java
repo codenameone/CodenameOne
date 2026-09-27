@@ -27,8 +27,6 @@ import java.lang.annotation.Annotation;
 
 /**
  * A mirror of java.lang.annotation.IncompleteAnnotationException.
- * 
- * @author Toby Reyelts
  */
 public class IncompleteAnnotationException extends RuntimeException {
 

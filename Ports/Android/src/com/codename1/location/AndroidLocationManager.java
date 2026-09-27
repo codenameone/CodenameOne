@@ -40,10 +40,6 @@ import static com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
 import com.codename1.ui.Display;
 import java.io.IOException;
 
-/**
- *
- * @author Chen
- */
 public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener {
     private LocationManager locationManager;
     private String bestProvider;

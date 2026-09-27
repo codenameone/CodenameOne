@@ -37,8 +37,6 @@ import java.io.InputStream;
 /// asynchronous loading for files (and the animation framework) which will
 /// not work for all cases (e.g. renderers) but could improve some performance/RAM
 /// aspects.
-///
-/// @author Shai Almog
 public final class FileEncodedImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;

@@ -138,8 +138,6 @@ import java.util.Vector;
 ///
 /// It is the responsibility of the implementation class to grab and fire all events to the
 /// Display specifically for key, pointer events and screen resolution.
-///
-/// @author Shai Almog
 @Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation", linux = "com.codename1.impl.linux.LinuxImplementation", mac = "com.codename1.impl.mac.MacImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode

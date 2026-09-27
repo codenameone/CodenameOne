@@ -36,8 +36,6 @@ import com.codename1.ui.Display;
 /// The values are stamped as display properties by the build; in the simulator
 /// and in local builds they report `false` / `"off"`, because those are never
 /// obfuscated.
-///
-/// @author Shai Almog
 public final class Hardening {
 
     private Hardening() {

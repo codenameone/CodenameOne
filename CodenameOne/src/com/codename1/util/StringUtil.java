@@ -30,8 +30,6 @@ import java.util.List;
 import java.util.Vector;
 
 /// Various utility methods for manipulating strings
-///
-/// @author Chen Fishbein
 public abstract class StringUtil {
 
 

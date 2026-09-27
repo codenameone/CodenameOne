@@ -42,8 +42,6 @@ import org.apache.tools.ant.BuildException;
 
 /**
  * Allows us to convert a theme into the resource file
- *
- * @author Shai Almog
  */
 public class ThemeTask extends ResourceTask implements ThemeTaskConstants {
     

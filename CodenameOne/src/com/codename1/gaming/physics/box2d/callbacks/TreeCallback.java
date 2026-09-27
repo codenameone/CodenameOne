@@ -27,7 +27,6 @@ import com.codename1.gaming.physics.box2d.collision.broadphase.DynamicTree;
 
 // update to rev 100
 /// callback for {@link DynamicTree}
-/// @author Daniel Murphy
 public interface TreeCallback {
 	
 	/// Callback from a query request.

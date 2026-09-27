@@ -98,7 +98,7 @@ public final class SensorSessionOptions {
     /// correlation and Health Connect as its own record type, and neither
     /// is implemented here -- the sample line this API writes over carries
     /// a single value. A cuff reading routed to the store therefore fails
-    /// with [HealthError#TYPE_NOT_SUPPORTED] on both platforms rather than
+    /// with [HealthError#TYPE_NOT_SUPPORTED][com.codename1.health.HealthError#TYPE_NOT_SUPPORTED] on both platforms rather than
     /// being quietly dropped, and the local and simulator stores keep it
     /// fine. Read it off the session and persist it yourself until the
     /// correlation paths land.
@@ -118,7 +118,7 @@ public final class SensorSessionOptions {
 
     /// How long samples are batched before a store write.
     ///
-    /// The [Duration] form of [#setStoreBatchMillis(int)], which is the type the rest of
+    /// The [Duration][java.time.Duration] form of [#setStoreBatchMillis(int)], which is the type the rest of
     /// the framework speaks; the millis form stays for the ports and the
     /// wire format.
     public SensorSessionOptions setStoreBatch(java.time.Duration value) {
@@ -140,7 +140,7 @@ public final class SensorSessionOptions {
         return setStoreBatchMillis((int) value.toMillis());
     }
 
-    /// How long samples are batched before a store write, as a [Duration].
+    /// How long samples are batched before a store write, as a [Duration][java.time.Duration].
     public java.time.Duration getStoreBatch() {
         return java.time.Duration.ofMillis(getStoreBatchMillis());
     }
@@ -181,7 +181,7 @@ public final class SensorSessionOptions {
 
     /// How old a sample may be before it is dropped.
     ///
-    /// The [Duration] form of [#setStaleSampleMillis(int)], which is the type the rest of
+    /// The [Duration][java.time.Duration] form of [#setStaleSampleMillis(int)], which is the type the rest of
     /// the framework speaks; the millis form stays for the ports and the
     /// wire format.
     public SensorSessionOptions setStaleSample(java.time.Duration value) {
@@ -203,7 +203,7 @@ public final class SensorSessionOptions {
         return setStaleSampleMillis((int) value.toMillis());
     }
 
-    /// How old a sample may be before it is dropped, as a [Duration].
+    /// How old a sample may be before it is dropped, as a [Duration][java.time.Duration].
     public java.time.Duration getStaleSample() {
         return java.time.Duration.ofMillis(getStaleSampleMillis());
     }

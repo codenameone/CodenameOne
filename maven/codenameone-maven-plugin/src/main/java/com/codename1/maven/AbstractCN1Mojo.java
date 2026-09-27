@@ -64,10 +64,6 @@ import org.apache.tools.ant.input.InputHandler;
 import org.apache.tools.ant.taskdefs.*;
 import org.apache.tools.ant.types.FileSet;
 
-/**
- *
- * @author shannah
- */
 public abstract class AbstractCN1Mojo extends AbstractMojo {
     
     protected static final String GROUP_ID="com.codenameone";

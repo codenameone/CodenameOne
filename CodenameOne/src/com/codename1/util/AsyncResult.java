@@ -24,9 +24,6 @@ package com.codename1.util;
 
 /// A callback used by `AsyncResource` to be able to handle both the success and error case
 /// in a single method.
-///
-/// @author shannah
-///
 public interface AsyncResult<V> {
     /// Called when an AsyncResource completes.  If it completes with an error, then error will be non-null.
     ///

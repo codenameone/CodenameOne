@@ -73,8 +73,6 @@ import java.io.InputStream;
 /// To verify that locking might be a problem you can launch the performance monitor tool (accessible from
 /// the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might
 /// have a problem.
-///
-/// @author Shai Almog
 public class EncodedImage extends Image {
     private byte[][] imageData;
     private int[] dpis;

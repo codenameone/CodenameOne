@@ -61,8 +61,6 @@ import javax.swing.JOptionPane;
 
 /**
  * Extends the UIBuilder from CodenameOne to provide a callback on loading
- *
- * @author Shai Almog
  */
 public class UIBuilderOverride extends UIBuilder {
     private String baseFormName;

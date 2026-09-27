@@ -39,8 +39,6 @@ import java.util.Vector;
 /// The List/Combo size is controlled from the outside in HTMLComponent using a wrapping Container.
 ///
 /// This class is also used by HTMLComboBox as the list popup when opening the HTMLComboBox (To allow OPTGROUP support)
-///
-/// @author Ofir Leitner
 class MultiComboBox extends List {
 
     private final boolean multiple; // true if this is a multiple choice combo
@@ -218,8 +216,6 @@ class MultiComboBox extends List {
     // Inner classes:
 
     /// A model that knows to handle both multiple selection and OPTGORUP labels
-    ///
-    /// @author Ofir Leitner
     static class MultiListModel extends DefaultListModel {
 
         Vector selected = new Vector();
@@ -295,8 +291,6 @@ class MultiComboBox extends List {
     }
 
     /// A renderer that knows to handle both multiple selection and OPTGORUP labels
-    ///
-    /// @author Ofir Leitner
     static class MultiCellRenderer extends DefaultListCellRenderer {
 
         private final MultiListModel model;

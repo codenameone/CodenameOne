@@ -98,8 +98,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(BorderLayout.SOUTH, progress).add(BorderLayout.NORTH, download);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class Slider extends Label implements ActionSource {
     private final EventDispatcher listeners = new EventDispatcher();
     private final EventDispatcher actionListeners = new EventDispatcher();

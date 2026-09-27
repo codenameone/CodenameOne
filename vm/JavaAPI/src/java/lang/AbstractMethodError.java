@@ -24,7 +24,6 @@ package java.lang;
 
 /**
  * Added this for Kotlin to compile.
- * @author shannah
  */
 public class AbstractMethodError extends Error {
     AbstractMethodError() {

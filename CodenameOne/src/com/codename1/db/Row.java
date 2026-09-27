@@ -41,8 +41,6 @@ import java.io.IOException;
 /// ```
 ///
 /// See the `com.codename1.db` package documentation for the full contract.
-///
-/// @author Chen
 public interface Row {
 
     /// Gets column value by index.

@@ -112,8 +112,6 @@ import com.codename1.ui.events.ActionListener;
 /// does not, `#pick(ActionListener)` reports an empty selection rather than
 /// quietly falling back to reading the address book, because that fallback
 /// would need the permission the caller was trying not to ask for.
-///
-/// @author Shai Almog
 public class ContactPicker {
 
     /// Requests the contact's name, which populates `Contact#getFirstName()`,

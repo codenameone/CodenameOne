@@ -33,8 +33,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 /// Encapsulates a receipt for an in-app purchase.
-///
-/// @author shannah
 public class Receipt implements Externalizable {
 
     public static final String STORE_CODE_ITUNES = "itunes";

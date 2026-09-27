@@ -45,10 +45,6 @@ import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 
-/**
- *
- * @author Shai
- */
 public class PulsateEditor extends javax.swing.JPanel {
     private com.codename1.ui.Image currentImage;
     private com.codename1.ui.EncodedImage[] internalImages;

@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 /**
  * This class implements Base64 encoding/decoding functionality
  * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
- * @author Alexander Y. Kleymenov
  */
 public class Base64 {
     

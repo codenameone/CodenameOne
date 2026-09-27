@@ -173,8 +173,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///                             }
 ///                         });
 ///
-///
-///
 ///                         break;
 ///                     case Canceled:
 ///                         FileSystemStorage fs = FileSystemStorage.getInstance();
@@ -194,7 +192,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///                                 });
 ///                             }
 ///                         });
-///
 ///
 ///                         break;
 ///                 }
@@ -222,7 +219,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///         return out;
 ///     }
 ///
-///
 ///     public void stop() {
 ///         current = getCurrentForm();
 ///         if(current instanceof Dialog) {
@@ -245,8 +241,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// After the user presses "Done", a preview screen is shown that allows the user to listen to the recording.  Then can choose
 /// to either accept the recording, cancel it, or try again.
-/// @author Steve Hannah
-///
 public class AudioRecorderComponent extends Container implements ActionSource {
     private final Button record;
     private final Button pause;

@@ -59,8 +59,6 @@ import com.codename1.ui.Window;
  * <p>{@code setDecorated} is partial by necessity: Catalyst cannot remove the
  * window frame, so it hides the title bar's title and toolbar, which is the part an
  * application supplying its own chrome needs.</p>
- *
- * @author Shai Almog
  */
 public class MacWindowManager extends WindowManager {
 

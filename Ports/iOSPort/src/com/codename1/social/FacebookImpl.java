@@ -29,10 +29,6 @@ import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.Callback;
 
-/**
- *
- * @author Shai Almog
- */
 public class FacebookImpl extends FacebookConnect {
     boolean loginCompleted;
     boolean loginCancelled;

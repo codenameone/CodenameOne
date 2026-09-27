@@ -33,8 +33,6 @@ import java.util.ArrayList;
 /// Animation manager concentrates all of the animations for a given form into a single place that allows us
 /// to manage all mutations to a Form in a way the prevents collisions between mutations. The one type of
 /// animation that isn't handled by this class is the form level transition, replace transitions are handled by this class.
-///
-/// @author Shai Almog
 public final class AnimationManager {
     private final TopLevelContainer parentForm;
     private final ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();

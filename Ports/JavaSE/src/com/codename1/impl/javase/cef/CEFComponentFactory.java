@@ -34,10 +34,6 @@ import javax.swing.JPanel;
 import org.cef.browser.ComponentDelegate;
 import org.cef.browser.ComponentFactory;
 
-/**
- *
- * @author shannah
- */
 public class CEFComponentFactory implements ComponentFactory {
 
     @Override

@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the boolean specific version of property
-///
-/// @author Shai Almog
 public class BooleanProperty<K> extends Property<Boolean, K> {
 
     /// Creates a boolean property with the given name.

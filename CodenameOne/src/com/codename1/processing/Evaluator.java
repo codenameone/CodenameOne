@@ -58,8 +58,6 @@ import java.util.List;
 ///  Select by position:
 ///
 ///  [last() - 5]`
-///
-/// @author Eric Coolman
 interface Evaluator {
 
     /// Evaluate a predicate expression against an array of StructuredContent elements.  This method

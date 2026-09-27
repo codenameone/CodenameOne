@@ -41,10 +41,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
-/**
- *
- * @author Chen
- */
 public class Audio extends AbstractMedia implements Runnable, MediaPlayer.OnInfoListener, AudioManager.OnAudioFocusChangeListener {
     private static final int MEDIA_INFO_BUFFERING_START = 701;
     private static final int MEDIA_INFO_BUFFERING_END = 702;

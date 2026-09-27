@@ -55,8 +55,6 @@ import com.codename1.ui.geom.GeneralPath;
 ///         ContainerTransformTransition.create("card", 300));
 /// nextForm.show();
 /// ```
-///
-/// @author Shai Almog
 public final class ContainerTransformTransition extends Transition {
 
     /// Material's container transform curve: fast out, slow in.

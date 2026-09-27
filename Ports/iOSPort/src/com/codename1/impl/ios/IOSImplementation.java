@@ -139,10 +139,6 @@ import java.util.Collections;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 
 
-/**
- *
- * @author Shai Almog
- */
 public class IOSImplementation extends CodenameOneImplementation {
     private IOSCalendarSource calendarSource;
     // Flag to indicate if the current openGallery process is selecting multiple files

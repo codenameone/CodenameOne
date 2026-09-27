@@ -49,8 +49,6 @@ import org.apache.tools.ant.types.Permissions;
 import org.apache.tools.ant.types.Permissions.Permission;
 
 /**
- *
- * @author shannah
  * @deprecated This was an early attempt at getting the simulator runnign using Maven.  Currently it is not used, as we are using the Maven exec plugin.
  */
 @Mojo( name="simulator", 

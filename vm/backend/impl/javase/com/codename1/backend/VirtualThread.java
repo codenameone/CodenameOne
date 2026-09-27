@@ -22,20 +22,18 @@
  */
 package com.codename1.backend;
 
-/**
- * The simulator has no virtual threads.
- *
- * They exist because ParparVM owns its whole translation and can switch a stack
- * in a couple of nanoseconds; on a stock JVM the same idea is Loom's job, not
- * ours. {@link #create} returning 0 is the documented "not available" answer and
- * the server falls back to its pooled path, so behaviour here differs in
- * scheduling only -- never in what a client sees.
- */
+/// The simulator has no virtual threads.
+///
+/// They exist because ParparVM owns its whole translation and can switch a stack
+/// in a couple of nanoseconds; on a stock JVM the same idea is Loom's job, not
+/// ours. [#create] returning 0 is the documented "not available" answer and
+/// the server falls back to its pooled path, so behaviour here differs in
+/// scheduling only -- never in what a client sees.
 public final class VirtualThread {
     private VirtualThread() {
     }
 
-    /** Always 0 here: not available, use the pool. */
+    /// Always 0 here: not available, use the pool.
     public static long create(int fd, int stackBytes) {
         return 0;
     }
@@ -51,7 +49,7 @@ public final class VirtualThread {
     public static void free(long handle) {
     }
 
-    /** No virtual threads here. */
+    /// No virtual threads here.
     public static int descriptorOf(long handle) {
         return -1;
     }
@@ -60,16 +58,16 @@ public final class VirtualThread {
         return false;
     }
 
-    /** No virtual threads here, so the server keeps the pool. */
+    /// No virtual threads here, so the server keeps the pool.
     public static boolean supported() {
         return false;
     }
 
-    /** No virtual threads here, so there is nothing to step aside for. */
+    /// No virtual threads here, so there is nothing to step aside for.
     public static void yieldNow() {
     }
 
-    /** Nothing to report where there are none. */
+    /// Nothing to report where there are none.
     public static void report() {
     }
 }

@@ -44,10 +44,6 @@ import com.codename1.html5.js.core.JSRegExp;
 import com.codename1.html5.js.typedarrays.ArrayBuffer;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 
-/**
- *
- * @author shannah
- */
 public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private String url;
     private boolean read;

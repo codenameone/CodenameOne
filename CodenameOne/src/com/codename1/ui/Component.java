@@ -71,8 +71,6 @@ import java.util.HashMap;
 /// likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
 /// to avoid regressions when the default is changed.
 ///
-/// @author Chen Fishbein
-///
 /// #### See also
 ///
 /// - Container

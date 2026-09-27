@@ -62,8 +62,6 @@ import java.util.List;
 ///  Select by position:
 ///
 ///  [last() - 5]`
-///
-/// @author Eric Coolman
 abstract class AbstractEvaluator implements Evaluator {
 
     private final String expr;

@@ -113,6 +113,9 @@ dependency-reduced-pom.xml
 # rendered from are already committed.
 /docs/website/content/javadoc/
 /docs/website/static/javadoc-search.json
+# The backend API reference, generated beside it the same way.
+/docs/website/content/backend/
+/docs/website/static/backend-javadoc-search.json
 # Left behind by the previous integration, which copied the whole standard
 # doclet tree into static/ and served it through a scoping script.
 /docs/website/static/javadoc/

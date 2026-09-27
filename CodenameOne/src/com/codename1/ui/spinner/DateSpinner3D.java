@@ -50,8 +50,6 @@ import static com.codename1.ui.CN.convertToPixels;
 /// whatever was last passed to `setValue` is remembered and handed back by
 /// `getValue`, so a round trip through this widget does not silently move a
 /// timestamp to midnight.
-///
-/// @author Steve Hannah
 public class DateSpinner3D extends Container implements InternalPickerWidget {
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());

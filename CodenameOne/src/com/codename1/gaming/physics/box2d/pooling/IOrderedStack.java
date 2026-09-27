@@ -25,7 +25,6 @@ package com.codename1.gaming.physics.box2d.pooling;
 
 /// This stack assumes that when you push 'n' items back,
 /// you're pushing back the last 'n' items popped.
-/// @author Daniel
 ///
 /// @param <E>
 public interface IOrderedStack<E> {

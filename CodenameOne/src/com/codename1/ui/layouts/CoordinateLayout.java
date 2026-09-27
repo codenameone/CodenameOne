@@ -31,8 +31,6 @@ import com.codename1.ui.geom.Dimension;
 /// that are adapted based on available space for the layout.
 /// The layout
 ///
-/// @author Chen Fishbein
-///
 /// #### Deprecated
 ///
 /// the usage of this layout is strongly discouraged as elements will not adapt to the right position/size

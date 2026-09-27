@@ -28,8 +28,6 @@ import java.util.Hashtable;
 
 /// Implements a bitmap font that uses an image and sets of offsets to draw a font
 /// with a given character set.
-///
-/// @author Shai Almog
 class CustomFont extends Font {
     /// Keep five colors in cache by default to allow faster selection colors
     private static final int COLOR_CACHE_SIZE = 5;

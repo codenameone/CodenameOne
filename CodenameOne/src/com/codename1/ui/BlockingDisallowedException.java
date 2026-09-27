@@ -27,8 +27,6 @@ package com.codename1.ui;
 /// disabled on any code run inside the `Display#invokeWithoutBlocking(java.lang.Runnable)` method, which will propagate
 /// this exception if `Display#invokeAndBlock(java.lang.Runnable)` throws this exception.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Display#invokeWithoutBlocking(java.lang.Runnable)
