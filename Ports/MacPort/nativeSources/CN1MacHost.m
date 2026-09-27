@@ -136,6 +136,34 @@ void CN1MacPublishExpectedContentSize(void) {
     }
     CGFloat w = CN1_MAC_DEFAULT_WIDTH;
     CGFloat h = CN1_MAC_DEFAULT_HEIGHT;
+    // The size the window will be given, not the size it is built with. Two things
+    // override the default after construction: macos.fixedWindowSize (the
+    // CN1FixedWindow* keys, applied by setFixedContentSize) and the frame AppKit
+    // restores from setFrameAutosaveName -- the size the user, or the previous
+    // launch, left it at. The benchmark runner hit the second one: the first launch
+    // fitted correctly, and every later launch restored the saved frame and laid the
+    // tree out twice again.
+    NSNumber *fixedW = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowWidth"];
+    NSNumber *fixedH = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowHeight"];
+    if (fixedW != nil && fixedH != nil && fixedW.doubleValue > 0 && fixedH.doubleValue > 0) {
+        w = fixedW.doubleValue;
+        h = fixedH.doubleValue;
+    } else {
+        NSString *saved = [[NSUserDefaults standardUserDefaults]
+                stringForKey:@"NSWindow Frame CN1MainWindow"];
+        NSArray<NSString *> *parts = [saved componentsSeparatedByCharactersInSet:
+                [NSCharacterSet whitespaceCharacterSet]];
+        if (parts.count >= 4) {
+            NSRect savedFrame = NSMakeRect(parts[0].doubleValue, parts[1].doubleValue,
+                    parts[2].doubleValue, parts[3].doubleValue);
+            NSRect savedContent = [NSWindow contentRectForFrameRect:savedFrame
+                                                          styleMask:cn1MacMainWindowStyle()];
+            if (savedContent.size.width > 0 && savedContent.size.height > 0) {
+                w = savedContent.size.width;
+                h = savedContent.size.height;
+            }
+        }
+    }
     NSArray<NSScreen *> *screens = [NSScreen screens];
     if (screens.count > 0) {
         NSRect visible = [[screens objectAtIndex:0] visibleFrame];
