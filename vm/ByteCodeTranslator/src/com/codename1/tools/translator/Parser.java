@@ -1251,15 +1251,22 @@ public class Parser extends ClassVisitor {
             }
         }
         bldM.append("extern struct clazz ClazzClazz;\n");
-        bldM.append("\n\nstruct clazz* const cn1ClazzById[] = {\n    [0] = 0");
+        // STATIC ENTRIES ONLY FOR OBJECTS NOBODY STAMPS. Every other entry is written the
+        // first time an object of that class is stamped (cn1ObjSetClass), so the table no
+        // longer references every class descriptor -- a reference that kept each class's
+        // constructor, mark function and methods alive through the link. What stays static
+        // is what exists without a stamp: class objects (their headers are compile-time
+        // constants), the String twins and the tagged boxes' proxies (the same), and the
+        // primitive arrays, whose descriptors name no element class and so pin nothing.
+        // Sized for every index, so a stamp can fill any of them.
+        bldM.append("\n\nstruct clazz* cn1ClazzById[").append(maxId + 1).append("] = {\n    [0] = 0");
+        String[] alwaysPresent = {"java_lang_Class", "java_lang_Object", "java_lang_String",
+                "java_lang_Integer", "java_lang_Long", "java_lang_Double", "java_lang_Float",
+                "java_lang_Character", "java_lang_Short"};
         for (ByteCodeClass bc : classes) {
             String n = bc.getClsName().replace('/', '_').replace('$', '_');
-            bldM.append(",\n    [cn1_class_id_").append(n).append(" + 1] = &class__").append(n);
-            for (int dim = 1; dim <= 3; dim++) {
-                if (ByteCodeClass.emitsArrayClass(n, dim)) {
-                    bldM.append(",\n    [cn1_array_").append(dim).append("_id_").append(n)
-                            .append(" + 1] = &class_array").append(dim).append("__").append(n);
-                }
+            if (java.util.Arrays.asList(alwaysPresent).contains(n)) {
+                bldM.append(",\n    [cn1_class_id_").append(n).append(" + 1] = &class__").append(n);
             }
         }
         for (String p : primitives) {
@@ -1273,7 +1280,7 @@ public class Parser extends ClassVisitor {
         bldM.append(",\n    [cn1_array_start_offset + 1] = &ClazzClazz");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i8] = &class__java_lang_String_i8");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i16] = &class__java_lang_String_i16");
-        bldM.append("};\nconst int cn1ClazzByIdCount = (int)(sizeof(cn1ClazzById) / sizeof(cn1ClazzById[0]));\n");
+        bldM.append("};\nconst int cn1ClazzByIdCount = ").append(maxId + 1).append(";\n");
 
         bldM.append("\n\nstruct clazz* classesList[] = {");
         first = true;

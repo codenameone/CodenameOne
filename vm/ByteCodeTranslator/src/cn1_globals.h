@@ -411,16 +411,38 @@ struct JavaObjectPrototype {
 // CN1_OBJ_HEADER_INIT. `o` is any object or array pointer.
 // The class index is the class's classId plus one, so 0 means "no class" (a slot under
 // construction, or a class descriptor's own header for the primitive array classes).
-extern struct clazz* const cn1ClazzById[];
+//
+// The table FILLS AS CLASSES ARE USED. Only the entries that must exist before any object is
+// stamped are static (Parser: class objects, the String twins, the tagged boxes, primitive
+// arrays); every other class's entry is written the first time an object of it is stamped
+// (cn1ObjSetClass -> cn1ClazzRegister). A static table naming every class was a reference
+// to every class descriptor, and through each descriptor's constructor, mark function and
+// initializer to every method it has, so the linker could strip nothing: in a Linux gallery
+// app that kept ~1.5MB of classes master's link removed. A class no object ever has is no
+// longer referenced, and goes.
+extern struct clazz* cn1ClazzById[];
 extern const int cn1ClazzByIdCount;
+extern void cn1ClazzRegister(uint16_t index, struct clazz* c);
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
+static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c);
 #define CN1_OBJ_CLASS(o)            (cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId])
-#define CN1_OBJ_SET_CLASS(o, c)     (((struct JavaObjectPrototype*)(o))->__cn1ClassId = cn1ClazzIndexOf(c))
+#define CN1_OBJ_SET_CLASS(o, c)     cn1ObjSetClass((struct JavaObjectPrototype*)(o), (c))
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c) {
     if(c == 0) {
         return 0;
     }
     return c->cn1HeaderIndex != 0 ? c->cn1HeaderIndex : (uint16_t)(c->classId + 1);
+}
+// Every object's class is stamped here, so this is where an entry is filled: the first
+// stamp of a class takes the out-of-line path, every later one a single load of an entry
+// already in cache. The entry is written, and fenced, BEFORE the header, so no thread can
+// hold an object whose class index resolves to nothing.
+static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c) {
+    uint16_t index = cn1ClazzIndexOf(c);
+    if(__builtin_expect(index != 0 && cn1ClazzById[index] == 0, 0)) {
+        cn1ClazzRegister(index, (struct clazz*)c);
+    }
+    o->__cn1ClassId = index;
 }
 // A BiBOP slot on its page's free list links to the next free slot through the word
 // AFTER the header, so the mark byte keeps reading the free mark (every slot is at least
