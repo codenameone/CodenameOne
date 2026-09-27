@@ -158,6 +158,26 @@ public final class Management implements HttpServer.Handler {
      *
      * @throws IllegalArgumentException when there is no such bean or operation
      */
+    private static ManagedBean find(List all, String objectName) {
+        for(int iter = 0 ; iter < all.size() ; iter++) {
+            ManagedBean bean = (ManagedBean)all.get(iter);
+            if(bean.getObjectName().equals(objectName)) {
+                return bean;
+            }
+        }
+        return null;
+    }
+
+    private static int operationIndex(ManagedBean bean, String operation) {
+        String[] ops = bean.operationNames();
+        for(int o = 0 ; o < ops.length ; o++) {
+            if(ops[o].equals(operation)) {
+                return o;
+            }
+        }
+        return -1;
+    }
+
     public static Object invoke(List all, String objectName, String operation,
                                 Map arguments) throws Exception {
         for(int iter = 0 ; iter < all.size() ; iter++) {
@@ -223,19 +243,36 @@ public final class Management implements HttpServer.Handler {
             if(parts == null) {
                 return request.respondJson(404, error("Expected /managed/{bean}/{operation}"));
             }
+            // Bean and operation names are Java identifiers, so there is nothing
+            // to percent-decode: an escaped one matches nothing. Looked up FIRST
+            // and on its own, so 404 means "no such operation" and nothing else --
+            // an operation that rejects its arguments is the caller's mistake to
+            // fix, a 400, not an endpoint that does not exist.
+            ManagedBean bean = find(beans(), parts[0]);
+            int op = bean == null ? -1 : operationIndex(bean, parts[1]);
+            if(bean == null) {
+                return request.respondJson(404, error("No managed bean " + parts[0]));
+            }
+            if(op < 0) {
+                return request.respondJson(404, error(parts[0] + " has no operation "
+                        + parts[1]));
+            }
             Map arguments = new LinkedHashMap();
             String body = request.getBody();
             if(body != null && body.trim().length() > 0) {
-                arguments = Json.parseObject(body);
+                try {
+                    arguments = Json.parseObject(body);
+                } catch (Exception err) {
+                    return request.respondJson(400, error("The body must be a JSON object "
+                            + "of the operation's arguments: " + err.getMessage()));
+                }
             }
             try {
                 Map result = new LinkedHashMap();
-                // Bean and operation names are Java identifiers, so there is
-                // nothing to percent-decode: an escaped one matches nothing.
-                result.put("result", invoke(beans(), parts[0], parts[1], arguments));
+                result.put("result", bean.invoke(op, arguments));
                 return request.respondJson(200, result);
             } catch (IllegalArgumentException err) {
-                return request.respondJson(404, error(err.getMessage()));
+                return request.respondJson(400, error(err.getMessage()));
             }
         }
         return null;

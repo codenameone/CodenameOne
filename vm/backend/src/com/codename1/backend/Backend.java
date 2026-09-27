@@ -94,6 +94,8 @@ public final class Backend {
     private final Sessions sessions;
     /** This server's executors. */
     private final Tasks.Registry tasks;
+    /** The recent requests of this server, kept once the development tools ask. */
+    private final RequestLog requestLog;
     /**
      * Whether start-up has finished -- the application's started() hook
      * included. The listener accepts before that hook runs, so health must not
@@ -105,8 +107,10 @@ public final class Backend {
                     Config config, int shutdownMillis, Tracer ownTracer,
                     Application application,
                     com.codename1.backend.metrics.MetricReader metricReader,
-                    List managedBeans, Sessions sessions, Tasks.Registry tasks) {
+                    List managedBeans, Sessions sessions, Tasks.Registry tasks,
+                    RequestLog requestLog) {
         this.tasks = tasks;
+        this.requestLog = requestLog;
         this.metricReader = metricReader;
         this.managedBeans = managedBeans;
         this.sessions = sessions;
@@ -170,6 +174,11 @@ public final class Backend {
 
     synchronized void markReady() {
         ready = true;
+    }
+
+    /** The log of this server's recent requests, off until something enables it. */
+    public RequestLog getRequestLog() {
+        return requestLog;
     }
 
     /** This server's sessions: their settings and the store they are kept in. */
@@ -415,6 +424,15 @@ public final class Backend {
          * serve a tool bound to a bean that has been destroyed.
          */
         public void registerTool(com.codename1.backend.mcp.McpTool tool) {
+            for(int iter = 0 ; iter < tools.size() ; iter++) {
+                if(((com.codename1.backend.mcp.McpTool)tools.get(iter)).name()
+                        .equals(tool.name())) {
+                    // Two active beans publishing one name: one would be
+                    // unreachable, and which depends on construction order.
+                    throw new IllegalStateException("Two MCP tools are named \""
+                            + tool.name() + "\"; give one a distinct name");
+                }
+            }
             tools.add(tool);
         }
 
@@ -423,8 +441,8 @@ public final class Backend {
             for(int iter = 0 ; iter < managed.size() ; iter++) {
                 if(((ManagedBean)managed.get(iter)).getObjectName()
                         .equals(bean.getObjectName())) {
-                    managed.set(iter, bean);
-                    return;
+                    throw new IllegalStateException("Two managed resources are named \""
+                            + bean.getObjectName() + "\"; set objectName on one");
                 }
             }
             managed.add(bean);
@@ -995,6 +1013,12 @@ public final class Backend {
             // send a TLS server's session cookie without Secure.
             final Sessions sessions = Sessions.configure(config, context != null, pool,
                     application);
+            // This server's own, which the development tools switch on.
+            final RequestLog requestLog = new RequestLog();
+            // Whether THIS server records request metrics, known only once the
+            // exporter has opened below; until then, and on a server that turned
+            // metrics off, its requests stay out of the process's histograms.
+            final boolean[] instrumented = new boolean[1];
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
@@ -1012,8 +1036,9 @@ public final class Backend {
 
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
-                                long started = com.codename1.backend.metrics.Metrics
-                                        .requestStarted();
+                                long started = instrumented[0]
+                                        ? com.codename1.backend.metrics.Metrics.requestStarted()
+                                        : 0L;
                                 Object previous = null;
                                 // This server's sessions, not a process-wide set:
                                 // cookies are not scoped by port, so a client of
@@ -1025,7 +1050,7 @@ public final class Backend {
                                     previous = CURRENT_REQUEST.get();
                                     CURRENT_REQUEST.set(request);
                                 }
-                                long startedMillis = RequestLog.enabled
+                                long startedMillis = requestLog.enabled
                                         ? System.currentTimeMillis() : 0L;
                                 // What the metrics record; stays 500 when a
                                 // handler or the session store throws.
@@ -1072,12 +1097,12 @@ public final class Backend {
                                                         + storeErr);
                                             }
                                         }
-                                        RequestLog.record(request, 500, startedMillis, err);
+                                        requestLog.record(request, 500, startedMillis, err);
                                         throw err;
                                     }
                                     // Null is a 404 from here, which is what a
                                     // router answers for a path it does not route.
-                                    RequestLog.record(request, response == null ? 404
+                                    requestLog.record(request, response == null ? 404
                                             : response.getStatus(), startedMillis, null);
                                     status = response == null ? 404 : response.getStatus();
                                     return response;
@@ -1141,11 +1166,15 @@ public final class Backend {
             }
             if(measuring) {
                 com.codename1.backend.metrics.Metrics.enableServer(server, pool);
+                instrumented[0] = true;
+            }
+            if(application != null && application.getScheduler() != null) {
+                application.getScheduler().setMeasured(measuring);
             }
             Backend backend = new Backend(server, pool, manager, config, drain,
                     tracing ? tracer : null, application,
                     metricReader != null && measuring ? metricReader : null,
-                    managedBeans, sessions, tasks);
+                    managedBeans, sessions, tasks, requestLog);
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;

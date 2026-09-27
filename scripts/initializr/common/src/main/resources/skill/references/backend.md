@@ -112,7 +112,10 @@ public class Transfers {
 
 - Everything done through the `DataSource` on the calling thread — directly, via an
   entity manager's DAOs, or via the injected `Session` — joins the transaction.
-- Unchecked exceptions and `Error`s roll back; checked exceptions commit.
+- Unchecked exceptions and `Error`s roll back; checked exceptions commit -- except
+  `DataAccessException`, what every failed database operation throws (a subclass
+  of `IOException`), which rolls back as Spring's unchecked one does. Another
+  `IOException` (file, mail, HTTP) commits unless listed in `rollbackFor`.
   `rollbackFor` / `noRollbackFor` change that.
 - Propagation: `REQUIRED` (default), `REQUIRES_NEW`, `NESTED` (savepoint),
   `SUPPORTS`, `MANDATORY`, `NOT_SUPPORTED`, `NEVER`. `readOnly = true` for readers.

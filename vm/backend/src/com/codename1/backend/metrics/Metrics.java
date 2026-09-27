@@ -317,11 +317,16 @@ public final class Metrics {
 
     /** A request has been answered. */
     public static void requestEnded(long started, String method, int status) {
+        // The route is cleared on every path: a server that does not measure
+        // still has its routers call route(), and a value left behind would be
+        // recorded under the next request this thread serves.
+        Object route = ROUTE.get();
+        if(route != null) {
+            ROUTE.set(null);
+        }
         if(!serverEnabled || started == 0L) {
             return;
         }
-        Object route = ROUTE.get();
-        ROUTE.set(null);
         requestDuration.record((System.nanoTime() - started) / 1000000.0, route, method,
                 new Integer(status));
     }

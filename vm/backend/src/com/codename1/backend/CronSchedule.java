@@ -66,8 +66,18 @@ public final class CronSchedule {
     private final String expression;
 
     private static final long DAY = 86400000L;
-    /** How far to look for a match before concluding there is none (Feb 30th). */
-    private static final int SEARCH_DAYS = 366 * 5;
+    /**
+     * How many steps to look for a match before concluding there is none. A full
+     * Gregorian cycle -- 400 years, 146097 days, after which weekdays and leap
+     * days repeat exactly -- because day of month AND day of week must both
+     * match, and a valid schedule can go decades between matches:
+     * {@code 0 0 0 29 2 MON} fired in 2016 and next fires in 2044. A step that
+     * rejects a day moves to the next day or month, so a cycle's worth of steps
+     * -- plus a margin for the few that stay within a day at a DST transition --
+     * covers every date there is; a schedule that matches nothing in a cycle
+     * matches nothing ever.
+     */
+    private static final int SEARCH_DAYS = 146097 + 366;
 
     /**
      * The masks the build computed. Called by generated code.

@@ -152,8 +152,12 @@ final class BackendSources {
               .append(rule[1]).append(" : (");
             open++;
         }
+        // Spring's default, plus DataAccessException: in Spring a failed statement
+        // is unchecked and rolls back, and here it is this checked subtype of
+        // IOException -- so listing it is what keeps the outcome Spring's.
         sb.append("cn1Error instanceof java.lang.RuntimeException || cn1Error instanceof "
-                + "java.lang.Error");
+                + "java.lang.Error || cn1Error instanceof "
+                + "com.codename1.backend.DataAccessException");
         for (int i = 0; i < open; i++) {
             sb.append(')');
         }

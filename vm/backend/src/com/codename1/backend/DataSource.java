@@ -280,7 +280,14 @@ public final class DataSource {
                 // life of the pool, and the alternative -- releasing the lock to
                 // connect -- lets several threads decide at once that the pool
                 // has room and open more connections than it is allowed.
-                Database opened = Database.open(url);
+                Database opened;
+                try {
+                    opened = Database.open(url);
+                } catch (IOException err) {
+                    // Spring's CannotGetJdbcConnectionException is a data access
+                    // failure too, and rolls a transaction back.
+                    throw DataAccessException.of(err);
+                }
                 try {
                     configure(opened);
                 } catch (IOException err) {

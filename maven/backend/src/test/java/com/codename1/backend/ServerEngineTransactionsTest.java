@@ -131,6 +131,7 @@ class ServerEngineTransactionsTest {
             Sessions.Jdbc store = new Sessions.Jdbc(pool);
             long now = System.currentTimeMillis();
             HttpSession s = new HttpSession("abc", now, now, 60);
+            s.markNew();                                   // only a new session inserts
             s.setAttribute("user", "ada");
             s.setAttribute("visits", new Long(3));
             store.save(s, null);
@@ -139,13 +140,32 @@ class ServerEngineTransactionsTest {
             assertEquals("ada", back.getAttribute("user"));
             assertEquals(3L, ((Number)back.getAttribute("visits")).longValue());
             store.save(back, null);                        // the update path
+            // Two copies of one session, each changing its own attribute: the
+            // second save must merge onto the first, not replace it.
+            HttpSession one = store.load("abc");
+            HttpSession two = store.load("abc");
+            one.setAttribute("theme", "dark");
+            two.setAttribute("lang", "en");
+            store.save(one, null);
+            store.save(two, null);
+            HttpSession both = store.load("abc");
+            assertEquals("dark", both.getAttribute("theme"), "a stale copy discarded a change");
+            assertEquals("en", both.getAttribute("lang"));
+            assertEquals("ada", both.getAttribute("user"));
             HttpSession renamed = new HttpSession("def", now, now, 60);
             store.save(renamed, "abc");
             assertNull(store.load("abc"), "the old id survived a rename");
             HttpSession stale = new HttpSession("old", now - 120000, now - 120000, 60);
+            stale.markNew();
             store.save(stale, null);
+            // A 30-day timeout: its multiplication once overflowed PostgreSQL's
+            // INTEGER and failed every purge.
+            HttpSession month = new HttpSession("month", now, now, 2592000);
+            month.markNew();
+            store.save(month, null);
             assertTrue(store.purgeExpired(now) >= 1);
             assertNull(store.load("old"));
+            assertNotNull(store.load("month"), "a live 30-day session was purged");
         } finally {
             pool.execute("DROP TABLE IF EXISTS cn1_http_session", null);
             pool.execute("DROP TABLE IF EXISTS cn1_tx_probe", null);

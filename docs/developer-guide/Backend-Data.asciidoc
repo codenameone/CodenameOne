@@ -270,7 +270,8 @@ before using it on SQLite.
 ==== Rollback rules
 
 The rules are Spring's. An unchecked exception or an `Error` leaving the method
-rolls the transaction back, and a checked exception commits it. `rollbackFor`
+rolls the transaction back, and a checked exception commits it -- with the one
+addition that keeps the outcome Spring's, described in the note below. `rollbackFor`
 adds exception types that roll back, `noRollbackFor` adds types that commit, and
 when several listed types match the thrown one the most specific wins. The
 decision is written into the method as a chain of `instanceof` tests, so nothing
@@ -283,12 +284,17 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 
 [IMPORTANT]
 ====
-Every `DataSource`, `Database` and dao method throws `IOException`, which is
-checked. Under the default rule, a statement that fails and propagates out of a
-`@Transactional` method therefore commits whatever the statements before it did.
-Spring doesn't have this problem, because its JDBC layer throws unchecked
-exceptions. Add `rollbackFor = IOException.class` to every `@Transactional`
-method that writes through the pool, as the examples in this chapter do.
+In Spring, a statement that fails throws the unchecked `DataAccessException`, so
+it rolls the transaction back. The methods of `DataSource`, `Database` and the daos
+declare the checked `IOException`, and the failures they report -- a statement the
+engine refused, a connection that couldn't be opened, a query that returned more
+than one row where one was expected -- are
+`com.codename1.backend.DataAccessException`, a subclass of it. The default rule
+rolls back for that type as well, so a failed statement undoes the transaction as
+it would in Spring. Any other `IOException` -- a file that couldn't be read, a
+mail server that refused a message -- is checked and commits, as it would in
+Spring; list it in `rollbackFor` to make it roll back, as the `Signups` example
+does. `noRollbackFor = DataAccessException.class` restores plain commit-on-checked.
 ====
 
 A method that joined a transaction can't roll back what the method that began it
@@ -377,9 +383,9 @@ gives `@Async`, `@Timed` and `@Counted` the same property.
 
 ==== Pitfalls
 
-* **Checked exceptions commit.** Covered above, and worth repeating: without
-  `rollbackFor = IOException.class`, a failed statement that propagates out of the
-  method commits the ones before it.
+* **Checked exceptions other than database failures commit.** A failed statement
+  rolls back, but an `IOException` from anything else -- a file, a mail server, an
+  outbound HTTP call -- commits unless it's listed in `rollbackFor`.
 * **`REQUIRES_NEW` needs a second connection.** The outer transaction keeps its
   connection while the inner one borrows another, so on a pool of one -- the
   default for an in-memory SQLite database -- the inner borrow waits for

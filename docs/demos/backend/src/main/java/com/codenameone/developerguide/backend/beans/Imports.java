@@ -53,7 +53,7 @@ public class Imports {
         return imported;                    // the good lines commit together
     }
 
-    @Transactional(propagation = Propagation.NESTED, rollbackFor = IOException.class)
+    @Transactional(propagation = Propagation.NESTED)
     void importLine(String line) throws IOException {
         String[] fields = line.split(",");
         db.execute("INSERT INTO contact (name) VALUES (?)", new Object[] {fields[0]});

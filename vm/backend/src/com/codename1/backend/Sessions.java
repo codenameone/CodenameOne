@@ -555,7 +555,8 @@ public final class Sessions {
                     + d.columnType(Dialect.BIGINT) + " NOT NULL, last_accessed "
                     + d.columnType(Dialect.BIGINT) + " NOT NULL, max_inactive "
                     + d.columnType(Dialect.INTEGER) + " NOT NULL, attributes "
-                    + d.columnType(Dialect.TEXT) + ")", null);
+                    + d.columnType(Dialect.TEXT) + ", version "
+                    + d.columnType(Dialect.BIGINT) + " NOT NULL)", null);
             ready = true;
         }
 
@@ -584,30 +585,77 @@ public final class Sessions {
             return value instanceof Number ? ((Number)value).longValue() : 0L;
         }
 
+        /** Attempts at an optimistic save before two requests' races are reported. */
+        private static final int SAVE_ATTEMPTS = 8;
+
+        /**
+         * Two requests of one client load separate copies of the session, and a
+         * copy written back whole would replace whatever the other request saved
+         * meanwhile -- its attributes, and a newer last use with an older one.
+         * So an existing session is saved by re-reading the row, applying only
+         * the attributes THIS request set or removed, and writing it back only
+         * if its version has not moved; the last use only ever goes forward.
+         */
         public void save(HttpSession session, String previousId) throws IOException {
             prepare();
-            String json = Json.write(session.attributesCopy());
-            Object[] values = new Object[] {new Long(session.getLastAccessedTime()),
-                    new Integer(session.getMaxInactiveInterval()), json, session.getId()};
-            int updated = pool.execute("UPDATE " + TABLE + " SET last_accessed = ?, "
-                    + "max_inactive = ?, attributes = ? WHERE id = ?", values);
-            if(updated == 0 && !session.isNew() && previousId == null) {
-                // The row is gone: another request invalidated this session, or
-                // it expired, while this one held its own copy. Writing it back
-                // would undo a logout with a stale cookie, so it stays gone.
-                return;
-            }
-            if(updated == 0) {
+            if(session.isNew() || previousId != null) {
+                // A new id: nobody else can have written this row yet.
                 pool.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
-                        + "max_inactive, attributes) VALUES (?, ?, ?, ?, ?)",
+                        + "max_inactive, attributes, version) VALUES (?, ?, ?, ?, ?, 0)",
                         new Object[] {session.getId(), new Long(session.getCreationTime()),
                         new Long(session.getLastAccessedTime()),
-                        new Integer(session.getMaxInactiveInterval()), json});
+                        new Integer(session.getMaxInactiveInterval()),
+                        Json.write(session.attributesCopy())});
+                session.storedAccessed = session.getLastAccessedTime();
+                if(previousId != null) {
+                    delete(previousId);
+                }
+                return;
             }
-            session.storedAccessed = session.getLastAccessedTime();
-            if(previousId != null) {
-                delete(previousId);
+            java.util.Set changed = session.changedNames();
+            Map mine = session.attributesCopy();
+            Long used = new Long(session.getLastAccessedTime());
+            for(int attempt = 0 ; attempt < SAVE_ATTEMPTS ; attempt++) {
+                Map row = pool.queryOne("SELECT max_inactive, attributes, version FROM "
+                        + TABLE + " WHERE id = ?", new Object[] {session.getId()});
+                if(row == null) {
+                    // The row is gone: another request invalidated this session,
+                    // or it expired, while this one held its own copy. Writing it
+                    // back would undo a logout with a stale cookie.
+                    return;
+                }
+                Map merged = new LinkedHashMap();
+                Object text = row.get("attributes");
+                if(text instanceof String && ((String)text).length() > 0) {
+                    merged.putAll(Json.parseObject((String)text));
+                }
+                java.util.Iterator names = changed.iterator();
+                while(names.hasNext()) {
+                    Object name = names.next();
+                    if(mine.containsKey(name)) {
+                        merged.put(name, mine.get(name));
+                    } else {
+                        merged.remove(name);
+                    }
+                }
+                int maxInactive = session.isMaxInactiveChanged()
+                        ? session.getMaxInactiveInterval() : (int)number(row.get("max_inactive"));
+                long version = number(row.get("version"));
+                int updated = pool.execute("UPDATE " + TABLE + " SET attributes = ?, "
+                        + "max_inactive = ?, last_accessed = CASE WHEN last_accessed > ? "
+                        + "THEN last_accessed ELSE ? END, version = ? WHERE id = ? AND "
+                        + "version = ?", new Object[] {Json.write(merged),
+                        new Integer(maxInactive), used, used, new Long(version + 1),
+                        session.getId(), new Long(version)});
+                if(updated > 0) {
+                    session.storedAccessed = session.getLastAccessedTime();
+                    return;
+                }
+                // Another request saved between the read and the write: read its
+                // result and apply this request's changes to that instead.
             }
+            throw new IOException("Session changes could not be saved: other requests "
+                    + "kept changing it (" + SAVE_ATTEMPTS + " attempts)");
         }
 
         void touchIfStale(HttpSession session) throws IOException {
@@ -618,8 +666,11 @@ public final class Sessions {
             if(now - session.storedAccessed < touchInterval(session.getMaxInactiveInterval())) {
                 return;
             }
-            pool.execute("UPDATE " + TABLE + " SET last_accessed = ? WHERE id = ?",
-                    new Object[] {new Long(now), session.getId()});
+            // Forward only: a slower request must not move the last use back.
+            Long at = new Long(now);
+            pool.execute("UPDATE " + TABLE + " SET last_accessed = CASE WHEN last_accessed "
+                    + "> ? THEN last_accessed ELSE ? END WHERE id = ?",
+                    new Object[] {at, at, session.getId()});
             session.storedAccessed = now;
         }
 
@@ -645,9 +696,16 @@ public final class Sessions {
             // The same grace load() allows: the timeout plus the touch interval,
             // min(a minute, a quarter of the timeout).
             Long at = new Long(now);
+            //
+            // Decimal multipliers, never integer ones: max_inactive is an INTEGER
+            // column, and PostgreSQL multiplies INTEGER by an integer literal in
+            // 32 bits, so a 30-day timeout overflowed and every purge failed.
+            // CAST(... AS BIGINT) is not MySQL; a decimal literal widens on all
+            // three engines, exactly on PostgreSQL and MySQL, and within a
+            // double's exact range on SQLite.
             return pool.execute("DELETE FROM " + TABLE + " WHERE max_inactive > 0 AND "
-                    + "(last_accessed + max_inactive * 1250 < ? OR "
-                    + "last_accessed + max_inactive * 1000 + " + TOUCH_INTERVAL + " < ?)",
+                    + "(last_accessed + max_inactive * 1250.0 < ? OR "
+                    + "last_accessed + max_inactive * 1000.0 + " + TOUCH_INTERVAL + " < ?)",
                     new Object[] {at, at});
         }
 

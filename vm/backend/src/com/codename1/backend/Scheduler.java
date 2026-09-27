@@ -116,6 +116,17 @@ public final class Scheduler {
     private Thread thread;
     private boolean started;
     private boolean stopped;
+    /**
+     * Whether this scheduler's server records metrics. Per scheduler: the job
+     * histogram is the process's, and a second server that turned metrics off
+     * must not add its jobs to the first one's.
+     */
+    private boolean measured;
+
+    /** Set by the server once it knows whether it records metrics. */
+    public void setMeasured(boolean measured) {
+        this.measured = measured;
+    }
     private boolean lockTableReady;
 
     /**
@@ -321,9 +332,12 @@ public final class Scheduler {
                 next = now;
             }
             // Catch up without a burst: the next START after now on the rate's
-            // own grid.
-            while(next <= now) {
-                next += job.period;
+            // own grid -- in one step, never one period at a time, which after a
+            // suspended VM or a clock jumped forward is millions of iterations
+            // under the monitor every other job and management call waits on.
+            if(next <= now) {
+                long missed = (now - next) / job.period + 1;
+                next += missed * job.period;
             }
             return next;
         }
@@ -352,7 +366,7 @@ public final class Scheduler {
                 release(job);
             }
             long end = System.currentTimeMillis();
-            if(ran) {
+            if(ran && measured) {
                 com.codename1.backend.metrics.Metrics.jobRan(job.name, end - start,
                         error != null);
             }

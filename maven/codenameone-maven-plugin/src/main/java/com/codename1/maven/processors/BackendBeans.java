@@ -470,6 +470,7 @@ final class BackendBeans {
             }
         }
         dropSteppedAside();
+        checkUniqueNames();
         pickEntryPackage();
     }
 
@@ -1000,6 +1001,43 @@ final class BackendBeans {
             ctx.getLog().info("cn1: " + b.describe() + (drop.contains(b)
                     ? " steps aside: another bean has its type"
                     : " steps aside with its configuration class"));
+        }
+    }
+
+    /// MCP tools and managed resources are found by name alone, so two with one
+    /// name leave one unreachable -- which one depending on registration order.
+    /// Two that are always built are refused here; two conditional ones may be
+    /// meant for different profiles, and the server refuses them at start-up if
+    /// both turn out active.
+    private void checkUniqueNames() {
+        Map<String, Bean> tools = new LinkedHashMap<String, Bean>();
+        Map<String, Bean> managed = new LinkedHashMap<String, Bean>();
+        for (Bean b : beans) {
+            for (Tool t : b.tools) {
+                Bean other = tools.get(t.name);
+                // The same bean twice is always a clash; two beans only when
+                // they cannot be told apart by their conditions.
+                if (other != null && (other == b || !(other.isConditional()
+                        && b.isConditional()))) {
+                    ctx.error(b.cls, "Two @McpTool methods are named \"" + t.name + "\" -- in "
+                            + other.describe() + " and " + b.describe() + " -- and a tool is "
+                            + "called by name. Give one a distinct name with "
+                            + "@McpTool(name = ...).");
+                } else if (other == null) {
+                    tools.put(t.name, b);
+                }
+            }
+            if (b.managed != null) {
+                Bean other = managed.get(b.managed.objectName);
+                if (other != null && !(other.isConditional() && b.isConditional())) {
+                    ctx.error(b.cls, "Two @ManagedResource beans are named \""
+                            + b.managed.objectName + "\" -- " + other.describe() + " and "
+                            + b.describe() + " -- and operations are invoked by that name. "
+                            + "Set objectName on one.");
+                } else if (other == null) {
+                    managed.put(b.managed.objectName, b);
+                }
+            }
         }
     }
 

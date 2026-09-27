@@ -39,7 +39,7 @@ public class Orders {
         this.audit = audit;
     }
 
-    @Transactional(rollbackFor = {IOException.class, PaymentDeclined.class}, timeout = 10)
+    @Transactional(rollbackFor = PaymentDeclined.class, timeout = 10)
     public long place(String sku, int quantity) throws IOException, PaymentDeclined {
         long id = db.insert("INSERT INTO orders (sku, quantity) VALUES (?, ?)",
                 new Object[] {sku, Integer.valueOf(quantity)}, "id");

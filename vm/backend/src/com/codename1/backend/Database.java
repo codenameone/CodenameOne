@@ -274,15 +274,21 @@ public final class Database {
     }
 
     private int executeUntraced(String sql, Object[] params) throws IOException {
-        params = portableParameters(params);
-        String rendered = bind(sql, params);
-        if(sqlite != null) {
-            return sqlite.execute(rendered, params);
+        // Every engine's failure surfaces as a DataAccessException, which
+        // @Transactional rolls back for; see that class.
+        try {
+            params = portableParameters(params);
+            String rendered = bind(sql, params);
+            if(sqlite != null) {
+                return sqlite.execute(rendered, params);
+            }
+            if(postgres != null) {
+                return postgres.execute(rendered, params);
+            }
+            return mysql.execute(rendered, params);
+        } catch (IOException err) {
+            throw DataAccessException.of(err);
         }
-        if(postgres != null) {
-            return postgres.execute(rendered, params);
-        }
-        return mysql.execute(rendered, params);
     }
 
     /** Runs a query and returns every row as a column-name to value map. */
@@ -311,15 +317,19 @@ public final class Database {
     }
 
     private List queryUntraced(String sql, Object[] params) throws IOException {
-        params = portableParameters(params);
-        String rendered = bind(sql, params);
-        if(sqlite != null) {
-            return sqlite.query(rendered, params);
+        try {
+            params = portableParameters(params);
+            String rendered = bind(sql, params);
+            if(sqlite != null) {
+                return sqlite.query(rendered, params);
+            }
+            if(postgres != null) {
+                return postgres.query(rendered, params);
+            }
+            return mysql.query(rendered, params);
+        } catch (IOException err) {
+            throw DataAccessException.of(err);
         }
-        if(postgres != null) {
-            return postgres.query(rendered, params);
-        }
-        return mysql.query(rendered, params);
     }
 
     /**
@@ -338,7 +348,7 @@ public final class Database {
             return null;
         }
         if(rows.size() > 1) {
-            throw new IOException("Expected at most one row and the query returned "
+            throw new DataAccessException("Expected at most one row and the query returned "
                     + rows.size() + ": [" + sql + "]");
         }
         return (Map)rows.get(0);
@@ -380,14 +390,18 @@ public final class Database {
         // and add none of their own.
         Span span = Tracing.startDatabase(dialect.getName(), sql);
         if(span == null) {
-            return insertUntraced(sql, params, idColumn);
+            try {
+                return insertUntraced(sql, params, idColumn);
+            } catch (IOException err) {
+                throw DataAccessException.of(err);
+            }
         }
         Throwable failure = null;
         try {
             return insertUntraced(sql, params, idColumn);
         } catch (IOException err) {
             failure = err;
-            throw err;
+            throw DataAccessException.of(err);
         } catch (RuntimeException err) {
             failure = err;
             throw err;

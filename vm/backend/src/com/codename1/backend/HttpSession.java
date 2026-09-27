@@ -66,6 +66,13 @@ public final class HttpSession {
     private boolean fresh;
     private boolean dirty;
     private String previousId;
+    /**
+     * The attribute names this request set or removed, so a store that loads a
+     * copy per request can apply just these onto what another request saved in
+     * the meantime, instead of replacing it with this copy's stale whole map.
+     */
+    private final java.util.Set changed = new java.util.HashSet();
+    private boolean maxInactiveChanged;
     private Object[] beans;
     /** The last-access time the store holds, which lags the live one. */
     long storedAccessed;
@@ -103,6 +110,7 @@ public final class HttpSession {
 
     public synchronized void setMaxInactiveInterval(int seconds) {
         maxInactiveSeconds = seconds;
+        maxInactiveChanged = true;
         dirty = true;
     }
 
@@ -118,12 +126,14 @@ public final class HttpSession {
         } else {
             attributes.put(name, value);
         }
+        changed.add(name);
         dirty = true;
     }
 
     public synchronized void removeAttribute(String name) {
         checkValid();
         if(attributes.remove(name) != null) {
+            changed.add(name);
             dirty = true;
         }
     }
@@ -200,6 +210,17 @@ public final class HttpSession {
         dirty = false;
         fresh = false;
         previousId = null;
+        changed.clear();
+        maxInactiveChanged = false;
+    }
+
+    /** The names this request set or removed, as a copy. */
+    synchronized java.util.Set changedNames() {
+        return new java.util.HashSet(changed);
+    }
+
+    synchronized boolean isMaxInactiveChanged() {
+        return maxInactiveChanged;
     }
 
     /** The id the client held before {@link #changeSessionId}, or null. */

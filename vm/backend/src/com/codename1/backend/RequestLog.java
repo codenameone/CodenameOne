@@ -35,24 +35,30 @@ import java.util.Map;
  * read per request and nothing else.
  */
 public final class RequestLog {
-    static boolean enabled;
-    private static Map[] ring = new Map[0];
-    private static int next;
-    private static int size;
+    /**
+     * Per server, never per process: with two servers in one process, the one
+     * running the development tools must not show the other's request targets
+     * and exceptions. Plain, not volatile: a request that misses the switch by
+     * a moment is simply not logged.
+     */
+    boolean enabled;
+    private Map[] ring = new Map[0];
+    private int next;
+    private int size;
 
-    private RequestLog() {
+    RequestLog() {
     }
 
     /** Starts keeping the last {@code capacity} requests. */
-    public static synchronized void enable(int capacity) {
+    public synchronized void enable(int capacity) {
         ring = new Map[capacity < 1 ? 1 : capacity];
         next = 0;
         size = 0;
         enabled = true;
     }
 
-    static void record(HttpServer.Request request, int status, long startedMillis,
-                       Throwable error) {
+    void record(HttpServer.Request request, int status, long startedMillis,
+                Throwable error) {
         if(!enabled) {
             return;
         }
@@ -78,7 +84,7 @@ public final class RequestLog {
                 entry.put("causes", where.toString());
             }
         }
-        synchronized(RequestLog.class) {
+        synchronized(this) {
             ring[next] = entry;
             next = (next + 1) % ring.length;
             if(size < ring.length) {
@@ -88,7 +94,7 @@ public final class RequestLog {
     }
 
     /** The newest {@code limit} requests, newest first; only failures when asked. */
-    public static synchronized List recent(int limit, boolean failuresOnly) {
+    public synchronized List recent(int limit, boolean failuresOnly) {
         List out = new ArrayList();
         for(int iter = 0 ; iter < size && out.size() < limit ; iter++) {
             int at = (next - 1 - iter + ring.length) % ring.length;

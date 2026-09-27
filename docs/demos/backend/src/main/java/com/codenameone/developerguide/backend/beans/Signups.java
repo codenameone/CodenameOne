@@ -53,8 +53,9 @@ public class Signups {
     public void register(String email) throws IOException {
         db.execute("INSERT INTO signup (email) VALUES (?)", new Object[] {email});
         // Throws when the mail server refuses: the insert above is rolled back,
-        // because both run in the one transaction this method began. IOException
-        // is checked, so it takes rollbackFor to make it roll back.
+        // because both run in the one transaction this method began. A failed
+        // statement would roll back on its own -- it is a DataAccessException --
+        // but the mailer's IOException is checked, so it takes rollbackFor.
         mailer.send(email, "Welcome", "Thanks for signing up.");
     }
 // end::backend-transactional[]

@@ -74,6 +74,16 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a schedule decades between matches is still found")
+    void cronFindsARareMatch() {
+        // February 29th on a Monday: 2016, then 2044.
+        CronSchedule s = CronSchedule.parse("0 0 0 29 2 MON", "UTC");
+        long jan2020 = 1577836800000L;
+        long feb29of2044 = 2340316800000L;
+        assertEquals(feb29of2044, s.next(jan2020));
+    }
+
+    @Test
     @DisplayName("a cron time a spring-forward night skips does not fire an hour late")
     void cronSkipsTheDstGap() {
         CronSchedule s = CronSchedule.parse("0 30 2 * * *", "America/New_York");
@@ -277,6 +287,28 @@ class ApplicationRuntimeTest {
             store.save(b, null);
             assertNull(store.load("sid"), "a stale copy brought an invalidated session back");
 
+            // Two copies each changing their own attribute: merged, not replaced,
+            // and the slower one's older last use does not move it back.
+            HttpSession fresh = new HttpSession("merge", now, now, 1800);
+            fresh.markNew();
+            store.save(fresh, null);
+            HttpSession one = store.load("merge");
+            HttpSession two = store.load("merge");
+            one.touch(now + 5000);
+            one.setAttribute("theme", "dark");
+            two.setAttribute("lang", "en");
+            store.save(one, null);
+            store.save(two, null);
+            HttpSession merged = store.load("merge");
+            assertEquals("dark", merged.getAttribute("theme"), "a stale copy discarded a change");
+            assertEquals("en", merged.getAttribute("lang"));
+            assertEquals(now + 5000, merged.getLastAccessedTime(),
+                    "a slower request moved the last use back");
+            two.removeAttribute("lang");
+            store.save(two, null);
+            assertNull(store.load("merge").getAttribute("lang"));
+            assertEquals("dark", store.load("merge").getAttribute("theme"));
+
             // A ten-second session last written eleven seconds ago may be a
             // read-only one used every few seconds whose touches were never
             // written; it is not expired until the touch interval has passed too.
@@ -348,6 +380,103 @@ class ApplicationRuntimeTest {
 
     private static double number(Backend b) {
         return ((Number)b.getServer().getMetrics().get("requestsServed")).doubleValue();
+    }
+
+    @Test
+    @DisplayName("a managed operation answers 404 only for what does not exist, 400 for bad input")
+    void managedOperationStatuses() throws Exception {
+        final ManagedBean cache = new ManagedBean() {
+            public String getObjectName() { return "cache"; }
+            public String getDescription() { return ""; }
+            public String[] attributeNames() { return new String[0]; }
+            public String[] attributeDescriptions() { return new String[0]; }
+            public Object readAttribute(int index) { return null; }
+            public String[] operationNames() { return new String[] {"evict"}; }
+            public String[] operationDescriptions() { return new String[] {""}; }
+            public String[][] operationParameters() { return new String[][] {{"key"}}; }
+            public Object invoke(int index, Map arguments) {
+                if(!arguments.containsKey("key")) {
+                    throw new IllegalArgumentException("key is required");
+                }
+                return "evicted";
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(Management.TOKEN, "t0k");
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        environment.registerManaged(cache);
+                        return new HttpServer.Handler[0];
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        try {
+            assertEquals(200, manage(port, "/manage/managed/cache/evict", "{\"key\":\"a\"}"));
+            assertEquals(400, manage(port, "/manage/managed/cache/evict", "{}"),
+                    "an argument the operation refused was reported as a missing endpoint");
+            assertEquals(400, manage(port, "/manage/managed/cache/evict", "{not json"),
+                    "a malformed body was an internal error");
+            assertEquals(404, manage(port, "/manage/managed/cache/nope", "{}"));
+            assertEquals(404, manage(port, "/manage/managed/none/evict", "{}"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    private static int manage(int port, String path, String body) throws IOException {
+        HttpURLConnection c = open(port, path);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("Authorization", "Bearer t0k");
+        c.setRequestProperty("Content-Type", "application/json");
+        OutputStream out = c.getOutputStream();
+        out.write(body.getBytes("UTF-8"));
+        out.close();
+        return c.getResponseCode();
+    }
+
+    @Test
+    @DisplayName("a server that does not measure keeps its requests out of another's histogram")
+    void uninstrumentedServerIsNotMeasured() throws Exception {
+        int[] ports = {freePort(), freePort()};
+        Properties measured = new Properties();
+        measured.setProperty(Config.SERVER_PORT, String.valueOf(ports[0]));
+        Properties plain = new Properties();
+        plain.setProperty(Config.SERVER_PORT, String.valueOf(ports[1]));
+        HttpServer.Handler ok = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+            }
+        };
+        Backend a = Backend.builder(Config.of(measured, "dev")).quiet().handler(ok).start();
+        Backend b = Backend.builder(Config.of(plain, "prod")).quiet().handler(ok).start();
+        try {
+            read(open(ports[0], "/a"));
+            long before = requestCount();
+            read(open(ports[1], "/b"));
+            read(open(ports[1], "/b"));
+            assertEquals(before, requestCount(),
+                    "requests to a server without metrics were recorded");
+        } finally {
+            a.stop();
+            b.stop();
+        }
+    }
+
+    private static long requestCount() {
+        long n = 0;
+        List points = Metrics.get("http.server.request.duration").points();
+        for(int iter = 0 ; iter < points.size() ; iter++) {
+            n += ((Number)((Map)points.get(iter)).get("count")).longValue();
+        }
+        return n;
     }
 
     @Test
@@ -708,7 +837,7 @@ class ApplicationRuntimeTest {
     // ----------------------------------------------------------------- helpers
 
     /** An application with no beans, for tests that only need the hooks. */
-    static final class EmptyApplication implements Backend.Application {
+    static class EmptyApplication implements Backend.Application {
         public HttpServer.Handler[] create(Backend.Environment environment) {
             return new HttpServer.Handler[0];
         }

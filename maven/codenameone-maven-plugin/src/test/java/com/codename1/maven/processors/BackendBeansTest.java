@@ -851,6 +851,86 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aFailedStatementRollsBackAndAnotherCheckedExceptionCommits() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Rows", PKG + "@Service public class Rows {\n"
+                + "    private final DataSource db;\n"
+                + "    public Rows(DataSource db) { this.db = db; }\n"
+                + "    @PostConstruct public void schema() throws java.io.IOException {\n"
+                + "        db.execute(\"CREATE TABLE r (v TEXT)\", null);\n"
+                + "    }\n"
+                + "    @Transactional public void badStatement() throws java.io.IOException {\n"
+                + "        db.execute(\"INSERT INTO r (v) VALUES ('a')\", null);\n"
+                + "        db.execute(\"INSERT INTO no_such_table (v) VALUES ('b')\", null);\n"
+                + "    }\n"
+                + "    @Transactional public void fileFailure() throws java.io.IOException {\n"
+                + "        db.execute(\"INSERT INTO r (v) VALUES ('c')\", null);\n"
+                + "        throw new java.io.IOException(\"the file was not there\");\n"
+                + "    }\n"
+                + "    public int count() throws java.io.IOException {\n"
+                + "        return ((Number) db.queryOne(\"SELECT COUNT(*) AS n FROM r\", null)"
+                + ".get(\"n\")).intValue();\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Rows rows;\n"
+                + "    public Api(Rows rows) { this.rows = rows; }\n"
+                + "    @GetMapping(\"/bad\") public String bad() throws java.io.IOException {\n"
+                + "        try { rows.badStatement(); } catch (DataAccessException e) { }\n"
+                + "        return String.valueOf(rows.count());\n"
+                + "    }\n"
+                + "    @GetMapping(\"/file\") public String file() throws java.io.IOException {\n"
+                + "        try { rows.fileFailure(); } catch (java.io.IOException e) { }\n"
+                + "        return String.valueOf(rows.count());\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .requiresDataSource()
+                .application((Backend.Application) loader
+                        .loadClass("com.example.BackendWiring").newInstance())
+                .start();
+        try {
+            // As in Spring, where a failed statement is an unchecked
+            // DataAccessException: the insert before it is undone.
+            assertEquals("a failed statement committed the work before it", "0",
+                    http("GET", port, "/bad"));
+            // And any other checked exception commits, as Spring's rule says.
+            assertEquals("1", http("GET", port, "/file"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void duplicateToolAndManagedNamesAreBuildErrors() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.a.Stats", "package com.example.a;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@Component @ManagedResource public class Stats {\n"
+                + "    @ManagedAttribute public int getN() { return 1; }\n"
+                + "    @McpTool(description = \"x\") public String find() { return \"a\"; }\n"
+                + "}\n");
+        s.put("com.example.b.Stats", "package com.example.b;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@Component(\"otherStats\") @ManagedResource public class Stats {\n"
+                + "    @ManagedAttribute public int getN() { return 2; }\n"
+                + "    @McpTool(description = \"y\") public String find() { return \"b\"; }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("Two @McpTool methods are named \"find\""));
+        assertTrue(errors, errors.contains("Two @ManagedResource beans are named \"Stats\""));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

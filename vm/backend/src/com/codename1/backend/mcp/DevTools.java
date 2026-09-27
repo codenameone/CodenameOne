@@ -35,7 +35,6 @@ import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.DevConsole;
 import com.codename1.backend.Management;
-import com.codename1.backend.RequestLog;
 import com.codename1.backend.Scheduler;
 import com.codename1.backend.Web;
 import com.codename1.backend.metrics.Metrics;
@@ -69,7 +68,7 @@ public final class DevTools implements McpServer.Extension {
 
     public void install(McpServer server, Backend running) {
         this.backend = running;
-        RequestLog.enable(200);
+        running.getRequestLog().enable(200);
         DevConsole.install();
         server.register(new Tool("backend_routes",
                 "Lists every HTTP route of the running backend: method, path and the "
@@ -114,7 +113,8 @@ public final class DevTools implements McpServer.Extension {
                 schema(new String[] {"limit", "integer", "How many, default 20",
                         "failuresOnly", "boolean", "Only 5xx answers and exceptions"}, null)) {
             Object run(Map a) {
-                return RequestLog.recent(intArg(a, "limit", 20), boolArg(a, "failuresOnly"));
+                return backend.getRequestLog().recent(intArg(a, "limit", 20),
+                        boolArg(a, "failuresOnly"));
             }
         });
         server.register(new Tool("backend_logs",
