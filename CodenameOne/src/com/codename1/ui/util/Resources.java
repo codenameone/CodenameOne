@@ -1420,16 +1420,41 @@ public class Resources {
         return font;
     }
 
+    /// System fonts this resource file has already asked for, by face, style and size.
+    private HashMap<Integer, Font> systemFonts;
+
+    /// One system font per face/style/size for the whole file.
+    ///
+    /// Every font entry in a theme starts from a system font -- the fallback, and the
+    /// style a TrueType font is derived with -- and Font.createSystemFont builds a new
+    /// native font on each call. A theme has a font entry for every UIID and state:
+    /// the Flutter runtime's Material theme has 330, nearly all the same system font,
+    /// and on Linux each one was a Pango font with its metrics measured -- 319 of the
+    /// 360 font creations in a launch were the same Sans 18px. A font is immutable, so
+    /// the entries can share one.
+    private Font systemFont(int face, int style, int size) {
+        if (systemFonts == null) {
+            systemFonts = new HashMap<Integer, Font>();
+        }
+        Integer key = Integer.valueOf(((face & 0xff) << 16) | ((style & 0xff) << 8) | (size & 0xff));
+        Font f = systemFonts.get(key);
+        if (f == null) {
+            f = Font.createSystemFont(face, style, size);
+            systemFonts.put(key, f);
+        }
+        return f;
+    }
+
     Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
         switch (sizeSetting) {
             case 0: // small
-                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
+                fontSize = systemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
                 break;
             case 1: // medium
-                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM).getHeight();
+                fontSize = systemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM).getHeight();
                 break;
             case 2: // large
-                fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight();
+                fontSize = systemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE).getHeight();
                 break;
             case 3: // millimetres
                 fontSize = Display.getInstance().convertToPixels((int) (fontSize * 10), true) / 10.0f;
@@ -1742,7 +1767,7 @@ public class Resources {
                         continue;
                     }
                 } else {
-                    f = Font.createSystemFont(input.readByte(), input.readByte(), input.readByte());
+                    f = systemFont(input.readByte(), input.readByte(), input.readByte());
                     if (minorVersion > 4) {
                         boolean hasTTF = input.readBoolean();
                         if (hasTTF) {

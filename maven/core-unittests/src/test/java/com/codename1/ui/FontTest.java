@@ -37,7 +37,6 @@ class FontTest extends UITestBase {
     @BeforeEach
     void clearCaches() throws Exception {
         getDerivedFontCache().clear();
-        setFontReturnedHeight(0f);
         implementation.setTrueTypeSupported(true);
         implementation.setNativeFontSchemeSupported(true);
     }
@@ -48,6 +47,20 @@ class FontTest extends UITestBase {
         Font second = Font.createTrueTypeFont("CustomFont", "custom.ttf");
         assertSame(first, second);
         assertTrue(first.isTTFNativeFont());
+    }
+
+    /// The load cache must hold across other loads. Its key used to carry the height of
+    /// whichever font was loaded last, so loading a second font in between -- which a
+    /// theme does for every alternate entry -- made the first one load again.
+    @EdtTest
+    void testCreateTrueTypeFontStaysCachedAcrossOtherLoads() {
+        Font regular = Font.createTrueTypeFont("CustomFont", "custom.ttf");
+        // A different height from the first, which is what used to move the key.
+        Font tall = Font.createTrueTypeFont("TallFont", "tall.ttf");
+        assertNotEquals(regular.getHeight(), tall.getHeight(), "the fixture's loads disagree about height");
+        assertNotSame(regular, tall, "different fonts are different loads");
+        assertSame(regular, Font.createTrueTypeFont("CustomFont", "custom.ttf"));
+        assertSame(tall, Font.createTrueTypeFont("TallFont", "tall.ttf"));
     }
 
     @EdtTest
@@ -129,9 +142,4 @@ class FontTest extends UITestBase {
         return cache;
     }
 
-    private void setFontReturnedHeight(float value) throws Exception {
-        Field field = Font.class.getDeclaredField("fontReturnedHeight");
-        field.setAccessible(true);
-        field.set(null, value);
-    }
 }
