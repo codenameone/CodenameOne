@@ -226,6 +226,11 @@ public final class McpServer implements HttpServer.Handler {
         }
         if (parsed instanceof List) {
             List batch = (List) parsed;
+            if (batch.isEmpty()) {
+                // JSON-RPC: an empty batch is an invalid request, answered with a
+                // single error -- not the silent 202 an all-notification batch gets.
+                return request.respondJson(200, rpcError(null, -32600, "Invalid request"));
+            }
             List answers = new ArrayList();
             for (Object element : batch) {
                 Object answer = dispatch(element);

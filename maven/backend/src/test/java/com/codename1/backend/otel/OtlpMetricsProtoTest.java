@@ -188,4 +188,43 @@ class OtlpMetricsProtoTest {
             exporter.shutdown(0);
         }
     }
+
+    @Test
+    @DisplayName("two exporters of one identity: one exports, the other takes over when it stops")
+    void oneExporterPerIdentityExports() throws Exception {
+        java.net.ServerSocket probe = new java.net.ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:" + closed + "/v1/metrics");
+        p.setProperty(OtlpMetricExporter.INTERVAL, "20");
+        com.codename1.backend.Config config = com.codename1.backend.Config.of(p, "test");
+        OtlpMetricExporter first = new OtlpMetricExporter("dup");
+        OtlpMetricExporter second = new OtlpMetricExporter("dup");
+        first.open(config);
+        second.open(config);
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                    () -> first.open(config), "the same exporter opened twice");
+            long deadline = System.currentTimeMillis() + 5000;
+            while(System.currentTimeMillis() < deadline && failures(first) < 3) {
+                Thread.sleep(20);
+            }
+            assertTrue(failures(first) >= 3);
+            assertEquals(0L, failures(second), "both exporters sent the process's metrics");
+            first.shutdown(0);
+            deadline = System.currentTimeMillis() + 5000;
+            while(System.currentTimeMillis() < deadline && failures(second) < 3) {
+                Thread.sleep(20);
+            }
+            assertTrue(failures(second) >= 3, "nobody exported after the first stopped");
+        } finally {
+            first.shutdown(0);
+            second.shutdown(0);
+        }
+    }
+
+    private static long failures(OtlpMetricExporter e) {
+        return ((Number) e.status().get("failures")).longValue();
+    }
 }

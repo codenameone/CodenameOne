@@ -127,23 +127,40 @@ public final class OtlpMetricExporter implements MetricReader {
                             + "service and endpoint, or set " + ENABLED + "=false on one.");
                 }
             }
-            if (!OPEN.contains(this)) {
-                OPEN.add(this);
+            if (OPEN.contains(this)) {
+                // A second thread would export the same streams beside the first,
+                // and shutdown() tracks one run: the other would never stop.
+                throw new IOException("This metrics exporter is already open; give each "
+                        + "server its own, or open it once");
+            }
+            OPEN.add(this);
+            if (OPEN.size() > 1) {
+                // The same identity as the one already exporting: sending the
+                // process's instruments again would give the collector every point
+                // twice and run every gauge callback twice. This one waits, and
+                // takes over if that one shuts down first.
+                return true;
             }
         }
+        startExporting();
+        return true;
+    }
+
+    /// Starts this exporter's thread: it is the one exporting the process's metrics.
+    private void startExporting() {
         final Run mine = new Run();
-        synchronized (lock) {
-            run = mine;
-        }
-        thread = new Thread(new Runnable() {
+        Thread started = new Thread(new Runnable() {
             @Override
             public void run() {
                 loop(mine);
             }
         }, "cn1-otel-metrics");
-        thread.setDaemon(true);
-        thread.start();
-        return true;
+        started.setDaemon(true);
+        synchronized (lock) {
+            run = mine;
+            thread = started;
+        }
+        started.start();
     }
 
     private void loop(Run mine) {
@@ -215,8 +232,19 @@ public final class OtlpMetricExporter implements MetricReader {
 
     @Override
     public void shutdown(int timeoutMillis) {
+        OtlpMetricExporter successor = null;
         synchronized (OPEN) {
+            boolean leading = !OPEN.isEmpty() && OPEN.get(0) == this; //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
             OPEN.remove(this);
+            if (leading && !OPEN.isEmpty()) {
+                successor = (OtlpMetricExporter) OPEN.get(0);
+            }
+        }
+        if (successor != null) {
+            // The one that waited behind this, with the same identity, exports
+            // from now on; the process's metrics are not left unreported while
+            // another server is still running.
+            successor.startExporting();
         }
         Thread exporter;
         synchronized (lock) {

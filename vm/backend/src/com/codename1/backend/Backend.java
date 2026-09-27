@@ -563,10 +563,14 @@ public final class Backend {
         private final java.util.concurrent.atomic.AtomicBoolean instrumented;
         private final Application app;
         private final boolean track;
+        /// This server's tracer, or the untraced marker; bound for the request
+        /// so work it hands to another thread -- an @Async call -- keeps it.
+        private final Tracer tracer;
 
         Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
                 RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,
-                Application app, boolean track) {
+                Application app, boolean track, Tracer tracer) {
+            this.tracer = tracer;
             this.chain = chain;
             this.sessions = sessions;
             this.tasks = tasks;
@@ -641,6 +645,7 @@ public final class Backend {
             // one's session to the other and be let in.
             request.sessions = sessions;
             Object previousTasks = Tasks.enter(tasks);
+            Object previousOwner = Tracing.own(tracer);
             if (track) {
                 previous = CURRENT_REQUEST.get();
                 CURRENT_REQUEST.set(request);
@@ -722,6 +727,7 @@ public final class Backend {
                         CURRENT_REQUEST.set(previous);
                     }
                     Tasks.leave(previousTasks);
+                    Tracing.disown(previousOwner);
                     sessions.leave(request);
                 }
             }
@@ -1365,7 +1371,8 @@ public final class Backend {
                                 throws Exception {
                             // Every endpoint's callbacks carry this server's
                             // executors, as its HTTP requests do.
-                            HttpServer.WebSocketRegistry registry = withTasks(direct, tasks, active);
+                            HttpServer.WebSocketRegistry registry = withTasks(direct, tasks,
+                                    active != null ? active : Tracing.NONE);
                             // The same two arguments a Handlers factory gets,
                             // and for the same reason: an endpoint that needs
                             // the database declares it rather than reaching
@@ -1380,7 +1387,8 @@ public final class Backend {
                     };
                 }
                 server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
-                        new Serving(chain, sessions, tasks, requestLog, instrumented, app, track),
+                        new Serving(chain, sessions, tasks, requestLog, instrumented, app, track,
+                                active != null ? active : Tracing.NONE),
                         context, routes);
                 bound = true;
             } finally {
@@ -1393,9 +1401,9 @@ public final class Backend {
             synchronized (tasks) {
                 tasks.server = server;
             }
-            if (active != null) {
-                server.setTracer(active);
-            }
+            // Always set: with tracing off, the untraced marker, so another traced
+            // server in the process cannot claim this one's requests.
+            server.setTracer(active != null ? active : Tracing.NONE);
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.

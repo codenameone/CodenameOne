@@ -58,6 +58,44 @@ public final class Tracing {
     /// so: a websocket callback runs after its upgrade's span has ended, and with
     /// two servers in one process the installed tracer is only the latest one's.
     private static final ThreadLocal OWNER = new ThreadLocal();
+
+    /// The owner of a server that traces nothing. Null already means "whatever
+    /// tracer is installed", which is right for a bare HttpServer or a program's
+    /// own threads -- and wrong for a backend with tracing off: another backend in
+    /// the same process installing its tracer would then export this one's
+    /// requests, jobs and callbacks under the other's service name. A server with
+    /// tracing off passes this instead, and nothing it does is traced.
+    static final Tracer NONE = new Untraced();
+
+    private static final class Untraced implements Tracer {
+        @Override
+        public boolean open(Config config) {
+            return false;
+        }
+
+        @Override
+        public Span startSpan(String name, int kind, Span parent, String traceparent,
+                              String tracestate) {
+            return null;
+        }
+
+        @Override
+        public void flush(int timeoutMillis) {
+        }
+
+        @Override
+        public void shutdown(int timeoutMillis) {
+        }
+
+        @Override
+        public HttpServer.Handler relay() {
+            return null;
+        }
+
+        @Override
+        public void metrics(Map out) {
+        }
+    }
     private static volatile boolean reportedFailure; //NOPMD AvoidUsingVolatile - set once from any host thread
     private static final Span NOOP = new NoopSpan();
 
@@ -290,10 +328,20 @@ public final class Tracing {
             return current.owner;
         }
         Object owner = OWNER.get();
+        if (owner == NONE) { //NOPMD CompareObjectsWithEquals - the untraced marker, by identity
+            return null;
+        }
         if (owner instanceof Tracer) {
             return (Tracer) owner;
         }
         return tracer;
+    }
+
+    /// The owner this thread's work was bound to, for work handed to another
+    /// thread with no span to carry it; null when unbound.
+    static Tracer captureOwner() {
+        Object owner = OWNER.get();
+        return owner instanceof Tracer ? (Tracer) owner : null;
     }
 
     /// Makes `own` the tracer this thread's spans report to while no span of
@@ -325,7 +373,7 @@ public final class Tracing {
         // The parent's tracer: the run belongs to whoever started it.
         Tracer t = parent != null && parent.owner != null ? parent.owner
                 : own != null ? own : tracer;
-        if (t == null || isSuppressed()) {
+        if (t == null || t == NONE || isSuppressed()) { //NOPMD CompareObjectsWithEquals - the untraced marker
             return work.run(NOOP);
         }
         Span span = null;
@@ -452,7 +500,7 @@ public final class Tracing {
     /// must still go to the first's endpoint under its service name.
     static Span startServer(HttpServer.Request request, boolean secure, Tracer own) {
         Tracer t = own != null ? own : tracer;
-        if (t == null || request == null) {
+        if (t == null || t == NONE || request == null) { //NOPMD CompareObjectsWithEquals - the untraced marker
             return null;
         }
         Span span = null;

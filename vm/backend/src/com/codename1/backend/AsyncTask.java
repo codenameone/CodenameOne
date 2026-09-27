@@ -43,6 +43,9 @@ public abstract class AsyncTask implements Runnable, Future {
     private final String name;
     private final boolean returnsVoid;
     private final Span parent;
+    /// The caller's server's tracer when there is no parent span to carry it --
+    /// in particular the untraced marker of a server with tracing off.
+    private final Tracer owner;
     private boolean done;
     private boolean cancelled;
     private boolean started;
@@ -59,6 +62,7 @@ public abstract class AsyncTask implements Runnable, Future {
         this.name = name;
         this.returnsVoid = returnsVoid;
         this.parent = Tracing.captureParent();
+        this.owner = Tracing.captureOwner();
     }
 
     /// Runs the method's body. Generated.
@@ -75,7 +79,7 @@ public abstract class AsyncTask implements Runnable, Future {
         Object result = null;
         Throwable error = null;
         try {
-            result = Tracing.inBackground(name, parent, new Tracing.Work() {
+            result = Tracing.inBackground(name, parent, owner, new Tracing.Work() {
                 @Override
                 public Object run(Span span) throws Exception {
                     return call();

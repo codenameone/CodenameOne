@@ -137,7 +137,10 @@ public final class Scheduler {
     /// Called by the generated application before it starts the scheduler.
     public synchronized void bind(Backend backend) {
         this.measured = backend.isMeasured();
-        this.tracer = backend.getTracer();
+        // Tracing off is the untraced marker, not null: null would hand the runs
+        // to whichever tracer another server in the process installed.
+        Tracer own = backend.getTracer();
+        this.tracer = own != null ? own : Tracing.NONE;
     }
     private boolean lockTableReady;
 

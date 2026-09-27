@@ -103,6 +103,14 @@ public final class Histogram extends Instrument {
         this.plain = new Series(null, this.bounds.length + 1);
     }
 
+    /// Whether `other` has the same boundaries and label keys: two
+    /// registrations of one name must agree on both, or the values the second
+    /// records are read against the first's buckets and labels.
+    boolean sameShape(Histogram other) {
+        return java.util.Arrays.equals(bounds, other.bounds)
+                && java.util.Arrays.equals(labels, other.labels);
+    }
+
     /// The label keys this histogram was created with.
     public String[] getLabelKeys() {
         return (String[]) labels.clone();

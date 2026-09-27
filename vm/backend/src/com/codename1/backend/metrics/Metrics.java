@@ -173,6 +173,16 @@ public final class Metrics {
                 throw new IllegalArgumentException("Metric " + name
                         + " already exists as another kind");
             }
+            if (kind == Instrument.HISTOGRAM && !((Histogram) existing).sameShape(
+                    new Histogram(name, description, unit, bounds, labels))) {
+                // Shared by name like every instrument, but only when the shape
+                // matches: the server's own http.server.request.duration reused
+                // with an application's labels or buckets would record its route
+                // values against the wrong keys, and export series nobody asked for.
+                throw new IllegalArgumentException("Histogram " + name + " already exists "
+                        + "with other bucket boundaries or label keys; give this one "
+                        + "another name");
+            }
             return existing;
         }
         Instrument created;

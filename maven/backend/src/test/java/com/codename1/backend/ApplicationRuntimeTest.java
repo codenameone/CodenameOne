@@ -1590,8 +1590,73 @@ class ApplicationRuntimeTest {
         assertNull(Tasks.checkedKind("k", "  "));
     }
 
+    @Test
+    @DisplayName("a histogram registered again must have the same buckets and labels")
+    void histogramShapesMustAgree() {
+        Histogram h = Metrics.histogram("test.shape", "", "ms", new double[] {1, 2}, null);
+        assertTrue(h == Metrics.histogram("test.shape", "", "ms", new double[] {1, 2}, null));
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.shape", "",
+                "ms", new double[] {1, 3}, null));
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.shape", "",
+                "ms", new double[] {1, 2}, new String[] {"route", null, null}));
+    }
+
+    @Test
+    @DisplayName("an empty JSON-RPC batch is answered with Invalid Request")
+    void anEmptyBatchIsInvalid() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null, null);
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "[]"));
+        assertEquals(200, r.getStatus());
+        // respondJson defers the encoding to the write; render the value here.
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32600") && body.contains("\"id\":null"), body);
+    }
+
+    @Test
+    @DisplayName("a server with tracing off stays untraced when another server installs a tracer")
+    void anUntracedServerIsNotClaimed() throws Exception {
+        final List started = new ArrayList();
+        Tracer other = new QuietTracer() {
+            public Span startSpan(String name, int kind, Span parent, String traceparent,
+                                  String tracestate) {
+                started.add(name);
+                return null;
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        // A span of the application's own, inside the request.
+                        Tracing.startSpan("custom").end();
+                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                    }
+                }).start();
+        Tracing.install(other);                       // another server, started after
+        try {
+            assertEquals("ok", read(open(port, "/")));
+            assertTrue(started.isEmpty(),
+                    "the untraced server's work went to another server's tracer: " + started);
+            // The fallback itself is unchanged: with no owner, the installed one.
+            Tracing.startServer(new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null), false, null);
+            assertEquals(1, started.size());
+        } finally {
+            Tracing.install(null);
+            backend.stop();
+        }
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
-    static final class QuietTracer implements Tracer {
+    static class QuietTracer implements Tracer {
         public boolean open(Config config) {
             return true;
         }
