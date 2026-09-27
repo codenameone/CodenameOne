@@ -92,7 +92,7 @@ public final class Histogram extends Instrument {
             // As Prometheus will see them: folded to its alphabet, and beside the
             // "le" every bucket sample carries. Two that fold alike, or one that
             // IS le, repeat a label name in a sample, and the scrape is rejected.
-            String folded = Metrics.promName(this.labels[iter]);
+            String folded = Metrics.promLabel(this.labels[iter]);
             if ("le".equals(folded) || !exported.add(folded)) {
                 throw new IllegalArgumentException("Histogram " + name + ": label key "
                         + this.labels[iter] + " is exported to Prometheus as " + folded

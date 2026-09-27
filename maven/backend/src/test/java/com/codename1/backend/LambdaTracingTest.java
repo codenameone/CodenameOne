@@ -213,6 +213,28 @@ class LambdaTracingTest {
     }
 
     @Test
+    @DisplayName("an Error out of the tracer is a monitoring fault too: the work goes on untraced")
+    void tracerErrorsAreContained() throws Exception {
+        Recorder recorder = new Recorder();
+        recorder.errorOnAttributes = true;
+        Tracing.install(recorder);
+        assertEquals(null, Tracing.startLambda(null, "req"));
+        RecordedSpan span = (RecordedSpan)recorder.spans.get(0);
+        assertTrue(span.ended, "a span dropped after an Error in its decoration was never ended");
+        assertTrue(span.discarded);
+
+        recorder.startError = new LinkageError("tracer class missing");
+        assertEquals(null, Tracing.startLambda(null, "req"),
+                "an Error from startSpan escaped into the invocation");
+        Object ran = Tracing.inBackground("job", null, null, new Tracing.Work() {
+            public Object run(Span s) {
+                return "ran";
+            }
+        });
+        assertEquals("ran", ran, "background work did not run past a failing tracer");
+    }
+
+    @Test
     @DisplayName("a span whose decoration throws is still ended")
     void abandonedSpansAreEnded() throws Exception {
         Recorder recorder = new Recorder();
@@ -235,6 +257,8 @@ class LambdaTracingTest {
     private static final class Recorder implements Tracer {
         final List spans = new ArrayList();
         boolean throwOnAttributes;
+        boolean errorOnAttributes;
+        Error startError;
 
         public boolean open(Config config) {
             return true;
@@ -242,7 +266,10 @@ class LambdaTracingTest {
 
         public Span startSpan(String name, int kind, Span parent, String traceparent,
                               String tracestate) {
-            RecordedSpan span = new RecordedSpan(throwOnAttributes);
+            if(startError != null) {
+                throw startError;
+            }
+            RecordedSpan span = new RecordedSpan(throwOnAttributes, errorOnAttributes);
             spans.add(span);
             return span;
         }
@@ -268,18 +295,23 @@ class LambdaTracingTest {
 
     private static final class RecordedSpan extends Span {
         private final boolean throwOnAttributes;
+        private final boolean errorOnAttributes;
         boolean ended;
         boolean discarded;
         String error;
         final List errors = new ArrayList();
 
-        RecordedSpan(boolean throwOnAttributes) {
+        RecordedSpan(boolean throwOnAttributes, boolean errorOnAttributes) {
             this.throwOnAttributes = throwOnAttributes;
+            this.errorOnAttributes = errorOnAttributes;
         }
 
         private Span attr() {
             if(throwOnAttributes) {
                 throw new IllegalStateException("tracer bug");
+            }
+            if(errorOnAttributes) {
+                throw new AssertionError("tracer assertion");
             }
             return this;
         }

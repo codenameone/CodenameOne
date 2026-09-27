@@ -1006,9 +1006,6 @@ public final class HttpServer {
             this.extraHeaders = extraHeaders;
         }
 
-        /// A response whose body is a file. The server sends it with sendfile where
-        /// the platform has it, so the bytes never enter user space, and CLOSES the
-        /// descriptor when it is done -- a handler that returned one must not.
         /// This response with other extra headers, as a NEW object. For a header
         /// the server adds to one request's answer -- a session cookie -- because
         /// the Response a handler returns may be a constant shared by every
@@ -1023,6 +1020,9 @@ public final class HttpServer {
             return copy;
         }
 
+        /// A response whose body is a file. The server sends it with sendfile where
+        /// the platform has it, so the bytes never enter user space, and CLOSES the
+        /// descriptor when it is done -- a handler that returned one must not.
         public static Response file(int status, String contentType, int fd,
                                     long offset, long length, Map extraHeaders) {
             return new Response(status, contentType, null, fd, offset, length, extraHeaders);
@@ -2513,13 +2513,6 @@ public final class HttpServer {
         return server != null && server.running && server.vtHosts != null;
     }
 
-    /// Runs `task` on a virtual thread of the running server's hosts.
-    /// Answers false, having done nothing, when there is none to run it on; the
-    /// caller then runs it on a platform thread.
-    ///
-    /// The task is queued on a host and the host woken through its pipe; the
-    /// host creates the virtual thread itself, because a virtual thread's VM state
-    /// belongs to the host that runs it.
     /// The tracer this server's requests report to, when it has one of its own.
     private volatile Tracer serverTracer; //NOPMD AvoidUsingVolatile - set by setTracer after start, read by every worker
 
@@ -2538,6 +2531,9 @@ public final class HttpServer {
     /// Queues `task` on a host of `server`, which must be the server
     /// that owns the virtual-thread slot; false -- run it elsewhere -- when it is
     /// not, is stopping, or runs no virtual threads.
+    ///
+    /// The host is woken through its pipe and creates the virtual thread itself,
+    /// because a virtual thread's VM state belongs to the host that runs it.
     static boolean submitVirtualTask(Runnable task, HttpServer server) {
         if (task == null || server == null || server != ACTIVE_SERVER || !server.running
                 || server.vtHosts == null) {

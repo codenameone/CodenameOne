@@ -250,6 +250,46 @@ public final class Config {
         return get(key, null);
     }
 
+    /// A secret that clients present in a request header -- a bearer token -- or
+    /// null when no layer has one.
+    ///
+    /// Refused when no request could carry it exactly: the request parser rejects
+    /// a control character in a header value and trims surrounding spaces and
+    /// tabs, so a token read with a secret file's trailing newline would answer
+    /// every request 401 while the server looked healthy. The value stays out of
+    /// the message; it is a secret.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the value holds a control character, or leading or
+    /// trailing whitespace
+    public String getHeaderSecret(String key) throws IOException {
+        String value = get(key);
+        if (value == null || value.length() == 0 || sendableFieldValue(value)) {
+            return value;
+        }
+        throw new IOException(key + " holds a control character or leading or trailing "
+                + "whitespace, so no request can carry it in a header; remove it (a secret "
+                + "file's trailing newline is the usual cause)");
+    }
+
+    /// Whether a request header could carry this value exactly: no control
+    /// character but tab, and no space or tab at either end, which the request
+    /// parser trims as surrounding whitespace.
+    static boolean sendableFieldValue(String value) {
+        int last = value.length() - 1;
+        for (int iter = 0 ; iter <= last ; iter++) {
+            char c = value.charAt(iter);
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                return false;
+            }
+            if ((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// The value for `key`, or `fallback` when no layer has one.
     public String get(String key, String fallback) throws IOException {
         String raw = raw(key);

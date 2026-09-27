@@ -64,6 +64,10 @@ public final class HttpSession {
     private boolean fresh;
     private boolean dirty;
     private String previousId;
+    /// Set by a store whose rotation found the old row already gone -- another
+    /// request of the same client rotated or invalidated it first -- so the new
+    /// id has nothing stored under it and must not be sent to the client.
+    private boolean rotationLost;
     /// The attribute names this request set or removed, so a store that loads a
     /// copy per request can apply just these onto what another request saved in
     /// the meantime, instead of replacing it with this copy's stale whole map.
@@ -211,6 +215,7 @@ public final class HttpSession {
         dirty = false;
         fresh = false;
         previousId = null;
+        rotationLost = false;
         changed.clear();
         maxInactiveChanged = false;
     }
@@ -222,6 +227,14 @@ public final class HttpSession {
 
     synchronized boolean isMaxInactiveChanged() {
         return maxInactiveChanged;
+    }
+
+    synchronized void markRotationLost() {
+        rotationLost = true;
+    }
+
+    synchronized boolean isRotationLost() {
+        return rotationLost;
     }
 
     /// The id the client held before [#changeSessionId], or null.

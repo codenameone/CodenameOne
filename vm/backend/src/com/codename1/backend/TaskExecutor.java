@@ -37,6 +37,11 @@ import java.util.LinkedList;
 /// runtime or a server that has none -- the Java SE arm, a TLS server, Windows --
 /// it runs the task on its pool instead, which is why it has a size too.
 public final class TaskExecutor {
+    /// The executor whose task this thread is running, so shutdown() can tell
+    /// that its caller IS one of the tasks it waits for: an @Async method that
+    /// stops the server would otherwise wait out the whole timeout on itself.
+    private static final ThreadLocal RUNNING = new ThreadLocal();
+
     private final String name;
     private final boolean virtual;
     private final int size;
@@ -177,12 +182,15 @@ public final class TaskExecutor {
         // The task works for this executor's server: an @Async call it makes, or
         // an executor it asks for, is that server's too.
         Object previous = Tasks.enter(registry);
+        Object outer = RUNNING.get();
+        RUNNING.set(this);
         try {
             task.run();
             ok = true;
         } catch (Throwable err) {
             System.err.println("Task " + task + " on executor " + name + " failed: " + err);
         } finally {
+            RUNNING.set(outer);
             Tasks.leave(previous);
             synchronized (this) {
                 active--;
@@ -190,7 +198,9 @@ public final class TaskExecutor {
                 if (!ok) {
                     failed++;
                 }
-                if (shutdown && active == 0 && queue.isEmpty()) {
+                if (shutdown && queue.isEmpty()) {
+                    // Not only at zero: a shutdown called from one of this
+                    // executor's own tasks waits for the others to reach one.
                     notifyAll();
                 }
             }
@@ -208,11 +218,17 @@ public final class TaskExecutor {
 
     /// Stops taking tasks and waits up to `waitMillis` for the queued and
     /// running ones to finish.
+    ///
+    /// Called from one of this executor's own tasks -- one that stops the
+    /// server -- that task is not waited for: it cannot finish until this
+    /// returns. The HTTP drain leaves out the request that stopped it the same way.
     public synchronized void shutdown(long waitMillis) {
         shutdown = true;
         notifyAll();
+        boolean fromOwnTask = RUNNING.get() == this; //NOPMD CompareObjectsWithEquals - the executor itself, by identity
+        int self = fromOwnTask ? 1 : 0;
         long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
-        while ((active > 0 || !queue.isEmpty()) && waitMillis > 0) {
+        while ((active > self || !queue.isEmpty()) && waitMillis > 0) {
             long left = deadline - System.currentTimeMillis();
             if (left <= 0) {
                 break;
@@ -223,7 +239,7 @@ public final class TaskExecutor {
                 break;
             }
         }
-        if (queue.isEmpty() && active == 0) {
+        if (queue.isEmpty() && active <= self) {
             return;
         }
         // Out of time. The server destroys its beans and closes its database
@@ -245,12 +261,15 @@ public final class TaskExecutor {
         }
         queue.clear();
         if (workers != null) {
+            Thread caller = Thread.currentThread();
             for (Thread element : workers) {
-                element.interrupt();
+                if (element != caller) { //NOPMD CompareObjectsWithEquals - threads by identity
+                    element.interrupt();
+                }
             }
         }
         System.err.println("Executor " + name + " did not finish within the shutdown "
-                + "timeout: " + waiting + " queued task(s) dropped, " + active
+                + "timeout: " + waiting + " queued task(s) dropped, " + (active - self)
                 + " still running");
     }
 

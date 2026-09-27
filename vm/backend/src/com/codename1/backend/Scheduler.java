@@ -111,6 +111,11 @@ public final class Scheduler {
     private final List jobs = new ArrayList();
     private final DataSource locks;
     private final String instance;
+    /// Numbers each claim this scheduler makes, so the row records WHICH run holds
+    /// it and not just which instance: two jobs sharing a lock name run in one
+    /// process, and a run that outlived its lease must not release the claim
+    /// the next run took after it expired.
+    private long claims;
     private boolean started;
     private boolean stopped;
     /// Whether this scheduler's server records metrics. Per scheduler: the job
@@ -384,12 +389,16 @@ public final class Scheduler {
         long start = System.currentTimeMillis();
         String error = null;
         boolean ran = false;
+        String lease = null;
         Tracer runTracer;
         synchronized (this) {
             runTracer = tracer;
         }
         try {
-            if (job.lock == null || claim(job)) {
+            if (job.lock != null) {
+                lease = claim(job);
+            }
+            if (job.lock == null || lease != null) {
                 ran = true;
                 Tracing.inBackground("scheduled " + job.name, null, runTracer,
                         new RunBody(job.body));
@@ -398,8 +407,8 @@ public final class Scheduler {
             error = String.valueOf(err);
             System.err.println("Scheduled job " + job.name + " failed: " + err);
         } finally {
-            if (ran && job.lock != null) {
-                release(job);
+            if (lease != null) {
+                release(job, lease);
             }
             long end = System.currentTimeMillis();
             if (ran && measured) {
@@ -427,8 +436,15 @@ public final class Scheduler {
         }
     }
 
-    private boolean claim(Job job) throws IOException {
+    /// Claims the job's lock row; the lease that now holds it, or null when another
+    /// run does.
+    String claim(Job job) throws IOException {
         prepareLockTable();
+        String lease;
+        synchronized (this) {
+            claims++;
+            lease = instance + "#" + claims;
+        }
         // The DATABASE's clock, which every replica shares: with each replica's
         // own, one running ahead by more than the remaining lease would take a
         // lock another still legitimately holds, and run the job beside it.
@@ -436,15 +452,15 @@ public final class Scheduler {
         long until = now + job.lockAtMostFor;
         int updated = locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ?, locked_at = ?, "
                 + "locked_by = ? WHERE name = ? AND lock_until <= ?",
-                new Object[] {Long.valueOf(until), Long.valueOf(now), instance, job.lock, Long.valueOf(now)});
+                new Object[] {Long.valueOf(until), Long.valueOf(now), lease, job.lock, Long.valueOf(now)});
         if (updated > 0) {
-            return true;
+            return lease;
         }
         try {
             locks.execute("INSERT INTO " + LOCK_TABLE + " (name, lock_until, locked_at, "
                     + "locked_by) VALUES (?, ?, ?, ?)",
-                    new Object[] {job.lock, Long.valueOf(until), Long.valueOf(now), instance});
-            return true;
+                    new Object[] {job.lock, Long.valueOf(until), Long.valueOf(now), lease});
+            return lease;
         } catch (IOException failed) {
             // Only a row that exists means another instance holds the claim.
             // Anything else -- a dropped connection, a missing permission -- is
@@ -458,17 +474,19 @@ public final class Scheduler {
                 throw failed;
             }
             if (row != null) {
-                return false;
+                return null;
             }
             throw failed;
         }
     }
 
-    private void release(Job job) {
+    /// Gives up `lease`'s claim -- and only that one: after an expiry the row
+    /// may belong to a later run, of this job or another sharing its lock name.
+    void release(Job job, String lease) {
         try {
             locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ? WHERE name = ? AND "
                     + "locked_by = ?", new Object[] {Long.valueOf(databaseNow()),
-                        job.lock, instance});
+                        job.lock, lease});
         } catch (IOException err) {
             // The claim expires by itself; the only cost is that the next run on
             // another instance waits for it.

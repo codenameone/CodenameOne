@@ -325,6 +325,15 @@ public final class Sessions {
             if (session.isDirty()) {
                 boolean announce = session.isNew() || previous != null;
                 s.save(session, previous);
+                if (session.isRotationLost()) {
+                    // Another request of this client moved the session first, and
+                    // its response carries the id that has a row. Announcing this
+                    // one could replace that cookie, if it arrived last, with an id
+                    // nothing stores: the client would be signed out. The beans stay
+                    // where they are for the request that won to move.
+                    announce = false;
+                    previous = null;
+                }
                 if (announce) {
                     cookie = cookie(session.getId(), -1);
                 }
@@ -777,12 +786,17 @@ public final class Sessions {
             final String lock = "sqlite".equals(pool.dialect().getName()) ? "" : " FOR UPDATE";
             final java.util.Set changed = session.changedNames();
             final Map mine = session.attributesCopy();
+            Object moved;
             try {
-                pool.inTransaction(new Rotation(session, previousId, lock, changed, mine));
+                moved = pool.inTransaction(new Rotation(session, previousId, lock, changed, mine));
             } catch (IOException err) {
                 throw err;
             } catch (Exception err) {
                 throw new IOException("Could not rotate the session: " + err.getMessage(), err);
+            }
+            if (!Boolean.TRUE.equals(moved)) {
+                session.markRotationLost();
+                return;
             }
             session.storedAccessed = session.getLastAccessedTime();
         }
@@ -809,7 +823,9 @@ public final class Sessions {
                 Map row = db.queryOne("SELECT created, max_inactive, attributes FROM "
                         + TABLE + " WHERE id = ?" + lock, new Object[] {previousId});
                 if (row == null) {
-                    return null;            // invalidated meanwhile: stays gone
+                    // Rotated or invalidated meanwhile by another request of this
+                    // client: stays gone, and the caller must not announce the id.
+                    return Boolean.FALSE;
                 }
                 Map merged = new LinkedHashMap();
                 Object text = row.get("attributes");
@@ -835,7 +851,7 @@ public final class Sessions {
                         Integer.valueOf(maxInactive), Json.write(merged)});
                 db.execute("DELETE FROM " + TABLE + " WHERE id = ?",
                         new Object[] {previousId});
-                return null;
+                return Boolean.TRUE;
             }
         }
 

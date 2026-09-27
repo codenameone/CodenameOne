@@ -45,7 +45,7 @@ public interface McpTool {
     ///
     /// #### Throws
     ///
-    /// - `IllegalArgumentException`: @throws IllegalArgumentException for arguments the tool cannot use, which
+    /// - `IllegalArgumentException`: for arguments the tool cannot use, which
     /// the agent is told as a tool error it can correct
     Object call(Map arguments) throws Exception;
 }

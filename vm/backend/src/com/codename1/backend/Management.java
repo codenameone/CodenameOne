@@ -70,14 +70,14 @@ public final class Management implements HttpServer.Handler {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: @throws IOException when they are on outside development with no token,
+    /// - `IOException`: when they are on outside development with no token,
     /// which would publish the server's internals to anyone
     public static Management fromConfig(Config config) throws IOException {
         boolean development = config.isDevelopmentProfile();
         if (!config.getBoolean(ENABLED, development)) {
             return null;
         }
-        String token = config.get(TOKEN);
+        String token = config.getHeaderSecret(TOKEN);
         if (!development && (token == null || token.length() == 0)) {
             throw new IOException(ENABLED + " is on outside a development profile and "
                     + TOKEN + " is not set. The metrics and managed beans would be readable "

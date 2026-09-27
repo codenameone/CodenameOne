@@ -263,8 +263,12 @@ public final class McpArgs {
                 throw new IllegalArgumentException("\"" + name + "\" must be a whole number");
             }
             // longValue() saturates: 1e20 would become Long.MAX_VALUE and the tool
-            // would act on a number nobody sent. 2^63 itself is out of range.
-            if (d < -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
+            // would act on a number nobody sent. Both boundaries are refused: 2^63
+            // is out of range, and a double of exactly -2^63 is as likely to be a
+            // rounded -9223372036854775809.0 as the minimum itself -- doubles are
+            // 2048 apart there. The exact minimum written as an integer arrives as
+            // a Long above and stays valid.
+            if (d <= -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
                 throw new IllegalArgumentException("\"" + name + "\" is out of range");
             }
             return (long) d;

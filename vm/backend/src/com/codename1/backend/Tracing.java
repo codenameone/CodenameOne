@@ -164,7 +164,7 @@ public final class Tracing {
         if (previous != null && previous != installed) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
             try {
                 previous.shutdown(REPLACED_SHUTDOWN_MILLIS);
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
             }
         }
@@ -213,7 +213,7 @@ public final class Tracing {
                 // failed after its database initialisation holds exactly the spans
                 // that explain the failure, and shutdown(0) dropped them unsent.
                 stopFailed.shutdown(REPLACED_SHUTDOWN_MILLIS);
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
             }
         }
@@ -265,8 +265,6 @@ public final class Tracing {
         }
     }
 
-    /// A new child of the current span that is NOT made current, for work whose
-    /// start and end are in different places. The caller must end it.
     /// The current span when tracing is on, for handing to work that runs on
     /// another thread; null otherwise.
     static Span captureParent() {
@@ -310,7 +308,7 @@ public final class Tracing {
                 span.owner = t;
                 enter(span);
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             span = null;
         }
@@ -338,7 +336,7 @@ public final class Tracing {
                 span.owner = t;
             }
             return span == null ? NOOP : span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return NOOP;
         }
@@ -400,7 +398,7 @@ public final class Tracing {
             if (name != null && name.indexOf(' ') < 0) {
                 span.updateName(name + " " + template);
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -460,7 +458,7 @@ public final class Tracing {
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             abandon(span);
             return null;
@@ -490,7 +488,7 @@ public final class Tracing {
                     span.setError("the response could not be written");
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         finish(span);
@@ -527,7 +525,7 @@ public final class Tracing {
                 if (span.getKind() == Span.KIND_SERVER) {
                     return span;
                 }
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
                 return null;
             }
@@ -568,7 +566,7 @@ public final class Tracing {
                     }
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         return span;
@@ -596,7 +594,7 @@ public final class Tracing {
                 out.add(TRACESTATE + ": " + state);
             }
             return out;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return null;
         }
@@ -622,7 +620,7 @@ public final class Tracing {
                     span.setError(String.valueOf(status));
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         finish(span);
@@ -655,7 +653,7 @@ public final class Tracing {
                     span.setAttribute("db.query.text", sql);
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         return span;
@@ -670,7 +668,7 @@ public final class Tracing {
             if (span.isRecording()) {
                 span.setAttribute(key, value);
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -739,7 +737,7 @@ public final class Tracing {
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             abandon(span);
             return null;
@@ -776,7 +774,7 @@ public final class Tracing {
         }
         try {
             t.flush(timeoutMillis);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -823,7 +821,7 @@ public final class Tracing {
         }
         try {
             owned.shutdown(timeoutMillis);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -836,7 +834,7 @@ public final class Tracing {
         }
         try {
             t.metrics(out);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -874,7 +872,7 @@ public final class Tracing {
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return null;
         }
@@ -907,7 +905,7 @@ public final class Tracing {
         }
         try {
             span.end();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -923,13 +921,13 @@ public final class Tracing {
         }
         try {
             span.discard();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             // The tracer is already failing; ending the span below still matters.
             failed(err);
         }
         try {
             span.end();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -937,13 +935,20 @@ public final class Tracing {
     private static void guardedException(Span span, Throwable error) {
         try {
             span.recordException(error);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
 
     /// Once per process: a broken tracer must not also flood the log.
-    private static void failed(RuntimeException err) {
+    /// Every hook into the tracer catches Throwable, not just RuntimeException:
+    /// an AssertionError or a LinkageError out of a tracer is as much a
+    /// monitoring fault as an exception, and letting it escape would fail the
+    /// request -- and every later one, since the tracer stays installed. That
+    /// includes a VirtualMachineError raised inside the tracer's own code; if
+    /// the process really is out of memory, the request's next allocation says
+    /// so on its own.
+    private static void failed(Throwable err) {
         if (!reportedFailure) {
             reportedFailure = true;
             System.err.println("tracing failed and the operation continued untraced: " + err);

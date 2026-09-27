@@ -552,7 +552,7 @@ public final class Metrics {
                     sb.append(',');
                 }
                 first = false;
-                sb.append(promName(String.valueOf(e.getKey()))).append("=\"")
+                sb.append(promLabel(String.valueOf(e.getKey()))).append("=\"")
                         .append(escapeLabel(String.valueOf(e.getValue()))).append('"');
             }
         }
@@ -571,6 +571,20 @@ public final class Metrics {
             char c = name.charAt(iter);
             boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
                     || c == ':' || (iter > 0 && c >= '0' && c <= '9');
+            sb.append(ok ? c : '_');
+        }
+        return sb.toString();
+    }
+
+    /// A label name in Prometheus's alphabet, which is the metric-name alphabet
+    /// WITHOUT the colon: `tenant:id` written as a label is a syntax error the
+    /// scraper rejects the whole exposition for.
+    static String promLabel(String name) {
+        StringBuilder sb = new StringBuilder(name.length());
+        for (int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+                    || (iter > 0 && c >= '0' && c <= '9');
             sb.append(ok ? c : '_');
         }
         return sb.toString();

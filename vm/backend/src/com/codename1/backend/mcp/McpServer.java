@@ -123,7 +123,7 @@ public final class McpServer implements HttpServer.Handler {
         if (!config.getBoolean(ENABLED, anyTools || extension != null)) {
             return null;
         }
-        String token = config.get(TOKEN);
+        String token = config.getHeaderSecret(TOKEN);
         if (!development && (token == null || token.length() == 0)) {
             throw new IOException("The MCP endpoint is on outside a development profile and "
                     + TOKEN + " is not set, so anyone who can reach the port could call its "

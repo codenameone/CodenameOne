@@ -1262,6 +1262,139 @@ class ApplicationRuntimeTest {
         assertTrue(e.getMessage().contains(McpServer.TOKEN), e.getMessage());
     }
 
+    @Test
+    @DisplayName("of two requests rotating one database session, the loser sends no cookie")
+    void aLostRotationIsNotAnnounced(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "r.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions sessions = new Sessions();
+            Sessions.Jdbc store = new Sessions.Jdbc(pool);
+            sessions.setStore(store);
+            long now = System.currentTimeMillis();
+            HttpSession created = new HttpSession("twice", now, now, 1800);
+            created.markNew();
+            store.save(created, null);
+            HttpSession first = store.load("twice");
+            HttpSession second = store.load("twice");
+            first.owner = sessions;
+            second.owner = sessions;
+            String won = first.changeSessionId();
+            String lost = second.changeSessionId();
+            HttpServer.Response a = sessions.finish(first, HttpServer.Response.text(200, "a"));
+            HttpServer.Response b = sessions.finish(second, HttpServer.Response.text(200, "b"));
+            assertTrue(String.valueOf(a.extraHeaders).contains(won),
+                    "the rotation that moved the row did not announce its id");
+            assertTrue(b.extraHeaders == null || !String.valueOf(b.extraHeaders).contains(lost),
+                    "the losing rotation sent an id nothing stores: " + b.extraHeaders);
+            assertNotNull(store.load(won));
+            assertNull(store.load(lost));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("an expired run releases only its own lease, not a later run's")
+    void anExpiredRunDoesNotReleaseItsSuccessor(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "l.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Scheduler scheduler = new Scheduler(pool);
+            Runnable nothing = new Runnable() {
+                public void run() {
+                }
+            };
+            Scheduler.Job slow = new Scheduler.Job("slow", Scheduler.FIXED_DELAY, null, 1000, 0,
+                    null, Tasks.PLATFORM, "shared", 1, nothing);
+            Scheduler.Job next = new Scheduler.Job("next", Scheduler.FIXED_DELAY, null, 1000, 0,
+                    null, Tasks.PLATFORM, "shared", 60000, nothing);
+            String expired = scheduler.claim(slow);
+            assertNotNull(expired);
+            Thread.sleep(20);                        // the 1ms lease runs out
+            String current = scheduler.claim(next);
+            assertNotNull(current, "an expired lease was not taken over");
+            scheduler.release(slow, expired);        // the overrun finally ends
+            assertNull(scheduler.claim(slow),
+                    "the overrun released the lease a later run now holds");
+            scheduler.release(next, current);
+            assertNotNull(scheduler.claim(slow), "releasing its own lease freed nothing");
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("a colon is legal in a Prometheus metric name but not in a label name")
+    void prometheusLabelNamesHaveNoColon() {
+        Histogram h = Metrics.histogram("test.lbl.render", "", "ms", null,
+                new String[] {"tenant:id", null, null});
+        h.record(1, "acme", null, null);
+        String text = Metrics.prometheus();
+        assertTrue(text.contains("tenant_id=\"acme\""), text);
+        assertFalse(text.contains("tenant:id="), "a colon reached a label name: " + text);
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.lbl.colon",
+                "", "ms", null, new String[] {"tenant:id", "tenant_id", null}));
+    }
+
+    @Test
+    @DisplayName("a task that shuts its own executor down is not waited for")
+    void aTaskStoppingItsExecutorIsNotAwaited() throws Exception {
+        Tasks.Registry registry = Tasks.open(null);
+        final TaskExecutor one = new TaskExecutor("self", false, 1, registry);
+        final long[] took = {-1};
+        final boolean[] interrupted = {false};
+        final CountDownLatch done = new CountDownLatch(1);
+        one.execute(new Runnable() {
+            public void run() {
+                long start = System.currentTimeMillis();
+                one.shutdown(5000);
+                took[0] = System.currentTimeMillis() - start;
+                interrupted[0] = Thread.currentThread().isInterrupted();
+                done.countDown();
+            }
+        });
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertTrue(took[0] < 2000, "the stopping task waited " + took[0] + "ms for itself");
+        assertFalse(interrupted[0], "the stopping task was interrupted by its own shutdown");
+        Tasks.shutdown(registry, 0);
+    }
+
+    @Test
+    @DisplayName("a double that rounds to -2^63 is refused as a long, the exact Long is not")
+    void theNegativeLongBoundaryIsChecked() {
+        Map args = new LinkedHashMap();
+        args.put("rounded", Double.valueOf(-9223372036854775809.0));
+        args.put("exact", Long.valueOf(Long.MIN_VALUE));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.longValue(args, "rounded", true));
+        assertEquals(Long.MIN_VALUE,
+                com.codename1.backend.mcp.McpArgs.longValue(args, "exact", true));
+    }
+
+    @Test
+    @DisplayName("a bearer token no request could present is refused at start, unechoed")
+    void unsendableBearerTokensAreRefused() {
+        String[] bad = {"s3cret\n", " s3cret", "s3\u0001cret"};
+        for(String token : bad) {
+            Properties mcp = new Properties();
+            mcp.setProperty(McpServer.ENABLED, "true");
+            mcp.setProperty(McpServer.TOKEN, token);
+            IOException e = assertThrows(IOException.class,
+                    () -> McpServer.fromConfig(Config.of(mcp, "prod"), null, null, null));
+            assertTrue(e.getMessage().contains(McpServer.TOKEN), e.getMessage());
+            assertFalse(e.getMessage().contains("s3"), "the secret was echoed");
+            Properties manage = new Properties();
+            manage.setProperty(Management.ENABLED, "true");
+            manage.setProperty(Management.TOKEN, token);
+            e = assertThrows(IOException.class,
+                    () -> Management.fromConfig(Config.of(manage, "prod")));
+            assertTrue(e.getMessage().contains(Management.TOKEN), e.getMessage());
+        }
+    }
+
     // ----------------------------------------------------------------- helpers
 
     /** An application with no beans, for tests that only need the hooks. */
