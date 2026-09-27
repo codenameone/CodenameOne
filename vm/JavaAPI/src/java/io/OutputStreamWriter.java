@@ -102,19 +102,25 @@ public class OutputStreamWriter extends java.io.Writer {
         }
     }
 
+    // Every entry point that touches buf, count or pendingHigh holds Writer.lock, as the
+    // JDK's writers do: the buffer is shared state, so two threads writing one writer
+    // would otherwise interleave inside it and drop or corrupt bytes. Uncontended, the
+    // monitor costs a compare-and-swap per call, not per character.
     /**
      * Close the stream.
      */
     public void close() throws java.io.IOException{
-        if(closed) {
-            return;   // closing a closed writer has no effect, as in the JDK
-        }
-        try {
-            finishPending();
-            flushBuffer();
-        } finally {
-            closed = true;
-            os.close();
+        synchronized (lock) {
+            if(closed) {
+                return;   // closing a closed writer has no effect, as in the JDK
+            }
+            try {
+                finishPending();
+                flushBuffer();
+            } finally {
+                closed = true;
+                os.close();
+            }
         }
     }
 
@@ -122,70 +128,78 @@ public class OutputStreamWriter extends java.io.Writer {
      * Flush the stream.
      */
     public void flush() throws java.io.IOException{
-        ensureOpen();
-        flushBuffer();
-        os.flush();
+        synchronized (lock) {
+            ensureOpen();
+            flushBuffer();
+            os.flush();
+        }
     }
 
     /**
      * Write a portion of an array of characters.
      */
     public void write(char[] cbuf, int off, int len) throws java.io.IOException{
-        // The bounds check has to be explicit now. It used to happen by accident,
-        // inside the String the old body built; the encode loop below would simply
-        // run zero times for a negative length and return as though it had written
-        // something, where Writer.write says it throws.
-        ensureOpen();
-        if(off < 0 || len < 0 || off + len > cbuf.length || off + len < 0) {
-            throw new IndexOutOfBoundsException();
-        }
-        if(utf8) {
-            int end = off + len;
-            for(int i = off ; i < end ; i++) {
-                encodeChar(cbuf[i]);
+        synchronized (lock) {
+            // The bounds check has to be explicit now. It used to happen by accident,
+            // inside the String the old body built; the encode loop below would simply
+            // run zero times for a negative length and return as though it had written
+            // something, where Writer.write says it throws.
+            ensureOpen();
+            if(off < 0 || len < 0 || off + len > cbuf.length || off + len < 0) {
+                throw new IndexOutOfBoundsException();
             }
-            return;
+            if(utf8) {
+                int end = off + len;
+                for(int i = off ; i < end ; i++) {
+                    encodeChar(cbuf[i]);
+                }
+                return;
+            }
+            write(new String(cbuf, off, len));
         }
-        write(new String(cbuf, off, len));
     }
 
     /**
      * Write a single character.
      */
     public void write(int c) throws java.io.IOException{
-        ensureOpen();
-        if(utf8) {
-            encodeChar((char)c);
-            return;
+        synchronized (lock) {
+            ensureOpen();
+            if(utf8) {
+                encodeChar((char)c);
+                return;
+            }
+            write(new String(new char[] {(char)c}));
         }
-        write(new String(new char[] {(char)c}));
     }
 
     /**
      * Write a portion of a string.
      */
     public void write(java.lang.String str, int off, int len) throws java.io.IOException{
-        // Same reasoning as the char[] overload: substring used to raise this, and
-        // the encode loop does not.
-        ensureOpen();
-        if(off < 0 || len < 0 || off + len > str.length() || off + len < 0) {
-            throw new StringIndexOutOfBoundsException();
-        }
-        if(utf8) {
-            int end = off + len;
-            for(int i = off ; i < end ; i++) {
-                encodeChar(str.charAt(i));
+        synchronized (lock) {
+            // Same reasoning as the char[] overload: substring used to raise this, and
+            // the encode loop does not.
+            ensureOpen();
+            if(off < 0 || len < 0 || off + len > str.length() || off + len < 0) {
+                throw new StringIndexOutOfBoundsException();
             }
-            return;
+            if(utf8) {
+                int end = off + len;
+                for(int i = off ; i < end ; i++) {
+                    encodeChar(str.charAt(i));
+                }
+                return;
+            }
+            if(off > 0 || len != str.length()) {
+                // substring takes an END index, not a length. With off > 0 this used to
+                // ask for [off, len), which is the wrong range and is shorter than the
+                // caller asked for -- or throws when len < off.
+                str = str.substring(off, off + len);
+            }
+            byte[] b = str.getBytes(enc);
+            writeBytes(b, 0, b.length);
         }
-        if(off > 0 || len != str.length()) {
-            // substring takes an END index, not a length. With off > 0 this used to
-            // ask for [off, len), which is the wrong range and is shorter than the
-            // caller asked for -- or throws when len < off.
-            str = str.substring(off, off + len);
-        }
-        byte[] b = str.getBytes(enc);
-        writeBytes(b, 0, b.length);
     }
 
     private void writeBytes(byte[] b, int off, int len) throws java.io.IOException {

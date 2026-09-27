@@ -537,12 +537,20 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * purely to hand it to equals -- an allocation, and a full copy of the content,
      * to answer a question that needs neither. The String case still short circuits
      * on equals, which is native and compares words at a time. */
+    // null answers false, as it always has here (the JDK throws); kept, not changed in
+    // passing, because callers may rely on it.
     public boolean contentEquals(CharSequence cs) {
         if (cs == null) {
             return false;
         }
         if (cs instanceof String) {
             return equals(cs);
+        }
+        // A StringBuffer reached through CharSequence still has to be compared under ONE
+        // hold of its monitor: the loop below would lock per length() and per charAt(), and
+        // a concurrent mutation between them answers wrongly or throws.
+        if (cs instanceof StringBuffer) {
+            return contentEquals((StringBuffer) cs);
         }
         if (cs.length() != count) {
             return false;

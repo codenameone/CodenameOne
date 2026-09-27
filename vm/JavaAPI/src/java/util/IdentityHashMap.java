@@ -326,7 +326,9 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
         if (maxSize >= 0) {
             this.size = 0;
             threshold = getThreshold(maxSize);
-            elementData = newElementArray(computeElementArraySize());
+            int capacity = computeElementArraySize();
+            elementData = newElementArray(capacity);
+            elementCapacity = capacity;
         } else {
             throw new IllegalArgumentException();
         }
@@ -372,8 +374,11 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
      *            the number of elements
      * @return Reference to the element array
      */
+    // Allocates only. elementCapacity is published by the caller once the block exists:
+    // setting it here, before an allocation that can throw OutOfMemoryError, left a map a
+    // caller could keep using with the old, smaller block and the new, larger mask, so
+    // findIndex read and wrote past the end of the native allocation.
     private long newElementArray(int s) {
-        elementCapacity = s;
         return NativeStorage.references(s);
     }
 
@@ -639,8 +644,8 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             newlength = MAXIMUM_ARRAY_SIZE;
         }
         // The old block is read while the new one is filled, so BOTH have to stay
-        // reachable across the loop -- newElementArray publishes the new capacity,
-        // so the old one is kept in a local rather than re-read from the field.
+        // reachable across the loop; the new capacity is published only with the new
+        // block, after the copy, so a failed allocation leaves the map as it was.
         long oldData = elementData;
         long newData = newElementArray(newlength);
         for (int i = 0; i < oldCapacity; i = i + 2) {
@@ -653,6 +658,7 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements
             }
         }
         elementData = newData;
+        elementCapacity = newlength;
         // retire, not free: the collector may still be tracing the old block in
         // this cycle, so it is handed back only once no marker can be inside it.
         NativeStorage.retire(oldData);
