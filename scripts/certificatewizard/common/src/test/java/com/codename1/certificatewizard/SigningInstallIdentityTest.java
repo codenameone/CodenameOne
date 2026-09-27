@@ -48,11 +48,19 @@ class SigningInstallIdentityTest {
         }
     }
 
-    /// The shape of a real profile: an XML plist inside a binary CMS envelope.
     private static Path profile(String team) throws Exception {
+        return profile(team, team);
+    }
+
+    /// The shape of a real profile: an XML plist inside a binary CMS envelope. `prefix` is the
+    /// App ID prefix in the entitlement, which differs from `team` on a legacy Bundle Seed ID.
+    private static Path profile(String prefix, String team) throws Exception {
         String plist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
                 + "<key>Name</key><string>Demo STORE</string>\n"
-                + "<key>Entitlements</key><dict><key>application-identifier</key><string>" + team
+                + "<key>Entitlements</key><dict>"
+                + "<key>com.apple.developer.parent-application-identifiers</key><array><string>"
+                + "ZZZZZZZZZZ.other</string></array>"
+                + "<key>application-identifier</key><string>" + prefix
                 + ".com.example.demo</string></dict>\n"
                 + "<key>TeamIdentifier</key>\n<array>\n\t<string>" + team + "</string>\n</array>\n"
                 + "<key>TeamName</key><string>Example</string>\n</dict></plist>";
@@ -74,18 +82,32 @@ class SigningInstallIdentityTest {
     }
 
     @Test
-    void teamIdentifierIsReadFromTheProfileEnvelope() throws Exception {
+    void appIdPrefixIsReadFromTheProfileEnvelope() throws Exception {
         assertEquals("A1B2C3D4E5",
-                SigningAssetInstaller.profileTeamIdentifier(Files.readAllBytes(profile("A1B2C3D4E5"))));
-        assertNull(SigningAssetInstaller.profileTeamIdentifier(null));
-        assertNull(SigningAssetInstaller.profileTeamIdentifier("no plist here".getBytes(StandardCharsets.UTF_8)));
-        assertNull(SigningAssetInstaller.profileTeamIdentifier(
-                "<key>TeamIdentifier</key><array><string>not a team</string></array>"
+                SigningAssetInstaller.profileAppIdPrefix(Files.readAllBytes(profile("A1B2C3D4E5"))),
+                "the parent-application-identifiers key before it is a different key");
+        assertNull(SigningAssetInstaller.profileAppIdPrefix(null));
+        assertNull(SigningAssetInstaller.profileAppIdPrefix("no plist here".getBytes(StandardCharsets.UTF_8)));
+        assertNull(SigningAssetInstaller.profileAppIdPrefix(
+                "<key>application-identifier</key><string>not-a-prefix.com.example</string>"
                         .getBytes(StandardCharsets.UTF_8)));
-        assertNull(SigningAssetInstaller.profileTeamIdentifier(
-                "<key>TeamIdentifier</key><array></array><key>X</key><string>A1B2C3D4E5</string>"
+        assertNull(SigningAssetInstaller.profileAppIdPrefix(
+                "<key>application-identifier</key><key>X</key><string>A1B2C3D4E5.com.example</string>"
                         .getBytes(StandardCharsets.UTF_8)),
-                "a string after the array closes is some other key's value");
+                "a string after another key is that key's value");
+    }
+
+    /// A legacy Bundle Seed ID: the profile's App ID is under the seed, not the team, and the
+    /// entitlement Xcode matches is the App ID's. Writing the TeamIdentifier would produce a
+    /// value this very profile cannot sign.
+    @Test
+    void aLegacySeedPrefixIsWrittenRatherThanTheTeam() throws Exception {
+        Path settings = settings("codename1.packageName=com.example.demo\n"
+                + "codename1.ios.appid=Q5GHSKAL2F.com.example.demo\n");
+        SigningAssetInstaller.applyReleaseCertificate(settings.toString(), "/tmp/dist.p12", "pw",
+                profile("SEED123456", "A1B2C3D4E5").toString());
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        assertTrue(written.contains("codename1.ios.appid=SEED123456.com.example.demo\n"), written);
     }
 
     /// Issue #5901: the template's placeholder team, Q5GHSKAL2F, survived every wizard install,

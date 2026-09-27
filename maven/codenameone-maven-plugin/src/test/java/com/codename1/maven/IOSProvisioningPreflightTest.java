@@ -279,6 +279,27 @@ public class IOSProvisioningPreflightTest {
         assertTrue(check(p, true).isEmpty());
     }
 
+    /**
+     * An account with a legacy Bundle Seed ID: the profile's App ID prefix is the seed, not the
+     * team, and an appid carrying the seed is exactly what signing wants. Judging against the
+     * TeamIdentifier would refuse it.
+     */
+    @Test
+    public void appIdUnderALegacySeedPrefixPasses() throws Exception {
+        String seedProfile = profile("Seed STORE", FUTURE,
+                "<key>Entitlements</key><dict>"
+                + "<key>get-task-allow</key><false/>"
+                + "<key>application-identifier</key><string>SEED123456.com.example.app</string>"
+                + "</dict>\n"
+                + "<key>TeamIdentifier</key><array><string>A1B2C3D4E5</string></array>\n");
+        Properties p = settings(write(seedProfile), true, "app-store");
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.ios.appid", "SEED123456.com.example.app");
+        assertTrue(check(p, true).isEmpty());
+        p.setProperty("codename1.ios.appid", "A1B2C3D4E5.com.example.app");
+        assertFatal(check(p, true), "SEED123456", "codename1.ios.appid=SEED123456.com.example.app");
+    }
+
     /** An App ID that does not start with a team ID states no team, so there is nothing to hold. */
     @Test
     public void appIdWithoutATeamIsNotJudged() throws Exception {
@@ -292,12 +313,12 @@ public class IOSProvisioningPreflightTest {
     }
 
     @Test
-    public void teamPrefixIsOnlyAWellFormedTeamId() {
-        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.teamPrefix("A1B2C3D4E5.com.example.app"));
-        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.teamPrefix("A1B2C3D4E5.*"));
-        assertNull(IOSProvisioningPreflight.teamPrefix("com.example.app"));
-        assertNull(IOSProvisioningPreflight.teamPrefix("ABCD1234.com.example.app"));
-        assertNull(IOSProvisioningPreflight.teamPrefix("a1b2c3d4e5.com.example.app"));
+    public void appIdPrefixIsOnlyAWellFormedPrefix() {
+        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.appIdPrefix("A1B2C3D4E5.com.example.app"));
+        assertEquals("A1B2C3D4E5", IOSProvisioningPreflight.appIdPrefix("A1B2C3D4E5.*"));
+        assertNull(IOSProvisioningPreflight.appIdPrefix("com.example.app"));
+        assertNull(IOSProvisioningPreflight.appIdPrefix("ABCD1234.com.example.app"));
+        assertNull(IOSProvisioningPreflight.appIdPrefix("a1b2c3d4e5.com.example.app"));
     }
 
     /** No package name to compare against, and a profile is not refused on a guess. */

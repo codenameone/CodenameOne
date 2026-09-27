@@ -31,6 +31,8 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.KeyboardFocusManager;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.Taskbar;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
@@ -200,6 +202,7 @@ public class CertificateWizardStub implements Runnable, WindowListener {
         Timer timer = new Timer(delay, e -> {
             try {
                 captureOffscreen(new File(screenshot));
+                captureOnScreen(screenshot);
                 captureOwnedWindows(screenshot);
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -225,6 +228,48 @@ public class CertificateWizardStub implements Runnable, WindowListener {
         frm.getContentPane().paint(graphics);
         graphics.dispose();
         ImageIO.write(image, "png", target);
+    }
+
+    /// The composited desktop pixels of the window, beside the offscreen paint as
+    /// `<name>.onscreen.png`. The two can disagree: `contentPane.paint()` drives a fresh Swing
+    /// paint pass, so it can look healthy while the window the user is actually looking at is
+    /// stale or unpainted -- the shape of issue #5443 -- which is why the Windows tooling job
+    /// gates on this image and not the other. Best effort: a Robot grab can be denied, and it
+    /// never fails the capture. `-Dcertificatewizard.screenshot.onscreen=false` turns it off.
+    private static void captureOnScreen(String screenshot) {
+        if (!Boolean.parseBoolean(System.getProperty("certificatewizard.screenshot.onscreen", "true"))) {
+            return;
+        }
+        try {
+            // A window that is not showing yet, or that another application covers, would write
+            // whatever is at those screen coordinates into a file named after this one: someone
+            // else's pixels, reading as a broken wizard. Better to write nothing.
+            if (!frm.isShowing()) {
+                System.err.println("On-screen capture skipped: window is not showing");
+                return;
+            }
+            if (!frm.isActive()) {
+                System.err.println("On-screen capture skipped: window is not the active window");
+                return;
+            }
+            Rectangle bounds = frm.getBounds();
+            if (bounds.width <= 0 || bounds.height <= 0) {
+                return;
+            }
+            BufferedImage image = new Robot().createScreenCapture(bounds);
+            ImageIO.write(image, "png", new File(onScreenPath(screenshot)));
+        } catch (Throwable ex) {
+            System.err.println("On-screen capture unavailable: " + ex);
+        }
+    }
+
+    static String onScreenPath(String screenshot) {
+        int dot = screenshot.lastIndexOf('.');
+        int separator = Math.max(screenshot.lastIndexOf('/'), screenshot.lastIndexOf('\\'));
+        if (dot > separator) {
+            return screenshot.substring(0, dot) + ".onscreen" + screenshot.substring(dot);
+        }
+        return screenshot + ".onscreen.png";
     }
 
     /// On the desktop an InteractionDialog opens as a window of its own, which a paint of the

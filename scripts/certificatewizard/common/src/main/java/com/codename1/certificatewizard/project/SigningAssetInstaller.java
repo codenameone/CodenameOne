@@ -135,7 +135,7 @@ public final class SigningAssetInstaller {
         update(settingsPath, updates);
     }
 
-    /// Points `codename1.ios.appid` at the team that issued the profile being installed.
+    /// Points `codename1.ios.appid` at the App ID prefix of the profile being installed.
     ///
     /// The build server writes that value verbatim into the app's `application-identifier` and
     /// `keychain-access-groups` entitlements, and Xcode refuses to sign when the profile says
@@ -146,32 +146,39 @@ public final class SigningAssetInstaller {
     /// with a profile that was otherwise exactly right. The old wizard rewrote the key; this one
     /// never did.
     ///
+    /// The prefix is the one in the profile's own `application-identifier` entitlement, NOT its
+    /// `TeamIdentifier`. The two are usually the same ten characters, but an account that still
+    /// carries a legacy Bundle Seed ID issues App IDs under that seed, and the entitlement Xcode
+    /// matches is the App ID's. Taking the team there wrote a value the profile cannot sign.
+    ///
     /// The bundle half is the project's `codename1.packageName`, which is what the build signs
-    /// as. Left untouched when the profile names no team or the project has no package name:
+    /// as. Left untouched when the profile states no prefix or the project has no package name:
     /// guessing either would write a value that is wrong in a new way.
     static void putTeamQualifiedAppId(String settingsPath, String profilePath, Map<String, String> updates)
             throws IOException {
         if (profilePath == null || profilePath.length() == 0) {
             return;
         }
-        String team = profileTeamIdentifier(readBytes(profilePath));
-        if (team == null) {
+        String prefix = profileAppIdPrefix(readBytes(profilePath));
+        if (prefix == null) {
             return;
         }
         String bundleId = setting(read(settingsPath), "codename1.packageName");
         if (bundleId == null || bundleId.length() == 0 || bundleId.indexOf("${") >= 0) {
             return;
         }
-        updates.put("codename1.ios.appid", team + "." + bundleId);
+        updates.put("codename1.ios.appid", prefix + "." + bundleId);
     }
 
-    /// The team a provisioning profile was issued to, or null when it names none.
+    /// The prefix of a provisioning profile's `application-identifier` entitlement -- the part
+    /// before the first dot of `ABCDE12345.com.example.app` -- or null when it states none.
     ///
     /// A `.mobileprovision` is a CMS envelope around an XML property list, and the list is
-    /// stored uncompressed, so the `TeamIdentifier` array can be read out of the raw bytes
-    /// without verifying the signature -- the wizard only needs to know which team Apple put
-    /// there, not to trust the file. Only a well formed ten character team ID is returned.
-    public static String profileTeamIdentifier(byte[] profile) {
+    /// stored uncompressed, so the entitlement can be read out of the raw bytes without
+    /// verifying the signature: the wizard only needs to know what Apple put there, not to trust
+    /// the file. The value has to follow its key directly -- `parent-application-identifiers` is
+    /// a different key -- and only a well formed ten character prefix is returned.
+    public static String profileAppIdPrefix(byte[] profile) {
         if (profile == null) {
             return null;
         }
@@ -181,24 +188,32 @@ public final class SigningAssetInstaller {
         } catch (java.io.UnsupportedEncodingException ex) {
             return null;
         }
-        int key = text.indexOf("<key>TeamIdentifier</key>");
-        if (key < 0) {
+        String key = "<key>application-identifier</key>";
+        int at = text.indexOf(key);
+        if (at < 0) {
             return null;
         }
-        int arrayEnd = text.indexOf("</array>", key);
-        int open = text.indexOf("<string>", key);
-        if (open < 0 || (arrayEnd >= 0 && open > arrayEnd)) {
+        int open = at + key.length();
+        while (open < text.length() && Character.isWhitespace(text.charAt(open))) {
+            open++;
+        }
+        if (!text.startsWith("<string>", open)) {
             return null;
         }
         int close = text.indexOf("</string>", open);
         if (close < 0) {
             return null;
         }
-        String team = text.substring(open + "<string>".length(), close).trim();
-        return isTeamIdentifier(team) ? team : null;
+        String appId = text.substring(open + "<string>".length(), close).trim();
+        int dot = appId.indexOf('.');
+        if (dot < 0) {
+            return null;
+        }
+        String prefix = appId.substring(0, dot);
+        return isAppIdPrefix(prefix) ? prefix : null;
     }
 
-    private static boolean isTeamIdentifier(String s) {
+    private static boolean isAppIdPrefix(String s) {
         if (s.length() != 10) {
             return false;
         }

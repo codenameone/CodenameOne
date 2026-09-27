@@ -265,7 +265,14 @@ run_wizard_scenario() {
     WIZARD_FAILURES+=("$name (launcher)")
     return 0
   fi
-  if ! "$JAVA_BIN" "$SANITY_SRC_W" "$(winpath "$png")" 300 200; then
+  # The on-screen grab is the gate, as in the Settings matrix: the offscreen paint can
+  # look healthy while the visible window is black (#5443).
+  local gate="$ARTIFACTS_DIR/certificatewizard-$name.onscreen.png"
+  if [ ! -s "$gate" ]; then
+    wt_log "  scenario $name: no on-screen capture, falling back to offscreen paint"
+    gate="$png"
+  fi
+  if ! "$JAVA_BIN" "$SANITY_SRC_W" "$(winpath "$gate")" 300 200; then
     WIZARD_FAILURES+=("$name")
   fi
 }
