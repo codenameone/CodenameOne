@@ -76,7 +76,10 @@ body::-webkit-scrollbar { width: 0 !important }
 
 .cn1-capture-dialog {
     position: fixed;
-    top: 10px;
+    /* --cn1-chrome-top is the height of the javascript.titleBar=html chrome (0 without it).
+       Fixed boxes are placed against the viewport, not the body the chrome moves down, so each
+       full-window overlay offsets itself or its top would sit under the chrome. */
+    top: calc(10px + var(--cn1-chrome-top, 0px));
     left: 10px;
     right: 10px;
     bottom: 10px;
@@ -90,7 +93,7 @@ body::-webkit-scrollbar { width: 0 !important }
 }
 .cn1-capture-preview-dialog {
     position: fixed;
-    top: 10px;
+    top: calc(10px + var(--cn1-chrome-top, 0px));
     left: 10px;
     right: 10px;
     bottom: 10px;
@@ -156,7 +159,7 @@ body::-webkit-scrollbar { width: 0 !important }
 
 div.cn1-image-capture-dialog {
     position: fixed;
-    top: 0;
+    top: var(--cn1-chrome-top, 0px);
     left: 0;
     bottom: 0;
     right: 0;
@@ -266,8 +269,9 @@ div.cn1-image-capture-dialog.state-accept-snapshot .dontuse-btn {
 
 div#cn1-video-capture {
     position:fixed;
+    top: var(--cn1-chrome-top, 0px);
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--cn1-chrome-top, 0px));
     background-color:black;
     
 }

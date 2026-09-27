@@ -4669,7 +4669,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (explicit != null && explicit.length() > 0) {
             return explicit;
         }
-        String shared = d.getProperty("nativeTheme", d.getProperty("cn1.nativeTheme", null));
+        // Every hint is trimmed and ASCII-folded here exactly as the build's theme pruning reads it
+        // (JavaScriptBuildHints.lower): if the two read " modern " differently, the build keeps
+        // one theme and the runtime asks for another it has deleted.
+        String shared = asciiLower(d.getProperty("nativeTheme", d.getProperty("cn1.nativeTheme", null)));
         // A desktop browser takes the desktop native theme of its operating system when the
         // app asks for the native look (or pins one with javascript.desktopTheme). Phones and
         // tablets -- iPadOS included, which reports a Mac user agent -- keep the branches below.
@@ -4677,7 +4680,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // plugin and in the cloud builder), so change the two together.
         if (isDesktop() && !isIOS()) {
             String desktop = desktopThemeFor(asciiLower(d.getProperty("javascript.desktopTheme", null)),
-                    asciiLower(shared), desktopOs_());
+                    shared, desktopOs_());
             if (desktop != null) {
                 return "/" + desktop + ".res";
             }
@@ -4686,7 +4689,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // Material 3 elsewhere. Used for any "modern"/"auto" path.
         boolean iosLike = isIOSLikeBrowser();
         if (iosLike) {
-            String iosMode = d.getProperty("ios.themeMode", null);
+            String iosMode = asciiLower(d.getProperty("ios.themeMode", null));
             if (iosMode == null && shared != null) {
                 // "native" joins modern/auto here: it means the platform's own look on
                 // every OS, and on an iOS-like browser that is the modern theme.
@@ -4698,7 +4701,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
             if (iosMode != null) {
-                iosMode = iosMode.toLowerCase();
                 if ("legacy".equals(iosMode) || "iphone".equals(iosMode)) {
                     return "/iPhoneTheme.res";
                 }
@@ -4711,7 +4713,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // No iOS hint - keep the pre-existing JS-port default.
             return "/iOS7Theme.res";
         }
-        String androidMode = d.getProperty("and.themeMode", d.getProperty("cn1.androidTheme", null));
+        String androidMode = asciiLower(d.getProperty("and.themeMode", d.getProperty("cn1.androidTheme", null)));
         if (androidMode == null && shared != null) {
             if ("modern".equalsIgnoreCase(shared) || "auto".equalsIgnoreCase(shared)
                     || "native".equalsIgnoreCase(shared)) {
@@ -4721,7 +4723,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
         if (androidMode != null) {
-            androidMode = androidMode.toLowerCase();
             if ("legacy".equals(androidMode)) {
                 return "/androidTheme.res";
             }
@@ -4855,6 +4856,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 });
         chromeTopCss = desktopChrome.getHeight();
         HTMLElement body = doc().getBody();
+        // Fixed-position overlays (the capture dialogs) are placed against the viewport, not the
+        // body moved down below, so style.css offsets them by this too.
+        doc().getDocumentElement().getStyle().setProperty("--cn1-chrome-top", chromeTopCss + "px");
         body.getStyle().setProperty("top", chromeTopCss + "px");
         body.getStyle().setProperty("height", "calc(100% - " + chromeTopCss + "px)");
         updateCanvasSize();
@@ -14413,25 +14417,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     };
     
+    /**
+     * How many TextSelections are enabled. The copy and context-menu listeners are one pair on
+     * the document, shared by every form with selection on; with javascript.textSelection that is
+     * every cached root form. Disabling selection on one form used to remove the pair outright, so
+     * returning to another form -- still enabled, so never initialized again -- left copy and the
+     * context menu dead. The pair is added with the first and removed with the last.
+     */
+    private int enabledTextSelections;
+
     @Override
     public void initializeTextSelection(TextSelection sel) {
         sel.addTextSelectionListener(textSelectionListener);
-        HTMLDocument doc = Window.current().getDocument();
-        doc.addEventListener("copy", copyListener);
-        contextListenerActive = true;
-        doc.addEventListener("contextmenu", contextListener);
-        
-        
-        
+        if (enabledTextSelections++ == 0) {
+            HTMLDocument doc = Window.current().getDocument();
+            doc.addEventListener("copy", copyListener);
+            contextListenerActive = true;
+            doc.addEventListener("contextmenu", contextListener);
+        }
     }
 
     @Override
     public void deinitializeTextSelection(TextSelection sel) {
-        contextListenerActive = false;
-        HTMLDocument doc = Window.current().getDocument();
-        doc.removeEventListener("copy", copyListener);
-        doc.removeEventListener("contextmenu", contextListener);
         sel.removeTextSelectionListener(textSelectionListener);
+        if (enabledTextSelections > 0 && --enabledTextSelections == 0) {
+            contextListenerActive = false;
+            HTMLDocument doc = Window.current().getDocument();
+            doc.removeEventListener("copy", copyListener);
+            doc.removeEventListener("contextmenu", contextListener);
+        }
     }
 
     private class HeavyButton {

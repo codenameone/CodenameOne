@@ -164,6 +164,34 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void nativeModeToolbarBarAndOverflowCommandsAddedAfterShowReachTheNativeMenu() {
+        // Only the side-menu paths used to republish; a command added to the left bar, the right
+        // bar or the overflow after the form was shown had nowhere to appear while the Toolbar
+        // was hidden.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.show();
+        DisplayTest.flushEdt();
+
+        Command left = Command.create("Left", null, null);
+        Command right = Command.create("Right", null, null);
+        Command overflow = Command.create("Overflow", null, null);
+        f.getToolbar().addCommandToLeftBar(left);
+        f.getToolbar().addCommandToRightBar(right);
+        f.getToolbar().addCommandToOverflowMenu(overflow);
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(left), "left bar command published");
+        assertTrue(bridged.contains(right), "right bar command published");
+        assertTrue(bridged.contains(overflow), "overflow command published");
+
+        f.getToolbar().removeOverflowCommand(overflow);
+        f.getToolbar().removeCommand(right);
+        bridged = implementation.getLastNativeCommands();
+        assertFalse(bridged.contains(overflow), "a removed overflow command leaves the native menu");
+        assertFalse(bridged.contains(right), "a removed bar command leaves the native menu");
+    }
+
+    @FormTest
     void nativeCommandBehaviourStillDrawsSoftButtonsWithNoNativeMenuBar() {
         implementation.setDesktop(true);
         implementation.setNativeCommandsSupported(false);
