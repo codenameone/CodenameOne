@@ -679,6 +679,15 @@ class ApplicationRuntimeTest {
                             request.getSession(true).invalidate();
                             return request.respond(200, "text/plain", "out".getBytes("UTF-8"));
                         }
+                        if(t.startsWith("/switch")) {
+                            // Ends the session and starts another in one request.
+                            request.getSession(true).invalidate();
+                            String none = String.valueOf(request.getSession(false));
+                            HttpSession next = request.getSession(true);
+                            next.setAttribute("user", "grace");
+                            return request.respond(200, "text/plain",
+                                    (none + "|" + next.isValid()).getBytes("UTF-8"));
+                        }
                         return null;
                     }
                 })
@@ -704,6 +713,30 @@ class ApplicationRuntimeTest {
             HttpURLConnection after = open(port, "/me");
             after.setRequestProperty("Cookie", pair);
             assertEquals("nobody", read(after));
+            // Invalidated then replaced in one request: a lookup in between finds
+            // none, and the new session is what the client ends up with.
+            HttpURLConnection login2 = open(port, "/login");
+            assertEquals("in", read(login2));
+            String pair2 = login2.getHeaderField("Set-Cookie");
+            pair2 = pair2.substring(0, pair2.indexOf(';'));
+            HttpURLConnection sw = open(port, "/switch");
+            sw.setRequestProperty("Cookie", pair2);
+            assertEquals("null|true", read(sw));
+            String replaced = null;
+            List cookies = sw.getHeaderFields().get("Set-Cookie");
+            for(int iter = 0 ; iter < cookies.size() ; iter++) {
+                String c = (String)cookies.get(iter);
+                if(!c.contains("Max-Age=0")) {
+                    replaced = c.substring(0, c.indexOf(';'));
+                }
+            }
+            assertNotNull(replaced, "the replacement session was never sent");
+            HttpURLConnection whoNow = open(port, "/me");
+            whoNow.setRequestProperty("Cookie", replaced);
+            assertEquals("grace", read(whoNow));
+            HttpURLConnection oldOne = open(port, "/me");
+            oldOne.setRequestProperty("Cookie", pair2);
+            assertEquals("nobody", read(oldOne));
         } finally {
             backend.stop();
         }

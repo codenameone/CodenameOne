@@ -254,6 +254,10 @@ public class BackendBeansTest {
             assertTrue(still, still.contains("one") && still.contains("two"));
             String metrics = http("GET", port, "/manage/prometheus");
             assertTrue(metrics, metrics.contains("http_server_request_duration_bucket"));
+            // The scheduler is built by the application after the server knows it
+            // measures; its runs must still be recorded.
+            assertTrue("the scheduled job's runs were not measured: " + metrics,
+                    metrics.contains("Jobs.tick"));
         } finally {
             backend.stop();
         }
@@ -1030,6 +1034,53 @@ public class BackendBeansTest {
         }
         assertTrue("a stopped server's managed gauge still reads its destroyed bean",
                 com.codename1.backend.metrics.Metrics.get("gaugestats.count") == null);
+    }
+
+    @Test
+    public void asyncOnARequestBeanOrAScheduledMethodIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit {\n"
+                + "    @Async public void later() { }\n"
+                + "}\n");
+        s.put("com.example.Jobs", PKG + "@Component public class Jobs {\n"
+                + "    @Scheduled(fixedRate = 1000) @Async public void tick() { }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("is on a @RequestScope bean"));
+        assertTrue(errors, errors.contains("is also @Async"));
+    }
+
+    @Test
+    public void aFieldDependencyIsInitializedBeforeItsUser() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        // Aaa is found first and uses Zzz, injected into a field, in its own
+        // @PostConstruct: Zzz's must have run by then.
+        s.put("com.example.Aaa", PKG + "@Component public class Aaa {\n"
+                + "    @Autowired private Zzz zzz;\n"
+                + "    public String seen = \"unset\";\n"
+                + "    @PostConstruct public void init() { seen = zzz.state(); }\n"
+                + "}\n");
+        s.put("com.example.Zzz", PKG + "@Component public class Zzz {\n"
+                + "    private String state = \"cold\";\n"
+                + "    @PostConstruct public void warm() { state = \"warm\"; }\n"
+                + "    public String state() { return state; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Aaa aaa;\n"
+                + "    @GetMapping(\"/x\") public String x() { return aaa.seen; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("a @PostConstruct ran before its field dependency's", "warm",
+                    http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
     }
 
     @Test

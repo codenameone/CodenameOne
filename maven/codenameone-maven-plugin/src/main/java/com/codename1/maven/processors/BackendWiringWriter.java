@@ -203,10 +203,18 @@ final class BackendWiringWriter {
             }
         }
         sb.append("        // Initialization, in dependency order.\n");
+        // By EVERY injection -- fields and setters too, not just constructors --
+        // so a @PostConstruct never calls a dependency whose own has not run.
+        // Construction order cannot be used: it only had to follow constructors,
+        // and a field dependency found later was initialized after its user.
+        List<BackendBeans.Bean> eager = new ArrayList<BackendBeans.Bean>();
         for (BackendBeans.Bean b : model.order) {
             if (b.isEager()) {
-                initialize(sb, b, b.var, "        ", true);
+                eager.add(b);
             }
+        }
+        for (BackendBeans.Bean b : dependencyOrder(eager)) {
+            initialize(sb, b, b.var, "        ", true);
         }
         for (BackendBeans.Bean b : model.beans) {
             if (b.managed == null && b.tools.isEmpty()) {
@@ -556,6 +564,9 @@ final class BackendWiringWriter {
                 + "throws Exception {\n");
         if (model.hasJobs()) {
             sb.append("        scheduler = new com.codename1.backend.Scheduler(dataSource);\n");
+            // Before it starts: whether its runs are measured, and whose tracer
+            // their spans go to, are this server's.
+            sb.append("        scheduler.bind(backend);\n");
             int index = 0;
             for (BackendBeans.Bean b : model.beans) {
                 if (b.jobs.isEmpty()) {

@@ -538,6 +538,21 @@ final class BackendBeans {
         if (props != null) {
             bindProperties(bean, props, cls);
         }
+        if (REQUEST.equals(bean.scope)) {
+            for (MethodInfo m : cls.getMethods()) {
+                if (m.getAnnotation(ASYNC) != null
+                        || (cls.getClassAnnotation(ASYNC) != null && m.isPublic()
+                        && !m.isConstructor() && !m.isStatic())) {
+                    // The task would hold the request's instance after the request
+                    // ended and destroyed it.
+                    ctx.error(cls, "@Async method " + cls.getSourceName() + "." + m.getName()
+                            + " is on a @RequestScope bean, which is destroyed when its "
+                            + "request ends -- possibly before the task runs. Move the "
+                            + "method to a singleton and pass it what it needs.");
+                    break;
+                }
+            }
+        }
         collectJobs(bean);
         collectTools(bean);
         collectManaged(bean);
@@ -1123,6 +1138,17 @@ final class BackendBeans {
             if (m.isStatic() || Type.getArgumentTypes(m.getDescriptor()).length != 0) {
                 ctx.error(cls, "@Scheduled method " + where + " must be an instance method "
                         + "that takes no arguments.");
+                continue;
+            }
+            if (m.getAnnotation(ASYNC) != null
+                    || (cls.getClassAnnotation(ASYNC) != null && m.isPublic())) {
+                // The scheduler would call the stub, which returns once the body
+                // is queued: the run would count as over -- and a lock be
+                // released -- while it is still going, so runs could overlap.
+                ctx.error(cls, "@Scheduled method " + where + " is also @Async. A scheduled "
+                        + "run already happens off the request thread, on the executor "
+                        + "@Scheduled names, and it must end when its work does; drop "
+                        + "@Async and pick the thread with @Scheduled(thread = ...).");
                 continue;
             }
             Job job = new Job(m, RestClientAnnotationProcessor.simpleName(

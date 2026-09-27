@@ -874,8 +874,16 @@ public final class Database {
             return result;
         } finally {
             if (!committed) {
-                try { rollbackTransaction(); }
-                catch (Exception err) { System.err.println("rollback failed: " + err); }
+                try {
+                    rollbackTransaction();
+                } catch (Exception err) {
+                    // Closed, not left for a pool to lend again: a connection
+                    // whose ROLLBACK failed still believes a transaction is open
+                    // and owned, and its next borrower would wait on that owner
+                    // for ever. A pool discards a closed connection.
+                    System.err.println("rollback failed; closing the connection: " + err);
+                    close();
+                }
             }
         }
     }

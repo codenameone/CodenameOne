@@ -124,6 +124,8 @@ public final class HttpServer {
         private boolean canonicalChecked;
         /** The sessions of the server serving this request; set by Backend. */
         Sessions sessions;
+        /** See {@link #endedSession}. */
+        private HttpSession endedSession;
         /** This request's session once looked up; see {@link #getSession(boolean)}. */
         private HttpSession session;
         private boolean sessionResolved;
@@ -587,6 +589,7 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.endedSession = null;
         }
 
         /** The session of this request, creating one if it has none. */
@@ -601,6 +604,14 @@ public final class HttpServer {
          * See {@link Sessions} for the cookie and where sessions are kept.
          */
         public HttpSession getSession(boolean create) {
+            if(sessionResolved && session != null && !session.isValid()) {
+                // Invalidated earlier in this request: it is not the session any
+                // more. Kept aside so the end of the request still deletes it and
+                // clears its cookie; a lookup now answers as if there were none,
+                // and create starts a new one.
+                endedSession = session;
+                session = null;
+            }
             if(sessionResolved && (session != null || !create)) {
                 return session;
             }
@@ -625,6 +636,11 @@ public final class HttpServer {
         /** The session, if this request looked it up. */
         HttpSession resolvedSession() {
             return session;
+        }
+
+        /** A session this request invalidated and then replaced, or null. */
+        HttpSession endedSession() {
+            return endedSession;
         }
 
         /**
@@ -682,6 +698,7 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
+            this.endedSession = null;
         }
 
         /**

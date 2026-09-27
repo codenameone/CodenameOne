@@ -49,6 +49,10 @@ effect. `invalidate()` ends one, and the response clears the client's cookie:
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/Account.java[tag=backend-session-logout,indent=0]
 ----
 
+After `invalidate()`, the request no longer has that session: `getSession(false)`
+returns null, and `getSession(true)` starts a new one, whose cookie the response
+sends after clearing the old one.
+
 [cols="2,3", options="header"]
 |===
 | `HttpSession` method | What it does

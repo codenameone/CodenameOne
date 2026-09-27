@@ -123,9 +123,25 @@ public final class Scheduler {
      */
     private boolean measured;
 
+    /**
+     * The tracer this scheduler's runs report to: its server's, so with two
+     * traced servers in one process a job is exported under its own server's
+     * name rather than the one installed last. Null for the installed one.
+     */
+    private Tracer tracer;
+
     /** Set by the server once it knows whether it records metrics. */
     public void setMeasured(boolean measured) {
         this.measured = measured;
+    }
+
+    /**
+     * Takes the measuring and tracing of the server that runs this scheduler.
+     * Called by the generated application before it starts the scheduler.
+     */
+    public synchronized void bind(Backend backend) {
+        this.measured = backend.isMeasured();
+        this.tracer = backend.getTracer();
     }
     private boolean lockTableReady;
 
@@ -351,7 +367,7 @@ public final class Scheduler {
         try {
             if(job.lock == null || claim(job, start)) {
                 ran = true;
-                Tracing.inBackground("scheduled " + job.name, null, new Tracing.Work() {
+                Tracing.inBackground("scheduled " + job.name, null, tracer, new Tracing.Work() {
                     public Object run(Span span) throws Exception {
                         job.body.run();
                         return null;

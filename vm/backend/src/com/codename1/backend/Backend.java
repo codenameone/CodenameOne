@@ -96,6 +96,22 @@ public final class Backend {
     private final Tasks.Registry tasks;
     /** This server's managed-attribute gauges, removed from the process's when it stops. */
     private final List gauges;
+    /**
+     * Whether this server records metrics, which its scheduler reads when the
+     * application builds it. Set once, before the Backend is handed to anyone.
+     */
+    private boolean measured;
+
+    /** Whether this server records request and job metrics. */
+    public boolean isMeasured() {
+        return measured;
+    }
+
+    /** The tracer this server installed, or null: its scheduled jobs are traced by it. */
+    public Tracer getTracer() {
+        return ownTracer;
+    }
+
     /** The recent requests of this server, kept once the development tools ask. */
     private final RequestLog requestLog;
     /**
@@ -112,10 +128,21 @@ public final class Backend {
                     List managedBeans, Sessions sessions, Tasks.Registry tasks,
                     RequestLog requestLog, List gauges) {
         this.gauges = gauges;
-        for(int iter = 0 ; iter < gauges.size() ; iter++) {
-            Object[] g = (Object[])gauges.get(iter);
-            com.codename1.backend.metrics.Metrics.addSource((String)g[0], (String)g[1],
-                    (String)g[2], (com.codename1.backend.metrics.Gauge.Source)g[3]);
+        int added = 0;
+        try {
+            for( ; added < gauges.size() ; added++) {
+                Object[] g = (Object[])gauges.get(added);
+                com.codename1.backend.metrics.Metrics.addSource((String)g[0], (String)g[1],
+                        (String)g[2], (com.codename1.backend.metrics.Gauge.Source)g[3]);
+            }
+        } catch (RuntimeException err) {
+            // A start that fails here must not leave the gauges it did add.
+            for(int iter = 0 ; iter < added ; iter++) {
+                Object[] g = (Object[])gauges.get(iter);
+                com.codename1.backend.metrics.Metrics.removeSource((String)g[0],
+                        (com.codename1.backend.metrics.Gauge.Source)g[3]);
+            }
+            throw err;
         }
         this.tasks = tasks;
         this.requestLog = requestLog;
@@ -1102,13 +1129,31 @@ public final class Backend {
                                         // client receives, and the request log
                                         // must say so rather than record the
                                         // handler's own status.
+                                        HttpSession ended = request.endedSession();
                                         HttpSession session = request.resolvedSession();
-                                        if(session != null) {
+                                        if(ended != null || session != null) {
                                             sessionFinished = true;
+                                        }
+                                        if(ended != null) {
+                                            // First, so its clearing cookie comes
+                                            // before the new session's.
+                                            response = sessions.finish(ended, response);
+                                        }
+                                        if(session != null) {
                                             response = sessions.finish(session, response);
                                         }
                                     } catch (Exception err) {
                                         endRequestBeans(request);
+                                        HttpSession ended = request.endedSession();
+                                        if(ended != null && !sessionFinished) {
+                                            try {
+                                                sessions.finish(ended, null);
+                                            } catch (Exception storeErr) {
+                                                System.err.println("Could not end the "
+                                                        + "session of a failed request: "
+                                                        + storeErr);
+                                            }
+                                        }
                                         HttpSession session = request.resolvedSession();
                                         if(session != null && !sessionFinished) {
                                             // The handler threw, but what it did to
@@ -1191,26 +1236,35 @@ public final class Backend {
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.
             boolean measuring = management != null;
-            if(metricReader != null) {
-                try {
+            Backend backend;
+            // Every failure between the bind and a Backend that owns the server
+            // stops the listener: otherwise the beans are destroyed and the pool
+            // closed by the outer cleanup while the orphaned listener keeps the
+            // port and answers with a torn-down application. The exporter
+            // refusing its configuration, an application metric that collides
+            // with a built-in one, a managed gauge whose Prometheus name clashes.
+            try {
+                if(metricReader != null) {
                     measuring |= metricReader.open(config);
-                } catch (IOException err) {
-                    server.stop(0);
-                    throw err;
                 }
+                if(measuring) {
+                    com.codename1.backend.metrics.Metrics.enableServer(server, pool);
+                    instrumented[0] = true;
+                }
+                backend = new Backend(server, pool, manager, config, drain,
+                        tracing ? tracer : null, application,
+                        metricReader != null && measuring ? metricReader : null,
+                        managedBeans, sessions, tasks, requestLog,
+                        environment == null ? new ArrayList() : environment.gauges);
+            } catch (Exception err) {
+                server.stop(0);
+                com.codename1.backend.metrics.Metrics.disableServer(server, pool);
+                if(metricReader != null) {
+                    metricReader.shutdown(0);
+                }
+                throw err;
             }
-            if(measuring) {
-                com.codename1.backend.metrics.Metrics.enableServer(server, pool);
-                instrumented[0] = true;
-            }
-            if(application != null && application.getScheduler() != null) {
-                application.getScheduler().setMeasured(measuring);
-            }
-            Backend backend = new Backend(server, pool, manager, config, drain,
-                    tracing ? tracer : null, application,
-                    metricReader != null && measuring ? metricReader : null,
-                    managedBeans, sessions, tasks, requestLog,
-                    environment == null ? new ArrayList() : environment.gauges);
+            backend.measured = measuring;
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;

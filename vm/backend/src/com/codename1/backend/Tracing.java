@@ -318,8 +318,19 @@ public final class Tracing {
      * caller -- or as a root span when that is null, as a scheduled job's run is.
      */
     static Object inBackground(String name, Span parent, Work work) throws Exception {
+        return inBackground(name, parent, null, work);
+    }
+
+    /**
+     * {@link #inBackground(String, Span, Work)} reporting to {@code own} when
+     * there is no parent to take the tracer from -- a scheduled run, whose
+     * scheduler knows which server it belongs to.
+     */
+    static Object inBackground(String name, Span parent, Tracer own, Work work)
+            throws Exception {
         // The parent's tracer: the run belongs to whoever started it.
-        Tracer t = parent != null && parent.owner != null ? parent.owner : tracer;
+        Tracer t = parent != null && parent.owner != null ? parent.owner
+                : own != null ? own : tracer;
         if(t == null || isSuppressed()) {
             return work.run(NOOP);
         }
