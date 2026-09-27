@@ -414,8 +414,11 @@ final class TabGlassGesture {
     TabGlassMotion at(float s, float[] centreOut) {
         float rel = releaseS(s);
         float d = TEMPLATE_DELAY_S;
+        // While the finger is down releaseS answers Float.MAX_VALUE; pass it on
+        // untouched. Test the state, not the float: ParparVM writes the constant as
+        // a decimal a C float never equals, so an == on it is always false on iOS.
         TabGlassMotion m = TabGlassMotion.held(s - d, toPt - fromPt, upS < 0 ? -1 : upS - d,
-                rel == Float.MAX_VALUE ? rel : rel - d);
+                upS < 0 ? rel : rel - d);
         m.barGrowPt = barGrowPt(s, upS);
         if (!isScrubbing() || s < scrubStartS) {
             centreOut[0] = tapCentre(s);
