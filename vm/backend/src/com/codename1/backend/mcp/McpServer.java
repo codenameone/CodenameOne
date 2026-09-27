@@ -261,15 +261,21 @@ public final class McpServer implements HttpServer.Handler {
         boolean notification = !m.containsKey("id");
         Object methodValue = m.get("method");
         if (!(methodValue instanceof String)) {
-            // A response to something the server sent, or garbage; the server
-            // sends nothing, so either way there is nothing to answer.
-            return notification ? null : rpcError(id, -32600, "Invalid request");
+            if (m.containsKey("result") || m.containsKey("error")) {
+                // A response to something the server sent; it sends nothing, so
+                // there is nothing to match it to and nothing to answer.
+                return null;
+            }
+            // No method is not a notification -- a notification is a VALID
+            // request without an id -- so it is answered, with a null id when it
+            // carried none.
+            return rpcError(notification ? null : id, -32600, "Invalid request");
         }
         if (!"2.0".equals(m.get("jsonrpc"))) {
             // A JSON-RPC 2.0 request says so exactly; one that does not -- no
             // version, or a 1.0 envelope -- is refused before anything runs, a
             // tool call included.
-            return notification ? null : rpcError(id, -32600, "Invalid request: jsonrpc "
+            return rpcError(notification ? null : id, -32600, "Invalid request: jsonrpc "
                     + "must be \"2.0\"");
         }
         String method = (String) methodValue;

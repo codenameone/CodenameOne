@@ -2301,6 +2301,13 @@ public final class HttpServer {
         return new ArrayList();
     }
 
+    /// Whether the calling thread is serving a request or a websocket callback of
+    /// some server -- work a stop() drain waits for.
+    static boolean servingOnThisThread() {
+        return SERVING_FD.get() != null || Boolean.TRUE.equals(SERVING_WS.get())
+                || Boolean.TRUE.equals(SERVING_H2.get());
+    }
+
     /// workOutstanding(), minus what the calling handler is itself holding.
     ///
     /// A handler that calls stop() holds one in-flight request and one active

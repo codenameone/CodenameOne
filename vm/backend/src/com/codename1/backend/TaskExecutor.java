@@ -42,6 +42,11 @@ public final class TaskExecutor {
     /// stops the server would otherwise wait out the whole timeout on itself.
     private static final ThreadLocal RUNNING = new ThreadLocal();
 
+    /// Whether the calling thread is running a task of any executor.
+    static boolean runningOnThisThread() {
+        return RUNNING.get() != null;
+    }
+
     private final String name;
     private final boolean virtual;
     private final int size;

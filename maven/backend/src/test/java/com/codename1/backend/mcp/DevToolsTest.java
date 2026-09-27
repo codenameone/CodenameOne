@@ -122,4 +122,18 @@ class DevToolsTest {
             refusing.stop(0);
         }
     }
+
+    @Test
+    @DisplayName("a batch the backend cannot take gets an error for each request in it")
+    void aFailedBatchAnswersEveryId() throws Exception {
+        java.net.ServerSocket probe = new java.net.ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        java.net.URL url = new java.net.URL("http://127.0.0.1:" + closed + "/mcp");
+        String answer = StdioBridge.post(url, null, "[{\"jsonrpc\":\"2.0\",\"method\":\"ping\","
+                + "\"id\":1},{\"jsonrpc\":\"2.0\",\"method\":\"note\"},"
+                + "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":\"two\"}]", 2000);
+        assertTrue(answer != null && answer.startsWith("[") && answer.contains("\"id\":1")
+                && answer.contains("\"id\":\"two\""), String.valueOf(answer));
+    }
 }

@@ -1734,6 +1734,144 @@ class ApplicationRuntimeTest {
                 c.next(midnightUtc + 5 * hour + 30 * 60000L));
     }
 
+    @Test
+    @DisplayName("a session rotated by a running request is spared under its old id too")
+    void aRotatingRequestKeepsItsOldIdBusy(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "busy.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions sessions = new Sessions();
+            sessions.setStore(new Sessions.Jdbc(pool));
+            long now = System.currentTimeMillis();
+            HttpSession stored = new HttpSession("old", now - 3600000, now - 3600000, 60);
+            stored.markNew();
+            sessions.getStore().save(stored, null);
+            HttpSession copy = sessions.getStore().load("old");
+            copy.owner = sessions;
+            HttpServer.Request running = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null);
+            sessions.enter(running, copy);
+            copy.changeSessionId();              // the row is still under "old"
+            assertNotNull(sessions.find("old", false),
+                    "another request expired the row a rotating request still owns");
+            assertNotNull(sessions.getStore().load("old"));
+            sessions.leave(running);
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("an id-less message with no method is invalid, and answered; a response is ignored")
+    void malformedIdlessMessagesAreAnswered() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null, null);
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "{\"jsonrpc\":\"2.0\"}"));
+        assertEquals(200, r.getStatus());
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32600") && body.contains("\"id\":null"), body);
+        r = server.handle(new HttpServer.Request("POST", "/mcp", "HTTP/1.1",
+                new LinkedHashMap(), "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}"));
+        assertEquals(202, r.getStatus(), "a response the client sent was answered");
+    }
+
+    @Test
+    @DisplayName("a float argument too small for a float is refused, not made zero")
+    void floatUnderflowIsRefused() {
+        Map args = new LinkedHashMap();
+        args.put("tiny", Double.valueOf(1e-100));
+        args.put("zero", Double.valueOf(0));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.floatValue(args, "tiny", true));
+        assertEquals(0f, com.codename1.backend.mcp.McpArgs.floatValue(args, "zero", true));
+    }
+
+    @Test
+    @DisplayName("a handler that loses a race to stop the server does not hold up the drain")
+    void aSecondStoppingHandlerReturns() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(Config.SERVER_SHUTDOWN_MILLIS, "20000");
+        final Backend[] self = new Backend[1];
+        final CountDownLatch both = new CountDownLatch(2);
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        both.countDown();
+                        both.await(5, TimeUnit.SECONDS);
+                        self[0].stop();
+                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                    }
+                }).start();
+        self[0] = backend;
+        final List errors = new ArrayList();
+        Thread[] callers = new Thread[2];
+        for(int i = 0 ; i < 2 ; i++) {
+            callers[i] = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        HttpURLConnection c = open(port, "/");
+                        c.getResponseCode();
+                    } catch (IOException err) {
+                        // the server is stopping under it; fine
+                    }
+                }
+            });
+            callers[i].start();
+        }
+        long started = System.currentTimeMillis();
+        for(Thread t : callers) {
+            t.join(30000);
+        }
+        backend.stop();
+        long took = System.currentTimeMillis() - started;
+        assertTrue(took < 15000, "the drain waited " + took + "ms for the losing stop caller");
+    }
+
+    @Test
+    @DisplayName("a scheduled run that ends during the drain still records its metrics")
+    void aDrainedRunIsMeasured() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        final CountDownLatch running = new CountDownLatch(1);
+        final Scheduler[] scheduler = new Scheduler[1];
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .application(new EmptyApplication() {
+                    public void started(Backend b) {
+                        scheduler[0] = new Scheduler(null);
+                        scheduler[0].fixedDelay("drainedJob", 0, 1000000, null, Tasks.PLATFORM,
+                                null, -1, new Runnable() {
+                                    public void run() {
+                                        running.countDown();
+                                        try {
+                                            Thread.sleep(400);
+                                        } catch (InterruptedException err) {
+                                            // the drain may interrupt at its deadline
+                                        }
+                                    }
+                                });
+                        scheduler[0].bind(b);
+                        scheduler[0].start();
+                    }
+
+                    public void stopping() {
+                        scheduler[0].stop(0);            // stop launching; the run drains
+                    }
+                }).start();
+        assertTrue(running.await(5, TimeUnit.SECONDS));
+        backend.stop();
+        assertTrue(Json.write(Metrics.snapshot()).contains("drainedJob"),
+                "the run that finished in the drain was not recorded");
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

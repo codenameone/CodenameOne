@@ -150,7 +150,7 @@ public final class StdioBridge {
     /// nothing, and a body that is no single request passes the server's through.
     static String refused(String body, int status, String answer) {
         Object request = parse(body);
-        if (!(request instanceof java.util.Map)) {
+        if (!(request instanceof java.util.Map) && !(request instanceof java.util.List)) {
             return answer;
         }
         String detail = answer == null ? "" : answer.trim();
@@ -171,20 +171,39 @@ public final class StdioBridge {
     /// a notification, which is never answered. Parsed, not searched: a pattern
     /// took the first "id" anywhere, so a tool argument named id got the answer
     /// and the host waited forever.
+    ///
+    /// A batch gets one error per element that has an id, as a batch answer: the
+    /// host is waiting on each of them, and a single error under no id -- or
+    /// nothing at all -- would leave every one incomplete.
     static String errorUnderRequestId(String body, String message) {
         Object request = parse(body);
+        if (request instanceof java.util.List) {
+            java.util.List answers = new java.util.ArrayList();
+            for (Object element : (java.util.List) request) {
+                if (element instanceof java.util.Map
+                        && ((java.util.Map) element).containsKey("id")) {
+                    answers.add(errorFor(((java.util.Map) element).get("id"), message));
+                }
+            }
+            return answers.isEmpty() ? null : com.codename1.backend.Json.write(answers);
+        }
         if (!(request instanceof java.util.Map)
                 || !((java.util.Map) request).containsKey("id")) {
             return null;
         }
+        return com.codename1.backend.Json.write(errorFor(((java.util.Map) request).get("id"),
+                message));
+    }
+
+    private static java.util.Map errorFor(Object id, String message) {
         java.util.Map error = new java.util.LinkedHashMap();
         error.put("code", Integer.valueOf(-32000));
         error.put("message", message);
         java.util.Map response = new java.util.LinkedHashMap();
         response.put("jsonrpc", "2.0");
-        response.put("id", ((java.util.Map) request).get("id"));
+        response.put("id", id);
         response.put("error", error);
-        return com.codename1.backend.Json.write(response);
+        return response;
     }
 
     private static Object parse(String text) {

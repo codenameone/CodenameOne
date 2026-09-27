@@ -226,6 +226,15 @@ public final class Backend {
         // waits for the first to finish rather than returning while the server
         // is still draining.
         synchronized (this) {
+            if (stopping && (HttpServer.servingOnThisThread()
+                    || TaskExecutor.runningOnThisThread())) {
+                // A caller that is itself in-flight work -- a handler, a callback,
+                // a task -- and lost the race: waiting would hold the very request
+                // or task the winner's drain is waiting for, so the winner would
+                // sit out the whole timeout and then tear the server down under
+                // this caller. It returns instead; the stop is under way.
+                return;
+            }
             while (stopping) {
                 try {
                     wait();
@@ -267,17 +276,19 @@ public final class Backend {
             }
         }
         server.stop(shutdownMillis);
+        // Background work next: @Async calls and scheduled runs still going get
+        // the same grace the requests did, while the beans they use are alive.
+        Tasks.shutdown(tasks, shutdownMillis);
         // Out of the process's server gauges, which would otherwise keep reading
-        // a stopped server and pool.
+        // a stopped server and pool -- AFTER the drain: a scheduled run that ends
+        // in it records its duration and outcome, and with the last measured
+        // server's metrics already off that record was silently dropped.
         com.codename1.backend.metrics.Metrics.disableServer(server, dataSource);
         for (Object element : gauges) {
             Object[] g = (Object[]) element;
             com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
                     (com.codename1.backend.metrics.Gauge.Source) g[3]);
         }
-        // Background work next: @Async calls and scheduled runs still going get
-        // the same grace the requests did, while the beans they use are alive.
-        Tasks.shutdown(tasks, shutdownMillis);
         // @PreDestroy after the drain, so no request is still using a bean it
         // tears down, and before the pool closes, so a bean can still flush to
         // the database on its way out. Session beans first: they may use the
@@ -1463,6 +1474,10 @@ public final class Backend {
             } finally {
                 if (!owned) {
                     server.stop(0);
+                    // The listener was accepting, so a request may already have
+                    // built session-scoped beans; nothing later destroys them --
+                    // the outer clean-up ends only the singletons, and after them.
+                    sessions.close();
                     com.codename1.backend.metrics.Metrics.disableServer(server, pool);
                     if (metricReader != null) {
                         metricReader.shutdown(0);

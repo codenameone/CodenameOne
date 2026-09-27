@@ -490,7 +490,16 @@ public final class Sessions {
         java.util.Set ids = new java.util.HashSet();
         Iterator it = inUse.keySet().iterator();
         while (it.hasNext()) {
-            ids.add(((HttpSession) it.next()).getId());
+            HttpSession session = (HttpSession) it.next();
+            ids.add(session.getId());
+            // And the id it had before a rotation this request has not stored yet:
+            // changeSessionId() moves the object's id at once, but the row, and the
+            // client's cookie, stay under the old id until the request ends. A
+            // purge or lookup meanwhile must spare that one too.
+            String previous = session.previousId();
+            if (previous != null) {
+                ids.add(previous);
+            }
         }
         return ids;
     }

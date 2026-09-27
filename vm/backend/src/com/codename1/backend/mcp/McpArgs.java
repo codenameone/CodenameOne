@@ -194,7 +194,13 @@ public final class McpArgs {
         if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE) {
             throw new IllegalArgumentException("\"" + name + "\" is out of range");
         }
-        return (float) d;
+        float f = (float) d;
+        if (f == 0 && d != 0) {
+            // Below the smallest float: 1e-100 would arrive as 0, a different
+            // number from the one sent, like the overflow above.
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return f;
     }
 
     public static Boolean booleanObject(Map args, String name, boolean required) {
