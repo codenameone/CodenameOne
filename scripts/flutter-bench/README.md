@@ -80,12 +80,20 @@ result, and several were caught only after being measured the wrong way first.
   looked like a timing regression; the cause was a stray simulator holding the
   machine at load 8.
 
-- **Start-up is a bracket, not a point.** The runtimes do not expose the same
-  event. Flutter's `FIRSTCONTENT` is a UI-thread callback that runs *before*
-  that frame is rasterized, while Codename One's `FIRSTFRAME` fires once the
-  form is on screen. Comparing those two charges one runtime for rasterizing
-  its first screen and not the other. The harness reports Flutter's figure as
-  a range (`FIRSTCONTENT`..`RASTERDONE`) and takes the ratio from the end least
+- **Start-up compares the same event on both sides: the first content frame
+  on screen.** Codename One's `FIRSTFRAME` fires once its first form has been
+  drawn. On the desktop, Flutter's `RASTERDONE` says how long ago its
+  first content frame finished rasterizing, read from the engine's own frame
+  timings, and the harness subtracts that from when the line appeared. Neither
+  `FIRSTCONTENT` nor the line's own arrival is that event:
+  - `FIRSTCONTENT` is a UI-thread callback that runs two frames after the
+    content frame, because it waits for the element tree to stay the same size
+    across two more frames.
+  - A release engine batches timing reports for about a second, so the line
+    itself arrives about a second late.
+
+  On the web there is no shared clock to read, so Flutter's figure stays a range
+  (`FIRSTCONTENT`..`RASTERDONE`), and the ratio is taken from the end least
   favorable to Codename One.
 
 - **Executable code is every Mach-O in the bundle**, not the main executable.

@@ -52,8 +52,10 @@ METRICS = [
     ("idle_memory_bytes", "Memory at rest", "bytes"),
 ]
 
-# Start-up is reported as a BRACKET, not a point, because the two runtimes do
-# not expose the same event. Flutter's `cold_start_ms` is RASTERDONE, after its
+# Start-up is a point wherever Flutter can report the moment its content frame
+# was on screen (see platforms.MARKERS), and then `cold_start_lower_ms` is None.
+# Where it cannot -- the web -- it is reported as a BRACKET, because the two
+# runtimes do not expose the same event. Flutter's `cold_start_ms` is RASTERDONE, after its
 # first frame is rasterised, and `cold_start_lower_ms` is FIRSTCONTENT, a
 # UI-thread callback before it; Codename One has one marker. The RATIO is taken
 # from Flutter's LOWER end -- the one least favourable to Codename One -- because

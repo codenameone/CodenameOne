@@ -85,6 +85,26 @@ class TimeStreamDeadlines(unittest.TestCase):
         self.assertIsNotNone(upper)
         self.assertLessEqual(lower, upper)
 
+    def test_an_exact_present_time_replaces_the_bracket(self):
+        # RASTERDONE printed ~500ms after a frame that finished rasterising 400ms
+        # before it: the figure is when that frame was on screen, and a point.
+        (upper, lower), _ = self._time(
+            "flutter", "import time; print('BENCH:FIRSTCONTENT'); time.sleep(0.5);"
+                       "print('BENCH:RASTERDONE after=1ms presentedAgoUs=400000');"
+                       "time.sleep(60)")
+        self.assertIsNone(lower, "an exact figure is not a bracket")
+        self.assertGreater(upper, 50.0)
+        self.assertLess(upper, 350.0, "the reported delay must be subtracted")
+
+    def test_an_impossible_present_time_is_not_believed(self):
+        # A delay longer than the launch itself can only be two clocks that do
+        # not agree; the bracket is kept rather than a negative start-up.
+        (upper, lower), _ = self._time(
+            "flutter", "import time; print('BENCH:FIRSTCONTENT'); time.sleep(0.2);"
+                       "print('BENCH:RASTERDONE presentedAgoUs=99000000'); time.sleep(60)")
+        self.assertIsNotNone(lower)
+        self.assertGreaterEqual(upper, 150.0)
+
     def test_an_exit_ends_the_wait(self):
         (upper, _), elapsed = self._time("codenameone", "print('unrelated')")
         self.assertIsNone(upper)

@@ -51,6 +51,16 @@ import benchlib
 # present-complete lies between them, and both ends are reported rather than
 # one being picked.
 #
+# Except where the app can say exactly where. Off the web RASTERDONE carries
+# presentedAgoUs, how long before the line was printed the content frame's
+# raster finished, read from the engine's own FrameTiming. The time the line
+# appears minus that is the moment Flutter's first content frame was on screen
+# -- the same event Codename One's marker reports -- so the figure is a point,
+# not a bracket. The bracket's upper end was ~1s late on every desktop run,
+# because a release engine batches timing reports, and its lower end is two
+# frames late, because FIRSTCONTENT waits for the tree to stay the same size
+# across two more frames; neither was the event being compared.
+#
 # BENCH:FIRSTFRAME-INVALID is deliberately NOT matched: the application prints
 # it instead of the marker when its first frame reported errors, so a run whose
 # widget tree failed half way through layout times out here rather than
@@ -64,6 +74,10 @@ MARKERS = {
 LOWER_BOUND_MARKERS = {
     "flutter": re.compile(r"BENCH:FIRSTCONTENT"),
 }
+
+# How long before its RASTERDONE line Flutter's content frame finished
+# rasterising; see MARKERS.
+_PRESENTED_AGO = re.compile(r"presentedAgoUs=(\d+)")
 
 ANDROID_WARMUP_LAUNCHES = int(os.environ.get("BENCH_ANDROID_WARMUP", "3"))
 LAUNCH_TIMEOUT_S = float(os.environ.get("BENCH_LAUNCH_TIMEOUT", "90"))
@@ -210,6 +224,7 @@ class Adapter(object):
         lower_marker = LOWER_BOUND_MARKERS.get(side)
         upper = None
         lower = None
+        exact = False
         deadline = started + LAUNCH_TIMEOUT_S
         settle_until = None
         while True:
@@ -228,6 +243,16 @@ class Adapter(object):
                 seen = time.time()
                 upper = (seen - started) * 1000.0
                 settle_until = seen + SETTLE_S
+                ago = _PRESENTED_AGO.search(line)
+                if ago is not None:
+                    presented = upper - int(ago.group(1)) / 1000.0
+                    # Only a time inside the launch is believed: a clock the
+                    # engine and the timeline did not share would say so here.
+                    if 0 < presented <= upper:
+                        upper, exact = presented, True
+        if exact:
+            # The exact moment, so there is no bracket to report.
+            lower = None
         return upper, lower
 
 

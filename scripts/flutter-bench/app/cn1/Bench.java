@@ -83,14 +83,21 @@ public class Bench extends Lifecycle {
     /// Asked for by a marker file on the desktop, the launch intent's data URI on
     /// Android (which the port publishes as AppArg), or the page's query string on
     /// the web -- the channels the Flutter app reads the same request from.
+    ///
+    /// AppArg is read on Android ONLY. On iOS and macOS, asking for it from
+    /// start() parks the event thread until the application becomes active (see
+    /// IOSImplementation.getAppArg), which is 70-90ms into a macOS cold start --
+    /// and every timed launch asked, so the check that selects compute mode was
+    /// itself the largest single item in the start-up figure, a cost the Flutter
+    /// build does not pay and no application of ours pays unless it asks.
     private static boolean computeRequested() {
         if (markerFile("BENCH_COMPUTE")) {
             return true;
         }
         com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
-        String arg = d.getProperty("AppArg", null);
-        if (arg != null && arg.indexOf("benchcompute") >= 0) {
-            return true;
+        if ("and".equals(d.getPlatformName())) {
+            String arg = d.getProperty("AppArg", null);
+            return arg != null && arg.indexOf("benchcompute") >= 0;
         }
         String search = d.getProperty("browser.window.location.search", null);
         return search != null && search.indexOf("benchCompute") >= 0;

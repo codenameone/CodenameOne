@@ -9,6 +9,9 @@
 // measured from outside so neither runtime is trusted for its own clock; the
 // Codename One build prints the identical marker from its own wrapper.
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:ui' show FramePhase;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,6 +24,25 @@ int _frames = 0;
 // Set when FIRSTCONTENT is announced; the next FrameTiming to arrive belongs to
 // a frame at or after the content frame, and carries its raster timings.
 bool _contentAnnounced = false;
+// When the frame that first built the final tree finished building, on the
+// Timeline clock, so its FrameTiming can be picked out exactly.
+//
+// The content frame is the FIRST frame that built the final tree, not the one
+// that announces it: FIRSTCONTENT waits for two more frames with the same
+// element count to prove the tree has stopped growing, and those two repaint
+// nothing -- their raster measured 0-1ms against 10-11ms for the frame that drew
+// the gallery. Timing to the announcing frame charged Flutter for two frames of
+// waiting that a user does not see.
+//
+// Found by time, not by number. PlatformDispatcher.frameData.frameNumber is not
+// kept current through the start-up frames -- the callbacks for the warm-up
+// frame, the 59-element frame and the gallery's frame all read 1 on macOS -- so
+// matching it against FrameTiming.frameNumber picked no frame at all.
+int _contentBuiltUs = -1;
+// buildStart, rasterFinish and raster duration of every frame reported, in
+// microseconds on the Timeline clock. Kept because the content frame's timing
+// can arrive in a batch BEFORE the frame that announces content has run.
+final List<List<int>> _frameTimes = <List<int>>[];
 bool _rasterAnnounced = false;
 int _buildUs = 0;
 int _rasterUs = 0;
@@ -65,12 +87,14 @@ void main(List<String> args) {
     } else {
       stable = 0;
       previous = n;
+      _contentBuiltUs = developer.Timeline.now;
     }
     if (stable >= 2) {
       // ignore: avoid_print
       print('BENCH:FIRSTCONTENT after=${clock.elapsedMilliseconds}ms '
           'elements=$n renderObjects=${_countRenderObjects()}');
       _contentAnnounced = true;
+      _announcePresented();
       // Stage split, so the comparison is not just a single number. build is
       // widget build + layout on the UI thread; raster is paint and GPU
       // submission on the raster thread. Codename One reports the same split as
@@ -104,16 +128,63 @@ void main(List<String> args) {
       // is after its raster completed. addTimingsCallback is delivered
       // asynchronously, so it is an UPPER bound: the true present-complete time
       // lies between FIRSTCONTENT and this.
-      if (_contentAnnounced && !_rasterAnnounced) {
-        _rasterAnnounced = true;
-        // ignore: avoid_print
-        print('BENCH:RASTERDONE after=${_benchClock.elapsedMilliseconds}ms '
-            'rasterMs=${t.rasterDuration.inMicroseconds ~/ 1000}');
+      //
+      // Off the web it is EXACT instead. The timings carry the moment the content
+      // frame's raster finished, on the clock dart:developer's Timeline reads, so
+      // the line says how long ago that was and the harness subtracts it: the
+      // result is the content frame on screen -- the event Codename One's marker
+      // reports -- without the ~1s the engine batches timing reports for in a
+      // release build, which is what made the old upper bound useless.
+      if (kIsWeb) {
+        if (_contentAnnounced && !_rasterAnnounced) {
+          _rasterAnnounced = true;
+          // ignore: avoid_print
+          print('BENCH:RASTERDONE after=${_benchClock.elapsedMilliseconds}ms '
+              'rasterMs=${t.rasterDuration.inMicroseconds ~/ 1000}');
+        }
+      } else {
+        _frameTimes.add(<int>[
+          t.timestampInMicroseconds(FramePhase.buildStart),
+          t.timestampInMicroseconds(FramePhase.rasterFinish),
+          t.rasterDuration.inMicroseconds,
+        ]);
       }
     }
+    _announcePresented();
   });
   SchedulerBinding.instance.addPostFrameCallback(watch);
   runApp(const GalleryApp());
+}
+
+/// Prints RASTERDONE for the content frame once both halves are known: that the
+/// tree has settled, and the timing of the frame that first drew it.
+void _announcePresented() {
+  if (kIsWeb || _rasterAnnounced || !_contentAnnounced) {
+    return;
+  }
+  // The content frame is the last one to START building before the callback
+  // that saw the final tree ran. Only decided once a later frame has been
+  // reported too: timings arrive in order, so until then the batch holding the
+  // content frame may still be on its way.
+  List<int>? raster;
+  bool later = false;
+  for (final List<int> f in _frameTimes) {
+    if (f[0] <= _contentBuiltUs) {
+      if (raster == null || f[0] > raster[0]) {
+        raster = f;
+      }
+    } else {
+      later = true;
+    }
+  }
+  if (raster == null || !later) {
+    return;
+  }
+  _rasterAnnounced = true;
+  final int agoUs = developer.Timeline.now - raster[1];
+  // ignore: avoid_print
+  print('BENCH:RASTERDONE after=${_benchClock.elapsedMilliseconds}ms '
+      'rasterMs=${raster[2] ~/ 1000} presentedAgoUs=$agoUs');
 }
 
 /// How many elements exist once the first frame is on screen.
