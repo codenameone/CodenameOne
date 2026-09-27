@@ -295,6 +295,7 @@ public class FidelityDeviceRunner {
         // it passed while the running app showed no glass -- a false green. Capturing the live
         // screen makes the suite tell the truth: glass widgets go red until the live-screen
         // glass actually works. (emitTiles, the old offscreen path, is kept for reference.)
+        waitForTilesPainted(wrappers);
         cropAndEmit(captureStableScreen(), wrappers, names, w, h);
     }
 
@@ -373,6 +374,7 @@ public class FidelityDeviceRunner {
                 }
             });
             settle();
+            waitForTilesPainted(wrappers);
             cropAndEmit(captureStableScreen(), wrappers, names, w, h);
         }
     }
@@ -561,6 +563,71 @@ public class FidelityDeviceRunner {
         }
     }
 
+    /// A tile that records where it was last painted.
+    ///
+    /// The crop rectangle comes from the tile's CURRENT layout, and a screen capture
+    /// that stops changing is not proof the screen shows that layout: a device that
+    /// has not presented the new form yet is just as still. Android's disabled text
+    /// field was captured 50px right of where it sits twice (dark once, light once,
+    /// 81% against a 96-97% baseline) with the settle-until-stable capture already in
+    /// place. The capture now waits until every tile has been painted at the position
+    /// it will be cropped from.
+    private static final class PaintedTile extends Container {
+        private int paintedX = Integer.MIN_VALUE;
+        private int paintedY = Integer.MIN_VALUE;
+
+        PaintedTile(com.codename1.ui.layouts.Layout layout) {
+            super(layout);
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+            super.paint(g);
+            paintedX = getAbsoluteX();
+            paintedY = getAbsoluteY();
+        }
+
+        boolean paintedWhereItIs() {
+            return paintedX == getAbsoluteX() && paintedY == getAbsoluteY();
+        }
+    }
+
+    private static final int PAINT_WAIT_ATTEMPTS = 30;
+
+    /// Blocks until every tile has painted at its laid-out position, repainting the
+    /// form between checks; see PaintedTile. Gives up after ~3s and says so rather
+    /// than hanging the suite.
+    private void waitForTilesPainted(final List wrappers) {
+        for (int attempt = 0; attempt < PAINT_WAIT_ATTEMPTS; attempt++) {
+            final boolean[] ready = new boolean[] {true};
+            runOnEdtSync(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < wrappers.size(); i++) {
+                        Object t = wrappers.get(i);
+                        if (t instanceof PaintedTile && !((PaintedTile) t).paintedWhereItIs()) {
+                            ready[0] = false;
+                        }
+                    }
+                    if (!ready[0]) {
+                        Form current = Display.getInstance().getCurrent();
+                        if (current != null) {
+                            current.repaint();
+                        }
+                    }
+                }
+            });
+            if (ready[0]) {
+                return;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+            }
+        }
+        println("CN1SS:INFO:fidelity tiles not painted at their layout after " + PAINT_WAIT_ATTEMPTS + " checks");
+    }
+
     /// How many extra captures to wait for the screen to stop changing, and how far apart.
     private static final int STABLE_ATTEMPTS = 6;
     private static final long STABLE_GAP_MS = 200;
@@ -682,17 +749,17 @@ public class FidelityDeviceRunner {
                 || "TabsMorph".equals(compId) || "TabOne".equals(compId));
         Container tile;
         if (centered) {
-            tile = new Container(new FlowLayout(Component.CENTER, Component.TOP));
+            tile = new PaintedTile(new FlowLayout(Component.CENTER, Component.TOP));
         } else if (fullWidth) {
-            tile = new Container(new BorderLayout());
+            tile = new PaintedTile(new BorderLayout());
         } else if (widthCenter) {
             // Full-width but thin. The slider track floats vertically centred; the
             // progress bar sits at the TOP of the tile (the native linear bar is a
             // top-anchored hairline), so progress is top-aligned, slider centred.
             int valign = "ProgressBar".equals(compId) ? Component.TOP : Component.CENTER;
-            tile = new Container(new FlowLayout(Component.LEFT, valign));
+            tile = new PaintedTile(new FlowLayout(Component.LEFT, valign));
         } else {
-            tile = new Container(new FlowLayout(Component.LEFT, Component.TOP));
+            tile = new PaintedTile(new FlowLayout(Component.LEFT, Component.TOP));
         }
         applyBackdrop(tile, backdropSpec, appearance);
         tile.getAllStyles().setPadding(0, 0, 0, 0);
