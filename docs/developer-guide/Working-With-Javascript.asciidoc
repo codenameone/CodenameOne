@@ -519,7 +519,56 @@ For example: `MacIntel`, `Win32`, `FreeBSD i386`, "WebTV OS"
 [id="native_theme", reftext="Changing the Native Theme"]
 === Changing the native theme
 
-The JavaScript port selects a bundled native theme from the detected browser platform. You can override this behavior by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to the path of a theme included with your app. Place additional JavaScript-only themes in `javascript/src/main/resources` so they aren't bundled into other platforms.
+The JavaScript port picks a native theme from the build hints and the browser it runs in. The shared `nativeTheme` hint, and the per-platform `ios.themeMode` and `and.themeMode` hints, apply here as they do on a device:
+
+* Unset, an Android browser gets the Holo Light theme and every other browser the iOS 7 theme.
+* `nativeTheme=modern` gives iOS and Mac browsers the Liquid Glass theme and every other browser Material 3.
+* `nativeTheme=native` does the same on phones and tablets, and gives a desktop browser the desktop theme of its operating system: Windows 11 Fluent, macOS Aqua, or GNOME Adwaita for Linux and everything else. An iPad counts as a tablet even though it reports a Mac browser.
+
+Two JavaScript hints refine that:
+
+[cols="1,2,3", options="header"]
+|===
+|Hint |Values |Description
+
+|`javascript.desktopTheme`
+|`auto` (default) +
+`fluent` / `aqua` / `adwaita` +
+`none`
+|`auto` follows the operating system as described above. Naming a theme gives every desktop browser that theme, whatever it runs on. `none` keeps the mobile themes on the desktop too.
+
+|`javascript.native.theme`
+|a resource path, such as `/WindowsFluentTheme.res`
+|Loads this theme in every browser, instead of the one the hints and the browser would pick. Place JavaScript-only themes in `javascript/src/main/resources` so they aren't bundled into other platforms.
+|===
+
+The build ships only the themes the application can reach. Pinning a desktop theme, or leaving the desktop themes out, keeps the others out of the bundle. A theme your own code opens by name, such as `Resources.open("/GnomeAdwaitaTheme.res")`, is always kept.
+
+==== Title bar and menu bar on the desktop
+
+A desktop native theme expects the operating system to own the window title and the menu bar. The native desktop ports hide the Toolbar and hand the form title to the window and the commands to the system menu bar. A web page has neither, so the `javascript.titleBar` build hint decides what stands in for them:
+
+* `toolbar` (default) keeps the Toolbar inside the app, styled by the desktop theme, with its hamburger side menu and overflow menu.
+* `html` draws a title bar and a menu bar in the page, above the app. The title bar shows the current form's title, and the menu bar lists every Toolbar command, grouped into menus by `Command.setDesktopMenu()` exactly as the native Windows menu bar groups them. A command with no menu hint goes into a *Commands* menu. The bars follow the operating system's look and the browser's light or dark preference. There are no minimize, maximize or close buttons, because a page can't do any of those to the browser window.
+
+The browser tab title is the application's display name in both modes.
+
+=== Page settings
+
+The generated `index.html` sets up the page for the application:
+
+* The page title is the application's display name, `codename1.displayName`.
+* A `viewport` meta tag gives mobile browsers the device's width, so the app starts at the phone's own scale rather than as a shrunken desktop page. Pinch zoom stays available.
+* Browser translation is off: the page carries `<meta name="google" content="notranslate">` and `translate="no"`. The app draws its own text, and a browser translating the page under it, or loading it through a translation site, breaks it. Set `javascript.allowBrowserTranslation=true` to let the browser offer translation.
+* The page carries `<meta name="darkreader-lock">`, which asks the Dark Reader extension to leave the app's own colors alone. Dark Reader honors it in its default Dynamic mode only; its Filter, Filter+ and Static modes ignore it. Set `javascript.darkreaderLock=false` to omit it.
+
+=== Selecting and copying text
+
+The app's text is present in the page, so find-in-page matches it and assistive technology reads it. Selecting it with the mouse isn't available by default, because the app itself receives every press and drag.
+
+Set the `javascript.textSelection=true` build hint to make read-only text selectable in every form: labels, span labels and non-editable text areas. With a mouse, press and drag across the text; on a touch screen, long-press it, so a swipe over text still scrolls. Copy the selection with the platform's copy shortcut. Buttons, editable fields and text inside a lead component such as a `MultiButton` never take part, because their press belongs to the control.
+
+The hint is the equivalent of calling `TextSelection.setDefaultSelectable(true)` and enabling `Form.getTextSelection()` on every form. An individual component still decides for itself with `setTextSelectionEnabled()`.
 
 === Disabling the 'OnBeforeUnload' handler
 

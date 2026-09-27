@@ -147,6 +147,11 @@ Variable, SF or Cantarell -- and the Fluent and Adwaita images fall back to
 the Mac's system font. On a real Windows or Linux desktop the text looks
 different.
 
+In a web browser, `nativeTheme=native` selects the desktop theme of the
+browser's operating system, and the `javascript.titleBar` build hint decides
+whether the title and the commands stay in the Toolbar or move to an HTML title
+bar and menu bar. See <<native_theme>>.
+
 To preview a desktop theme in the simulator, pick the Desktop skin and
 choose the theme from the *Native Theme* menu. With *Auto* selected the
 Desktop skin follows `desktop.themeMode`, which is what the packaged

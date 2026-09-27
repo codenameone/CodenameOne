@@ -9588,6 +9588,14 @@ public final class Display extends CN1Constants {
     private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
         Component c = cmp;
         while (c != null) {
+            // The walk ends at the top level. Form and Window answer isScrollableY() for their
+            // content pane, which the walk has already visited on the way up -- but applyScroll
+            // would move the top level's OWN scroll position, and that translates everything it
+            // paints: the Toolbar scrolled off with the content, and the space it left was blank
+            // (issue #5910). Reaching the top level means the page is already at its edge.
+            if (c instanceof TopLevelContainer) {
+                return false;
+            }
             // A disabled component takes no wheel, exactly as it took no synthetic drag:
             // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
             // the wheel too. The walk continues, so an enabled ancestor still gets it.

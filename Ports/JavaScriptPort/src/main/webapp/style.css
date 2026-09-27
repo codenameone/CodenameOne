@@ -298,3 +298,143 @@ div#cn1-video-capture > video {
     padding: 1mm;
 }
 
+
+/* The HTML title bar and menu bar of the javascript.titleBar=html build hint
+   (JavaScriptDesktopChrome). The port moves the body down by the chrome's height,
+   so the canvas and every overlay positioned inside the body start below it. The
+   heights are fixed so the port measures the chrome once. */
+#cn1-desktop-chrome {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 2147483647;
+    font: 13px system-ui, -apple-system, "Segoe UI", Cantarell, Ubuntu, sans-serif;
+    color: #1f1f1f;
+    background: #f3f3f3;
+    border-bottom: 1px solid #d6d6d6;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#cn1-desktop-chrome .cn1-chrome-title {
+    height: 30px;
+    line-height: 30px;
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar {
+    display: flex;
+    height: 28px;
+    padding: 0 4px;
+    align-items: stretch;
+}
+#cn1-desktop-chrome .cn1-chrome-menu {
+    position: relative;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary {
+    list-style: none;
+    height: 100%;
+    line-height: 28px;
+    padding: 0 10px;
+    border-radius: 4px;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary::-webkit-details-marker {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+#cn1-desktop-chrome .cn1-chrome-menu[open] > summary {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:focus-visible,
+#cn1-desktop-chrome .cn1-chrome-menu-item:focus-visible {
+    outline: 2px solid #0067c0;
+    outline-offset: -2px;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-items {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    min-width: 200px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    background: #f9f9f9;
+    border: 1px solid #d6d6d6;
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([disabled]) {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item[disabled] {
+    opacity: 0.45;
+}
+#cn1-desktop-chrome .cn1-chrome-shortcut {
+    opacity: 0.6;
+}
+
+/* macOS: the title centred in a lighter bar, the system font, rounded selection. */
+#cn1-desktop-chrome.cn1-chrome-mac {
+    background: #ececec;
+    border-bottom-color: #cfcfcf;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-title {
+    text-align: center;
+    font-weight: 600;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-menu-item:hover:not([disabled]) {
+    background: #0a64d8;
+    color: #fff;
+}
+
+/* GNOME: a HeaderBar-style bar with the title centred in bold. */
+#cn1-desktop-chrome.cn1-chrome-linux {
+    background: #ebebeb;
+    border-bottom-color: #d4d4d4;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-title {
+    text-align: center;
+    font-weight: 700;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-menu-items {
+    border-radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    #cn1-desktop-chrome {
+        color: #f0f0f0;
+        background: #202020;
+        border-bottom-color: #3a3a3a;
+    }
+    #cn1-desktop-chrome.cn1-chrome-mac {
+        background: #2c2c2c;
+    }
+    #cn1-desktop-chrome.cn1-chrome-linux {
+        background: #303030;
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+    #cn1-desktop-chrome .cn1-chrome-menu[open] > summary,
+    #cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([disabled]) {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu-items {
+        background: #2b2b2b;
+        border-color: #3f3f3f;
+    }
+}

@@ -188,6 +188,7 @@ public class TextSelection {
     private final Spans selectedSpans = new Spans();
     private final EventDispatcher textSelectionListeners = new EventDispatcher();
     private final Rectangle tmpRect = new Rectangle();
+    private static boolean defaultSelectable;
     private final Component root;
     private boolean rtl;
     private final TextSelectionTrigger trigger = getDefaultTextSelectionTrigger();
@@ -467,6 +468,40 @@ public class TextSelection {
         this.root = root;
     }
 
+    /// Makes read-only text selectable wherever the application did not decide: labels, span
+    /// labels and non-editable text areas report `isTextSelectionEnabled()` true unless
+    /// `setTextSelectionEnabled` was called on them. Off by default.
+    ///
+    /// Buttons never take the default, and neither does text inside a lead component such as
+    /// a `MultiButton`: the press that would start a selection there is the press that
+    /// activates the control.
+    ///
+    /// Text selection still has to be enabled on the form (`Form#getTextSelection()`) for any
+    /// of this to be reachable. The JavaScript port does both when the
+    /// `javascript.textSelection` build hint is set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `selectable`: true to make read-only text selectable by default
+    public static void setDefaultSelectable(boolean selectable) {
+        defaultSelectable = selectable;
+    }
+
+    /// Whether read-only text is selectable by default. See `#setDefaultSelectable(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when read-only text is selectable unless a component says otherwise
+    public static boolean isDefaultSelectable() {
+        return defaultSelectable;
+    }
+
+    /// Whether `cmp` takes the default of `#setDefaultSelectable(boolean)`: it is on, and the
+    /// component is not part of a lead component, whose press belongs to the control.
+    static boolean isSelectableByDefault(Component cmp) {
+        return defaultSelectable && cmp.getLeadComponent() == null;
+    }
+
     /// Gets the default trigger type for text selection.  This will vary by platform.
     /// On mobile/touch devices, it will return `TextSelectionTrigger#LongPress`,
     /// and on desktop environments with a mouse, it will return `TextSelectionTrigger#Press`.
@@ -545,7 +580,7 @@ public class TextSelection {
                 f.removePointerDraggedListener(pressListener);
                 f.removePointerReleasedListener(pressListener);
                 f.removeDragFinishedListener(pressListener);
-                f.addLongPressListener(pressListener);
+                f.removeLongPressListener(pressListener);
                 Display.impl.deinitializeTextSelection(this);
             }
         }

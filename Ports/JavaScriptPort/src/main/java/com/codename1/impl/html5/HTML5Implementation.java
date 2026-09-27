@@ -235,7 +235,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // and handle them directly.
     private EventListener nativeEventListener;
     
-    private JSFunction onMouseMoveHandle, onTouchMoveHandle, onPointerMoveHandle;
     private NativeFont defaultFont;
     private String pendingTextChanges;
     private TextArea currentEditingField;
@@ -555,6 +554,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return new HTML5Graphics(this, id, width, height);
     }
 
+    /**
+     * True for a pointer event a finger produced.
+     *
+     * <p>A touch screen fires both families for one gesture -- pointerdown and touchstart,
+     * pointermove and touchmove -- and the canvas listens to both. Both handlers used to act on
+     * it, and because each crosses the worker boundary they raced: pointerdown marked the mouse
+     * down, touchstart saw that and cancelled mouse tracking without pressing, and pointerdown
+     * then saw the touch down and dropped its own press. Nothing pressed, so every drag that
+     * followed was ignored and a phone could not scroll at all, and taps only landed when the
+     * race went the other way (issue #5912). The touch handlers carry multi-touch, so a finger
+     * is theirs alone and the pointer handlers keep the mouse and the pen.</p>
+     */
+    private static boolean isTouchPointer(Event evt) {
+        String type = ((JSOImplementations.PointerTypeEvent) evt).getPointerType();
+        return "touch".equals(type);
+    }
+
     private int getClientX(MouseEvent evt) {
         int x = evt.getClientX();
         if (x == -1) {
@@ -569,7 +585,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (y == -1) {
             return y;
         }
-        return (int)((y + getScrollY_()) * devicePixelRatioValue());
+        return (int)((y - chromeTopCss + getScrollY_()) * devicePixelRatioValue());
     }
     
     private boolean hitTest(int x, int y) {
@@ -1280,9 +1296,39 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
+    /**
+     * True once a paint recorded since the last flush repaints the whole screen, so the frame
+     * carrying it may clear the canvas first. See {@link #pendingFrameClears}.
+     */
+    private boolean paintCoversScreen;
+
+    /**
+     * Whether the frame waiting to be drained repaints every pixel of the screen, which is what
+     * makes clearing the canvas before replaying it safe.
+     *
+     * <p>The flushed rectangle cannot answer that. {@code PaintSurface.paintDirty()} clips a
+     * queued component to its dirty region but flushes the component's whole bounds, so a Form
+     * or a Dialog that repaints only part of itself still flushes a full-screen rectangle.
+     * Clearing on the rectangle alone wiped everything outside the part that did repaint: a
+     * Dialog repainting its body left the tinted form around it transparent, which showed as
+     * a dialog floating on a white page (issue #5910). The clear is therefore earned by the
+     * paint itself -- a form painting under a full-screen clip, or a transition frame, whose
+     * buffered images cover the screen -- and anything else keeps the pixels it did not
+     * repaint, as it does on every other port.</p>
+     */
+    private boolean pendingFrameClears;
+
     @Override
     public void beforeComponentPaint(Component c, Graphics g) {
         super.beforeComponentPaint(c, g);
+        if (!paintCoversScreen && c instanceof Form && isDisplayGraphics(g)
+                && graphics.getClipX() <= 0 && graphics.getClipY() <= 0
+                && graphics.getClipX() + graphics.getClipWidth() >= displayWidth
+                && graphics.getClipY() + graphics.getClipHeight() >= displayHeight
+                && c.getAbsoluteX() <= 0 && c.getAbsoluteY() <= 0
+                && c.getWidth() >= displayWidth && c.getHeight() >= displayHeight) {
+            paintCoversScreen = true;
+        }
         Object overlay = c.getNativeOverlay();
         if (overlay != null) {
             NativeOverlay no = (NativeOverlay)overlay;
@@ -1964,6 +2010,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (isTouchPointer(evt)) {
+                    // A finger belongs to the touch handlers; see isTouchPointer.
+                    return;
+                }
                 // Set ``mouseDown=true`` IMMEDIATELY, before any JSO call
                 // that can yield. ParparVM compiles every Java method to a
                 // JS generator, and JSO calls (``evt.getType()``,
@@ -2073,6 +2123,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         onMouseUp = new EventListener(){
             @Override
             public void handleEvent(Event evt) {
+                if (isTouchPointer(evt)) {
+                    return;
+                }
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2151,10 +2204,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @SuppressSyncErrors
             @Override
             public void handleEvent(Event evt) {
+                // Mark the touch down and the press in flight BEFORE anything that can yield,
+                // exactly as onMouseDown does and for the same reason. Every JSO call below
+                // suspends this handler while it crosses the worker boundary, and a quick tap's
+                // touchend is dispatched in that window: it found no touch down, dropped the
+                // release, and the press it belonged to was never released -- the button stayed
+                // pressed and nothing fired, which on a phone is every tap on the hamburger menu
+                // and most taps on a button (issue #5912).
+                final boolean touchAlreadyDown = pointerState.isTouchDown();
+                pointerState.setTouchDown(true);
+                synchronized (pointerEventOrderLock) {
+                    pressInFlight = true;
+                    deferredRelease = null;
+                }
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
                     if (cevt.isDefaultPrevented()) {
+                        if (!touchAlreadyDown) {
+                            pointerState.setTouchDown(false);
+                        }
+                        completePressInFlight();
                         return;
                     }
                 }
@@ -2182,8 +2252,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.stopPropagation();
                 }
                 JavaScriptInputCoordinator.TouchStartDecision touchDecision = JavaScriptInputCoordinator.resolveTouchStart(
-                        pointerState.isMouseDown(), pointerState.isTouchDown(), evt.getTarget() == textField || evt.getTarget() == textArea, isEditing && editingStartingUp);
+                        pointerState.isMouseDown(), touchAlreadyDown, evt.getTarget() == textField || evt.getTarget() == textArea, isEditing && editingStartingUp);
                 if (touchDecision.shouldIgnoreEvent()) {
+                    if (!touchAlreadyDown) {
+                        pointerState.setTouchDown(false);
+                    }
+                    completePressInFlight();
                     return;
                 }
                 if (touchDecision.shouldCancelMouseTracking()) {
@@ -2219,9 +2293,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                         @Override
                         public void run() {
-                            HTML5Implementation.this.pointerPressed(x, y);
+                            try {
+                                HTML5Implementation.this.pointerPressed(x, y);
+                            } finally {
+                                completePressInFlight();
+                            }
                         }
                     });
+                } else {
+                    completePressInFlight();
                 }
                 
             }
@@ -2267,14 +2347,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 TouchEvent me = (TouchEvent)evt;
                 installBacksideHooksInUserInteraction(false);
-                nativeCallSerially(new Runnable() {
+                final Runnable releaseDispatch = new Runnable() {
                     @Override
                     public void run() {
-                        pointerState.setLastTouchUpPosition(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
-                        HTML5Implementation.this.pointerReleased(pointerState.getTouchesX(), pointerState.getTouchesY()); 
-                        
+                        nativeCallSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                pointerState.setLastTouchUpPosition(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
+                                HTML5Implementation.this.pointerReleased(pointerState.getTouchesX(), pointerState.getTouchesY());
+                            }
+                        });
                     }
-                });
+                };
+                // A tap's touchend can overtake its touchstart, which is still suspended on a
+                // host call and has not pressed yet. Releasing first would leave the press
+                // without its release, so the release waits for the press, as onMouseUp does.
+                boolean releaseNow;
+                synchronized (pointerEventOrderLock) {
+                    if (pressInFlight) {
+                        deferredRelease = releaseDispatch;
+                        releaseNow = false;
+                    } else {
+                        releaseNow = true;
+                    }
+                }
+                if (releaseNow) {
+                    releaseDispatch.run();
+                }
                 if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), pointerState.getTouchStartTime(), currentTimeMillisecondsJS(), pointerState.getTouchStartX(), pointerState.getTouchStartY(), pointerState.getTouchesX()[0], pointerState.getTouchesY()[0])) {
                     // Hack for iOS only to anticipate clicking on a text field
                     createAndFocusTextFieldPreemptively(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
@@ -2396,7 +2495,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         
                         MouseEvent me = (MouseEvent)evt;
                         int x = unscaleCoord(me.getClientX());
-                        int y = unscaleCoord(me.getClientY());
+                        int y = unscaleCoord(me.getClientY() - chromeTopCss);
                         
                        if (!hitTest(x, y)) {
                             _debug("1.Failed hit test at "+x+","+y);
@@ -2438,7 +2537,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (te.getTargetTouches().getLength() > 0) {
                         MouseEvent me = te.getTargetTouches().get(0);
                         int x = unscaleCoord(me.getClientX());
-                        int y = unscaleCoord(me.getClientY());
+                        int y = unscaleCoord(me.getClientY() - chromeTopCss);
                         boolean hitTestResult = false;
                         if (!hitTest(x, y)) {
                             if (pointerState.isCapturingEvents()) {
@@ -2485,7 +2584,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                     MouseEvent me = (MouseEvent)evt;
                     int x = unscaleCoord(me.getClientX());
-                    int y = unscaleCoord(me.getClientY());
+                    int y = unscaleCoord(me.getClientY() - chromeTopCss);
 
                    if (!hitTest(x, y)) {
                         if (pointerState.isCapturingEvents()) {
@@ -2572,9 +2671,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // scrolling barely registered (a full drag scrolled <1%). onMouseMove /
         // onTouchMove gate on pointerState.isMouseDown()/isTouchDown(), so they
         // are no-ops outside an active press (e.g. plain hover).
-        onMouseMoveHandle = EventUtil.addEventListener(outputCanvas, "mousemove", onMouseMove, true);
-        onPointerMoveHandle = EventUtil.addEventListener(outputCanvas, "pointermove", onMouseMove, true);
-        onTouchMoveHandle = EventUtil.addEventListener(outputCanvas, "touchmove", onTouchMove, true);
+        //
+        // Registered through the element, like the press listeners above, and not through
+        // EventUtil: EventUtil hands the browser a raw functor from inside the worker, which the
+        // worker-callback bridge never sees, so the listener was added and never called. Every
+        // move of every drag was lost -- a finger could not scroll, and a mouse drag could not
+        // either -- while the press and the release still arrived (issue #5912).
+        outputCanvas.addEventListener("mousemove", onMouseMove, true);
+        outputCanvas.addEventListener("pointermove", onMouseMove, true);
+        outputCanvas.addEventListener("touchmove", onTouchMove, true);
 
         /**
          *  The installbacksidehooks event is an event that can be triggered from native javascript to install
@@ -3579,7 +3684,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
         context.clip();
         // Wipe the drain region only when this frame is repainting the
-        // *entire* canvas (form transitions, full-screen redraws). Each
+        // *entire* canvas (form transitions, full-screen redraws) -- which the
+        // paint reports through pendingFrameClears, because a full-screen crop
+        // alone does not mean every pixel is repainted (see that field). Each
         // such drain carries a full paint, so stale pixels must not
         // bleed through from the previous drain -- without this, title
         // bars from prior forms accumulated across tests because the new
@@ -3608,7 +3715,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // the runs of a component that has gone, with nothing else queued -- is exactly that
         // shape, and a full-screen crop is what a form-sized component asks for when it
         // repaints.
-        if (framePaintsPixels(frame)
+        boolean frameClears = pendingFrameClears;
+        pendingFrameClears = false;
+        if (frameClears && framePaintsPixels(frame)
                 && frame.getCropX() == 0 && frame.getCropY() == 0
                 && frame.getCropW() >= displayWidth
                 && frame.getCropH() >= displayHeight) {
@@ -4066,7 +4175,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         refreshDevicePixelRatio();
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
-                window.getInnerHeight(),
+                window.getInnerHeight() - chromeTopCss,
                 devicePixelRatioValue());
         canvas.setWidth(dimensions.getBackingWidth());
         canvas.setHeight(dimensions.getBackingHeight());
@@ -4472,6 +4581,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             tp.put("@paintsTitleBarBool", "false");
 
             UIManager.getInstance().setThemeProps(tp);
+            installDesktopChromeIfRequested();
             return;
     	} catch (IOException ex){
             Log.e(ex);
@@ -4521,13 +4631,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * always points at the OS-appropriate modern .res so screenshot
      * tests can install it regardless of the configured default.
      */
-    private static String resolveNativeThemeResource() {
+    private String resolveNativeThemeResource() {
         Display d = Display.getInstance();
         String explicit = d.getProperty("javascript.native.theme", null);
         if (explicit != null && explicit.length() > 0) {
             return explicit;
         }
         String shared = d.getProperty("nativeTheme", d.getProperty("cn1.nativeTheme", null));
+        // A desktop browser takes the desktop native theme of its operating system when the
+        // app asks for the native look (or pins one with javascript.desktopTheme). Phones and
+        // tablets -- iPadOS included, which reports a Mac user agent -- keep the branches below.
+        // The build prunes the bundle from the same table (JavaScriptBuildHints in the Maven
+        // plugin and in the cloud builder), so change the two together.
+        if (isDesktop() && !isIOS()) {
+            String desktop = desktopThemeFor(asciiLower(d.getProperty("javascript.desktopTheme", null)),
+                    asciiLower(shared), desktopOs_());
+            if (desktop != null) {
+                return "/" + desktop + ".res";
+            }
+        }
         // Auto-detected branch chooses Liquid Glass on iOS/Mac and
         // Material 3 elsewhere. Used for any "modern"/"auto" path.
         boolean iosLike = isIOSLikeBrowser();
@@ -4581,6 +4703,165 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // which routes Android user agents to Holo Light and every
         // other non-iOS browser (Linux/Windows/Chrome OS) to iOS 7.
         return isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
+    }
+
+    /// The desktop theme for a desktop browser, or null to keep the mobile themes. Mirrors
+    /// `JavaScriptBuildHints.desktopThemeFor` in the builders, which decide what the bundle
+    /// carries from the same hints.
+    static String desktopThemeFor(String desktopHint, String shared, String os) {
+        if ("fluent".equals(desktopHint) || "windows".equals(desktopHint)) {
+            return "WindowsFluentTheme";
+        }
+        if ("aqua".equals(desktopHint) || "mac".equals(desktopHint) || "macos".equals(desktopHint)) {
+            return "MacOSAquaTheme";
+        }
+        if ("adwaita".equals(desktopHint) || "gnome".equals(desktopHint) || "linux".equals(desktopHint)) {
+            return "GnomeAdwaitaTheme";
+        }
+        // Only "native" reaches the desktop themes by itself: "modern" means the mobile modern
+        // themes, exactly as it does for the JavaSE desktop build.
+        if ((desktopHint == null || "auto".equals(desktopHint)) && "native".equals(shared)) {
+            if ("win".equals(os)) {
+                return "WindowsFluentTheme";
+            }
+            if ("mac".equals(os)) {
+                return "MacOSAquaTheme";
+            }
+            return "GnomeAdwaitaTheme";
+        }
+        return null;
+    }
+
+    /// `win`, `mac` or `linux`: the desktop operating system the browser reports. Everything
+    /// that is neither Windows nor a Mac -- Linux, ChromeOS, the BSDs -- is closest to GNOME.
+    @JSBody(params={}, script="var u = navigator.userAgent || '';"
+            + "if (/Windows|Win32|Win64/.test(u)) return 'win';"
+            + "if (/Mac/.test(u)) return 'mac';"
+            + "return 'linux';")
+    private static native String desktopOs_();
+
+    private static String asciiLower(String s) {
+        if (s == null) {
+            return null;
+        }
+        s = s.trim();
+        if (s.length() == 0) {
+            return null;
+        }
+        // Hint keywords are ASCII; toLowerCase() is locale sensitive.
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return b.toString();
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Desktop title bar and menu bar
+    //
+    // A desktop native theme expects the platform to own the window title and the menu bar.
+    // A browser page owns neither, so the javascript.titleBar build hint picks what stands in:
+    //
+    // - "toolbar" (the default): the Toolbar stays in the app and the desktop theme styles it.
+    //   getConfiguredDesktopTitleBarMode() answers "toolbar", which outranks the theme's own
+    //   desktopTitleBarMode constant (native for Fluent and Aqua, custom for Adwaita) -- without
+    //   that, Form would detach the Toolbar and hand the title and the commands to hooks that
+    //   put them nowhere.
+    // - "html": JavaScriptDesktopChrome draws a title bar and a menu bar in the document above
+    //   the canvas, and this port then answers the native-title and native-command hooks the
+    //   way the Windows and Linux ports do.
+    // ---------------------------------------------------------------------------------------
+
+    /// The `javascript.textSelection` build hint: read-only text becomes selectable and copyable
+    /// in every form, through the framework's own TextSelection -- the canvas owns pointer input,
+    /// so the browser's native selection cannot reach the text (see the text layer's comment in
+    /// __init). The trigger is TextSelection's platform default: a press-drag with a mouse, a
+    /// long press on a touch screen, so a swipe over text still scrolls.
+    private void applyTextSelectionHint(Form f) {
+        if (f == null || !"true".equals(asciiLower(Display.getInstance().getProperty("javascript.textSelection", null)))) {
+            return;
+        }
+        TextSelection.setDefaultSelectable(true);
+        TextSelection sel = f.getTextSelection();
+        if (!sel.isEnabled()) {
+            sel.setEnabled(true);
+        }
+    }
+
+    private JavaScriptDesktopChrome desktopChrome;
+
+    /// CSS pixels the HTML chrome takes from the top of the page; 0 without it. The body -- and
+    /// with it the canvas and every overlay positioned inside it -- starts below the chrome, so
+    /// only viewport coordinates (a pointer event's clientY) need this subtracted.
+    private int chromeTopCss;
+
+    private void installDesktopChromeIfRequested() {
+        if (desktopChrome != null || !isDesktop() || isIOS()) {
+            return;
+        }
+        if (!"html".equals(asciiLower(Display.getInstance().getProperty("javascript.titleBar", null)))) {
+            return;
+        }
+        desktopChrome = new JavaScriptDesktopChrome((HTMLDocument) doc(), outputCanvas, desktopOs_(),
+                new JavaScriptDesktopChrome.CommandSink() {
+                    public void commandChosen(final Command cmd) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                dispatchNativeMenuCommand(cmd);
+                            }
+                        });
+                    }
+                });
+        chromeTopCss = desktopChrome.getHeight();
+        HTMLElement body = doc().getBody();
+        body.getStyle().setProperty("top", chromeTopCss + "px");
+        body.getStyle().setProperty("height", "calc(100% - " + chromeTopCss + "px)");
+        updateCanvasSize();
+        sizeChanged(getDisplayWidth(), getDisplayHeight());
+    }
+
+    @Override
+    public boolean isNativeCommandsSupported() {
+        return desktopChrome != null;
+    }
+
+    @Override
+    public boolean isNativeTitle() {
+        return desktopChrome != null;
+    }
+
+    @Override
+    public void refreshNativeTitle() {
+        if (desktopChrome == null) {
+            return;
+        }
+        Form f = getCurrentForm();
+        // A Dialog is painted inside the form rather than owning the window; letting it retitle
+        // the bar would leave the wrong title behind once it is dismissed.
+        if (f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            desktopChrome.setTitle(f.getTitle());
+        }
+    }
+
+    @Override
+    public String getConfiguredDesktopTitleBarMode() {
+        if (!isDesktop()) {
+            return null;
+        }
+        return desktopChrome != null ? "native" : "toolbar";
+    }
+
+    @Override
+    public String getDesktopTitleBarMode() {
+        return desktopChrome != null ? "native" : "toolbar";
+    }
+
+    @Override
+    public void setNativeCommands(java.util.Vector commands) {
+        if (desktopChrome != null) {
+            desktopChrome.setCommands(commands);
+        }
     }
 
     @Override
@@ -6984,6 +7265,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     graphicsLocked = locked;
                 }
             }, pendingDisplay, flushedOps, x, y, width, height);
+            // A transition frame draws two buffered images that cover the screen and is not a
+            // component paint, so beforeComponentPaint never sees it.
+            if (paintCoversScreen || Display.getInstance().isInTransition()) {
+                pendingFrameClears = true;
+            }
+            paintCoversScreen = false;
         }
         beginGraphicsAtomic();
         try {
@@ -11722,6 +12009,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
+        if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
+            desktopChrome.setTitle(f.getTitle());
+        }
+        applyTextSelectionHint(f);
         // A form built before the last scheme or density change still holds the styles it
         // resolved then, so it is brought up to date as it appears rather than coming back in
         // the old palette.
@@ -14003,20 +14294,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return selectedText;
     }
     
-    @JSBody(params={"evt", "content"}, script="try { evt.clipboardData.setData('text/plain', content);} catch (e){}")
-    private native static void setClipboardData(Event evt, String content);
-    
     EventListener copyListener = new EventListener() {
         @SuppressSyncErrors
         public void handleEvent(Event evt) {
             if (selectedText == null || selectedText.isEmpty()) {
                 return;
             }
-            if (!jQuery_is_(outputCanvas, ":focus")) {
+            // A copy while a native field is being edited is that field's copy.
+            if (isEditing) {
                 return;
             }
-            setClipboardData(evt, selectedText);
-            evt.preventDefault();
+            // Not through the event. This listener runs in the worker, after the browser has
+            // finished dispatching the copy event, so writing into its clipboardData does
+            // nothing -- and the canvas, which has no tabindex, never holds focus, so the old
+            // ":focus" gate returned before even trying. Ctrl/Cmd+C over a selection copied
+            // nothing at all. copyToClipboard goes through the main thread's clipboard API,
+            // which the key press that raised this event has just granted.
+            copyToClipboard(selectedText);
         }
     };
     
@@ -14060,7 +14354,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 public void run() {
                     _log("Showing context menu");
                     MouseEvent me = lastMouseEvent != null ? lastMouseEvent : evt;
-                    ContextMenu.showAt(unscaleCoord(me.getClientX()) + CN.convertToPixels(2), unscaleCoord(me.getClientY()) + CN.convertToPixels(2));
+                    ContextMenu.showAt(unscaleCoord(me.getClientX()) + CN.convertToPixels(2), unscaleCoord(me.getClientY() - chromeTopCss) + CN.convertToPixels(2));
                     
                 }
             });
@@ -14207,7 +14501,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         f.putClientProperty(THEME_GENERATION_PROPERTY, Integer.valueOf(themeGeneration));
         if (generation != 0 || themeGeneration != 0) {
+            // The refresh builds new Style instances, and a background painter is not something
+            // the theme supplies -- it was installed on the form itself. A Dialog is the case
+            // that matters: showModal installs the painter that draws the tinted form behind the
+            // dialog and only then makes the dialog current, which is what calls this. Dropping
+            // it left every dialog floating on a blank page (issue #5910), and a painter an
+            // application set with setBgPainter was lost the same way.
+            com.codename1.ui.Painter painter = f.getUnselectedStyle().getBgPainter();
             f.refreshTheme();
+            if (painter != null) {
+                f.getUnselectedStyle().setBgPainter(painter);
+            }
         }
     }
 

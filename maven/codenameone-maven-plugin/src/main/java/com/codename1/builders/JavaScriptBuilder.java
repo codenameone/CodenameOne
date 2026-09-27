@@ -39,8 +39,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -192,6 +194,9 @@ public class JavaScriptBuilder extends Executor {
             // application looks like a database user and nothing is ever pruned. The iOS,
             // Windows and Linux builders scan at the same point for the same reason.
             recordDatabaseUsage(stageClasses);
+            // Same point and same reason: the port names every native theme, so a scan after it
+            // is merged in would keep them all.
+            themeReferences = JavaScriptBuildHints.scanThemeReferences(stageClasses);
 
             File portSources = locateJavaScriptPortSources(request);
             File portClassesStaged = stageJavaScriptPort(request, portSources, stageClasses, portClasses);
@@ -211,7 +216,7 @@ public class JavaScriptBuilder extends Executor {
             File parparvmCompilerJar = extractParparVMCompiler();
 
             if (!runByteCodeTranslator(parparvmCompilerJar, stageClasses, translatorOut, translatorAppName,
-                    request.getPackageName(), request.getMainClass(), request.getVersion())) {
+                    request.getPackageName(), request.getMainClass(), request.getVersion(), request)) {
                 return false;
             }
 
@@ -315,7 +320,14 @@ public class JavaScriptBuilder extends Executor {
     }
 
 
+    /**
+     * Theme names the application's own classes mention, from
+     * {@link JavaScriptBuildHints#scanThemeReferences(File)}; read when the port assets are pruned.
+     */
+    private Set<String> themeReferences = new HashSet<String>();
+
     private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
+        pruneUnusedThemes(new File(webApp, "assets"), request);
         File js = new File(webApp, "js");
         if (!js.isDirectory()) {
             return;
@@ -351,6 +363,29 @@ public class JavaScriptBuilder extends Executor {
             }
             debug("Omitting the SQLite engine; this application does not use com.codename1.db");
         }
+    }
+
+    /**
+     * Deletes the native themes this application cannot reach. The port bundle carries every
+     * theme the runtime resolver can pick between, and the resolver's choice depends on hints
+     * that are known here -- so an app that never asks for the desktop themes, or pins one, does
+     * not ship the rest into its public web root.
+     */
+    private void pruneUnusedThemes(File assets, BuildRequest request) {
+        if (!assets.isDirectory()) {
+            return;
+        }
+        Set<String> keep = JavaScriptBuildHints.themesToShip(request, themeReferences);
+        for (String theme : JavaScriptBuildHints.ALL_THEMES) {
+            if (keep.contains(theme)) {
+                continue;
+            }
+            File f = new File(assets, theme + ".res");
+            if (f.isFile() && !f.delete()) {
+                log("WARNING: could not delete " + f + "; it will ship in the bundle");
+            }
+        }
+        debug("Native themes shipped: " + keep);
     }
 
     private File locateJavaScriptPortSources(BuildRequest request) {
@@ -556,6 +591,10 @@ public class JavaScriptBuilder extends Executor {
             pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
             pw.println("            public void run() {");
             pw.print(hardeningRuntimeProperties(request));
+            // The theme, title-bar and text-selection hints, read by the port through
+            // Display.getProperty. The native theme is installed from the lifecycle's init,
+            // which runs after this.
+            pw.print(JavaScriptBuildHints.launcherProperties(request));
             pw.println("            }");
             pw.println("        });");
             pw.println("    }");
@@ -897,7 +936,7 @@ public class JavaScriptBuilder extends Executor {
 
     private boolean runByteCodeTranslator(File compilerJar, File stageClasses, File translatorOut,
                                           String translatorAppName, String packageName, String mainClass,
-                                          String version) throws Exception {
+                                          String version, BuildRequest pageRequest) throws Exception {
         Map<String, String> env = new HashMap<String, String>();
         log("Running ByteCodeTranslator (javascript target) for " + mainClass);
         java.util.List<String> cmd = new java.util.ArrayList<String>();
@@ -927,6 +966,9 @@ public class JavaScriptBuilder extends Executor {
         if (jsPortWebApp != null && jsPortWebApp.isDirectory() && !webAppOverridden) {
             extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
+        // The page title and the index.html opt-outs, placed before the CN1_TRANSLATOR_OPTS
+        // entries: the JVM keeps the last -D for a key, so an explicit override there wins.
+        extraOpts.addAll(0, JavaScriptBuildHints.translatorOptions(pageRequest));
         // Heap sized from the machine (see TranslatorHeap); a -Xmx in
         // CN1_TRANSLATOR_OPTS still takes precedence. The old fixed 512m was
         // tuned against the sample apps and made a large app fail with

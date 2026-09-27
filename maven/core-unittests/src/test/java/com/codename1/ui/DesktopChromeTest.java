@@ -138,6 +138,31 @@ class DesktopChromeTest extends UITestBase {
      * form takes when the application sets {@code Display.COMMAND_BEHAVIOR_NATIVE} directly
      * rather than through the desktop title-bar mode.
      */
+    /**
+     * The desktop native themes declare {@code commandBehavior: Native}. With a Toolbar the
+     * commands live on the Toolbar, not on the form's MenuBar, so publishing the MenuBar's list
+     * at show time handed the native menu bar nothing: the menu bar came up empty and the
+     * commands, whose Toolbar was hidden, could not be reached at all.
+     */
+    @FormTest
+    void nativeCommandBehaviourWithAToolbarPublishesTheToolbarsCommands() {
+        desktopMode("native");
+        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+        try {
+            Form f = new Form("My App");
+            Command save = Command.create("Save", null, null);
+            f.getToolbar().addCommandToOverflowMenu(save);
+            f.show();
+            DisplayTest.flushEdt();
+
+            Vector bridged = implementation.getLastNativeCommands();
+            assertNotNull(bridged, "commands must be bridged to the native menu bar");
+            assertTrue(bridged.contains(save), "the Toolbar's command must reach the native menu bar");
+        } finally {
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
+        }
+    }
+
     @FormTest
     void nativeCommandBehaviourStillDrawsSoftButtonsWithNoNativeMenuBar() {
         implementation.setDesktop(true);

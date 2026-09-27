@@ -681,6 +681,13 @@ public class JSOImplementations {
     
     
     
+    /// The part of a PointerEvent the port reads to tell a finger from a mouse. A plain mouse
+    /// event has no such property and answers null.
+    public interface PointerTypeEvent extends Event {
+        @JSProperty
+        public String getPointerType();
+    }
+
     public interface WheelEvent extends MouseEvent {
         @JSProperty
         public double getDeltaX();

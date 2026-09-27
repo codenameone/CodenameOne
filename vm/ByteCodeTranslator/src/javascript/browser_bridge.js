@@ -1771,6 +1771,26 @@
   // without losing information. We extend this as more event types show
   // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
   // covered below.
+  function serializeTouchList(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i] || (typeof list.item === 'function' ? list.item(i) : null);
+      if (!t) {
+        continue;
+      }
+      out.push({
+        identifier: t.identifier | 0,
+        clientX: +t.clientX || 0,
+        clientY: +t.clientY || 0,
+        pageX: +t.pageX || 0,
+        pageY: +t.pageY || 0,
+        screenX: +t.screenX || 0,
+        screenY: +t.screenY || 0
+      });
+    }
+    return out;
+  }
+
   function serializeEventForWorker(evt) {
     if (evt == null || typeof evt !== 'object') {
       return evt;
@@ -1789,6 +1809,8 @@
     if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
     if ('screenX' in evt) out.screenX = +evt.screenX || 0;
     if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('pointerType' in evt) out.pointerType = evt.pointerType == null ? '' : String(evt.pointerType);
+    if ('pointerId' in evt) out.pointerId = evt.pointerId | 0;
     if ('button'  in evt) out.button  = evt.button  | 0;
     if ('buttons' in evt) out.buttons = evt.buttons | 0;
     if ('detail'  in evt) out.detail  = evt.detail  | 0;
@@ -1848,10 +1870,16 @@
     if (evt.source && typeof storeHostRef === 'function') out.source = storeHostRef(evt.source);
     // preventDefault / stopPropagation are fire-and-forget from the worker
     // side (we eagerly call them on the main-thread event just in case).
-    // touches arrays are serialised shallow — most user code reads the
-    // first touch's clientX/Y which is the same as the top-level fields
-    // except on real multi-touch, but the port.js shims use the flat
-    // fields already.
+    //
+    // A TouchEvent has no clientX/clientY of its own: its coordinates live
+    // only in the three touch lists, so those are copied point by point.
+    // They used to be left out on the theory that the flat fields covered
+    // them, and they do not exist on a touch event -- the port's touch
+    // handlers read getTargetTouches(), got null and threw on every touch,
+    // so a phone could neither scroll nor reliably tap (issue #5912).
+    if (evt.touches) out.touches = serializeTouchList(evt.touches);
+    if (evt.targetTouches) out.targetTouches = serializeTouchList(evt.targetTouches);
+    if (evt.changedTouches) out.changedTouches = serializeTouchList(evt.changedTouches);
     if (evt.target && typeof storeHostRef === 'function') {
       out.target = storeHostRef(evt.target);
     }

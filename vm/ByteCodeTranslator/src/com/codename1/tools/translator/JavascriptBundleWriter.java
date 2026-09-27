@@ -1636,7 +1636,68 @@ final class JavascriptBundleWriter {
             stubs.append("<script src=\"").append(stub).append("\"></script>\n");
         }
         index = index.replace("<!--__NATIVE_INTERFACE_STUBS__-->", stubs.toString().trim());
+        index = applyPageSettings(index,
+                System.getProperty(PAGE_TITLE_PROPERTY),
+                Boolean.parseBoolean(System.getProperty(ALLOW_TRANSLATION_PROPERTY, "false")),
+                !"false".equalsIgnoreCase(System.getProperty(DARKREADER_LOCK_PROPERTY, "true")));
         Files.write(new File(outputDirectory, "index.html").toPath(), index.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The application's display name, which becomes the page title. The builders pass the
+    /// `codename1.displayName` of the project; without it the page keeps the generic title.
+    static final String PAGE_TITLE_PROPERTY = "codename1.javascript.title";
+
+    /// `true` lets the browser offer machine translation of the page (the
+    /// `javascript.allowBrowserTranslation` build hint). Off by default: an application renders
+    /// its own text into a canvas and a DOM text layer, and a translator rewriting that layer
+    /// under the running app -- or loading the page through a translation proxy -- breaks it.
+    static final String ALLOW_TRANSLATION_PROPERTY = "codename1.javascript.allowBrowserTranslation";
+
+    /// `false` drops the Dark Reader opt-out (the `javascript.darkreaderLock` build hint). The app
+    /// paints its own palette, including its own dark mode, so an extension recolouring the DOM
+    /// around the canvas only produces a page that disagrees with itself.
+    static final String DARKREADER_LOCK_PROPERTY = "codename1.javascript.darkreaderLock";
+
+    static final String DEFAULT_PAGE_TITLE = "Codename One JavaScript Port";
+
+    /// Fills the page-level placeholders of the `index.html` template.
+    ///
+    /// Only `<meta>` tags and an attribute are added, never inline script or style, so the CSP
+    /// hashes [JavascriptSecurityHeaders] computes from this page afterwards are unaffected.
+    ///
+    /// The viewport is unconditional: without it every mobile browser lays the page out on a
+    /// ~980px virtual viewport and scales it down, so the app starts as a shrunken desktop page.
+    /// It deliberately leaves zoom enabled.
+    static String applyPageSettings(String index, String title, boolean allowTranslation, boolean darkReaderLock) {
+        StringBuilder meta = new StringBuilder();
+        meta.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+        if (!allowTranslation) {
+            meta.append("\n<meta name=\"google\" content=\"notranslate\">");
+        }
+        if (darkReaderLock) {
+            meta.append("\n<meta name=\"darkreader-lock\">");
+        }
+        String pageTitle = title == null || title.trim().length() == 0 ? DEFAULT_PAGE_TITLE : title.trim();
+        return index
+                .replace("__HTML_ATTRS__", allowTranslation ? "" : " translate=\"no\"")
+                .replace("<!--__HEAD_META__-->", meta.toString())
+                .replace("__APP_TITLE__", escapeHtml(pageTitle));
+    }
+
+    private static String escapeHtml(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '&': out.append("&amp;"); break;
+                case '<': out.append("&lt;"); break;
+                case '>': out.append("&gt;"); break;
+                case '"': out.append("&quot;"); break;
+                case '\'': out.append("&#39;"); break;
+                default: out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /**

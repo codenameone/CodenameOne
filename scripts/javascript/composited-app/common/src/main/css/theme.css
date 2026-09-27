@@ -1,0 +1,92 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/** Define Theme Constants here */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+}
+
+/** Style for Button class */
+Button {
+    font-family: "native:MainLight";
+    font-size: 3mm;
+}
+
+/** Style for App Title Bar Text */
+Title {
+    font-family: "native:MainLight";
+    font-size: 6mm;
+}
+
+/** Style for Dialog body */
+DialogBody {
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+}
+
+/** Style for Dialog title bar text */
+DialogTitle {
+    font-family: "native:MainLight";
+    font-size: 4.5mm;
+}
+
+/** Style for the side menu */
+SideNavigationPanel {
+    background: white;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
+@media platform-ios {
+    /** iOS Only styles for side menu. */
+    SideNavigationPanel {
+        /** Extra top padding to deal with notch on iPhoneX */
+        padding: 6mm 1mm 1mm 1mm;
+    }
+}
+
+/** Style for commands in side menu. */
+SideCommand {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: black;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #cccccc;
+}
+
+/* Dark mode: the native theme handles dark mode for standard components
+ * (Form, Toolbar, Button, ...). The side menu below is the only thing this
+ * template hard-codes to light colors, so it's the only thing we flip for
+ * dark mode -- keeping the rest of the UI native. Add your own rules here as
+ * needed, or delete this block if you only want a light theme. */
+@media (prefers-color-scheme: dark) {
+    SideNavigationPanel {
+        background: #0f172a;
+    }
+    SideCommand {
+        color: #e2e8f0;
+        background: #0f172a;
+        border-bottom: 2px solid #334155;
+    }
+}

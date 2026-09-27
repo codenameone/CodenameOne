@@ -240,6 +240,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
     };
     private boolean textSelectionEnabled;
+    /// True once `#setTextSelectionEnabled(boolean)` decided; until then a read-only text area
+    /// follows `TextSelection#setDefaultSelectable(boolean)`.
+    private boolean textSelectionExplicit;
     private TextSelection.Spans span;
     private TextSelection.TextSelectionSupport textSelectionSupport;
 
@@ -2352,7 +2355,10 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - #setTextSelectionEnabled(boolean)
     public boolean isTextSelectionEnabled() {
-        return textSelectionEnabled;
+        if (textSelectionExplicit) {
+            return textSelectionEnabled;
+        }
+        return !isEditable() && TextSelection.isSelectableByDefault(this);
     }
 
     /// Enables text selection on this TextArea.  Text selection must also be enabled on the Form in order to
@@ -2371,6 +2377,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - TextSelection#setEnabled(boolean)
     public void setTextSelectionEnabled(boolean enabled) {
         this.textSelectionEnabled = enabled;
+        this.textSelectionExplicit = true;
         updateCursor();
     }
 
@@ -2397,13 +2404,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
                 @Override
                 public boolean isTextSelectionEnabled(TextSelection sel) {
-                    return (!isEditable() && textSelectionEnabled) || (isEditable() && !isEnabled());
+                    return (!isEditable() && TextArea.this.isTextSelectionEnabled()) || (isEditable() && !isEnabled());
                 }
 
 
                 @Override
                 public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
-                    return (!isEditable() && textSelectionEnabled) || (isEditable() && !isEnabled());
+                    return (!isEditable() && TextArea.this.isTextSelectionEnabled()) || (isEditable() && !isEnabled());
                 }
 
 

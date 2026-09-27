@@ -171,6 +171,28 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelPastTheEndOfThePageLeavesTheFormWhereItIs() {
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pageMax = page.getScrollDimension().getHeight() - page.getHeight();
+        for (int i = 0; i < 200 && page.getScrollY() < pageMax; i++) {
+            wheelAt(x, y, 0, -px(20));
+        }
+        assertEquals(pageMax, page.getScrollY(), "the page reaches its end");
+
+        // Issue #5910. The form answers isScrollableY() for its content pane, so the walk used
+        // to carry on to the form itself and scroll THAT: the Toolbar went off the top with
+        // the content and the space it left was blank.
+        for (int i = 0; i < 5; i++) {
+            wheelAt(x, y, 0, -px(20));
+        }
+        assertEquals(0, f.getScrollY(), "the form itself never scrolls");
+        assertEquals(pageMax, page.getScrollY(), "and the page stays at its end");
+    }
+
+    @FormTest
     void aWheelPastTheEndOfAnInnerScrollerMovesThePage() {
         Form f = scrollingForm();
         Container page = f.getContentPane();

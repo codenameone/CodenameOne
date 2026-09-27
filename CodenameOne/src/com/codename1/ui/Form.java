@@ -3299,11 +3299,17 @@ public class Form extends Container implements TopLevelContainer {
         // an EmbeddedContainer -- would otherwise overwrite the real surface's native
         // menu bar with its own.
         if (getParent() == null) {
-            if (Display.getInstance().isNativeCommands()) {
-                Display.impl.setNativeCommands(menuBar.getCommands());
-            } else if (isDesktopNativeChrome() && toolbar != null) {
-                // bridge the (hidden) toolbar's commands to the native desktop menu bar
+            if (isDesktopNativeChrome() && toolbar != null) {
+                // bridge the (hidden) toolbar's commands to the native desktop menu bar.
+                // Checked BEFORE the native command behaviour: the desktop native themes declare
+                // commandBehavior Native, and with a Toolbar the commands live on the Toolbar
+                // rather than on this form's MenuBar -- publishing the MenuBar's list there
+                // handed the native menu bar nothing, so it came up empty while the Toolbar
+                // that held the commands was hidden. getAllNativeMenuCommands() includes the
+                // Toolbar's MenuBar, so nothing the other branch would publish is lost.
                 Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+            } else if (Display.getInstance().isNativeCommands()) {
+                Display.impl.setNativeCommands(menuBar.getCommands());
             }
         }
         if (getParent() != null) {
