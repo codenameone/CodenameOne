@@ -1095,7 +1095,7 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
                     // Tag java.lang.String references with JDWP type 's'
                     // so the IDE can read their contents via
                     // StringReference.Value instead of invoking toString().
-                    if (v->typeCode == 'L' && cls == &class__java_lang_String) {
+                    if (v->typeCode == 'L' && cn1IsStringClass(cls)) {
                         tag = 's';
                     }
                     break;
@@ -1240,7 +1240,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             @try {
                 // toNSString walks the String's char[]; a reference that is
                 // not really a String would send it off into arbitrary memory.
-                if (cn1_debugger_class_of_wire_id(obj) == &class__java_lang_String) {
+                if (cn1IsStringClass(cn1_debugger_class_of_wire_id(obj))) {
                     struct ThreadLocalData* listenerTsd = getThreadLocalData();
                     // This call is what registers the listener in allThreads;
                     // remember it here so the enumeration can leave it out.

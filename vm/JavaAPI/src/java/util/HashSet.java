@@ -214,12 +214,15 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E> {
         // Capped at 2^30, as HashMap.calculateCapacity and Hashtable.cn1Capacity are:
         // past it the shift wraps negative, then to zero, and the loop never ends.
         while (cap < capacity && cap < (1 << 30)) cap <<= 1;
-        /* No threshold field. It was always (int)(cap * 0.75f) -- the loadFactor
-         * argument is validated and then ignored -- and for the only capacities this
-         * table ever has, powers of two starting at 4, that is exactly
-         * cap - (cap >> 2). Deriving it costs a shift and a subtract where the field
-         * cost 4 bytes on every set, which is what took java.util.HashSet from the
-         * 48-byte BiBOP slot class into the 64-byte one. See cn1HsThreshold in
+        /* The load factor is validated and then NOT honoured: the threshold is always
+         * 0.75 of the capacity. That is a deliberate change from the HashMap-backed set
+         * this replaced, which passed the factor through. A factor is a tuning hint --
+         * the set's contents and behaviour are the same at any value -- and storing one
+         * costs a field, which is 4 bytes on every set and takes java.util.HashSet from
+         * the 48-byte BiBOP slot class into the 64-byte one; at the self-hosting peak
+         * 145k sets are live, most holding a handful of elements. So the threshold is
+         * derived, not stored: for the only capacities this table has, powers of two
+         * from 4, 0.75 is exactly cap - (cap >> 2). See cn1HsThreshold in
          * nativeMethods.m, which also keeps a 2-slot table's empty slot. */
         cn1Cap = cap;
     }

@@ -136,7 +136,9 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
     if (!cn1_debugger_safe_read(&obj->__cn1ClassId, &classIndex, sizeof(classIndex))) {
         return NULL;
     }
-    if (classIndex == 0 || classIndex >= (uint16_t)cn1ClazzByIdCount) return NULL;
+    // Compared as int: the count can be 65536 (a full 16-bit index space), which a
+    // uint16_t cast would turn into 0 and so reject every object.
+    if (classIndex == 0 || (int)classIndex >= cn1ClazzByIdCount) return NULL;
     struct clazz* cls = __atomic_load_n(&cn1ClazzById[classIndex], __ATOMIC_RELAXED);
     if (cls == NULL) return NULL;
     // Copied into raw bytes rather than a "struct clazz" local because the
