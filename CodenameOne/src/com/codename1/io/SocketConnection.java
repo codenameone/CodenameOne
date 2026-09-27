@@ -28,8 +28,6 @@ import java.io.OutputStream;
 
 /// Callback for establishment of a socket connection. Notice this callback
 /// is always invoked on a new separate thread to allow uninterrupted IO.
-///
-/// @author Shai Almog
 public abstract class SocketConnection {
     /// Keeping member field so the GC won't collect these objects before the socket itself is collected.
     /// This can cause a problem since there's native reliance on these objects.

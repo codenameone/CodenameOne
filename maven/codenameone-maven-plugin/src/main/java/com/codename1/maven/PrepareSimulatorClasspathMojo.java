@@ -54,8 +54,6 @@ import static com.codename1.maven.PathUtil.path;
  * codename1.css.compiler.args.input
  * codename1.css.compiler.args.output
  * codename1.css.compiler.args.output
- *
- * @author shannah
  */
 @Mojo(name = "prepare-simulator-classpath", defaultPhase = LifecyclePhase.INITIALIZE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {

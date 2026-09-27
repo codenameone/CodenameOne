@@ -24,47 +24,45 @@ package com.codename1.backend.otel;
 
 import java.io.IOException;
 
-/**
- * The OpenTelemetry samplers named by {@code OTEL_TRACES_SAMPLER}:
- * {@code always_on}, {@code always_off}, {@code traceidratio} and the three
- * {@code parentbased_} forms, which follow the caller's decision when there is a
- * caller and apply the named rule only to a new trace.
- *
- * <p>Parent-based is the default, and it matters most for a mobile backend: the
- * app decides once, at the edge, and every service the request touches agrees,
- * so a trace is either whole or absent rather than missing its middle.
- */
+/// The OpenTelemetry samplers named by `OTEL_TRACES_SAMPLER`:
+/// `always_on`, `always_off`, `traceidratio` and the three
+/// `parentbased_` forms, which follow the caller's decision when there is a
+/// caller and apply the named rule only to a new trace.
+///
+/// Parent-based is the default, and it matters most for a mobile backend: the
+/// app decides once, at the edge, and every service the request touches agrees,
+/// so a trace is either whole or absent rather than missing its middle.
 final class Sampler {
     private final boolean parentBased;
-    /** For a new trace: 1 always, 0 never, otherwise a ratio. */
+    /// For a new trace: 1 always, 0 never, otherwise a ratio.
     private final double ratio;
     private final long bound;
 
     private Sampler(boolean parentBased, double ratio) {
         this.parentBased = parentBased;
         this.ratio = ratio;
-        this.bound = ratio >= 1 ? Long.MAX_VALUE : (long)(ratio * (double)Long.MAX_VALUE);
+        this.bound = ratio >= 1 ? Long.MAX_VALUE : (long) (ratio * (double) Long.MAX_VALUE);
     }
 
-    /** From the sampler's name and its argument, which is the ratio for the ratio forms. */
+    /// From the sampler's name and its argument, which is the ratio for the ratio forms.
     static Sampler parse(String name, String argument) throws IOException {
         String n = name == null || name.trim().length() == 0 ? "parentbased_always_on" : name.trim();
-        if("always_on".equals(n)) {
+        if ("always_on".equals(n)) {
             return new Sampler(false, 1);
         }
-        if("always_off".equals(n)) {
+        if ("always_off".equals(n)) {
             return new Sampler(false, 0);
         }
-        if("traceidratio".equals(n)) {
+        if ("traceidratio".equals(n)) {
             return new Sampler(false, ratio(argument));
         }
-        if("parentbased_always_on".equals(n)) {
+        if ("parentbased_always_on".equals(n)) {
             return new Sampler(true, 1);
         }
-        if("parentbased_always_off".equals(n)) {
+        if ("parentbased_always_off".equals(n)) {
             return new Sampler(true, 0);
         }
-        if("parentbased_traceidratio".equals(n)) {
+        if ("parentbased_traceidratio".equals(n)) {
             return new Sampler(true, ratio(argument));
         }
         // Refused rather than defaulted: a deployment that asked for a sampler
@@ -74,14 +72,12 @@ final class Sampler {
                 + "parentbased_traceidratio.");
     }
 
-    /**
-     * The ratio argument, read ONLY by the samplers that take one. A shared
-     * deployment template sets OTEL_TRACES_SAMPLER_ARG for whichever sampler it
-     * expects, and a service that chose always_on must not refuse to start over an
-     * argument it never uses. Absent means 1, as the specification says.
-     */
+    /// The ratio argument, read ONLY by the samplers that take one. A shared
+    /// deployment template sets OTEL_TRACES_SAMPLER_ARG for whichever sampler it
+    /// expects, and a service that chose always_on must not refuse to start over an
+    /// argument it never uses. Absent means 1, as the specification says.
     private static double ratio(String argument) throws IOException {
-        if(argument == null || argument.trim().length() == 0) {
+        if (argument == null || argument.trim().length() == 0) {
             return 1;
         }
         double ratio;
@@ -89,30 +85,28 @@ final class Sampler {
             ratio = Double.parseDouble(argument.trim());
         } catch (NumberFormatException err) {
             throw new IOException("The sampler argument must be a number between 0 and 1 "
-                    + "and is '" + argument + "'");
+                    + "and is '" + argument + "'", err);
         }
-        if(!(ratio >= 0 && ratio <= 1)) {
+        if (!(ratio >= 0 && ratio <= 1)) {
             throw new IOException("The sampler argument must be between 0 and 1 and is "
                     + argument);
         }
         return ratio;
     }
 
-    /**
-     * Whether to record a span.
-     *
-     * <p>The ratio compares the LOW 64 bits of the trace id, which is what the
-     * other OpenTelemetry SDKs compare, so every service in a trace that samples
-     * at the same ratio makes the same decision about it without being told.
-     */
+    /// Whether to record a span.
+    ///
+    /// The ratio compares the LOW 64 bits of the trace id, which is what the
+    /// other OpenTelemetry SDKs compare, so every service in a trace that samples
+    /// at the same ratio makes the same decision about it without being told.
     boolean sample(boolean hasParent, boolean parentSampled, long traceLo) {
-        if(parentBased && hasParent) {
+        if (parentBased && hasParent) {
             return parentSampled;
         }
-        if(ratio >= 1) {
+        if (ratio >= 1) {
             return true;
         }
-        if(ratio <= 0) {
+        if (ratio <= 0) {
             return false;
         }
         return (traceLo & Long.MAX_VALUE) < bound;

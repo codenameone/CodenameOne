@@ -20,8 +20,6 @@ import java.util.Vector;
 /// This class serves as a aggregator of all the event listeners for all the active components within the HTML page.
 /// It is in itself an ActionListener and a FocusListener, and it creates SelectionListeners and DataChangedListeners if needed.
 /// Upon events it both updates the DOM if needed, and dispatches event methods on HTMLCallback
-///
-/// @author Ofir Leitner
 class HTMLEventsListener implements ActionListener, FocusListener {
 
     Hashtable comps = new Hashtable();

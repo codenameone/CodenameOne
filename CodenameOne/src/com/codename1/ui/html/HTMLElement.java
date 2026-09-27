@@ -32,8 +32,6 @@ import java.util.Vector;
 
 /// The HTMLElement class defines a single HTML element with its attributes and children.
 /// Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
-///
-/// @author Ofir Leitner
 public class HTMLElement extends Element {
 
 //////////////////////////////////

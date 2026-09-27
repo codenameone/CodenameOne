@@ -40,8 +40,6 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /// This class is responsible for applying CSS directives to an HTMLComponent
-///
-/// @author Ofir Leitner
 class CSSEngine {
 
     /// Denotes that the selector should be applied to the unselected style of the component

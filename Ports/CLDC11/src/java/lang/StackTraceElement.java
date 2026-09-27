@@ -22,7 +22,6 @@
  */
 package java.lang;
 
-/// @author shannah
 public class StackTraceElement {
     private String declaringClass;
     private String methodName;

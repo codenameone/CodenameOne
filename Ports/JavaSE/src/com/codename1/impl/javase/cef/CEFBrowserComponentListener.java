@@ -24,10 +24,6 @@ package com.codename1.impl.javase.cef;
 
 import com.codename1.ui.events.ActionEvent;
 
-/**
- *
- * @author shannah
- */
 public interface CEFBrowserComponentListener {
     public void onError(ActionEvent e);
     public void onStart(ActionEvent e);

@@ -29,8 +29,6 @@ import com.codename1.ui.events.ActionListener;
 /// TextComponent extended to automatically add mask/unmask password button near
 /// the TextField; it acts like a normal TextComponent if the Constraint is not
 /// TextArea.PASSWORD
-///
-/// @author Francesco Galgani
 public class TextComponentPassword extends TextComponent {
     private final TextField field = super.getField();
 

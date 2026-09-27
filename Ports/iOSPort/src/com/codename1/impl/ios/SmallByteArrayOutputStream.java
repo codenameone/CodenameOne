@@ -30,8 +30,6 @@ import java.util.List;
 /**
  * Workaround for a BOHEM GC limitation of allocating large byte array output
  * streams for large blocks of data
- *
- * @author Shai Almog
  */
 public class SmallByteArrayOutputStream extends OutputStream {
     private List<byte[]> bytes = new ArrayList<byte[]>();

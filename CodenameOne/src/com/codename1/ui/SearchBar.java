@@ -27,8 +27,6 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.plaf.UIManager;
 
 /// SearchBar Toolbar.
-///
-/// @author Chen
 class SearchBar extends Toolbar {
 
     private final TextField search;

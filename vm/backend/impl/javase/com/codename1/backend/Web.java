@@ -28,37 +28,34 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Java SE twin of Web, on HttpURLConnection.
- *
- * Certificate verification is the JVM's default trust store, and there is
- * deliberately no way to turn it off here either -- an "insecure" flag is the kind
- * of thing that ships enabled.
- */
+/// Java SE twin of Web, on HttpURLConnection.
+///
+/// Certificate verification is the JVM's default trust store, and there is
+/// deliberately no way to turn it off here either -- an "insecure" flag is the kind
+/// of thing that ships enabled.
 public final class Web {
 
-    /**
-     * ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
-     * platform has no Locale to ask for the root one. On a device set to Turkish
-     * the I of an ASCII token folds to a dotless i, so a header stored under one
-     * spelling is looked up under another and getHeader answers null: nothing is
-     * thrown, nothing is logged, and the caller reads a header that is there as
-     * absent. A header name is ASCII by specification. Copied rather than shared;
-     * see CLAUDE.md. Both arms of Web carry it, because both index headers.
-     */
+    /// ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
+    /// platform has no Locale to ask for the root one. On a device set to Turkish
+    /// the I of an ASCII token folds to a dotless i, so a header stored under one
+    /// spelling is looked up under another and getHeader answers null: nothing is
+    /// thrown, nothing is logged, and the caller reads a header that is there as
+    /// absent. A header name is ASCII by specification. Copied rather than shared;
+    /// see CLAUDE.md. Both arms of Web carry it, because both index headers.
     private static String asciiLower(String value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
         StringBuilder out = new StringBuilder(value.length());
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
         }
         return out.toString();
     }
@@ -73,7 +70,7 @@ public final class Web {
         private final Map headers;
         private final Map values;
 
-        /** @param values name (lower case) to every value, as the twin takes. */
+        /// @param values name (lower case) to every value, as the twin takes.
         Result(int status, byte[] body, String error, Map values) {
             this.status = status;
             this.body = body;
@@ -81,10 +78,10 @@ public final class Web {
             this.values = values == null ? new LinkedHashMap() : values;
             this.headers = new LinkedHashMap();
             java.util.Iterator it = this.values.entrySet().iterator();
-            while(it.hasNext()) {
-                Map.Entry entry = (Map.Entry)it.next();
-                List all = (List)entry.getValue();
-                if(all != null && !all.isEmpty()) {
+            while (it.hasNext()) {
+                Map.Entry entry = (Map.Entry) it.next();
+                List all = (List) entry.getValue();
+                if (all != null && !all.isEmpty()) {
                     this.headers.put(entry.getKey(), all.get(0));
                 }
             }
@@ -94,27 +91,25 @@ public final class Web {
             return status;
         }
 
-        /**
-         * The response headers, lower-cased names to values. See the translated
-         * twin for why this exists.
-         */
+        /// The response headers, lower-cased names to values. See the translated
+        /// twin for why this exists.
         public Map getHeaders() {
             return headers;
         }
 
-        /** The FIRST value for a name; see the translated twin. */
+        /// The FIRST value for a name; see the translated twin.
         public String getHeader(String name) {
             List all = getHeaderValues(name);
-            return all.isEmpty() ? null : (String)all.get(0);
+            return all.isEmpty() ? null : (String) all.get(0);
         }
 
-        /** Every value for a name, in arrival order; empty when absent. */
+        /// Every value for a name, in arrival order; empty when absent.
         public List getHeaderValues(String name) {
-            if(name == null) {
-                return new java.util.ArrayList();
+            if (name == null) {
+                return new ArrayList();
             }
-            List all = (List)values.get(asciiLower(name));
-            return all == null ? new java.util.ArrayList() : all;
+            List all = (List) values.get(asciiLower(name));
+            return all == null ? new ArrayList() : all;
         }
 
         public boolean isSuccess() {
@@ -126,14 +121,12 @@ public final class Web {
         }
 
         public String getBodyAsString() {
-            if(body == null) {
+            if (body == null) {
                 return null;
             }
-            try {
-                return new String(body, "UTF-8");
-            } catch (IOException err) {
-                return new String(body);
-            }
+            // A JDK always has UTF-8, so the old fallback to the platform default
+            // charset could not run -- but it named a charset nobody meant.
+            return new String(body, StandardCharsets.UTF_8);
         }
 
         public String getError() {
@@ -148,7 +141,7 @@ public final class Web {
     public static Result getJson(String url, String bearerToken) throws IOException {
         List headers = new ArrayList();
         headers.add("Accept: application/json");
-        if(bearerToken != null) {
+        if (bearerToken != null) {
             headers.add("Authorization: Bearer " + bearerToken);
         }
         return request("GET", url, headers, null);
@@ -158,7 +151,7 @@ public final class Web {
         List headers = new ArrayList();
         headers.add("Content-Type: application/json");
         headers.add("Accept: application/json");
-        if(bearerToken != null) {
+        if (bearerToken != null) {
             headers.add("Authorization: Bearer " + bearerToken);
         }
         return request("POST", url, headers, json == null ? new byte[0] : json.getBytes("UTF-8"));
@@ -188,34 +181,32 @@ public final class Web {
      * that makes every outbound request is the last point that is still true.
      */
     static {
-        if(System.getProperty("sun.net.http.maxHeaderSize") == null) {
+        if (System.getProperty("sun.net.http.maxHeaderSize") == null) {
             System.setProperty("sun.net.http.maxHeaderSize", "307200");
         }
     }
 
-    /**
-     * The ceiling on one outbound response body, from CN1_WEB_MAX_RESPONSE_MB.
-     *
-     * Defaults to the 64MB CN1_HTTP_MAX_UPLOAD_MB uses for the inbound direction.
-     * A value that is not 1..2047 plain digits is IGNORED rather than clamped: a
-     * misconfigured bound must not silently become a different one than the
-     * caller believes it set.
-     */
+    /// The ceiling on one outbound response body, from CN1_WEB_MAX_RESPONSE_MB.
+    ///
+    /// Defaults to the 64MB CN1_HTTP_MAX_UPLOAD_MB uses for the inbound direction.
+    /// A value that is not 1..2047 plain digits is IGNORED rather than clamped: a
+    /// misconfigured bound must not silently become a different one than the
+    /// caller believes it set.
     private static long maxResponseBytes() {
         long mb = 64;
         String text = System.getenv("CN1_WEB_MAX_RESPONSE_MB");
-        if(text != null && text.length() > 0) {
+        if (text != null && text.length() > 0) {
             long parsed = 0;
             boolean digits = text.length() <= 4;
-            for(int iter = 0 ; digits && iter < text.length() ; iter++) {
+            for (int iter = 0 ; digits && iter < text.length() ; iter++) {
                 char c = text.charAt(iter);
-                if(c < '0' || c > '9') {
+                if (c < '0' || c > '9') {
                     digits = false;
                 } else {
                     parsed = parsed * 10 + (c - '0');
                 }
             }
-            if(digits && parsed >= 1 && parsed <= 2047) {
+            if (digits && parsed >= 1 && parsed <= 2047) {
                 mb = parsed;
             }
         }
@@ -248,18 +239,16 @@ public final class Web {
         }
     }
 
-    /**
-     * @param trace the trace-context lines, or null. Sent, but not counted as the
-     *              caller's headers when deciding whether to follow a redirect --
-     *              the translated twin's rule, for the translated twin's reason.
-     */
+    /// @param trace the trace-context lines, or null. Sent, but not counted as the
+    /// caller's headers when deciding whether to follow a redirect --
+    /// the translated twin's rule, for the translated twin's reason.
     private static Result perform(String method, String url, List headers, byte[] body,
                                   List trace) throws IOException {
         HttpURLConnection connection;
         try {
-            connection = (HttpURLConnection)new URL(url).openConnection();
+            connection = (HttpURLConnection) new URL(url).openConnection();
         } catch (IOException err) {
-            throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage());
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage(), err);
         }
         try {
             String verb = method == null ? "GET" : method;
@@ -280,7 +269,7 @@ public final class Web {
                         + "is not one of them. The packaged backend sends it normally, "
                         + "so this is a limitation of cn1:backend rather than of your "
                         + "code. Exercise this path against the packaged binary, or use "
-                        + "POST with the override header your service expects.");
+                        + "POST with the override header your service expects.", unsupported);
             }
             connection.setConnectTimeout(30000);
             connection.setReadTimeout(30000);
@@ -318,18 +307,18 @@ public final class Web {
                     && (body == null || body.length == 0) && safeMethod);
             connection.setRequestProperty("User-Agent", "codenameone-backend");
             List lines = headers;
-            if(trace != null) {
+            if (trace != null) {
                 lines = new ArrayList();
-                if(headers != null) {
+                if (headers != null) {
                     lines.addAll(headers);
                 }
                 lines.addAll(trace);
             }
-            if(lines != null) {
-                for(int iter = 0 ; iter < lines.size() ; iter++) {
-                    String header = String.valueOf(lines.get(iter));
+            if (lines != null) {
+                for (Object line : lines) {
+                    String header = String.valueOf(line);
                     int colon = header.indexOf(':');
-                    if(colon > 0) {
+                    if (colon > 0) {
                         // addRequestProperty, not set: the packaged client appends
                         // every line it is given, so two Cookie or two extension
                         // lines both go out there while setRequestProperty kept
@@ -341,8 +330,8 @@ public final class Web {
                     }
                 }
             }
-            if(body != null && body.length > 0) {
-                if("GET".equals(verb)) {
+            if (body != null && body.length > 0) {
+                if ("GET".equals(verb)) {
                     // SILENTLY REWRITTEN OTHERWISE. HttpURLConnection turns a GET
                     // into a POST the moment anything is written to it -- the JDK
                     // does it for backward compatibility and says nothing -- while
@@ -361,7 +350,7 @@ public final class Web {
                 }
                 connection.setDoOutput(true);
                 connection.setFixedLengthStreamingMode(body.length);
-                OutputStream out = connection.getOutputStream();
+                OutputStream out = connection.getOutputStream(); //NOPMD CloseResource - the connection owns it; disconnect() below releases it
                 out.write(body);
                 out.flush();
             }
@@ -371,11 +360,11 @@ public final class Web {
             } catch (IOException err) {
                 // No status at all: DNS, connect or TLS failed. The translated twin
                 // throws here too rather than reporting a status of -1.
-                throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage());
+                throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + err.getMessage(), err);
             }
             InputStream in = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            if(in != null) {
+            if (in != null) {
                 // BOUNDED. This arm had no ceiling at all, so an endless or merely
                 // huge upstream response grew this buffer until the JVM died --
                 // and a read timeout is no help when the bytes arrive quickly.
@@ -386,9 +375,9 @@ public final class Web {
                 byte[] chunk = new byte[8192];
                 int n;
                 long total = 0;
-                while((n = in.read(chunk)) > 0) {
+                while ((n = in.read(chunk)) > 0) {
                     total += n;
-                    if(total > allowed) {
+                    if (total > allowed) {
                         throw new IOException("Request to " + Urls.forMessage(url) + " failed: the response "
                                 + "is larger than the " + (allowed / (1024 * 1024))
                                 + "MB CN1_WEB_MAX_RESPONSE_MB allows");
@@ -405,19 +394,19 @@ public final class Web {
             // what the translated twin produces and what this documents. The map
             // getHeaderFields builds is in the JDK's own order, and for a repeated
             // field that is not arrival order; the indexed accessors are.
-            for(int iter = 0 ; ; iter++) {
+            for (int iter = 0 ; ; iter++) {
                 String name = connection.getHeaderFieldKey(iter);
                 String value = connection.getHeaderField(iter);
-                if(name == null && value == null) {
+                if (name == null && value == null) {
                     break;      // past the end
                 }
-                if(name == null) {
+                if (name == null) {
                     continue;   // the status line, which has no key
                 }
                 String key = asciiLower(name);
-                List all = (List)responseHeaders.get(key);
-                if(all == null) {
-                    all = new java.util.ArrayList();
+                List all = (List) responseHeaders.get(key);
+                if (all == null) {
+                    all = new ArrayList();
                     responseHeaders.put(key, all);
                 }
                 all.add(value);

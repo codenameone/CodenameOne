@@ -86,7 +86,6 @@ import java.util.Iterator;
 ///
 /// There are a couple of things to notice in this code:
 ///
-///
 /// - You need not explicitly add the components to the container, this
 /// is indirectly done by using one of the `add` methods.
 ///
@@ -103,12 +102,6 @@ import java.util.Iterator;
 /// `setAutocreateGaps()` method.  Similarly you can use
 /// the `setAutocreateContainerGaps()` method to insert gaps
 /// between the components and the container.
-///
-/// @author Tomas Pavek
-/// @author Jan Stola
-/// @author Scott Violet
-/// @author Shai Almog
-/// @version $Revision: 1.25 $
 public class GroupLayout extends Layout {
     /// Compass-direction North (up).
     public static final int NORTH = 1;

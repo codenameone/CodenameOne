@@ -29,8 +29,6 @@ import com.codename1.ui.animations.Animation;
 ///
 /// Java 5 has no default methods, so behaviour common to the two top levels lives
 /// here as statics rather than on `TopLevelContainer`.
-///
-/// @author Shai Almog
 final class TopLevelSupport {
 
     /// Client property recording a layer's depth within a layered pane.

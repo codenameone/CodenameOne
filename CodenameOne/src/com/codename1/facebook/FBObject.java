@@ -26,8 +26,6 @@ package com.codename1.facebook;
 import java.util.Hashtable;
 
 /// This is a base class for all FaceBook Objects
-///
-/// @author Chen Fishbein
 public class FBObject {
 
     private String id;

@@ -45,8 +45,6 @@ import java.util.StringTokenizer;
 /// TODO: finish this list
 /// ```
 ///
-/// @author Eric Coolman
-///
 /// #### See also
 ///
 /// - [http://docs.oracle.com/javase/6/docs/api/java/net/URI.html](http://docs.oracle.com/javase/6/docs/api/java/net/URI.html)

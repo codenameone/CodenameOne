@@ -39,8 +39,6 @@ import java.util.Map;
 /// other. Font size honors an absolute {@link TextStyle#getFontSizePx()} when set,
 /// otherwise the relative {@link TextStyle#getFontSizeLevel()}, with heading scale
 /// applied on top in both cases.</p>
-///
-/// @author Codename One
 public final class RichRunPainter {
 
     private Font baseFont;

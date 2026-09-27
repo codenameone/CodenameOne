@@ -65,10 +65,12 @@ public final class WebSocket {
     }
 
     /// Handler for the close event.
-    ///
-    /// @param statusCode the RFC 6455 close status code (1000 = normal, etc.)
-    /// @param reason     the human-readable reason, or empty string
     public interface CloseHandler {
+        /// Called once when the connection closes.
+        ///
+        /// @param ws         the socket that closed
+        /// @param statusCode the RFC 6455 close status code (1000 = normal, etc.)
+        /// @param reason     the human-readable reason, or empty string
         void onClose(WebSocket ws, int statusCode, String reason);
     }
 

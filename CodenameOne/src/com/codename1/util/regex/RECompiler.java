@@ -25,10 +25,6 @@ import java.util.HashMap;
 /// with RE.  For a description of the syntax accepted by RECompiler and what you can
 /// do with regular expressions, see the documentation for the RE matcher class.
 ///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @author [Michael McCallum](mailto:gholam@xtra.co.nz)
-/// @version $Id: RECompiler.java 518156 2007-03-14 14:31:26Z vgritsenko $
-///
 /// #### See also
 ///
 /// - RE

@@ -23,7 +23,6 @@
  */
 package java.lang;
 
-/// @author user2
 public class IllegalStateException extends RuntimeException {
     public IllegalStateException() {}
     public IllegalStateException(String s) {}

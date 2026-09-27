@@ -25,8 +25,6 @@ package com.codename1.ui.util.xml;
 
 /**
  * A JAXB XML object for loading the resource file into RAM
- *
- * @author Shai Almog
  */
 public class ResourceFileXML {
     private int majorVersion;

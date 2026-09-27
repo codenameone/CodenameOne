@@ -24,8 +24,6 @@ package com.codename1.ui.spinner;
 
 /// Interface for 3D spinners that allow selected values to set and retrieved
 /// by the Picker.
-///
-/// @author shannah
 interface InternalPickerWidget {
     Object getValue();
 

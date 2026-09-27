@@ -33,8 +33,6 @@ package com.codename1.ui;
 /// the input device to the screen, it should call `Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)`
 /// which will execute the `#close()` method of the the current input device.
 ///
-/// @author Steve Hannah
-///
 /// #### See also
 ///
 /// - Form#setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)

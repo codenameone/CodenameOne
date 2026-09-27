@@ -73,8 +73,6 @@ import java.util.Vector;
 ///   return entry;
 /// }
 /// ```
-///
-/// @author Chen Fishbein
 public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
 
 

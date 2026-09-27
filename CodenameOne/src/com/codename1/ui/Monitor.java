@@ -33,8 +33,6 @@ import com.codename1.ui.geom.Rectangle;
 /// Instances are snapshots. A monitor that is unplugged, moved or has its resolution
 /// changed produces a fresh set, announced through
 /// `Desktop#addMonitorListener(com.codename1.ui.events.ActionListener)`.
-///
-/// @author Shai Almog
 public final class Monitor {
 
     private final int index;

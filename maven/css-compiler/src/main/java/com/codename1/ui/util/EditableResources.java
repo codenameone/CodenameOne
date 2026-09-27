@@ -91,8 +91,6 @@ import javax.swing.tree.TreePath;
 /**
  * This class enhances the resources class by inheriting it and using package
  * friendly accessor methods.
- *
- * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
     private static final short MINOR_VERSION = 16;

@@ -27,8 +27,6 @@ import java.util.Comparator;
 
 /**
  * A string comparator equivalent to String.CASE_INSENSITIVE_ORDER which isn't available in Codename One
- *
- * @author Shai Almog
  */
 public class CaseInsensitiveOrder implements Comparator<String> {
 

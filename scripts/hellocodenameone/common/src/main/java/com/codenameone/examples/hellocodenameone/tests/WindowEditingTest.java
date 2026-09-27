@@ -38,8 +38,6 @@ import com.codename1.ui.layouts.BoxLayout;
  * window entirely. The port now resolves the owning window for both the editor and its
  * bounds; this golden is what would catch a regression, since a misplaced native editor
  * is invisible in the window's own capture.</p>
- *
- * @author Shai Almog
  */
 public class WindowEditingTest extends WindowHostTest {
 

@@ -31,8 +31,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 
 /// A timeline represents the motions of animation objects
-///
-/// @author Shai Almog
 public final class Timeline extends Image implements Animation, Painter {
     AnimationObject[] animations;
     private int time;

@@ -35,8 +35,6 @@ import java.util.Map;
 /// by Display to play an animation when moving from one form to the next. A transition
 /// can be installed on a  `com.codename1.ui.Form`  object using the in/out transitions, for ease of use
 /// `com.codename1.ui.plaf.LookAndFeel` has support for default transitions.
-///
-/// @author Shai Almog
 public abstract class Transition implements Animation {
 
     private Component source;

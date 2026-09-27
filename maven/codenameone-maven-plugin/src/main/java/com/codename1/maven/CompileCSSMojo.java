@@ -54,8 +54,6 @@ import static com.codename1.maven.PathUtil.path;
  *   codenameone_settings.properties.  Otherwise this mojo does nothing.
  * . The CSS from cn1libs in dependencies is merged with the project CSS (located at src/main/css/theme.css) into
  *   a build directory at target/css.  This merged file is then compiled to the output file in build/classes/theme.res.
- *
- * @author shannah
  */
 @Mojo(name = "css", defaultPhase = LifecyclePhase.PROCESS_RESOURCES,
         requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME,

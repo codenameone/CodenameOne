@@ -28,8 +28,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 
 /// Event object delivered when an `ActionListener` callback is invoked
-///
-/// @author Chen Fishbein
 public class ActionEvent {
 
     private final Type trigger;
@@ -478,8 +476,6 @@ public class ActionEvent {
     }
 
     /// The event type, as declared when the event is created.
-    ///
-    /// @author Ddyer
     public enum Type {
         /// Unspecified command type, this occurs when one of the old undifferentiated constructors was invoked
         Other,

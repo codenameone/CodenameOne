@@ -40,9 +40,6 @@ package com.codename1.ui;
 ///
 /// You can also assign a factory whose scope is limited to a particular Form, Container,
 /// or Component, by setting the context argument in `setImageFactory()`.
-///
-/// @author shannah
-///
 public abstract class ImageFactory {
     private static final String KEY = "$$IMAGE_FACTORY$$";
 

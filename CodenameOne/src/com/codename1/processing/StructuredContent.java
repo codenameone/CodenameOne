@@ -30,8 +30,6 @@ import java.util.Map;
 /// An interface to abstract access to structured content DOMs. Implementations
 /// of this interface work similar to a Node/Element object of a typical DOM
 /// parser where it, where it represents a position within a structured document.
-///
-/// @author Eric Coolman
 interface StructuredContent {
     /// Select all children directly below the current position with a given tag
     /// name. An empty List is returned if no matches found.

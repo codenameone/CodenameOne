@@ -31,8 +31,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 /**
  * Swing renderer that exposes some basic features
- *
- * @author Shai Almog
  */
 public class SwingRenderer extends DefaultTableCellRenderer {
         private Color unselectedForeground;

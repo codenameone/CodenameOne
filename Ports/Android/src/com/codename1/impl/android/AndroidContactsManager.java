@@ -46,10 +46,6 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- *
- * @author Chen
- */
 public class AndroidContactsManager {
 
     private static AndroidContactsManager instance = new AndroidContactsManager();

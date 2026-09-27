@@ -21,7 +21,6 @@ import com.codename1.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/// @author Kamran Zafar
 public class TarOutputStream extends BufferedOutputStream {
     private long bytesWritten;
     private long currentFileSize;

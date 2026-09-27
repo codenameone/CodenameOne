@@ -53,8 +53,6 @@ import java.util.Hashtable;
 ///         Vector result = new Vector();
 ///         Element e = (Element)parent;
 ///         for(int iter = 0 ; iter
-///
-/// @author Ofir Leitner
 public class XMLParser {
     private static final Element END_TAG = new Element();
     /// A constant containing the CDATA tag identifier (minus the C which is read anyway first)

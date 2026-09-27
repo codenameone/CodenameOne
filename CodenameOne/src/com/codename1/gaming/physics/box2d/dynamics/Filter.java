@@ -25,8 +25,6 @@ package com.codename1.gaming.physics.box2d.dynamics;
 
 // updated to rev 100
 /// This holds contact filtering data.
-///
-/// @author daniel
 public class Filter {
 	/// The collision category bits. Normally you would just set one bit.
 	public int categoryBits;

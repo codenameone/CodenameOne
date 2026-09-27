@@ -31,8 +31,6 @@ import com.codename1.sensors.MotionSensorManager;
  * bursts used to reproduce the shake, pick up and free fall gestures. The core
  * derives gravity, linear acceleration and orientation from these readings, so
  * every gesture can be exercised from the desktop without hardware.
- *
- * @author Codename One
  */
 public class JavaSEMotionSensorManager extends MotionSensorManager {
     static final int TRANSIENT_NONE = 0;

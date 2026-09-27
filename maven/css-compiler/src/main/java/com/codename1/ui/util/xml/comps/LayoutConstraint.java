@@ -24,10 +24,6 @@
 package com.codename1.ui.util.xml.comps;
 
 
-/**
- *
- * @author Shai Almog
- */
 public class LayoutConstraint {
     private String value;
 

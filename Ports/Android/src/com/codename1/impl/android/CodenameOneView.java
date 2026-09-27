@@ -43,10 +43,6 @@ import com.codename1.ui.events.ActionListener;
 import java.lang.reflect.Method;
 
 
-/**
- *
- * @author Chen
- */
 public class CodenameOneView {
 
     int width = 1;

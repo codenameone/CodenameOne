@@ -31,7 +31,6 @@ import com.codename1.ui.Display;
  * Activity for Background Fetch
  * 
  * <p>DEPRECATED!!  We no longer use activities for background services.  We do it directly in the service.</p>
- * @author Steve
  * @deprecated
  * @see BackgroundFetchHandler
  */

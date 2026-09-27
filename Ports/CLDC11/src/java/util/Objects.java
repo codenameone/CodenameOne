@@ -30,7 +30,6 @@ package java.util;
 /// the build server will automatically remap all uses of java.util.Objects to use this implementation instead.
 ///
 /// This class consists of static utility methods for operating on objects. These utilities include null-safe or null-tolerant methods for computing the hash code of an object, returning a string for an object, and comparing two objects.
-/// @author shannah
 public final class Objects {
     /// Returns true if the arguments are equal to each other and false otherwise. Consequently, if both arguments are null, true is returned and if exactly one argument is null, false is returned. Otherwise, equality is determined by using the equals method of the first argument.
     ///

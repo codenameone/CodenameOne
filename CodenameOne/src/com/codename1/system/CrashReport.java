@@ -30,8 +30,6 @@ package com.codename1.system;
 /// Notice that exceptions will only be reported for threads created by Codename One
 /// using the API's within the Display class, this will not work for exceptions within
 /// threads that are created by the new Thread() API.
-///
-/// @author Shai Almog
 public interface CrashReport {
     /// Callback for an exception that was not handled by the developer
     ///

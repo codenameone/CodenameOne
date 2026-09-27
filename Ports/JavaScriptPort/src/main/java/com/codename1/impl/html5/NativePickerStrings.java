@@ -40,10 +40,6 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 
 
-/**
- *
- * @author shannah
- */
 public class NativePickerStrings extends NativePicker {
     private boolean complete;
     private boolean cancelled;

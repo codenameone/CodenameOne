@@ -36,8 +36,6 @@ import java.util.prefs.Preferences;
 /**
  * The test runner allows running Codename One unit tests on a specific Codename One application within the 
  * simulator. 
- *
- * @author Shai Almog
  */
 public class TestRunner {
     private static final int VERSION = 1;

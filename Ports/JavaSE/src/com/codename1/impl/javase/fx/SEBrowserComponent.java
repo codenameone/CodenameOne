@@ -66,15 +66,12 @@ import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
 
 /**
- *
  * Retina support note:  The browser component currently doesn't take advantage
  * of hidpi displays like the Video Component does.  This is because the *actual*
  * WebView needs to be the same visible dimensions the Swing Canvas for events to
  * work properly.  (Even if you intercept the events of the WebView and convert 
  * their coordinates, there are other aspects, such as tooltips, that will work
  * weirdly if the component doesn't take the acutal space on which it is rendered.
- * 
- * @author Chen
  */
 public class SEBrowserComponent extends PeerComponent implements IBrowserComponent{
     private static boolean firstTime = true;

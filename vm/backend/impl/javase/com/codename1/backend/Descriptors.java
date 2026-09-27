@@ -28,17 +28,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Synthetic descriptors for the Java SE runtime.
- *
- * The shared code above -- HttpServer, StaticFiles -- deals in int descriptors,
- * because on the translated target that is what they are. The JVM will not hand
- * out a real fd portably, so this maps a synthetic int onto the channel it stands
- * for. Nothing above needs to know.
- *
- * Ids start above the numbers a real process would use for stdin/stdout/stderr so
- * a stray 0, 1 or 2 cannot be mistaken for a live descriptor.
- */
+/// Synthetic descriptors for the Java SE runtime.
+///
+/// The shared code above -- HttpServer, StaticFiles -- deals in int descriptors,
+/// because on the translated target that is what they are. The JVM will not hand
+/// out a real fd portably, so this maps a synthetic int onto the channel it stands
+/// for. Nothing above needs to know.
+///
+/// Ids start above the numbers a real process would use for stdin/stdout/stderr so
+/// a stray 0, 1 or 2 cannot be mistaken for a live descriptor.
 final class Descriptors {
     private static final AtomicInteger NEXT = new AtomicInteger(64);
     private static final Map<Integer, Object> ENTRIES = new ConcurrentHashMap<Integer, Object>();
@@ -61,9 +59,9 @@ final class Descriptors {
     }
 
     static void closeQuietly(Object entry) {
-        if(entry instanceof Channel) {
+        if (entry instanceof Channel) {
             try {
-                ((Channel)entry).close();
+                ((Channel) entry).close();
             } catch (IOException ignored) {
                 // already gone
             }

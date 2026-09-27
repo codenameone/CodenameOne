@@ -50,9 +50,6 @@ import java.util.Set;
 /// `Integer`.
 ///
 /// The workaround is to remain consistent and use code like this `Preferences.get("primitiveLongValue", (long)0)`.
-///
-/// @author Shai Almog
-/// @author Miguel Mu\u00f1oz
 public final class Preferences {
     private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap = new HashMap<String, ArrayList<PreferenceListener>>();
     private static Hashtable<String, Object> p;

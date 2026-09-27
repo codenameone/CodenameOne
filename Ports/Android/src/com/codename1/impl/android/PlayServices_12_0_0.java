@@ -35,7 +35,6 @@ import com.google.android.gms.location.LocationServices;
 /**
  * PlayServices implementation supporting playServicesVersion=12.0.0
  * 
- * @author shannah
  * @see PlayServices docs for description of how the BuildServer deals with these subclasses.
  */
 public class PlayServices_12_0_0 extends PlayServices {

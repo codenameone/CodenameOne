@@ -27,8 +27,6 @@ package com.codename1.push;
 /// push callback it will receive push notification calls from the system.
 /// Notice that its very possible that a separate instance of the main class
 /// will be created to perform the push!
-///
-/// @author Shai Almog
 public interface PushCallback {
     /// Error code returned when sending a push notification
     int REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE = 1;

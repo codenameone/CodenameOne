@@ -34,10 +34,6 @@ import com.codename1.html5.js.typedarrays.Int16Array;
 import com.codename1.html5.js.typedarrays.Int32Array;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 
-/**
- *
- * @author shannah
- */
 public class JS {
     public static JSObject getGlobal() {
         return Window.current();

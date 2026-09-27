@@ -51,8 +51,6 @@ import java.util.Vector;
 /// All communication with the map and layers should be done in WGS84, it takes
 /// care of coordinates transformation.
 ///
-/// @author Roman Kamyk
-///
 /// #### Deprecated
 ///
 /// Use the modern [MapView] (pure-vector) or [NativeMap] (native provider

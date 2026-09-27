@@ -28,9 +28,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /// A collection of useful progress animations and utility methods.
-///
-/// @author shannah
-///
 public class CommonProgressAnimations {
 
     /// Base class for ProgressAnimations

@@ -21,8 +21,6 @@ import java.util.HashMap;
 
 /// A subclass of RECompiler which can dump a regular expression program
 /// for debugging purposes.
-///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
 public class REDebugCompiler extends RECompiler {
     /// Mapping from opcodes to descriptive strings
     static HashMap hashOpcode = new HashMap();

@@ -31,8 +31,6 @@ import java.util.logging.Logger;
 
 /**
  * Simple input stream that wraps an NSFileHandle object
- *
- * @author Steve Hannah
  */
 
 public class NSFileInputStream extends InputStream {

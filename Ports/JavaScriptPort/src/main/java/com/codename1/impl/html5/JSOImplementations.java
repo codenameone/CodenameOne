@@ -41,10 +41,6 @@ import com.codename1.html5.js.dom.HTMLImageElement;
 import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.html5.js.typedarrays.ArrayBuffer;
 
-/**
- *
- * @author shannah
- */
 public class JSOImplementations {
     
     

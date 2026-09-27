@@ -37,8 +37,6 @@ import java.io.OutputStream;
 /// or resource and loads it only when necessary. The huge advantage is that RAM usage
 /// is practically none-existant, it is potentially very slow in worst case scenarios
 /// and has the other drawback of requiring the width/height in advanced to work properly.
-///
-/// @author Shai Almog
 public final class FileEncodedImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;

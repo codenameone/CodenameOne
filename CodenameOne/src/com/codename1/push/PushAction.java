@@ -24,8 +24,6 @@ package com.codename1.push;
 
 /// Encapsulates a push notification action.  Available actions for a push notification are defined
 /// by the `PushActionsProvider#getPushActionCategories()` implementation.
-///
-/// @author Steve Hannah
 public class PushAction {
     private final String id;
     private final String title;

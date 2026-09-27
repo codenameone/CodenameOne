@@ -26,8 +26,6 @@ package com.codename1.designer;
 
 /**
  * Represents a user custom component that can be integrated into the UI builder
- *
- * @author Shai Almog
  */
 public class CustomComponent {
     private String type;

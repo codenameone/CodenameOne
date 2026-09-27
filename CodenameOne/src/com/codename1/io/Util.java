@@ -69,8 +69,6 @@ import java.util.Set;
 import java.util.Vector;
 
 /// Various utility methods used for HTTP/IO operations
-///
-/// @author Shai Almog
 public final class Util {
     private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());
     private static CodenameOneImplementation implInstance;

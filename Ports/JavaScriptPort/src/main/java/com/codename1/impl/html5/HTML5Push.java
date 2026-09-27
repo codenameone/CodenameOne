@@ -35,10 +35,6 @@ import com.codename1.html5.js.core.JSArray;
 import com.codename1.html5.js.core.JSString;
 
 
-/**
- *
- * @author shannah
- */
 public class HTML5Push {
     private static PushCallback pushCallback;
     

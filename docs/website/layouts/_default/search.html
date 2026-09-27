@@ -10,7 +10,8 @@
     <label class="cn1-search-label" for="cn1-search-input">Search</label>
     <input id="cn1-search-input" class="cn1-search-input" type="search" placeholder="Try: native interfaces, CSS, iOS, push notifications" autocomplete="off" />
     <p class="cn1-search-note">
-      Note: API types and members are matched by name and listed separately below.
+      Note: API types and members are matched by name and listed separately below,
+      each marked as client (runs in your app) or backend (runs on your server).
       Developer Guide chapters are included in these results.
     </p>
     <p class="cn1-search-status" id="cn1-search-status">Loading search index…</p>
@@ -227,35 +228,50 @@
     return out;
   };
 
-  const buildEntries = (payload) => {
+  // Two indexes, one per reference: the client API and the backend API. A type
+  // shared by both (the ORM and the entity annotations) is in each; it is kept
+  // from the client index, where its page is the canonical one, and labelled as
+  // shared rather than listed twice.
+  const audienceOf = (payload, type) => (type.sh ? "shared" : (type.a || payload.audience || "client"));
+
+  const buildEntries = (payloads) => {
     const out = [];
-    for (const type of payload.types || []) {
-      out.push({
-        label: type.n,
-        context: type.p,
-        url: type.u,
-        kind: type.k,
-        summary: type.s || "",
-        key: type.n.toLowerCase(),
-        humps: humps(type.n),
-        isType: true,
-      });
-      for (const [label, anchor] of type.m || []) {
-        const name = label.split("(")[0];
+    for (const payload of payloads) {
+      const isBackendIndex = payload.audience === "backend";
+      for (const type of payload.types || []) {
+        if (isBackendIndex && type.sh) continue;
+        const audience = audienceOf(payload, type);
         out.push({
-          label: label,
-          context: type.p + "." + type.n,
-          url: type.u + "#" + anchor,
-          kind: "member",
-          summary: "",
-          key: name.toLowerCase(),
-          humps: humps(name),
-          isType: false,
+          label: type.n,
+          context: type.p,
+          url: type.u,
+          kind: type.k,
+          audience: audience,
+          summary: type.s || "",
+          key: type.n.toLowerCase(),
+          humps: humps(type.n),
+          isType: true,
         });
+        for (const [label, anchor] of type.m || []) {
+          const name = label.split("(")[0];
+          out.push({
+            label: label,
+            context: type.p + "." + type.n,
+            url: type.u + "#" + anchor,
+            kind: "member",
+            audience: audience,
+            summary: "",
+            key: name.toLowerCase(),
+            humps: humps(name),
+            isType: false,
+          });
+        }
       }
     }
     return out;
   };
+
+  const AUDIENCE_LABELS = { client: "client", backend: "backend", shared: "client + backend" };
 
   // Lower sorts first. Types outrank members at equal quality of match, because
   // a query that names a type usually means the type.
@@ -280,7 +296,7 @@
     resultsEl.innerHTML = matches.map((entry) => `
       <a class="cn1-search-api__hit" href="${escapeHtml(entry.url)}">
         <code class="cn1-search-api__name">${escapeHtml(entry.label)}</code>
-        <span class="cn1-search-api__kind">${escapeHtml(entry.kind)}</span>
+        <span class="cn1-search-api__kind"><span class="cn1-api-badge cn1-api-badge--${escapeHtml(entry.audience)}">${escapeHtml(AUDIENCE_LABELS[entry.audience] || entry.audience)}</span> ${escapeHtml(entry.kind)}</span>
         <span class="cn1-search-api__context">${escapeHtml(entry.context)}</span>
         ${entry.summary ? `<span class="cn1-search-api__summary">${escapeHtml(entry.summary)}</span>` : ""}
       </a>
@@ -303,18 +319,23 @@
     render(scored.slice(0, MAX_RESULTS).map((pair) => pair[1]), query);
   };
 
-  fetch("/javadoc-search.json")
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status))))
-    .then((payload) => {
-      entries = buildEntries(payload);
+  const load = (url) => fetch(url)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(url + ": HTTP " + r.status))));
+
+  // Each index is optional on its own: a content-only local build has neither,
+  // and a build without the backend reference has only the client one. Neither
+  // is an error worth showing a visitor.
+  Promise.allSettled([load("/javadoc-search.json"), load("/backend-javadoc-search.json")])
+    .then((results) => {
+      const payloads = [];
+      for (const result of results) {
+        if (result.status === "fulfilled") payloads.push(result.value);
+        else console.info("API search index unavailable:", result.reason);
+      }
+      if (!payloads.length) return;
+      entries = buildEntries(payloads);
       input.addEventListener("input", run);
       run();
-    })
-    .catch((err) => {
-      // The API index only exists in a build that generated the API pages, so a
-      // content-only local build simply has no API section. Not an error worth
-      // showing a visitor.
-      console.info("API search index unavailable:", err);
     });
 })();
 </script>

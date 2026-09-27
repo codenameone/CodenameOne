@@ -24,10 +24,6 @@ package com.codename1.impl.android;
 
 import android.content.Intent;
 
-/**
- *
- * @author Chen
- */
 public interface IntentResultListener {
     
     public int CAPTURE_IMAGE = 1;

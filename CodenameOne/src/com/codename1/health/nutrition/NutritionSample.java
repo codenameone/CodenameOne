@@ -63,7 +63,7 @@ import java.util.Map;
 /// Neither phone carries this shape yet -- see the package
 /// documentation. A read or write of
 /// [HealthDataType#NUTRITION] on iOS or Android is refused with
-/// [HealthError#TYPE_NOT_SUPPORTED]; everything here works against the
+/// [HealthError#TYPE_NOT_SUPPORTED][com.codename1.health.HealthError#TYPE_NOT_SUPPORTED]; everything here works against the
 /// local store.
 public final class NutritionSample extends SessionSample {
 

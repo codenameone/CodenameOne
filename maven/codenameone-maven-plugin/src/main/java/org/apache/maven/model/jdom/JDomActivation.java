@@ -33,8 +33,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.rewriteElement;
 
 /**
  * JDOM implementation of POMs {@code activation} element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomActivation extends Activation implements JDomBacked {
 

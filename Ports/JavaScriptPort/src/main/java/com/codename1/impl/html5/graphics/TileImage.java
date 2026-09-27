@@ -27,10 +27,6 @@ import com.codename1.impl.html5.HTML5Implementation;
 import com.codename1.impl.html5.HTML5Implementation.NativeImage;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class TileImage implements ExecutableOp {
 
     final NativeImage img;

@@ -34,8 +34,6 @@ import java.io.InputStream;
 /// Simple service that allows downloading and caching data locally.
 /// When the data is requested again the server is queried with a conditional
 /// get query.
-///
-/// @author Shai Almog
 public final class CachedDataService extends ConnectionRequest {
     private final CachedData data = new CachedData();
     private boolean responseProcessed;

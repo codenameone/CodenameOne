@@ -91,8 +91,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// hi.show();
 /// ```
 ///
-/// @author Shai Almog
-///
 /// #### See also
 ///
 /// - SpanButton

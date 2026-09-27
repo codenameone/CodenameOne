@@ -28,8 +28,6 @@ import com.codename1.gaming.physics.box2d.collision.shapes.Shape;
 // updated to rev 100
 /// A fixture definition is used to create a fixture. This class defines an
 /// abstract fixture definition. You can reuse fixture definitions safely.
-///
-/// @author daniel
 public class FixtureDef {
 	/// The shape, this must be set. The shape will be cloned, so you
 	/// can create the shape on the stack.

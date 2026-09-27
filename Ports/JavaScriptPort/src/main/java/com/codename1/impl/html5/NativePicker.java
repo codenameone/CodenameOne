@@ -39,10 +39,6 @@ import com.codename1.html5.js.dom.HTMLDocument;
 
 
 
-/**
- *
- * @author shannah
- */
 abstract class NativePicker {
     
     protected final int type;

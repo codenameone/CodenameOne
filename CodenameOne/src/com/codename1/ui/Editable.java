@@ -26,9 +26,6 @@ package com.codename1.ui;
 /// in the UI.  `Component` implements this interface, but only with empty
 /// methods.  You can provide an alternative editing implementation for any Component by
 /// passing an Editable object to `Component#setEditingDelegate(com.codename1.ui.Editable)`.
-///
-/// @author shannah
-///
 public interface Editable {
     /// Checks whether the component is editable.
     boolean isEditable();

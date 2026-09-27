@@ -30,8 +30,6 @@ import javax.swing.SwingUtilities;
 /**
  * Shows a help file and allows the user to select never showing it again as an
  * option.
- *
- * @author Shai Almog
  */
 public class ShowHelpDontAnnoy extends javax.swing.JDialog {
     private String resource;

@@ -29,8 +29,6 @@ package com.codename1.ui.html;
 ///
 /// Note that the resourceRequested method should be implemented as well, since HTMLComponent has situations in which a resource
 /// needs to be fetched immediately (And block all the rest).
-///
-/// @author Ofir Leitner
 public interface AsyncDocumentRequestHandler extends DocumentRequestHandler {
 
     /// This method is called by HTMLComponent when a resource is requested asynchronously.

@@ -45,8 +45,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * Used by the UI builder to edit commands within the UI
- *
- * @author Shai Almog
  */
 public class CommandEditor extends javax.swing.JPanel {
     private Properties projectGeneratorSettings;

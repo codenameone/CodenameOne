@@ -25,9 +25,6 @@ package com.codename1.ui;
 
 /// A utility wrapper that allows a Component to be used as an Image so that it can
 /// be set as the icon for a Label or button.
-///
-/// @author shannah
-///
 public class ComponentImage extends Image {
 
     private final Component cmp;

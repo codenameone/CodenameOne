@@ -34,8 +34,6 @@ import java.util.Map;
 import java.util.Vector;
 
 /// A DOM accessor implementation for working with XML content.
-///
-/// @author Eric Coolman
 class XMLContent implements StructuredContent {
     private final Element root;
 

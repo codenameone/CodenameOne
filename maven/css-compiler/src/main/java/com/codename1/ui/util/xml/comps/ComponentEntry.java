@@ -27,8 +27,6 @@ import java.util.List;
 
 /**
  * XML representation for a component in the UI tree
- *
- * @author Shai Almog
  */
 public class ComponentEntry {
     private String name;

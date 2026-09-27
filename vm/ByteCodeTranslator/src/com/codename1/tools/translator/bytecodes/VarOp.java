@@ -26,10 +26,6 @@ package com.codename1.tools.translator.bytecodes;
 import com.codename1.tools.translator.BytecodeMethod;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class VarOp extends Instruction implements AssignableExpression {
     private int var;
     public VarOp(int opcode, int var) {

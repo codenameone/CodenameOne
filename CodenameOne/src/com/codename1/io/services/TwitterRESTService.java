@@ -39,8 +39,6 @@ import java.util.Vector;
 /// Calls to the Twitter REST API can be performed via this class although currently
 /// support for authentication isn't implemented due to the transition to oAuth instead
 /// of basic authentication.
-///
-/// @author Shai Almog
 public class TwitterRESTService extends ConnectionRequest {
     public static final String METHOD_USER_TIMELINE = "statuses/user_timeline";
     public static final String METHOD_TWEETS = "search/tweets";

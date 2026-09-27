@@ -48,8 +48,6 @@ import com.codename1.ui.Image;
 /// Only the operations every windowing system provides are abstract. Everything a
 /// platform might reasonably lack has an inert default, so a later addition here
 /// never breaks an existing port.
-///
-/// @author Shai Almog
 public abstract class WindowManager {
 
     // ---- window lifecycle -----------------------------------------------------

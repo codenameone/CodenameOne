@@ -126,8 +126,6 @@ import java.util.Vector;
 /// }
 /// ```
 ///
-/// @author Chen Fishbein
-///
 /// #### See also
 ///
 /// - com.codename1.ui.Container

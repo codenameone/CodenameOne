@@ -28,8 +28,6 @@ import java.util.Vector;
 
 /// This class represents a Facebook Post Object
 /// http://developers.facebook.com/docs/reference/api/post/
-///
-/// @author Chen Fishbein
 public class Post extends FBObject {
 
     private String type;

@@ -37,8 +37,6 @@ import java.util.Vector;
 /// will never be removed from a sufficiently large cache.
 /// Cache can work purely in memory or swap data into storage based on user definitions.
 /// Notice that this class isn't threadsafe.
-///
-/// @author Shai Almog
 public class CacheMap {
     private final Hashtable memoryCache = new Hashtable();
     private final Hashtable weakCache = new Hashtable();

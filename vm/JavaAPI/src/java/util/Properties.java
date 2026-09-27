@@ -30,10 +30,6 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 
-/**
- *
- * @author shannah
- */
 public class Properties extends HashMap<String, String> {
 
     /**

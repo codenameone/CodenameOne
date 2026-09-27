@@ -11,10 +11,6 @@ package ${groupId};
 
 import com.codename1.testing.AbstractTest;
 
-/**
- *
- * @author shannah
- */
 public class MyFirstTest extends AbstractTest {
 
     @Override

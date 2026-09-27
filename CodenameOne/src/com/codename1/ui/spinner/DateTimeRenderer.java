@@ -34,8 +34,6 @@ import java.util.Map;
 /// A renderer that can represent values for Date and time, time is represented as an integer
 /// for seconds since midnight. This is formatted accordingly by the renderer
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

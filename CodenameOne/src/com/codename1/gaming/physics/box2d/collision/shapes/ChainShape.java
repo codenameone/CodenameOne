@@ -37,8 +37,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 /// can use inside and outside collision. Therefore, you may use any winding order. Since there may
 /// be many vertices, they are allocated using Alloc. Connectivity information is used to create
 /// smooth collisions. WARNING The chain will not collide properly if there are self-intersections.
-///
-/// @author Daniel
 public class ChainShape extends Shape {
 
   public Vec2[] m_vertices;

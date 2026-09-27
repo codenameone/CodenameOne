@@ -27,10 +27,6 @@ import java.util.List;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class SwitchInstruction extends Instruction {
     private Label dflt;
     private int[] keys;

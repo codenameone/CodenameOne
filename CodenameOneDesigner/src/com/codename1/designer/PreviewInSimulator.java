@@ -38,10 +38,6 @@ import java.util.prefs.Preferences;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 
-/**
- *
- * @author Shai Almog
- */
 public class PreviewInSimulator {
     public static void execute(final JComponent parent, final String theme, final File resource, final String selection, final File baseResDir) {
         new Thread() {

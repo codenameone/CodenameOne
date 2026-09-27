@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.util.Date;
 
 /// This class represent an access token.
-///
-/// @author Chen
 public class AccessToken implements Externalizable {
 
 

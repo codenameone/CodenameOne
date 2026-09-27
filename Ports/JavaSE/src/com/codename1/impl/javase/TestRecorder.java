@@ -43,8 +43,6 @@ import javax.swing.JOptionPane;
 /**
  * The test recorder monitors Codename One and automatically creates a unit test
  * matching user actions.
- *
- * @author Shai Almog
  */
 public class TestRecorder extends javax.swing.JFrame {
     private Form currentForm;

@@ -23,9 +23,6 @@
 package com.codename1.ui;
 
 /// A base class for Paints that use multiple gradients.
-///
-/// @author shannah
-///
 public abstract class MultipleGradientPaint implements Paint {
 
 

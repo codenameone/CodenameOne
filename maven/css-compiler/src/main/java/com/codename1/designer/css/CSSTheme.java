@@ -106,10 +106,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.flute.parser.ParseException;
 
-/**
- *
- * @author shannah
- */
 public class CSSTheme {
     private boolean refreshImages;
     URL baseURL;

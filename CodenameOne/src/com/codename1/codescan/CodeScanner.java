@@ -30,8 +30,6 @@ import com.codename1.ui.Display;
 /// API might not be implemented for all platforms in which case the getInstance()
 /// method will return null!
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// Use the cn1-codescanner cn1lib.

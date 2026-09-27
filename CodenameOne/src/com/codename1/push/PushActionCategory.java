@@ -35,8 +35,6 @@ import java.util.Set;
 ///
 /// Applications that wish to support actions must implement `PushActionsProvider` in its main class.  The `PushActionsProvider#getPushActionCategories()`
 /// implementation defines all of the categories that are available for push notifications.
-///
-/// @author shannah
 public class PushActionCategory {
     private final String id;
     private final List<PushAction> actions;

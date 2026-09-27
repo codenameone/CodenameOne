@@ -6,8 +6,6 @@ import java.util.Date;
 
 /**
  * This class provides information gathered from the build environment.
- * 
- * @author JReleaseInfo AntTask
  */
 public class Version {
 

@@ -30,8 +30,6 @@ import java.io.InputStream;
 
 /**
  * Font class implementing the new TTF functionality from Codename One where applicable
- * 
- * @author Shai Almog
  */
 public class EditorTTFFont extends Font {
     private Font systemFont;

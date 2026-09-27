@@ -26,8 +26,6 @@ package com.codename1.payment;
 /// Callback interface that the main class must implement in order for the restore
 /// option of in-app-purchasing to work. Once the main class implements this
 /// interface the methods within it are invoked to indicate the various restore states.
-///
-/// @author Steve Hannah
 public interface RestoreCallback {
     /// Indicates a the given SKU was restored by a user. When restoring multiple
     /// SKU's at once multiple calls to this method will be performed.

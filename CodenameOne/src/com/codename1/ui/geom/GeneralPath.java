@@ -83,8 +83,6 @@ import java.util.Arrays;
 /// Note: This description and image were copied from [the GNU classpath](http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html)
 /// docs). License here http://www.gnu.org/licenses/licenses.html#FDL
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - com.codename1.ui.Graphics#drawShape
@@ -1881,7 +1879,6 @@ public final class GeneralPath implements Shape {
         double y;
     }
 
-    /// @author shannah
     final static class ShapeUtil {
         private ShapeUtil() {
         }

@@ -61,18 +61,13 @@ import com.codename1.util.SuccessCallback;
 /// JSObject provides a set of typed getter methods that will automatically cast to
 /// particular types:
 ///
-///
 ///      getInt()Returns int
-///
 ///
 ///      getString()Returns String
 ///
-///
 ///      getDouble()Returns double
 ///
-///
 ///      getObject()Returns JSObject
-///
 ///
 ///      getBoolean()Returns boolean
 ///
@@ -121,8 +116,6 @@ import com.codename1.util.SuccessCallback;
 /// We can then capture photos directly from Javascript using a function similar to the following:
 ///
 /// `````java camera.capture(function(url){ if ( url == null ){ // No image was captured return; } // Fetch the preview  tag. var image = document.getElementById('preview-image'); // Set the preview URL to the image that was taken. image.src = url; }); `````
-///
-/// @author shannah
 ///
 /// #### Deprecated
 ///

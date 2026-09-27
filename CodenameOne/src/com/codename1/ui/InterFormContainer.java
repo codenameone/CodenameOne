@@ -38,9 +38,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// Note that the InterFormContainer object itself cannot be added to multiple forms.   You
 /// need to create two InterFormContainer instances that share the same content.
-///
-/// @author shannah
-///
 public class InterFormContainer extends Container {
     private final Component content;
 

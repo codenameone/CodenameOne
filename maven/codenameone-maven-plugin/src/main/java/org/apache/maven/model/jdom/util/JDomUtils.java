@@ -36,9 +36,6 @@ import static org.jdom2.filter.Filters.textOnly;
 
 /**
  * Common JDom functions
- *
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
- * @author Marc Rohlfs, CoreMedia AG
  */
 public final class JDomUtils {
 

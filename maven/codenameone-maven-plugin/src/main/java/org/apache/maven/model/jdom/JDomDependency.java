@@ -41,9 +41,6 @@ import static org.codehaus.plexus.util.StringUtils.trim;
 /**
  * JDOM implementation of the {@link Dependency} class. It holds the child elements of the Maven POMs {@code dependency}
  * element.
- *
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomDependency extends Dependency implements JDomBacked {
 

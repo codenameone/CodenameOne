@@ -28,10 +28,6 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 
-/**
- *
- * @author shannah
- */
 public class IOSVirtualKeyboard implements VirtualKeyboardInterface {
     private IOSImplementation impl;
     

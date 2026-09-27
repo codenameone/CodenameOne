@@ -46,8 +46,6 @@ import org.w3c.dom.NodeList;
 
 /**
  * Allows us to define an animated gif as an animation object
- *
- * @author Shai Almog
  */
 public class AnimationImpl {
     private File file;

@@ -53,8 +53,6 @@ import com.codename1.impl.ios.IOSImplementation;
 /// on their own class instead: the Catalyst windowing ones on
 /// `CatalystWindowNative`, which this port does not ship, and the AppKit ones on
 /// `MacNative`, which the iOS port does not.
-///
-/// @author Shai Almog
 public class MacImplementation extends IOSImplementation {
 
     @Override

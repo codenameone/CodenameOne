@@ -27,10 +27,6 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.SuccessCallback;
 
-/**
- *
- * @author Chen
- */
 public class MediaProxy extends AbstractMedia {
 
     private Media media;

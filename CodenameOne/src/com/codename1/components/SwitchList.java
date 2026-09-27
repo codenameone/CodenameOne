@@ -34,8 +34,6 @@ import static com.codename1.ui.ComponentSelector.$;
 
 /// A list of switches.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - ButtonList for code samples;

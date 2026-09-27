@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 /// Spinner renderer that can automatically simulate the iOS perspective transform behavior
-///
-/// @author Shai Almog
 class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
     private static final int PERSPECTIVES = 9;
     private static final int FRONT_ANGLE = 4;

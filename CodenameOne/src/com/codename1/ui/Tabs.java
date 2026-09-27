@@ -90,8 +90,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(BorderLayout.NORTH, GridLayout.encloseIn(2, swipeXBtn, swipeYBtn));
 /// hi.add(BorderLayout.CENTER, tabs);
 /// ```
-///
-/// @author Chen Fishbein
 public class Tabs extends Container {
     private final Container contentPane = new Container(new TabsLayout());
     private final Container tabsContainer;

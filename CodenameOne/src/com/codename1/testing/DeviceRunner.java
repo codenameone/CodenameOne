@@ -33,8 +33,6 @@ import java.io.InputStream;
 
 /// Runs the test cases from the test build of the app, notice that this class
 /// is abstract since device/app specific code can exist in the implementation
-///
-/// @author Shai Almog
 public abstract class DeviceRunner {
     private static final int VERSION = 1;
     private int failedTests;

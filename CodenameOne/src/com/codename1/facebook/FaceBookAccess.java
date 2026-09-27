@@ -50,8 +50,6 @@ import java.util.Vector;
 /// http://developers.facebook.com/docs/reference/api/
 /// This class encapsulates the Network access and provide simple methods to acess the Facebook servers.
 ///
-/// @author Chen Fishbein
-///
 /// @deprecated This legacy OAuth2/Graph REST wrapper predates Facebook's current policies and
 /// embeds credentials client-side, which Facebook no longer permits for production use. Use
 /// [com.codename1.social.FacebookConnect] (native SDK path) for login, and a server-side

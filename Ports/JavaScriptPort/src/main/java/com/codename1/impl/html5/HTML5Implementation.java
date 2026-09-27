@@ -179,10 +179,6 @@ import com.codename1.html5.js.typedarrays.Float64Array;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
 
-/**
- *
- * @author shannah
- */
 public class HTML5Implementation extends CodenameOneImplementation {
     private L10NManager l10n;
     private int density;

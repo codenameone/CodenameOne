@@ -31,7 +31,6 @@ import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
 /// Joints and fixtures are destroyed when their associated
 /// body is destroyed. Implement this listener so that you
 /// may nullify references to these joints and shapes.
-/// @author Daniel Murphy
 public interface DestructionListener {
 	
 	/// Called when any joint is about to be destroyed due

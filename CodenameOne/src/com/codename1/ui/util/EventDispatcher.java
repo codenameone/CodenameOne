@@ -58,8 +58,6 @@ import java.util.Vector;
 ///     listeners.fireActionEvent(ev);
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class EventDispatcher {
 
     private static boolean fireStyleEventsOnNonEDT = false;

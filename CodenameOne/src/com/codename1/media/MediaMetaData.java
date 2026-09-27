@@ -26,9 +26,6 @@ import com.codename1.ui.Image;
 
 /// MetaData for use by `RemoteControlListener` to provide information about
 /// the currently playing background media on the device's lock screen.
-///
-/// @author shannah
-///
 public class MediaMetaData {
 
     private String title;

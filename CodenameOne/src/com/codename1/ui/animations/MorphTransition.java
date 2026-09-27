@@ -51,8 +51,6 @@ import java.util.Map;
 /// deterministic (it never reads the wall clock), is repeatable, and can move
 /// backwards, which makes it compose cleanly with a frame-export loop that renders
 /// the same animation at a set of progress fractions.
-///
-/// @author Shai Almog
 public final class MorphTransition extends Transition {
     private final HashMap<String, String> fromTo = new HashMap<String, String>();
 

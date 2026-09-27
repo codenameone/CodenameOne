@@ -52,8 +52,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>Neither had any test coverage before, and both are in the paint path where a
  * regression shows up as wrong pixels rather than an exception.</p>
- *
- * @author Shai Almog
  */
 @CodenameOneTest
 class MultiWindowGraphicsRoutingTest {

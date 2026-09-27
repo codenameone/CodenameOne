@@ -25,8 +25,6 @@ package com.codename1.ui.html;
 
 /// A simple class used to hold both a display text and an actual value for a combobox item.
 /// The renderer takes the display text, while the form submission process takes the value.
-///
-/// @author Ofir Leitner
 class OptionItem {
 
     String text;

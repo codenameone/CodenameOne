@@ -70,8 +70,6 @@ import java.util.Vector;
 /// ```
 ///
 /// Notice that share looks different on a device
-///
-/// @author Chen Fishbein
 public class ShareButton extends Button implements ActionListener {
 
     private final Vector shareServices = new Vector();

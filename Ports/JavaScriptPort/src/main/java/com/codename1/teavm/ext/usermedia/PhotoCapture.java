@@ -61,10 +61,6 @@ import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.html5.js.dom.HTMLVideoElement;
 
-/**
- *
- * @author shannah
- */
 public class PhotoCapture {
     
     private static final String DIALOG_CLASS = "cn1-image-capture-dialog";

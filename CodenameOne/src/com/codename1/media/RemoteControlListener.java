@@ -28,9 +28,6 @@ package com.codename1.media;
 ///
 /// Apps should implement their own subclass and register it with the app using
 /// `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
-///
-/// @author shannah
-///
 public class RemoteControlListener {
 
     /// Called when user presses play button on remote control.

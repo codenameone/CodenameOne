@@ -88,10 +88,6 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 //import org.apache.tools.ant.types.Path;
 
-/**
- *
- * @author shannah
- */
 public class CN1CSSCLI {
     public static String version = "7.0";
     static Object lock = new Object();

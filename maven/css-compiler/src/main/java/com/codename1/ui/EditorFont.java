@@ -43,8 +43,6 @@ import javax.swing.JOptionPane;
 /**
  * Font object for creation within the Theme Creator which stores all the fallback
  * scenarios for fonts.
- *
- * @author Shai Almog
  */
 public class EditorFont extends Font {
     private static Map<Integer, String> face = new HashMap<Integer, String>();

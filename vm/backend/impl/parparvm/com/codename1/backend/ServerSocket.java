@@ -24,12 +24,10 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * A listening TCP socket and the blocking read/write a worker uses once it owns a
- * connection. Deliberately fd-based rather than object-per-socket: the reactor
- * deals in descriptors and an extra object per idle connection is exactly the cost
- * this design exists to avoid.
- */
+/// A listening TCP socket and the blocking read/write a worker uses once it owns a
+/// connection. Deliberately fd-based rather than object-per-socket: the reactor
+/// deals in descriptors and an extra object per idle connection is exactly the cost
+/// this design exists to avoid.
 public final class ServerSocket {
     private int fd;
 
@@ -37,17 +35,15 @@ public final class ServerSocket {
         this.fd = fd;
     }
 
-    /**
-     * - `host`: null or "0.0.0.0" to listen on every interface
-     * - `port`: 0 to let the OS choose, then ask {@link #getPort}
-     */
+    /// - `host`: null or "0.0.0.0" to listen on every interface
+    /// - `port`: 0 to let the OS choose, then ask [#getPort]
     public static ServerSocket bind(String host, int port, int backlog) throws IOException {
         // The native side casts this to unsigned short, so 65536 became 0 and the
         // process listened on an arbitrary port instead of refusing the setting.
         // The Java SE arm rejects it through InetSocketAddress, so a PORT tested
         // with cn1:backend behaved differently once packaged -- and an arbitrary
         // port is the worst way to find out, because the process starts.
-        if(port < 0 || port > 65535) {
+        if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
         // A NUL ENDS THE NAME where it becomes a C string, and what is left is
@@ -58,11 +54,11 @@ public final class ServerSocket {
         // GIVEN has to survive the crossing intact. The Java SE arm fails such a
         // name at resolution, so without this the two arms disagreed about which
         // interfaces a configured host means.
-        if(host != null) {
+        if (host != null) {
             Urls.requireHostName(host);
         }
         int fd = bindImpl(host, port, backlog);
-        if(fd < 0) {
+        if (fd < 0) {
             throw new IOException("Could not bind " + (host == null ? "*" : host) + ":" + port);
         }
         return new ServerSocket(fd);
@@ -76,91 +72,73 @@ public final class ServerSocket {
         return boundPortImpl(fd);
     }
 
-    /** The accepted descriptor, or -1 when nothing was waiting. */
+    /// The accepted descriptor, or -1 when nothing was waiting.
     public int accept() {
         return acceptImpl(fd);
     }
 
     public void close() {
-        if(fd >= 0) {
+        if (fd >= 0) {
             int f = fd;
             fd = -1;
             closeFdImpl(f);
         }
     }
 
-    /**
-     * Blocking or non-blocking mode for one descriptor. The reactor needs
-     * non-blocking; a worker that owns a connection wants blocking, so it can read
-     * a request without a state machine.
-     */
+    /// Blocking or non-blocking mode for one descriptor. The reactor needs
+    /// non-blocking; a worker that owns a connection wants blocking, so it can read
+    /// a request without a state machine.
     public static void setBlocking(int fd, boolean blocking) throws IOException {
-        if(setBlockingImpl(fd, blocking) != 0) {
+        if (setBlockingImpl(fd, blocking) != 0) {
             throw new IOException("Could not change blocking mode on fd " + fd);
         }
     }
 
-    /** Thrown when a read or write deadline expires. */
+    /// Thrown when a read or write deadline expires.
     public static final class TimeoutException extends IOException {
         TimeoutException(String message) {
             super(message);
         }
     }
 
-    /**
-     * Applies a receive and send deadline. Without one a connection that opens and
-     * says nothing holds a worker forever, and the pool is bounded.
-     */
+    /// Applies a receive and send deadline. Without one a connection that opens and
+    /// says nothing holds a worker forever, and the pool is bounded.
     public static void setTimeout(int fd, int millis) throws IOException {
-        if(setTimeoutImpl(fd, millis) != 0) {
+        if (setTimeoutImpl(fd, millis) != 0) {
             throw new IOException("Could not set a deadline on fd " + fd);
         }
     }
 
-    /** -1 at end of stream, as InputStream does. */
-    /**
-     * Waits for the socket to become readable, for at most timeoutMillis. True if
-     * it is, false if the wait expired.
-     *
-     * One syscall, and it leaves the descriptor exactly as it was. The caller uses
-     * it between requests on a keep-alive connection, where the alternatives --
-     * setting and restoring a receive deadline, or flipping to non-blocking and
-     * back -- cost two to four syscalls each way and disturb the deadline that
-     * governs a real request read.
-     */
-    /**
-     * A reusable per-thread read buffer of at least {@code capacity} bytes.
-     *
-     * The same array comes back on every call for a thread, so a server that reads
-     * through it allocates nothing per request. Its contents belong to the current
-     * callback only -- the next read on this thread overwrites them, so nothing may
-     * retain it or hand it to code that might.
-     *
-     * On the translated target the storage is a C buffer that the collector never
-     * allocated and never sweeps, so the read path contributes nothing at all to
-     * the allocation rate that paces the GC. Java SE cannot do that and returns an
-     * ordinary cached array; the observable contract is the same, which is the
-     * point -- only the allocation accounting differs.
-     *
-     * Read from {@code fd} into this thread's reusable buffer and return an array
-     * whose length is exactly the number of bytes read, or null at end of stream.
-     *
-     * On the translated target this allocates nothing and copies nothing: the array
-     * header and its storage are C memory the collector never touches, and the
-     * length is set per read so the caller can scan to {@code array.length}. Java SE
-     * cannot resize an array and returns a right-sized copy instead -- same
-     * contract, different allocation accounting.
-     *
-     * The bytes belong to the current callback on the current thread. Anything that
-     * must outlive either has to be copied out first.
-     */
+    /// Read from `fd` into this thread's reusable buffer and return an array
+    /// whose length is exactly the number of bytes read, or null at end of stream.
+    ///
+    /// On the translated target this allocates nothing and copies nothing: the array
+    /// header and its storage are C memory the collector never touches, and the
+    /// length is set per read so the caller can scan to `array.length`. Java SE
+    /// cannot resize an array and returns a right-sized copy instead -- same
+    /// contract, different allocation accounting.
+    ///
+    /// The bytes belong to the current callback on the current thread. Anything that
+    /// must outlive either has to be copied out first.
     public static byte[] readIntoThreadBuffer(int fd, int capacity) {
         return readIntoThreadBufferImpl(fd, capacity);
     }
 
+    /// A reusable per-thread read buffer of at least `capacity` bytes.
+    ///
+    /// The same array comes back on every call for a thread, so a server that reads
+    /// through it allocates nothing per request. Its contents belong to the current
+    /// callback only -- the next read on this thread overwrites them, so nothing may
+    /// retain it or hand it to code that might.
+    ///
+    /// On the translated target the storage is a C buffer that the collector never
+    /// allocated and never sweeps, so the read path contributes nothing at all to
+    /// the allocation rate that paces the GC. Java SE cannot do that and returns an
+    /// ordinary cached array; the observable contract is the same, which is the
+    /// point -- only the allocation accounting differs.
     public static byte[] threadReadBuffer(int capacity) {
         byte[] foreign = threadReadBufferImpl(capacity);
-        if(foreign != null) {
+        if (foreign != null) {
             return foreign;
         }
         // The native refused (allocation failure). An ordinary array is correct,
@@ -169,21 +147,30 @@ public final class ServerSocket {
         return new byte[capacity];
     }
 
+    /// Waits for the socket to become readable, for at most timeoutMillis. True if
+    /// it is, false if the wait expired.
+    ///
+    /// One syscall, and it leaves the descriptor exactly as it was. The caller uses
+    /// it between requests on a keep-alive connection, where the alternatives --
+    /// setting and restoring a receive deadline, or flipping to non-blocking and
+    /// back -- cost two to four syscalls each way and disturb the deadline that
+    /// governs a real request read.
     public static boolean awaitReadable(int fd, int timeoutMillis) throws IOException {
         int rc = awaitReadableImpl(fd, timeoutMillis);
-        if(rc < 0) {
+        if (rc < 0) {
             throw new IOException("Poll failed on fd " + fd);
         }
         return rc > 0;
     }
 
+    /// -1 at end of stream, as InputStream does.
     public static int read(int fd, byte[] buffer, int offset, int length) throws IOException {
         checkRange(buffer, offset, length);
         int n = readImpl(fd, buffer, offset, length);
-        if(n == -3) {
+        if (n == -3) {
             throw new TimeoutException("Read timed out on fd " + fd);
         }
-        if(n < -1) {
+        if (n < -1) {
             throw new IOException("Read failed on fd " + fd);
         }
         return n;
@@ -191,49 +178,45 @@ public final class ServerSocket {
 
     public static void write(int fd, byte[] buffer, int offset, int length) throws IOException {
         checkRange(buffer, offset, length);
-        if(writeImpl(fd, buffer, offset, length) != length) {
+        if (writeImpl(fd, buffer, offset, length) != length) {
             throw new IOException("Write failed on fd " + fd);
         }
     }
 
     public static void closeFd(int fd) {
-        if(fd >= 0) {
+        if (fd >= 0) {
             closeFdImpl(fd);
         }
     }
 
-    /**
-     * Breaks a descriptor in both directions without closing it.
-     *
-     * For the one case a close cannot serve: a thread is parked inside a write to
-     * a peer that has stopped reading, and the connection has to go NOW. A close
-     * would free the number while that thread still holds it, and the number is
-     * reused immediately -- so the write lands in whatever connection was handed
-     * it next. shutdown(2) makes the parked write fail instead, and the close
-     * follows once the writer has left.
-     *
-     * Quiet about failure on purpose: every reason it can fail (the peer already
-     * went, the descriptor was already shut) is a state the caller wanted anyway.
-     */
-    /**
-     * The RECEIVE deadline alone, leaving the send deadline where it is.
-     *
-     * setTimeout sets both, which is right for a request -- a peer that stops
-     * reading blocks a worker in send() just as effectively as one that stops
-     * writing. A websocket wants them apart: it is idle by design, so its read
-     * allowance is minutes or nothing at all, while a send to a peer that has
-     * stopped reading must still give up. Using setTimeout for that quietly moved
-     * the send bound from fifteen seconds to five minutes, and
-     * CN1_WS_IDLE_TIMEOUT_MS=0 removed it entirely.
-     */
+    /// The RECEIVE deadline alone, leaving the send deadline where it is.
+    ///
+    /// setTimeout sets both, which is right for a request -- a peer that stops
+    /// reading blocks a worker in send() just as effectively as one that stops
+    /// writing. A websocket wants them apart: it is idle by design, so its read
+    /// allowance is minutes or nothing at all, while a send to a peer that has
+    /// stopped reading must still give up. Using setTimeout for that quietly moved
+    /// the send bound from fifteen seconds to five minutes, and
+    /// CN1_WS_IDLE_TIMEOUT_MS=0 removed it entirely.
     public static void setReceiveTimeout(int fd, int millis) throws IOException {
-        if(fd >= 0 && setReceiveTimeoutImpl(fd, millis) != 0) {
+        if (fd >= 0 && setReceiveTimeoutImpl(fd, millis) != 0) {
             throw new IOException("Could not set the receive timeout on fd " + fd);
         }
     }
 
+    /// Breaks a descriptor in both directions without closing it.
+    ///
+    /// For the one case a close cannot serve: a thread is parked inside a write to
+    /// a peer that has stopped reading, and the connection has to go NOW. A close
+    /// would free the number while that thread still holds it, and the number is
+    /// reused immediately -- so the write lands in whatever connection was handed
+    /// it next. shutdown(2) makes the parked write fail instead, and the close
+    /// follows once the writer has left.
+    ///
+    /// Quiet about failure on purpose: every reason it can fail (the peer already
+    /// went, the descriptor was already shut) is a state the caller wanted anyway.
     public static void shutdown(int fd) {
-        if(fd >= 0) {
+        if (fd >= 0) {
             shutdownImpl(fd);
         }
     }
@@ -245,19 +228,17 @@ public final class ServerSocket {
     private static native int acceptImpl(int serverFd);
     private static native int setBlockingImpl(int fd, boolean blocking);
     private static native int setTimeoutImpl(int fd, int millis);
-    /**
-     * A byte[] backed by this thread's C read buffer, handed over without a copy.
-     *
-     * The same object comes back on every call for a thread, its storage is never
-     * allocated by the collector, and it is not swept -- so the read path
-     * contributes nothing to the allocation rate that paces the GC. Returns null
-     * if the buffer cannot be provided, and the caller must then fall back to an
-     * ordinary array rather than assume it worked.
-     *
-     * The contents belong to the current callback ONLY. Nothing may retain this
-     * array or hand it to code that might: the next read on this thread overwrites
-     * it, and a grow moves the storage underneath it.
-     */
+    /// A byte\[\] backed by this thread's C read buffer, handed over without a copy.
+    ///
+    /// The same object comes back on every call for a thread, its storage is never
+    /// allocated by the collector, and it is not swept -- so the read path
+    /// contributes nothing to the allocation rate that paces the GC. Returns null
+    /// if the buffer cannot be provided, and the caller must then fall back to an
+    /// ordinary array rather than assume it worked.
+    ///
+    /// The contents belong to the current callback ONLY. Nothing may retain this
+    /// array or hand it to code that might: the next read on this thread overwrites
+    /// it, and a grow moves the storage underneath it.
     static native byte[] threadReadBufferImpl(int capacity);
 
     static native byte[] readIntoThreadBufferImpl(int fd, int capacity);
@@ -265,21 +246,19 @@ public final class ServerSocket {
 
     private static native int awaitReadableImpl(int fd, int timeoutMillis);
 
-    /**
-     * Refuses a slice that does not lie inside the array.
-     *
-     * The natives below index the array through the pointer they are handed and
-     * ParparVM adds no bounds check of its own, so a bad offset is a native read
-     * or write of whatever is next in the heap rather than an exception. The
-     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
-     * invisible on the simulator and only appears once packaged. The subtraction
-     * avoids the overflow that `offset + length` has.
-     */
+    /// Refuses a slice that does not lie inside the array.
+    ///
+    /// The natives below index the array through the pointer they are handed and
+    /// ParparVM adds no bounds check of its own, so a bad offset is a native read
+    /// or write of whatever is next in the heap rather than an exception. The
+    /// JavaSE arm gets this free from its stream APIs, which is why such a bug is
+    /// invisible on the simulator and only appears once packaged. The subtraction
+    /// avoids the overflow that `offset + length` has.
     private static void checkRange(byte[] buffer, int offset, int length) {
-        if(buffer == null) {
+        if (buffer == null) {
             throw new NullPointerException("buffer");
         }
-        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+        if (offset < 0 || length < 0 || length > buffer.length - offset) {
             throw new IndexOutOfBoundsException("offset " + offset + ", length "
                     + length + ", buffer " + buffer.length);
         }
@@ -288,7 +267,7 @@ public final class ServerSocket {
     private static native int readImpl(int fd, byte[] buffer, int offset, int length);
     private static native int writeImpl(int fd, byte[] buffer, int offset, int length);
     private static native void closeFdImpl(int fd);
-    /** Cores available to this process. */
+    /// Cores available to this process.
     public static int availableProcessors() {
         int n = availableProcessorsImpl();
         return n > 0 ? n : 1;

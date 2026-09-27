@@ -38,8 +38,6 @@ import java.util.List;
 
 /**
  * Simulator database, backed by the SQLite JDBC driver.
- *
- * @author Chen
  */
 public class SEDatabase extends Database {
 

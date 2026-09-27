@@ -75,7 +75,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// BorderLayout and BoxLayout include some variant tags to customize their behaviour also:
 ///
-///
 /// - **borderAbs, borderAbsolute** - BorderLayout with center absolute behaviour.  This is the same as ``
 ///
 /// - **borderTotalBelow** - BorderLayout with Total Below center behaviour. This is the same as ``
@@ -161,7 +160,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// **Other Layouts**:
 ///
-///
 /// - **Flow Layout** - `{flow:[...]`}
 ///
 /// - **Grid Layout** - `{grid:[...], cols:3, rows:2`}
@@ -177,7 +175,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// **Layout Variants**
 ///
 /// BoxLayout and BorderLayout include variant shorthands to customize their behaviour.
-///
 ///
 /// - **xNoGrow, xng** - Same as `{x:[...], noGrow:true`}
 ///
@@ -206,9 +203,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///     .getView();
 /// }
 /// ```
-///
-/// @author shannah
-///
 public final class UIFragment {
 
 

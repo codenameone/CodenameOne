@@ -102,8 +102,6 @@ import com.codename1.ui.Transform;
 /// hi.show();
 /// ```
 ///
-/// @author Steve Hannah
-///
 /// #### See also
 ///
 /// - GeneralPath for a concrete implementation of Shape.

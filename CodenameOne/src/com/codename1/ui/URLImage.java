@@ -114,8 +114,6 @@ import java.util.Map;
 /// URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
 /// Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", ada);
 /// ```
-///
-/// @author Shai Almog
 public final class URLImage extends EncodedImage {
 
     /// Flag used by `java.lang.String, com.codename1.ui.Image, int)`.

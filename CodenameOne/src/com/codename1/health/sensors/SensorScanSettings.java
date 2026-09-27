@@ -59,7 +59,7 @@ public final class SensorScanSettings {
 
     /// How long to scan before giving up.
     ///
-    /// The [Duration] form of [#setTimeoutMillis(int)], which is the type the rest of
+    /// The [Duration][java.time.Duration] form of [#setTimeoutMillis(int)], which is the type the rest of
     /// the framework speaks; the millis form stays for the ports and the
     /// wire format.
     public SensorScanSettings setTimeout(java.time.Duration value) {
@@ -81,7 +81,7 @@ public final class SensorScanSettings {
         return setTimeoutMillis((int) value.toMillis());
     }
 
-    /// How long to scan before giving up, as a [Duration].
+    /// How long to scan before giving up, as a [Duration][java.time.Duration].
     public java.time.Duration getTimeout() {
         return java.time.Duration.ofMillis(getTimeoutMillis());
     }
