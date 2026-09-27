@@ -575,6 +575,120 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aScopedOrOverloadedManagedResourceIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visits", PKG + "@Component @SessionScope @ManagedResource\n"
+                + "public class Visits {\n"
+                + "    @ManagedAttribute public int getCount() { return 1; }\n"
+                + "}\n");
+        s.put("com.example.Cache", PKG + "@Component @ManagedResource public class Cache {\n"
+                + "    @ManagedOperation public void evict() { }\n"
+                + "    @ManagedOperation public void evict(String key) { }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("must be a singleton"));
+        assertTrue(errors, errors.contains("is overloaded"));
+    }
+
+    @Test
+    public void aFactoryBeanRunsInheritedCallbacksAndDestroysSubclassFirst() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Log", PKG + "public class Log { public static String text = \"\"; }\n");
+        s.put("com.example.BaseClient", PKG + "public class BaseClient {\n"
+                + "    @PostConstruct public void open() { Log.text += \"open,\"; }\n"
+                + "    @PreDestroy public void closeBase() { Log.text += \"base,\"; }\n"
+                + "}\n");
+        s.put("com.example.Client", PKG + "public class Client extends BaseClient {\n"
+                + "    @PreDestroy public void flush() { Log.text += \"sub,\"; }\n"
+                + "}\n");
+        s.put("com.example.Clients", PKG + "@Configuration public class Clients {\n"
+                + "    @Bean public Client client() { return new Client(); }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Client client;\n"
+                + "    @GetMapping(\"/x\") public String x() { return Log.text; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("open,", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+        Class<?> log = backend.getApplication().getClass().getClassLoader()
+                .loadClass("com.example.Log");
+        assertEquals("the subclass must release its state before the base tears down",
+                "open,sub,base,", log.getField("text").get(null));
+    }
+
+    @Test
+    public void aRequestBeanCanUseAnotherWhileItIsDestroyed() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Clock", PKG + "@Component @RequestScope public class Clock {\n"
+                + "    public String now() { return \"t\"; }\n"
+                + "}\n");
+        s.put("com.example.Audit", PKG + "@Component @RequestScope public class Audit {\n"
+                + "    public static String last = \"none\";\n"
+                + "    @Autowired private Clock clock;\n"
+                + "    public void touch() { }\n"
+                + "    @PreDestroy public void done() { last = clock.now(); }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Audit audit;\n"
+                + "    @GetMapping(\"/x\") public String x() { audit.touch(); return Audit.last; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("none", http("GET", port, "/x"));
+            assertEquals("the @PreDestroy could not reach a request-scoped dependency", "t",
+                    http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aSessionBeanBuiltByAFailingRequestIsStillDestroyed() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+                + "    public static int destroyed;\n"
+                + "    public void add() { }\n"
+                + "    @PreDestroy void close() { destroyed++; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Cart cart;\n"
+                + "    @GetMapping(\"/fail\") public String fail() {\n"
+                + "        cart.add();\n"
+                + "        throw new IllegalStateException(\"boom\");\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/fail").openConnection();
+            assertEquals(500, c.getResponseCode());
+        } finally {
+            backend.stop();
+        }
+        Class<?> cart = backend.getApplication().getClass().getClassLoader()
+                .loadClass("com.example.Cart");
+        assertEquals("a session bean built by a failing request was dropped undestroyed", 1,
+                cart.getField("destroyed").getInt(null));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

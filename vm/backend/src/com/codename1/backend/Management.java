@@ -246,8 +246,12 @@ public final class Management implements HttpServer.Handler {
         boolean up = true;
         if(backend != null) {
             Map server = backend.getServer().getMetrics();
-            up = "ok".equals(server.get("status"));
-            out.put("status", up ? "UP" : "DRAINING");
+            boolean serving = "ok".equals(server.get("status"));
+            // STARTING until the application's start-up hook has returned: the
+            // listener accepts before it runs, and a load balancer that read UP
+            // then would send traffic to a server that may still fail to start.
+            up = serving && backend.isReady();
+            out.put("status", !serving ? "DRAINING" : up ? "UP" : "STARTING");
             out.put("uptimeSeconds", server.get("uptimeSeconds"));
             if(backend.getDataSource() != null) {
                 Map db = new LinkedHashMap();
@@ -256,7 +260,9 @@ public final class Management implements HttpServer.Handler {
                 out.put("database", db);
             }
         } else {
-            out.put("status", "UP");
+            // Not attached yet: the server is still being put together.
+            up = false;
+            out.put("status", "STARTING");
         }
         return request.respondJson(up ? 200 : 503, out);
     }

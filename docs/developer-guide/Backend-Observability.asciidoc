@@ -191,7 +191,9 @@ attribute, numeric or not, appears in the management listing. A
 strings, numbers, booleans, and enums. An operation's parameters are named by
 `@McpParam` when they carry one, and otherwise `arg0`, `arg1`, in order. The build
 checks each of these rules and refuses a managed method on a class with no
-`@ManagedResource`.
+`@ManagedResource`. It also refuses a managed resource that isn't a singleton,
+because metrics are read outside any request or session. An operation is invoked
+by name, so it refuses an overloaded one too.
 
 `@Timed` records each call's duration as a histogram, and `@Counted` counts calls,
 with a second counter for the failures. Their instruments are named after the class and method
@@ -255,7 +257,7 @@ The management endpoints make the same information available over HTTP, for a
 load balancer and for an operator:
 
 ----
-GET  /manage/health        public; 503 while the server drains
+GET  /manage/health        public; 503 while starting or draining
 GET  /manage/metrics       every metric, as JSON
 GET  /manage/prometheus    every metric, in the Prometheus text format
 GET  /manage/jobs          the scheduled jobs and their last runs
@@ -264,6 +266,12 @@ POST /manage/managed/{bean}/{operation}
 ----
 
 An operation's body is a JSON object of its arguments by parameter name.
+
+Health reports `STARTING` until the server has finished starting, including the
+application's scheduled jobs and exporters, `UP` while it serves, and `DRAINING`
+once it's stopping. The listener accepts connections before start-up finishes, so
+a load balancer that checks health doesn't send traffic to a server that may
+still fail to start.
 
 [cols="2,3", options="header"]
 |===

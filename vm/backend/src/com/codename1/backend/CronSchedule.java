@@ -337,6 +337,14 @@ public final class CronSchedule {
             }
             long candidateLocal = day * DAY + found * 1000L;
             long candidate = toUtc(candidateLocal);
+            if(candidate + offsetAt(candidate) != candidateLocal) {
+                // A wall-clock time the zone skips -- 02:30 on a spring-forward
+                // night -- does not exist, and toUtc lands on another one (03:30)
+                // that the fields never asked for. Skipped, as Quartz does: search
+                // on from the first real time after the gap.
+                t = candidate > t ? candidate : t + 1000L;
+                continue;
+            }
             if(candidate > afterMillis) {
                 return candidate;
             }

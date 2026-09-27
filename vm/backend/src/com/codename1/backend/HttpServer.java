@@ -2683,7 +2683,7 @@ public final class HttpServer {
         for(int iter = 0 ; iter < tokens.length ; iter++) {
             Runnable task = takeVirtualTask(tokens[iter].longValue());
             if(task != null) {
-                Tasks.platform(task);
+                TaskExecutor.fallBack(task);
             }
         }
         if(host.wakeRead >= 0) {
@@ -2722,7 +2722,7 @@ public final class HttpServer {
             if(handle == 0) {
                 Runnable task = takeVirtualTask(token);
                 if(task != null) {
-                    Tasks.platform(task);
+                    TaskExecutor.fallBack(task);
                 }
                 continue;
             }

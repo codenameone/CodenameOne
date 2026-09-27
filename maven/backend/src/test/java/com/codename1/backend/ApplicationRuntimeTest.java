@@ -65,6 +65,16 @@ class ApplicationRuntimeTest {
     // ------------------------------------------------------------------ cron
 
     @Test
+    @DisplayName("a cron time a spring-forward night skips does not fire an hour late")
+    void cronSkipsTheDstGap() {
+        CronSchedule s = CronSchedule.parse("0 30 2 * * *", "America/New_York");
+        // From 2026-03-07 12:00Z: 02:30 on the 8th does not exist in New York
+        // (02:00 jumps to 03:00), so the next firing is 02:30 EDT on the 9th,
+        // not 03:30 EDT on the 8th (1772955000000).
+        assertEquals(1773037800000L, s.next(1772884800000L));
+    }
+
+    @Test
     @DisplayName("cron finds the next matching second, and the ones after it")
     void cronNext() {
         CronSchedule every15 = CronSchedule.parse("*/15 * * * * *", "UTC");
@@ -202,6 +212,106 @@ class ApplicationRuntimeTest {
     // --------------------------------------------------------------- sessions
 
     @Test
+    @DisplayName("a server without generated beans still applies the session settings")
+    void handlerOnlySessionSettings() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty("cn1.session.cookie", "APPSESSION");
+        settings.setProperty("cn1.session.same-site", "Strict");
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        request.getSession(true).setAttribute("k", "v");
+                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                    }
+                })
+                .start();
+        try {
+            HttpURLConnection c = open(port, "/");
+            assertEquals("ok", read(c));
+            String cookie = c.getHeaderField("Set-Cookie");
+            assertTrue(cookie != null && cookie.startsWith("APPSESSION=")
+                    && cookie.contains("SameSite=Strict"), String.valueOf(cookie));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("each server has its own executors, and stopping one leaves the other's running")
+    void executorsArePerServer() throws Exception {
+        final TaskExecutor[] seen = new TaskExecutor[2];
+        Backend[] servers = new Backend[2];
+        int[] ports = {freePort(), freePort()};
+        for(int i = 0 ; i < 2 ; i++) {
+            final int index = i;
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(ports[i]));
+            servers[i] = Backend.builder(Config.of(settings, "test")).quiet()
+                    .handler(new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request)
+                                throws Exception {
+                            seen[index] = Tasks.executor("jobs", Tasks.PLATFORM);
+                            return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                        }
+                    }).start();
+        }
+        try {
+            assertEquals("ok", read(open(ports[0], "/")));
+            assertEquals("ok", read(open(ports[1], "/")));
+            assertTrue(seen[0] != null && seen[1] != null && seen[0] != seen[1],
+                    "two servers shared one executor");
+            servers[1].stop();
+            assertTrue(seen[1].isShutdown());
+            assertFalse(seen[0].isShutdown(), "stopping one server shut the other's executor");
+            final CountDownLatch ran = new CountDownLatch(1);
+            seen[0].execute(new Runnable() {
+                public void run() {
+                    ran.countDown();
+                }
+            });
+            assertTrue(ran.await(5, TimeUnit.SECONDS));
+        } finally {
+            servers[0].stop();
+            servers[1].stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a task still queued when the shutdown deadline passes never starts")
+    void shutdownDropsQueuedWorkAtTheDeadline() throws Exception {
+        Tasks.Registry registry = Tasks.open(null);
+        TaskExecutor one = new TaskExecutor("one", false, 1, registry);
+        final CountDownLatch release = new CountDownLatch(1);
+        final CountDownLatch started = new CountDownLatch(1);
+        final AtomicInteger late = new AtomicInteger();
+        one.execute(new Runnable() {
+            public void run() {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException err) {
+                    // the shutdown interrupts it; fine
+                }
+            }
+        });
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        one.execute(new Runnable() {
+            public void run() {
+                late.incrementAndGet();
+            }
+        });
+        one.shutdown(50);
+        assertEquals(1, one.getDroppedCount());
+        release.countDown();
+        Thread.sleep(200);
+        assertEquals(0, late.get(), "a queued task ran after the shutdown deadline");
+        Tasks.shutdown(registry, 0);
+    }
+
+    @Test
     @DisplayName("a session is created on demand, found again by its cookie, and invalidated")
     void sessions() throws Exception {
         int port = freePort();
@@ -295,6 +405,23 @@ class ApplicationRuntimeTest {
         } finally {
             p.clear();
         }
+    }
+
+    @Test
+    @DisplayName("a histogram keeps its own copy of its boundaries and label keys")
+    void histogramCopiesItsArrays() {
+        double[] bounds = {1, 2, 3};
+        String[] labels = {"route"};
+        Histogram h = Metrics.histogram("test.copied", "", "ms", bounds, labels);
+        bounds[0] = 100;
+        labels[0] = "renamed";
+        h.getLabelKeys()[0] = "again";
+        assertEquals("route", h.getLabelKeys()[0]);
+        h.record(0.5);
+        Map point = (Map)h.points().get(0);
+        assertEquals(1.0, ((Number)((List)point.get("bounds")).get(0)).doubleValue());
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram("test.unsorted",
+                "", "ms", new double[] {2, 1}, null));
     }
 
     @Test

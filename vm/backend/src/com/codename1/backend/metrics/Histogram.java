@@ -42,9 +42,18 @@ import java.util.Map;
  * label with unbounded values cannot grow the histogram without limit.
  */
 public final class Histogram extends Instrument {
-    /** OpenTelemetry's default explicit bucket boundaries. */
-    public static final double[] DEFAULT_BOUNDS = {0, 5, 10, 25, 50, 75, 100, 250, 500, 750,
-            1000, 2500, 5000, 7500, 10000};
+    /**
+     * OpenTelemetry's default explicit bucket boundaries. Private, and handed
+     * out as copies: a histogram's boundaries must never change once values are
+     * counted against them, or the exported counts describe other buckets.
+     */
+    private static final double[] DEFAULT_BOUNDS = {0, 5, 10, 25, 50, 75, 100, 250, 500,
+            750, 1000, 2500, 5000, 7500, 10000};
+
+    /** A copy of OpenTelemetry's default explicit bucket boundaries. */
+    public static double[] defaultBounds() {
+        return (double[])DEFAULT_BOUNDS.clone();
+    }
 
     /** Series beyond this many share one, marked as overflow. */
     static final int MAX_SERIES = 2000;
@@ -60,14 +69,31 @@ public final class Histogram extends Instrument {
     Histogram(String name, String description, String unit, double[] bounds,
               String[] labels) {
         super(name, description, unit, HISTOGRAM);
-        this.bounds = bounds == null ? DEFAULT_BOUNDS : bounds;
-        this.labels = labels == null ? new String[0] : labels;
+        // Copied, so the caller changing its array later cannot move the
+        // boundaries or rename the labels under counts already recorded.
+        this.bounds = bounds == null ? DEFAULT_BOUNDS : (double[])bounds.clone();
+        for(int iter = 0 ; iter < this.bounds.length ; iter++) {
+            double b = this.bounds[iter];
+            if(Double.isNaN(b) || Double.isInfinite(b)
+                    || (iter > 0 && b <= this.bounds[iter - 1])) {
+                throw new IllegalArgumentException("Histogram " + name + ": bucket "
+                        + "boundaries must be finite and strictly ascending");
+            }
+        }
+        this.labels = labels == null ? new String[0] : (String[])labels.clone();
+        for(int iter = 0 ; iter < this.labels.length ; iter++) {
+            // Null is an unused slot of the three; an empty name is a mistake.
+            if(this.labels[iter] != null && this.labels[iter].length() == 0) {
+                throw new IllegalArgumentException("Histogram " + name + ": a label key "
+                        + "is empty");
+            }
+        }
         this.plain = new Series(null, this.bounds.length + 1);
     }
 
     /** The label keys this histogram was created with. */
     public String[] getLabelKeys() {
-        return labels;
+        return (String[])labels.clone();
     }
 
     /** Records one value in the series without labels. */

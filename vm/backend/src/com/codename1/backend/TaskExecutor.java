@@ -48,11 +48,18 @@ public final class TaskExecutor {
     private long completed;
     private long failed;
     private boolean shutdown;
+    /** Tasks dropped unstarted because the shutdown deadline passed. */
+    private long dropped;
+    /** Whether shutdown ran out of time; nothing may start after that. */
+    private boolean timedOut;
+    /** The server these executors belong to, which the task threads carry. */
+    private final Tasks.Registry registry;
 
-    TaskExecutor(String name, boolean virtual, int size) {
+    TaskExecutor(String name, boolean virtual, int size, Tasks.Registry registry) {
         this.name = name;
         this.virtual = virtual;
         this.size = size < 1 ? 1 : size;
+        this.registry = registry;
     }
 
     public String getName() {
@@ -166,12 +173,16 @@ public final class TaskExecutor {
 
     void runCounted(Runnable task) {
         boolean ok = false;
+        // The task works for this executor's server: an @Async call it makes, or
+        // an executor it asks for, is that server's too.
+        Object previous = Tasks.enter(registry);
         try {
             task.run();
             ok = true;
         } catch (Throwable err) {
             System.err.println("Task " + task + " on executor " + name + " failed: " + err);
         } finally {
+            Tasks.leave(previous);
             synchronized(this) {
                 active--;
                 completed++;
@@ -213,6 +224,71 @@ public final class TaskExecutor {
                 break;
             }
         }
+        if(queue.isEmpty() && active == 0) {
+            return;
+        }
+        // Out of time. The server destroys its beans and closes its database
+        // next, so a task still WAITING must never start: it would run against
+        // both. Those are dropped and counted. A task already running cannot be
+        // stopped from outside -- Java has no safe way to -- so its thread is
+        // interrupted, which ends any wait, sleep or interruptible I/O it is in,
+        // and it is reported by name so the overrun is visible.
+        timedOut = true;
+        int waiting = queue.size();
+        dropped += waiting;
+        queue.clear();
+        if(workers != null) {
+            for(int iter = 0 ; iter < workers.length ; iter++) {
+                workers[iter].interrupt();
+            }
+        }
+        System.err.println("Executor " + name + " did not finish within the shutdown "
+                + "timeout: " + waiting + " queued task(s) dropped, " + active
+                + " still running");
+    }
+
+    /** Tasks the shutdown deadline dropped before they could start. */
+    public synchronized long getDroppedCount() {
+        return dropped;
+    }
+
+    /**
+     * Runs a task a host accepted for a virtual thread and then could not give
+     * one -- no stack, or the server stopping -- on this executor's own platform
+     * workers instead. It was accepted before any shutdown and is already counted
+     * active, so it is queued even now, and shutdown() waits for it.
+     */
+    static void fallBack(Runnable task) {
+        if(task instanceof Counted) {
+            Counted c = (Counted)task;
+            c.owner.requeue(c.task);
+            return;
+        }
+        Tasks.platform(task);
+    }
+
+    private synchronized void requeue(Runnable task) {
+        active--;
+        if(timedOut) {
+            dropped++;
+            notifyAll();
+            return;
+        }
+        queue.addLast(task);
+        if(workers == null) {
+            startWorkers();
+        } else if(shutdown) {
+            // The pool's threads may already have drained and ended; one more
+            // runs this and ends in turn, and shutdown() is still waiting on it.
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    work();
+                }
+            }, "cn1-task-" + name + "-late");
+            t.setDaemon(true);
+            t.start();
+        }
+        notify();
     }
 
     public String toString() {

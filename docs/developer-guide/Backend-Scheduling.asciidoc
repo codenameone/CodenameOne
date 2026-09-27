@@ -187,6 +187,10 @@ bad one stops the server.
 which is what a server's clock should be set to regardless. The build checks the name,
 and a zone on a job that isn't a cron job is an error.
 
+In a zone with daylight saving time, a time the clocks skip doesn't exist, and a
+job due then doesn't run that day: `0 30 2 * * *` in `America/New_York` skips the
+spring-forward night instead of running at 03:30.
+
 ==== Fixed rate and fixed delay
 
 `fixedRate` starts runs a fixed number of milliseconds apart, measured from start

@@ -38,6 +38,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The metrics export decoded by the classes opentelemetry-proto generates from
@@ -71,5 +72,35 @@ class OtlpMetricsProtoTest {
         assertEquals(6L, point.getCount());
         assertEquals(1260.5, point.getSum(), 1e-9);
         assertNotNull(point.getAttributesList());
+    }
+
+    @Test
+    @DisplayName("an exporter opened again after a shutdown exports periodically again")
+    void reopenedExporterKeepsExporting() throws Exception {
+        java.net.ServerSocket probe = new java.net.ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        java.util.Properties p = new java.util.Properties();
+        // Nothing listens there, so every export counts as a failure -- which is
+        // what shows the thread is running.
+        p.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:" + closed + "/v1/metrics");
+        p.setProperty(OtlpMetricExporter.INTERVAL, "20");
+        com.codename1.backend.Config config = com.codename1.backend.Config.of(p, "test");
+        OtlpMetricExporter exporter = new OtlpMetricExporter("reopen");
+        exporter.open(config);
+        exporter.shutdown(0);
+        exporter.open(config);
+        try {
+            long deadline = System.currentTimeMillis() + 5000;
+            long failures = 0;
+            while(System.currentTimeMillis() < deadline && failures < 3) {
+                Thread.sleep(20);
+                failures = ((Number)exporter.status().get("failures")).longValue();
+            }
+            assertTrue(failures >= 3, "the reopened exporter stopped after " + failures
+                    + " export(s)");
+        } finally {
+            exporter.shutdown(0);
+        }
     }
 }

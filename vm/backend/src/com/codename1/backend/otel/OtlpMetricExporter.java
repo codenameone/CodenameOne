@@ -70,9 +70,13 @@ public final class OtlpMetricExporter implements MetricReader {
     private Map resource;
     private Thread thread;
     private final Object lock = new Object();
-    private boolean stopping;
-    /** Whether the exporter thread sends one last export before it ends. */
-    private boolean finalExport;
+    /**
+     * The lifecycle of one open(): a builder started again reuses this reader,
+     * and a fresh Run is what keeps the new thread from inheriting the stopped
+     * one's flags -- and an old thread still finishing its last export from
+     * being revived by the new ones.
+     */
+    private Run run;
     private long exports;
     private long failures;
     private String lastError;
@@ -111,9 +115,13 @@ public final class OtlpMetricExporter implements MetricReader {
         OtlpTracer.parseHeaders(own != null ? own : config.get(OtlpTracer.HEADERS), headers);
         intervalMillis = OtlpTracer.positive(config, INTERVAL, 60000);
         resource = OtlpTracer.resource(config, defaultServiceName);
+        final Run mine = new Run();
+        synchronized(lock) {
+            run = mine;
+        }
         thread = new Thread(new Runnable() {
             public void run() {
-                loop();
+                loop(mine);
             }
         }, "cn1-otel-metrics");
         thread.setDaemon(true);
@@ -121,11 +129,11 @@ public final class OtlpMetricExporter implements MetricReader {
         return true;
     }
 
-    private void loop() {
+    private void loop(Run mine) {
         while(true) {
             synchronized(lock) {
                 long deadline = System.currentTimeMillis() + intervalMillis;
-                while(!stopping) {
+                while(!mine.stopping) {
                     long left = deadline - System.currentTimeMillis();
                     if(left <= 0) {
                         break;
@@ -136,8 +144,8 @@ public final class OtlpMetricExporter implements MetricReader {
                         return;
                     }
                 }
-                if(stopping) {
-                    if(!finalExport) {
+                if(mine.stopping) {
+                    if(!mine.finalExport) {
                         return;
                     }
                     break;
@@ -186,24 +194,32 @@ public final class OtlpMetricExporter implements MetricReader {
     }
 
     public void shutdown(int timeoutMillis) {
+        Thread exporter;
         synchronized(lock) {
-            if(stopping) {
+            if(run == null || run.stopping) {
                 return;
             }
-            stopping = true;
+            run.stopping = true;
             // One last export, so the counts of the final minute are not lost --
             // made by the exporter thread, which is bounded by the join below
             // rather than by the HTTP client's own connect and read timeouts.
-            finalExport = timeoutMillis > 0;
+            run.finalExport = timeoutMillis > 0;
+            exporter = thread;
             lock.notifyAll();
         }
-        if(thread != null && timeoutMillis > 0) {
+        if(exporter != null && timeoutMillis > 0) {
             try {
-                thread.join(timeoutMillis);
+                exporter.join(timeoutMillis);
             } catch (InterruptedException err) {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /** Whether one open()'s thread should stop, and whether it exports once more first. */
+    private static final class Run {
+        boolean stopping;
+        boolean finalExport;
     }
 
     /** Exports attempted, failures, and the last error, for the management view. */

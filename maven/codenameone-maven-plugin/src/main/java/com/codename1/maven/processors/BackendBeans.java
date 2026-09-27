@@ -520,6 +520,22 @@ final class BackendBeans {
         if (!chooseConstructor(bean)) {
             return null;
         }
+        hierarchy(bean, cls, false);
+        AnnotationValues props = cls.getClassAnnotation(CONFIG_PROPERTIES);
+        if (props != null) {
+            bindProperties(bean, props, cls);
+        }
+        collectJobs(bean);
+        collectTools(bean);
+        collectManaged(bean);
+        return bean;
+    }
+
+    /// Walks `cls` and its superclasses, top first, collecting what each declares.
+    ///
+    /// @param lifecycleOnly only the @PostConstruct and @PreDestroy methods -- for
+    ///        the object a @Bean method returns, which the build does not inject
+    private void hierarchy(Bean bean, AnnotatedClass cls, boolean lifecycleOnly) {
         // Superclasses first, as Spring injects and initializes them: a field an
         // abstract base declares @Autowired is as much a dependency as one the
         // bean declares, and AnnotatedClass lists only DECLARED members.
@@ -546,16 +562,8 @@ final class BackendBeans {
                 }
             }
             members(bean, cls, chain.get(level), level > 0 && !concerns(chain.get(level)),
-                    overridden, declaredBelow, fieldNames);
+                    overridden, declaredBelow, fieldNames, lifecycleOnly);
         }
-        AnnotationValues props = cls.getClassAnnotation(CONFIG_PROPERTIES);
-        if (props != null) {
-            bindProperties(bean, props, cls);
-        }
-        collectJobs(bean);
-        collectTools(bean);
-        collectManaged(bean);
-        return bean;
     }
 
     /// The injection points and lifecycle methods one class of a bean's
@@ -567,8 +575,8 @@ final class BackendBeans {
     /// @param declaredBelow every method a subclass declares, private ones too
     private void members(Bean bean, AnnotatedClass cls, AnnotatedClass declaring,
                          boolean unwoven, Set<String> overridden, Set<String> declaredBelow,
-                         Set<String> fieldNames) {
-        for (FieldInfo f : declaring.getFields()) {
+                         Set<String> fieldNames, boolean lifecycleOnly) {
+        for (FieldInfo f : lifecycleOnly ? new ArrayList<FieldInfo>() : declaring.getFields()) {
             boolean autowired = f.getAnnotation(AUTOWIRED) != null;
             AnnotationValues value = f.getAnnotation(VALUE);
             if (!autowired && value == null) {
@@ -627,7 +635,7 @@ final class BackendBeans {
                 continue;
             }
             String where = declaring.getSourceName() + "." + m.getName();
-            if (m.getAnnotation(AUTOWIRED) != null) {
+            if (!lifecycleOnly && m.getAnnotation(AUTOWIRED) != null) {
                 if (m.isStatic()) {
                     ctx.error(cls, "@Autowired method " + where + " is static; the build "
                             + "injects instances.");
@@ -829,16 +837,9 @@ final class BackendBeans {
             bean.constructorPoints.add(p);
         }
         if (bean.cls != null && ctx.lookup(bean.type) != null) {
-            for (MethodInfo lm : bean.cls.getMethods()) {
-                if (lm.getAnnotation(POST_CONSTRUCT) != null
-                        && lifecycle(bean.cls, lm, "@PostConstruct")) {
-                    bean.postConstruct.add(lm);
-                }
-                if (lm.getAnnotation(PRE_DESTROY) != null
-                        && lifecycle(bean.cls, lm, "@PreDestroy")) {
-                    bean.preDestroy.add(lm);
-                }
-            }
+            // The whole hierarchy, as for a class bean: an initializer or
+            // destructor the returned class inherits is as much its own.
+            hierarchy(bean, bean.cls, true);
         }
         AnnotationValues props = m.getAnnotation(CONFIG_PROPERTIES);
         if (props != null) {
@@ -1163,6 +1164,17 @@ final class BackendBeans {
         if (!any) {
             return;
         }
+        if (!SINGLETON.equals(bean.scope)) {
+            // Its gauges are read by the metrics exporter and its operations by
+            // the management endpoint, on threads with no request or session to
+            // find a scoped instance in -- every read would fail and the gauge
+            // would silently export nothing. A prototype has no one instance.
+            ctx.error(cls, cls.getSourceName() + " is a @ManagedResource with scope "
+                    + bean.scope + ". A managed resource is read outside any request, so it "
+                    + "must be a singleton; keep the per-" + bean.scope + " state in a "
+                    + "singleton it reports on.");
+            return;
+        }
         Managed managed = new Managed();
         String objectName = resource.getStringOrDefault("objectName", "").trim();
         managed.objectName = objectName.length() > 0 ? objectName
@@ -1177,6 +1189,12 @@ final class BackendBeans {
                         || ret.getSort() == Type.VOID || ret.getSort() == Type.ARRAY) {
                     ctx.error(cls, "@ManagedAttribute " + where + " must be an instance getter "
                             + "that takes no arguments and returns a value.");
+                    continue;
+                }
+                if (managed.attributeNames.contains(attributeName(m.getName()))) {
+                    ctx.error(cls, "@ManagedAttribute " + where + " has the attribute name "
+                            + attributeName(m.getName()) + ", which another getter of "
+                            + cls.getSourceName() + " already reports under.");
                     continue;
                 }
                 managed.attributes.add(m);
@@ -1202,6 +1220,17 @@ final class BackendBeans {
                     }
                     AnnotationValues named = parameterAnnotations(m, i).get(MCP_PARAM);
                     names.add(named != null ? named.getString("value") : "arg" + i);
+                }
+                for (MethodInfo other : managed.operations) {
+                    if (other.getName().equals(m.getName())) {
+                        // Management and MCP name an operation by its method
+                        // name alone, so an overload could never be reached.
+                        ctx.error(cls, "@ManagedOperation " + where + " is overloaded; an "
+                                + "operation is invoked by name, so only one method of "
+                                + "that name can be one. Rename the others.");
+                        ok = false;
+                        break;
+                    }
                 }
                 if (ok) {
                     managed.operations.add(m);

@@ -352,7 +352,9 @@ since each serves the whole life of the server rather than one request.
 Beans are built in dependency order, and a bean's `@PostConstruct` method runs
 once it and everything it depends on has been built and injected. At shutdown,
 `@PreDestroy` methods run in the reverse order, so a bean's dependencies are still
-there when its own method runs:
+there when its own method runs. Within one bean the same rule holds for its class
+hierarchy: a superclass's `@PostConstruct` runs before the subclass's, and a
+subclass's `@PreDestroy` runs before the superclass's:
 
 [source,java]
 ----
@@ -366,7 +368,11 @@ is what makes the `flush` above safe:
 . Scheduled jobs stop starting, so none begins while the server drains.
 . The server stops accepting and waits, up to
   `cn1.server.shutdownTimeoutMillis`, for the requests in flight.
-. `@Async` calls and scheduled runs that haven't finished get the same grace.
+. `@Async` calls and scheduled runs that haven't finished get the same grace. A
+  task still waiting in a queue when that time is up is dropped rather than
+  started against beans about to be destroyed, and the threads of the ones still
+  running are interrupted. Each server has its own executors, so stopping one
+  server leaves another in the same process running.
 . `@PreDestroy` and `destroyMethod` run, in reverse dependency order.
 . The connection pool closes.
 . The last metrics and spans are exported.

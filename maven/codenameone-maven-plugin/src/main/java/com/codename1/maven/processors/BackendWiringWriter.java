@@ -635,13 +635,22 @@ final class BackendWiringWriter {
             return;
         }
         sb.append("        if (").append(ref).append(" != null) {\n");
-        for (MethodInfo m : b.preDestroy) {
+        for (MethodInfo m : destroyOrder(b)) {
             destroyCall(sb, b, ref + "." + callName(m) + "()");
         }
         if (b.destroyMethod != null) {
             destroyCall(sb, b, ref + "." + b.destroyMethod + "()");
         }
         sb.append("        }\n");
+    }
+
+    /// The @PreDestroy methods in the order they run: the reverse of the
+    /// @PostConstruct order, so a subclass releases what it holds before the
+    /// superclass tears down the state it was built on.
+    private static List<MethodInfo> destroyOrder(BackendBeans.Bean b) {
+        List<MethodInfo> out = new ArrayList<MethodInfo>(b.preDestroy);
+        java.util.Collections.reverse(out);
+        return out;
     }
 
     private static void destroyCall(StringBuilder sb, BackendBeans.Bean b, String call) {
@@ -673,7 +682,7 @@ final class BackendWiringWriter {
               .append(b.slot).append("] instanceof ").append(type).append(") {\n");
             sb.append("            ").append(type).append(" bean = (").append(type)
               .append(") beans[").append(b.slot).append("];\n");
-            for (MethodInfo m : b.preDestroy) {
+            for (MethodInfo m : destroyOrder(b)) {
                 sb.append("    ");
                 destroyCall(sb, b, "bean." + callName(m) + "()");
             }

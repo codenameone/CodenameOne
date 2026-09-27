@@ -92,12 +92,21 @@ public final class Backend {
     private final List managedBeans;
     /** This server's session settings and store. */
     private final Sessions sessions;
+    /** This server's executors. */
+    private final Tasks.Registry tasks;
+    /**
+     * Whether start-up has finished -- the application's started() hook
+     * included. The listener accepts before that hook runs, so health must not
+     * report the server ready to a load balancer until it has returned.
+     */
+    private boolean ready;
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
                     Config config, int shutdownMillis, Tracer ownTracer,
                     Application application,
                     com.codename1.backend.metrics.MetricReader metricReader,
-                    List managedBeans, Sessions sessions) {
+                    List managedBeans, Sessions sessions, Tasks.Registry tasks) {
+        this.tasks = tasks;
         this.metricReader = metricReader;
         this.managedBeans = managedBeans;
         this.sessions = sessions;
@@ -154,6 +163,15 @@ public final class Backend {
         return new ArrayList(managedBeans);
     }
 
+    /** Whether the server has finished starting and serves its application. */
+    public synchronized boolean isReady() {
+        return ready;
+    }
+
+    synchronized void markReady() {
+        ready = true;
+    }
+
     /** This server's sessions: their settings and the store they are kept in. */
     public Sessions getSessions() {
         return sessions;
@@ -191,9 +209,12 @@ public final class Backend {
             }
             stopping = true;
         }
+        // The callbacks below work for this server, whichever thread stops it.
+        Object callerTasks = Tasks.enter(tasks);
         try {
             stopOnce();
         } finally {
+            Tasks.leave(callerTasks);
             synchronized(this) {
                 stopping = false;
                 stopped = true;
@@ -218,7 +239,7 @@ public final class Backend {
         server.stop(shutdownMillis);
         // Background work next: @Async calls and scheduled runs still going get
         // the same grace the requests did, while the beans they use are alive.
-        Tasks.shutdown(shutdownMillis);
+        Tasks.shutdown(tasks, shutdownMillis);
         // @PreDestroy after the drain, so no request is still using a bean it
         // tears down, and before the pool closes, so a bean can still flush to
         // the database on its way out. Session beans first: they may use the
@@ -459,6 +480,8 @@ public final class Backend {
         private final List mcpTools = new ArrayList();
         /** The application a start in progress has begun building, until a Backend owns it. */
         private Application createdApplication;
+        /** The executors a start in progress opened, until a Backend owns them. */
+        private Tasks.Registry startingTasks;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
         private boolean quiet;
@@ -750,6 +773,15 @@ public final class Backend {
         }
 
         private Backend startTraced(boolean tracing) throws Exception {
+            Object callerTasks = Tasks.peek();
+            try {
+                return startTracedOnce(tracing);
+            } finally {
+                Tasks.leave(callerTasks);
+            }
+        }
+
+        private Backend startTracedOnce(boolean tracing) throws Exception {
             DataSource pool = openDataSource();
             try {
                 return startWith(pool, tracing);
@@ -769,6 +801,13 @@ public final class Backend {
                 // left exactly that case leaking on a failed start.
                 Application built = createdApplication;
                 createdApplication = null;
+                Tasks.Registry tasks = startingTasks;
+                startingTasks = null;
+                if(tasks != null) {
+                    // Whatever @PostConstruct submitted stops before the beans it
+                    // uses are destroyed, as in stop().
+                    Tasks.shutdown(tasks, 0);
+                }
                 if(built != null) {
                     // Before the pool closes, as Backend.stop() orders it, so a
                     // bean can still flush to the database on its way out.
@@ -806,7 +845,12 @@ public final class Backend {
                 // /manage/health or a managed operation's path first.
                 routers.add(relay != null ? 1 : 0, management);
             }
-            Tasks.configure(config);
+            // This server's executors, which the threads building and serving
+            // it carry; Tasks explains why they are not the process's.
+            final Tasks.Registry tasks = Tasks.open(config);
+            startingTasks = tasks;
+            // Restored by startTraced when this returns or throws.
+            Tasks.enter(tasks);
             // From here until a Backend owns it, a failed start must still run
             // the destroy callbacks of the beans create() built -- including a
             // create() that fails partway -- or a caller that retries leaks
@@ -943,9 +987,11 @@ public final class Backend {
             // context exists to leak there. This is a packaged-runtime path.
             boolean ownsContext = context != null && tls == null;
             HttpServer server;
-            final Sessions sessions = application != null
-                    ? Sessions.configure(config, context != null, pool, application)
-                    : new Sessions();
+            // For EVERY server, handler-only ones too: their handlers can call
+            // getSession(), and skipping the settings would, among other things,
+            // send a TLS server's session cookie without Secure.
+            final Sessions sessions = Sessions.configure(config, context != null, pool,
+                    application);
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
@@ -961,6 +1007,7 @@ public final class Backend {
                                 // two servers on one host would otherwise present
                                 // one's session to the other and be let in.
                                 request.sessions = sessions;
+                                Object previousTasks = Tasks.enter(tasks);
                                 if(track) {
                                     previous = CURRENT_REQUEST.get();
                                     CURRENT_REQUEST.set(request);
@@ -972,6 +1019,7 @@ public final class Backend {
                                 int status = 500;
                                 try {
                                     HttpServer.Response response = null;
+                                    boolean sessionFinished = false;
                                     try {
                                         for(int iter = 0 ; iter < chain.length ; iter++) {
                                             response = chain[iter].handle(request);
@@ -986,9 +1034,25 @@ public final class Backend {
                                         // handler's own status.
                                         HttpSession session = request.resolvedSession();
                                         if(session != null) {
+                                            sessionFinished = true;
                                             response = sessions.finish(session, response);
                                         }
                                     } catch (Exception err) {
+                                        HttpSession session = request.resolvedSession();
+                                        if(session != null && !sessionFinished) {
+                                            // The handler threw, but what it did to
+                                            // the session stands, as in a servlet
+                                            // container -- and a session-scoped bean
+                                            // it built must be kept or destroyed, not
+                                            // dropped with the request unreleased.
+                                            try {
+                                                sessions.finish(session, null);
+                                            } catch (Exception storeErr) {
+                                                System.err.println("Could not store the "
+                                                        + "session of a failed request: "
+                                                        + storeErr);
+                                            }
+                                        }
                                         RequestLog.record(request, 500, startedMillis, err);
                                         throw err;
                                     }
@@ -1006,14 +1070,22 @@ public final class Backend {
                                     // request would be recorded under it.
                                     com.codename1.backend.metrics.Metrics.requestEnded(started,
                                             request.getMethod(), status);
-                                    if(track) {
-                                        CURRENT_REQUEST.set(previous);
-                                    }
-                                    if(app != null) {
-                                        Object[] beans = request.takeScopedBeans();
-                                        if(beans != null) {
-                                            app.requestEnded(beans);
+                                    // Destroyed while this is still the current
+                                    // request: a @PreDestroy that calls another
+                                    // request-scoped bean goes through that bean's
+                                    // stand-in, which looks the request up.
+                                    try {
+                                        if(app != null) {
+                                            Object[] beans = request.takeScopedBeans();
+                                            if(beans != null) {
+                                                app.requestEnded(beans);
+                                            }
                                         }
+                                    } finally {
+                                        if(track) {
+                                            CURRENT_REQUEST.set(previous);
+                                        }
+                                        Tasks.leave(previousTasks);
                                     }
                                 }
                             }
@@ -1057,9 +1129,10 @@ public final class Backend {
             Backend backend = new Backend(server, pool, manager, config, drain,
                     tracing ? tracer : null, application,
                     metricReader != null && measuring ? metricReader : null,
-                    managedBeans, sessions);
+                    managedBeans, sessions, tasks);
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
+            startingTasks = null;
             if(management != null) {
                 management.attach(backend);
             }
@@ -1083,6 +1156,7 @@ public final class Backend {
                     throw err;
                 }
             }
+            backend.markReady();
             if(!quiet) {
                 announce(backend, listenPort, context != null);
             }
