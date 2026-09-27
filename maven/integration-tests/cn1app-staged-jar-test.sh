@@ -60,6 +60,7 @@ mvn -B -ntp archetype:generate \
   -DgroupId=com.example \
   -Dversion=1.0-SNAPSHOT \
   -DmainName=MyApp \
+  -DjavaVersion=$CN1_ARCHETYPE_JAVA_VERSION \
   -DinteractiveMode=false
 
 cd $APP
