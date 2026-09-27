@@ -391,14 +391,19 @@ jobs:
           PERF=$(ls /usr/lib/linux-tools/*/perf 2>/dev/null | head -1); PERF=${PERF:-perf}
           sudo sysctl -w kernel.perf_event_paranoid=-1 kernel.kptr_restrict=0 >/dev/null
           exe="${{ steps.build.outputs.cn1 }}/Bench"
+          dbg=$(find "${RUNNER_TEMP}/fbench/cn1/linux/target" -name 'Bench.debug' | head -1)
+          echo "debug companion: $dbg"
+          if [ -n "$dbg" ] && [ ! -f "${{ steps.build.outputs.cn1 }}/Bench.debug" ]; then cp "$dbg" "${{ steps.build.outputs.cn1 }}/"; fi
+          sudo mkdir -p /usr/lib/debug && id=$(readelf -n "$exe" | awk '/Build ID/{print $3}') && echo "build id $id" && \
+            sudo mkdir -p /usr/lib/debug/.build-id/${id:0:2} && sudo cp "${{ steps.build.outputs.cn1 }}/Bench.debug" /usr/lib/debug/.build-id/${id:0:2}/${id:2}.debug || true
           ls -la "${{ steps.build.outputs.cn1 }}"
           mkdir -p "$RUNNER_TEMP/prof"
           for i in 1 2 3; do
             xvfb-run -a timeout 2 "$PERF" record -F 4000 -g -o "$RUNNER_TEMP/prof/perf$i.data" -- "$exe" > "$RUNNER_TEMP/prof/out$i.txt" 2>&1 || true
           done
           for i in 1 2 3; do
-            "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --no-children --sort comm,symbol --percent-limit 0.4 2>/dev/null | grep -v "^$" | head -70 > "$RUNNER_TEMP/prof/self$i.txt"
-            "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --children --sort symbol --percent-limit 1.5 -g none 2>/dev/null | grep -v "^$" | head -120 > "$RUNNER_TEMP/prof/incl$i.txt"
+            "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --no-children --sort symbol --percent-limit 0.3 -g none 2>/dev/null | grep -v "^$" | head -70 > "$RUNNER_TEMP/prof/self$i.txt"
+            "$PERF" report -i "$RUNNER_TEMP/prof/perf$i.data" --stdio --children --sort symbol --percent-limit 0.8 -g none 2>/dev/null | grep -v "^$" | head -120 > "$RUNNER_TEMP/prof/incl$i.txt"
           done
           echo "== self (run 2)"; cat "$RUNNER_TEMP/prof/self2.txt"
           echo "== inclusive (run 2)"; cat "$RUNNER_TEMP/prof/incl2.txt"
