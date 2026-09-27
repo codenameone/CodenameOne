@@ -849,7 +849,7 @@ final class JavascriptReachability {
                     // has existed and other things may depend on that.
                     String rawOwner = JavascriptNameUtil.sanitizeClassName(f.getOwner());
                     markClassInstantiated(rawOwner);
-                    String declaringOwner = JavascriptMethodGenerator.resolveStaticFieldOwner(
+                    String declaringOwner = JavascriptNameUtil.resolveStaticFieldOwner(
                             f.getOwner(), f.getFieldName(), byName);
                     if (declaringOwner != null && !declaringOwner.equals(rawOwner)) {
                         markClassInstantiated(declaringOwner);

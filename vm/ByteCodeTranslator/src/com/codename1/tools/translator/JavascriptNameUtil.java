@@ -191,4 +191,48 @@ final class JavascriptNameUtil {
         BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), arguments);
         return arguments;
     }
+
+    /**
+     * The class or interface that declares the static field {@code owner.fieldName}, found
+     * by searching up from {@code owner}; {@code owner} itself when it cannot be resolved.
+     * Lives here rather than in JavascriptMethodGenerator because RTA (JavascriptReachability)
+     * needs it on every target, and the self-hosted translator stubs the generator out.
+     */
+    static String resolveStaticFieldOwner(String owner, String fieldName, java.util.Map<String, ByteCodeClass> idx) {
+        if (owner == null) {
+            return null;
+        }
+        String start = sanitizeClassName(owner);
+        if (idx == null || fieldName == null) {
+            return start;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (current == null || !seen.add(current)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                continue;
+            }
+            for (ByteCodeField f : cls.getFields()) {
+                if (f.isStaticField() && fieldName.equals(f.getFieldName())) {
+                    return current;
+                }
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(sanitizeClassName(base));
+            }
+        }
+        return start;
+    }
 }

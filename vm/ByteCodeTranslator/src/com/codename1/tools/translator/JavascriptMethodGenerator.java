@@ -811,41 +811,7 @@ final class JavascriptMethodGenerator {
      * runs before it and has to reach the same answer -- passes its own index.
      */
     static String resolveStaticFieldOwner(String owner, String fieldName, Map<String, ByteCodeClass> idx) {
-        if (owner == null) {
-            return null;
-        }
-        String start = JavascriptNameUtil.sanitizeClassName(owner);
-        if (idx == null || fieldName == null) {
-            return start;
-        }
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
-        stack.push(start);
-        while (!stack.isEmpty()) {
-            String current = stack.pop();
-            if (current == null || !seen.add(current)) {
-                continue;
-            }
-            ByteCodeClass cls = idx.get(current);
-            if (cls == null) {
-                continue;
-            }
-            for (ByteCodeField f : cls.getFields()) {
-                if (f.isStaticField() && fieldName.equals(f.getFieldName())) {
-                    return current;
-                }
-            }
-            if (cls.getBaseInterfaces() != null) {
-                for (String iface : cls.getBaseInterfaces()) {
-                    stack.push(JavascriptNameUtil.sanitizeClassName(iface));
-                }
-            }
-            String base = cls.getBaseClass();
-            if (base != null) {
-                stack.push(JavascriptNameUtil.sanitizeClassName(base));
-            }
-        }
-        return start;
+        return JavascriptNameUtil.resolveStaticFieldOwner(owner, fieldName, idx);
     }
 
     /**
