@@ -237,6 +237,10 @@ class Adapter(object):
                 break
             if line is None:
                 continue  # timed out; the checks above decide whether to stop
+            if "BENCH:" in line:
+                # Diagnostic branch only: every start-up line, with its arrival.
+                print("    %s +%.0fms %s" % (side, (time.time() - started) * 1000.0,
+                                          line.strip()[-200:]), flush=True)
             if lower is None and lower_marker and lower_marker.search(line):
                 lower = (time.time() - started) * 1000.0
             if upper is None and marker.search(line):
