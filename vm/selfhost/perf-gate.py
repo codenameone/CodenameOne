@@ -99,6 +99,22 @@ def cpu_model():
             for line in Path('/proc/cpuinfo').read_text(errors='replace').splitlines():
                 if line.lower().startswith(('model name', 'hardware')):
                     return line.split(':', 1)[1].strip()
+            # arm64 Linux has no model name in /proc/cpuinfo; lscpu decodes the
+            # implementer and part numbers into one (Neoverse-N1, Cortex-A72, ...).
+            for line in subprocess.check_output(['lscpu'], text=True).splitlines():
+                if line.strip().lower().startswith('model name'):
+                    name = line.split(':', 1)[1].strip()
+                    if name and name != '-':
+                        return name
+            # Undecodable (a VM that hides it): the raw ids still tell two parts apart.
+            ids = {}
+            for line in Path('/proc/cpuinfo').read_text(errors='replace').splitlines():
+                key, _, value = line.partition(':')
+                if key.strip() in ('CPU implementer', 'CPU part') and key.strip() not in ids:
+                    ids[key.strip()] = value.strip()
+            if ids:
+                return 'implementer %s part %s' % (ids.get('CPU implementer', '?'),
+                                                   ids.get('CPU part', '?'))
         if os.name == 'nt':
             return os.environ.get('PROCESSOR_IDENTIFIER', '') or platform.processor()
     except (OSError, subprocess.CalledProcessError):
@@ -221,8 +237,12 @@ def interleave(cores, rounds, arms, run_one, work, tag):
             continue   # warmup: verified, not measured
         time_ratios.append(sample['parpar'][0] / sample['jdk25'][0])
         memory_ratios.append(sample['parpar'][1] / sample['jdk25'][1])
-        print('  %s, %s, round %d: time %.3fx, RAM %.3fx'
-              % (tag, cores_text(cores), round_index, time_ratios[-1], memory_ratios[-1]),
+        # The raw times as well as the ratio: a ratio that moves cannot otherwise say
+        # which arm moved, ParparVM or the JDK beside it on the same runner.
+        print('  %s, %s, round %d: time %.3fx, RAM %.3fx (parpar %.1fms %.1fMB, jdk25 %.1fms %.1fMB)'
+              % (tag, cores_text(cores), round_index, time_ratios[-1], memory_ratios[-1],
+                 sample['parpar'][0] * 1000, sample['parpar'][1] / 1048576.0,
+                 sample['jdk25'][0] * 1000, sample['jdk25'][1] / 1048576.0),
               flush=True)
     return time_ratios, memory_ratios, enforced
 
