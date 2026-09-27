@@ -910,8 +910,13 @@ public class Toolbar extends Container {
     ///
     /// - `callback`: gets the search string callbacks
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
-        SearchBar s = new CallbackSearchBar(this, callback);
         Form f = getComponentForm();
+        if (f == null) {
+            // Detached -- the desktop chrome hides the Toolbar in native title-bar mode -- so
+            // there is no Toolbar on screen for the search bar to replace.
+            return;
+        }
+        SearchBar s = new CallbackSearchBar(this, callback);
         setHidden(true);
         f.removeComponentFromForm(this);
         f.setToolbar(s);
@@ -2652,6 +2657,12 @@ public class Toolbar extends Container {
             }
         }
         addUniqueCommands(all, desktopHiddenSideMenuCommands);
+        // The search command opens a search bar IN the Toolbar, which is exactly what native
+        // chrome detaches; from a native menu it would have nothing to open. Leaving it out keeps
+        // the menu to commands that work there.
+        if (searchCommand != null) {
+            all.removeElement(searchCommand);
+        }
         return all;
     }
 

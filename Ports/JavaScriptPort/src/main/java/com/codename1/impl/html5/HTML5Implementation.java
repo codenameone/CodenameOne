@@ -297,6 +297,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         boolean done;
         /** Drags that arrived before the press itself was dispatched, in order. */
         List<Runnable> moves;
+        /**
+         * Where this press's touch last was. The release reads it from here rather than from
+         * pointerState, whose arrays the NEXT tap's touchstart overwrites -- a release parked
+         * until after that would otherwise fire at the second tap's position.
+         */
+        int[] touchX;
+        int[] touchY;
     }
 
     /** The most recent press; a release always belongs to the press that preceded it. */
@@ -2326,6 +2333,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 
                 pointerState.setTouches(x, y);
+                if (press != null) {
+                    press.touchX = x;
+                    press.touchY = y;
+                }
 
                 callSerially(new Runnable() {
 
@@ -2411,8 +2422,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         nativeCallSerially(new Runnable() {
                             @Override
                             public void run() {
-                                pointerState.setLastTouchUpPosition(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
-                                HTML5Implementation.this.pointerReleased(pointerState.getTouchesX(), pointerState.getTouchesY());
+                                int[] rx = press != null && press.touchX != null ? press.touchX : pointerState.getTouchesX();
+                                int[] ry = press != null && press.touchY != null ? press.touchY : pointerState.getTouchesY();
+                                pointerState.setLastTouchUpPosition(rx[0], ry[0]);
+                                HTML5Implementation.this.pointerReleased(rx, ry);
                             }
                         });
                     }
@@ -2482,6 +2495,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 
                 pointerState.setTouches(x, y);
+                if (press != null) {
+                    press.touchX = x;
+                    press.touchY = y;
+                }
                 dispatchMove(press, new Runnable() {
                     public void run() {
                         nativeCallSerially(new Runnable() {

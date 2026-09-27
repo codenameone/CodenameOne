@@ -192,6 +192,29 @@ class DesktopChromeTest extends UITestBase {
     }
 
     @FormTest
+    void nativeModeLeavesTheSearchCommandOutOfTheNativeMenu() {
+        // The search command opens a search bar inside the Toolbar, which native chrome hides;
+        // from the menu it threw instead of searching.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.getToolbar().addSearchCommand(null);
+        Command other = Command.create("Other", null, null);
+        f.getToolbar().addCommandToOverflowMenu(other);
+        f.show();
+        DisplayTest.flushEdt();
+
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(other), "ordinary commands are still published");
+        for (int i = 0; i < bridged.size(); i++) {
+            Command c = (Command) bridged.elementAt(i);
+            assertFalse(c.getMaterialIcon() == FontImage.MATERIAL_SEARCH && "".equals(c.getCommandName()),
+                    "the search command is not published");
+        }
+        f.getToolbar().showSearchBar(null);
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
     void nativeCommandBehaviourStillDrawsSoftButtonsWithNoNativeMenuBar() {
         implementation.setDesktop(true);
         implementation.setNativeCommandsSupported(false);
