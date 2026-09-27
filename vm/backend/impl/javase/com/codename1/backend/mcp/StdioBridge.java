@@ -124,7 +124,11 @@ public final class StdioBridge {
             while ((n = stream.read(chunk)) > 0) {
                 buffer.write(chunk, 0, n);
             }
-            return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            String answer = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            if (status < 200 || status >= 300) {
+                return refused(body, status, answer);
+            }
+            return answer;
         } catch (IOException err) {
             return unreachable(body, err);
         } catch (RuntimeException err) {
@@ -135,29 +139,61 @@ public final class StdioBridge {
     /// The answer the host gets when the backend is not up: an error under the id
     /// it asked with, or nothing for a notification.
     static String unreachable(String body, Exception err) {
-        // The backend is not up: answer the host rather than hang it, under
-        // the id it asked with -- and not at all for a notification. The
-        // TOP-LEVEL id, parsed: a pattern took the first "id" anywhere, so a
-        // tool argument named id got the answer and the host waited forever.
-        Object request;
-        try {
-            request = com.codename1.backend.Json.parse(body);
-        } catch (IOException parseErr) {
-            return null;
-        } catch (RuntimeException parseErr) {
-            return null;
+        return errorUnderRequestId(body, "backend unreachable: " + err.getMessage());
+    }
+
+    /// The answer the host gets when the backend refused the HTTP request -- a 401
+    /// for a missing or wrong token, most often. That refusal comes before the
+    /// server reads the JSON-RPC body, so its error carries a null id, and a host
+    /// waiting on its own id would never see the request complete. So it is
+    /// answered again under the id the host asked with; a notification gets
+    /// nothing, and a body that is no single request passes the server's through.
+    static String refused(String body, int status, String answer) {
+        Object request = parse(body);
+        if (!(request instanceof java.util.Map)) {
+            return answer;
         }
+        String detail = answer == null ? "" : answer.trim();
+        Object parsed = parse(detail);
+        if (parsed instanceof java.util.Map
+                && ((java.util.Map) parsed).get("error") instanceof java.util.Map) {
+            Object message = ((java.util.Map) ((java.util.Map) parsed).get("error")).get("message");
+            detail = message == null ? "" : String.valueOf(message);
+        }
+        if (detail.length() > 200) {
+            detail = detail.substring(0, 200);
+        }
+        return errorUnderRequestId(body, "backend answered HTTP " + status
+                + (detail.length() > 0 ? ": " + detail : ""));
+    }
+
+    /// An error under the TOP-LEVEL id of `body`, or null when it has none --
+    /// a notification, which is never answered. Parsed, not searched: a pattern
+    /// took the first "id" anywhere, so a tool argument named id got the answer
+    /// and the host waited forever.
+    static String errorUnderRequestId(String body, String message) {
+        Object request = parse(body);
         if (!(request instanceof java.util.Map)
                 || !((java.util.Map) request).containsKey("id")) {
             return null;
         }
         java.util.Map error = new java.util.LinkedHashMap();
         error.put("code", Integer.valueOf(-32000));
-        error.put("message", "backend unreachable: " + err.getMessage());
+        error.put("message", message);
         java.util.Map response = new java.util.LinkedHashMap();
         response.put("jsonrpc", "2.0");
         response.put("id", ((java.util.Map) request).get("id"));
         response.put("error", error);
         return com.codename1.backend.Json.write(response);
+    }
+
+    private static Object parse(String text) {
+        try {
+            return com.codename1.backend.Json.parse(text);
+        } catch (IOException parseErr) {
+            return null;
+        } catch (RuntimeException parseErr) {
+            return null;
+        }
     }
 }

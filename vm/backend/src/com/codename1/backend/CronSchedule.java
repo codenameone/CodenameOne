@@ -392,20 +392,29 @@ public final class CronSchedule {
                 continue;
             }
             long candidateLocal = day * DAY + found * 1000L;
-            long candidate = toUtc(candidateLocal);
-            if (candidate + offsetAt(candidate) != candidateLocal) {
+            long first = localToUtc(candidateLocal, true);
+            if (first == Long.MIN_VALUE) {
                 // A wall-clock time the zone skips -- 02:30 on a spring-forward
                 // night -- does not exist, and toUtc lands on another one (03:30)
                 // that the fields never asked for. Skipped, as Quartz does: search
                 // on from the first real time after the gap.
+                long candidate = toUtc(candidateLocal);
                 t = candidate > t ? candidate : t + 1000L;
                 continue;
             }
-            if (candidate > afterMillis) {
-                return candidate;
+            // A time the clocks pass twice -- 01:30 on a fall-back night -- is the
+            // FIRST of the two, as Spring and Quartz fire it; the second only when
+            // the search starts after the first, as a server started in that
+            // repeated hour does.
+            if (first > afterMillis) {
+                return first;
             }
-            // A DST fold mapped this back to or before the start: step past it.
-            t = candidate <= t ? t + 1000L : candidate + 1000L;
+            long second = localToUtc(candidateLocal, false);
+            if (second > afterMillis) {
+                return second;
+            }
+            // Both are at or before the start: step past them.
+            t = second <= t ? t + 1000L : second + 1000L;
         }
         return -1;
     }
@@ -478,6 +487,28 @@ public final class CronSchedule {
         int dow = (int) floorMod(day + 4, 7);
         return timeZone.getOffset(1, civil[0], civil[1] - 1, civil[2], dow + 1,
                 (int) (standard - day * DAY));
+    }
+
+    /// The instant a wall-clock time falls on: the earlier of the two in a
+    /// fall-back overlap when `earliest` is set, the later otherwise, and
+    /// Long.MIN_VALUE when the zone skips that time. The offsets half a day
+    /// either side are the only two it can have: transitions are months apart.
+    private long localToUtc(long local, boolean earliest) {
+        if (timeZone == null) {
+            return local - fixedOffset;
+        }
+        int raw = timeZone.getRawOffset();
+        long before = local - offsetAt(local - raw - DAY / 2);
+        long after = local - offsetAt(local - raw + DAY / 2);
+        boolean beforeValid = before + offsetAt(before) == local;
+        boolean afterValid = after + offsetAt(after) == local;
+        if (beforeValid && afterValid) {
+            return earliest ? Math.min(before, after) : Math.max(before, after);
+        }
+        if (beforeValid) {
+            return before;
+        }
+        return afterValid ? after : Long.MIN_VALUE;
     }
 
     private long toUtc(long local) {

@@ -232,7 +232,11 @@ public List<Order> findOrders(@McpParam(value = "email", description = "Customer
 ```
 
 Outside a dev profile the endpoint requires `cn1.mcp.token` (the server refuses to
-start without it) and a browser `Origin` other than localhost is refused.
+start without it) and a browser `Origin` other than localhost is refused. On a dev
+profile the token is optional, but a server without one listens on `127.0.0.1`
+only: its tools reach the database. To test from a phone or another machine, set
+`cn1.mcp.token` (the MCP client then sends it as a bearer token) or turn the
+endpoint off with `cn1.mcp.enabled=false`.
 
 ## Testing
 

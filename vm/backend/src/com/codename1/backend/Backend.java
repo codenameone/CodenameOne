@@ -734,7 +734,14 @@ public final class Backend {
         }
     }
 
-    /// What an [Application] is built from.
+    /// Whether `host` names this machine's loopback interface.
+    static boolean isLoopback(String host) {
+        String h = host.trim();
+        return "localhost".equalsIgnoreCase(h) || h.startsWith("127.")
+                || "::1".equals(h) || "[::1]".equals(h);
+    }
+
+        /// What an [Application] is built from.
     public static final class Environment {
         private final Config config;
         private final DataSource dataSource;
@@ -1242,6 +1249,29 @@ public final class Backend {
             if (mcpServer != null) {
                 routers.add(0, mcpServer);
             }
+            // A tokenless MCP endpoint -- the development default -- answers
+            // anyone who can reach the port, and its tools write SQL and call every
+            // handler. With no address chosen the listener would bind every
+            // interface, so it binds loopback instead; an address chosen
+            // explicitly that is not loopback needs the token.
+            String bindHost = host;
+            if (mcpServer != null && !mcpServer.hasToken()) {
+                if (bindHost == null || bindHost.length() == 0) {
+                    bindHost = "127.0.0.1";
+                    if (!quiet) {
+                        System.out.println("cn1: the MCP endpoint has no token, so the server "
+                                + "listens on 127.0.0.1 only; set "
+                                + com.codename1.backend.mcp.McpServer.TOKEN
+                                + " to serve other machines");
+                    }
+                } else if (!isLoopback(bindHost)) {
+                    throw new IOException("The MCP endpoint has no token and the server is "
+                            + "bound to " + bindHost + ", so any machine that reaches it "
+                            + "could run its tools; set "
+                            + com.codename1.backend.mcp.McpServer.TOKEN
+                            + ", or bind to a loopback address");
+                }
+            }
             if (factory != null) {
                 HttpServer.Handler[] built = factory.create(pool, manager);
                 if (built != null) {
@@ -1386,7 +1416,7 @@ public final class Backend {
                         }
                     };
                 }
-                server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
+                server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         new Serving(chain, sessions, tasks, requestLog, instrumented, app, track,
                                 active != null ? active : Tracing.NONE),
                         context, routes);

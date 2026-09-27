@@ -89,4 +89,37 @@ class DevToolsTest {
         }
         assertTrue(StdioBridge.readTimeoutMillis() > 0);
     }
+
+    @Test
+    @DisplayName("an HTTP refusal, a 401 most often, is answered under the host's own id")
+    void aRefusalKeepsTheRequestId() throws Exception {
+        com.sun.net.httpserver.HttpServer refusing = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        refusing.createContext("/mcp", exchange -> {
+            byte[] answer = ("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32001,"
+                    + "\"message\":\"A bearer token is required\"}}").getBytes("UTF-8");
+            java.io.InputStream in = exchange.getRequestBody();
+            while(in.read() >= 0) {
+                // drain the request
+            }
+            exchange.sendResponseHeaders(401, answer.length);
+            exchange.getResponseBody().write(answer);
+            exchange.close();
+        });
+        refusing.start();
+        try {
+            java.net.URL url = new java.net.URL("http://127.0.0.1:"
+                    + refusing.getAddress().getPort() + "/mcp");
+            String answer = StdioBridge.post(url, null,
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":9}", 5000);
+            assertTrue(answer != null && answer.contains("\"id\":9")
+                    && answer.contains("401") && answer.contains("bearer token"),
+                    String.valueOf(answer));
+            assertTrue(StdioBridge.post(url, null,
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"note\"}", 5000) == null,
+                    "a notification got an answer");
+        } finally {
+            refusing.stop(0);
+        }
+    }
 }

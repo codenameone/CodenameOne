@@ -22,7 +22,11 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 The description is what an agent chooses tools by, so it says when to use the
 tool as well as what it does. A parameter needs `@McpParam` to name it, since a
 Java parameter name doesn't survive compilation. Outside a development profile
-the endpoint refuses to start without `cn1.mcp.token`. It also refuses a browser
+the endpoint refuses to start without `cn1.mcp.token`. On a development profile
+the token is optional, but a server without one listens on `127.0.0.1` only, since
+its tools reach the database and every handler; set a token to serve other
+machines, and a server bound to another address refuses to start without one.
+It also refuses a browser
 request unless its origin is a loopback address or is listed in
 `cn1.mcp.allowedOrigins`, which keeps a web page from driving it. A page the
 server serves itself has to be listed too.
@@ -75,7 +79,8 @@ answered 405.
   or when the development tools are available; set `false` to turn it off.
 
 | `cn1.mcp.token`
-| A bearer token every call must carry. Required outside a development profile.
+| A bearer token every call must carry. Required outside a development profile;
+  without it a development server listens on `127.0.0.1` only.
 
 | `cn1.mcp.allowedOrigins`
 | Comma-separated browser origins allowed besides loopback ones, or `*`.

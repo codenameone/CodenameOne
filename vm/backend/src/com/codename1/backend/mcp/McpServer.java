@@ -265,6 +265,13 @@ public final class McpServer implements HttpServer.Handler {
             // sends nothing, so either way there is nothing to answer.
             return notification ? null : rpcError(id, -32600, "Invalid request");
         }
+        if (!"2.0".equals(m.get("jsonrpc"))) {
+            // A JSON-RPC 2.0 request says so exactly; one that does not -- no
+            // version, or a 1.0 envelope -- is refused before anything runs, a
+            // tool call included.
+            return notification ? null : rpcError(id, -32600, "Invalid request: jsonrpc "
+                    + "must be \"2.0\"");
+        }
         String method = (String) methodValue;
         Map params = m.get("params") instanceof Map ? (Map) m.get("params") : new LinkedHashMap();
         // A notification is still an invocation -- an id-less tools/call runs its
@@ -421,6 +428,13 @@ public final class McpServer implements HttpServer.Handler {
         }
         int colon = rest.lastIndexOf(':');
         return colon > 0 ? rest.substring(0, colon) : rest;
+    }
+
+    /// Whether requests must present a bearer token. Without one -- a
+    /// development profile's default -- the server binds its listener to
+    /// loopback, since this endpoint reaches the database and every handler.
+    public boolean hasToken() {
+        return token != null;
     }
 
     private boolean authorized(HttpServer.Request request) {

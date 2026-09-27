@@ -1655,6 +1655,85 @@ class ApplicationRuntimeTest {
         }
     }
 
+    @Test
+    @DisplayName("a tokenless MCP endpoint binds loopback, and refuses an explicit public address")
+    void tokenlessMcpStaysOnLoopback() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        int port = freePort();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        IOException refused = assertThrows(IOException.class, () -> Backend.builder(
+                Config.of(settings, "dev")).quiet().application(new EmptyApplication())
+                .mcp(null).host("0.0.0.0").start());
+        assertTrue(refused.getMessage().contains(McpServer.TOKEN), refused.getMessage());
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .application(new EmptyApplication()).mcp(null).start();
+        try {
+            java.net.InetAddress external = null;
+            java.util.Enumeration nics = java.net.NetworkInterface.getNetworkInterfaces();
+            while(external == null && nics != null && nics.hasMoreElements()) {
+                java.net.NetworkInterface nic = (java.net.NetworkInterface) nics.nextElement();
+                java.util.Enumeration addresses = nic.getInetAddresses();
+                while(nic.isUp() && addresses.hasMoreElements()) {
+                    java.net.InetAddress a = (java.net.InetAddress) addresses.nextElement();
+                    if(a instanceof java.net.Inet4Address && !a.isLoopbackAddress()) {
+                        external = a;
+                        break;
+                    }
+                }
+            }
+            if(external != null) {
+                java.net.Socket probe = new java.net.Socket();
+                try {
+                    probe.connect(new java.net.InetSocketAddress(external, port), 2000);
+                    org.junit.jupiter.api.Assertions.fail("the tokenless MCP server answered on "
+                            + external.getHostAddress());
+                } catch (IOException expected) {
+                    // refused: loopback only
+                } finally {
+                    probe.close();
+                }
+            }
+            java.net.Socket local = new java.net.Socket("127.0.0.1", port);
+            local.close();
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a request that is not JSON-RPC 2.0 is refused before its method runs")
+    void onlyJsonRpc2IsDispatched() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null, null);
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "{\"jsonrpc\":\"1.0\",\"id\":4,"
+                + "\"method\":\"ping\"}"));
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32600") && !body.contains("\"result\""), body);
+        r = server.handle(new HttpServer.Request("POST", "/mcp", "HTTP/1.1",
+                new LinkedHashMap(), "{\"id\":5,\"method\":\"ping\"}"));
+        body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32600"), body);
+    }
+
+    @Test
+    @DisplayName("a time the clocks pass twice fires at the first, or the second when started between")
+    void cronInAFallBackOverlap() {
+        CronSchedule c = CronSchedule.parse("0 30 1 * * *", "America/New_York");
+        long hour = 3600000L;
+        // 2026-11-01: 01:30 EDT is 05:30Z and 01:30 EST is 06:30Z.
+        long midnightUtc = 1793491200000L;                  // 2026-11-01T00:00:00Z
+        assertEquals(midnightUtc + 5 * hour + 30 * 60000L, c.next(midnightUtc + 4 * hour));
+        assertEquals(midnightUtc + 6 * hour + 30 * 60000L, c.next(midnightUtc + 6 * hour));
+        // After the first, the next is the following day's, not the repeat.
+        assertEquals(midnightUtc + 30 * hour + 30 * 60000L,
+                c.next(midnightUtc + 5 * hour + 30 * 60000L));
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {
