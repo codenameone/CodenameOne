@@ -284,7 +284,7 @@ public final class OtlpMetricExporter implements MetricReader {
                 dp.put("timeUnixNano", time);
                 if (instrument.getKind() == Instrument.HISTOGRAM) {
                     dp.put("count", String.valueOf(point.get("count")));
-                    dp.put("sum", point.get("sum"));
+                    dp.put("sum", jsonDouble(point.get("sum")));
                     List buckets = (List) point.get("buckets");
                     List counts = new ArrayList(buckets.size());
                     for (Object element : buckets) {
@@ -293,8 +293,8 @@ public final class OtlpMetricExporter implements MetricReader {
                     dp.put("bucketCounts", counts);
                     dp.put("explicitBounds", point.get("bounds"));
                     if (point.get("min") != null) {
-                        dp.put("min", point.get("min"));
-                        dp.put("max", point.get("max"));
+                        dp.put("min", jsonDouble(point.get("min")));
+                        dp.put("max", jsonDouble(point.get("max")));
                     }
                 } else {
                     Object value = point.get("value");
@@ -306,7 +306,7 @@ public final class OtlpMetricExporter implements MetricReader {
                         // would be rounded. A string, as OTLP JSON writes int64.
                         dp.put("asInt", String.valueOf(value));
                     } else {
-                        dp.put("asDouble", value);
+                        dp.put("asDouble", jsonDouble(value));
                     }
                 }
                 dataPoints.add(dp);
@@ -348,5 +348,25 @@ public final class OtlpMetricExporter implements MetricReader {
 
     private static String nanos(long millis) {
         return String.valueOf(millis) + "000000";
+    }
+
+    /// A double as OTLP/JSON carries it. The protobuf JSON mapping writes the
+    /// non-finite values as the strings "Infinity", "-Infinity" and "NaN"; the
+    /// generic writer would put null there instead, which a collector reads as an
+    /// unset value -- or rejects, with the whole export. An infinite gauge
+    /// reading, or an infinite observation in a histogram's sum, min or max,
+    /// is a real value to report. The same tree feeds the protobuf encoder, which
+    /// parses a double field given as a string, so both encodings carry it.
+    static Object jsonDouble(Object value) {
+        if (value instanceof Double || value instanceof Float) {
+            double d = ((Number) value).doubleValue();
+            if (Double.isNaN(d)) {
+                return "NaN";
+            }
+            if (Double.isInfinite(d)) {
+                return d > 0 ? "Infinity" : "-Infinity";
+            }
+        }
+        return value;
     }
 }

@@ -54,6 +54,10 @@ public final class Tracing {
     private static volatile Tracer tracer; //NOPMD AvoidUsingVolatile - read on every request without the lock
     private static final ThreadLocal CURRENT = new ThreadLocal();
     private static final ThreadLocal SUPPRESSED = new ThreadLocal();
+    /// The tracer of the server whose work this thread is doing when no span says
+    /// so: a websocket callback runs after its upgrade's span has ended, and with
+    /// two servers in one process the installed tracer is only the latest one's.
+    private static final ThreadLocal OWNER = new ThreadLocal();
     private static volatile boolean reportedFailure; //NOPMD AvoidUsingVolatile - set once from any host thread
     private static final Span NOOP = new NoopSpan();
 
@@ -280,7 +284,25 @@ public final class Tracing {
         if (current != null && current.owner != null) {
             return current.owner;
         }
+        Object owner = OWNER.get();
+        if (owner instanceof Tracer) {
+            return (Tracer) owner;
+        }
         return tracer;
+    }
+
+    /// Makes `own` the tracer this thread's spans report to while no span of
+    /// its own is current; answers what to hand [#disown] afterwards. A null
+    /// `own` leaves the installed tracer in charge.
+    static Object own(Tracer own) {
+        Object previous = OWNER.get();
+        OWNER.set(own);
+        return previous;
+    }
+
+    /// Restores what [#own] replaced.
+    static void disown(Object previous) {
+        OWNER.set(previous);
     }
 
     /// Runs `work` on this thread as a span whose parent is `parent`,

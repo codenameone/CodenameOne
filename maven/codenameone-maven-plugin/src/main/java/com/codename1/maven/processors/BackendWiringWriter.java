@@ -220,7 +220,12 @@ final class BackendWiringWriter {
             if (b.managed == null && b.tools.isEmpty()) {
                 continue;
             }
-            String ref = reference(b);
+            // Evaluated once: a prototype's reference is a factory call, and
+            // naming it in the null test and again below would build -- and
+            // initialize -- a second instance only to drop the first.
+            String ref = "exposed" + b.var;
+            sb.append("        {\n        ").append(typeOf(b)).append(' ').append(ref)
+              .append(" = ").append(reference(b)).append(";\n");
             sb.append("        if (").append(ref).append(" != null) {\n");
             if (b.managed != null) {
                 sb.append("            ").append(b.managed.adapterBinary).append(" managed")
@@ -235,15 +240,17 @@ final class BackendWiringWriter {
                 sb.append("            environment.registerTool(new ")
                   .append(t.adapterBinary).append('(').append(ref).append("));\n");
             }
-            sb.append("        }\n");
+            sb.append("        }\n        }\n");
         }
         sb.append("        java.util.List handlers = new java.util.ArrayList();\n");
         for (Router r : routers) {
             BackendBeans.Bean b = model.beanOfClass(r.controllerBinary);
-            String ref = reference(b);
+            String ref = "routed" + b.var;
+            sb.append("        {\n        ").append(typeOf(b)).append(' ').append(ref)
+              .append(" = ").append(reference(b)).append(";\n");
             sb.append("        if (").append(ref).append(" != null) {\n");
             sb.append("            handlers.add(new ").append(r.routerBinary).append('(').append(ref)
-              .append("));\n        }\n");
+              .append("));\n        }\n        }\n");
         }
         sb.append("        com.codename1.backend.HttpServer.Handler[] out =\n")
           .append("                new com.codename1.backend.HttpServer.Handler[handlers.size()];\n");
@@ -310,7 +317,13 @@ final class BackendWiringWriter {
                     ? BackendWeaver.bridge(b.factory.getName()) : b.factory.getName();
             String target = b.owner != null ? reference(b.owner)
                     : b.factoryOwnerClass.getSourceName();
-            return target + "." + name + "(" + args + ")";
+            // Checked where it is produced: an injection point given the bean
+            // directly would take the null without a word, and the server would
+            // report ready and fail on first use, far from the factory at fault.
+            return "((" + typeOf(b) + ") com.codename1.backend.Wiring.produced(" + target + "."
+                    + name + "(" + args + "), "
+                    + BackendSources.quote("@Bean " + b.factoryOwnerClass.getSourceName() + "."
+                    + b.factory.getName()) + "))";
         }
         if (b.constructor.isPublic()) {
             return "new " + b.cls.getSourceName() + "(" + args + ")";

@@ -414,10 +414,19 @@ public final class Backend {
     /// server started last -- and be stopped with it.
     static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
                                                   final Tasks.Registry tasks) {
+        return withTasks(registry, tasks, null);
+    }
+
+    /// [#withTasks(HttpServer.WebSocketRegistry,Tasks.Registry)], with the
+    /// server's own tracer bound for every callback as well.
+    static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
+                                                  final Tasks.Registry tasks,
+                                                  final Tracer tracer) {
         return new HttpServer.WebSocketRegistry() {
             @Override
             public void route(String path, WebSocket endpoint) {
-                registry.route(path, endpoint == null ? null : new TaskBound(endpoint, tasks));
+                registry.route(path, endpoint == null ? null
+                        : new TaskBound(endpoint, tasks, tracer));
             }
 
             @Override
@@ -428,7 +437,7 @@ public final class Backend {
                         Object previous = Tasks.enter(tasks);
                         try {
                             WebSocket endpoint = router.open(request);
-                            return endpoint == null ? null : new TaskBound(endpoint, tasks);
+                            return endpoint == null ? null : new TaskBound(endpoint, tasks, tracer);
                         } finally {
                             Tasks.leave(previous);
                         }
@@ -438,87 +447,105 @@ public final class Backend {
         };
     }
 
-    /// An endpoint whose every callback runs carrying its server's executors.
+    /// An endpoint whose every callback runs carrying its server's executors and
+    /// its tracer: the upgrade's span has ended by the time a message arrives, so
+    /// without one a span the callback starts -- or a call it makes -- would report
+    /// to whichever server installed its tracer last.
     static final class TaskBound implements WebSocket {
         private final WebSocket endpoint;
         private final Tasks.Registry tasks;
+        private final Tracer tracer;
 
         TaskBound(WebSocket endpoint, Tasks.Registry tasks) {
+            this(endpoint, tasks, null);
+        }
+
+        TaskBound(WebSocket endpoint, Tasks.Registry tasks, Tracer tracer) {
             this.endpoint = endpoint;
             this.tasks = tasks;
+            this.tracer = tracer;
+        }
+
+        private Object[] bind() {
+            return new Object[] {Tasks.enter(tasks), Tracing.own(tracer)};
+        }
+
+        private static void unbind(Object[] previous) {
+            Tracing.disown(previous[1]);
+            Tasks.leave(previous[0]);
         }
 
         @Override
         public void onOpen(WebSocketSession session) throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onOpen(session);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onText(WebSocketSession session, String message) throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onText(session, message);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onBinary(WebSocketSession session, byte[] message, int offset, int length)
                 throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onBinary(session, message, offset, length);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onPing(WebSocketSession session, byte[] payload, int offset, int length)
                 throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onPing(session, payload, offset, length);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onPong(WebSocketSession session, byte[] payload, int offset, int length)
                 throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onPong(session, payload, offset, length);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onClose(WebSocketSession session, int code, String reason)
                 throws Exception {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onClose(session, code, reason);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
 
         @Override
         public void onError(WebSocketSession session, Exception error) {
-            Object previous = Tasks.enter(tasks);
+            Object[] previous = bind();
             try {
                 endpoint.onError(session, error);
             } finally {
-                Tasks.leave(previous);
+                unbind(previous);
             }
         }
     }
@@ -1331,7 +1358,7 @@ public final class Backend {
                                 throws Exception {
                             // Every endpoint's callbacks carry this server's
                             // executors, as its HTTP requests do.
-                            HttpServer.WebSocketRegistry registry = withTasks(direct, tasks);
+                            HttpServer.WebSocketRegistry registry = withTasks(direct, tasks, active);
                             // The same two arguments a Handlers factory gets,
                             // and for the same reason: an endpoint that needs
                             // the database declares it rather than reaching

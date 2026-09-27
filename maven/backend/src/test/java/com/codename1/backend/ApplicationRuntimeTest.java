@@ -1395,6 +1395,100 @@ class ApplicationRuntimeTest {
         }
     }
 
+    @Test
+    @DisplayName("a session a running request holds is not expired by the next lookup")
+    void aLookupSparesASessionInUse() throws Exception {
+        Sessions sessions = new Sessions();
+        long now = System.currentTimeMillis();
+        // Stored an hour ago with a minute's timeout: expired by the stored time,
+        // but a request that began then is still running and holding it.
+        HttpSession held = new HttpSession("long", now - 3600000, now - 3600000, 60);
+        held.owner = sessions;
+        held.markNew();
+        sessions.getStore().save(held, null);
+        HttpServer.Request running = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(running, held);
+        assertNotNull(sessions.find("long", false),
+                "a second request expired the session another request is using");
+        assertNotNull(sessions.getStore().load("long"));
+        sessions.leave(running);
+        // One nobody is using still expires on lookup.
+        HttpSession idle = new HttpSession("idle", now - 3600000, now - 3600000, 60);
+        idle.owner = sessions;
+        idle.markNew();
+        sessions.getStore().save(idle, null);
+        assertNull(sessions.find("idle", false), "an idle expired session was found");
+    }
+
+    @Test
+    @DisplayName("a websocket callback reports to its own server's tracer")
+    void websocketCallbacksCarryTheirTracer() throws Exception {
+        final Tracer[] seen = new Tracer[1];
+        WebSocket endpoint = new WebSocket() {
+            public void onOpen(WebSocketSession session) {
+            }
+
+            public void onText(WebSocketSession session, String message) {
+                seen[0] = Tracing.active();
+            }
+
+            public void onBinary(WebSocketSession session, byte[] m, int o, int l) {
+            }
+        };
+        Tracer mine = new QuietTracer();
+        Tracer later = new QuietTracer();
+        Tasks.Registry tasks = Tasks.open(null);
+        Tracing.install(later);                       // a second server, started after
+        try {
+            new Backend.TaskBound(endpoint, tasks, mine).onText(null, "hi");
+            assertTrue(seen[0] == mine, "the callback reported to another server's tracer");
+            assertTrue(Tracing.active() == later, "the binding outlived the callback");
+        } finally {
+            Tracing.install(null);
+            Tasks.shutdown(tasks, 0);
+        }
+    }
+
+    @Test
+    @DisplayName("NaN and Infinity written as strings are refused as number arguments")
+    void nonFiniteNumberStringsAreRefused() {
+        Map args = new LinkedHashMap();
+        args.put("nan", "NaN");
+        args.put("inf", "-Infinity");
+        args.put("ok", "2.5");
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.doubleValue(args, "nan", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.doubleValue(args, "inf", true));
+        assertEquals(2.5, com.codename1.backend.mcp.McpArgs.doubleValue(args, "ok", true), 0.0);
+    }
+
+    /** A tracer that records nothing, for tests that only check which one is used. */
+    static final class QuietTracer implements Tracer {
+        public boolean open(Config config) {
+            return true;
+        }
+
+        public Span startSpan(String name, int kind, Span parent, String traceparent,
+                              String tracestate) {
+            return null;
+        }
+
+        public void flush(int timeoutMillis) {
+        }
+
+        public void shutdown(int timeoutMillis) {
+        }
+
+        public HttpServer.Handler relay() {
+            return null;
+        }
+
+        public void metrics(Map out) {
+        }
+    }
+
     // ----------------------------------------------------------------- helpers
 
     /** An application with no beans, for tests that only need the hooks. */

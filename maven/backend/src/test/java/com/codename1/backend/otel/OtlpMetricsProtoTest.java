@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,6 +73,23 @@ class OtlpMetricsProtoTest {
         assertEquals(6L, point.getCount());
         assertEquals(1260.5, point.getSum(), 1e-9);
         assertNotNull(point.getAttributesList());
+    }
+
+    @Test
+    @DisplayName("an infinite reading is exported as OTLP/JSON's string form, and as a double")
+    void infiniteValuesSurviveBothEncodings() throws Exception {
+        Histogram h = Metrics.histogram("test.proto.infinite", "", "ms",
+                new double[] {1, 10}, null);
+        h.record(Double.POSITIVE_INFINITY);
+        Map request = OtlpMetricExporter.request(new LinkedHashMap(),
+                Collections.singletonList(h), System.currentTimeMillis());
+        String json = new String(OtlpSchema.json(request), "UTF-8");
+        assertTrue(json.contains("\"sum\":\"Infinity\""), json);
+        assertFalse(json.contains("null"), "a non-finite value was written as null: " + json);
+        ExportMetricsServiceRequest decoded = ExportMetricsServiceRequest.parseFrom(
+                OtlpSchema.metricsProtobuf(request));
+        assertEquals(Double.POSITIVE_INFINITY, decoded.getResourceMetrics(0).getScopeMetrics(0)
+                .getMetrics(0).getHistogram().getDataPoints(0).getSum(), 0.0);
     }
 
     @Test

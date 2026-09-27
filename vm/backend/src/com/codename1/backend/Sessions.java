@@ -206,7 +206,13 @@ public final class Sessions {
         purgeIfDue(s, now);
         if (cookieValue != null && cookieValue.length() > 0) {
             HttpSession found = s.load(cookieValue);
-            if (found != null && found.isValid() && !found.isExpired(now)) {
+            // A request still using the session counts as use: the database store
+            // writes the last use only when that request ends, so a long request
+            // makes the stored time look expired to the next one. Expiring it here
+            // would pull the row and the beans out from under the first request --
+            // the purge spares these ids for the same reason.
+            if (found != null && found.isValid()
+                    && (!found.isExpired(now) || isInUse(cookieValue))) {
                 found.touch(now);
                 found.owner = this;
                 synchronized (this) {
@@ -232,6 +238,10 @@ public final class Sessions {
         created.markNew();
         created.owner = this;
         return created;
+    }
+
+    private synchronized boolean isInUse(String id) {
+        return idsInUse().contains(id);
     }
 
     /// Expires what is due, at most once a minute. Package-private so a test can

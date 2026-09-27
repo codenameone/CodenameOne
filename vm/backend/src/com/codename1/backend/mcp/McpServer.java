@@ -250,15 +250,19 @@ public final class McpServer implements HttpServer.Handler {
         }
         Map m = (Map) message;
         Object id = m.get("id");
+        // By the key, not the value: an absent id is a notification, while an
+        // explicit null is a request JSON-RPC answers -- with null as its id.
+        // Reading the value alone left such a client waiting forever on a 202.
+        boolean notification = !m.containsKey("id");
         Object methodValue = m.get("method");
         if (!(methodValue instanceof String)) {
             // A response to something the server sent, or garbage; the server
             // sends nothing, so either way there is nothing to answer.
-            return id == null ? null : rpcError(id, -32600, "Invalid request");
+            return notification ? null : rpcError(id, -32600, "Invalid request");
         }
         String method = (String) methodValue;
         Map params = m.get("params") instanceof Map ? (Map) m.get("params") : new LinkedHashMap();
-        if (id == null) {
+        if (notification) {
             return null;
         }
         try {

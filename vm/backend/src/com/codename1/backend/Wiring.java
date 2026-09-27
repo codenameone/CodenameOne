@@ -139,6 +139,17 @@ public final class Wiring {
         return havingValue.equalsIgnoreCase(value.trim());
     }
 
+    /// What a `@Bean` method returned, refused when it is null: a factory that
+    /// produces nothing is a bug in the factory, and handing the null to what
+    /// injects it would only move the failure to its first use.
+    public static Object produced(Object bean, String factory) {
+        if (bean == null) {
+            throw new IllegalStateException(factory + " returned null; a @Bean method must "
+                    + "return the bean, or be made conditional so that it is not built");
+        }
+        return bean;
+    }
+
     /// The one bean of `candidates` that exists, when all of them are
     /// conditional. More than one existing is ambiguous; none is a missing
     /// dependency when `required`.

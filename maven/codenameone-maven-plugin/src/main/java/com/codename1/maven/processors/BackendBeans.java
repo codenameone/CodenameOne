@@ -870,6 +870,13 @@ final class BackendBeans {
             // The whole hierarchy, as for a class bean: an initializer or
             // destructor the returned class inherits is as much its own.
             hierarchy(bean, bean.cls, true);
+            // And its operational surface: a project class a factory builds is
+            // a bean like any other, so its @Scheduled jobs, @McpTool methods
+            // and @ManagedResource attributes must not silently disappear just
+            // because @Bean rather than a stereotype created it.
+            collectJobs(bean);
+            collectTools(bean);
+            collectManaged(bean);
         }
         AnnotationValues props = m.getAnnotation(CONFIG_PROPERTIES);
         if (props != null) {
@@ -1502,35 +1509,72 @@ final class BackendBeans {
                         + b.scope + "-scoped; an endpoint serves many connections for the "
                         + "life of the server, so it must be a singleton.");
             }
-            if (b.webSocket) {
-                // Its callbacks run outside the HTTP handler that makes a request
-                // current, so a scoped stand-in would throw on first use.
-                List<Point> all = new ArrayList<Point>(b.constructorPoints);
-                all.addAll(b.fields.values());
-                for (Call c : b.setters) {
-                    all.addAll(c.points);
-                }
-                for (Point p : all) {
-                    for (Bean d : p.candidates) {
-                        if (REQUEST.equals(d.scope) || SESSION.equals(d.scope)) {
-                            ctx.error(b.cls, "Websocket endpoint " + b.describe() + " injects "
-                                    + d.describe() + ", which is " + d.scope + "-scoped. A "
-                                    + "websocket callback runs outside any HTTP request, so "
-                                    + "there is no " + d.scope + " to find it in; inject a "
-                                    + "singleton, and keep per-connection state in the "
-                                    + "WebSocketSession's attachment.");
-                        }
-                    }
-                }
-            }
             if (!b.jobs.isEmpty() && (REQUEST.equals(b.scope) || SESSION.equals(b.scope))) {
                 ctx.error(b.cls, b.describe() + " has @Scheduled methods but is " + b.scope
                         + "-scoped; a job runs outside any request.");
             }
         }
+        // Every candidate is resolved now, so what runs outside any HTTP request
+        // can be checked through the whole graph: a websocket callback, a
+        // scheduled run and a managed-attribute read all happen on threads with no
+        // request current, and a request- or session-scoped stand-in reached from
+        // there -- directly, or through a singleton that injects it -- throws on
+        // first use. Only the direct injections used to be checked.
+        for (Bean b : beans) {
+            String role = b.webSocket ? "Websocket endpoint"
+                    : !b.jobs.isEmpty() ? "Bean with @Scheduled methods"
+                    : b.managed != null ? "@ManagedResource bean" : null;
+            if (role == null || b.cls == null) {
+                continue;
+            }
+            List<Bean> path = scopedReach(b, new ArrayList<Bean>(), new HashSet<Bean>());
+            if (path == null) {
+                continue;
+            }
+            Bean d = path.get(path.size() - 1);
+            StringBuilder via = new StringBuilder();
+            for (int i = 1; i < path.size() - 1; i++) {
+                via.append(i == 1 ? " through " : " -> ").append(path.get(i).describe());
+            }
+            String outside = b.webSocket ? "A websocket callback runs"
+                    : !b.jobs.isEmpty() ? "A scheduled job runs"
+                    : "A managed attribute is read";
+            ctx.error(b.cls, role + " " + b.describe() + " reaches " + d.describe() + via
+                    + ", which is " + d.scope + "-scoped. " + outside + " outside any HTTP "
+                    + "request, so there is no " + d.scope + " to find it in; inject a singleton"
+                    + (b.webSocket ? ", and keep per-connection state in the "
+                    + "WebSocketSession's attachment." : "."));
+        }
         if (!ctx.hasErrors()) {
             orderConstruction();
         }
+    }
+
+    /// The path from `from` to the first request- or session-scoped bean it
+    /// injects, directly or through other beans; null when there is none.
+    private List<Bean> scopedReach(Bean from, List<Bean> path, Set<Bean> seen) {
+        if (!seen.add(from)) {
+            return null;
+        }
+        path.add(from);
+        if (path.size() > 1 && (REQUEST.equals(from.scope) || SESSION.equals(from.scope))) {
+            return path;
+        }
+        List<Point> all = new ArrayList<Point>(from.constructorPoints);
+        all.addAll(from.fields.values());
+        for (Call c : from.setters) {
+            all.addAll(c.points);
+        }
+        for (Point p : all) {
+            for (Bean d : p.candidates) {
+                List<Bean> found = scopedReach(d, path, seen);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        path.remove(path.size() - 1);
+        return null;
     }
 
     /// The generated wiring names the bean's type, so the type must be visible

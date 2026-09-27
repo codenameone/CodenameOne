@@ -281,13 +281,22 @@ public final class McpArgs {
     }
 
     private static double toDouble(Object v, String name) {
+        double d;
         if (v instanceof Number) {
-            return ((Number) v).doubleValue();
+            d = ((Number) v).doubleValue();
+        } else {
+            try {
+                d = Double.parseDouble(String.valueOf(v).trim());
+            } catch (NumberFormatException err) {
+                throw new IllegalArgumentException("\"" + name + "\" must be a number", err);
+            }
         }
-        try {
-            return Double.parseDouble(String.valueOf(v).trim());
-        } catch (NumberFormatException err) {
-            throw new IllegalArgumentException("\"" + name + "\" must be a number", err);
+        // The schema advertises a JSON number, and JSON has no NaN or infinity;
+        // parseDouble accepts the strings "NaN" and "Infinity", which would slip
+        // past every comparison the method makes against its own limits.
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            throw new IllegalArgumentException("\"" + name + "\" must be a finite number");
         }
+        return d;
     }
 }

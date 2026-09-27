@@ -1157,6 +1157,110 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aFactoryBuiltBeanKeepsItsScheduledJobs() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Ticker", PKG + "public class Ticker {\n"
+                + "    public static volatile int runs;\n"
+                + "    @Scheduled(fixedRate = 20) public void tick() { runs++; }\n"
+                + "}\n");
+        s.put("com.example.Setup", PKG + "@Configuration public class Setup {\n"
+                + "    @Bean public Ticker ticker() { return new Ticker(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        Backend backend = start(classes, freePort(), new Properties());
+        Class<?> ticker = backend.getApplication().getClass().getClassLoader()
+                .loadClass("com.example.Ticker");
+        try {
+            long deadline = System.currentTimeMillis() + 5000;
+            while (ticker.getField("runs").getInt(null) < 2
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20);
+            }
+            assertTrue("a @Bean-built class's @Scheduled method never ran",
+                    ticker.getField("runs").getInt(null) >= 2);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void scopedBeansReachedThroughASingletonAreRefusedOffRequest() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Helper", PKG + "@Component public class Helper {\n"
+                + "    @Autowired private Visit visit;\n"
+                + "}\n");
+        s.put("com.example.Chat", PKG + "@WebSocketMapping(\"/chat\")\n"
+                + "public class Chat implements WebSocket {\n"
+                + "    @Autowired private Helper helper;\n"
+                + "    public void onOpen(WebSocketSession s) { }\n"
+                + "    public void onText(WebSocketSession s, String m) { }\n"
+                + "    public void onBinary(WebSocketSession s, byte[] m, int o, int l) { }\n"
+                + "}\n");
+        s.put("com.example.Nightly", PKG + "@Component public class Nightly {\n"
+                + "    public Nightly(Helper helper) { }\n"
+                + "    @Scheduled(fixedRate = 60000) public void run() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Websocket endpoint chat (com.example.Chat) reaches "
+                + "visit (com.example.Visit) through helper (com.example.Helper)"));
+        assertTrue(errors, errors.contains("A websocket callback runs outside any HTTP request"));
+        assertTrue(errors, errors.contains("nightly (com.example.Nightly) reaches visit"));
+        assertTrue(errors, errors.contains("A scheduled job runs outside any HTTP request"));
+        // The singleton itself may inject it: it is used from requests.
+        s.remove("com.example.Chat");
+        s.remove("com.example.Nightly");
+        assertNoErrors(process(compile(s)));
+    }
+
+    @Test
+    public void aPrototypeControllerIsBuiltOnce() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG + "@RestController @Scope(\"prototype\") public class Api {\n"
+                + "    public static final AtomicInteger BUILT = new AtomicInteger();\n"
+                + "    public Api() { BUILT.incrementAndGet(); }\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        Backend backend = start(classes, freePort(), new Properties());
+        try {
+            Class<?> api = backend.getApplication().getClass().getClassLoader()
+                    .loadClass("com.example.Api");
+            assertEquals("the router's controller was built twice, one discarded", 1,
+                    ((java.util.concurrent.atomic.AtomicInteger) api.getField("BUILT").get(null))
+                            .get());
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aFactoryReturningNullStopsTheStart() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Setup", PKG + "@Configuration public class Setup {\n"
+                + "    @Bean public StringBuilder buffer() { return null; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    public Api(StringBuilder buffer) { }\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        try {
+            start(classes, freePort(), new Properties()).stop();
+            fail("a @Bean method that returned null let the server start");
+        } catch (Exception expected) {
+            String all = String.valueOf(expected);
+            for (Throwable t = expected.getCause(); t != null; t = t.getCause()) {
+                all += " / " + t;
+            }
+            assertTrue(all, all.contains("@Bean com.example.Setup.buffer returned null"));
+        }
+    }
+
+    @Test
     public void sessionBeansAndSocketsCannotHoldRequestState() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
