@@ -350,6 +350,75 @@ class TabsGlassSelectionTest extends UITestBase {
     }
 
     @FormTest
+    void forcedGlassStatesMeasureTheirOwnFont() {
+        // Label caches its string width for the unselected style only; the forced
+        // selected state must not be measured with the unselected font's width.
+        Button b = new Button("Two");
+        // Distinct classes: every test-port font reports the same face, size and
+        // style, so plain Fonts compare equal and Style.setFont would skip them.
+        Font small = new Font(implementation.createTestFont(6, 12)) {
+        };
+        Font large = new Font(implementation.createTestFont(11, 20)) {
+        };
+        b.getUnselectedStyle().setFont(small);
+        b.getPressedStyle().setFont(large);
+        assertNotEquals(small.stringWidth(b.getText()), large.stringWidth(b.getText()),
+                "precondition: the two fonts measure the title differently");
+        // A normal unselected paint primes Label's unselected width cache.
+        assertSame(b.getUnselectedStyle(), b.getStyle());
+        assertEquals(small.stringWidth(b.getText()), b.getStringWidth(b.getStyle().getFont()));
+        b.glassPaintState = Button.GLASS_PAINT_SELECTED;
+        try {
+            Style selected = b.getStyle();
+            assertSame(large, selected.getFont(), "precondition: the selected pass paints the pressed style");
+            assertEquals(large.stringWidth(b.getText()), b.getStringWidth(selected.getFont()),
+                    "the selected pass measures with the selected font");
+        } finally {
+            b.glassPaintState = Button.GLASS_PAINT_NONE;
+        }
+    }
+
+    @FormTest
+    void aPresetSwitchReinstallsTheTabLayout() {
+        // Switching between the ios26 and ios27 presets flips the glass motion with
+        // the placement unchanged; the tab layout must follow.
+        Tabs tabs = glassTabs();
+        Container tc = tabs.getTabsContainer();
+        assertTrue(tabs.isGlassMotion());
+        assertTrue(tc.getLayout() instanceof Tabs.GlassTabsLayout, "precondition: the glass layout");
+        Hashtable ios26 = new Hashtable();
+        ios26.put("@tabsMorphPreset", "ios26");
+        UIManager.getInstance().addThemeProps(ios26);
+        tabs.refreshTheme(false);
+        assertFalse(tabs.isGlassMotion());
+        assertFalse(tc.getLayout() instanceof Tabs.GlassTabsLayout, "back to the regular layout");
+        Hashtable ios27 = new Hashtable();
+        ios27.put("@tabsMorphPreset", "ios27");
+        UIManager.getInstance().addThemeProps(ios27);
+        tabs.refreshTheme(false);
+        assertTrue(tc.getLayout() instanceof Tabs.GlassTabsLayout, "and the glass layout again");
+    }
+
+    @FormTest
+    void aPressUnderAnOverlayDoesNotLiftTheLens() {
+        // A layered-pane overlay (a side menu, a sheet) covering the bar receives
+        // the press; the lens under it must not lift or travel.
+        Tabs tabs = glassTabs();
+        Component target = tabs.getTabsContainer().getComponentAt(2);
+        int x = target.getAbsoluteX() + target.getWidth() / 2;
+        int y = target.getAbsoluteY() + target.getHeight() / 2;
+        Form form = Display.getInstance().getCurrent();
+        Container layer = form.getLayeredPane();
+        layer.setLayout(new BorderLayout());
+        layer.add(BorderLayout.CENTER, new Button("overlay"));
+        form.revalidate();
+        assertFalse(tabs.getTabsContainer().equals(form.getComponentAt(x, y))
+                || tabs.getTabsContainer().contains(form.getComponentAt(x, y)), "precondition: the overlay is on top");
+        tabs.recordGlassPress(x, y);
+        assertFalse(tabs.isGlassMotionRunningTo(2), "the lens must stay under the overlay");
+    }
+
+    @FormTest
     void glassTabTitlesNeverScroll() {
         // A ticker started on a tab (focus arriving while the tab was narrower)
         // would drift the title with the clock; UITabBar never scrolls one.

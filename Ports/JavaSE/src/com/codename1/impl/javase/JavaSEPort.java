@@ -21098,7 +21098,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             int[] src = dest.getRGB(rx, ry, rw, rh, null, 0, rw);
             int[] out = new int[rw * rh];
             applyLensBuffer(src, out, rw, rh, cornerRadius * scale, magnify, aberration, tintColor, tintStrength);
-            dest.setRGB(rx, ry, rw, rh, out, 0, rw);
+            writeClipped(graphics, dest, rx, ry, rw, rh, out);
             return true;
         } catch (Throwable t) {
             return false;
@@ -21177,11 +21177,37 @@ public class JavaSEPort extends CodenameOneImplementation {
             int[] out = new int[ow * oh];
             com.codename1.ui.plaf.GlassLensBlend.apply(src, sw, sh, out, ox0 - sx0, oy0 - sy0, ow, oh,
                     lx - sx0, ly - sy0, lw, lh, cr, o, amount);
-            dest.setRGB(ox0, oy0, ow, oh, out, 0, ow);
+            writeClipped(graphics, dest, ox0, oy0, ow, oh, out);
             return true;
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /// Writes the `w` x `h` pixels of `out` into `dest` at (`dx`, `dy`) (buffer
+    /// pixels), but only inside `graphics`' clip. The region ops read and write the
+    /// buffer directly, and a raw setRGB bypasses the Graphics2D clip that keeps a
+    /// component's painting off its siblings; the Metal and JavaScript paths clip.
+    private void writeClipped(Object graphics, BufferedImage dest, int dx, int dy, int w, int h, int[] out) {
+        int x0 = Math.max(0, dx);
+        int y0 = Math.max(0, dy);
+        int x1 = Math.min(dest.getWidth(), dx + w);
+        int y1 = Math.min(dest.getHeight(), dy + h);
+        Graphics2D g2 = getGraphics(graphics);
+        java.awt.Shape clip = g2.getClip();
+        if (clip != null) {
+            // The clip is in the graphics' user space; the buffer is in device pixels
+            // (the simulator zoom and any user transform in between).
+            java.awt.Rectangle c = g2.getTransform().createTransformedShape(clip).getBounds();
+            x0 = Math.max(x0, c.x);
+            y0 = Math.max(y0, c.y);
+            x1 = Math.min(x1, c.x + c.width);
+            y1 = Math.min(y1, c.y + c.height);
+        }
+        if (x1 <= x0 || y1 <= y0) {
+            return;
+        }
+        dest.setRGB(x0, y0, x1 - x0, y1 - y0, out, (y0 - dy) * w + (x0 - dx), w);
     }
 
     @Override
@@ -21269,7 +21295,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             for (int yy = 0; yy < rh; yy++) {
                 System.arraycopy(full, (yy + oy) * fullW + ox, part, yy * rw, rw);
             }
-            dest.setRGB(rx, ry, rw, rh, part, 0, rw);
+            writeClipped(graphics, dest, rx, ry, rw, rh, part);
             return true;
         } catch (Throwable t) {
             return false;

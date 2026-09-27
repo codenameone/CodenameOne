@@ -3123,6 +3123,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return defaultFont;
     }
 
+    /// A native font with its own metrics, for tests that need two fonts to measure
+    /// text differently (every other font here is 8 px a character).
+    public Object createTestFont(int charWidth, int height) {
+        return new TestFont(charWidth, height);
+    }
+
     @Override
     public Object createFont(int face, int style, int size) {
         return new TestFont(defaultFont.charWidth, defaultFont.height);

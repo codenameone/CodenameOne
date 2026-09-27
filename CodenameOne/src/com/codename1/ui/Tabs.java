@@ -404,6 +404,15 @@ public class Tabs extends Container {
                 setTabPlacement(tabPlace);
             }
         }
+        // A theme switch between the ios26 and ios27 presets flips the glass motion
+        // without touching the placement; the tab layout has to follow it, or the
+        // glass renderer runs over the grid (or the regular one over the glass
+        // layout's overlapping, lens-wide tabs).
+        if (tabsContainer != null
+                && (tabsContainer.getLayout() instanceof GlassTabsLayout) != isGlassMotion()) {
+            setTabsLayout(tabPlacement);
+            tabsContainer.setShouldCalcPreferredSize(true);
+        }
     }
 
     /// {@inheritDoc}
@@ -1803,7 +1812,7 @@ public class Tabs extends Container {
     /// Remembers where a press landed on the tab bar, so the touch glow of the
     /// selection it triggers expands from the finger like the native one.
     void recordGlassPress(int x, int y) {
-        if (tabsContainer != null && tabsContainer.visibleBoundsContains(x, y)) {
+        if (tabsContainer != null && tabsContainer.visibleBoundsContains(x, y) && isPressOnTabBar(x, y)) {
             glassPressX = x - tabsContainer.getAbsoluteX();
             glassPressY = y - tabsContainer.getAbsoluteY();
             // UIKit moves the lens on touch-DOWN; the selection itself still happens
@@ -1822,6 +1831,19 @@ public class Tabs extends Container {
             glassPressX = -1;
             glassPressY = -1;
         }
+    }
+
+    /// True when the component a press at (x, y) actually reaches is the tab bar or
+    /// one of its tabs, not an overlay covering it (a side menu, a sheet in the
+    /// layered pane): the lens must not lift under something the finger never
+    /// touched. The coordinates are the listener's, local to the tabs' surface.
+    private boolean isPressOnTabBar(int x, int y) {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            return true;
+        }
+        Component target = top.asContainer().getComponentAt(x, y);
+        return target != null && (tabsContainer.equals(target) || tabsContainer.contains(target));
     }
 
     /// True while the glass motion is travelling to tab `index` (package-private,

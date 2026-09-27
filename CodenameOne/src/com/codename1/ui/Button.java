@@ -967,7 +967,13 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     @Override
     public Style getStyle() {
         if (glassPaintState != GLASS_PAINT_NONE && isEnabled()) {
-            return glassPaintState == GLASS_PAINT_SELECTED ? getPressedStyle() : getUnselectedStyle();
+            boolean selected = glassPaintState == GLASS_PAINT_SELECTED;
+            Style forced = selected ? getPressedStyle() : getUnselectedStyle();
+            // Keep Component.getStyle()'s bookkeeping: Label reuses a cached string
+            // width only while the unselected style is the one in force, and a
+            // selected style may carry a different font.
+            isUnselectedStyle = !selected;
+            return forced;
         }
         return super.getStyle();
     }
