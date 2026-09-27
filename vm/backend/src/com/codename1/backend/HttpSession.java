@@ -179,8 +179,12 @@ public final class HttpSession {
         lastAccessed = now;
     }
 
+    /** Extra time before expiry, for a store whose stored last use lags. */
+    long expiryGraceMillis;
+
     synchronized boolean isExpired(long now) {
-        return maxInactiveSeconds > 0 && now - lastAccessed > maxInactiveSeconds * 1000L;
+        return maxInactiveSeconds > 0
+                && now - lastAccessed > maxInactiveSeconds * 1000L + expiryGraceMillis;
     }
 
     synchronized void markNew() {
@@ -215,25 +219,41 @@ public final class HttpSession {
         }
     }
 
-    /** The session-scoped beans this object holds, or null. */
-    synchronized Object[] beansOrNull() {
-        return beans;
+    /**
+     * The server whose sessions this belongs to, which keeps the session-scoped
+     * beans; null for a session made outside one.
+     */
+    Sessions owner;
+
+    /** The beans held on this object itself, when it has no owner; taken once. */
+    synchronized Object[] takeLocalBeans() {
+        Object[] out = beans;
+        beans = null;
+        return out;
     }
 
-    /** Hands this object the beans the server kept for its session, unless it has its own. */
-    synchronized void attachBeans(Object[] kept) {
-        if(kept == null) {
-            beans = null;
-        } else if(beans == null) {
-            beans = kept;
-        }
+    /**
+     * What generated code locks while it builds one of this session's beans: an
+     * object every loaded copy of the session shares.
+     */
+    public Object beanLock() {
+        Sessions o = owner;
+        return o == null ? this : o.beanLock(this);
     }
 
     /**
      * The {@code @SessionScope} beans of this session, by the slot the build gave
      * each. Called by generated code.
      */
-    public synchronized Object[] scopedBeans(int count) {
+    public Object[] scopedBeans(int count) {
+        Sessions o = owner;
+        if(o != null) {
+            return o.sharedBeans(this, count);
+        }
+        return localBeans(count);
+    }
+
+    private synchronized Object[] localBeans(int count) {
         if(beans == null || beans.length < count) {
             Object[] grown = new Object[count];
             if(beans != null) {

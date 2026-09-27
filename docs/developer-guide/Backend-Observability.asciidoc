@@ -172,6 +172,11 @@ The route attribute is the template -- `GET /notes/{id}` is recorded as
 ask for. A request that fails, whether in a handler or in the session store, is
 recorded with status 500.
 
+The instruments belong to the process, as an OpenTelemetry meter's do. With more
+than one server in a process, each server gauge reports the sum over the servers
+still running, and the request histogram counts every server's requests. A
+server that stops drops out of the sums.
+
 ==== Managed beans
 
 The application's own metrics follow the JMX model -- attributes to watch and

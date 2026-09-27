@@ -170,42 +170,58 @@ public final class Metrics {
 
     // ------------------------------------------------------- server instrumentation
 
+    /** The servers recording their own metrics, and their pools. */
+    private static final List LIVE_SERVERS = new ArrayList();
+    private static final List LIVE_POOLS = new ArrayList();
+
     /**
-     * Starts recording the server's own metrics. Called once the server is
+     * Starts recording a server's own metrics. Called once the server is
      * listening; the pool may be null.
+     *
+     * <p>The instruments are the process's, as an OpenTelemetry meter's are, so
+     * with two servers in one process each built-in gauge reports the SUM over
+     * the servers still running, and the request histogram counts both. Each
+     * server used to register its own source under the same name, so the last
+     * one started silently replaced the others' -- and a stopped server's stayed.
      */
     public static void enableServer(final com.codename1.backend.HttpServer server,
                                     final com.codename1.backend.DataSource pool) {
+        synchronized(Metrics.class) {
+            if(!LIVE_SERVERS.contains(server)) {
+                LIVE_SERVERS.add(server);
+            }
+            if(pool != null && !LIVE_POOLS.contains(pool)) {
+                LIVE_POOLS.add(pool);
+            }
+        }
         requestDuration = histogram("http.server.request.duration",
                 "Duration of HTTP server requests", "ms", null,
                 new String[] {"http.route", "http.request.method", "http.response.status_code"});
         jobDuration = histogram("cn1.scheduler.run.duration",
                 "Duration of scheduled job runs", "ms", null,
                 new String[] {"cn1.job", "cn1.outcome", null});
-        serverMetric(server, "http.server.active_requests", "activeRequests",
+        serverMetric("http.server.active_requests", "activeRequests",
                 "Requests being served", "{request}");
-        serverMetric(server, "http.server.open_connections", "openConnections",
+        serverMetric("http.server.open_connections", "openConnections",
                 "Open client connections", "{connection}");
-        serverMetric(server, "cn1.server.websocket_connections", "webSocketConnections",
+        serverMetric("cn1.server.websocket_connections", "webSocketConnections",
                 "Open websocket connections", "{connection}");
-        serverMetric(server, "cn1.server.requests_served", "requestsServed",
+        serverMetric("cn1.server.requests_served", "requestsServed",
                 "Requests answered since start", "{request}");
-        serverMetric(server, "cn1.server.connections_refused", "connectionsRefused",
+        serverMetric("cn1.server.connections_refused", "connectionsRefused",
                 "Connections refused for being over the limit", "{connection}");
-        if(pool != null) {
-            gauge("db.client.connection.count", "Open database connections", "{connection}",
-                    new Gauge.Source() {
-                public double read() {
-                    return pool.getOpenCount();
-                }
-            });
-            gauge("db.client.connection.idle", "Idle database connections", "{connection}",
-                    new Gauge.Source() {
-                public double read() {
-                    return pool.getIdleCount();
-                }
-            });
-        }
+        gauge("db.client.connection.count", "Open database connections", "{connection}",
+                new Gauge.Source() {
+            public double read() {
+                return poolSum(false);
+            }
+        });
+        gauge("db.client.connection.idle", "Idle database connections", "{connection}",
+                new Gauge.Source() {
+            public double read() {
+                return poolSum(true);
+            }
+        });
         gauge("cn1.task.queue_depth", "Tasks waiting for a thread, by executor", "{task}",
                 new Gauge.MultiSource() {
             public List read() {
@@ -230,16 +246,59 @@ public final class Metrics {
                 return (System.currentTimeMillis() - STARTED) / 1000.0;
             }
         });
-        serverEnabled = true;
+        synchronized(Metrics.class) {
+            serverEnabled = true;
+        }
     }
 
-    private static void serverMetric(final com.codename1.backend.HttpServer server,
-                                     String name, final String key, String description,
+    /**
+     * A server has stopped: its gauges stop counting it, and once none is left
+     * the server instruments stop recording.
+     */
+    public static void disableServer(com.codename1.backend.HttpServer server,
+                                     com.codename1.backend.DataSource pool) {
+        synchronized(Metrics.class) {
+            LIVE_SERVERS.remove(server);
+            if(pool != null) {
+                LIVE_POOLS.remove(pool);
+            }
+            if(LIVE_SERVERS.isEmpty()) {
+                serverEnabled = false;
+            }
+        }
+    }
+
+    private static synchronized List liveServers() {
+        return new ArrayList(LIVE_SERVERS);
+    }
+
+    private static double poolSum(boolean idle) {
+        List pools;
+        synchronized(Metrics.class) {
+            pools = new ArrayList(LIVE_POOLS);
+        }
+        double sum = 0;
+        for(int iter = 0 ; iter < pools.size() ; iter++) {
+            com.codename1.backend.DataSource p = (com.codename1.backend.DataSource)pools.get(iter);
+            sum += idle ? p.getIdleCount() : p.getOpenCount();
+        }
+        return sum;
+    }
+
+    private static void serverMetric(String name, final String key, String description,
                                      String unit) {
         gauge(name, description, unit, new Gauge.Source() {
             public double read() {
-                Object v = server.getMetrics().get(key);
-                return v instanceof Number ? ((Number)v).doubleValue() : Double.NaN;
+                List servers = liveServers();
+                double sum = 0;
+                for(int iter = 0 ; iter < servers.size() ; iter++) {
+                    Object v = ((com.codename1.backend.HttpServer)servers.get(iter))
+                            .getMetrics().get(key);
+                    if(v instanceof Number) {
+                        sum += ((Number)v).doubleValue();
+                    }
+                }
+                return sum;
             }
         });
     }

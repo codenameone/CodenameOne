@@ -121,8 +121,9 @@ exercising it, and the server prints the endpoint's address when it starts:
 | Read the last lines the server printed.
 
 | `backend_sql`
-| Run SQL against the server's database. Only reading statements run unless
-  `write` is true.
+| Run SQL against the server's database. Unless `write` is true, the statement
+  runs in a read-only transaction the database enforces, one statement at a time,
+  so a statement that writes fails even when it begins like a read.
 
 | `backend_schema`
 | List the entities and their tables and columns.

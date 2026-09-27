@@ -302,7 +302,9 @@ in the method that began the transaction, it lets that method return normally,
 and the transaction rolls back without an error when the method ends. Called in a method
 that joined the transaction, it counts as that method failing: the transaction
 becomes rollback-only, and the method that began it throws
-`TransactionException.UnexpectedRollback` when it ends normally.
+`TransactionException.UnexpectedRollback` when it ends normally. Called in a
+`NESTED` method, it undoes only that method's work: its savepoint is rolled back
+when it returns, and the surrounding transaction carries on.
 
 `Transactions.isActive()` and `Transactions.isRollbackOnly()` answer the obvious
 questions about the calling thread.

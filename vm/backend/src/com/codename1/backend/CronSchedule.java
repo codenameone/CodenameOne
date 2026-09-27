@@ -138,13 +138,35 @@ public final class CronSchedule {
         if((dow & (1L << 7)) != 0) {
             dow = (dow & ~(1L << 7)) | 1L;
         }
+        long months = field(fields[4], 1, 12, MONTHS, false, expression, "month");
+        if(!last && !canEverMatch(dom, months)) {
+            // What the build refuses for a literal expression, refused here for
+            // one read from configuration: accepted, it would start and then
+            // never fire, and the scheduler would quietly disable the job.
+            throw new IllegalArgumentException("\"" + expression + "\" names no day that "
+                    + "exists in the months it allows, so it would never fire");
+        }
         return new CronSchedule(
                 field(fields[0], 0, 59, null, false, expression, "second"),
                 field(fields[1], 0, 59, null, false, expression, "minute"),
                 field(fields[2], 0, 23, null, false, expression, "hour"),
-                dom,
-                field(fields[4], 1, 12, MONTHS, false, expression, "month"),
-                dow, last, zone, expression);
+                dom, months, dow, last, zone, expression);
+    }
+
+    /** Whether some allowed day of month exists in some allowed month. */
+    private static boolean canEverMatch(long days, long months) {
+        int[] lengths = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        for(int m = 1 ; m <= 12 ; m++) {
+            if((months & (1L << m)) == 0) {
+                continue;
+            }
+            for(int d = 1 ; d <= lengths[m] ; d++) {
+                if((days & (1L << d)) != 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static final String[] MONTHS = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL",

@@ -268,7 +268,8 @@ to compete on explicitly, for a class whose default set is too wide or too narro
 A `@Bean` method inherits the conditions of the `@Configuration` class it's
 declared in, static methods included. A `@Profile("prod")` configuration class
 therefore contributes nothing on any other profile, which is what the annotation on
-the class says.
+the class says. The same holds for `@ConditionalOnMissingBean` on the class: a
+configuration class that steps aside takes its `@Bean` methods with it.
 
 ==== Beans with a lifecycle of their own
 
@@ -333,9 +334,11 @@ requests served at once see two instances.
 
 The stand-in extends the bean's class and overrides its methods, which is where the
 rules for a scoped or lazy bean come from. The class can't be final, a method it
-declares can't be final either -- a call to it would run on the stand-in instead of
-the bean -- and it needs a constructor with no arguments, which may be protected.
-Inject anything else through fields. Each rule is checked by the build.
+declares or inherits can't be final either -- a call to it would run on the stand-in
+instead of the bean -- and it needs a constructor with no arguments, which may be
+protected. Methods inherited from a library class are forwarded too, so the library
+has to be on the build's classpath. Inject anything else through fields. Each rule
+is checked by the build.
 
 `@Lazy` suits a bean that's expensive to prepare and not always needed:
 

@@ -2189,6 +2189,11 @@ public final class HttpServer {
         // A quarter of the drain window at most, so the goodbyes cannot eat the
         // time the requests in flight were promised.
         closeWebSocketsForShutdown(Math.max(1, Math.min(drainMillis / 4, 2000)));
+        // Background tasks on virtual threads get the same window as the requests:
+        // each host keeps resuming its own after the loop below ends -- a yielded
+        // task can only ever run on the host it started on -- and the sweep waits
+        // for them before it frees anything.
+        taskDrainDeadline = System.currentTimeMillis() + drainMillis;
         running = false;
         reactor.remove(listener.getFd());
         listener.close();
@@ -2222,6 +2227,7 @@ public final class HttpServer {
                 break;
             }
         }
+        awaitTaskDrain(callerFd);
         // Whatever is still open at the deadline is an idle keep-alive connection or
         // a request that overran; both have to be closed rather than held forever.
         //
@@ -2820,6 +2826,15 @@ public final class HttpServer {
             return ringCount == 0;
         }
 
+        /** Set, under the inbox lock, once a stopping host has finished its tasks. */
+        boolean tasksDrained;
+
+        boolean hasQueuedTasks() {
+            synchronized(inbox) {
+                return !inbox.isEmpty();
+            }
+        }
+
         void ringAdd(long handle) {
             if(ringCount == ring.length) {
                 // Growth allocates, which is why the ring starts big enough that
@@ -3103,6 +3118,93 @@ public final class HttpServer {
     /** Round robin over the hosts, used only by whoever is accepting. */
     private int vtNextHost = 0;
 
+    /** Until when a stopping host keeps running its background tasks. */
+    private volatile long taskDrainDeadline;
+
+    /**
+     * After the loop: the background tasks this host is running, run to the end
+     * or to the drain deadline. Only they are resumed -- no polling, no
+     * connections, which stop() is taking down -- and a host that exits with a
+     * yielded task still in its ring would leave that task's Future unfinished
+     * and its executor's active count stuck forever.
+     */
+    private void drainTasksAfterStop(VtHost me) {
+        try {
+            while(System.currentTimeMillis() < taskDrainDeadline) {
+                drainTaskInbox(me);
+                int budget = me.ringCount;
+                int tasks = 0;
+                while(budget-- > 0 && !me.ringEmpty()) {
+                    long handle = me.ringTake();
+                    if(VirtualThread.descriptorOf(handle) < 0) {
+                        advanceTask(me, handle);
+                        tasks++;
+                    } else {
+                        // A connection's: stop() reclaims those.
+                        me.ringAdd(handle);
+                    }
+                }
+                if(tasks == 0 && !me.hasQueuedTasks()) {
+                    return;
+                }
+            }
+            // Out of time: free what is left rather than leaking its stack. Its
+            // Future never completes, so say so.
+            int abandoned = 0;
+            int left = me.ringCount;
+            while(left-- > 0 && !me.ringEmpty()) {
+                long handle = me.ringTake();
+                if(VirtualThread.descriptorOf(handle) < 0) {
+                    VirtualThread.free(handle);
+                    abandoned++;
+                } else {
+                    me.ringAdd(handle);
+                }
+            }
+            if(abandoned > 0) {
+                System.err.println(abandoned + " background task(s) on virtual threads did "
+                        + "not finish within the shutdown window and were abandoned");
+            }
+        } finally {
+            synchronized(me.inbox) {
+                me.tasksDrained = true;
+            }
+        }
+    }
+
+    /**
+     * Waits, until the drain deadline, for every host to finish its tasks --
+     * except the host running a handler that called stop(): it cannot reach its
+     * drain until this returns, so waiting for it waited out the whole window,
+     * which the drain above already goes out of its way not to do.
+     */
+    private void awaitTaskDrain(int callerFd) {
+        VtHost[] hosts = vtHosts;
+        if(hosts == null) {
+            return;
+        }
+        VtHost callersHost = callerFd >= 0 ? ownerOf(callerFd) : null;
+        while(System.currentTimeMillis() < taskDrainDeadline + 50) {
+            boolean all = true;
+            for(int iter = 0 ; iter < hosts.length ; iter++) {
+                if(hosts[iter] != null && hosts[iter] != callersHost) {
+                    synchronized(hosts[iter].inbox) {
+                        all &= hosts[iter].tasksDrained;
+                    }
+                }
+            }
+            if(all) {
+                return;
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     /**
      * One host thread: run whoever is ready, then poll for more.
      *
@@ -3114,6 +3216,16 @@ public final class HttpServer {
      */
     private void runVirtualThreadHost(int index) {
         VtHost me = vtHosts[index];
+        try {
+            runVirtualThreadHostLoop(me, index);
+        } finally {
+            // Every way out, the early returns on a failed poller included, or
+            // stop() would wait out the whole window for a flag never set.
+            drainTasksAfterStop(me);
+        }
+    }
+
+    private void runVirtualThreadHostLoop(VtHost me, int index) {
         int[] ready = new int[READY_CAPACITY];
         int listenFd = listener.getFd();
         boolean owner = (index == 0);       // only one host accepts

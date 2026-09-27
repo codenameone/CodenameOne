@@ -81,7 +81,15 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 
 A session is saved after the handler returns, and only when the request changed
 it. A request that only reads its session writes nothing, apart from the last access
-time the database store keeps, which it updates at most once a minute.
+time the database store keeps. That store updates it when it's older than a
+minute, or a quarter of the session's timeout when that's shorter, and allows the
+same interval on top of the timeout before it calls a session expired, so a
+session in use is never expired early.
+
+With the database store, two requests of one client load separate copies of the
+session. If one of them invalidates it, the other can't write it back: a copy of a
+session whose row is gone is dropped rather than saved again, so a request still
+running with an old cookie can't undo a sign-out.
 
 === The cookie
 

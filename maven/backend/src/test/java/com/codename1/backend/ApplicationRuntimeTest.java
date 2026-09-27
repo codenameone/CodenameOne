@@ -65,6 +65,15 @@ class ApplicationRuntimeTest {
     // ------------------------------------------------------------------ cron
 
     @Test
+    @DisplayName("a configured cron expression naming a day no allowed month has is refused")
+    void impossibleCronIsRefused() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> CronSchedule.parse("0 0 0 30 2 *", "UTC"));
+        assertTrue(e.getMessage().contains("never fire"), e.getMessage());
+        CronSchedule.parse("0 0 0 29 2 *", "UTC");          // a leap day exists
+    }
+
+    @Test
     @DisplayName("a cron time a spring-forward night skips does not fire an hour late")
     void cronSkipsTheDstGap() {
         CronSchedule s = CronSchedule.parse("0 30 2 * * *", "America/New_York");
@@ -95,7 +104,12 @@ class ApplicationRuntimeTest {
         CronSchedule last = CronSchedule.parse("0 0 0 L * *", "UTC");
         long jan1 = 1767225600000L;
         assertEquals(jan1 + 30 * 86400000L, last.next(jan1)); // Jan 31
-        assertEquals(-1, CronSchedule.parse("0 0 0 30 2 *", "UTC").next(jan1));
+        // The 30th of February is refused when parsed now; built from masks
+        // directly, as the generated code does, it still answers "never".
+        long feb = 1L << 2;
+        long day30 = 1L << 30;
+        assertEquals(-1, new CronSchedule(1L, 1L, 1L, day30, feb, 0x7fL, false, "UTC",
+                "0 0 0 30 2 *").next(jan1));
     }
 
     @Test
@@ -210,6 +224,100 @@ class ApplicationRuntimeTest {
     }
 
     // --------------------------------------------------------------- sessions
+
+    @Test
+    @DisplayName("the database session store: no resurrection, and no early expiry for a short timeout")
+    void jdbcSessionStore(@org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "s.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions.Jdbc store = new Sessions.Jdbc(pool);
+            long now = System.currentTimeMillis();
+            HttpSession created = new HttpSession("sid", now, now, 1800);
+            created.markNew();
+            created.setAttribute("user", "ada");
+            store.save(created, null);
+            // Two requests hold their own copies; one logs out.
+            HttpSession a = store.load("sid");
+            HttpSession b = store.load("sid");
+            assertNotNull(a);
+            store.delete(a.getId());
+            b.setAttribute("seen", "yes");
+            store.save(b, null);
+            assertNull(store.load("sid"), "a stale copy brought an invalidated session back");
+
+            // A ten-second session last written eleven seconds ago may be a
+            // read-only one used every few seconds whose touches were never
+            // written; it is not expired until the touch interval has passed too.
+            HttpSession short10 = new HttpSession("short", now, now - 11000, 10);
+            short10.markNew();
+            store.save(short10, null);
+            HttpSession back = store.load("short");
+            assertFalse(back.isExpired(now), "expired before the touch interval allowed");
+            assertTrue(back.isExpired(now + 2000));
+            assertEquals(2500L, Sessions.Jdbc.touchInterval(10));
+            assertEquals(60000L, Sessions.Jdbc.touchInterval(1800));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("every loaded copy of a session shares one set of session-scoped beans")
+    void sessionBeansAreSharedAcrossCopies() {
+        Sessions sessions = new Sessions();
+        long now = System.currentTimeMillis();
+        HttpSession first = new HttpSession("same", now, now, 1800);
+        HttpSession second = new HttpSession("same", now, now, 1800);
+        first.owner = sessions;
+        second.owner = sessions;
+        Object[] beansA = first.scopedBeans(2);
+        beansA[0] = "cart";
+        assertTrue(first.beanLock() == second.beanLock(),
+                "two copies of one session locked different objects");
+        assertEquals("cart", second.scopedBeans(2)[0]);
+    }
+
+    @Test
+    @DisplayName("the built-in server gauges add up every running server, and drop a stopped one")
+    void serverGaugesAggregate() throws Exception {
+        Backend[] servers = new Backend[2];
+        int[] ports = {freePort(), freePort()};
+        for(int i = 0 ; i < 2 ; i++) {
+            Properties settings = new Properties();
+            settings.setProperty(Config.SERVER_PORT, String.valueOf(ports[i]));
+            servers[i] = Backend.builder(Config.of(settings, "dev")).quiet()
+                    .handler(new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request)
+                                throws Exception {
+                            return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                        }
+                    }).start();
+        }
+        try {
+            read(open(ports[0], "/x"));
+            read(open(ports[1], "/x"));
+            read(open(ports[1], "/x"));
+            double both = served();
+            double expected = number(servers[0]) + number(servers[1]);
+            assertEquals(expected, both, 0.0, "the gauge reported one server, not the sum");
+            servers[1].stop();
+            assertEquals(number(servers[0]), served(), 0.0,
+                    "a stopped server was still counted");
+        } finally {
+            servers[0].stop();
+            servers[1].stop();
+        }
+    }
+
+    private static double served() {
+        Map point = (Map)Metrics.get("cn1.server.requests_served").points().get(0);
+        return ((Number)point.get("value")).doubleValue();
+    }
+
+    private static double number(Backend b) {
+        return ((Number)b.getServer().getMetrics().get("requestsServed")).doubleValue();
+    }
 
     @Test
     @DisplayName("a server without generated beans still applies the session settings")
@@ -441,6 +549,13 @@ class ApplicationRuntimeTest {
                 () -> com.codename1.backend.mcp.McpArgs.byteObject(args, "b", true));
         assertEquals(-128, com.codename1.backend.mcp.McpArgs.byteValue(args, "ok", true));
         assertEquals(-128, com.codename1.backend.mcp.McpArgs.shortValue(args, "ok", true));
+        // A JSON number too big for a long must not saturate to Long.MAX_VALUE.
+        args.put("huge", new Double(1e20));
+        args.put("big", new Double(9.007199254740992E15));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.longValue(args, "huge", true));
+        assertEquals(9007199254740992L,
+                com.codename1.backend.mcp.McpArgs.longValue(args, "big", true));
     }
 
     // ---------------------------------------------------------------- metrics

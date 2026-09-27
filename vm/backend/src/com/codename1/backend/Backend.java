@@ -237,6 +237,9 @@ public final class Backend {
             }
         }
         server.stop(shutdownMillis);
+        // Out of the process's server gauges, which would otherwise keep reading
+        // a stopped server and pool.
+        com.codename1.backend.metrics.Metrics.disableServer(server, dataSource);
         // Background work next: @Async calls and scheduled runs still going get
         // the same grace the requests did, while the beans they use are alive.
         Tasks.shutdown(tasks, shutdownMillis);

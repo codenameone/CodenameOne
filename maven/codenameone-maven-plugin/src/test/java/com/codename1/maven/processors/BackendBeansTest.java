@@ -53,6 +53,7 @@ import java.util.Properties;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -241,6 +242,16 @@ public class BackendBeansTest {
                     + "{\"sql\":\"DELETE FROM notes\"}}}");
             assertTrue("a write ran without write=true: " + refused,
                     refused.contains("\"isError\":true"));
+            // Begins like a read, deletes like a write: the engine must refuse it.
+            String disguised = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"backend_sql\",\"arguments\":"
+                    + "{\"sql\":\"WITH x AS (SELECT 1) DELETE FROM notes\"}}}");
+            assertTrue("a disguised write ran without write=true: " + disguised,
+                    disguised.contains("\"isError\":true"));
+            String still = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"backend_sql\",\"arguments\":"
+                    + "{\"sql\":\"SELECT text FROM notes ORDER BY text\"}}}");
+            assertTrue(still, still.contains("one") && still.contains("two"));
             String metrics = http("GET", port, "/manage/prometheus");
             assertTrue(metrics, metrics.contains("http_server_request_duration_bucket"));
         } finally {
@@ -689,6 +700,118 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aConfigurationThatStepsAsideTakesItsFactoriesWithIt() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Store", PKG + "public interface Store { String name(); }\n");
+        s.put("com.example.DefaultStores", PKG
+                + "@Configuration @ConditionalOnMissingBean(DbStore.class)\n"
+                + "public class DefaultStores {\n"
+                + "    @Bean public static Store memoryStore() {\n"
+                + "        return new Store() { public String name() { return \"memory\"; } };\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.DbStore", PKG + "@Component public class DbStore implements Store "
+                + "{ public String name() { return \"db\"; } }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    private final Store store;\n"
+                + "    public Api(Store store) { this.store = store; }\n"
+                + "    @GetMapping(\"/x\") public String x() { return store.name(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("db", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aRestartedApplicationForgetsTheBeansOfTheLastStart() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Feature", PKG + "@Component @ConditionalOnProperty(\"feature.x\")\n"
+                + "public class Feature { }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired(required = false) private Feature feature;\n"
+                + "    @GetMapping(\"/x\") public String x() { return String.valueOf(feature != null); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Backend.Application app = (Backend.Application) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties on = new Properties();
+        on.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        on.setProperty("feature.x", "true");
+        Backend first = Backend.builder(Config.of(on, "dev")).quiet().application(app).start();
+        try {
+            assertEquals("true", http("GET", port, "/x"));
+        } finally {
+            first.stop();
+        }
+        Properties off = new Properties();
+        off.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend second = Backend.builder(Config.of(off, "dev")).quiet().application(app).start();
+        try {
+            assertEquals("the second start injected the first start's destroyed bean",
+                    "false", http("GET", port, "/x"));
+        } finally {
+            second.stop();
+        }
+    }
+
+    @Test
+    public void aModuleWithOnlyAManagedResourceGetsAnApplication() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Stats", PKG + "@Component @ManagedResource public class Stats {\n"
+                + "    @ManagedAttribute public int getCount() { return 1; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        assertTrue("no application was generated for a managed-resource-only module",
+                new File(classes, "com/example/BackendWiring.class").isFile());
+    }
+
+    @Test
+    public void aScopedBeanForwardsMethodsItInheritsFromALibrary() throws Exception {
+        Map<String, String> lib = new LinkedHashMap<String, String>();
+        lib.put("org.lib.BaseCounter", "package org.lib;\n"
+                + "public class BaseCounter {\n"
+                + "    private int n;\n"
+                + "    public int next() { return ++n; }\n"
+                + "}\n");
+        File libClasses = tmp.newFolder();
+        JavaSourceCompiler.compile(lib, libClasses, backendClasspath());
+        List<File> cp = new ArrayList<File>(backendClasspath());
+        cp.add(libClasses);
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visits", PKG + "@Component @RequestScope\n"
+                + "public class Visits extends org.lib.BaseCounter { }\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Visits visits;\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        visits.next();\n"
+                + "        return String.valueOf(visits.next());\n"
+                + "    }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(s, classes, cp);
+        assertNoErrors(process(classes, new RestControllerAnnotationProcessor(), libClasses));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL(),
+                libClasses.toURI().toURL()}, getClass().getClassLoader());
+        Class<?> proxy = loader.loadClass("com.example.VisitsCn1Scoped");
+        assertNotNull("the stand-in does not forward next(), which its bean inherits",
+                proxy.getDeclaredMethod("next"));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");
@@ -834,11 +957,14 @@ public class BackendBeansTest {
         return process(classes, new RestControllerAnnotationProcessor());
     }
 
-    private ProcessorContext process(File classes, RestControllerAnnotationProcessor proc)
-            throws Exception {
+    private ProcessorContext process(File classes, RestControllerAnnotationProcessor proc,
+                                     File... extraClasspath) throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
         List<String> cp = new ArrayList<String>();
         for (File f : backendClasspath()) {
+            cp.add(f.getAbsolutePath());
+        }
+        for (File f : extraClasspath) {
             cp.add(f.getAbsolutePath());
         }
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,

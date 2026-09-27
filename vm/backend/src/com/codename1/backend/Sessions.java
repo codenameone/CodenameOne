@@ -203,18 +203,12 @@ public final class Sessions {
             HttpSession found = s.load(cookieValue);
             if(found != null && found.isValid() && !found.isExpired(now)) {
                 found.touch(now);
-                Held held;
-                synchronized(this) {
-                    held = (Held)beans.get(cookieValue);
-                }
-                if(held != null) {
-                    found.attachBeans(held.beans);
-                }
+                found.owner = this;
                 return found;
             }
             if(found != null) {
                 s.delete(cookieValue);
-                destroy(take(cookieValue), found.beansOrNull());
+                destroy(take(cookieValue));
             }
         }
         if(!create) {
@@ -222,6 +216,7 @@ public final class Sessions {
         }
         HttpSession created = new HttpSession(newId(), now, now, timeout);
         created.markNew();
+        created.owner = this;
         return created;
     }
 
@@ -247,7 +242,7 @@ public final class Sessions {
         }
         if(expired != null) {
             for(int iter = 0 ; iter < expired.size() ; iter++) {
-                destroy((Object[])expired.get(iter), null);
+                destroy((Object[])expired.get(iter));
             }
         }
         try {
@@ -271,14 +266,13 @@ public final class Sessions {
         String previous = session.previousId();
         if(!session.isValid()) {
             s.delete(session.getId());
-            Object[] kept = take(session.getId());
+            // The beans end with the session, not with whatever next finds it gone.
+            destroy(take(session.getId()));
             if(previous != null) {
                 s.delete(previous);
-                destroy(take(previous), null);
+                destroy(take(previous));
             }
-            // The beans end with the session, not with whatever next finds it gone.
-            destroy(kept, session.beansOrNull());
-            session.attachBeans(null);
+            destroy(session.takeLocalBeans());
             cookie = cookie("", 0);
         } else {
             if(session.isDirty()) {
@@ -299,25 +293,21 @@ public final class Sessions {
         return withHeader(response, "Set-Cookie", cookie);
     }
 
-    /** Records the session's beans under its current id, after a request used it. */
+    /**
+     * After a request used the session: moves its beans to its new id when it
+     * was rotated, and notes the use, which is what keeps them from expiring.
+     */
     private void keep(HttpSession session, String previousId) {
-        Object[] live = session.beansOrNull();
+        Object[] late = null;
         synchronized(this) {
             Held held = previousId == null ? null : (Held)beans.remove(previousId);
-            if(live == null && held == null) {
-                held = (Held)beans.get(session.getId());
-                if(held == null) {
-                    return;
-                }
-            }
-            if(held == null) {
+            if(held != null) {
+                beans.put(session.getId(), held);
+            } else {
                 held = (Held)beans.get(session.getId());
             }
             if(held == null) {
-                held = new Held();
-            }
-            if(live != null) {
-                held.beans = live;
+                return;
             }
             held.lastAccessed = session.getLastAccessedTime();
             held.maxInactiveSeconds = session.getMaxInactiveInterval();
@@ -325,12 +315,54 @@ public final class Sessions {
                 // The server stopped while this request was in flight; nothing
                 // will destroy what is kept after close().
                 beans.remove(session.getId());
-            } else {
-                beans.put(session.getId(), held);
-                return;
+                late = held.beans;
             }
         }
-        destroy(live, null);
+        destroy(late);
+    }
+
+    /**
+     * The session-scoped beans of the session with this id, shared by every
+     * copy of it a request loads -- a database store hands each request its own
+     * HttpSession, so beans kept on that object would be built once per copy.
+     * Created atomically under this lock, the first time any copy asks.
+     */
+    synchronized Object[] sharedBeans(HttpSession session, int count) {
+        Held held = holderFor(session);
+        if(held.beans == null || held.beans.length < count) {
+            Object[] grown = new Object[count];
+            if(held.beans != null) {
+                System.arraycopy(held.beans, 0, grown, 0, held.beans.length);
+            }
+            held.beans = grown;
+        }
+        return held.beans;
+    }
+
+    /** The object generated code locks while it builds one session's bean. */
+    synchronized Object beanLock(HttpSession session) {
+        return holderFor(session);
+    }
+
+    private Held holderFor(HttpSession session) {
+        String id = session.getId();
+        Held held = (Held)beans.get(id);
+        String previous = held == null ? session.previousId() : null;
+        if(previous != null) {
+            // Rotated by changeSessionId() earlier in this request: the beans
+            // built under the old id are this session's still.
+            held = (Held)beans.remove(previous);
+            if(held != null) {
+                beans.put(id, held);
+            }
+        }
+        if(held == null) {
+            held = new Held();
+            held.lastAccessed = session.getLastAccessedTime();
+            held.maxInactiveSeconds = session.getMaxInactiveInterval();
+            beans.put(id, held);
+        }
+        return held;
     }
 
     private synchronized Object[] take(String id) {
@@ -338,16 +370,10 @@ public final class Sessions {
         return held == null ? null : held.beans;
     }
 
-    /** Runs the destroy methods of one session's beans; the second array may repeat the first. */
-    private void destroy(Object[] first, Object[] second) {
-        if(application == null) {
-            return;
-        }
-        if(first != null) {
-            ended(first);
-        }
-        if(second != null && second != first) {
-            ended(second);
+    /** Runs the destroy methods of one session's beans. */
+    private void destroy(Object[] sessionBeans) {
+        if(application != null && sessionBeans != null) {
+            ended(sessionBeans);
         }
     }
 
@@ -372,7 +398,7 @@ public final class Sessions {
             beans.clear();
         }
         for(int iter = 0 ; iter < all.size() ; iter++) {
-            destroy(((Held)all.get(iter)).beans, null);
+            destroy(((Held)all.get(iter)).beans);
         }
     }
 
@@ -531,8 +557,13 @@ public final class Sessions {
             if(row == null) {
                 return null;
             }
+            int maxInactive = (int)number(row.get("max_inactive"));
             HttpSession s = new HttpSession(id, number(row.get("created")),
-                    number(row.get("last_accessed")), (int)number(row.get("max_inactive")));
+                    number(row.get("last_accessed")), maxInactive);
+            // The stored time lags the real last use by up to one touch interval,
+            // so that much more is allowed before calling the session expired --
+            // late by at most the interval, never early.
+            s.expiryGraceMillis = touchInterval(maxInactive);
             Object text = row.get("attributes");
             if(text instanceof String && ((String)text).length() > 0) {
                 s.loadAttributes(Json.parseObject((String)text));
@@ -551,6 +582,12 @@ public final class Sessions {
                     new Integer(session.getMaxInactiveInterval()), json, session.getId()};
             int updated = pool.execute("UPDATE " + TABLE + " SET last_accessed = ?, "
                     + "max_inactive = ?, attributes = ? WHERE id = ?", values);
+            if(updated == 0 && !session.isNew() && previousId == null) {
+                // The row is gone: another request invalidated this session, or
+                // it expired, while this one held its own copy. Writing it back
+                // would undo a logout with a stale cookie, so it stays gone.
+                return;
+            }
             if(updated == 0) {
                 pool.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
                         + "max_inactive, attributes) VALUES (?, ?, ?, ?, ?)",
@@ -569,12 +606,24 @@ public final class Sessions {
             // would turn every request into a database write. Within a minute is
             // close enough for a timeout measured in tens of minutes.
             long now = System.currentTimeMillis();
-            if(now - session.storedAccessed < TOUCH_INTERVAL) {
+            if(now - session.storedAccessed < touchInterval(session.getMaxInactiveInterval())) {
                 return;
             }
             pool.execute("UPDATE " + TABLE + " SET last_accessed = ? WHERE id = ?",
                     new Object[] {new Long(now), session.getId()});
             session.storedAccessed = now;
+        }
+
+        /**
+         * How stale the stored last use may get: a minute, or a quarter of the
+         * timeout when that is shorter. A fixed minute let a ten-second session
+         * used every five seconds expire, because its reads were never written.
+         */
+        static long touchInterval(int maxInactiveSeconds) {
+            if(maxInactiveSeconds <= 0) {
+                return TOUCH_INTERVAL;
+            }
+            return Math.min(TOUCH_INTERVAL, maxInactiveSeconds * 250L);
         }
 
         public void delete(String id) throws IOException {
@@ -584,8 +633,13 @@ public final class Sessions {
 
         public int purgeExpired(long now) throws IOException {
             prepare();
+            // The same grace load() allows: the timeout plus the touch interval,
+            // min(a minute, a quarter of the timeout).
+            Long at = new Long(now);
             return pool.execute("DELETE FROM " + TABLE + " WHERE max_inactive > 0 AND "
-                    + "last_accessed + max_inactive * 1000 < ?", new Object[] {new Long(now)});
+                    + "(last_accessed + max_inactive * 1250 < ? OR "
+                    + "last_accessed + max_inactive * 1000 + " + TOUCH_INTERVAL + " < ?)",
+                    new Object[] {at, at});
         }
 
         public int size() {

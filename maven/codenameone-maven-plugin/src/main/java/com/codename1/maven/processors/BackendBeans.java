@@ -394,6 +394,15 @@ final class BackendBeans {
         return false;
     }
 
+    boolean hasManaged() {
+        for (Bean b : beans) {
+            if (b.managed != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     boolean hasTools() {
         for (Bean b : beans) {
             if (!b.tools.isEmpty()) {
@@ -904,8 +913,10 @@ final class BackendBeans {
                     bean.propertySetters.add(m);
                 }
             }
+            // Setters a library base class declares bind as well.
             String parent = c.getSuperInternalName();
-            c = parent == null || "java/lang/Object".equals(parent) ? null : ctx.lookup(parent);
+            c = parent == null || "java/lang/Object".equals(parent) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, parent);
         }
         if (bean.propertySetters.isEmpty()) {
             ctx.error(where, "@ConfigurationProperties(\"" + prefix + "\") on " + bean.name
@@ -967,10 +978,28 @@ final class BackendBeans {
                 }
             }
         }
-        for (Bean b : drop) {
+        // A configuration that steps aside takes its @Bean methods with it,
+        // static ones included, as its @Profile and @ConditionalOnProperty
+        // already do: they are its declarations, and a non-static one would
+        // otherwise be built through an owner that no longer exists.
+        List<Bean> withFactories = new ArrayList<Bean>(drop);
+        for (Bean b : beans) {
+            if (b.factory == null || withFactories.contains(b)) {
+                continue;
+            }
+            for (Bean gone : drop) {
+                if (gone.cls != null && b.factoryOwnerClass == gone.cls) {
+                    withFactories.add(b);
+                    break;
+                }
+            }
+        }
+        for (Bean b : withFactories) {
             beans.remove(b);
             byName.remove(b.name);
-            ctx.getLog().info("cn1: " + b.describe() + " steps aside: another bean has its type");
+            ctx.getLog().info("cn1: " + b.describe() + (drop.contains(b)
+                    ? " steps aside: another bean has its type"
+                    : " steps aside with its configuration class"));
         }
     }
 
@@ -1513,6 +1542,13 @@ final class BackendBeans {
                     + "arguments (it may be protected), and inject the rest with fields.");
             return;
         }
+        String unreadable = unreadableAncestor(b.cls);
+        if (unreadable != null) {
+            ctx.error(where, what + " bean " + b.describe() + " extends " + unreadable
+                    + ", which is not on the build's classpath, so the stand-in the build "
+                    + "generates cannot forward the methods it inherits from it.");
+            return;
+        }
         for (MethodInfo m : proxiedMethods(b.cls, true)) {
             if (m.isFinal()) {
                 ctx.error(where, what + " bean " + b.describe() + " has final method "
@@ -1554,10 +1590,32 @@ final class BackendBeans {
                 }
                 out.add(m);
             }
+            // On through the compile classpath, not just this project's classes:
+            // a public method a library base class declares is called on the
+            // stand-in too, and unforwarded it would run on the stand-in's own,
+            // never-initialized state instead of the scoped bean's.
             String parent = c.getSuperInternalName();
-            c = parent == null || "java/lang/Object".equals(parent) ? null : ctx.lookup(parent);
+            c = parent == null || "java/lang/Object".equals(parent) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, parent);
         }
         return out;
+    }
+
+    /// The first superclass of `cls` the build cannot read, or null.
+    private String unreadableAncestor(AnnotatedClass cls) {
+        AnnotatedClass c = cls;
+        while (c != null) {
+            String parent = c.getSuperInternalName();
+            if (parent == null || "java/lang/Object".equals(parent)) {
+                return null;
+            }
+            AnnotatedClass next = RestControllerAnnotationProcessor.resolveClass(ctx, parent);
+            if (next == null) {
+                return parent.replace('/', '.');
+            }
+            c = next;
+        }
+        return null;
     }
 
     /// The eager singletons in dependency order, through constructor and factory

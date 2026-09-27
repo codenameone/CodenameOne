@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.mcp;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -31,6 +32,7 @@ import java.util.Map;
 import com.codename1.backend.Backend;
 import com.codename1.backend.Config;
 import com.codename1.backend.DataSource;
+import com.codename1.backend.Database;
 import com.codename1.backend.DevConsole;
 import com.codename1.backend.Management;
 import com.codename1.backend.RequestLog;
@@ -293,6 +295,62 @@ public final class DevTools implements McpServer.Extension {
         return out;
     }
 
+    /**
+     * Runs a statement the caller did not confirm as a write, where the ENGINE
+     * refuses writes -- the first keyword is only a courtesy check. A
+     * PostgreSQL data-modifying WITH, an EXPLAIN ANALYZE DELETE and a writable
+     * SQLite pragma all begin like reads, and each would otherwise change the
+     * database. PostgreSQL and MySQL enforce a read-only transaction; SQLite
+     * ignores that flag, so query_only is set on the connection as well. The
+     * transaction is always rolled back.
+     */
+    private static List readOnly(DataSource pool, String statement, Object[] params)
+            throws IOException {
+        String body = statement.trim();
+        while(body.endsWith(";")) {
+            body = body.substring(0, body.length() - 1).trim();
+        }
+        if(body.indexOf(';') >= 0) {
+            // A second statement could end the read-only transaction and run
+            // outside it.
+            throw new IllegalArgumentException("Send one statement at a time, or pass "
+                    + "write=true");
+        }
+        if(body.regionMatches(true, 0, "PRAGMA", 0, 6) && body.indexOf('=') >= 0) {
+            // Setting a pragma changes the pooled connection for whoever borrows
+            // it next -- or the file -- whatever the transaction says.
+            throw new IllegalArgumentException("That pragma sets a value; pass write=true "
+                    + "to run it");
+        }
+        Database db = pool.borrow();
+        boolean sqlite = "sqlite".equals(db.dialect().getName());
+        boolean healthy = true;
+        try {
+            if(sqlite) {
+                db.execute("PRAGMA query_only = ON", null);
+            }
+            db.beginTransaction(true);
+            try {
+                return db.query(body, params);
+            } finally {
+                db.rollbackTransaction();
+            }
+        } finally {
+            if(sqlite) {
+                try {
+                    db.execute("PRAGMA query_only = OFF", null);
+                } catch (IOException err) {
+                    // A connection stuck read-only must not go back to the pool.
+                    healthy = false;
+                }
+            }
+            if(!healthy) {
+                db.close();
+            }
+            pool.release(db);
+        }
+    }
+
     private Object sql(Map a) throws Exception {
         DataSource pool = backend.getDataSource();
         if(pool == null) {
@@ -322,7 +380,7 @@ public final class DevTools implements McpServer.Extension {
             throw new IllegalArgumentException("That statement writes; pass write=true to run "
                     + "it");
         }
-        List rows = pool.query(statement, params);
+        List rows = readOnly(pool, statement, params);
         if(rows.size() > 500) {
             List cut = new ArrayList(rows.subList(0, 500));
             Map out = new LinkedHashMap();

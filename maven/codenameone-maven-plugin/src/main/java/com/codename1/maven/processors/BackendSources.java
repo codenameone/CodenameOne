@@ -385,7 +385,9 @@ final class BackendSources {
                 return RestClientAnnotationProcessor.packageOf(c.getBinaryName()).equals(pkg);
             }
             String parent = c.getSuperInternalName();
-            c = parent == null ? null : beans.ctx.lookup(parent);
+            // The same walk proxiedMethods makes, library classes included.
+            c = parent == null || "java/lang/Object".equals(parent) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(beans.ctx, parent);
         }
         return false;
     }

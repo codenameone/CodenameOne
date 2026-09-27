@@ -203,6 +203,22 @@ class TransactionsTest {
     }
 
     @Test
+    @DisplayName("setRollbackOnly in a NESTED method undoes only its savepoint")
+    void nestedRollbackOnlyIsLocal() throws Exception {
+        Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        insert("kept");
+        Transactions.Transaction nested = Transactions.begin(Transactions.NESTED, false, -1);
+        insert("undone");
+        Transactions.setRollbackOnly();
+        assertTrue(Transactions.isRollbackOnly());
+        Transactions.commit(nested);
+        assertFalse(Transactions.isRollbackOnly(), "the outer transaction was marked too");
+        insert("after");
+        Transactions.commit(outer);                  // no UnexpectedRollback
+        assertEquals(2, rows());
+    }
+
+    @Test
     @DisplayName("MANDATORY refuses to run alone and NEVER refuses to run inside one")
     void mandatoryAndNever() throws Exception {
         assertThrows(TransactionException.IllegalState.class,

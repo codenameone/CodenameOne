@@ -101,8 +101,12 @@ public final class Transactions {
          * chose to undo its own work, so the rollback is silent, as in Spring.
          */
         boolean localRollback;
-        /** How many joined or nested calls are running inside the one that began it. */
-        int participants;
+        /**
+         * The joined and nested calls running inside the one that began it,
+         * innermost last -- which is how setRollbackOnly() knows whose work it
+         * undoes.
+         */
+        final java.util.ArrayList calls = new java.util.ArrayList();
         int savepoints;
         /**
          * Savepoints a NESTED method took before the transaction had touched a
@@ -136,6 +140,8 @@ public final class Transactions {
         final boolean suspends;
         final String savepoint;
         boolean completed;
+        /** A NESTED call asked, by setRollbackOnly(), to undo its own work. */
+        boolean rollbackRequested;
 
         Transaction(int kind, Physical physical, Physical suspended, boolean suspends,
                     String savepoint) {
@@ -160,7 +166,15 @@ public final class Transactions {
     /** Whether the calling thread's transaction has been marked rollback-only. */
     public static boolean isRollbackOnly() {
         Physical p = used ? (Physical)CURRENT.get() : null;
-        return p != null && (p.rollbackOnly || p.localRollback);
+        if(p == null) {
+            return false;
+        }
+        Transaction top = innermost(p);
+        return p.rollbackOnly || p.localRollback || (top != null && top.rollbackRequested);
+    }
+
+    private static Transaction innermost(Physical p) {
+        return p.calls.isEmpty() ? null : (Transaction)p.calls.get(p.calls.size() - 1);
     }
 
     /**
@@ -174,10 +188,16 @@ public final class Transactions {
             throw new TransactionException.IllegalState("setRollbackOnly() outside a "
                     + "transaction: there is nothing to roll back");
         }
-        if(p.participants == 0) {
+        Transaction top = innermost(p);
+        if(top == null) {
             // The method that began the transaction: it returns normally and
             // its work is undone, with nothing thrown.
             p.localRollback = true;
+        } else if(top.kind == KIND_SAVEPOINT) {
+            // A NESTED method: its own work goes, back to its savepoint, and
+            // the transaction around it carries on -- which is what a savepoint
+            // is for.
+            top.rollbackRequested = true;
         } else {
             // A joined method: whoever began the transaction must learn that
             // what it thinks it committed was not saved.
@@ -196,7 +216,7 @@ public final class Transactions {
         used = true;
         Transaction tx = open(propagation, readOnly, timeoutSeconds);
         if(tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
-            tx.physical.participants++;
+            tx.physical.calls.add(tx);
         }
         return tx;
     }
@@ -286,6 +306,10 @@ public final class Transactions {
                     // Never set: the nested method did not touch the database.
                     return;
                 }
+                if(tx.rollbackRequested) {
+                    rollBackToSavepoint(tx);
+                    return;
+                }
                 try {
                     flushSession(tx.physical);
                     tx.physical.db.releaseSavepoint(tx.savepoint);
@@ -345,19 +369,7 @@ public final class Transactions {
                     // Never set, so nothing ran after it: nothing to undo.
                     return;
                 }
-                try {
-                    tx.physical.db.rollbackToSavepoint(tx.savepoint);
-                    tx.physical.db.releaseSavepoint(tx.savepoint);
-                    if(tx.physical.session != null) {
-                        // The rows it wrote since the savepoint are gone, so the
-                        // instances it still manages would be lying about them.
-                        tx.physical.session.clear();
-                    }
-                } catch (Exception err) {
-                    tx.physical.rollbackOnly = true;
-                    System.err.println("Could not roll back to savepoint " + tx.savepoint
-                            + "; the transaction will roll back instead: " + err);
-                }
+                rollBackToSavepoint(tx);
                 return;
             case KIND_NEW:
                 try {
@@ -371,10 +383,27 @@ public final class Transactions {
         }
     }
 
+    /** Undoes a NESTED call's work, back to its savepoint; never throws. */
+    private static void rollBackToSavepoint(Transaction tx) {
+        try {
+            tx.physical.db.rollbackToSavepoint(tx.savepoint);
+            tx.physical.db.releaseSavepoint(tx.savepoint);
+            if(tx.physical.session != null) {
+                // The rows it wrote since the savepoint are gone, so the
+                // instances it still manages would be lying about them.
+                tx.physical.session.clear();
+            }
+        } catch (Exception err) {
+            tx.physical.rollbackOnly = true;
+            System.err.println("Could not roll back to savepoint " + tx.savepoint
+                    + "; the transaction will roll back instead: " + err);
+        }
+    }
+
     /** A joined or nested call has ended. */
     private static void leave(Transaction tx) {
         if(tx.physical != null && (tx.kind == KIND_JOINED || tx.kind == KIND_SAVEPOINT)) {
-            tx.physical.participants--;
+            tx.physical.calls.remove(tx);
         }
     }
 

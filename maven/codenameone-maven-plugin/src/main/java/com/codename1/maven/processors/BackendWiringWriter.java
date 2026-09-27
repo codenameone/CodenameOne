@@ -149,6 +149,22 @@ final class BackendWiringWriter {
         sb.append("    public com.codename1.backend.HttpServer.Handler[] create(\n")
           .append("            com.codename1.backend.Backend.Environment environment) "
                   + "throws Exception {\n");
+        // Every field back to null first. A builder started again reuses this
+        // object, and a bean whose condition is off this time -- or a lazy one
+        // already built -- would otherwise keep the stopped server's destroyed
+        // instance and hand it to routes, injections, tools and jobs.
+        sb.append("        synchronized (this) {\n");
+        sb.append("            scheduler = null;\n            transactionSession = null;\n");
+        for (BackendBeans.Bean b : model.beans) {
+            if (BackendBeans.PROTOTYPE.equals(b.scope)) {
+                continue;
+            }
+            sb.append("            ").append(b.var).append(" = null;\n");
+            if (b.lazy) {
+                sb.append("            ").append(b.var).append("Real = null;\n");
+            }
+        }
+        sb.append("        }\n");
         sb.append("        config = environment.getConfig();\n");
         sb.append("        dataSource = environment.getDataSource();\n");
         sb.append("        entities = environment.getEntityManager();\n");
@@ -816,7 +832,10 @@ final class BackendWiringWriter {
                       + "used outside a request\");\n        }\n");
             sb.append("        com.codename1.backend.HttpSession session = "
                     + "request.getSession(true);\n");
-            sb.append("        synchronized (session) {\n");
+            // The session's shared lock, not the HttpSession: a database store
+            // loads a separate copy per request, and locking one copy would let
+            // two requests each build the bean.
+            sb.append("        synchronized (session.beanLock()) {\n");
             sb.append("            Object[] beans = session.scopedBeans(").append(model.sessionSlots)
               .append(");\n");
             sb.append("            if (beans[slot] == null) {\n                beans[slot] = "

@@ -1225,9 +1225,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // entry point exactly as much as one with only controllers does. Guarding
         // on controllers alone left it with no main at all -- and the failure is
         // that the build succeeds and produces nothing runnable. The same goes
-        // for one whose only work is scheduled jobs or MCP tools.
+        // for one whose only work is scheduled jobs, MCP tools or managed
+        // resources -- the management endpoints serve those.
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasTools()) {
+                && !beans.hasTools() && !beans.hasManaged()) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
             // early without this left the marker naming a bootstrap that still

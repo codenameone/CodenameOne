@@ -246,6 +246,9 @@ the `cn1.scheduler.run.duration` histogram, by job and outcome.
 
 When the server stops, the scheduler stops first so that no run begins during the
 drain, and runs that haven't finished get the same grace period as the requests in flight.
+A task on a virtual thread keeps running on its host thread through that window.
+One still running when it ends is abandoned and reported, and its `Future` never
+completes.
 
 === Pitfalls
 

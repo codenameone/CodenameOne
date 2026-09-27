@@ -240,12 +240,21 @@ public final class McpArgs {
     }
 
     private static long toLong(Object v, String name) {
+        if(v instanceof Long || v instanceof Integer || v instanceof Short
+                || v instanceof Byte) {
+            return ((Number)v).longValue();
+        }
         if(v instanceof Number) {
             double d = ((Number)v).doubleValue();
-            if(d != Math.floor(d)) {
+            if(Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
                 throw new IllegalArgumentException("\"" + name + "\" must be a whole number");
             }
-            return ((Number)v).longValue();
+            // longValue() saturates: 1e20 would become Long.MAX_VALUE and the tool
+            // would act on a number nobody sent. 2^63 itself is out of range.
+            if(d < -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
+                throw new IllegalArgumentException("\"" + name + "\" is out of range");
+            }
+            return (long)d;
         }
         try {
             return Long.parseLong(String.valueOf(v).trim());
