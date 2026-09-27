@@ -73,6 +73,16 @@ public class TransformRenderElement extends EffectRenderElement {
         boolean scales = !suppressed && (sx != 1.0 || sy != 1.0);
         boolean rotates = !suppressed && angle != null && angle.doubleValue() != 0.0;
         boolean translates = offset != null && (offset.dx() != 0 || offset.dy() != 0);
+        if (scales && !(sx != 0.0 && sy != 0.0 && isFinite(sx) && isFinite(sy))) {
+            // A collapsed (or non-finite) scale shows nothing, so paint nothing --
+            // Flutter's RenderTransform returns before painting its child when the
+            // matrix's determinant is zero. This used to render the whole subtree into
+            // a layer and then draw that layer at zero size. The gallery's desktop
+            // settings panel sits under a ScaleTransition at 0 until it is opened, so
+            // every cold start rasterised the entire hidden settings page, switch
+            // shadows and all, inside the first frame.
+            return;
+        }
         if (!scales && !rotates) {
             // A translation needs no matrix and no layer: shifting the origin is exact,
             // costs nothing, and works on every port.
@@ -170,5 +180,11 @@ public class TransformRenderElement extends EffectRenderElement {
         } finally {
             g.setTransform(saved);
         }
+    }
+
+    /// True for any value but NaN and the infinities. Arithmetic rather than
+    /// Double.isFinite, which neither vm/JavaAPI nor Ports/CLDC11 declares.
+    private static boolean isFinite(double v) {
+        return v - v == 0.0;
     }
 }
