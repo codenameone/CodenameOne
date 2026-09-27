@@ -275,18 +275,56 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // matching Button.released never fires -- so a Hello-button click never
     // shows its Dialog.
     //
-    // Fix: deferred-release pattern. onMouseDown sets ``pressInFlight=true``
-    // synchronously at handler entry (before any JSO yield) and clears it
-    // after ``Display.pointerPressed`` returns. onMouseUp checks the flag at
-    // dispatch time: if a press is still in flight, it stashes the release
-    // in ``deferredRelease`` and returns immediately; the press's completion
-    // hook then runs the deferred release. We avoid ``Object.wait()`` on
+    // Fix: deferred-release pattern. onMouseDown / onTouchStart open a press
+    // slot synchronously at handler entry (before any JSO yield) and complete
+    // it after ``Display.pointerPressed`` returns. The release handler checks
+    // the slot at dispatch time: if its press is still in flight, the release
+    // is parked on that slot and the handler returns immediately; the press's
+    // completion hook then runs it. We avoid ``Object.wait()`` on
     // purpose -- blocking a worker-side event-listener thread while the EDT
     // is inside ``invokeAndBlock`` (e.g. Dialog modal) starves subsequent
     // pointerdown listener invocations and stalls the entire UI.
+    //
+    // Each press has its own slot. A single shared flag and release slot was enough for one
+    // click at a time, but a quick second tap -- whose press starts while the first press is
+    // still on its way -- cleared the first tap's parked release, so the first press never got
+    // one and the control stayed pressed.
     private final Object pointerEventOrderLock = new Object();
-    private boolean pressInFlight = false;
-    private Runnable deferredRelease;
+
+    /** A press still on its way to Display.pointerPressed, and the release that overtook it. */
+    private static final class PressSlot {
+        Runnable release;
+        boolean done;
+    }
+
+    /** The most recent press; a release always belongs to the press that preceded it. */
+    private PressSlot lastPress;
+
+    /** Marks a press as in flight. Call synchronously at handler entry, before any JSO yield. */
+    private PressSlot beginPressInFlight() {
+        synchronized (pointerEventOrderLock) {
+            PressSlot slot = new PressSlot();
+            lastPress = slot;
+            return slot;
+        }
+    }
+
+    /** Runs a release now, or parks it on its press if that press has not been dispatched yet. */
+    private void dispatchRelease(Runnable release) {
+        boolean now;
+        synchronized (pointerEventOrderLock) {
+            PressSlot slot = lastPress;
+            if (slot != null && !slot.done) {
+                slot.release = release;
+                now = false;
+            } else {
+                now = true;
+            }
+        }
+        if (now) {
+            release.run();
+        }
+    }
 
     private Form _getCurrent() {
         return getCurrentForm();
@@ -2044,15 +2082,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // previous click. The matching nativeCallSerially below
                 // clears the flag after Display.pointerPressed returns, then
                 // runs any release that onMouseUp deferred while waiting.
-                synchronized (pointerEventOrderLock) {
-                    pressInFlight = true;
-                    deferredRelease = null;
-                }
+                final PressSlot press = beginPressInFlight();
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
                     if (cevt.isDefaultPrevented()) {
-                        completePressInFlight();
+                        completePressInFlight(press);
                         return;
                     }
                 }
@@ -2082,7 +2117,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // text field): clear mouseDown so the permanent mousemove
                     // listener's press gate does not dispatch drags for it.
                     pointerState.setMouseDown(false);
-                    completePressInFlight();
+                    completePressInFlight(press);
                     return;
                 }
                 pointerState.setLastMousePosition(x, y);
@@ -2105,7 +2140,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             applyMouseMetadata(me);
                             HTML5Implementation.this.pointerPressed(new int[]{x}, new int[]{y});
                         } finally {
-                            completePressInFlight();
+                            completePressInFlight(press);
                         }
                     }
                 });
@@ -2184,18 +2219,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // run it. Otherwise queue the release immediately. Avoids
                 // blocking the worker's listener thread, which would starve
                 // subsequent pointerdown invocations during a Dialog modal.
-                boolean runNow;
-                synchronized (pointerEventOrderLock) {
-                    if (pressInFlight) {
-                        deferredRelease = releaseDispatch;
-                        runNow = false;
-                    } else {
-                        runNow = true;
-                    }
-                }
-                if (runNow) {
-                    releaseDispatch.run();
-                }
+                dispatchRelease(releaseDispatch);
 
             }
         };
@@ -2213,10 +2237,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // and most taps on a button (issue #5912).
                 final boolean touchAlreadyDown = pointerState.isTouchDown();
                 pointerState.setTouchDown(true);
-                synchronized (pointerEventOrderLock) {
-                    pressInFlight = true;
-                    deferredRelease = null;
-                }
+                final PressSlot press = beginPressInFlight();
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2224,7 +2245,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         if (!touchAlreadyDown) {
                             pointerState.setTouchDown(false);
                         }
-                        completePressInFlight();
+                        completePressInFlight(press);
                         return;
                     }
                 }
@@ -2257,7 +2278,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (!touchAlreadyDown) {
                         pointerState.setTouchDown(false);
                     }
-                    completePressInFlight();
+                    completePressInFlight(press);
                     return;
                 }
                 if (touchDecision.shouldCancelMouseTracking()) {
@@ -2296,12 +2317,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             try {
                                 HTML5Implementation.this.pointerPressed(x, y);
                             } finally {
-                                completePressInFlight();
+                                completePressInFlight(press);
                             }
                         }
                     });
                 } else {
-                    completePressInFlight();
+                    completePressInFlight(press);
                 }
                 
             }
@@ -2362,18 +2383,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // A tap's touchend can overtake its touchstart, which is still suspended on a
                 // host call and has not pressed yet. Releasing first would leave the press
                 // without its release, so the release waits for the press, as onMouseUp does.
-                boolean releaseNow;
-                synchronized (pointerEventOrderLock) {
-                    if (pressInFlight) {
-                        deferredRelease = releaseDispatch;
-                        releaseNow = false;
-                    } else {
-                        releaseNow = true;
-                    }
-                }
-                if (releaseNow) {
-                    releaseDispatch.run();
-                }
+                dispatchRelease(releaseDispatch);
                 if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), pointerState.getTouchStartTime(), currentTimeMillisecondsJS(), pointerState.getTouchStartX(), pointerState.getTouchStartY(), pointerState.getTouchesX()[0], pointerState.getTouchesY()[0])) {
                     // Hack for iOS only to anticipate clicking on a text field
                     createAndFocusTextFieldPreemptively(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
@@ -2677,7 +2687,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // worker-callback bridge never sees, so the listener was added and never called. Every
         // move of every drag was lost -- a finger could not scroll, and a mouse drag could not
         // either -- while the press and the release still arrived (issue #5912).
-        outputCanvas.addEventListener("mousemove", onMouseMove, true);
+        // pointermove only: a mouse or pen move fires pointermove AND its compatibility
+        // mousemove, so listening to both dispatched every drag step twice. Every browser this
+        // port supports has pointer events, which is why JavaScriptEventWiring registers only
+        // pointerdown / pointerup too.
         outputCanvas.addEventListener("pointermove", onMouseMove, true);
         outputCanvas.addEventListener("touchmove", onTouchMove, true);
 
@@ -3953,12 +3966,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
-    private void completePressInFlight() {
+    private void completePressInFlight(PressSlot press) {
         Runnable pending;
         synchronized (pointerEventOrderLock) {
-            pressInFlight = false;
-            pending = deferredRelease;
-            deferredRelease = null;
+            press.done = true;
+            pending = press.release;
+            press.release = null;
         }
         if (pending != null) {
             pending.run();

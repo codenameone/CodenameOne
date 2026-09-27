@@ -35,24 +35,15 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 /// Issue #5910 reported the area around a dialog as blank in a browser. The cause was in the
 /// JavaScript port -- a theme refresh on show dropped the backdrop painter -- and
 /// scripts/test-javascript-composited-rendering.mjs guards that. This guards the framework half
-/// the port relies on, on the desktop path and under the legacy theme the report ran.
+/// the port relies on, on the desktop path and the mobile one.
+///
+/// Deliberately no variant that installs a real theme: several classes cache theme constants in
+/// statics on first use, so a test that installs one changes the tests that run after it in the
+/// same JVM -- the first version of this class failed eight unrelated tests that way.
 class DialogBackdropTest extends UITestBase {
 
     @FormTest
     void theFormShowsAroundADesktopDialog() {
-        implementation.setDesktop(true);
-        try {
-            assertBackdropPainted();
-        } finally {
-            implementation.setDesktop(false);
-        }
-    }
-
-    @FormTest
-    void theFormShowsAroundADesktopDialogUnderTheLegacyTheme() throws Exception {
-        java.io.File res = new java.io.File("../../Themes/iOS7Theme.res");
-        com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(new java.io.FileInputStream(res));
-        com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(r.getThemeResourceNames()[0]));
         implementation.setDesktop(true);
         try {
             assertBackdropPainted();

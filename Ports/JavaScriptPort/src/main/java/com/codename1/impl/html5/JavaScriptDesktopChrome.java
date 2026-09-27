@@ -231,6 +231,13 @@ final class JavaScriptDesktopChrome {
             label.setTextContent(c.getCommandName());
             item.appendChild(label);
             String shortcut = shortcutText(c, mac);
+            String binding = acceleratorBinding(c);
+            if (binding != null) {
+                // browser_bridge.js matches key presses against this on the main thread, where
+                // preventDefault still works -- so Ctrl/Cmd+S runs the command instead of also
+                // opening the browser's Save dialog -- and activates the item with a click.
+                item.setAttribute("data-cn1-accel", binding);
+            }
             if (shortcut != null) {
                 HTMLElement accel = document.createElement("span");
                 accel.setAttribute("class", "cn1-chrome-shortcut");
@@ -308,6 +315,29 @@ final class JavaScriptDesktopChrome {
         } else {
             item.setAttribute("aria-disabled", "true");
         }
+    }
+
+    /// The key binding browser_bridge.js matches, as `primary[+alt][+shift]+<key>` with the key in
+    /// lower case; null for a command without a primary-modifier shortcut, which a page cannot
+    /// claim without breaking ordinary typing.
+    static String acceleratorBinding(Command c) {
+        int key = c.getDesktopShortcutKeyChar();
+        int mods = c.getDesktopShortcutModifiers();
+        if (key <= 0 || (mods & Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder("primary");
+        if ((mods & Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0) {
+            sb.append("+alt");
+        }
+        if ((mods & Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT) != 0) {
+            sb.append("+shift");
+        }
+        char ch = (char) key;
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = (char) (ch + 32);
+        }
+        return sb.append('+').append(ch).toString();
     }
 
     void closeMenus() {

@@ -6838,6 +6838,38 @@
   }
   try { installPeerPointerToggle(); } catch (e) { /* non-fatal */ }
 
+  // Keyboard accelerators of the HTML menu bar (javascript.titleBar=html). The menu items carry
+  // data-cn1-accel ("primary[+alt][+shift]+<key>"); a matching key press activates the item with
+  // a click, which reaches the app through the item's ordinary listener. Matched HERE, on the main
+  // thread and in the capture phase, because only here can the default be prevented: the worker
+  // sees the event after the browser has acted on it, so Ctrl/Cmd+S would have opened the
+  // browser's Save dialog as well. Only primary-modifier combinations are claimed, so ordinary
+  // typing is never intercepted.
+  function installMenuAccelerators() {
+    document.addEventListener('keydown', function(e) {
+      if (!(e.ctrlKey || e.metaKey) || e.repeat) {
+        return;
+      }
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      var key = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (!key || key === '"' || key === '\\') {
+        return;
+      }
+      var binding = 'primary' + (e.altKey ? '+alt' : '') + (e.shiftKey ? '+shift' : '') + '+' + key;
+      var item = chrome.querySelector('[data-cn1-accel="' + binding + '"]');
+      if (!item || item.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      item.click();
+    }, true);
+  }
+  try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
+
   global.startParparVmApp = function() {
     log('startParparVmApp');
     diag('INIT', 'startParparVmApp', 'entered');

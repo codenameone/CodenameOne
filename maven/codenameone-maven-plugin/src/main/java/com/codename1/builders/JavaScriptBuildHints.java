@@ -268,8 +268,9 @@ public final class JavaScriptBuildHints {
     /// [#THEME_PROPERTIES] (recorded as [#RUNTIME_THEME_CHOICE]). A class that names a resource
     /// or a property stores the string verbatim in its constant pool, so a byte search finds it.
     ///
-    /// Framework classes (`com/codename1/`) are skipped: the tree is the application merged
-    /// with the framework, and the framework's build-hint annotations spell the hint names too.
+    /// The framework's annotation and implementation packages are skipped (see
+    /// [#isFrameworkPath(String)]): the tree is the application merged with the framework, and
+    /// those spell the hint names too.
     /// Call this BEFORE the port is merged in, for the same reason: the port names every theme.
     static Set<String> scanThemeReferences(File classesDir) throws IOException {
         Set<String> found = new LinkedHashSet<String>();
@@ -279,8 +280,13 @@ public final class JavaScriptBuildHints {
         return found;
     }
 
+    /// The framework packages that spell the theme hint names without choosing a theme: the
+    /// build-hint annotations declare them, and the ports read them. Only these are skipped --
+    /// not all of `com/codename1/`, which applications and cn1libs use for their own packages
+    /// too, and whose calls to `Display.setProperty` must still be seen.
     static boolean isFrameworkPath(String relativePath) {
-        return relativePath.startsWith("com/codename1/");
+        return relativePath.startsWith("com/codename1/annotations/")
+                || relativePath.startsWith("com/codename1/impl/");
     }
 
     private static void scanDirectory(File dir, String relativePath, Set<String> found) throws IOException {

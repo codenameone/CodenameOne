@@ -157,7 +157,10 @@ class JavaScriptBuildHintsTest {
     @Test
     void frameworkClassesAreNotScanned() {
         assertTrue(JavaScriptBuildHints.isFrameworkPath("com/codename1/annotations/buildhints/Android.class"));
+        assertTrue(JavaScriptBuildHints.isFrameworkPath("com/codename1/impl/html5/HTML5Implementation.class"));
         assertFalse(JavaScriptBuildHints.isFrameworkPath("com/example/app/Main.class"));
+        // Applications and cn1libs use com.codename1.* packages too; their choices must be seen.
+        assertFalse(JavaScriptBuildHints.isFrameworkPath("com/codename1/demos/theme/Main.class"));
     }
 
     /// The bytes of a CONSTANT_Utf8 entry, as a class file stores a string constant.

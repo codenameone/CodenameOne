@@ -358,6 +358,10 @@ div#cn1-video-capture > video {
     left: 0;
     top: 100%;
     min-width: 200px;
+    /* A long menu scrolls inside the window: the body is fixed with overflow hidden, so a
+       panel taller than the viewport would put its last commands out of reach. */
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
     padding: 4px;
     display: flex;
     flex-direction: column;

@@ -60,7 +60,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { chromium, firefox, webkit, devices } = require('playwright');
 
-const bundleDir = process.argv[2];
+const bundleDir = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const outDir = process.argv[3] || path.resolve('artifacts/javascript-composited');
 if (!bundleDir || !fs.existsSync(path.join(bundleDir, 'index.html'))) {
   console.error('usage: test-javascript-composited-rendering.mjs <bundle-dir> [artifacts-dir]');
@@ -80,7 +80,7 @@ const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/index.html';
   const file = path.join(bundleDir, path.normalize(p));
-  if (!file.startsWith(path.resolve(bundleDir))) { res.writeHead(403); res.end(); return; }
+  if (!file.startsWith(bundleDir)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
