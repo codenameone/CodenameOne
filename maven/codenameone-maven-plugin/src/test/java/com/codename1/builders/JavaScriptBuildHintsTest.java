@@ -148,6 +148,14 @@ class JavaScriptBuildHintsTest {
     }
 
     @Test
+    void pruningCanBeTurnedOff() {
+        // For an app that computes its theme path, e.g. Resources.open("/" + name + ".res").
+        assertEquals(new HashSet<String>(JavaScriptBuildHints.ALL_THEMES),
+                ship(request("javascript.pruneThemes", "false")));
+        assertEquals(set("iOS7Theme", "android_holo_light"), ship(request("javascript.pruneThemes", "true")));
+    }
+
+    @Test
     void anExtensionlessLayeredThemeReferenceIsKept() {
         // Resources.openLayered("/AndroidMaterialTheme") appends ".res" itself.
         Set<String> refs = new LinkedHashSet<String>();

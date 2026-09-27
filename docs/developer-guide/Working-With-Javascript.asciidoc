@@ -542,7 +542,7 @@ Two JavaScript hints refine that:
 |Loads this theme in every browser, instead of the one the hints and the browser would pick. Place JavaScript-only themes in `javascript/src/main/resources` so they aren't bundled into other platforms.
 |===
 
-The build ships only the themes the application can reach. Pinning a desktop theme, or leaving the desktop themes out, keeps the others out of the bundle. A theme your own code opens by name, such as `Resources.open("/GnomeAdwaitaTheme.res")`, is always kept.
+The build ships only the themes the application can reach. Pinning a desktop theme, or leaving the desktop themes out, keeps the others out of the bundle. A theme your own code opens by name, such as `Resources.open("/GnomeAdwaitaTheme.res")`, is always kept. If your code builds the name at runtime, for example from its configuration, set `javascript.pruneThemes=false` to ship every theme.
 
 ==== Title bar and menu bar on the desktop
 

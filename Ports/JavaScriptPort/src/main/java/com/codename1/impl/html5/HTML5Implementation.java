@@ -295,6 +295,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static final class PressSlot {
         Runnable release;
         boolean done;
+        /** Drags that arrived before the press itself was dispatched, in order. */
+        List<Runnable> moves;
     }
 
     /** The most recent press; a release always belongs to the press that preceded it. */
@@ -317,6 +319,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private PressSlot pressForRelease() {
         synchronized (pointerEventOrderLock) {
             return lastPress;
+        }
+    }
+
+    /**
+     * Runs a drag now, or queues it behind its press if the press has not been dispatched yet.
+     * A drag delivered before its press is dropped by the framework (nothing is pressed) or
+     * starts a gesture out of order, which is what a quick swipe under bridge latency produced.
+     */
+    private void dispatchMove(PressSlot slot, Runnable move) {
+        boolean now;
+        synchronized (pointerEventOrderLock) {
+            if (slot != null && !slot.done) {
+                if (slot.moves == null) {
+                    slot.moves = new ArrayList<Runnable>();
+                }
+                slot.moves.add(move);
+                now = false;
+            } else {
+                now = true;
+            }
+        }
+        if (now) {
+            move.run();
         }
     }
 
@@ -2427,6 +2452,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (!pointerState.isTouchDown()) {
                     return;
                 }
+                // The press this move belongs to, taken before any JSO yield: touchDown is set at
+                // touchstart's ENTRY, so a move can arrive while that press is still on its way.
+                final PressSlot press = pressForRelease();
                 debugLog("in TouchMove");
                 TouchEvent me = (TouchEvent)evt;
                 JSArray<MouseEvent> touches = me.getTargetTouches();
@@ -2454,10 +2482,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 
                 pointerState.setTouches(x, y);
-                nativeCallSerially(new Runnable() {
-                    @Override
+                dispatchMove(press, new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerDragged(x, y);  
+                        nativeCallSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                HTML5Implementation.this.pointerDragged(x, y);
+                            }
+                        });
                     }
                 });
             }
@@ -2472,13 +2504,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // race that used to add them inside the suspending onMouseDown
                 // (which the cooperative scheduler can take a while to complete).
                 // Only act while a pointer is actually pressed. Keep this gate
-                // FIRST and cheap: the listener is permanent AND bound to both
-                // mousemove and pointermove, so it fires (twice) on every mouse
-                // move -- debugLog (a native debugFlag bridge call) must stay BELOW
-                // the gate, else it taxes every hover app-wide.
+                // FIRST and cheap: the listener is permanent (pointermove), so it
+                // fires on every mouse move -- debugLog (a native debugFlag bridge
+                // call) must stay BELOW the gate, else it taxes every hover app-wide.
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
+                final PressSlot press = pressForRelease();
                 debugLog("In mouseMove");
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
@@ -2495,11 +2527,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 
                 pointerState.setLastMousePosition(x, y);
-                nativeCallSerially(new Runnable() {
-
-                    @Override
+                dispatchMove(press, new Runnable() {
                     public void run() {
-                        HTML5Implementation.this.pointerDragged(x, y);
+                        nativeCallSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                HTML5Implementation.this.pointerDragged(x, y);
+                            }
+                        });
                     }
                 });
             }
@@ -3980,10 +4015,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private void completePressInFlight(PressSlot press) {
         Runnable pending;
+        List<Runnable> moves;
         synchronized (pointerEventOrderLock) {
             press.done = true;
             pending = press.release;
             press.release = null;
+            moves = press.moves;
+            press.moves = null;
+        }
+        if (moves != null) {
+            for (Runnable move : moves) {
+                move.run();
+            }
         }
         if (pending != null) {
             pending.run();
@@ -4852,6 +4895,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 dispatchNativeMenuCommand(cmd);
                             }
                         });
+                    }
+
+                    public Object renderIcon(HTMLElement into, Command cmd) {
+                        Image icon = cmd.getIcon();
+                        if (icon == null && cmd.getMaterialIcon() != 0) {
+                            Style st = UIManager.getInstance().getComponentStyle("Command");
+                            float size = cmd.getMaterialIconSize();
+                            icon = size > 0 ? FontImage.createMaterial(cmd.getMaterialIcon(), st, size)
+                                    : FontImage.createMaterial(cmd.getMaterialIcon(), st);
+                        }
+                        if (icon == null || icon.getWidth() <= 0 || icon.getHeight() <= 0) {
+                            return null;
+                        }
+                        Image rendered = Image.createImage(icon.getWidth(), icon.getHeight(), 0);
+                        rendered.getGraphics().drawImage(icon, 0, 0);
+                        attachImageToElement((NativeImage) rendered.getImage(), into,
+                                scaleCoord(icon.getWidth()) + "px", scaleCoord(icon.getHeight()) + "px");
+                        return rendered;
                     }
                 });
         chromeTopCss = desktopChrome.getHeight();

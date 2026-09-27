@@ -145,6 +145,12 @@ public final class JavaScriptBuildHints {
     ///   in the application's own classes; an application that opens a theme itself keeps it
     static Set<String> themesToShip(BuildRequest request, Set<String> referencedByApp) {
         Set<String> out = new LinkedHashSet<String>();
+        if ("false".equals(lower(request.getArg("javascript.pruneThemes", null)))) {
+            // The application names its theme in a way no scan can see -- a path it computes,
+            // a name read from its configuration -- and has said so.
+            out.addAll(ALL_THEMES);
+            return out;
+        }
         if (referencedByApp.contains(RUNTIME_THEME_CHOICE)) {
             // The application picks the theme itself, so the hints do not say which one it
             // will open. Keep them all rather than delete the one it asks for.

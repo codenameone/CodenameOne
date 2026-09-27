@@ -393,6 +393,13 @@ div#cn1-video-capture > video {
 #cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
     opacity: 0.45;
 }
+#cn1-desktop-chrome .cn1-chrome-icon {
+    display: inline-flex;
+    align-items: center;
+}
+#cn1-desktop-chrome .cn1-chrome-icon canvas {
+    display: block;
+}
 #cn1-desktop-chrome .cn1-chrome-shortcut {
     opacity: 0.6;
 }

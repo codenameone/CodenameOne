@@ -53,6 +53,10 @@ final class JavaScriptDesktopChrome {
     /// Receives a chosen menu item; called on the worker, not the EDT.
     interface CommandSink {
         void commandChosen(Command cmd);
+
+        /// Draws the command's icon into `into`; returns what must stay referenced while the
+        /// element shows it (the rendered image), or null when the command has no icon.
+        Object renderIcon(HTMLElement into, Command cmd);
     }
 
     /// The standard top-level menus and where each placement hint lands, in the order desktop
@@ -90,6 +94,9 @@ final class JavaScriptDesktopChrome {
     private final List<List<Object[]>> itemsByMenu = new ArrayList<List<Object[]>>();
     private final Map<String, Command> commandsById = new HashMap<String, Command>();
     private int nextCommandId;
+    /// The icon images the current menus show, kept reachable until the next rebuild: an image's
+    /// host surface is released when the Java image is collected.
+    private final List<Object> iconImages = new ArrayList<Object>();
 
     JavaScriptDesktopChrome(HTMLDocument document, HTMLElement appSurface, String os, CommandSink sink) {
         this.document = document;
@@ -162,6 +169,7 @@ final class JavaScriptDesktopChrome {
         menus.clear();
         itemsByMenu.clear();
         commandsById.clear();
+        iconImages.clear();
         menuBar.setInnerHTML("");
         Map<String, List<Command>> groups = group(commands);
         for (Map.Entry<String, List<Command>> e : groups.entrySet()) {
@@ -181,8 +189,11 @@ final class JavaScriptDesktopChrome {
                     continue;
                 }
                 Command c = (Command) o;
-                String name = c.getCommandName();
-                if (name == null || name.length() == 0) {
+                // An icon-only command -- new Command("", icon), a common right-bar action -- is
+                // kept: with the Toolbar hidden this menu is its only way to be reached. The
+                // native desktop ports skip it because their menus take text only; this one can
+                // show the icon itself.
+                if (!hasLabel(c) && !hasIcon(c)) {
                     continue;
                 }
                 String menu = titleForHint(c.getDesktopMenu());
@@ -226,6 +237,15 @@ final class JavaScriptDesktopChrome {
         return hint;
     }
 
+    private static boolean hasLabel(Command c) {
+        String name = c.getCommandName();
+        return name != null && name.length() > 0;
+    }
+
+    private static boolean hasIcon(Command c) {
+        return c.getIcon() != null || c.getMaterialIcon() != 0;
+    }
+
     private static boolean isStandard(String menu) {
         for (String m : MENU_ORDER) {
             if (m.equals(menu)) {
@@ -262,9 +282,22 @@ final class JavaScriptDesktopChrome {
             String id = String.valueOf(nextCommandId++);
             commandsById.put(id, c);
             item.setAttribute("data-cn1-cmd", id);
-            HTMLElement label = document.createElement("span");
-            label.setTextContent(c.getCommandName());
-            item.appendChild(label);
+            if (hasLabel(c)) {
+                HTMLElement label = document.createElement("span");
+                label.setTextContent(c.getCommandName());
+                item.appendChild(label);
+            } else {
+                HTMLElement icon = document.createElement("span");
+                icon.setAttribute("class", "cn1-chrome-icon");
+                item.appendChild(icon);
+                Object image = sink.renderIcon(icon, c);
+                if (image != null) {
+                    iconImages.add(image);
+                }
+                // Something for assistive technology to announce; the command has no text of its
+                // own to offer.
+                item.setAttribute("aria-label", "Command " + (items.size()));
+            }
             String shortcut = shortcutText(c, mac);
             String binding = acceleratorBinding(c);
             if (binding != null) {

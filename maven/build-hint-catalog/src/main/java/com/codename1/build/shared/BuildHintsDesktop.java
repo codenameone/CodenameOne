@@ -136,6 +136,16 @@ final class BuildHintsDesktop {
                         + "generated proxy packaging unless `javascript.proxy.target` is also set. If "
                         + "`javascript.inject_proxy` is `false`, this build hint is ignored."));
 
+        h.add(new Hint("javascript.pruneThemes")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("javascript")
+                .doc("true/false (defaults to `true`). The build ships only the native themes the "
+                        + "application can reach from its theme hints, plus any theme its code names "
+                        + "as a string. Set to `false` for an application that loads a native theme by "
+                        + "a name it computes or reads from configuration, which no build can see."));
+
         h.add(new Hint("javascript.textSelection")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.BOOLEAN)
