@@ -49,8 +49,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
 /// Provides object pooling for all objects used in the engine. Objects retrieved from here should
 /// only be used temporarily, and then pushed back (with the exception of arrays).
-///
-/// @author Daniel Murphy
 public class DefaultWorldPool implements IWorldPool {
 
   private final OrderedStack<Vec2> vecs;

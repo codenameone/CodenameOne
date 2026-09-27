@@ -24,8 +24,6 @@ import java.util.Locale;
 
 /**
  * A renderer for Date.
- *  
- * @author Ricardo Lopes
  */
 public class DateRenderer extends DefaultCellRenderer {
 

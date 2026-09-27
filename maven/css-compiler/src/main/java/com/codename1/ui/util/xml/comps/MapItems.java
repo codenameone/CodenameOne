@@ -25,10 +25,6 @@ package com.codename1.ui.util.xml.comps;
 
 import com.codename1.ui.util.xml.Val;
 
-/**
- *
- * @author Shai Almog
- */
 public class MapItems {    
     private Val[] imageItem; 
 

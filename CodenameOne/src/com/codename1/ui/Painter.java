@@ -50,8 +50,6 @@ import com.codename1.ui.geom.Rectangle;
 /// };
 /// cmp.getStyle().setBgPainter(p);
 /// ```
-///
-/// @author Chen Fishbein
 public interface Painter {
 
     /// Draws inside the given rectangle clipping area.

@@ -57,10 +57,6 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLElement;
 
-/**
- *
- * @author shannah
- */
 public class HTML5Media extends AbstractMedia {
     public static boolean microphoneActive;
     private HTMLMediaElement el;

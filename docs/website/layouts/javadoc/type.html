@@ -3,10 +3,11 @@
 <article class="post-single cn1-api cn1-api--type">
   <header class="post-header cn1-api__header">
     <nav class="cn1-api__crumbs" aria-label="API location">
-      <a href="/javadoc/">API</a>
+      <a href="{{ $j.root | default "/javadoc/" }}">{{ $j.audienceLabel | default "API" }}</a>
       <span aria-hidden="true">/</span>
       <a href="{{ $j.package.url }}">{{ $j.package.name }}</a>
     </nav>
+    {{ partial "javadoc/audience.html" $j }}
     {{- with $j.annotations }}
     <p class="cn1-api__annotations">{{ range . }}<code>{{ . }}</code> {{ end }}</p>
     {{- end }}

@@ -22,10 +22,6 @@
  */
 package java.lang;
 
-/**
- *
- * @author shannah
- */
 public abstract class Number {
     public abstract int intValue();
     

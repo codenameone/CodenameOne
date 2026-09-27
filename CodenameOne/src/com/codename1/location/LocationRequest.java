@@ -24,8 +24,6 @@ package com.codename1.location;
 
 /// This class is used when requesting to listen to location update.
 /// See `l, com.codename1.location.LocationRequest req) setLocationListener`
-///
-/// @author Chen
 public class LocationRequest {
 
     /// When you need gps location updates

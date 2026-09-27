@@ -28,7 +28,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
 /// Friction joint definition.
-/// @author Daniel Murphy
 public class FrictionJointDef extends JointDef {
 
 

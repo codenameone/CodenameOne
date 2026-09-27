@@ -31,8 +31,6 @@ import java.io.IOException;
 /**
  * This is an implementation to the google sign in.
  * https://developers.google.com/+/mobile/android/getting-started
- * 
- * @author Chen
  */
 public class GoogleImpl extends GoogleConnect  {
 

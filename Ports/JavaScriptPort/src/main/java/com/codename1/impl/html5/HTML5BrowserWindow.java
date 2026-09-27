@@ -40,7 +40,6 @@ import com.codename1.html5.js.dom.EventListener;
 
 /**
  * A base class for JavaSE browser window implementations.
- * @author shannah
  * @since 7.0
  */
 public class HTML5BrowserWindow {

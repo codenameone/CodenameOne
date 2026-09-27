@@ -24,8 +24,6 @@
 package com.codename1.io.rest;
 
 /// The http Response class
-///
-/// @author Chen Fishbein
 public class Response<T> {
     private final int responseCode;
     private final T responseData;

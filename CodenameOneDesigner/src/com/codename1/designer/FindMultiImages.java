@@ -35,8 +35,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Allows seeking for multi-images in a directory hierarchy seamlessly
- *
- * @author Shai Almog
  */
 public class FindMultiImages extends javax.swing.JDialog {
     private EditableResources res;

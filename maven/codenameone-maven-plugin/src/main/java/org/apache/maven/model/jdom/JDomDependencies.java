@@ -36,8 +36,6 @@ import static org.codehaus.plexus.util.StringUtils.defaultString;
 
 /**
  * JDOM implementation of POMs {@code dependencies} element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomDependencies extends ArrayList<Dependency> implements JDomBacked {
 

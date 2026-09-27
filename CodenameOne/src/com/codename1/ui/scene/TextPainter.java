@@ -29,8 +29,6 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 
 /// A painter for painting text into a Node.
-///
-/// @author shannah
 public class TextPainter implements NodePainter {
     private String text;
     private int vAlign = Component.CENTER;

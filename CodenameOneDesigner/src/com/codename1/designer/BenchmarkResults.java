@@ -31,8 +31,6 @@ import javax.swing.table.DefaultTableModel;
 
 /**
  *  Shows the result of a benchmark run in the theme editor
- *
- * @author Shai Almog
  */
 public class BenchmarkResults extends javax.swing.JDialog {
 

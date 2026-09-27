@@ -83,8 +83,6 @@ import java.util.HashMap;
 /// hi.add(phone);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class Validator {
     private static final String VALID_MARKER = "cn1$$VALID_MARKER";
     /// Indicates the default mode in which validation failures are expressed

@@ -30,8 +30,6 @@ import com.codename1.ui.list.ListModel;
 
 /// A list of Radio buttons that can be managed as a single component.
 ///
-/// @author Steve Hannah
-///
 /// #### See also
 ///
 /// - ButtonList for code samples

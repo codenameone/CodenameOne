@@ -29,29 +29,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * A span as {@link OtlpTracer} records it.
- *
- * <p>Written by one thread -- the one doing the work it times -- and handed to
- * the exporter only by {@link #end}, through a synchronized queue, so nothing
- * here needs a lock of its own.
- */
+/// A span as [OtlpTracer] records it.
+///
+/// Written by one thread -- the one doing the work it times -- and handed to
+/// the exporter only by [#end], through a synchronized queue, so nothing
+/// here needs a lock of its own.
 final class OtelSpan extends Span {
-    /** Whether an export of this span has already been retried once; see BatchExporter. */
+    /// Whether an export of this span has already been retried once; see BatchExporter.
     boolean exportRetried;
-    /** OpenTelemetry's default attribute and event limits. */
+    /// OpenTelemetry's default attribute and event limits.
     static final int MAX_ATTRIBUTES = 128;
     static final int MAX_EVENTS = 128;
-    /** Past this a string attribute is truncated. A request body in an attribute is a bug. */
+    /// Past this a string attribute is truncated. A request body in an attribute is a bug.
     static final int MAX_VALUE_LENGTH = 4096;
-    /** Past this an attribute KEY is dropped; see put. */
+    /// Past this an attribute KEY is dropped; see put.
     static final int MAX_KEY_LENGTH = 256;
 
     private final OtlpTracer tracer;
     final long traceHi;
     final long traceLo;
     final long spanId;
-    /** 0 for a root span. */
+    /// 0 for a root span.
     final long parentId;
     final boolean parentRemote;
     final boolean sampled;
@@ -59,20 +57,18 @@ final class OtelSpan extends Span {
     final int kind;
     String name;
     final long startEpochNanos;
-    /**
-     * The clock this span reads: an epoch time and the monotonic reading taken at
-     * the same moment, shared by every span of one trace in this process.
-     */
+    /// The clock this span reads: an epoch time and the monotonic reading taken at
+    /// the same moment, shared by every span of one trace in this process.
     final long anchorEpochNanos;
     final long anchorNano;
     long endEpochNanos;
-    /** Key to value (String, Long, Double or Boolean), in the order first set. */
+    /// Key to value (String, Long, Double or Boolean), in the order first set.
     final Map attributes;
     int droppedAttributes;
-    /** Each an Object[] {Long time, String name, Map attributes}. */
+    /// Each an Object\[\] {Long time, String name, Map attributes}.
     final List events;
     int droppedEvents;
-    /** 0 unset, 2 error: OTLP's StatusCode. OK is never set by instrumentation. */
+    /// 0 unset, 2 error: OTLP's StatusCode. OK is never set by instrumentation.
     int statusCode;
     String statusMessage;
     private boolean ended;
@@ -100,7 +96,7 @@ final class OtelSpan extends Span {
         // was reported ending after the parent that contains it. The monotonic
         // reading also keeps a clock step from producing a span that ends before
         // it starts.
-        if(localParent != null) {
+        if (localParent != null) {
             this.anchorEpochNanos = localParent.anchorEpochNanos;
             this.anchorNano = localParent.anchorNano;
         } else {
@@ -112,19 +108,22 @@ final class OtelSpan extends Span {
         this.events = sampled ? new ArrayList(0) : null;
     }
 
+    @Override
     public Span setAttribute(String key, String value) {
-        if(value != null && value.length() > MAX_VALUE_LENGTH) {
+        if (value != null && value.length() > MAX_VALUE_LENGTH) {
             value = bound(value);
         }
         return put(key, value);
     }
 
+    @Override
     public Span setAttribute(String key, long value) {
         return put(key, Long.valueOf(value));
     }
 
+    @Override
     public Span setAttribute(String key, double value) {
-        if(Double.isNaN(value) || Double.isInfinite(value)) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
             // JSON has no spelling for either, so the whole export would be
             // refused by a collector over one attribute. Kept as text instead.
             return put(key, String.valueOf(value));
@@ -132,12 +131,13 @@ final class OtelSpan extends Span {
         return put(key, Double.valueOf(value));
     }
 
+    @Override
     public Span setAttribute(String key, boolean value) {
         return put(key, value ? Boolean.TRUE : Boolean.FALSE);
     }
 
     private Span put(String key, Object value) {
-        if(!sampled || ended || key == null || value == null || tracer.excluded(key)) {
+        if (!sampled || ended || key == null || value == null || tracer.excluded(key)) {
             return this;
         }
         // An oversized KEY is dropped rather than cut. Values are truncated because a
@@ -145,11 +145,11 @@ final class OtelSpan extends Span {
         // attribute, and two long keys sharing one would silently overwrite each other.
         // Left unbounded, one key read from a request could carry the whole export
         // batch past the collector's size limit and lose every span in it.
-        if(key.length() > MAX_KEY_LENGTH) {
+        if (key.length() > MAX_KEY_LENGTH) {
             droppedAttributes++;
             return this;
         }
-        if(!attributes.containsKey(key) && attributes.size() >= MAX_ATTRIBUTES) {
+        if (!attributes.containsKey(key) && attributes.size() >= MAX_ATTRIBUTES) {
             droppedAttributes++;
             return this;
         }
@@ -157,13 +157,14 @@ final class OtelSpan extends Span {
         return this;
     }
 
-    /** Whether {@code owner} made this span. */
+    /// Whether `owner` made this span.
     boolean isFrom(OtlpTracer owner) {
-        return tracer == owner;
+        return tracer == owner; //NOPMD CompareObjectsWithEquals - which tracer INSTANCE made it
     }
 
+    @Override
     public Span recordException(Throwable error) {
-        if(!sampled || ended || error == null) {
+        if (!sampled || ended || error == null) {
             return this;
         }
         // The exclusion list governs these like any other attribute: it is how a
@@ -178,15 +179,15 @@ final class OtelSpan extends Span {
         // stops bounding memory.
         String description = message == null ? type : message;
         statusMessage = description == null ? null : bound(description);
-        if(events.size() >= MAX_EVENTS) {
+        if (events.size() >= MAX_EVENTS) {
             droppedEvents++;
             return this;
         }
         Map attrs = new LinkedHashMap();
-        if(type != null) {
+        if (type != null) {
             attrs.put("exception.type", type);
         }
-        if(message != null) {
+        if (message != null) {
             attrs.put("exception.message", message.length() > MAX_VALUE_LENGTH
                     ? bound(message) : message);
         }
@@ -194,8 +195,9 @@ final class OtelSpan extends Span {
         return this;
     }
 
+    @Override
     public Span setError(String description) {
-        if(!sampled || ended) {
+        if (!sampled || ended) {
             return this;
         }
         statusCode = 2;
@@ -203,59 +205,65 @@ final class OtelSpan extends Span {
         return this;
     }
 
+    @Override
     public Span updateName(String newName) {
-        if(!ended && newName != null) {
+        if (!ended && newName != null) {
             name = bound(newName);
         }
         return this;
     }
 
+    @Override
     public String getName() {
         return name;
     }
 
+    @Override
     public int getKind() {
         return kind;
     }
 
+    @Override
     public boolean isRecording() {
         return sampled && !ended && !discarded;
     }
 
+    @Override
     public String traceparent() {
         return TraceContext.format(traceHi, traceLo, spanId, sampled);
     }
 
+    @Override
     public String tracestate() {
         return tracestate;
     }
 
+    @Override
     public void discard() {
         discarded = true;
     }
 
+    @Override
     public void end() {
-        if(ended) {
+        if (ended) {
             return;
         }
         ended = true;
         endEpochNanos = nowEpochNanos();
-        if(sampled && !discarded) {
+        if (sampled && !discarded) {
             tracer.ended(this);
         }
     }
 
-    /**
-     * At most MAX_VALUE_LENGTH chars, cut on a code point boundary. A cut through a
-     * surrogate pair kept a lone high surrogate, which UTF-8 encoding then
-     * replaced, so the exported value was not the one the server recorded.
-     */
+    /// At most MAX_VALUE_LENGTH chars, cut on a code point boundary. A cut through a
+    /// surrogate pair kept a lone high surrogate, which UTF-8 encoding then
+    /// replaced, so the exported value was not the one the server recorded.
     static String bound(String value) {
-        if(value.length() <= MAX_VALUE_LENGTH) {
+        if (value.length() <= MAX_VALUE_LENGTH) {
             return value;
         }
         int end = MAX_VALUE_LENGTH;
-        if(Character.isHighSurrogate(value.charAt(end - 1))) {
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
             end--;
         }
         return value.substring(0, end);

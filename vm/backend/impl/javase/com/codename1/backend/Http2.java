@@ -23,20 +23,18 @@
 package com.codename1.backend;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
-/**
- * HTTP/2 is deliberately absent from the local Java SE runtime.
- *
- * h2 is only ever reached through ALPN on a TLS connection, and the local runtime
- * does not terminate TLS (see Tls), so this could not be entered even if it were
- * implemented. Keeping the shape and refusing at create() means the shared server
- * code above needs no target-specific branch.
- */
+/// HTTP/2 is deliberately absent from the local Java SE runtime.
+///
+/// h2 is only ever reached through ALPN on a TLS connection, and the local runtime
+/// does not terminate TLS (see Tls), so this could not be entered even if it were
+/// implemented. Keeping the shape and refusing at create() means the shared server
+/// code above needs no target-specific branch.
 public final class Http2 {
-    /** The ALPN protocol identifier, needed by the shared code even here. */
+    /// The ALPN protocol identifier, needed by the shared code even here.
     public static final String ALPN = "h2";
 
     private static final String UNSUPPORTED =
@@ -50,7 +48,7 @@ public final class Http2 {
         throw new IOException(UNSUPPORTED);
     }
 
-    /** Mirrors the native runtime's stream shape so shared code compiles. */
+    /// Mirrors the native runtime's stream shape so shared code compiles.
     public static final class Stream {
         final int id;
         final String method;
@@ -88,20 +86,18 @@ public final class Http2 {
             return headers;
         }
 
-        /** The body as it ARRIVED, so the caller can check it before decoding. */
+        /// The body as it ARRIVED, so the caller can check it before decoding.
         public byte[] getBody() {
             return body;
         }
 
         public String getBodyAsString() {
-            if(body == null || body.length == 0) {
+            if (body == null || body.length == 0) {
                 return null;
             }
-            try {
-                return new String(body, "UTF-8");
-            } catch (UnsupportedEncodingException err) {
-                return new String(body);
-            }
+            // A JDK always has UTF-8, so the old fallback to the platform default
+            // charset could not run -- but it named a charset nobody meant.
+            return new String(body, StandardCharsets.UTF_8);
         }
     }
 
@@ -113,17 +109,15 @@ public final class Http2 {
         return null;
     }
 
-    /**
-     * As {@link #respond}, with the body read from a descriptor rather than the heap.
-     * Unsupported here for the same reason the rest of this class is: the local run
-     * does not terminate TLS, so it never speaks HTTP/2.
-     */
+    /// As [#respond], with the body read from a descriptor rather than the heap.
+    /// Unsupported here for the same reason the rest of this class is: the local run
+    /// does not terminate TLS, so it never speaks HTTP/2.
     public boolean respondFile(int streamId, int status, String contentType, List extraHeaders,
             int fd, long offset, long length) throws IOException {
         throw new IOException(UNSUPPORTED);
     }
 
-    /** No session here, so there is no descriptor ceiling to enforce. */
+    /// No session here, so there is no descriptor ceiling to enforce.
     public static void setMaxFileBodies(int limit) {
     }
 
@@ -132,7 +126,7 @@ public final class Http2 {
         throw new IOException(UNSUPPORTED);
     }
 
-    /** Nothing is ever submitted here, so there is no ceiling to enforce. */
+    /// Nothing is ever submitted here, so there is no ceiling to enforce.
     public static void setMaxBodyBytes(long limit) {
     }
 
@@ -144,22 +138,22 @@ public final class Http2 {
         return false;
     }
 
-    /** No session, so no stream ever closes. */
+    /// No session, so no stream ever closes.
     public int[] closedStreams() {
         return null;
     }
 
-    /** Nothing is ever submitted here, so nothing is ever outstanding. */
+    /// Nothing is ever submitted here, so nothing is ever outstanding.
     public long pendingBodyBytes() {
         return 0;
     }
 
-    /** Likewise: no session, so no file-backed body holds a descriptor. */
+    /// Likewise: no session, so no file-backed body holds a descriptor.
     public static int pendingBodyFiles() {
         return 0;
     }
 
-    /** And nothing is submitted, so no body holds heap either. */
+    /// And nothing is submitted, so no body holds heap either.
     public static long pendingBodyBytesAll() {
         return 0;
     }

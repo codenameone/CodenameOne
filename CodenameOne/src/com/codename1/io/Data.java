@@ -29,9 +29,6 @@ import java.io.UnsupportedEncodingException;
 /// An interface that can be implemented by any object to allow it to be treated as data.  Data
 /// has a size, and can be appended to an OutputStream.  It is useful primarily for adding a custom
 /// body to a ConnectionRequest.
-///
-/// @author shannah
-///
 public interface Data {
 
     /// Appends the data's content to an output stream.

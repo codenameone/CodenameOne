@@ -23,9 +23,6 @@
 package com.codename1.ui.events;
 
 /// An interface that can be implemented by any class that broadcasts ActionEvents.
-///
-/// @author shannah
-///
 public interface ActionSource<T extends ActionEvent> {
     /// Adds ActionListener to receive action events form this source.
     ///

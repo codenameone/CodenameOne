@@ -28,8 +28,6 @@ import java.util.Date;
 import java.util.TimeZone;
 
 /// Utility class for working with dates and timezones.
-///
-/// @author shannah, Diamond
 public class DateUtil {
 
     public static final long MILLISECOND = 1L;

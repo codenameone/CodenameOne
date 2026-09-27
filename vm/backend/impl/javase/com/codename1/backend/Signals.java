@@ -22,15 +22,15 @@
  */
 package com.codename1.backend;
 
-/**
- * Java SE twin of Signals.
- *
- * The JVM already turns SIGTERM and SIGINT into a shutdown hook, which runs on an
- * ordinary thread and may do anything -- so the self-pipe the translated build
- * needs has no counterpart here. SIGPIPE is likewise the JVM's problem: it sets
- * the disposition itself, and a write to a departed peer surfaces as an
- * IOException.
- */
+import java.util.concurrent.CountDownLatch;
+
+/// Java SE twin of Signals.
+///
+/// The JVM already turns SIGTERM and SIGINT into a shutdown hook, which runs on an
+/// ordinary thread and may do anything -- so the self-pipe the translated build
+/// needs has no counterpart here. SIGPIPE is likewise the JVM's problem: it sets
+/// the disposition itself, and a write to a departed peer surfaces as an
+/// IOException.
 public final class Signals {
     private Signals() {
     }
@@ -39,37 +39,32 @@ public final class Signals {
         return true;
     }
 
-    /**
-     * Blocks forever. There is nothing to wait for here -- the hook installed by
-     * onShutdown is what runs -- and returning would let a caller treat that as a
-     * signal having arrived.
-     */
+    /// Blocks forever. There is nothing to wait for here -- the hook installed by
+    /// onShutdown is what runs -- and returning would let a caller treat that as a
+    /// signal having arrived.
     public static int awaitShutdownSignal() {
-        Object lock = new Object();
-        synchronized(lock) {
-            while(true) {
-                try {
-                    lock.wait();
-                } catch (InterruptedException err) {
-                    Thread.currentThread().interrupt();
-                    return -1;
-                }
-            }
+        // A latch nothing ever counts down, rather than a wait() on a private
+        // monitor nobody can notify: the same "forever", without a wait that is
+        // not in a loop testing a condition.
+        try {
+            new CountDownLatch(1).await();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
         }
+        return -1;
     }
 
-    /**
-     * Runs body from a JVM shutdown hook.
-     *
-     * The hook RETURNS when body is done, and body must not call System.exit:
-     * exiting from inside a shutdown hook blocks forever, because System.exit
-     * waits for the shutdown it is already part of. The JVM ends on its own once
-     * every hook has returned, so there is nothing left to do here. The ParparVM
-     * implementation of this method does have to end the process, which is why
-     * that belongs in these two files and not in any caller.
-     */
+    /// Runs body from a JVM shutdown hook.
+    ///
+    /// The hook RETURNS when body is done, and body must not call System.exit:
+    /// exiting from inside a shutdown hook blocks forever, because System.exit
+    /// waits for the shutdown it is already part of. The JVM ends on its own once
+    /// every hook has returned, so there is nothing left to do here. The ParparVM
+    /// implementation of this method does have to end the process, which is why
+    /// that belongs in these two files and not in any caller.
     public static void onShutdown(final Runnable body) {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
             public void run() {
                 System.out.println("shutdown requested");
                 body.run();

@@ -39,10 +39,6 @@ import java.util.LinkedList;
 import java.util.List;
 import javax.swing.JFrame;
 
-/**
- *
- * @author shannah
- */
 public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     

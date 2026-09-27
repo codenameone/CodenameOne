@@ -30,8 +30,6 @@ import com.codename1.ui.geom.Point;
 import java.util.Vector;
 
 /// This is a Lines Layer
-///
-/// @author Roman Kamyk
 public class LinesLayer extends AbstractLayer {
 
     private final Vector _lineSegments;

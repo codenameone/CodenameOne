@@ -93,8 +93,6 @@ import com.codename1.ui.util.ImageIO;
 /// FontImage.setMaterialIcon(myButton, FontImage.MATERIAL_SAVE);
 /// hi.add(myButton);
 /// ```
-///
-/// @author Shai Almog
 public final class FontImage extends Image {
     /// Material design icon font character code see
     /// https://www.material.io/resources/icons/ for full list

@@ -51,8 +51,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 /// bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
 /// joint motor to drive the rotation or to model rotational friction. This joint is designed for
 /// vehicle suspensions.
-///
-/// @author Daniel Murphy
 public class WheelJoint extends Joint {
 
   private float m_frequencyHz;

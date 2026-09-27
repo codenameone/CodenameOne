@@ -1,8 +1,9 @@
 name: Check since tags
 
-# Fails the build if Java sources under CodenameOne/src carry @since tags or
-# Markdown/Javadoc "Since" sections. Generated documentation changes have
-# repeatedly guessed versions, which is worse than omitting the metadata.
+# Fails the build if Java sources under CodenameOne/src, or the backend runtime
+# under vm/backend, carry @since tags or Markdown/Javadoc "Since" sections.
+# Generated documentation changes have repeatedly guessed versions, which is worse
+# than omitting the metadata. Both are published API references.
 
 permissions:
   contents: read
@@ -14,6 +15,8 @@ on:
       - master
     paths:
       - 'CodenameOne/src/**/*.java'
+      - 'vm/backend/src/**/*.java'
+      - 'vm/backend/impl/**/*.java'
       - 'scripts/check-since-tags.sh'
       - '.github/workflows/check-since-tags.yml'
   push:
@@ -21,6 +24,8 @@ on:
       - master
     paths:
       - 'CodenameOne/src/**/*.java'
+      - 'vm/backend/src/**/*.java'
+      - 'vm/backend/impl/**/*.java'
       - 'scripts/check-since-tags.sh'
       - '.github/workflows/check-since-tags.yml'
 
@@ -33,3 +38,9 @@ jobs:
       - name: Reject since markers in API docs
         shell: bash
         run: scripts/check-since-tags.sh
+
+      - name: Reject since markers in the backend API docs
+        shell: bash
+        run: |
+          scripts/check-since-tags.sh vm/backend/src
+          scripts/check-since-tags.sh vm/backend/impl

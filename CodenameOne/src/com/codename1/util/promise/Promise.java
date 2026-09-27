@@ -50,8 +50,6 @@ import static com.codename1.ui.CN.invokeAndBlock;
 /// For more complex cases, where the return value of one Functor is meant to be piped into the subsequent Functor, then the Functor
 /// variants should be used.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - [MDN documentation for Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)

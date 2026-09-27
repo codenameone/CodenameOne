@@ -28,8 +28,6 @@ import com.codename1.ui.geom.Point;
 
 /// Do not use this layer directly, you need to add this layer into a PointsLayer class
 /// instance in order for it to work as expected!
-///
-/// @author Roman Kamyk
 public class PointLayer extends Coord implements Layer {
 
     private final String name;

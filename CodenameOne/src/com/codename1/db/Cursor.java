@@ -48,8 +48,6 @@ import java.io.IOException;
 ///
 /// Because a backward seek re-runs the statement, a cursor is a repeatable read only inside a
 /// transaction. See the `com.codename1.db` package documentation for the full contract.
-///
-/// @author Chen
 public interface Cursor {
 
     /// Moves the cursor onto the first row.

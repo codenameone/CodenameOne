@@ -30,8 +30,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Adds a new image resource
- *
- * @author Shai Almog
  */
 public class AddImageResource extends javax.swing.JDialog {
     private boolean okPressed;

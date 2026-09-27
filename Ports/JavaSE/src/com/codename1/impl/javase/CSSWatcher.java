@@ -44,10 +44,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- *
- * @author shannah
- */
 public class CSSWatcher implements Runnable {
     private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private volatile Thread watchThread;

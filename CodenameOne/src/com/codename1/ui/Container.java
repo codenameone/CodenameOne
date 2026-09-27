@@ -85,8 +85,6 @@ import java.util.Vector;
 /// Container also provides the lead component functionality that allows treating an entire Container hierarchy
 /// as a single component. This is discussed in depth within the [developer guide](https://www.codenameone.com/manual/misc-features.html#_lead_component).
 ///
-/// @author Chen Fishbein
-///
 /// #### See also
 ///
 /// - com.codename1.ui.layouts

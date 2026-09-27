@@ -28,40 +28,36 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Outbound HTTP and HTTPS for server-side binaries. Backed by libcurl, so TLS
- * verification, redirects, chunked decoding and the system certificate store all
- * come from a library that is maintained for the purpose.
- *
- * Distinct from [Http], which is a raw-socket plaintext client for the host
- * runtime's loopback control protocol. Use this one for anything real.
- *
- * **Certificate store.** A dynamically linked build finds the system CA bundle.
- * A fully static build has whatever the image provides, which for a `scratch`
- * container is nothing - and TLS then fails with "unable to get local issuer
- * certificate". Ship a `ca-certificates.crt` and point curl at it with the
- * `CURL_CA_BUNDLE` or `SSL_CERT_FILE` environment variable; both are read by
- * libcurl itself, so no code here has to know about it.
- */
+/// Outbound HTTP and HTTPS for server-side binaries. Backed by libcurl, so TLS
+/// verification, redirects, chunked decoding and the system certificate store all
+/// come from a library that is maintained for the purpose.
+///
+/// Distinct from [Http], which is a raw-socket plaintext client for the host
+/// runtime's loopback control protocol. Use this one for anything real.
+///
+/// **Certificate store.** A dynamically linked build finds the system CA bundle.
+/// A fully static build has whatever the image provides, which for a `scratch`
+/// container is nothing - and TLS then fails with "unable to get local issuer
+/// certificate". Ship a `ca-certificates.crt` and point curl at it with the
+/// `CURL_CA_BUNDLE` or `SSL_CERT_FILE` environment variable; both are read by
+/// libcurl itself, so no code here has to know about it.
 public final class Web {
 
-    /**
-     * ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
-     * platform has no Locale to ask for the root one. On a device set to Turkish
-     * the I of an ASCII token folds to a dotless i, so a header stored under one
-     * spelling is looked up under another and getHeader answers null: nothing is
-     * thrown, nothing is logged, and the caller reads a header that is there as
-     * absent. A header name is ASCII by specification. Copied rather than shared;
-     * see CLAUDE.md. Both arms of Web carry it, because both index headers.
-     */
+    /// ASCII lower case, because String.toLowerCase() is LOCALE SENSITIVE and this
+    /// platform has no Locale to ask for the root one. On a device set to Turkish
+    /// the I of an ASCII token folds to a dotless i, so a header stored under one
+    /// spelling is looked up under another and getHeader answers null: nothing is
+    /// thrown, nothing is logged, and the caller reads a header that is there as
+    /// absent. A header name is ASCII by specification. Copied rather than shared;
+    /// see CLAUDE.md. Both arms of Web carry it, because both index headers.
     private static String asciiLower(String value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
         StringBuilder out = new StringBuilder(value.length());
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
         }
         return out.toString();
     }
@@ -69,7 +65,7 @@ public final class Web {
     private Web() {
     }
 
-    /** An outbound response: status, body, and libcurl's message when it failed. */
+    /// An outbound response: status, body, and libcurl's message when it failed.
     public static final class Result {
         private final int status;
         private final byte[] body;
@@ -77,10 +73,8 @@ public final class Web {
         private final Map headers;
         private final Map values;
 
-        /**
-         * @param values name (lower case) to the List of every value the response
-         *               carried for it, in arrival order
-         */
+        /// @param values name (lower case) to the List of every value the response
+        /// carried for it, in arrival order
         Result(int status, byte[] body, String error, Map values) {
             this.status = status;
             this.body = body;
@@ -90,16 +84,16 @@ public final class Web {
             // caller that iterates it still gets a Map of Strings.
             this.headers = new LinkedHashMap();
             java.util.Iterator it = this.values.entrySet().iterator();
-            while(it.hasNext()) {
-                Map.Entry entry = (Map.Entry)it.next();
-                List all = (List)entry.getValue();
-                if(all != null && !all.isEmpty()) {
+            while (it.hasNext()) {
+                Map.Entry entry = (Map.Entry) it.next();
+                List all = (List) entry.getValue();
+                if (all != null && !all.isEmpty()) {
                     this.headers.put(entry.getKey(), all.get(0));
                 }
             }
         }
 
-        /** The HTTP status, or -1 when the transfer itself failed. */
+        /// The HTTP status, or -1 when the transfer itself failed.
         public int getStatus() {
             return status;
         }
@@ -113,7 +107,7 @@ public final class Web {
         }
 
         public String getBodyAsString() {
-            if(body == null) {
+            if (body == null) {
                 return null;
             }
             try {
@@ -123,52 +117,46 @@ public final class Web {
             }
         }
 
-        /** Non-null only when the transfer failed before producing a status. */
+        /// Non-null only when the transfer failed before producing a status.
         public String getError() {
             return error;
         }
 
-    /**
-     * The response headers, lower-cased names to values.
-     *
-     * A response's headers are half of what an API says -- the ETag S3 returns for
-     * a PUT, the content type of an object, the rate-limit budget a service
-     * publishes -- and a client that can only read the body cannot see any of it.
-     * Names are lower-cased because HTTP header names are case insensitive and a
-     * caller should not have to guess which case this server chose.
-     */
-    public Map getHeaders() {
-        return headers;
-    }
-
-    /**
-     * The FIRST value for a name, matched case-insensitively. Null when absent.
-     *
-     * <p>First rather than last, which is what this used to answer -- and the two
-     * differ only for a field the response repeated, which is the case that was
-     * losing data. Use getHeaderValues for a field that is legitimately repeated:
-     * Set-Cookie is the one every response has, and its values cannot be joined
-     * back together because an Expires attribute contains a comma of its own.
-     */
-    public String getHeader(String name) {
-        List all = getHeaderValues(name);
-        return all.isEmpty() ? null : (String)all.get(0);
-    }
-
-    /**
-     * Every value the response carried for a name, in arrival order.
-     *
-     * <p>Empty, never null, when the response had none. A repeated field used to
-     * collapse to one value here, so a response setting three cookies delivered
-     * one and nothing said the others had been dropped.
-     */
-    public List getHeaderValues(String name) {
-        if(name == null) {
-            return new ArrayList();
+        /// The response headers, lower-cased names to values.
+        ///
+        /// A response's headers are half of what an API says -- the ETag S3 returns for
+        /// a PUT, the content type of an object, the rate-limit budget a service
+        /// publishes -- and a client that can only read the body cannot see any of it.
+        /// Names are lower-cased because HTTP header names are case insensitive and a
+        /// caller should not have to guess which case this server chose.
+        public Map getHeaders() {
+            return headers;
         }
-        List all = (List)values.get(asciiLower(name));
-        return all == null ? new ArrayList() : all;
-    }
+
+        /// The FIRST value for a name, matched case-insensitively. Null when absent.
+        ///
+        /// First rather than last, which is what this used to answer -- and the two
+        /// differ only for a field the response repeated, which is the case that was
+        /// losing data. Use getHeaderValues for a field that is legitimately repeated:
+        /// Set-Cookie is the one every response has, and its values cannot be joined
+        /// back together because an Expires attribute contains a comma of its own.
+        public String getHeader(String name) {
+            List all = getHeaderValues(name);
+            return all.isEmpty() ? null : (String) all.get(0);
+        }
+
+        /// Every value the response carried for a name, in arrival order.
+        ///
+        /// Empty, never null, when the response had none. A repeated field used to
+        /// collapse to one value here, so a response setting three cookies delivered
+        /// one and nothing said the others had been dropped.
+        public List getHeaderValues(String name) {
+            if (name == null) {
+                return new ArrayList();
+            }
+            List all = (List) values.get(asciiLower(name));
+            return all == null ? new ArrayList() : all;
+        }
     }
 
     public static Result get(String url) throws IOException {
@@ -178,7 +166,7 @@ public final class Web {
     public static Result getJson(String url, String bearerToken) throws IOException {
         List headers = new ArrayList();
         headers.add("Accept: application/json");
-        if(bearerToken != null) {
+        if (bearerToken != null) {
             headers.add("Authorization: Bearer " + bearerToken);
         }
         return request("GET", url, headers, null);
@@ -188,21 +176,19 @@ public final class Web {
         List headers = new ArrayList();
         headers.add("Content-Type: application/json");
         headers.add("Accept: application/json");
-        if(bearerToken != null) {
+        if (bearerToken != null) {
             headers.add("Authorization: Bearer " + bearerToken);
         }
         byte[] payload;
         try {
             payload = json == null ? new byte[0] : json.getBytes("UTF-8");
         } catch (IOException err) {
-            throw new IOException("Could not encode the request body");
+            throw new IOException("Could not encode the request body", err);
         }
         return request("POST", url, headers, payload);
     }
 
-    /**
-     * - `headers`: a list of "Name: value" strings, or null
-     */
+    /// - `headers`: a list of "Name: value" strings, or null
     public static Result request(String method, String url, List headers, byte[] body) throws IOException {
         Urls.requireHttp(url);
         // The request line's other field; see HeaderLines.requireMethod.
@@ -228,45 +214,43 @@ public final class Web {
         }
     }
 
-    /**
-     * @param trace the trace-context lines, or null. Sent like any other header,
-     *              but NOT counted as the caller's: whether a redirect is followed
-     *              freely depends on whether the caller handed over something that
-     *              could leak (see CURLOPT_FOLLOWLOCATION in cn1_backend_web.c),
-     *              and a trace id is not that. Counting it would have silently
-     *              stopped every plain GET following redirects the moment tracing
-     *              was turned on.
-     */
+    /// @param trace the trace-context lines, or null. Sent like any other header,
+    /// but NOT counted as the caller's: whether a redirect is followed
+    /// freely depends on whether the caller handed over something that
+    /// could leak (see CURLOPT_FOLLOWLOCATION in cn1_backend_web.c),
+    /// and a trace id is not that. Counting it would have silently
+    /// stopped every plain GET following redirects the moment tracing
+    /// was turned on.
     private static Result perform(String method, String url, List headers, byte[] body,
                                   List trace) throws IOException {
         StringBuilder joined = new StringBuilder();
         boolean callerHeaders = false;
-        if(headers != null) {
-            for(int iter = 0 ; iter < headers.size() ; iter++) {
-                if(iter > 0) {
+        if (headers != null) {
+            for (int iter = 0 ; iter < headers.size() ; iter++) {
+                if (iter > 0) {
                     joined.append('\n');
                 }
                 String line = String.valueOf(headers.get(iter));
                 // What the native side would turn into a list entry: a line with
                 // something in it. An empty one never reached libcurl before either.
-                if(line.length() > 0) {
+                if (line.length() > 0) {
                     callerHeaders = true;
                 }
                 joined.append(line);
             }
         }
-        if(trace != null) {
-            for(int iter = 0 ; iter < trace.size() ; iter++) {
-                if(joined.length() > 0) {
+        if (trace != null) {
+            for (Object line : trace) {
+                if (joined.length() > 0) {
                     joined.append('\n');
                 }
-                joined.append(String.valueOf(trace.get(iter)));
+                joined.append(String.valueOf(line));
             }
         }
         initialiseCurlOnce();
         long handle = performImpl(method, url, HeaderLines.narrowed(joined.toString()), body,
                 callerHeaders);
-        if(handle == 0) {
+        if (handle == 0) {
             // REDACTED, because this message goes wherever the caller logs it and
             // the URL may be a presigned one whose signature is the credential.
             throw new IOException("Could not start a request to "
@@ -275,7 +259,7 @@ public final class Web {
         try {
             int status = statusImpl(handle);
             String error = errorImpl(handle);
-            if(status < 0) {
+            if (status < 0) {
                 throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
                         + (error == null ? "unknown error" : error));
             }
@@ -286,42 +270,40 @@ public final class Web {
         }
     }
 
-    /**
-     * libcurl hands back the raw header block, status lines and all. Redirects
-     * mean there can be several blocks; the LAST one describes the response the
-     * caller got, so a later block replaces an earlier one rather than merging
-     * with it.
-     */
+    /// libcurl hands back the raw header block, status lines and all. Redirects
+    /// mean there can be several blocks; the LAST one describes the response the
+    /// caller got, so a later block replaces an earlier one rather than merging
+    /// with it.
     static Map parseHeaders(String raw) {
         Map out = new LinkedHashMap();
-        if(raw == null) {
+        if (raw == null) {
             return out;
         }
         int at = 0;
-        while(at < raw.length()) {
+        while (at < raw.length()) {
             int end = raw.indexOf('\n', at);
-            if(end < 0) {
+            if (end < 0) {
                 end = raw.length();
             }
             String line = raw.substring(at, end).trim();
             at = end + 1;
-            if(line.length() == 0) {
+            if (line.length() == 0) {
                 continue;
             }
-            if(line.regionMatches(true, 0, "HTTP/", 0, 5)) {
+            if (line.regionMatches(true, 0, "HTTP/", 0, 5)) {
                 // A new status line: everything before it belonged to a redirect.
                 out.clear();
                 continue;
             }
             int colon = line.indexOf(':');
-            if(colon <= 0) {
+            if (colon <= 0) {
                 continue;
             }
             // EVERY value, in arrival order. Overwriting meant a response with
             // three Set-Cookie lines delivered one.
             String name = asciiLower(line.substring(0, colon).trim());
-            List all = (List)out.get(name);
-            if(all == null) {
+            List all = (List) out.get(name);
+            if (all == null) {
                 all = new ArrayList();
                 out.put(name, all);
             }
@@ -330,39 +312,37 @@ public final class Web {
         return out;
     }
 
-    /** Whether libcurl's global initialisation has been done successfully. */
+    /// Whether libcurl's global initialisation has been done successfully.
     private static boolean curlInitialised;
 
-    /**
-     * Initialises libcurl once, before any thread can be inside the library.
-     *
-     * curl_easy_init does this implicitly on first use, and the implicit path is
-     * NOT thread safe below libcurl 7.84 or in a build whose curl_version_info
-     * does not report CURL_VERSION_THREADSAFE. Two workers whose first outbound
-     * request overlaps would both enter it. The link is against whatever -lcurl
-     * the system provides, with no version floor, so this cannot be assumed away.
-     *
-     * <p>Every path into libcurl here is request(), and request() is the only
-     * caller of performImpl, so holding the monitor across the initialisation is
-     * enough: no other thread can be inside curl while it runs.
-     *
-     * <p>Under the monitor rather than behind a double-checked volatile read.
-     * Every caller is about to make a network request, beside which an
-     * uncontended monitor costs nothing, and it keeps the guarantee off the
-     * question of how the translated runtime orders a volatile.
-     *
-     * <p>The flag is set only when the initialisation SUCCEEDED, so a failure is
-     * retried rather than remembered as done. There is no matching
-     * curl_global_cleanup: the process is exiting by the time one would apply,
-     * and calling it while another thread might still be in libcurl is the very
-     * thing this avoids.
-     */
+    /// Initialises libcurl once, before any thread can be inside the library.
+    ///
+    /// curl_easy_init does this implicitly on first use, and the implicit path is
+    /// NOT thread safe below libcurl 7.84 or in a build whose curl_version_info
+    /// does not report CURL_VERSION_THREADSAFE. Two workers whose first outbound
+    /// request overlaps would both enter it. The link is against whatever -lcurl
+    /// the system provides, with no version floor, so this cannot be assumed away.
+    ///
+    /// Every path into libcurl here is request(), and request() is the only
+    /// caller of performImpl, so holding the monitor across the initialisation is
+    /// enough: no other thread can be inside curl while it runs.
+    ///
+    /// Under the monitor rather than behind a double-checked volatile read.
+    /// Every caller is about to make a network request, beside which an
+    /// uncontended monitor costs nothing, and it keeps the guarantee off the
+    /// question of how the translated runtime orders a volatile.
+    ///
+    /// The flag is set only when the initialisation SUCCEEDED, so a failure is
+    /// retried rather than remembered as done. There is no matching
+    /// curl_global_cleanup: the process is exiting by the time one would apply,
+    /// and calling it while another thread might still be in libcurl is the very
+    /// thing this avoids.
     private static synchronized void initialiseCurlOnce() throws IOException {
-        if(curlInitialised) {
+        if (curlInitialised) {
             return;
         }
         int rc = globalInitImpl();
-        if(rc != 0) {
+        if (rc != 0) {
             // THROWN, not left for the request to carry on past. Returning here
             // set out to retry later and meanwhile let THIS worker walk into
             // curl_easy_init, whose implicit initialisation is the very thing
@@ -375,7 +355,7 @@ public final class Web {
         curlInitialised = true;
     }
 
-    /** curl_global_init's CURLcode -- 0 is CURLE_OK. */
+    /// curl_global_init's CURLcode -- 0 is CURLE_OK.
     private static native int globalInitImpl();
 
     private static native long performImpl(String method, String url, byte[] headerLines,

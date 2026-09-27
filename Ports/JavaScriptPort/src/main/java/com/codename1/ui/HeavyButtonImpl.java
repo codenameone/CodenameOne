@@ -23,10 +23,6 @@
 
 package com.codename1.ui;
 
-/**
- *
- * @author shannah
- */
 public class HeavyButtonImpl extends HeavyButton {
     
     public HeavyButtonImpl(String label) {

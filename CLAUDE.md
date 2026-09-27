@@ -337,6 +337,64 @@ on the JDK subset the backend compiles against and on other marked classes, and
 A class marked outside the current packages also needs its path added to
 `parparvm-tests.yml`'s `paths`, which cannot read the marker.
 
+### Two API references: client and backend
+
+The website publishes the framework and the backend runtime as two separate API
+references, both rendered by `maven/javadoc-hugo-doclet` through the same
+templates:
+
+- **Client API** at `/javadoc/` (and `javadocs.zip`): `CodenameOne/src` plus the
+  CLDC `java.*` classes. Every existing link points here; its URLs never move.
+- **Backend API** at `/backend/javadoc/` (and `backend-javadocs.zip`):
+  `vm/backend/src`, the production `vm/backend/impl/parparvm` classes (not the
+  `impl/javase` twins, whose comments describe how they differ from production),
+  and the core classes marked `@SharedWithBackend`.
+
+A shared class is documented in **both**, badged "Client and backend" on each, and
+its backend page declares the client page canonical. Every other page carries a
+Client/Backend banner and switch, and its `<title>` and meta description name
+the reference, because a reader arriving from a search engine sees nothing else.
+The doclet takes `--audience`, `--url-root` and `--counterpart-root`; the site
+search merges both indexes and labels every hit.
+
+The backend is held to the client's gates:
+
+- `///` markdown comments only, no `package.html`
+  (`validate-java25-markdown-docs.sh` covers `vm/backend/src` and `impl/`);
+  `package-info.java` per package; no since markers.
+- SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
+  forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
+  using the core's own `pmd.xml` and `checkstyle.xml`. PMD and Checkstyle cover
+  `impl/parparvm` too, although Maven compiles only `impl/javase`.
+- Error Prone's `BanClassForName`, because ParparVM translates the backend too.
+- `build_javadocs.sh` runs BOTH references with `-Xdoclint:all,-missing -Werror`
+  and no `|| true`: an unresolved `[Reference]`, a stray `@Word` at the start of a
+  comment line, a `@param` naming no parameter, or a duplicated tag fails the
+  build. An unresolved reference matters beyond style: the website's doclet
+  renders it as plain text without a word, so it is a link that silently
+  vanished. JBox2D's `@warning` is registered with `-tag`, not rewritten.
+
+`DM_CONVERT_CASE` is deliberately not excluded for the backend, as it is for the
+core: a server folds protocol tokens, and the next section is why that matters.
+
+### No `@author`, `@version` or `@since` in documentation
+
+All three are banned, each by its own gate. `@since` (and "#### Since" sections)
+guessed at versions, which is worse than none -- `scripts/check-since-tags.sh`.
+`@author` and `@version` say nothing about the API, and a block tag's body runs to
+the next tag or the end of the comment: text written after one was swallowed into
+it, and since the doclet drops `@author`, 90 published comments had silently lost
+a "See also" or "Deprecated" section. `scripts/check-author-tags.py` rejects them
+in every tracked `.java` file (its own workflow, `check-author-tags.yml`), in `///`
+and `/** */` comments. A plain `/* */` comment is left alone: vendored license
+headers (MiG Layout's BSD notice) carry an `@author` that is part of the notice.
+
+Removing them touched ~1,200 old files, which pulled them into the diff-scoped
+copyright-header gate: Codename One's own files got the standard header, and
+genuine third-party files (JBox2D, Apache/Harmony, jtar, Itiner.pl, the Maven
+JDom fork, contributor-named notices) are listed by exact path in
+`scripts/copyright-header-exclusions.txt` with their provenance.
+
 ### Never case-fold a protocol token with `toLowerCase()`
 
 `String.toLowerCase()` and `toUpperCase()` are **locale sensitive**, and Codename

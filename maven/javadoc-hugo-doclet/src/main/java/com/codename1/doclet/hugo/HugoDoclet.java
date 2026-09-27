@@ -80,9 +80,31 @@ import jdk.javadoc.doclet.Reporter;
  */
 public final class HugoDoclet implements Doclet {
 
+    /**
+     * The annotation that marks a core class the backend runtime compiles too.
+     * See CodenameOne/src/com/codename1/impl/SharedWithBackend.java. It has
+     * source retention, which is enough: the doclet reads the sources.
+     */
+    static final String SHARED_WITH_BACKEND = "com.codename1.impl.SharedWithBackend";
+
     private Reporter reporter;
     private Path contentRoot;
     private Path searchIndex;
+    private String urlRoot = "/javadoc/";
+    /**
+     * Which API this run documents: {@code client} (the framework an app is
+     * built on) or {@code backend} (the server runtime). The two references are
+     * separate sites under separate roots, and every page says which one it
+     * belongs to, because a reader arriving from a search engine sees one page
+     * and nothing else: a {@code Query} or a {@code Database} is a plausible name
+     * in either.
+     */
+    private Audience audience = Audience.CLIENT;
+    /**
+     * The root of the OTHER reference, or null when it is not being published.
+     * A shared type links to its own page there.
+     */
+    private String counterpartRoot;
 
     private DocletEnvironment environment;
     private Elements elements;
@@ -119,7 +141,48 @@ public final class HugoDoclet implements Doclet {
                 new SimpleOption("-d", "<dir>", "Hugo content directory to generate into",
                         value -> contentRoot = Path.of(value)),
                 new SimpleOption("--search-index", "<file>", "JSON search index to write",
-                        value -> searchIndex = Path.of(value)));
+                        value -> searchIndex = Path.of(value)),
+                new SimpleOption("--url-root", "<path>",
+                        "Site path the generated pages are published under (default /javadoc/)",
+                        value -> urlRoot = Refs.normalizeRoot(value)),
+                new SimpleOption("--audience", "client|backend",
+                        "Which API this reference documents (default client)",
+                        value -> audience = Audience.parse(value)),
+                new SimpleOption("--counterpart-root", "<path>",
+                        "Site path of the other reference, for linking shared types to it",
+                        value -> counterpartRoot = Refs.normalizeRoot(value)));
+    }
+
+    /** The two references the site publishes. */
+    enum Audience {
+        CLIENT("client", "Client API", "Codename One API",
+                "Codename One client API reference"),
+        BACKEND("backend", "Backend API", "Codename One Backend API",
+                "Codename One backend API reference");
+
+        final String id;
+        /** The short label every page carries, and the suffix of its SEO title. */
+        final String label;
+        /** The overview's heading. */
+        final String overviewTitle;
+        /** The overview's meta description. */
+        final String overviewDescription;
+
+        Audience(String id, String label, String overviewTitle, String overviewDescription) {
+            this.id = id;
+            this.label = label;
+            this.overviewTitle = overviewTitle;
+            this.overviewDescription = overviewDescription;
+        }
+
+        static Audience parse(String value) {
+            for (Audience candidate : values()) {
+                if (candidate.id.equals(value.strip())) {
+                    return candidate;
+                }
+            }
+            throw new IllegalArgumentException("--audience must be client or backend, not " + value);
+        }
     }
 
     @Override
@@ -128,6 +191,10 @@ public final class HugoDoclet implements Doclet {
             reporter.print(javax.tools.Diagnostic.Kind.ERROR, "-d is required");
             return false;
         }
+        // Set on every run rather than left to the option: the root is static,
+        // and a second run in the same JVM (the doclet's own tests do this) must
+        // not inherit the first one's.
+        Refs.setRoot(urlRoot);
         this.environment = environment;
         this.elements = environment.getElementUtils();
         this.types = environment.getTypeUtils();
@@ -355,6 +422,75 @@ public final class HugoDoclet implements Doclet {
         return Refs.typeUrl(owner) + "#" + anchors.get(0);
     }
 
+    // -------------------------------------------------------------- audience
+
+    /**
+     * Whether a type is one of the core classes the backend compiles too.
+     *
+     * <p>Read off the outermost type, because the marker sits on the top level
+     * declaration and a nested type is shared along with it.
+     */
+    private static boolean isShared(TypeElement type) {
+        Element outermost = type;
+        while (outermost.getEnclosingElement() instanceof TypeElement outer) {
+            outermost = outer;
+        }
+        for (javax.lang.model.element.AnnotationMirror mirror : outermost.getAnnotationMirrors()) {
+            if (mirror.getAnnotationType().asElement() instanceof TypeElement annotation
+                    && annotation.getQualifiedName().contentEquals(SHARED_WITH_BACKEND)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** What a page is labelled with: its own reference, or both for a shared type. */
+    private String audienceLabel(boolean shared) {
+        return shared ? "Client and Backend API" : audience.label;
+    }
+
+    /**
+     * The meta description, led by the reference it belongs to.
+     *
+     * <p>A search result shows this and the title and nothing else, and the two
+     * references have types a reader could mistake for each other. Leading with
+     * the audience answers "is this the one I want" before the click.
+     */
+    private String describe(String summary, boolean shared) {
+        String lead = audienceLabel(shared) + ".";
+        return summary == null || summary.isBlank() ? lead : lead + " " + summary;
+    }
+
+    /** The fields every template reads to label a page and link its counterpart. */
+    private void putAudience(Map<String, Object> api, boolean shared, String counterpart) {
+        api.put("audience", audience.id);
+        api.put("audienceLabel", audience.label);
+        api.put("root", Refs.root());
+        api.put("shared", shared);
+        api.put("counterpartRoot", counterpartRoot);
+        // Only a shared page has a counterpart of its own; every other page links
+        // the other reference's overview instead, which the template reads from
+        // counterpartRoot.
+        api.put("counterpart", shared ? counterpart : null);
+    }
+
+    /**
+     * Points a shared type's backend page at its client page as the canonical
+     * one.
+     *
+     * <p>The two pages render the same class from the same comment, and a search
+     * engine that finds both picks one arbitrarily and may show neither. The
+     * client page is the older address and the one the developer guide links, so
+     * it is the one kept; the backend copy stays reachable from the backend
+     * reference and says it is shared. Site-relative, because the website build
+     * rejects absolute links to its own domain.
+     */
+    private void putCanonical(Map<String, Object> frontMatter, boolean shared, String counterpart) {
+        if (shared && audience == Audience.BACKEND && counterpart != null) {
+            frontMatter.put("canonicalURL", counterpart);
+        }
+    }
+
     // ------------------------------------------------------------ type pages
 
     private void writeTypePage(TypeElement type) throws IOException {
@@ -363,6 +499,8 @@ public final class HugoDoclet implements Doclet {
 
         api.put("kind", kindOf(type));
         api.put("qualified", type.getQualifiedName().toString());
+        putAudience(api, isShared(type), counterpartRoot == null ? null
+                : Refs.typeUrl(counterpartRoot, type));
         api.put("simple", Refs.nestedDisplayName(type));
         // "public final enum E" and "public abstract annotation A" are not
         // declarations Java would accept: final is implicit on an enum and
@@ -458,9 +596,13 @@ public final class HugoDoclet implements Doclet {
 
         Map<String, Object> frontMatter = new LinkedHashMap<>();
         frontMatter.put("title", Refs.nestedDisplayName(type));
+        frontMatter.put("seoTitle", Refs.nestedDisplayName(type) + " (" + audienceLabel(isShared(type)) + ")");
         frontMatter.put("url", Refs.typeUrl(type));
-        frontMatter.put("description", TypeNames.summary(doc.description));
+        frontMatter.put("description", describe(TypeNames.plainSummary(doc.description), isShared(type)));
+        frontMatter.put("type", "javadoc");
         frontMatter.put("layout", "type");
+        putCanonical(frontMatter, isShared(type), counterpartRoot == null ? null
+                : Refs.typeUrl(counterpartRoot, type));
         // No alias: the .html spelling redirects here on its own, and the
         // directory spelling IS this page now.
         frontMatter.put("aliases", List.of());
@@ -1501,17 +1643,26 @@ public final class HugoDoclet implements Doclet {
             members.sort(Comparator.comparing(type -> type.getSimpleName().toString()));
 
             List<Map<String, Object>> rows = new ArrayList<>();
+            boolean allShared = true;
             for (TypeElement type : members) {
+                allShared &= isShared(type);
                 rows.add(new LinkedHashMap<>(Map.of(
                         "name", Refs.nestedDisplayName(type),
                         "url", Refs.typeUrl(type),
                         "kind", kindOf(type),
+                        "shared", isShared(type),
                         "summary", TypeNames.summary(docReader.read(type).description))));
             }
 
             Map<String, Object> api = new LinkedHashMap<>();
             api.put("kind", "package");
             api.put("qualified", entry.getKey());
+            // A package is only called shared when everything in it is. The
+            // backend publishes com.codename1.annotations with the four entity
+            // annotations it shares and none of the client-only ones, so the page
+            // says so and links to the whole package in the client reference.
+            putAudience(api, allShared, counterpartRoot == null ? null
+                    : Refs.packageUrl(counterpartRoot, pkg));
             // A package can be deprecated, and com.codename1.ui.layouts.mig is:
             // its comment warns not to rely on the integration in production.
             // DocReader lifts that out of the description, so omitting the fields
@@ -1523,8 +1674,10 @@ public final class HugoDoclet implements Doclet {
 
             Map<String, Object> frontMatter = new LinkedHashMap<>();
             frontMatter.put("title", entry.getKey());
+            frontMatter.put("seoTitle", entry.getKey() + " (" + audienceLabel(allShared) + ")");
             frontMatter.put("url", Refs.packageUrl(pkg));
-            frontMatter.put("description", TypeNames.summary(doc.description));
+            frontMatter.put("description", describe(TypeNames.plainSummary(doc.description), allShared));
+            frontMatter.put("type", "javadoc");
             frontMatter.put("layout", "package");
             // Deliberately no alias on the bare package directory. It would put an
             // index.html in com/codename1/ui/list/, which is the same directory as
@@ -1541,9 +1694,16 @@ public final class HugoDoclet implements Doclet {
     /** The API index at {@code /javadoc/}, listing every package. */
     private void writeOverview() throws IOException {
         Set<String> packageNames = new java.util.TreeSet<>();
+        Set<String> unsharedPackages = new java.util.TreeSet<>();
         for (TypeElement type : documented.values()) {
-            packageNames.add(Refs.packageOf(type).getQualifiedName().toString());
+            String name = Refs.packageOf(type).getQualifiedName().toString();
+            packageNames.add(name);
+            if (!isShared(type)) {
+                unsharedPackages.add(name);
+            }
         }
+        Set<String> sharedPackages = new java.util.TreeSet<>(packageNames);
+        sharedPackages.removeAll(unsharedPackages);
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (String name : packageNames) {
@@ -1554,6 +1714,7 @@ public final class HugoDoclet implements Doclet {
             rows.add(new LinkedHashMap<>(Map.of(
                     "name", name,
                     "url", Refs.packageUrl(pkg),
+                    "shared", sharedPackages.contains(name),
                     "summary", TypeNames.summary(docReader.read(pkg).description))));
         }
 
@@ -1561,14 +1722,19 @@ public final class HugoDoclet implements Doclet {
         api.put("kind", "overview");
         api.put("packages", rows);
         api.put("typeCount", documented.size());
+        api.put("title", audience.overviewTitle);
+        putAudience(api, false, counterpartRoot);
 
         Map<String, Object> frontMatter = new LinkedHashMap<>();
-        frontMatter.put("title", "API");
-        frontMatter.put("url", "/javadoc/");
-        frontMatter.put("description", "Codename One API reference");
+        frontMatter.put("title", audience.label);
+        frontMatter.put("seoTitle", audience.overviewTitle);
+        frontMatter.put("url", Refs.root());
+        frontMatter.put("description", audience.overviewDescription);
+        frontMatter.put("type", "javadoc");
         frontMatter.put("layout", "overview");
-        // The website has linked the API from /api/ since 2015.
-        frontMatter.put("aliases", List.of("/api/"));
+        // The website has linked the client API from /api/ since 2015. The
+        // backend reference is new and has no legacy address to keep.
+        frontMatter.put("aliases", audience == Audience.CLIENT ? List.of("/api/") : List.of());
         frontMatter.put("javadoc", api);
 
         write(contentRoot.resolve("_index.md"), Json.write(frontMatter));
@@ -1582,6 +1748,13 @@ public final class HugoDoclet implements Doclet {
         row.put("p", Refs.packageOf(type).getQualifiedName().toString());
         row.put("u", Refs.typeUrl(type));
         row.put("k", kindOf(type));
+        // Which reference the hit belongs to, and whether it is one of the classes
+        // both halves compile. The search page merges both indexes and labels
+        // every hit with this; a shared type is listed once, not twice.
+        row.put("a", audience.id);
+        if (isShared(type)) {
+            row.put("sh", 1);
+        }
         // Plain text: the results list escapes what it is given rather than
         // rendering it, which is right for a value that came out of a comment,
         // so markdown left here is displayed as its own source.
@@ -1655,6 +1828,7 @@ public final class HugoDoclet implements Doclet {
         }
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("generator", "HugoDoclet");
+        document.put("audience", audience.id);
         document.put("types", searchRows);
         write(searchIndex, Json.writeCompact(document));
 

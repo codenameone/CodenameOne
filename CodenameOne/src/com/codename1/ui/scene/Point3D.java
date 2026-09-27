@@ -24,8 +24,6 @@ package com.codename1.ui.scene;
 
 /// Encapsulates a point in 3D space.
 ///
-/// @author Steve Hannah
-///
 /// #### Deprecated
 ///
 /// For internal use only

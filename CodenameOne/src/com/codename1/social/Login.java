@@ -43,8 +43,6 @@ import java.util.ArrayList;
 /// services.
 /// Services can override the default Oauth2 web login and offers the native login
 /// experience.
-///
-/// @author Chen
 public abstract class Login {
 
 

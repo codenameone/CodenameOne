@@ -49,8 +49,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.rewriteElement;
 
 /**
  * JDom implementation of poms BUILD element
- *
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
  */
 public class JDomBuild extends Build implements JDomBacked {
 

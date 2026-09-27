@@ -26,10 +26,6 @@ package com.codename1.impl.html5;
 import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.dom.HTMLInputElement;
 
-/**
- *
- * @author shannah
- */
 public class FileChooser {
     
     @JSBody(params={"types"}, script="return jQuery('<input type=\"file\" name=\"pic\" id=\"pic\" accept=\"'+types.join(', ')+'\" />').get(0)")

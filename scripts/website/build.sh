@@ -167,6 +167,7 @@ build_javadocs_for_site() {
   )
   mkdir -p "${WEBSITE_DIR}/static/files"
   cp "${REPO_ROOT}/CodenameOne/javadocs.zip" "${WEBSITE_DIR}/static/files/javadocs.zip"
+  cp "${REPO_ROOT}/CodenameOne/backend-javadocs.zip" "${WEBSITE_DIR}/static/files/backend-javadocs.zip"
 
   # The doclet needs a JDK new enough to hand it markdown documentation comments
   # as DocTree.Kind.MARKDOWN, which is JDK 23 and later. Its own pom pins
@@ -215,12 +216,19 @@ build_javadocs_for_site() {
   # those files fails with "package exists in another module: java.base".
   # Compiling for a release that predates modules is what lets the framework's
   # own java.* classes be the documented ones.
+  #
+  # Two references come out of this, one per audience, and each names the other
+  # as its counterpart: every page carries a switch to the other one, and a type
+  # shared by both (the ORM, the entity annotations) links to its own page there.
   "${javadoc_bin}" \
     -doclet com.codename1.doclet.hugo.HugoDoclet \
     -docletpath "${doclet_classes}" \
     --release 8 \
     -d "${content_dir}" \
     --search-index "${WEBSITE_DIR}/static/javadoc-search.json" \
+    --audience client \
+    --url-root /javadoc/ \
+    --counterpart-root /backend/javadoc/ \
     -sourcepath "${temp_sources}:${REPO_ROOT}/Ports/CLDC11/src" \
     -quiet \
     -protected \
@@ -235,6 +243,58 @@ build_javadocs_for_site() {
   fi
   if [ -e "${content_dir}/com/codename1/impl" ]; then
     echo "Hugo API generation emitted com.codename1.impl; the internal package must stay excluded." >&2
+    exit 1
+  fi
+
+  # The backend reference, from the tree build_javadocs.sh staged for its own
+  # archive -- the server runtime plus the core classes it shares -- so the two
+  # renderings read identical sources here too. Hugo files it under
+  # content/backend/javadoc; the pages declare type "javadoc", so they render
+  # through the same templates as the client API.
+  local backend_sources="${REPO_ROOT}/CodenameOne/build/backendJavaSources"
+  local backend_argfile="${REPO_ROOT}/CodenameOne/build/backend-javadoc-sources.txt"
+  if [ ! -d "${backend_sources}" ] || [ ! -s "${backend_argfile}" ]; then
+    echo "Expected staged backend JavaDoc sources at ${backend_sources}." >&2
+    exit 1
+  fi
+  local backend_content_dir="${WEBSITE_DIR}/content/backend/javadoc"
+  rm -rf "${WEBSITE_DIR}/content/backend"
+  mkdir -p "${backend_content_dir}"
+
+  echo "Generating Hugo backend API content..." >&2
+  "${javadoc_bin}" \
+    -doclet com.codename1.doclet.hugo.HugoDoclet \
+    -docletpath "${doclet_classes}" \
+    --release 8 \
+    -d "${backend_content_dir}" \
+    --search-index "${WEBSITE_DIR}/static/backend-javadoc-search.json" \
+    --audience backend \
+    --url-root /backend/javadoc/ \
+    --counterpart-root /javadoc/ \
+    -sourcepath "${backend_sources}" \
+    -quiet \
+    -protected \
+    "@${backend_argfile}"
+
+  if [ ! -f "${backend_content_dir}/com/codename1/backend/HttpServer.md" ]; then
+    echo "Hugo backend API generation produced no com.codename1.backend content; aborting." >&2
+    exit 1
+  fi
+  if [ -e "${backend_content_dir}/com/codename1/impl" ]; then
+    echo "Hugo backend API generation emitted com.codename1.impl; the internal package must stay excluded." >&2
+    exit 1
+  fi
+  # Every page of this reference must say it is the backend's. A page that came
+  # out labelled as the client API is the confusion this split exists to stop,
+  # and it would look entirely normal on the site.
+  if grep -rlE '"audience": "client"' "${backend_content_dir}" >/dev/null; then
+    echo "Hugo backend API generation labelled a page as the client API:" >&2
+    grep -rlE '"audience": "client"' "${backend_content_dir}" | head >&2
+    exit 1
+  fi
+  # And the client reference must not have picked up a server class.
+  if [ -e "${content_dir}/com/codename1/backend" ]; then
+    echo "Hugo client API generation documented com.codename1.backend; it belongs to the backend reference." >&2
     exit 1
   fi
 }
@@ -806,6 +866,14 @@ if [ "${WEBSITE_INCLUDE_JAVADOCS}" = "true" ]; then
     "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/check-javadoc-parity.py" \
       "${REPO_ROOT}/CodenameOne/dist/javadoc" \
       "${WEBSITE_DIR}/public/javadoc"
+    # The backend reference is far smaller, so it is held to its own floors
+    # rather than the client's; see check-javadoc-parity.py.
+    "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/check-javadoc-parity.py" \
+      --url-root /backend/javadoc/ \
+      --search-index "${WEBSITE_DIR}/public/backend-javadoc-search.json" \
+      --min-pages 60 --min-fragments 300 \
+      "${REPO_ROOT}/CodenameOne/dist/backend-javadoc" \
+      "${WEBSITE_DIR}/public/backend/javadoc"
 
     # Comparing files is not enough. Cloudflare Pages redirects /x.html to /x
     # before it considers an asset, so a page can be present on disk, pass every

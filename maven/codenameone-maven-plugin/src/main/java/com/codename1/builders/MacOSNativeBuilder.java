@@ -54,8 +54,6 @@ import javax.imageio.ImageIO;
  * The plists and entitlements this builder writes over the top come from
  * {@link MacOSXcodeProject}, which is deliberately free of any Xcode dependency
  * so the generation is unit-testable on a machine with no developer tools.</p>
- *
- * @author Shai Almog
  */
 public class MacOSNativeBuilder extends Executor {
 

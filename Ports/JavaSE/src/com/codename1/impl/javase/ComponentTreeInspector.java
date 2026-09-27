@@ -70,10 +70,6 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-/**
- *
- * @author shannah
- */
 public class ComponentTreeInspector extends JPanel {
     private List<String> themePaths = new ArrayList<String>();
     private List<String> themeNames = new ArrayList<String>();

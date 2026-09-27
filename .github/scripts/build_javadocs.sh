@@ -75,6 +75,17 @@ SOURCES_ARGFILE="$CN1_DIR/build/javadoc-sources.txt"
 find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java" \
   | grep -v '/com/codename1/impl/' > "$SOURCES_ARGFILE"
 
+# Held to doclint, and a failure fails the build: no -Xdoclint:none and no
+# "|| true". An unresolved [Reference] is not cosmetic here -- the website's
+# doclet renders it as plain text without a word, so every one is a link that
+# silently vanished from the published page. -Werror makes a warning (a
+# duplicated @param, an {@inheritDoc} with nothing to inherit) fail it too.
+# "missing" stays off: requiring a
+# comment on every member of the API is a different project.
+#
+# @warning is the vendored JBox2D's safety-note tag (22 uses). It is registered
+# rather than rewritten, so this archive prints it under a "Warning:" heading and
+# the website's doclet keeps lifting it into a warning block of its own.
 "$JAVADOC_CMD" \
   --allow-script-in-comments \
   --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
@@ -83,12 +94,16 @@ find "$CN1_DIR/build/tempJavaSources" "$ROOT_DIR/Ports/CLDC11/src" -name "*.java
   --release 8 \
   -sourcepath "$CN1_DIR/build/tempJavaSources:$ROOT_DIR/Ports/CLDC11/src" \
   -exclude com.codename1.impl \
-  -Xdoclint:none \
+  -Xdoclint:all,-missing \
+  -Xmaxerrs 10000 \
+  -Xmaxwarns 10000 \
+  -Werror \
+  -tag "warning:a:Warning:" \
   -quiet \
   -protected \
   -d "$CN1_DIR/dist/javadoc" \
   -windowtitle "Codename One API" \
-  "@$SOURCES_ARGFILE" || true
+  "@$SOURCES_ARGFILE"
 
 # Fail loudly if the core API failed to generate. Without this guard a partial
 # build (e.g. only the CLDC java.* packages) ships silently to the website.
@@ -108,4 +123,87 @@ fi
 (
   cd "$CN1_DIR/dist/javadoc"
   zip -r "$CN1_DIR/javadocs.zip" .
+)
+
+# ---------------------------------------------------------------------------
+# The backend API: the server runtime under vm/backend, published as a reference
+# of its own (backend-javadocs.zip here, /backend/javadoc/ on the website) so a
+# reader never mistakes a server class for one the app can call.
+#
+# Its sources are staged from three places: the shared runtime (vm/backend/src),
+# the per-target classes, and the core classes marked
+# @com.codename1.impl.SharedWithBackend, which vm/backend/shared-sources.sh
+# lists. Those shared classes are documented in BOTH references, because both
+# halves of an application really do use them.
+#
+# The per-target classes come from impl/parparvm, the production runtime, and
+# not from the impl/javase twins the local Maven jar compiles. The two have the
+# same public surface by design, but only the production classes document what
+# a class IS -- each Java SE twin documents how it differs from the real one
+# ("Java SE twin of Crypto, on the JDK's own providers"), which is a note for
+# whoever maintains it and nonsense as the summary of a public API page. They
+# declare nothing outside java.*, so the JDK resolves them here as it does the
+# rest.
+#
+# The shared classes keep their package-info.java, so a shared package has the
+# same description in both references. SharedWithBackend itself and the rest of
+# com.codename1.impl are staged for symbol resolution and filtered out of the
+# documented set, exactly as for the client API above.
+BACKEND_DIR="$ROOT_DIR/vm/backend"
+BACKEND_STAGE="$CN1_DIR/build/backendJavaSources"
+rm -rf "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc" "$CN1_DIR/backend-javadocs.zip"
+mkdir -p "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc"
+cp -r "$BACKEND_DIR/src/." "$BACKEND_STAGE/"
+cp -r "$BACKEND_DIR/impl/parparvm/." "$BACKEND_STAGE/"
+while IFS= read -r shared; do
+  rel="${shared#"$CN1_DIR/src/"}"
+  mkdir -p "$BACKEND_STAGE/$(dirname "$rel")"
+  cp "$shared" "$BACKEND_STAGE/$rel"
+  info="$(dirname "$shared")/package-info.java"
+  if [ -f "$info" ] && [ ! -f "$BACKEND_STAGE/$(dirname "$rel")/package-info.java" ]; then
+    cp "$info" "$BACKEND_STAGE/$(dirname "$rel")/package-info.java"
+  fi
+done < <("$BACKEND_DIR/shared-sources.sh")
+
+BACKEND_SOURCES_ARGFILE="$CN1_DIR/build/backend-javadoc-sources.txt"
+find "$BACKEND_STAGE" -name "*.java" \
+  | grep -v '/com/codename1/impl/' | LC_ALL=C sort > "$BACKEND_SOURCES_ARGFILE"
+
+# Held to the same doclint as the client API above. --release 8 matches the backend module's
+# source level, and the JDK is the class library it compiles against.
+"$JAVADOC_CMD" \
+  --allow-script-in-comments \
+  --add-stylesheet "$ROOT_DIR/maven/javadoc-resources/highlight.css" \
+  --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
+  --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
+  --release 8 \
+  -sourcepath "$BACKEND_STAGE" \
+  -Xdoclint:all,-missing \
+  -Xmaxerrs 10000 \
+  -Xmaxwarns 10000 \
+  -Werror \
+  -quiet \
+  -protected \
+  -d "$CN1_DIR/dist/backend-javadoc" \
+  -windowtitle "Codename One Backend API" \
+  "@$BACKEND_SOURCES_ARGFILE"
+
+if [ ! -f "$CN1_DIR/dist/backend-javadoc/com/codename1/backend/HttpServer.html" ]; then
+  echo "Backend JavaDoc generation produced no com.codename1.backend output; aborting." >&2
+  exit 1
+fi
+if [ -e "$CN1_DIR/dist/backend-javadoc/com/codename1/impl" ]; then
+  echo "Backend JavaDoc generated com.codename1.impl output; the internal package must stay excluded." >&2
+  exit 1
+fi
+# The shared classes are the point of staging the core sources at all; a run
+# that lost them would publish a backend ORM with no Session to call.
+if [ ! -f "$CN1_DIR/dist/backend-javadoc/com/codename1/orm/session/Session.html" ]; then
+  echo "Backend JavaDoc is missing the shared com.codename1.orm.session classes; aborting." >&2
+  exit 1
+fi
+
+(
+  cd "$CN1_DIR/dist/backend-javadoc"
+  zip -r "$CN1_DIR/backend-javadocs.zip" .
 )

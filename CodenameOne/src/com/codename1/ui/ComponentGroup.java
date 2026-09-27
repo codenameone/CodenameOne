@@ -57,8 +57,6 @@ import com.codename1.ui.layouts.Layout;
 ///         add("One Button").
 ///         add(ComponentGroup.enclose(new Button("ButtonGroupOnly UIID")));
 /// ```
-///
-/// @author Shai Almog
 public class ComponentGroup extends Container {
     private String elementUIID = "GroupElement";
     private String buttonUIID = "ButtonGroup";

@@ -36,8 +36,6 @@ import java.util.*;
  * A simple class that can invoke a lifecycle object to allow it to run a
  * Codename One application. Classes are loaded with a classloader so the UI
  * skin can be updated and the lifecycle objects reloaded.
- *
- * @author Shai Almog
  */
 public class Simulator {
     

@@ -49,8 +49,6 @@ import java.util.TimerTask;
 /// [com.codename1.ads.InterstitialAd] together with
 /// [com.codename1.ads.AdManager#bindInterstitialOnTransition] and
 /// [com.codename1.ads.AppOpenAd] instead.
-///
-/// @author Shai Almog
 @Deprecated
 public abstract class FullScreenAdService {
     private static final Object LOCK = new Object();

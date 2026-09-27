@@ -94,8 +94,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 
 /**
  * Allows changing the theme data
- *
- * @author Shai Almog
  */
 public class ThemeEditor extends BaseForm {
 

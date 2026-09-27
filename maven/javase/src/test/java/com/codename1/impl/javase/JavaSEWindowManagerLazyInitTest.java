@@ -57,8 +57,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *
  * <p>Asserting that concurrent callers get one <em>identical</em> manager is what rules
  * that out: a second instance is precisely a second poller.</p>
- *
- * @author Shai Almog
  */
 @CodenameOneTest
 class JavaSEWindowManagerLazyInitTest {

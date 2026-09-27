@@ -24,6 +24,11 @@ SOURCE_BASES = [
     Path("target/generated-sources"),
     Path("CodenameOne/src"),
     Path("maven/core-unittests/src/test/java"),
+    # The backend runtime, which maven/backend builds from outside its own
+    # directory: SpotBugs names classes relative to a source root.
+    Path("vm/backend/src"),
+    Path("vm/backend/impl/javase"),
+    Path("vm/backend/impl/parparvm"),
 ]
 
 DEFAULT_REPORT_TITLE = "✅ Continuous Quality Report"
@@ -429,21 +434,68 @@ def _enforce_spotbugs_gate(
     sys.exit(1)
 
 
-def parse_pmd() -> Optional[AnalysisReport]:
-    report_path: Optional[Path] = None
+def _report_paths(filename: str) -> Dict[str, Path]:
+    """Every target directory's copy of a report, keyed by project label.
+
+    PMD and Checkstyle used to read only the FIRST report found and stop, which
+    was harmless while core-unittests was the only project running them. With a
+    second one (the backend runtime) it silently meant the second report was never
+    read at all: its findings could not fail the build however many there were.
+    """
+    found: Dict[str, Path] = {}
     for target_dir in TARGET_DIRS:
-        candidate = target_dir / "pmd.xml"
+        candidate = target_dir / filename
         if candidate.exists():
-            report_path = candidate
-            break
-    if report_path is None:
-        return None
-    try:
-        root = ET.parse(report_path).getroot()
-    except ET.ParseError:
+            found[_spotbugs_project_label(target_dir)] = candidate
+    return found
+
+
+def _required(env_name: str) -> List[str]:
+    env_value = os.environ.get(env_name) or ""
+    return [item.strip() for item in env_value.split(os.pathsep) if item.strip()]
+
+
+def _enforce_required_reports(tool: str, filename: str, env_name: str) -> None:
+    """Fail when a project that must be analysed produced no report.
+
+    A missing report reads exactly like a clean one to everything below, which is
+    how a gate stops gating without anyone noticing.
+    """
+    present = _report_paths(filename)
+    missing = [label for label in _required(env_name) if label not in present]
+    if missing:
+        print(f"\n❌ Build failed because {tool} produced no report for: "
+              + ", ".join(sorted(missing)))
+        print("  A missing report means the analysis never ran; that would let "
+              "findings through unnoticed.")
+        sys.exit(1)
+
+
+def parse_pmd() -> Optional[AnalysisReport]:
+    report_paths = _report_paths("pmd.xml")
+    if not report_paths:
         return None
     priority_counts = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
     findings: List[Finding] = []
+    for report_path in report_paths.values():
+        try:
+            root = ET.parse(report_path).getroot()
+        except ET.ParseError:
+            # Unreadable is not clean. Reported as a finding of its own so the
+            # forbidden-rule gate below cannot mistake it for an empty report.
+            findings.append(Finding(severity="P1", location=str(report_path),
+                                    message="PMD report could not be parsed",
+                                    rule="UnparseableReport"))
+            continue
+        _collect_pmd(root, priority_counts, findings)
+    findings = [finding for finding in findings if finding.message]
+    if not findings:
+        return AnalysisReport(totals=priority_counts, findings=[])
+    findings.sort(key=lambda item: int(item.severity[1:]) if item.severity[1:].isdigit() else 99)
+    return AnalysisReport(totals=priority_counts, findings=findings)
+
+
+def _collect_pmd(root, priority_counts: Dict[str, int], findings: List[Finding]) -> None:
     for file_elem in root.iter():
         if not file_elem.tag.endswith("file"):
             continue
@@ -471,28 +523,33 @@ def parse_pmd() -> Optional[AnalysisReport]:
                     line=begin_line_int,
                 )
             )
-    findings = [finding for finding in findings if finding.message]
-    if not findings:
-        return AnalysisReport(totals=priority_counts, findings=[])
-    findings.sort(key=lambda item: int(item.severity[1:]) if item.severity[1:].isdigit() else 99)
-    return AnalysisReport(totals=priority_counts, findings=findings)
 
 
 def parse_checkstyle() -> Optional[AnalysisReport]:
-    report_path: Optional[Path] = None
-    for target_dir in TARGET_DIRS:
-        candidate = target_dir / "checkstyle-result.xml"
-        if candidate.exists():
-            report_path = candidate
-            break
-    if report_path is None:
-        return None
-    try:
-        root = ET.parse(report_path).getroot()
-    except ET.ParseError:
+    report_paths = _report_paths("checkstyle-result.xml")
+    if not report_paths:
         return None
     severities = {"error": 0, "warning": 0, "info": 0}
     findings: List[Finding] = []
+    for report_path in report_paths.values():
+        try:
+            root = ET.parse(report_path).getroot()
+        except ET.ParseError:
+            severities["error"] += 1
+            findings.append(Finding(severity="Error", location=str(report_path),
+                                    message="Checkstyle report could not be parsed",
+                                    rule="UnparseableReport"))
+            continue
+        _collect_checkstyle(root, severities, findings)
+    findings = [finding for finding in findings if finding.message]
+    if not findings:
+        return AnalysisReport(totals=severities, findings=[])
+    severity_order = {"Error": 0, "Warning": 1, "Info": 2}
+    findings.sort(key=lambda item: severity_order.get(item.severity, 99))
+    return AnalysisReport(totals=severities, findings=findings)
+
+
+def _collect_checkstyle(root, severities: Dict[str, int], findings: List[Finding]) -> None:
     for file_elem in root.findall("file"):
         file_path = file_elem.attrib.get("name")
         path_rel = _relative_path(file_path) if file_path else None
@@ -524,12 +581,6 @@ def parse_checkstyle() -> Optional[AnalysisReport]:
                     column=column_int,
                 )
             )
-    findings = [finding for finding in findings if finding.message]
-    if not findings:
-        return AnalysisReport(totals=severities, findings=[])
-    severity_order = {"Error": 0, "Warning": 1, "Info": 2}
-    findings.sort(key=lambda item: severity_order.get(item.severity, 99))
-    return AnalysisReport(totals=severities, findings=findings)
 
 
 def parse_benchmark() -> Optional[str]:
@@ -890,9 +941,14 @@ def main() -> None:
     spotbugs_reports, _, _, spotbugs_parse_errors = parse_spotbugs()
     _enforce_spotbugs_gate(spotbugs_reports, spotbugs_parse_errors)
 
+    _enforce_required_reports("PMD", "pmd.xml", "QUALITY_REPORT_REQUIRED_PMD")
+    _enforce_required_reports("Checkstyle", "checkstyle-result.xml",
+                              "QUALITY_REPORT_REQUIRED_CHECKSTYLE")
+
     pmd = parse_pmd()
     if pmd:
         forbidden_pmd_rules = {
+            "UnparseableReport",
             "ClassWithOnlyPrivateConstructorsShouldBeFinal",
             "CompareObjectsWithEquals",
             "FormalParameterNamingConventions",

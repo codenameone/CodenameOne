@@ -24,40 +24,36 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * The scheme rule for an OUTBOUND request, shared by both Web implementations.
- *
- * <p>Web documents an HTTP client. The packaged arm hands its URL to libcurl,
- * which speaks whatever its build enabled -- and the shipped builds enable
- * file://, so "file:///etc/passwd" read the file into the handler-visible
- * response body. Measured before this existed: file:///etc/hosts came back as
- * 684 bytes of it. Any application that passes a caller-supplied URL to
- * Web.request -- a webhook target, an avatar URL, a callback -- therefore had a
- * local file disclosure in it.
- *
- * <p>Checked HERE rather than left to each arm, for the usual reason: the Java SE
- * arm would have failed this by ClassCastException out of the HttpURLConnection
- * cast, which is a different error, and on a future arm might be no error at all.
- * libcurl is ALSO told to accept only http and https, on the initial request and
- * on redirects, so a URL this misses cannot become a file read further down.
- */
+/// The scheme rule for an OUTBOUND request, shared by both Web implementations.
+///
+/// Web documents an HTTP client. The packaged arm hands its URL to libcurl,
+/// which speaks whatever its build enabled -- and the shipped builds enable
+/// file://, so "file:///etc/passwd" read the file into the handler-visible
+/// response body. Measured before this existed: file:///etc/hosts came back as
+/// 684 bytes of it. Any application that passes a caller-supplied URL to
+/// Web.request -- a webhook target, an avatar URL, a callback -- therefore had a
+/// local file disclosure in it.
+///
+/// Checked HERE rather than left to each arm, for the usual reason: the Java SE
+/// arm would have failed this by ClassCastException out of the HttpURLConnection
+/// cast, which is a different error, and on a future arm might be no error at all.
+/// libcurl is ALSO told to accept only http and https, on the initial request and
+/// on redirects, so a URL this misses cannot become a file read further down.
 final class Urls {
     private Urls() {
     }
 
-    /**
-     * @throws IOException unless {@code url} names http or https. The scheme is
-     *                     compared without folding case, which is what a scheme
-     *                     is: RFC 3986 says it is case insensitive, and
-     *                     toLowerCase would be the locale-sensitive way to get
-     *                     that wrong.
-     */
+    /// @throws IOException unless `url` names http or https. The scheme is
+    /// compared without folding case, which is what a scheme
+    /// is: RFC 3986 says it is case insensitive, and
+    /// toLowerCase would be the locale-sensitive way to get
+    /// that wrong.
     static void requireHttp(String url) throws IOException {
-        if(url == null) {
+        if (url == null) {
             throw new IOException("No URL");
         }
         int colon = url.indexOf(':');
-        if(colon < 1
+        if (colon < 1
                 || !(url.regionMatches(true, 0, "http:", 0, 5)
                      || url.regionMatches(true, 0, "https:", 0, 6))) {
             // The SCHEME only. The rest of a URL can carry credentials in its
@@ -75,9 +71,9 @@ final class Urls {
         // was even going. CR, LF, TAB and DEL are refused with it: none of them
         // is legal in a URL, and each is a way to mean two things at once to
         // whatever parses it next.
-        for(int iter = 0 ; iter < url.length() ; iter++) {
+        for (int iter = 0 ; iter < url.length() ; iter++) {
             char c = url.charAt(iter);
-            if(c <= 0x20 || c == 0x7f) {
+            if (c <= 0x20 || c == 0x7f) {
                 throw new IOException("A URL cannot hold a control character or a "
                         + "space; this one does, at index " + iter
                         + ". Percent-encode it");
@@ -85,60 +81,56 @@ final class Urls {
         }
     }
 
-    /**
-     * Refuses a host name that carries a control character.
-     *
-     * <p>THE SAME TRUNCATION requireHttp refuses in a URL, one layer down and
-     * reachable without one. Tcp.connect hands the name to getaddrinfo as a C
-     * string on the packaged arm -- stringToUTF8 encodes through
-     * String.getBytes("UTF-8"), so a NUL ends the name there -- and a host of
-     * "127.0.0.1", a NUL, then ".example.com" resolves to 127.0.0.1, a
-     * destination an application that checked the .example.com suffix has
-     * already approved. The JavaSE arm resolves the whole string and fails, so
-     * this is a divergence between the arms as well as a hole in one of them.
-     *
-     * <p>Called from both arms for that reason: a rule that only one of them
-     * applies is a development loop that behaves differently from production.
-     */
+    /// Refuses a host name that carries a control character.
+    ///
+    /// THE SAME TRUNCATION requireHttp refuses in a URL, one layer down and
+    /// reachable without one. Tcp.connect hands the name to getaddrinfo as a C
+    /// string on the packaged arm -- stringToUTF8 encodes through
+    /// String.getBytes("UTF-8"), so a NUL ends the name there -- and a host of
+    /// "127.0.0.1", a NUL, then ".example.com" resolves to 127.0.0.1, a
+    /// destination an application that checked the .example.com suffix has
+    /// already approved. The JavaSE arm resolves the whole string and fails, so
+    /// this is a divergence between the arms as well as a hole in one of them.
+    ///
+    /// Called from both arms for that reason: a rule that only one of them
+    /// applies is a development loop that behaves differently from production.
     static void requireHostName(String host) throws IOException {
-        if(host == null || host.length() == 0) {
+        if (host == null || host.length() == 0) {
             throw new IOException("No host");
         }
-        for(int iter = 0 ; iter < host.length() ; iter++) {
+        for (int iter = 0 ; iter < host.length() ; iter++) {
             char c = host.charAt(iter);
-            if(c <= 0x20 || c == 0x7f) {
+            if (c <= 0x20 || c == 0x7f) {
                 throw new IOException("A host name cannot hold a control character "
                         + "or a space; this one does, at index " + iter);
             }
         }
     }
 
-    /**
-     * A URL with everything secret taken out of it, for a message a caller will
-     * log.
-     *
-     * Userinfo goes, and so does the WHOLE query -- not the parameters whose
-     * names look sensitive. That list is never finished (X-Amz-Signature,
-     * X-Amz-Credential, access_token, sig, key, token, password) and the case
-     * that matters most here is a presigned S3 URL, whose signature IS the
-     * credential. Dropping the query wholesale and saying so is the only version
-     * of this that cannot be wrong about a name nobody thought of.
-     *
-     * <p>The host and path stay, because an error naming no endpoint at all is
-     * not worth logging. requireHttp above prints only the scheme for the same
-     * reason, and Database.Url.describe does the same thing for a database URL.
-     *
-     * <p>AND THE FRAGMENT, for the same reason as the query: an implicit-flow
-     * OAuth token arrives as "#access_token=...", which is a credential in the
-     * one part of a URL that never even reaches the server. Cutting at the query
-     * alone left it in the message verbatim.
-     *
-     * <p>indexOf with a String and not a char: vm/JavaAPI has indexOf(String,
-     * int) and no indexOf(int, int), so the char form compiles on the JavaSE arm
-     * and fails to link in a translated build.
-     */
+    /// A URL with everything secret taken out of it, for a message a caller will
+    /// log.
+    ///
+    /// Userinfo goes, and so does the WHOLE query -- not the parameters whose
+    /// names look sensitive. That list is never finished (X-Amz-Signature,
+    /// X-Amz-Credential, access_token, sig, key, token, password) and the case
+    /// that matters most here is a presigned S3 URL, whose signature IS the
+    /// credential. Dropping the query wholesale and saying so is the only version
+    /// of this that cannot be wrong about a name nobody thought of.
+    ///
+    /// The host and path stay, because an error naming no endpoint at all is
+    /// not worth logging. requireHttp above prints only the scheme for the same
+    /// reason, and Database.Url.describe does the same thing for a database URL.
+    ///
+    /// AND THE FRAGMENT, for the same reason as the query: an implicit-flow
+    /// OAuth token arrives as "#access_token=...", which is a credential in the
+    /// one part of a URL that never even reaches the server. Cutting at the query
+    /// alone left it in the message verbatim.
+    ///
+    /// indexOf with a String and not a char: vm/JavaAPI has indexOf(String,
+    /// int) and no indexOf(int, int), so the char form compiles on the JavaSE arm
+    /// and fails to link in a translated build.
     static String forMessage(String url) {
-        if(url == null) {
+        if (url == null) {
             return "a request with no URL";
         }
         // Whichever comes first. A fragment starts at the first '#' and runs to
@@ -146,18 +138,18 @@ final class Urls {
         int query = url.indexOf('?');
         int fragment = url.indexOf('#');
         char marker = '?';
-        if(fragment >= 0 && (query < 0 || fragment < query)) {
+        if (fragment >= 0 && (query < 0 || fragment < query)) {
             query = fragment;
             marker = '#';
         }
         String out = query < 0 ? url : url.substring(0, query);
         int scheme = out.indexOf("://");
-        if(scheme >= 0) {
+        if (scheme >= 0) {
             int at = out.indexOf("@", scheme + 3);
             int slash = out.indexOf("/", scheme + 3);
             // A '@' before the authority ends is userinfo; one after it is an
             // ordinary path character and has nothing to do with credentials.
-            if(at >= 0 && (slash < 0 || at < slash)) {
+            if (at >= 0 && (slash < 0 || at < slash)) {
                 out = out.substring(0, scheme + 3) + "<redacted>@"
                         + out.substring(at + 1);
             }
@@ -165,26 +157,24 @@ final class Urls {
         return query < 0 ? out : out + marker + "<redacted>";
     }
 
-    /**
-     * Refuses a path that carries a NUL.
-     *
-     * <p>THE SAME TRUNCATION AS THE URL AND THE HOST, in the third string this
-     * runtime hands to a native. stringToUTF8 keeps the zero byte and C stops
-     * there, so an sslrootcert of "/tmp/mine", a NUL, then "/etc/ssl/approved.pem"
-     * is a value that READS as the approved bundle and loads the other file:
-     * stat() and SSL_CTX_load_verify_locations() both see only the prefix, and
-     * the session then verifies against a trust root somebody else chose. A
-     * database URL can carry it as %00, which Url.decode turns into the NUL.
-     *
-     * <p>Narrower than the URL and host rules on purpose: a file name may
-     * legitimately hold a space, and on POSIX very nearly anything else. The NUL
-     * is the one byte no path can contain and the only one that truncates.
-     */
+    /// Refuses a path that carries a NUL.
+    ///
+    /// THE SAME TRUNCATION AS THE URL AND THE HOST, in the third string this
+    /// runtime hands to a native. stringToUTF8 keeps the zero byte and C stops
+    /// there, so an sslrootcert of "/tmp/mine", a NUL, then "/etc/ssl/approved.pem"
+    /// is a value that READS as the approved bundle and loads the other file:
+    /// stat() and SSL_CTX_load_verify_locations() both see only the prefix, and
+    /// the session then verifies against a trust root somebody else chose. A
+    /// database URL can carry it as %00, which Url.decode turns into the NUL.
+    ///
+    /// Narrower than the URL and host rules on purpose: a file name may
+    /// legitimately hold a space, and on POSIX very nearly anything else. The NUL
+    /// is the one byte no path can contain and the only one that truncates.
     static void requireNoNul(String what, String value) throws IOException {
-        if(value == null) {
+        if (value == null) {
             return;
         }
-        if(value.indexOf('\u0000') >= 0) {
+        if (value.indexOf('\u0000') >= 0) {
             throw new IOException(what + " cannot hold a NUL: the native side reads "
                     + "it as the end of the name, so the file opened would not be "
                     + "the file named");

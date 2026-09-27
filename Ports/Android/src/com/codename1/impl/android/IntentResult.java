@@ -24,10 +24,6 @@ package com.codename1.impl.android;
 
 import android.content.Intent;
 
-/**
- *
- * @author Chen
- */
 public class IntentResult {
     private int requestCode;
     private int resultCode;

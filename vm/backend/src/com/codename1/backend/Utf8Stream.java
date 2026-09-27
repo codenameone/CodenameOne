@@ -22,65 +22,57 @@
  */
 package com.codename1.backend;
 
-/**
- * The same RFC 3629 rules {@link Utf8} applies, carried ACROSS calls.
- *
- * {@link Utf8#isValid} answers about a range it can see all of, and a sequence cut
- * off by the end of that range is invalid -- which is right for a request body,
- * where the range IS the body. A websocket text message is the opposite: RFC 6455
- * 5.6 lets a client split one character across two frames, so the last byte of a
- * frame can legitimately be the middle of a character, and the validator has to
- * remember where it was.
- *
- * It also has to fail AT the offending byte rather than at the end of the message.
- * A server that buffers a whole fragmented message and validates once answers the
- * same in the end, but it has already accepted however many megabytes the client
- * chose to send after the byte that made the message invalid.
- *
- * The table below is a copy of the one in Utf8, and the duplication is deliberate:
- * the shapes are genuinely different -- one scans a range with `at + following >=
- * end` as a failure, the other treats exactly that case as "ask me again" -- and
- * threading a resumable state machine through the request path would slow the hot
- * case down to serve the rare one. `Utf8StreamTest` cross-checks the two over
- * every leading byte and every boundary in the table, so the copies cannot drift
- * without a red test.
- */
+/// The same RFC 3629 rules [Utf8] applies, carried ACROSS calls.
+///
+/// [Utf8#isValid] answers about a range it can see all of, and a sequence cut
+/// off by the end of that range is invalid -- which is right for a request body,
+/// where the range IS the body. A websocket text message is the opposite: RFC 6455
+/// 5.6 lets a client split one character across two frames, so the last byte of a
+/// frame can legitimately be the middle of a character, and the validator has to
+/// remember where it was.
+///
+/// It also has to fail AT the offending byte rather than at the end of the message.
+/// A server that buffers a whole fragmented message and validates once answers the
+/// same in the end, but it has already accepted however many megabytes the client
+/// chose to send after the byte that made the message invalid.
+///
+/// The table below is a copy of the one in Utf8, and the duplication is deliberate:
+/// the shapes are genuinely different -- one scans a range with `at + following >=
+/// end` as a failure, the other treats exactly that case as "ask me again" -- and
+/// threading a resumable state machine through the request path would slow the hot
+/// case down to serve the rare one. `Utf8StreamTest` cross-checks the two over
+/// every leading byte and every boundary in the table, so the copies cannot drift
+/// without a red test.
 final class Utf8Stream {
-    /** Continuation bytes still expected for the character in progress. */
+    /// Continuation bytes still expected for the character in progress.
     private int pending;
-    /**
-     * Whether the NEXT byte is the second byte of its character, which is the one
-     * with the narrowed range. Bytes after it are always 80..BF.
-     */
+    /// Whether the NEXT byte is the second byte of its character, which is the one
+    /// with the narrowed range. Bytes after it are always 80..BF.
     private boolean atSecond;
     private int lowest;
     private int highest;
-    /**
-     * Sticky. Once a stream is invalid it stays invalid: the caller is going to
-     * close the connection, and answering "valid" for a later range would let a
-     * retry loop keep going on bytes that already failed.
-     */
+    /// Sticky. Once a stream is invalid it stays invalid: the caller is going to
+    /// close the connection, and answering "valid" for a later range would let a
+    /// retry loop keep going on bytes that already failed.
     private boolean failed;
 
-    /**
-     * Feeds the next bytes of the message.
-     *
-     * Returns false as soon as the stream cannot be UTF-8. A true answer means
-     * "nothing wrong so far", NOT "complete" -- a range ending mid-character is a
-     * true answer, and {@link #isComplete} is what asks the other question.
-     */
+    /// Feeds the next bytes of the message.
+    ///
+    /// Returns false as soon as the stream cannot be UTF-8. A true answer means
+    /// "nothing wrong so far", NOT "complete" -- a range ending mid-character is a
+    /// true answer, and [#isComplete] is what asks the other question.
     boolean accept(byte[] bytes, int offset, int length) {
-        if(failed) {
+        if (failed) {
             return false;
         }
         int at = offset;
         int end = offset + length;
-        while(at < end) {
+        while (at < end) {
             int b = bytes[at] & 0xff;
-            if(pending > 0) {
+            if (pending > 0) {
                 int floor = atSecond ? lowest : 0x80;
                 int ceiling = atSecond ? highest : 0xbf;
-                if(b < floor || b > ceiling) {
+                if (b < floor || b > ceiling) {
                     failed = true;
                     return false;
                 }
@@ -89,42 +81,42 @@ final class Utf8Stream {
                 at++;
                 continue;
             }
-            if(b < 0x80) {
+            if (b < 0x80) {
                 at++;
                 continue;
             }
-            if(b >= 0xc2 && b <= 0xdf) {
+            if (b >= 0xc2 && b <= 0xdf) {
                 pending = 1;
                 lowest = 0x80;
                 highest = 0xbf;
-            } else if(b == 0xe0) {
+            } else if (b == 0xe0) {
                 // A second byte below A0 would be an overlong two-byte value.
                 pending = 2;
                 lowest = 0xa0;
                 highest = 0xbf;
-            } else if(b >= 0xe1 && b <= 0xec) {
+            } else if (b >= 0xe1 && b <= 0xec) {
                 pending = 2;
                 lowest = 0x80;
                 highest = 0xbf;
-            } else if(b == 0xed) {
+            } else if (b == 0xed) {
                 // ED A0..BF is the surrogate range, which UTF-8 does not encode.
                 pending = 2;
                 lowest = 0x80;
                 highest = 0x9f;
-            } else if(b == 0xee || b == 0xef) {
+            } else if (b == 0xee || b == 0xef) {
                 pending = 2;
                 lowest = 0x80;
                 highest = 0xbf;
-            } else if(b == 0xf0) {
+            } else if (b == 0xf0) {
                 // Below 90 is an overlong three-byte value.
                 pending = 3;
                 lowest = 0x90;
                 highest = 0xbf;
-            } else if(b >= 0xf1 && b <= 0xf3) {
+            } else if (b >= 0xf1 && b <= 0xf3) {
                 pending = 3;
                 lowest = 0x80;
                 highest = 0xbf;
-            } else if(b == 0xf4) {
+            } else if (b == 0xf4) {
                 // F4 90 and above is past U+10FFFF.
                 pending = 3;
                 lowest = 0x80;
@@ -141,12 +133,12 @@ final class Utf8Stream {
         return true;
     }
 
-    /** True when every character fed so far is whole and none of them was invalid. */
+    /// True when every character fed so far is whole and none of them was invalid.
     boolean isComplete() {
         return !failed && pending == 0;
     }
 
-    /** Back to the start, for the next message on the same connection. */
+    /// Back to the start, for the next message on the same connection.
     void reset() {
         pending = 0;
         atSecond = false;

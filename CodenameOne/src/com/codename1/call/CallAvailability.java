@@ -61,7 +61,7 @@ public enum CallAvailability {
     /// The platform has no system call integration at all.
     UNSUPPORTED,
 
-    /// [Calls#configure] has not completed successfully, so a report would
+    /// [Calls#configure][com.codename1.call.session.Calls#configure] has not completed successfully, so a report would
     /// be refused.
     ///
     /// Not proof that it never ran: Android's configure answers

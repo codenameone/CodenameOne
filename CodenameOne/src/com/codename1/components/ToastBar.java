@@ -118,8 +118,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// Note: the video above refers to the `ToastBar` based on its development name of StatusBar. This
 /// was changed to avoid confusion with the iOS StatusBar.
-///
-/// @author shannah
 public final class ToastBar {
 
     /// The default timeout for info/error messages

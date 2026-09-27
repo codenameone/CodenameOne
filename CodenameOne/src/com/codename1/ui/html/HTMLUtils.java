@@ -27,8 +27,6 @@ import java.util.Hashtable;
 
 /// This class contains several useful static methods for HTML
 ///
-/// @author Ofir Leitner
-///
 /// #### Deprecated
 ///
 /// the HTML package is no longer used or maintained and may be removed in a future revision

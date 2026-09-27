@@ -66,7 +66,6 @@ import java.util.Map;
 /// functionality will be added. See the *Authentication and Identity*
 /// chapter of the developer guide for a migration recipe.
 ///
-/// @author Chen Fishbein
 /// @deprecated Use [com.codename1.io.oidc.OidcClient] for new code.
 @Deprecated
 public class Oauth2 {

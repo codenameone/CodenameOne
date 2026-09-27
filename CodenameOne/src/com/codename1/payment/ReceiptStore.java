@@ -25,8 +25,6 @@ package com.codename1.payment;
 import com.codename1.util.SuccessCallback;
 
 /// Interface that can be implemented to provide store of receipts.
-///
-/// @author shannah
 public interface ReceiptStore {
 
     /// Load receipts from the data source.

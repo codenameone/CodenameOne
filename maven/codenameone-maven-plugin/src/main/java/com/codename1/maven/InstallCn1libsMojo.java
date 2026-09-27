@@ -42,10 +42,6 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.Delete;
 import org.apache.tools.ant.taskdefs.Expand;
 
-/**
- *
- * @author shannah
- */
 @Mojo(name = "installcn1libs", requiresDependencyResolution = ResolutionScope.TEST)
 public class InstallCn1libsMojo extends AbstractCN1Mojo {
     

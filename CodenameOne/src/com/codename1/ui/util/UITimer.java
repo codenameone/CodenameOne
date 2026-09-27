@@ -32,8 +32,6 @@ import com.codename1.ui.animations.Animation;
 /// Simple timer callback that is invoked on the CodenameOne EDT thread rather
 /// than on a separate thread. Notice that the accuracy of this timer is very low!
 /// A timer must be linked to a specific form
-///
-/// @author Shai Almog
 public class UITimer {
     private final Internal i = new Internal();
     private Runnable internalRunnable;

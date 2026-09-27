@@ -61,8 +61,6 @@ import java.util.Vector;
 
 /// HTMLComponent is a Codename One Component that renders HTML documents that conform to the XHTML Mobile Profile 1.0
 ///
-/// @author Ofir Leitner
-///
 /// #### Deprecated
 ///
 /// @deprecated this component includes some customizability advantages but its probably better for 99% of the use
@@ -4080,8 +4078,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     }
 
     /// A thread used to refresh or redirect to another page in X seconds
-    ///
-    /// @author Ofir Leitner
     static class RedirectThread implements Runnable {
 
         int seconds;
@@ -4121,8 +4117,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     /// A label that when clicked focuses (and toggels when applicable) a certain input field.
     /// This implements the LABEL html tag
-    ///
-    /// @author Ofir Leitner
     static class ForLabel extends Label {
 
         String id;
@@ -4250,8 +4244,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     }
 
     /// A simple class drawing a bullet in various styles
-    ///
-    /// @author Ofir Leitner
     static class HTMLBullet extends HTMLListItem {
 
 
@@ -4336,8 +4328,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     /// HTMLComboBox overrides ComboBox to allow usage of MultiComboBox as its list.
     /// This is done for OPTGROUP labels support (Note that multiple features of MultiComboBox will be switched off)
-    ///
-    /// @author Ofir Leitner
     static class HTMLComboBox extends ComboBox {
 
         /// {{@inheritDoc}}

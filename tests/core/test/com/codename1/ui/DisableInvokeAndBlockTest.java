@@ -27,7 +27,6 @@ import com.codename1.testing.AbstractTest;
 
 /**
  * Tests for {@link Display#invokeWithoutBlocking(java.lang.Runnable) }
- * @author shannah
  */
 public class DisableInvokeAndBlockTest extends AbstractTest {
 

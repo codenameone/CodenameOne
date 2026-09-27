@@ -26,10 +26,6 @@ package com.codename1.designer;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
-/**
- *
- * @author Shai Almog
- */
 public class CSVParserOptions extends javax.swing.JDialog {
     private boolean canceled;
     

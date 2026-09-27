@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Runtime parser for CSS `filter:` / `backdrop-filter:` chains. Mirrors
-/// the build-time css-compiler's parser. Returns a [Style.FilterChain]
+/// the build-time css-compiler's parser. Returns a [FilterChain]
 /// holding a blur radius (in pixels) and a 4x5 color matrix that
 /// composes the chain's color-style functions
 /// (brightness / contrast / grayscale / hue-rotate / invert / opacity /

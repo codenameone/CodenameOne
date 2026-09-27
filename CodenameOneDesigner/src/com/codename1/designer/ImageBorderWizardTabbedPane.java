@@ -31,8 +31,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Part of the image border wizard in the theme
- *
- * @author Shai Almog
  */
 public class ImageBorderWizardTabbedPane extends javax.swing.JPanel {
     private ImageBorderCuttingWizard cutting;

@@ -31,10 +31,6 @@ import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
-/**
- *
- * @author Chen
- */
 public class BackgroundLocationHandler extends IntentService {
 
     public BackgroundLocationHandler() {

@@ -54,9 +54,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// selection by default.  Labels and SpanLabels have text selection disabled by default, but can be enabled using
 /// `Label#setTextSelectionEnabled(boolean)`, and `SpanLabel#setTextSelectionEnabled(boolean)` respectively.
 /// Similarly, text selection can be disabled on TextFields and TextAreas using `TextArea#setTextSelectionEnabled(boolean)`.
-///
-/// @author shannah
-///
 public class TextSelection {
 
     /// Comparator used for ordering components in left-to-right mode.

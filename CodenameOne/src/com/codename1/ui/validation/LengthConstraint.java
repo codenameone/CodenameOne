@@ -23,8 +23,6 @@
 package com.codename1.ui.validation;
 
 /// Creates a validation constraint based on minimum input length
-///
-/// @author Shai Almog
 public class LengthConstraint implements Constraint {
     private final int length;
     private final String errorMessage;

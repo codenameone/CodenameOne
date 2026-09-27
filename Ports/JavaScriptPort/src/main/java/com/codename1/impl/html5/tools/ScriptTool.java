@@ -38,10 +38,6 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLScriptElement;
 
-/**
- *
- * @author shannah
- */
 public class ScriptTool {
     
     private Set<String> loadedScripts = new HashSet<String>();

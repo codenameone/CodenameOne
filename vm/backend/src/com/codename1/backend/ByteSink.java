@@ -22,23 +22,21 @@
  */
 package com.codename1.backend;
 
-/**
- * A growable byte buffer that callers reuse.
- *
- * This exists because building output as a String and then encoding it is the
- * single most expensive thing a server can do per request. Measured on this
- * server: the response head alone, built with a StringBuilder, turned into a
- * String and then into bytes, was a third of all allocation; the JSON body was
- * most of the rest. Written as bytes into a buffer that lives as long as the
- * connection, both cost nothing.
- *
- * Deliberately not java.io.ByteArrayOutputStream: that one cannot be reset
- * without discarding its buffer on some implementations, has synchronized
- * methods, and hands out a COPY of its contents -- three allocations where this
- * has none.
- *
- * Not thread safe. One per connection, used by the worker that owns it.
- */
+/// A growable byte buffer that callers reuse.
+///
+/// This exists because building output as a String and then encoding it is the
+/// single most expensive thing a server can do per request. Measured on this
+/// server: the response head alone, built with a StringBuilder, turned into a
+/// String and then into bytes, was a third of all allocation; the JSON body was
+/// most of the rest. Written as bytes into a buffer that lives as long as the
+/// connection, both cost nothing.
+///
+/// Deliberately not java.io.ByteArrayOutputStream: that one cannot be reset
+/// without discarding its buffer on some implementations, has synchronized
+/// methods, and hands out a COPY of its contents -- three allocations where this
+/// has none.
+///
+/// Not thread safe. One per connection, used by the worker that owns it.
 public final class ByteSink {
     private byte[] data;
     private int length;
@@ -47,7 +45,7 @@ public final class ByteSink {
         data = new byte[initialCapacity < 16 ? 16 : initialCapacity];
     }
 
-    /** The backing array. Valid up to {@link #length}; not a copy. */
+    /// The backing array. Valid up to [#length]; not a copy.
     public byte[] bytes() {
         return data;
     }
@@ -61,11 +59,11 @@ public final class ByteSink {
     }
 
     public void ensure(int extra) {
-        if(length + extra <= data.length) {
+        if (length + extra <= data.length) {
             return;
         }
         int size = data.length * 2;
-        while(size < length + extra) {
+        while (size < length + extra) {
             size *= 2;
         }
         byte[] grown = new byte[size];
@@ -75,7 +73,7 @@ public final class ByteSink {
 
     public void put(int b) {
         ensure(1);
-        data[length++] = (byte)b;
+        data[length++] = (byte) b;
     }
 
     public void put(byte[] source, int offset, int count) {
@@ -88,123 +86,115 @@ public final class ByteSink {
         put(other.data, 0, other.length);
     }
 
-    /**
-     * ASCII only, one byte per character. For header names, JSON punctuation and
-     * other text this code owns; anything from outside goes through
-     * {@link #putUtf8}.
-     */
+    /// ASCII only, one byte per character. For header names, JSON punctuation and
+    /// other text this code owns; anything from outside goes through
+    /// [#putUtf8].
     public void putAscii(String ascii) {
         int n = ascii.length();
         ensure(n);
-        for(int iter = 0 ; iter < n ; iter++) {
-            data[length++] = (byte)ascii.charAt(iter);
+        for (int iter = 0 ; iter < n ; iter++) {
+            data[length++] = (byte) ascii.charAt(iter);
         }
     }
 
-    /**
-     * UTF-8, encoded in place.
-     *
-     * String.getBytes("UTF-8") would allocate the array this exists to avoid, and
-     * on the translated target it goes through the platform's encoder for every
-     * call. Surrogate pairs are combined; an unpaired surrogate becomes U+FFFD,
-     * because emitting a lone surrogate produces bytes no decoder will accept.
-     */
+    /// UTF-8, encoded in place.
+    ///
+    /// String.getBytes("UTF-8") would allocate the array this exists to avoid, and
+    /// on the translated target it goes through the platform's encoder for every
+    /// call. Surrogate pairs are combined; an unpaired surrogate becomes U+FFFD,
+    /// because emitting a lone surrogate produces bytes no decoder will accept.
     public void putUtf8(String value) {
         int n = value.length();
         ensure(n);                       // exact for ASCII, grown below otherwise
-        for(int iter = 0 ; iter < n ; iter++) {
+        for (int iter = 0 ; iter < n ; iter++) {
             int c = value.charAt(iter);
-            if(c < 0x80) {
+            if (c < 0x80) {
                 ensure(1);
-                data[length++] = (byte)c;
-            } else if(c < 0x800) {
+                data[length++] = (byte) c;
+            } else if (c < 0x800) {
                 ensure(2);
-                data[length++] = (byte)(0xc0 | (c >> 6));
-                data[length++] = (byte)(0x80 | (c & 0x3f));
-            } else if(c >= 0xd800 && c <= 0xdbff && iter + 1 < n
+                data[length++] = (byte) (0xc0 | (c >> 6));
+                data[length++] = (byte) (0x80 | (c & 0x3f));
+            } else if (c >= 0xd800 && c <= 0xdbff && iter + 1 < n
                     && value.charAt(iter + 1) >= 0xdc00 && value.charAt(iter + 1) <= 0xdfff) {
                 int code = 0x10000 + ((c - 0xd800) << 10) + (value.charAt(iter + 1) - 0xdc00);
                 iter++;
                 ensure(4);
-                data[length++] = (byte)(0xf0 | (code >> 18));
-                data[length++] = (byte)(0x80 | ((code >> 12) & 0x3f));
-                data[length++] = (byte)(0x80 | ((code >> 6) & 0x3f));
-                data[length++] = (byte)(0x80 | (code & 0x3f));
-            } else if(c >= 0xd800 && c <= 0xdfff) {
+                data[length++] = (byte) (0xf0 | (code >> 18));
+                data[length++] = (byte) (0x80 | ((code >> 12) & 0x3f));
+                data[length++] = (byte) (0x80 | ((code >> 6) & 0x3f));
+                data[length++] = (byte) (0x80 | (code & 0x3f));
+            } else if (c >= 0xd800 && c <= 0xdfff) {
                 ensure(3);               // unpaired surrogate -> U+FFFD
-                data[length++] = (byte)0xef;
-                data[length++] = (byte)0xbf;
-                data[length++] = (byte)0xbd;
+                data[length++] = (byte) 0xef;
+                data[length++] = (byte) 0xbf;
+                data[length++] = (byte) 0xbd;
             } else {
                 ensure(3);
-                data[length++] = (byte)(0xe0 | (c >> 12));
-                data[length++] = (byte)(0x80 | ((c >> 6) & 0x3f));
-                data[length++] = (byte)(0x80 | (c & 0x3f));
+                data[length++] = (byte) (0xe0 | (c >> 12));
+                data[length++] = (byte) (0x80 | ((c >> 6) & 0x3f));
+                data[length++] = (byte) (0x80 | (c & 0x3f));
             }
         }
     }
 
-    /**
-     * One code point as UTF-8.
-     *
-     * Separate from {@link #putUtf8} because a caller walking a String character
-     * by character has to combine a surrogate PAIR itself -- handing the halves
-     * over one at a time turns an emoji into two replacement characters, which is
-     * what the JSON writer did until its output was compared against the String
-     * form byte for byte.
-     */
+    /// One code point as UTF-8.
+    ///
+    /// Separate from [#putUtf8] because a caller walking a String character
+    /// by character has to combine a surrogate PAIR itself -- handing the halves
+    /// over one at a time turns an emoji into two replacement characters, which is
+    /// what the JSON writer did until its output was compared against the String
+    /// form byte for byte.
     public void putCodePoint(int code) {
-        if(code < 0x80) {
+        if (code < 0x80) {
             ensure(1);
-            data[length++] = (byte)code;
-        } else if(code < 0x800) {
+            data[length++] = (byte) code;
+        } else if (code < 0x800) {
             ensure(2);
-            data[length++] = (byte)(0xc0 | (code >> 6));
-            data[length++] = (byte)(0x80 | (code & 0x3f));
-        } else if(code < 0x10000) {
+            data[length++] = (byte) (0xc0 | (code >> 6));
+            data[length++] = (byte) (0x80 | (code & 0x3f));
+        } else if (code < 0x10000) {
             ensure(3);
-            data[length++] = (byte)(0xe0 | (code >> 12));
-            data[length++] = (byte)(0x80 | ((code >> 6) & 0x3f));
-            data[length++] = (byte)(0x80 | (code & 0x3f));
+            data[length++] = (byte) (0xe0 | (code >> 12));
+            data[length++] = (byte) (0x80 | ((code >> 6) & 0x3f));
+            data[length++] = (byte) (0x80 | (code & 0x3f));
         } else {
             ensure(4);
-            data[length++] = (byte)(0xf0 | (code >> 18));
-            data[length++] = (byte)(0x80 | ((code >> 12) & 0x3f));
-            data[length++] = (byte)(0x80 | ((code >> 6) & 0x3f));
-            data[length++] = (byte)(0x80 | (code & 0x3f));
+            data[length++] = (byte) (0xf0 | (code >> 18));
+            data[length++] = (byte) (0x80 | ((code >> 12) & 0x3f));
+            data[length++] = (byte) (0x80 | ((code >> 6) & 0x3f));
+            data[length++] = (byte) (0x80 | (code & 0x3f));
         }
     }
 
-    /**
-     * A number as ASCII digits, written in place. Long.toString would allocate a
-     * String and its char[], and this is on the path of every response (the
-     * status and the content length) and every JSON number.
-     */
+    /// A number as ASCII digits, written in place. Long.toString would allocate a
+    /// String and its char\[\], and this is on the path of every response (the
+    /// status and the content length) and every JSON number.
     public void putNumber(long value) {
-        if(value < 0) {
+        if (value < 0) {
             put('-');
-            if(value == Long.MIN_VALUE) {
+            if (value == Long.MIN_VALUE) {
                 // Negating it overflows; it has no positive counterpart.
                 putAscii("9223372036854775808");
                 return;
             }
             value = -value;
         }
-        if(value == 0) {
+        if (value == 0) {
             put('0');
             return;
         }
         int digits = 0;
         long counter = value;
-        while(counter > 0) {
+        while (counter > 0) {
             digits++;
             counter /= 10;
         }
         ensure(digits);
         length += digits;
         int at = length;
-        while(value > 0) {
-            data[--at] = (byte)('0' + (int)(value % 10));
+        while (value > 0) {
+            data[--at] = (byte) ('0' + (int) (value % 10));
             value /= 10;
         }
     }

@@ -34,10 +34,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.TextField;
 
-/**
- *
- * @author Chen
- */
 public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurface{
 
     private CodenameOneView cn1View;

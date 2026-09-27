@@ -28,10 +28,6 @@ import com.codename1.impl.html5.HTML5Implementation.NativeImage;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 
-/**
- *
- * @author shannah
- */
 public class DrawImage implements ExecutableOp {
     final NativeImage img;
     final int x, y, w, h, alpha;

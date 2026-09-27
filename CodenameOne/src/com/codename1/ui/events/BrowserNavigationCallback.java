@@ -33,8 +33,6 @@ package com.codename1.ui.events;
 ///
 /// This interface should be applied to the BrowserComponent or WebBrowser
 /// class.
-///
-/// @author shannah
 public interface BrowserNavigationCallback {
     /// **Important: Calls to this interface are always performed on a separate
     /// thread from the EDT! They are performed on the native webkit rendering

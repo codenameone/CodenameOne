@@ -37,8 +37,6 @@ import javax.swing.text.JTextComponent;
 
 /**
  * Allows adding constants to the CodenameOne theme
- *
- * @author Shai Almog
  */
 public class ConstantEditor extends javax.swing.JPanel {
     private Map<String, String> helpMap = new HashMap<String, String>();

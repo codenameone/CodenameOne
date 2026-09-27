@@ -99,8 +99,6 @@ import com.codename1.util.MathUtil;
 /// });
 /// hi.show();
 /// ```
-///
-/// @author Chen, Steve
 public class FlipTransition extends Transition {
 
     private static final int STATE_MOVE_AWAY = 1;

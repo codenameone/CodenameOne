@@ -36,8 +36,6 @@ import com.codename1.ui.plaf.Style;
 /// - Painting both a background color and a background image
 /// - Tiling horizontally or vertically (or both)
 /// - Background image position offset horizontal and vertical
-///
-/// @author Ofir Leitner
 class CSSBgPainter implements Painter {
     private final Component parent;
     int horizPos;

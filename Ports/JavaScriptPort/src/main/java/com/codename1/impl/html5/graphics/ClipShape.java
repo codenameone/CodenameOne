@@ -30,10 +30,6 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Shape;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class ClipShape implements ExecutableOp {
     
     final Shape shape;

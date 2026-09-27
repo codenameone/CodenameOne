@@ -35,10 +35,6 @@ import com.codename1.ui.Display;
 import com.zooz.android.lib.CheckoutActivity;
  ZOOZMARKER_END */
 
-/**
- *
- * @author Chen
- */
 public class ZoozPurchase extends Purchase implements IntentResultListener, Runnable {
 
     private Activity activity;

@@ -35,8 +35,6 @@ import java.util.prefs.Preferences;
  * Simple layout manager that arranges icons in a changeable grid similar to grid
  * layout in a sense but it doesn't impose the same limitation. Elements will flow
  * vertically if there is no room to grow horizontally.
- *
- * @author Shai Almog
  */
 public class WrappingLayout implements LayoutManager {
     private int maxButtonWidth;

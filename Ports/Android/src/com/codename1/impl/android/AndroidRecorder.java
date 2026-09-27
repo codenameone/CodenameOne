@@ -27,10 +27,6 @@ import com.codename1.media.AbstractMedia;
 import com.codename1.media.Media;
 import com.codename1.ui.Component;
 
-/**
- *
- * @author Chen
- */
 public class AndroidRecorder extends AbstractMedia{
     
     private MediaRecorder.OnErrorListener onErrorListener = new MediaRecorder.OnErrorListener() {

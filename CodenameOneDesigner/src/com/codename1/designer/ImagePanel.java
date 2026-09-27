@@ -31,8 +31,6 @@ import javax.swing.JPanel;
 /**
  * Panel containing a CodenameOne image that provides a photoshop-like square background
  * effect. 
- *
- * @author Shai Almog
  */
 class ImagePanel extends JPanel {
 

@@ -38,8 +38,6 @@ import java.io.OutputStream;
 /// Enable simple operations on image file & image objects such as dynamic scaling
 /// and storage to binary formats such as JPEG. Use Display.getImageIO() to get an instance
 /// of this class.
-///
-/// @author Shai Almog
 public abstract class ImageIO {
     /// Indicates the JPEG output format
     public static final String FORMAT_JPEG = "jpeg";

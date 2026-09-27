@@ -24,10 +24,6 @@ package com.codename1.designer.css;
 
 import java.io.File;
 
-/**
- *
- * @author shannah
- */
 public class PollingFileWatcher  {
 
     private File[] files;

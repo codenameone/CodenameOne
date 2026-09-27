@@ -27,8 +27,6 @@ import java.util.List;
 
 /**
  * A custom instruction allows us to override existing bytecode with an optimization
- * 
- * @author Shai Almog
  */
 public class CustomIntruction extends Instruction implements AssignableExpression {
     private String code;

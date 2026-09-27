@@ -22,10 +22,6 @@
  */
 package org.cef.browser;
 
-/**
- *
- * @author shannah
- */
 public interface UIPlatform {
     public int convertToPixels(int dips, boolean horizontal);
     public void runLater(Runnable r);

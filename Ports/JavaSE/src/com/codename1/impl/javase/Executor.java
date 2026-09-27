@@ -55,10 +55,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-/**
- *
- * @author Shai Almog
- */
 public class Executor {
     
     private static Class c;

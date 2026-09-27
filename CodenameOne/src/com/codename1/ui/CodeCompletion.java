@@ -25,8 +25,6 @@ package com.codename1.ui;
 
 /// A single code completion proposal returned by a `CodeCompletionProvider` and shown in the
 /// `CodeEditor` completion popup.
-///
-/// @author Shai Almog
 public class CodeCompletion {
     private final String displayText;
     private final String insertText;

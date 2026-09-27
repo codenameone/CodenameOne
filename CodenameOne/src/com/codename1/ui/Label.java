@@ -63,8 +63,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(left).add(right).add(bottom).add(top);
 /// hi.show();
 /// ```
-///
-/// @author Chen Fishbein
 public class Label extends Component implements IconHolder, TextHolder {
 
     private static int defaultGap = 2;

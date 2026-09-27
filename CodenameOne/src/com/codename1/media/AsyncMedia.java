@@ -35,8 +35,6 @@ import com.codename1.util.AsyncResource;
 /// In most cases this just casts the object to AsyncMedia, since most media returned from `MediaManager` already implement
 /// this interface.  In cases where the media doesn't already implement AsyncMedia, it will return an Async wrapper around the media.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - MediaManager#getAsyncMedia(com.codename1.media.Media)

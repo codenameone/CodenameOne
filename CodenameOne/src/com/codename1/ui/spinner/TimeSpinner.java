@@ -48,8 +48,6 @@ import java.util.ArrayList;
 ///
 /// Screenshots
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

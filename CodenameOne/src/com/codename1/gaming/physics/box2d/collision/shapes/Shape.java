@@ -77,10 +77,10 @@ public abstract class Shape {
 
   /// Cast a ray against a child shape.
   ///
-  /// @param argOutput the ray-cast results.
-  /// @param argInput the ray-cast input parameters.
-  /// @param argTransform the transform to be applied to the shape.
-  /// @param argChildIndex the child shape index
+  /// @param output the ray-cast results.
+  /// @param input the ray-cast input parameters.
+  /// @param transform the transform to be applied to the shape.
+  /// @param childIndex the child shape index
   /// @return if hit
   public abstract boolean raycast(RayCastOutput output, RayCastInput input, Transform transform,
       int childIndex);
@@ -88,8 +88,9 @@ public abstract class Shape {
 
   /// Given a transform, compute the associated axis aligned bounding box for a child shape.
   ///
-  /// @param argAabb returns the axis aligned box.
-  /// @param argXf the world transform of the shape.
+  /// @param aabb returns the axis aligned box.
+  /// @param xf the world transform of the shape.
+  /// @param childIndex the child shape index
   public abstract void computeAABB(final AABB aabb, final Transform xf, int childIndex);
 
   /// Compute the mass properties of this shape using its dimensions and density. The inertia tensor

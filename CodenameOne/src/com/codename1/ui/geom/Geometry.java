@@ -32,8 +32,6 @@ import java.util.Arrays;
 import java.util.List;
 
 /// A utility class to assist with geometry elements like bezier curves
-///
-/// @author Steve Hannah
 class Geometry {
 
     private static int factorial(int n) {

@@ -23,7 +23,6 @@
 
 package java.lang;
 
-/// @author Shai Almog
 public class UnsupportedOperationException extends RuntimeException {
     public UnsupportedOperationException() {
     }

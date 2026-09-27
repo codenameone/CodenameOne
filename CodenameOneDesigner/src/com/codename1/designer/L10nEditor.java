@@ -84,8 +84,6 @@ import org.xml.sax.XMLReader;
 
 /**
  * Editor for resource localization data
- *
- * @author  Shai Almog
  */
 public class L10nEditor extends BaseForm {
     //private Hashtable bundle;

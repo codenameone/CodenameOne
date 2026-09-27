@@ -25,8 +25,6 @@ package com.codename1.ui.events;
 
 /// Event callback interface invoked when a `com.codename1.ui.list.ListModel`
 /// changes its state thus indicating to the view that it should refresh.
-///
-/// @author Chen Fishbein
 public interface DataChangedListener {
     /// Type value for removed data in ListModel
     int REMOVED = 0;

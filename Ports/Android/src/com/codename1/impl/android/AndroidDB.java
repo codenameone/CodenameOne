@@ -39,10 +39,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- *
- * @author Chen
- */
 public class AndroidDB extends Database {
 
     private SQLiteDatabase db;

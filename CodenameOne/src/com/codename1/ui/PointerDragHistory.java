@@ -38,8 +38,6 @@ import com.codename1.impl.CodenameOneImplementation;
 /// a table keyed by window: a per-window slot table has to be leased, reclaimed and
 /// bounded, and getting any of that wrong loses a gesture or leaks a slot. An object
 /// the window holds is created when the window is and collected with it.
-///
-/// @author Shai Almog
 final class PointerDragHistory {
 
     private final float[] pathX;

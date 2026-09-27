@@ -23,10 +23,6 @@
 
 package java.net;
 
-/**
- * @author Eric Coolman
- *
- */
 public class URISyntaxException extends Exception {
 	private int index;
 	private String input;

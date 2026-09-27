@@ -102,7 +102,6 @@ import java.util.Vector;
 ///     }
 /// }
 /// ```
-/// @author Shai Almog
 public class MultipartRequest extends ConnectionRequest {
 
     private static final String CRLF = "\r\n";

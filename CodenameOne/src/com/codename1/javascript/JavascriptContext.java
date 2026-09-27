@@ -57,8 +57,6 @@ import java.util.Random;
 ///
 /// `````java WebBrowser b = new WebBrowser(); BrowserComponent bc = (BrowserComponent)b.getInternal(); JavascriptContext ctx = new JavascriptContext(bc); JSObject window = (JSObject)ctx.get("window"); `````
 ///
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// Use `BrowserComponent#execute(java.lang.String)` directly.

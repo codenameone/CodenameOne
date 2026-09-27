@@ -58,8 +58,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// hi.add(sb);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class SpanButton extends Container implements ActionSource<ActionEvent>, SelectableIconHolder, TextHolder {
 
     private final Button actualButton;

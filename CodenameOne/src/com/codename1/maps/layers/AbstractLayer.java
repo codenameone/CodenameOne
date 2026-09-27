@@ -23,8 +23,6 @@ import com.codename1.maps.BoundingBox;
 import com.codename1.maps.Projection;
 
 /// This class represents an abstract layer on the map.
-///
-/// @author Roman Kamyk
 public abstract class AbstractLayer implements Layer {
 
     protected final String name;

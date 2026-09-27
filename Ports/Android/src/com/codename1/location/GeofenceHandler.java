@@ -27,10 +27,6 @@ import android.content.Intent;
 import android.util.Log;
 import com.google.android.gms.location.GeofencingEvent;
 
-/**
- *
- * @author Chen
- */
 public class GeofenceHandler extends IntentService {
 
     public GeofenceHandler() {

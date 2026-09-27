@@ -26,10 +26,6 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.events.ActionEvent;
 import java.lang.ref.WeakReference;
 
-/**
- *
- * @author shannah
- */
 public class CEFBrowserComponentAdapter implements CEFBrowserComponentListener {
     private WeakReference<BrowserComponent> bcRef;
     

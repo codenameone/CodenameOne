@@ -37,7 +37,8 @@ import java.util.Map;
 /// (e.g. cross-device sync, encrypted-at-rest with your own key, in-memory
 /// only). The default is [DefaultStorageTokenStore], which serialises tokens
 /// to the standard [Storage] under a per-issuer key. For biometric-gated
-/// persistence on iOS / Android, use [SecureStorageTokenStore].
+/// persistence on iOS / Android, implement this interface over
+/// [SecureStorage][com.codename1.security.SecureStorage].
 ///
 /// All methods are asynchronous and may run network or biometric prompts on
 /// the calling thread.

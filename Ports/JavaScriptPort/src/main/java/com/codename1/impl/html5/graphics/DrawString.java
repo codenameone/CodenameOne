@@ -28,10 +28,6 @@ import com.codename1.impl.html5.HTML5Implementation;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class DrawString implements ExecutableOp {
     final String str;
     final int color, x, y, alpha;

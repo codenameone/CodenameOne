@@ -31,8 +31,6 @@ import java.util.Vector;
 
 /// The Element class defines a single XML element with its attributes and children.
 /// Due to its hierarchial nature, this class can be used for a single "leaf" Element, for more complex elements (with child elements), and up to describing the entire document.
-///
-/// @author Ofir Leitner
 public class Element implements Iterable<Element> {
 
     /// A constant that can be used for the get descendants methods to denote infinite recursion

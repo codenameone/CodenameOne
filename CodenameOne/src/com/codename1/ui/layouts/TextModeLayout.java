@@ -67,8 +67,6 @@ import java.util.ArrayList;
 ///
 /// f.show();
 /// ```
-///
-/// @author Shai Almog
 public class TextModeLayout extends Layout {
     /// The underlying table layout can be used freely to create constraints on the fly
     public final TableLayout table;

@@ -216,9 +216,6 @@ import java.util.Arrays;
 /// `SwitchList switchList = new SwitchList(new DefaultListModel("Red", "Green", "Blue", "Indigo"));
 /// switchList.setLayout(new TableLayout(switchList.getComponentCount()/3+1, 3));`
 /// ```
-///
-/// @author Steve Hannah
-///
 public abstract class ButtonList extends Container implements DataChangedListener, SelectionListener, ActionListener, ActionSource {
     private final EventDispatcher actionListeners = new EventDispatcher();
     private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();

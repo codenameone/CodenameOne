@@ -28,8 +28,6 @@ package com.codename1.push;
 /// `#getPushActionCategories()`, then the user may be presented with a set of options/actions
 /// on the push notification.  The selected action ID would be made available inside the `PushCallback#push(java.lang.String)`
 /// callback via the `PushContent#getActionId()` method.
-///
-/// @author Steve Hannah
 public interface PushActionsProvider {
 
     /// Returns the available categories for push notifications that this app responds to.  If the app

@@ -23,9 +23,6 @@
 package com.codename1.ui;
 
 /// A package-private utility class for working with working with lead components.
-///
-/// @author Steve Hannah
-///
 abstract class LeadUtil {
 
     /// Gets the lead parent for a component, or the component itself if there is

@@ -47,8 +47,6 @@ import java.util.Map;
 /// **Important**: These UI's are subject to change, e.g. a generated UI might not have
 /// validation for a specific property in one build and might introduce it in an update. We try to generate
 /// great UI's seamlessly and some improvements might break functionality.
-///
-/// @author Shai Almog
 public class InstantUI {
     private PropertyBase[] order;
 

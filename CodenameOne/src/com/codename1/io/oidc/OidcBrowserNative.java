@@ -29,12 +29,13 @@ package com.codename1.io.oidc;
 /// `Credential Manager` on Android).
 ///
 /// The platform port supplies an implementation named
-/// `com.codename1.io.oidc.OidcBrowserNativeImpl`; [SystemBrowser] loads it via
-/// `Class.forName` at first use. Cn1lib authors who want to plug in their own
-/// implementation (for example, one backed by a [com.codename1.system.NativeInterface]
-/// so a 3rd-party SDK can drive the browser) can declare a subtype and
-/// register it with [SystemBrowser#setNative(OidcBrowserNative)] -- there is
-/// no need to extend `NativeInterface` from this interface itself.
+/// `com.codename1.io.oidc.OidcBrowserNativeImpl` and registers it at start-up
+/// through [SystemBrowser#setProvider(OidcBrowserNative)] -- an instance
+/// rather than a class name, because class names are obfuscated. Cn1lib
+/// authors who want to plug in their own implementation (for example, one
+/// backed by a [com.codename1.system.NativeInterface] so a 3rd-party SDK can
+/// drive the browser) can declare a subtype and register it the same way --
+/// there is no need to extend `NativeInterface` from this interface itself.
 ///
 /// `redirectScheme` is the scheme half of the registered redirect URI (e.g.
 /// the `"com.example.app"` part of `"com.example.app:/oauth2redirect"`).

@@ -1,0 +1,58 @@
+{{- /*
+  Which API a page belongs to, and the switch to the other one.
+
+  The site publishes two references from the same doclet: the client API (the
+  framework an app is built on, /javadoc/) and the backend API (the server
+  runtime, /backend/javadoc/). A reader who lands on one page from a search
+  engine sees nothing else, and names such as Query, Database or Json are
+  plausible in either, so every page states its audience in words above the
+  title rather than relying on the URL.
+
+  A shared type (a core class marked @SharedWithBackend, compiled into both the
+  app and the server) is labelled as both, and its switch goes to the same type
+  in the other reference instead of that reference's overview.
+
+  Context: the page's .Params.javadoc map.
+*/ -}}
+{{- $j := . -}}
+{{- $isBackend := eq $j.audience "backend" -}}
+{{- $clientUrl := "/javadoc/" -}}
+{{- $backendUrl := "/backend/javadoc/" -}}
+{{- if $isBackend }}
+  {{- $backendUrl = $j.root -}}
+  {{- with $j.counterpartRoot }}{{ $clientUrl = . }}{{ end -}}
+  {{- with $j.counterpart }}{{ $clientUrl = . }}{{ end -}}
+{{- else }}
+  {{- $clientUrl = $j.root -}}
+  {{- with $j.counterpartRoot }}{{ $backendUrl = . }}{{ end -}}
+  {{- with $j.counterpart }}{{ $backendUrl = . }}{{ end -}}
+{{- end }}
+<div class="cn1-api-audience cn1-api-audience--{{ if $j.shared }}shared{{ else }}{{ $j.audience }}{{ end }}" role="note">
+  {{- if $j.counterpartRoot }}
+  <nav class="cn1-api-audience__switch" aria-label="Choose an API reference">
+    <a href="{{ $clientUrl }}"{{ if not $isBackend }} class="is-active" aria-current="page"{{ end }}>Client API</a>
+    <a href="{{ $backendUrl }}"{{ if $isBackend }} class="is-active" aria-current="page"{{ end }}>Backend API</a>
+  </nav>
+  {{- end }}
+  <p class="cn1-api-audience__text">
+    {{- if and $j.shared (eq $j.kind "package") }}
+    <strong>Client and backend.</strong>
+    Every class listed here is shared: the same code is compiled into your app
+    and into your server.
+    {{- if $isBackend }} The package's page in the client API lists all of it,
+    including any classes that exist only in the app.{{ end }}
+    {{- else if $j.shared }}
+    <strong>Client and backend.</strong>
+    This class is shared: the same code is compiled into your app and into your
+    server, so everything on this page works in both.
+    {{- else if $isBackend }}
+    <strong>Backend API.</strong>
+    Server-side code: this runs in a Codename One backend, not in the app on the
+    device.
+    {{- else }}
+    <strong>Client API.</strong>
+    The Codename One framework your app is built on: this runs on the device, not
+    in a backend.
+    {{- end }}
+  </p>
+</div>

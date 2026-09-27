@@ -24,8 +24,6 @@ import org.jdom2.Element;
 
 /**
  * JDom implementation of poms EXTENSION element
- *
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
  */
 public class JDomExtension extends Extension implements JDomBacked, MavenCoordinate {
 

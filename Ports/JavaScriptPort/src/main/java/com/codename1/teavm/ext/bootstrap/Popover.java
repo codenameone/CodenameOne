@@ -29,10 +29,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.dom.HTMLElement;
 
-/**
- *
- * @author shannah
- */
 public class Popover {
     private HTMLElement el;
     

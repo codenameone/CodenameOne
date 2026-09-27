@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /// An encoded image that stores the actual data of the encoded image in storage.
-///
-/// @author Shai Almog
 public final class StorageImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;

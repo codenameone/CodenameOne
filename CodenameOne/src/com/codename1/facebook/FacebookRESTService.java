@@ -39,8 +39,6 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /// Invokes the Facebook REST API documented here http://developers.facebook.com/docs/guides/mobile/
-///
-/// @author Shai Almog
 @SuppressWarnings("deprecation")
 class FacebookRESTService extends ConnectionRequest implements JSONParseCallback {
 

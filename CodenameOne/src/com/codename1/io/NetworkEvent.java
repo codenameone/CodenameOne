@@ -28,8 +28,6 @@ import com.codename1.ui.events.ActionEvent;
 
 /// Event containing more meta data for network events which may be error events or
 /// an update for progress indication code.
-///
-/// @author Shai Almog
 public class NetworkEvent extends ActionEvent {
     /// Indicates that a new request is initializing its connection
     public static final int PROGRESS_TYPE_INITIALIZING = 1;

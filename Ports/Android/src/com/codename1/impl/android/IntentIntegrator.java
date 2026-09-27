@@ -113,12 +113,6 @@ import com.codename1.ui.layouts.BoxLayout;
  * {@link com.google.zxing.BarcodeFormat#PDF_417}. Use {@link #initiateScan(java.util.Collection)}
  * with a collection containing the names of formats to scan for explicitly,
  * like "PDF_417", to use such formats.</p>
- *
- * @author Sean Owen
- * @author Fred Lin
- * @author Isaac Potoczny-Jones
- * @author Brad Drehmer
- * @author gcstang
  */
 public class IntentIntegrator {
 

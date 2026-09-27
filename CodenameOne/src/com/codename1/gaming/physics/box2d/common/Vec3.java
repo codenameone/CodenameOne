@@ -24,7 +24,6 @@
 package com.codename1.gaming.physics.box2d.common;
 
 
-/// @author Daniel Murphy
 public class Vec3 {
 
   public float x, y, z;

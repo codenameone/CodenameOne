@@ -26,7 +26,6 @@ import java.util.Map;
 
 /**
  * Added this for Kotlin
- * @author shannah
  */
 public interface ConcurrentMap<K,V> extends Map<K,V> {
     public V putIfAbsent(K key, V value);

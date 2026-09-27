@@ -31,8 +31,6 @@ import java.util.logging.Logger;
 
 /**
  * Simple input stream that wraps an NSData object
- *
- * @author Shai Almog
  */
 
 public class NSDataInputStream extends InputStream {

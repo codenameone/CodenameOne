@@ -27,8 +27,6 @@ import java.util.ArrayList;
 /// This class can be used to capture raw PCM data from the device's microphone.
 /// AudioBuffers should be obtained via the `boolean, int)`
 /// method.
-///
-/// @author shannah
 public class AudioBuffer {
     private final Object refLock = new Object();
     /// Registered callbacks to be notified when the contents of this buffer changes.

@@ -1,0 +1,40 @@
+name: Check author and version tags
+
+# @author and @version are banned from Java documentation comments, the same way
+# @since is. They say nothing about the API, and a block tag's body runs to the
+# next tag or the end of the comment -- so text written after one was swallowed
+# into it and never published. See scripts/check-author-tags.py.
+#
+# Its own workflow rather than a step in pr.yml, whose paths filter excludes
+# scripts/**: a change that weakened the gate could otherwise merge without the
+# gate ever running. It covers every tracked .java file, ports and tools included.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '**/*.java'
+      - 'scripts/check-author-tags.py'
+      - '.github/workflows/check-author-tags.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - '**/*.java'
+      - 'scripts/check-author-tags.py'
+      - '.github/workflows/check-author-tags.yml'
+
+jobs:
+  check-author-tags:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reject @author and @version in documentation comments
+        shell: bash
+        run: scripts/check-author-tags.py

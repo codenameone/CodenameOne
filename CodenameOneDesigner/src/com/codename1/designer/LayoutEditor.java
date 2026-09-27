@@ -31,8 +31,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * The UI used to change the layout of a given component within the UI builder
- *
- * @author Shai Almog
  */
 public class LayoutEditor extends javax.swing.JPanel {
     /** Creates new form LayoutEditor */

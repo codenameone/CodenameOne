@@ -43,8 +43,6 @@ import java.util.List;
  *       expressions, the args are still pushed normally and this pops them
  *       (reverse order) into the fields.</li>
  * </ul>
- *
- * @author Codename One
  */
 public class ScalarAllocInit extends Instruction {
     private final int structId;

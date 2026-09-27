@@ -29,8 +29,6 @@ import org.apache.tools.ant.Task;
 
 /**
  * A subtask of the l10n task allowing us to specify a specific locale value
- *
- * @author Shai Almog
  */
 public class LocaleTask extends Task {
     private File file;

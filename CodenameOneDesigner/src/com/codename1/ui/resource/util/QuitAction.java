@@ -48,8 +48,6 @@ import org.jdesktop.application.Application;
 
 /**
  * Action representing generic application exit logic
- *
- * @author Shai Almog
  */
 public class QuitAction extends AbstractAction implements WindowListener {
     public static QuitAction INSTANCE = new QuitAction();

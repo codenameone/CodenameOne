@@ -35,10 +35,8 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.common.Transform;
 
 // updated to rev 100
-/// This is non-static for faster pooling. To get an instance, use the {@link SingletonPool}, don't
+/// This is non-static for faster pooling. To get an instance, use [IWorldPool#getDistance()][com.codename1.gaming.physics.box2d.pooling.IWorldPool#getDistance()], don't
 /// construct a distance object.
-///
-/// @author Daniel Murphy
 public class Distance {
 
   public static int GJK_CALLS = 0;
@@ -65,8 +63,6 @@ public class Distance {
   }
 
   /// Used to warm start Distance. Set count to zero on first call.
-  ///
-  /// @author daniel
   public static class SimplexCache {
     /// length or area
     public float metric;
@@ -456,8 +452,6 @@ public class Distance {
 
   /// A distance proxy is used by the GJK algorithm. It encapsulates any shape. TODO: see if we can
   /// just do assignments with m_vertices, instead of copying stuff over
-  ///
-  /// @author daniel
   public static class DistanceProxy {
     public final Vec2[] m_vertices;
     public int m_count;

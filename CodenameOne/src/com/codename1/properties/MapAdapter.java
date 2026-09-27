@@ -33,8 +33,6 @@ import java.util.Map;
 ///
 /// To use this class create a new subclass of it and override the appropriate
 /// methods.
-///
-/// @author Shai Almog
 public abstract class MapAdapter {
     private final static Map<String, MapAdapter> lookup = new HashMap<String, MapAdapter>();
     private final Class type;

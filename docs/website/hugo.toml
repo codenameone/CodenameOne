@@ -85,17 +85,26 @@ name = "Developer Guide PDF"
 url = "/files/developer-guide.pdf"
 weight = 23
 
+# Two references, one per audience: the framework an app is built on, and the
+# server runtime a backend module runs on. They are separate menu entries rather
+# than one, so nobody reaches the server API believing it is the app's.
 [[menu.main]]
 parent = "docs"
-name = "API Reference"
+name = "Client API Reference"
 url = "/javadoc/"
 weight = 24
 
 [[menu.main]]
 parent = "docs"
+name = "Backend API Reference"
+url = "/backend/javadoc/"
+weight = 25
+
+[[menu.main]]
+parent = "docs"
 name = "How Do I?"
 url = "/how-do-i/"
-weight = 25
+weight = 26
 
 [[menu.main]]
 identifier = "tools"

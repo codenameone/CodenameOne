@@ -86,8 +86,6 @@ import java.util.Vector;
 ///  //order/lineitem[price > 5]/../@ponum
 /// etc`
 /// ```
-///
-/// @author Eric Coolman (2012-03 - derivative work from original Sun source).
 public final class Result {
 
     public static final String JSON = "json";

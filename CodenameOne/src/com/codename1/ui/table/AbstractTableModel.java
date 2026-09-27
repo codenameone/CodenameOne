@@ -28,8 +28,6 @@ import com.codename1.ui.validation.Validator;
 
 /// This abstract class extends table model with various capabilities such
 /// as type information etc.
-///
-/// @author Shai Almog
 public abstract class AbstractTableModel implements TableModel {
     private Validator validator;
 

@@ -31,8 +31,6 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 
 /// Base class for spinners
-///
-/// @author Shai Almog
 public abstract class BaseSpinner extends Container {
     private Style overlayStyle;
 

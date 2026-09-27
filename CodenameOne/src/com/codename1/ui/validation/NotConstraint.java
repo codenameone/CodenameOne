@@ -23,9 +23,6 @@
 package com.codename1.ui.validation;
 
 /// Negates a group of constraints, such that, if any of its child constraints is true, it returns false.
-///
-/// @author Diamond Mubaarak
-///
 public class NotConstraint implements Constraint {
 
     private final Constraint[] constraints;

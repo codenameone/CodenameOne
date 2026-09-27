@@ -25,8 +25,6 @@ package com.codename1.push;
 import com.codename1.xml.Element;
 
 /// A convenience class for building a push notification Payload.
-///
-/// @author shannah
 public class PushBuilder {
     private String title;
     private String body;

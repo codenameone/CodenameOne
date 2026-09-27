@@ -33,10 +33,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class DrawShape implements ExecutableOp {
 
     final Shape shape;

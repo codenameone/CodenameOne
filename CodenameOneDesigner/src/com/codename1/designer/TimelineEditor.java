@@ -66,10 +66,6 @@ import javax.swing.table.TableModel;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-/**
- *
- * @author Shai
- */
 public class TimelineEditor extends BaseForm {
     private CodenameOneImageRenderer renderer;
     private EditableResources res;

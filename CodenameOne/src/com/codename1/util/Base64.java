@@ -15,7 +15,6 @@
  *  limitations under the License.
  */
 
-/// @author Alexander Y. Kleymenov
 
 package com.codename1.util;
 

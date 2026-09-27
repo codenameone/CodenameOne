@@ -54,8 +54,6 @@ import java.util.List;
 ///
 /// All backends are addressed with the same vocabulary so concrete editors never need to know which
 /// one is active.
-///
-/// @author Shai Almog
 public abstract class AbstractEditorComponent extends Container implements EditorHost {
     private PeerComponent nativePeer;
     private PureEditor pureEditor;

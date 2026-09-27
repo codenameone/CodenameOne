@@ -28,8 +28,6 @@ import com.codename1.ui.Graphics;
 
 /// a Layer interface.
 /// Each Layer needs to ability to paint itself on the map
-///
-/// @author Chen
 public interface Layer {
 
     /// Paints the Layer on the given Graphics

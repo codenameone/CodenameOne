@@ -66,8 +66,6 @@ import com.codename1.ui.TopLevelContainer;
 ///
 /// ip.dispose();
 /// ```
-///
-/// @author Shai Almog
 public class InfiniteProgress extends Component {
     /// Indicates whether infinite progress and pull to refresh work in the material
     /// design mode by default

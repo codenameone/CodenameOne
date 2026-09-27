@@ -24,16 +24,14 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * TLS is deliberately absent from the local Java SE runtime.
- *
- * This twin exists so the shared server code compiles and runs unchanged on the
- * JVM; it is the fast edit-run loop, not the deployment target. Terminating TLS
- * here would mean a second, differently-behaving handshake and ALPN
- * implementation (SSLEngine) whose bugs would not be the ones production has --
- * worse than not having it, because it would look like coverage. Run the native
- * binary to exercise TLS; the integration suite does exactly that.
- */
+/// TLS is deliberately absent from the local Java SE runtime.
+///
+/// This twin exists so the shared server code compiles and runs unchanged on the
+/// JVM; it is the fast edit-run loop, not the deployment target. Terminating TLS
+/// here would mean a second, differently-behaving handshake and ALPN
+/// implementation (SSLEngine) whose bugs would not be the ones production has --
+/// worse than not having it, because it would look like coverage. Run the native
+/// binary to exercise TLS; the integration suite does exactly that.
 public final class Tls {
     private static final String UNSUPPORTED =
             "TLS is not available in the local Java SE runtime -- run the native "
@@ -51,7 +49,7 @@ public final class Tls {
         throw new IOException(UNSUPPORTED);
     }
 
-    /** The budget the translated arm bounds its handshake with; see that one. */
+    /// The budget the translated arm bounds its handshake with; see that one.
     public long accept(int fd, long budgetMillis) {
         throw new IllegalStateException(UNSUPPORTED);
     }

@@ -112,7 +112,6 @@ import com.codename1.ui.layouts.BoxLayout;
 ///     }
 /// }
 /// ```
-/// @author Chen
 public abstract class InfiniteContainer extends Container {
 
     private int amount = 10;

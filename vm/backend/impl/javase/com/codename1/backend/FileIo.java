@@ -35,17 +35,15 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.Map;
 
-/**
- * Java SE twin of FileIo.
- *
- * This arm does NOT splice. It once did -- FileChannel.transferTo is sendfile on
- * Linux and macOS, and this comment used to say so -- but sendFile here reads
- * into a ByteBuffer and writes it out, so hasSendFile answers false and the
- * shared StaticFiles logic takes its copying path, which owns one reusable
- * buffer instead of allocating per call. The simulator serving a large file
- * through a copy is the right trade; telling the shared code it was a kernel
- * splice was not.
- */
+/// Java SE twin of FileIo.
+///
+/// This arm does NOT splice. It once did -- FileChannel.transferTo is sendfile on
+/// Linux and macOS, and this comment used to say so -- but sendFile here reads
+/// into a ByteBuffer and writes it out, so hasSendFile answers false and the
+/// shared StaticFiles logic takes its copying path, which owns one reusable
+/// buffer instead of allocating per call. The simulator serving a large file
+/// through a copy is the right trade; telling the shared code it was a kernel
+/// splice was not.
 public final class FileIo {
     private FileIo() {
     }
@@ -53,39 +51,33 @@ public final class FileIo {
     private static final class OpenFile {
         final FileChannel channel;
         final Path path;
-        /**
-         * Captured when the descriptor was opened, not read from the path later.
-         *
-         * A static asset replaced between the open and the stat would otherwise be
-         * described by its replacement while the bytes still came from the original
-         * channel: the response advertised the new length, timestamp and ETag and
-         * streamed the old file, which truncates or overruns whenever the two sizes
-         * differ. A descriptor is a snapshot, so its metadata has to be one too.
-         */
+        /// Captured when the descriptor was opened, not read from the path later.
+        ///
+        /// A static asset replaced between the open and the stat would otherwise be
+        /// described by its replacement while the bytes still came from the original
+        /// channel: the response advertised the new length, timestamp and ETag and
+        /// streamed the old file, which truncates or overruns whenever the two sizes
+        /// differ. A descriptor is a snapshot, so its metadata has to be one too.
         final long size;
         final long modified;
         final boolean directory;
-        /** Whether the descriptor and the path agreed; see openRead. */
+        /// Whether the descriptor and the path agreed; see openRead.
         final boolean consistent;
-        /**
-     * The file's identity as the PATH saw it, or null where unsupported.
-     *
-     * <p>As the path saw it, not as the descriptor did, and that is the whole of
-     * what this arm can say: there is no fstat for a FileChannel in public Java,
-     * so every attribute here comes from a pathname lookup. A caller binding a
-     * served descriptor to a verified path with this -- StaticFiles does -- gets
-     * a weaker answer here than on the packaged arm, where the same number comes
-     * from an fstat of the open descriptor. Said out loud because the number
-     * looks identical on both sides of the API and only one of them describes
-     * the bytes.
-     */
+        /// The file's identity as the PATH saw it, or null where unsupported.
+        ///
+        /// As the path saw it, not as the descriptor did, and that is the whole of
+        /// what this arm can say: there is no fstat for a FileChannel in public Java,
+        /// so every attribute here comes from a pathname lookup. A caller binding a
+        /// served descriptor to a verified path with this -- StaticFiles does -- gets
+        /// a weaker answer here than on the packaged arm, where the same number comes
+        /// from an fstat of the open descriptor. Said out loud because the number
+        /// looks identical on both sides of the API and only one of them describes
+        /// the bytes.
         final Object fileKey;
-        /**
-         * The same identity as a number, for the ETag's third component. See the
-         * inode in the native stat: it is what distinguishes a file replaced by a
-         * timestamp-preserving copy from the one it replaced. 0 where the platform
-         * will not say.
-         */
+        /// The same identity as a number, for the ETag's third component. See the
+        /// inode in the native stat: it is what distinguishes a file replaced by a
+        /// timestamp-preserving copy from the one it replaced. 0 where the platform
+        /// will not say.
         final long identity;
         long position;
 
@@ -100,7 +92,7 @@ public final class FileIo {
             long capturedIdentity = 0;
             long statedSize = 0;
             try {
-                if(channel != null) {
+                if (channel != null) {
                     capturedSize = channel.size();
                 }
                 // ONE SNAPSHOT, THE IDENTITY INCLUDED. The inode used to be read
@@ -118,25 +110,25 @@ public final class FileIo {
                 Map unix = null;
                 try {
                     unix = Files.readAttributes(path, "unix:*");
-                } catch (Exception unsupported) {
+                } catch (IOException | RuntimeException unsupported) {
                     // Not a Unix filesystem view; the basic attributes below carry
                     // the same identity in fileKey, just not as a number.
                     unix = null;
                 }
-                if(unix != null) {
+                if (unix != null) {
                     Object sizeValue = unix.get("size");
                     Object modifiedValue = unix.get("lastModifiedTime");
                     Object inoValue = unix.get("ino");
                     capturedKey = unix.get("fileKey");
                     capturedDirectory = Boolean.TRUE.equals(unix.get("isDirectory"));
-                    if(modifiedValue instanceof FileTime) {
-                        capturedModified = ((FileTime)modifiedValue).toMillis();
+                    if (modifiedValue instanceof FileTime) {
+                        capturedModified = ((FileTime) modifiedValue).toMillis();
                     }
-                    if(sizeValue instanceof Number) {
-                        statedSize = ((Number)sizeValue).longValue();
+                    if (sizeValue instanceof Number) {
+                        statedSize = ((Number) sizeValue).longValue();
                     }
-                    if(inoValue instanceof Number) {
-                        capturedIdentity = ((Number)inoValue).longValue();
+                    if (inoValue instanceof Number) {
+                        capturedIdentity = ((Number) inoValue).longValue();
                     }
                 } else {
                     BasicFileAttributes attributes = Files.readAttributes(path,
@@ -150,7 +142,7 @@ public final class FileIo {
                     // one -- and from this same snapshot, like everything else.
                     capturedIdentity = capturedKey == null ? 0 : capturedKey.hashCode();
                 }
-                if(channel == null) {
+                if (channel == null) {
                     capturedSize = statedSize;
                     capturedConsistent = true;
                 } else {
@@ -159,7 +151,7 @@ public final class FileIo {
                     // bytes this descriptor will actually serve.
                     capturedConsistent = statedSize == capturedSize;
                 }
-            } catch (Exception ignored) {
+            } catch (IOException | RuntimeException ignored) {
                 // stat() reports the failure; there is nothing to do here.
             }
             this.identity = capturedIdentity;
@@ -171,26 +163,24 @@ public final class FileIo {
         }
     }
 
-    /** Unsupported on this runtime; see the ParparVM implementation. */
+    /// Unsupported on this runtime; see the ParparVM implementation.
     public static final int BENEATH_UNSUPPORTED = -2;
 
-    /**
-     * Always {@link #BENEATH_UNSUPPORTED} here. The local Java SE loop has no
-     * openat2, and a Java-side reimplementation would be the same racy
-     * open-then-check it replaces -- saying so lets the caller keep the older path
-     * rather than believe a check that did not happen.
-     */
+    /// Always [#BENEATH_UNSUPPORTED] here. The local Java SE loop has no
+    /// openat2, and a Java-side reimplementation would be the same racy
+    /// open-then-check it replaces -- saying so lets the caller keep the older path
+    /// rather than believe a check that did not happen.
     public static int openBeneath(String root, String relative) {
         return BENEATH_UNSUPPORTED;
     }
 
-    /** openRead: the file is there and could not be opened. See the native twin. */
+    /// openRead: the file is there and could not be opened. See the native twin.
     public static final int OPEN_FAILED = -2;
 
     public static int openRead(String path) {
         try {
             Path p = Paths.get(path);
-            if(Files.isDirectory(p)) {
+            if (Files.isDirectory(p)) {
                 // A directory has no channel, but the caller stats it and retries
                 // at the index file, so it must still get a descriptor back.
                 return Descriptors.add(new OpenFile(null, p));
@@ -207,7 +197,7 @@ public final class FileIo {
             // atomic replace; a file being rewritten continuously has no
             // consistent validator to offer and gets the last pair read.
             OpenFile opened = null;
-            for(int attempt = 0 ; attempt < 3 ; attempt++) {
+            for (int attempt = 0 ; attempt < 3 ; attempt++) {
                 // The file's IDENTITY across the open, because equal sizes prove
                 // nothing: a replacement by a file of the same length passes the
                 // size test, and then the old bytes are served under the new
@@ -217,15 +207,21 @@ public final class FileIo {
                 // Null where the filesystem has no such notion, and there the
                 // size test is all there is, which is what this did before.
                 Object keyBefore = fileKeyOf(p);
-                FileChannel channel = FileChannel.open(p, StandardOpenOption.READ);
+                FileChannel channel = FileChannel.open(p, StandardOpenOption.READ); //NOPMD CloseResource - owned by the descriptor table, or closed below when it is retried
                 OpenFile candidate = new OpenFile(channel, p);
                 boolean sameFile = keyBefore == null || candidate.fileKey == null
                         || keyBefore.equals(candidate.fileKey);
-                if((candidate.consistent && sameFile) || attempt == 2) {
+                if ((candidate.consistent && sameFile) || attempt == 2) {
                     opened = candidate;
                     break;
                 }
                 channel.close();
+            }
+            // Unreachable: the last attempt always adopts its candidate, and a failed
+            // open throws. Checked anyway, because a null here would be registered as
+            // a descriptor with nothing behind it.
+            if (opened == null) {
+                return OPEN_FAILED;
             }
             return Descriptors.add(opened);
         } catch (java.nio.file.NoSuchFileException absent) {
@@ -243,7 +239,7 @@ public final class FileIo {
             // link that is there answers true while a path that names nothing
             // answers false. Matches the lstat the translated arm does.
             try {
-                if(danglingLinkIn(java.nio.file.Paths.get(path))) {
+                if (danglingLinkIn(Paths.get(path))) {
                     return OPEN_FAILED;
                 }
             } catch (Exception unnameable) {
@@ -266,37 +262,35 @@ public final class FileIo {
         }
     }
 
-    /**
-     * Whether any component of {@code p} is a symlink whose target is missing.
-     *
-     * <p>EVERY COMPONENT, not just the last one. NOFOLLOW_LINKS asks about the
-     * entry the path names and nothing above it, so
-     * cn1.config.location=/config/current with current -> missing-release opened
-     * /config/current/application.properties, got NoSuchFileException for a
-     * component in the MIDDLE, and answered "absent" -- the same silent discard
-     * of every file-based setting, TLS paths included, that the final-component
-     * check was added to stop. A release directory swung by symlink is how most
-     * deployments roll forward, so the broken middle is the likelier half.
-     *
-     * <p>Walked from the root down, and a component that exists without following
-     * links but not with them is the answer: that is a link pointing at nothing.
-     * A path that simply names nothing has no such component and stays absent.
-     */
+    /// Whether any component of `p` is a symlink whose target is missing.
+    ///
+    /// EVERY COMPONENT, not just the last one. NOFOLLOW_LINKS asks about the
+    /// entry the path names and nothing above it, so
+    /// cn1.config.location=/config/current with current -> missing-release opened
+    /// /config/current/application.properties, got NoSuchFileException for a
+    /// component in the MIDDLE, and answered "absent" -- the same silent discard
+    /// of every file-based setting, TLS paths included, that the final-component
+    /// check was added to stop. A release directory swung by symlink is how most
+    /// deployments roll forward, so the broken middle is the likelier half.
+    ///
+    /// Walked from the root down, and a component that exists without following
+    /// links but not with them is the answer: that is a link pointing at nothing.
+    /// A path that simply names nothing has no such component and stays absent.
     private static boolean danglingLinkIn(Path p) {
         Path walked = p.isAbsolute() ? p.getRoot() : null;
         java.util.Iterator<Path> parts = p.iterator();
-        while(parts.hasNext()) {
+        while (parts.hasNext()) {
             Path part = parts.next();
             walked = walked == null ? part : walked.resolve(part);
-            if(java.nio.file.Files.exists(walked, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-                    && !java.nio.file.Files.exists(walked)) {
+            if (Files.exists(walked, LinkOption.NOFOLLOW_LINKS)
+                    && !Files.exists(walked)) {
                 return true;
             }
         }
         return false;
     }
 
-    /** A file's identity, or null when the filesystem does not report one. */
+    /// A file's identity, or null when the filesystem does not report one.
     private static Object fileKeyOf(Path p) {
         try {
             return Files.readAttributes(p, BasicFileAttributes.class).fileKey();
@@ -305,36 +299,34 @@ public final class FileIo {
         }
     }
 
-    /**
-     * The file's metadata AS IT IS NOW, rather than as it was when the
-     * descriptor opened.
-     *
-     * <p>{@link #stat} deliberately answers from the open-time snapshot -- the
-     * comment on OpenFile.size says why, and static asset serving depends on it,
-     * since a response has to describe the bytes the channel will actually
-     * stream. That makes stat() useless for asking whether the file CHANGED: on
-     * this runtime both a pre-read and a post-read stat return the identical
-     * captured values, so a comparison between them can never be unequal and the
-     * check reads as passed when it never ran. The native runtime's statImpl is
-     * a live fstat and does not have that problem, so the two runtimes disagreed
-     * about a check that looked symmetric.
-     *
-     * <p>Identity is reported from the same re-read, because mtime alone misses
-     * an atomic replace: a new file moved over the path can carry any timestamp,
-     * including the old one. The pair -- same identity with a different mtime is
-     * an in-place rewrite, a different identity is a replacement -- is what the
-     * caller compares against the open-time values.
-     *
-     * <p>Read through the unix view in one call where there is one, for the
-     * reason the open-time capture states: two lookups of a PATH can straddle a
-     * replace and pair one file's timestamp with another's inode.
-     */
+    /// The file's metadata AS IT IS NOW, rather than as it was when the
+    /// descriptor opened.
+    ///
+    /// [#stat] deliberately answers from the open-time snapshot -- the
+    /// comment on OpenFile.size says why, and static asset serving depends on it,
+    /// since a response has to describe the bytes the channel will actually
+    /// stream. That makes stat() useless for asking whether the file CHANGED: on
+    /// this runtime both a pre-read and a post-read stat return the identical
+    /// captured values, so a comparison between them can never be unequal and the
+    /// check reads as passed when it never ran. The native runtime's statImpl is
+    /// a live fstat and does not have that problem, so the two runtimes disagreed
+    /// about a check that looked symmetric.
+    ///
+    /// Identity is reported from the same re-read, because mtime alone misses
+    /// an atomic replace: a new file moved over the path can carry any timestamp,
+    /// including the old one. The pair -- same identity with a different mtime is
+    /// an in-place rewrite, a different identity is a replacement -- is what the
+    /// caller compares against the open-time values.
+    ///
+    /// Read through the unix view in one call where there is one, for the
+    /// reason the open-time capture states: two lookups of a PATH can straddle a
+    /// replace and pair one file's timestamp with another's inode.
     public static int statFresh(int fd, long[] out) {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof OpenFile) || out == null || out.length < 3) {
+        if (!(entry instanceof OpenFile) || out == null || out.length < 3) {
             return -1;
         }
-        OpenFile file = (OpenFile)entry;
+        OpenFile file = (OpenFile) entry;
         try {
             Map unix = null;
             try {
@@ -342,17 +334,17 @@ public final class FileIo {
             } catch (Exception unsupported) {
                 unix = null;
             }
-            if(unix != null) {
+            if (unix != null) {
                 Object modifiedValue = unix.get("lastModifiedTime");
                 Object sizeValue = unix.get("size");
                 Object inoValue = unix.get("ino");
-                out[0] = sizeValue instanceof Number ? ((Number)sizeValue).longValue() : 0;
+                out[0] = sizeValue instanceof Number ? ((Number) sizeValue).longValue() : 0;
                 out[1] = modifiedValue instanceof FileTime
-                        ? ((FileTime)modifiedValue).toMillis() : 0;
+                        ? ((FileTime) modifiedValue).toMillis() : 0;
                 out[2] = Boolean.TRUE.equals(unix.get("isDirectory")) ? 1 : 0;
-                if(out.length > 3) {
+                if (out.length > 3) {
                     out[3] = inoValue instanceof Number
-                            ? ((Number)inoValue).longValue() : 0;
+                            ? ((Number) inoValue).longValue() : 0;
                 }
             } else {
                 BasicFileAttributes a = Files.readAttributes(file.path,
@@ -360,73 +352,71 @@ public final class FileIo {
                 out[0] = a.size();
                 out[1] = a.lastModifiedTime().toMillis();
                 out[2] = a.isDirectory() ? 1 : 0;
-                if(out.length > 3) {
+                if (out.length > 3) {
                     Object key = a.fileKey();
                     out[3] = key == null ? 0 : key.hashCode();
                 }
             }
             return 0;
-        } catch (Exception unreadable) {
+        } catch (IOException | RuntimeException unreadable) {
             return -1;
         }
     }
 
     public static int stat(int fd, long[] out) {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof OpenFile) || out == null || out.length < 3) {
+        if (!(entry instanceof OpenFile) || out == null || out.length < 3) {
             return -1;
         }
-        OpenFile file = (OpenFile)entry;
+        OpenFile file = (OpenFile) entry;
         // From the descriptor, so the metadata and the bytes describe one file.
         out[0] = file.size;
         out[1] = file.modified;
         out[2] = file.directory ? 1 : 0;
-        if(out.length > 3) {
+        if (out.length > 3) {
             out[3] = file.identity;
         }
         return 0;
     }
 
-    /**
-     * One bounded chunk of the file to the socket, THROUGH THE DEADLINE.
-     *
-     * <p>Not FileChannel.transferTo, which is what this was. transferTo is sendfile
-     * underneath and moves the bytes without copying them, but it writes straight
-     * to the channel and so goes around ServerSocket.write -- and around
-     * Deadlines.writeWithDeadline, whose whole reason for existing is stated where
-     * it is called: a client that stops reading otherwise parks this worker
-     * indefinitely. In the pooled mode the descriptor here is BLOCKING, so a client
-     * that fills its receive buffer and stops held a worker for as long as it cared
-     * to, and enough slow downloads took the pool. Ordinary responses were never
-     * exposed to that; a static file was.
-     *
-     * <p>The copy this does instead costs a buffer per call on the arm that runs
-     * the local dev server, which is the arm that can afford it. The packaged
-     * server has the real sendfile.
-     */
+    /// One bounded chunk of the file to the socket, THROUGH THE DEADLINE.
+    ///
+    /// Not FileChannel.transferTo, which is what this was. transferTo is sendfile
+    /// underneath and moves the bytes without copying them, but it writes straight
+    /// to the channel and so goes around ServerSocket.write -- and around
+    /// Deadlines.writeWithDeadline, whose whole reason for existing is stated where
+    /// it is called: a client that stops reading otherwise parks this worker
+    /// indefinitely. In the pooled mode the descriptor here is BLOCKING, so a client
+    /// that fills its receive buffer and stops held a worker for as long as it cared
+    /// to, and enough slow downloads took the pool. Ordinary responses were never
+    /// exposed to that; a static file was.
+    ///
+    /// The copy this does instead costs a buffer per call on the arm that runs
+    /// the local dev server, which is the arm that can afford it. The packaged
+    /// server has the real sendfile.
     public static long sendFile(int socketFd, int fileFd, long offset, long count) {
         Object file = Descriptors.get(fileFd);
         Object socket = Descriptors.get(socketFd);
-        if(!(file instanceof OpenFile) || !(socket instanceof SocketChannel)) {
+        if (!(file instanceof OpenFile) || !(socket instanceof SocketChannel)) {
             return -1;
         }
-        FileChannel channel = ((OpenFile)file).channel;
-        if(channel == null) {
+        FileChannel channel = ((OpenFile) file).channel; //NOPMD CloseResource - owned by the descriptor table; close(int) releases it
+        if (channel == null) {
             return -1;
         }
         try {
-            int want = (int)Math.min(count, 64L * 1024L);
-            if(want <= 0) {
+            int want = (int) Math.min(count, 64L * 1024L);
+            if (want <= 0) {
                 return 0;
             }
             ByteBuffer chunk = ByteBuffer.allocate(want);
             int read = channel.read(chunk, offset);
-            if(read <= 0) {
+            if (read <= 0) {
                 return read < 0 ? -1 : 0;
             }
             ServerSocket.write(socketFd, chunk.array(), 0, read);
             return read;
-        } catch (Exception err) {
+        } catch (IOException | RuntimeException err) {
             return -1;
         }
     }
@@ -444,11 +434,11 @@ public final class FileIo {
 
     public static int read(int fd, byte[] buffer, int offset, int length) {
         Object entry = Descriptors.get(fd);
-        if(!(entry instanceof OpenFile) || buffer == null) {
+        if (!(entry instanceof OpenFile) || buffer == null) {
             return -1;
         }
-        OpenFile file = (OpenFile)entry;
-        if(file.channel == null) {
+        OpenFile file = (OpenFile) entry;
+        if (file.channel == null) {
             return -1;
         }
         try {
@@ -456,11 +446,11 @@ public final class FileIo {
             // A position is tracked explicitly so successive reads advance, which
             // is what the shared code expects of a descriptor.
             int n = file.channel.read(target, file.position);
-            if(n > 0) {
+            if (n > 0) {
                 file.position += n;
             }
             return n < 0 ? 0 : n;
-        } catch (Exception err) {
+        } catch (IOException | RuntimeException err) {
             return -1;
         }
     }
@@ -477,9 +467,9 @@ public final class FileIo {
 
     public static void close(int fd) {
         Object entry = Descriptors.remove(fd);
-        if(entry instanceof OpenFile) {
-            FileChannel channel = ((OpenFile)entry).channel;
-            if(channel != null) {
+        if (entry instanceof OpenFile) {
+            FileChannel channel = ((OpenFile) entry).channel; //NOPMD CloseResource - closed just below
+            if (channel != null) {
                 try {
                     channel.close();
                 } catch (IOException ignored) {

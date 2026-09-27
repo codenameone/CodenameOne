@@ -28,8 +28,6 @@ import com.codename1.ui.*;
 
 /**
  * Allows us to access package protected members in animation
- *
- * @author Shai Almog
  */
 public class AnimationAccessor {
     public static Image getImage(AnimationObject o) {

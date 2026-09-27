@@ -24,14 +24,12 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * Blocking TCP client socket for server-side (clean-target) binaries. Deliberately
- * not com.codename1.io.Socket: that routes through CodenameOneImplementation, which
- * a translated server binary does not have.
- */
+/// Blocking TCP client socket for server-side (clean-target) binaries. Deliberately
+/// not com.codename1.io.Socket: that routes through CodenameOneImplementation, which
+/// a translated server binary does not have.
 public final class Tcp {
     private long handle;
-    /** An OpenSSL session once startTls has run; 0 while the socket is plaintext. */
+    /// An OpenSSL session once startTls has run; 0 while the socket is plaintext.
     private long tls;
 
     private Tcp(long handle) {
@@ -44,7 +42,7 @@ public final class Tcp {
         // a value past 65535 does not fail there -- glibc wraps it, so 65536 dials
         // port 0 and 99999 dials 34463. The Java SE arm rejects it outright, so a
         // malformed database URL reached a DIFFERENT port only once packaged.
-        if(port < 0 || port > 65535) {
+        if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("port out of range: " + port);
         }
         // And the timeout, for the same reason one line up: the native side reads
@@ -52,7 +50,7 @@ public final class Tcp {
         // hangs a packaged server for the OS TCP timeout while the Java SE arm
         // fails immediately out of Socket.connect. Zero keeps its documented
         // meaning; below zero is not a shorter wait, it is a different API.
-        if(timeoutMillis < 0) {
+        if (timeoutMillis < 0) {
             throw new IllegalArgumentException("connect timeout must not be negative: "
                     + timeoutMillis);
         }
@@ -60,36 +58,32 @@ public final class Tcp {
         // in it does to the packaged arm, and why both arms refuse it.
         Urls.requireHostName(host);
         long h = connectImpl(host, port, timeoutMillis);
-        if(h == 0) {
+        if (h == 0) {
             throw new IOException("Connection to " + host + ":" + port + " failed");
         }
         return new Tcp(h);
     }
 
-    /**
-     * Upgrades this connection to TLS, verifying the peer certificate against the
-     * system trust store and against `host`.
-     *
-     * An upgrade rather than a secure connect because that is the shape the
-     * database protocols need: PostgreSQL and MySQL both begin in plaintext and
-     * ask to start TLS mid-conversation, so a connect-time flag could not express
-     * it. Calling it immediately after connect gives the ordinary secure-connect
-     * behaviour.
-     */
+    /// Upgrades this connection to TLS, verifying the peer certificate against the
+    /// system trust store and against `host`.
+    ///
+    /// An upgrade rather than a secure connect because that is the shape the
+    /// database protocols need: PostgreSQL and MySQL both begin in plaintext and
+    /// ask to start TLS mid-conversation, so a connect-time flag could not express
+    /// it. Calling it immediately after connect gives the ordinary secure-connect
+    /// behaviour.
     public void startTls(String host) throws IOException {
         startTls(host, null);
     }
 
-    /**
-     * As {@link #startTls(String)}, verifying against the PEM bundle at `caFile`
-     * INSTEAD of the system trust store.
-     *
-     * This is what a managed database needs: RDS, Cloud SQL and the like present
-     * certificates from a private CA, and a development container presents one it
-     * generated for itself. Falling back to the system store when the named bundle
-     * fails to load would verify against roots the caller deliberately did not
-     * choose, so that is an error rather than a fallback.
-     */
+    /// As [#startTls(String)], verifying against the PEM bundle at `caFile`
+    /// INSTEAD of the system trust store.
+    ///
+    /// This is what a managed database needs: RDS, Cloud SQL and the like present
+    /// certificates from a private CA, and a development container presents one it
+    /// generated for itself. Falling back to the system store when the named bundle
+    /// fails to load would verify against roots the caller deliberately did not
+    /// choose, so that is an error rather than a fallback.
     public void startTls(String host, String caFile) throws IOException {
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
@@ -104,7 +98,7 @@ public final class Tcp {
         // Urls.requireNoNul for what a NUL in it loads instead.
         Urls.requireNoNul("An sslrootcert path", caFile);
         checkOpen();
-        if(tls != 0) {
+        if (tls != 0) {
             return;
         }
         // CLAIMED LIKE ANY OTHER OPERATION. Reading the descriptor under the
@@ -126,7 +120,7 @@ public final class Tcp {
         } finally {
             release();
         }
-        if(session == 0) {
+        if (session == 0) {
             throw new IOException("TLS handshake with " + host + " failed: " + tlsErrorImpl());
         }
         // Published under the same monitor the claim takes, so a thread that goes
@@ -140,13 +134,13 @@ public final class Tcp {
         // another connection, and SSL_shutdown would write TLS bytes into that
         // one.
         boolean lost;
-        synchronized(this) {
+        synchronized (this) {
             lost = handle == 0;
-            if(!lost) {
+            if (!lost) {
                 tls = session;
             }
         }
-        if(lost) {
+        if (lost) {
             // Freed WITHOUT a shutdown: the descriptor is gone, so there is
             // nothing to tell the peer and nothing safe to write to.
             tlsDiscardImpl(session);
@@ -154,46 +148,42 @@ public final class Tcp {
         }
     }
 
-    /**
-     * Refuses a slice that does not lie inside the array.
-     *
-     * recv() and SSL_read() index the array straight through the pointer they are
-     * given, and ParparVM adds no bounds check of its own, so a bad offset here is
-     * a native read or write of whatever is next in the heap rather than an
-     * exception. The JavaSE implementation gets this free from the stream API,
-     * which is why the same code is safe on the simulator and unsafe only once it
-     * is packaged. The subtraction avoids the overflow `offset + length` has.
-     */
+    /// Refuses a slice that does not lie inside the array.
+    ///
+    /// recv() and SSL_read() index the array straight through the pointer they are
+    /// given, and ParparVM adds no bounds check of its own, so a bad offset here is
+    /// a native read or write of whatever is next in the heap rather than an
+    /// exception. The JavaSE implementation gets this free from the stream API,
+    /// which is why the same code is safe on the simulator and unsafe only once it
+    /// is packaged. The subtraction avoids the overflow `offset + length` has.
     private static void checkRange(byte[] buffer, int offset, int length) {
-        if(buffer == null) {
+        if (buffer == null) {
             throw new NullPointerException("buffer");
         }
-        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+        if (offset < 0 || length < 0 || length > buffer.length - offset) {
             throw new IndexOutOfBoundsException("offset " + offset + ", length "
                     + length + ", buffer " + buffer.length);
         }
     }
 
-    /** Operations currently inside a native on this connection. */
+    /// Operations currently inside a native on this connection.
     private int inFlight;
 
-    /** Whether close() has been called; the fields below are then its leftovers. */
+    /// Whether close() has been called; the fields below are then its leftovers.
     private boolean closing;
 
-    /** What the last operation out has to free, when close() could not. */
+    /// What the last operation out has to free, when close() could not.
     private long tlsAwaitingClose;
     private long handleAwaitingClose;
 
-    /**
-     * Takes a claim on this connection for one operation.
-     *
-     * <p>Returns the TLS session to use, or 0 to use the plain socket, and leaves
-     * the descriptor in `claimed` -- both read under the monitor so they describe
-     * the same instant. The claim is what stops close() from releasing either one
-     * while this operation is inside a native with it.
-     */
+    /// Takes a claim on this connection for one operation.
+    ///
+    /// Returns the TLS session to use, or 0 to use the plain socket, and leaves
+    /// the descriptor in `claimed` -- both read under the monitor so they describe
+    /// the same instant. The claim is what stops close() from releasing either one
+    /// while this operation is inside a native with it.
     private synchronized long claim(long[] claimed) throws IOException {
-        if(handle == 0) {
+        if (handle == 0) {
             throw new IOException("Socket closed");
         }
         inFlight++;
@@ -201,60 +191,53 @@ public final class Tcp {
         return tls;
     }
 
-    /**
-     * Releases a claim, finishing a close() that was waiting on it.
-     *
-     * <p>The session is DISCARDED rather than shut down: close() has already
-     * shut the socket down, so there is no longer a peer to tell. The descriptor
-     * is closed last, and only here -- which is the whole point. Closing it in
-     * close() would release the NUMBER while this operation was still inside
-     * read() or write() with it, and a number is handed to the next socket this
-     * process opens, so the read would be served by an unrelated connection.
-     */
+    /// Releases a claim, finishing a close() that was waiting on it.
+    ///
+    /// The session is DISCARDED rather than shut down: close() has already
+    /// shut the socket down, so there is no longer a peer to tell. The descriptor
+    /// is closed last, and only here -- which is the whole point. Closing it in
+    /// close() would release the NUMBER while this operation was still inside
+    /// read() or write() with it, and a number is handed to the next socket this
+    /// process opens, so the read would be served by an unrelated connection.
     private void release() {
         long discard = 0;
         long closeNow = 0;
-        synchronized(this) {
+        synchronized (this) {
             inFlight--;
-            if(inFlight == 0 && closing) {
+            if (inFlight == 0 && closing) {
                 discard = tlsAwaitingClose;
                 tlsAwaitingClose = 0;
                 closeNow = handleAwaitingClose;
                 handleAwaitingClose = 0;
             }
         }
-        if(discard != 0) {
+        if (discard != 0) {
             tlsDiscardImpl(discard);
         }
-        if(closeNow != 0) {
+        if (closeNow != 0) {
             closeImpl(closeNow);
         }
     }
 
-    /** Whether this connection is encrypted. */
+    /// Whether this connection is encrypted.
     public boolean isSecure() {
         return tls != 0;
     }
 
-    /**
-     * Reads up to length bytes. Returns -1 at end of stream, matching InputStream.
-     */
-    /**
-     * A receive and send deadline for this connection, in milliseconds; 0 for
-     * none.
-     *
-     * <p>Set after connecting and left in place. Without one, a peer that
-     * finishes connecting and then stops answering holds the calling thread for
-     * as long as it likes -- recv() on a blocking descriptor has no deadline of
-     * its own -- and for a database connection that thread is a request worker,
-     * or a virtual thread's carrier. A few stalled connections are then the whole
-     * server.
-     *
-     * <p>Claimed like any other operation, so a close() during it cannot hand the
-     * descriptor number to somebody else while setsockopt is looking at it.
-     */
+    /// A receive and send deadline for this connection, in milliseconds; 0 for
+    /// none.
+    ///
+    /// Set after connecting and left in place. Without one, a peer that
+    /// finishes connecting and then stops answering holds the calling thread for
+    /// as long as it likes -- recv() on a blocking descriptor has no deadline of
+    /// its own -- and for a database connection that thread is a request worker,
+    /// or a virtual thread's carrier. A few stalled connections are then the whole
+    /// server.
+    ///
+    /// Claimed like any other operation, so a close() during it cannot hand the
+    /// descriptor number to somebody else while setsockopt is looking at it.
     public void setReadTimeout(int millis) throws IOException {
-        if(millis < 0) {
+        if (millis < 0) {
             throw new IllegalArgumentException("read timeout must not be negative: "
                     + millis);
         }
@@ -262,7 +245,7 @@ public final class Tcp {
         long[] claimed = new long[1];
         claim(claimed);
         try {
-            if(setReadTimeoutImpl(claimed[0], millis) != 0) {
+            if (setReadTimeoutImpl(claimed[0], millis) != 0) {
                 throw new IOException("Could not set the connection's read timeout");
             }
         } finally {
@@ -270,6 +253,7 @@ public final class Tcp {
         }
     }
 
+    /// Reads up to length bytes. Returns -1 at end of stream, matching InputStream.
     public int read(byte[] buffer, int offset, int length) throws IOException {
         checkOpen();
         checkRange(buffer, offset, length);
@@ -279,7 +263,7 @@ public final class Tcp {
         // computed an empty slice was told the peer had gone away, but only once
         // packaged. SSL_read(_, 0) is worse: OpenSSL leaves it undefined and it
         // can report an error.
-        if(length == 0) {
+        if (length == 0) {
             return 0;
         }
         long[] claimed = new long[1];
@@ -291,7 +275,7 @@ public final class Tcp {
         } finally {
             release();
         }
-        if(n < -1) {
+        if (n < -1) {
             throw new IOException("Socket read failed");
         }
         return n;
@@ -304,7 +288,7 @@ public final class Tcp {
         // SSL_write(_, 0) is undefined too. This one happens to be harmless today
         // -- the check below is n != length, and 0 != 0 is false -- which is a
         // reason to make it explicit rather than to leave it resting on that.
-        if(length == 0) {
+        if (length == 0) {
             return;
         }
         long[] claimed = new long[1];
@@ -316,40 +300,38 @@ public final class Tcp {
         } finally {
             release();
         }
-        if(n != length) {
+        if (n != length) {
             throw new IOException("Socket write failed");
         }
     }
 
-    /**
-     * Closes the connection, and does not release anything an operation still
-     * holds.
-     *
-     * <p>When nothing is in flight this is the plain teardown it always was: shut
-     * the session down politely, close the descriptor, done.
-     *
-     * <p>When something IS in flight -- the ordinary case, since close() is how a
-     * blocked read gets cancelled -- the descriptor is SHUT DOWN rather than
-     * closed. That is what wakes the other thread, and it leaves the number
-     * allocated to us until that thread returns. Closing it here instead would
-     * hand the number back to the process while a read() or write() was still
-     * inside a native with it, and the next socket this process opens is given
-     * that same number: the read would then be served, silently, by an unrelated
-     * connection. The last operation out closes it for real.
-     *
-     * <p>close() still returns at once either way. It has to: the thread it is
-     * cancelling may be one that never comes back.
-     */
+    /// Closes the connection, and does not release anything an operation still
+    /// holds.
+    ///
+    /// When nothing is in flight this is the plain teardown it always was: shut
+    /// the session down politely, close the descriptor, done.
+    ///
+    /// When something IS in flight -- the ordinary case, since close() is how a
+    /// blocked read gets cancelled -- the descriptor is SHUT DOWN rather than
+    /// closed. That is what wakes the other thread, and it leaves the number
+    /// allocated to us until that thread returns. Closing it here instead would
+    /// hand the number back to the process while a read() or write() was still
+    /// inside a native with it, and the next socket this process opens is given
+    /// that same number: the read would then be served, silently, by an unrelated
+    /// connection. The last operation out closes it for real.
+    ///
+    /// close() still returns at once either way. It has to: the thread it is
+    /// cancelling may be one that never comes back.
     public void close() {
         long closeNow = 0;
         long shutDownNow = 0;
         long tlsCloseNow = 0;
-        synchronized(this) {
-            if(closing) {
+        synchronized (this) {
+            if (closing) {
                 return;                 // idempotent, and only the first one frees
             }
             closing = true;
-            if(inFlight == 0) {
+            if (inFlight == 0) {
                 tlsCloseNow = tls;
                 closeNow = handle;
             } else {
@@ -360,19 +342,19 @@ public final class Tcp {
             tls = 0;
             handle = 0;
         }
-        if(shutDownNow != 0) {
+        if (shutDownNow != 0) {
             shutdownImpl(shutDownNow);
         }
-        if(tlsCloseNow != 0) {
+        if (tlsCloseNow != 0) {
             tlsCloseImpl(tlsCloseNow);
         }
-        if(closeNow != 0) {
+        if (closeNow != 0) {
             closeImpl(closeNow);
         }
     }
 
     private void checkOpen() throws IOException {
-        if(handle == 0) {
+        if (handle == 0) {
             throw new IOException("Socket closed");
         }
     }
@@ -389,12 +371,10 @@ public final class Tcp {
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);
     private static native void tlsCloseImpl(long session);
 
-    /**
-     * shutdown(2) on the descriptor: wakes whatever is blocked on it WITHOUT
-     * giving the number back to the process. See close().
-     */
+    /// shutdown(2) on the descriptor: wakes whatever is blocked on it WITHOUT
+    /// giving the number back to the process. See close().
     private static native void shutdownImpl(long handle);
 
-    /** Frees a session whose descriptor has already gone; see startTls. */
+    /// Frees a session whose descriptor has already gone; see startTls.
     private static native void tlsDiscardImpl(long session);
 }

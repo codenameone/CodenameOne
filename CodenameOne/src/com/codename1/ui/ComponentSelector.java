@@ -60,7 +60,6 @@ import java.util.Set;
 /// Sets of components can either be created by explicitly adding components to the set, or by
 /// providing a "selector" string that specifies how the set should be formed.  Some examples:
 ///
-///
 /// - `$("Label")`  - The set of all components on the current form with UIID="Label"
 ///
 /// - `$("#AddressField")` - The set of components with name="AddressField"
@@ -85,7 +84,6 @@ import java.util.Set;
 /// You can add tags to components using `#addTags(java.lang.String...)`, and remove them using `#removeTags(java.lang.String...)`.
 /// Once you have tagged a component, it can be targeted quite easily using a selector.  Tags are specified in a selector with a .
 /// prefix.  E.g.:
-///
 ///
 /// - `$(".my-tag")` - The set of all components with tag "my-tag".
 ///
@@ -134,7 +132,6 @@ import java.util.Set;
 ///
 /// ComponentSelector includes a few different types of methods:
 ///
-///
 /// - Wrapper methods for `Component`, `Container`, etc... to operate on all applicable components in the set.
 ///
 /// - Component Tree Traversal Methods to return other sets of components based on the current set.  E.g. `#find(java.lang.String)`, `#getParent()`, `#getComponentAt(int)`,
@@ -164,14 +161,12 @@ import java.util.Set;
 ///                 })
 ///                 .asComponent(Button.class);
 ///
-///
 ///         Button slideUp = $(new Button("Slide Up"))
 ///                 .setIcon(FontImage.MATERIAL_EXPAND_LESS)
 ///                 .addActionListener(e->{
 ///                     $(e).getParent().find(">*").slideUpAndWait(1000).slideDownAndWait(1000);
 ///                 })
 ///                 .asComponent(Button.class);
-///
 ///
 ///         Button replace = $(new Button("Replace Fade/Slide"))
 ///                 .setIcon(FontImage.MATERIAL_REDEEM)
@@ -193,10 +188,8 @@ import java.util.Set;
 ///
 ///                             }, CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, false, 1000));
 ///
-///
 ///                 })
 ///                 .asComponent(Button.class);
-///
 ///
 ///         Button replaceFlip = $(new Button("Replace Flip"))
 ///                 .setIcon(FontImage.MATERIAL_REDEEM)
@@ -217,7 +210,6 @@ import java.util.Set;
 ///                                 return c;
 ///
 ///                             },new FlipTransition(0xffffff, 1000));
-///
 ///
 ///                 })
 ///                 .asComponent(Button.class);
@@ -272,7 +264,6 @@ import java.util.Set;
 ///             rowNum++;
 ///         }
 ///
-///
 ///         $(".cell", table).setMargin(0).setPadding(0)
 ///                 .addActionListener(e->{
 ///                     // Action listener in each cell so that we can highlight the
@@ -312,9 +303,6 @@ import java.util.Set;
 ///         $(".even", table)
 ///             .setBgColor(0xcccccc)
 ///             .setBgTransparency(255);
-///
-///
-///
 ///
 ///         f.addComponent(BorderLayout.CENTER, $(BoxLayout.encloseY(table)).setScrollableY(true).asComponent());
 ///
@@ -364,7 +352,6 @@ import java.util.Set;
 /// ```
 ///
 /// The following style pseudo-classes are supported:
-///
 ///
 /// - :pressed - Same as calling `#selectPressedStyle()`
 ///
@@ -421,7 +408,6 @@ import java.util.Set;
 /// One powerful aspect of working with sets of components is that you can generate very specific
 /// sets of components using very simple queries.  Consider the following queries:
 ///
-///
 /// - `$(myButton1, myButton2).getParent()` - The set of parents of myButton1 and myButton2.  If they have the
 /// same parent, then this set will only contain a single element: the common parent container.   If they have different parents, then this
 /// set will include both parent containers.
@@ -433,8 +419,6 @@ import java.util.Set;
 /// until it finds a matching component.  Works the same as jQuery's closest() method.
 ///
 /// - `$(".my-tag").getComponentAt(4)` - The set of 5th child components of containers with tag ".my-tag".
-///
-/// @author shannah
 ///
 /// #### See also
 ///
@@ -2247,11 +2231,10 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
     /// Returns results as an array.
     ///
-    /// @param
-    ///
     /// #### Parameters
     ///
-    /// - `a`
+    /// - `a`: the array to fill when it is large enough; otherwise a new array of the
+    ///   same runtime type is allocated
     @Override
     public <T> T[] toArray(T[] a) {
         return resultsImpl().toArray(a);

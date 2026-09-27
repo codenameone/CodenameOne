@@ -24,8 +24,6 @@
 package com.codename1.io.rest;
 
 /// This class is used to create the Http RequestBuilder(get/post/head/options/delete/put)
-///
-/// @author Chen Fishbein
 public abstract class Rest {
 
     /// Creates a GET request builder

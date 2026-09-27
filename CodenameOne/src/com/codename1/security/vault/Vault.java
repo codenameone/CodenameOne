@@ -1417,7 +1417,7 @@ public final class Vault {
         return out;
     }
 
-    /// Opens what [#seal] produced, including envelopes written before a [#rotateDataKey()].
+    /// Opens what [#seal] produced, including envelopes written before a [#rotateDataKey].
     ///
     /// A record sealed under a retired key version is opened by walking the key chain in the
     /// vault record. A record whose key version is newer than this vault knows about is

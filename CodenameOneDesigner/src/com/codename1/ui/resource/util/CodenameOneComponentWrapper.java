@@ -35,8 +35,6 @@ import javax.swing.JLabel;
 /**
  * Wraps a CodenameOne component in a Swing component for preview purposes, this is
  * effectively the "live preview" API
- *
- * @author Shai Almog
  */
 public class CodenameOneComponentWrapper extends JLabel {
     private com.codename1.ui.Component codenameOneCmp;

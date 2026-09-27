@@ -26,8 +26,6 @@ package com.codename1.ui.html;
 import com.codename1.ui.Label;
 
 /// An abstract class that is extended later by HTMLListIndex and BulletItem
-///
-/// @author Ofir Leitner
 abstract class HTMLListItem extends Label {
 
     /// Sets the list style to the given value

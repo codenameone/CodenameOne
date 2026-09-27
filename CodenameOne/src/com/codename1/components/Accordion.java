@@ -68,8 +68,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// ```
 ///
 /// Screenshots
-///
-/// @author Chen
 public class Accordion extends Container {
 
     private final EventDispatcher listeners = new EventDispatcher();

@@ -30,8 +30,6 @@ import java.util.TimerTask;
 
 /**
  * Executes a single test
- *
- * @author Shai Almog
  */
 public class TestExecuter {
     private static boolean failed;

@@ -38,8 +38,6 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
 
 /// Displays a progress dialog with the ability to cancel an ongoing operation
-///
-/// @author Shai Almog
 public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     private final ConnectionRequest request;
     private boolean disposeOnCompletion;

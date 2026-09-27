@@ -68,8 +68,6 @@ import org.jdesktop.swingx.sort.RowFilters;
 
 /**
  * Base class for forms containing common functionality for all forms
- *
- * @author Shai Almog
  */
 public class BaseForm extends JPanel {
     private static ImageIcon overrideImage;

@@ -35,8 +35,6 @@ import java.io.IOException;
 /// [https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts](https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Fposts)
 /// You can ask it to list your posts and then seek the correct id within the returned JSON
 ///
-/// @author Chen Fishbein
-///
 /// @deprecated This functionality is no longer possible, open a BrowserComponent
 /// with the link instead. This class will be removed in a future release.
 @Deprecated

@@ -464,7 +464,10 @@ jobs:
             -Plocal-dev-javase \
             -pl "$CN1LIB_MODULES" \
             package
-      - name: Run SpotBugs for ports and Maven plugin
+      # The backend runtime is named explicitly rather than left to -am: the plugin
+      # reaches it only through a test-scoped dependency, and its verify is where
+      # its SpotBugs, PMD and Checkstyle run -- the same gates the core has.
+      - name: Run SpotBugs for ports, Maven plugin and backend runtime
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
         env:
@@ -473,7 +476,7 @@ jobs:
           mvn -B -DskipTests=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
-            -pl android,ios,codenameone-maven-plugin -am verify
+            -pl android,ios,codenameone-maven-plugin,backend -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -671,7 +674,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -689,7 +692,8 @@ jobs:
             "android:maven/android/target" \
             "ios:maven/ios/target" \
             "bytecode-translator:vm/ByteCodeTranslator/target" \
-            "maven-plugin:maven/codenameone-maven-plugin/target"; do
+            "maven-plugin:maven/codenameone-maven-plugin/target" \
+            "backend:maven/backend/target"; do
             label="${entry%%:*}"
             dir="${entry#*:}"
             for filename in spotbugsXml.xml spotbugs.xml; do
@@ -704,6 +708,12 @@ jobs:
           fi
           if [ -f maven/core-unittests/target/checkstyle-result.xml ]; then
             cp maven/core-unittests/target/checkstyle-result.xml quality-artifacts/static-analysis/
+          fi
+          if [ -f maven/backend/target/pmd.xml ]; then
+            cp maven/backend/target/pmd.xml quality-artifacts/static-analysis/pmd-backend.xml
+          fi
+          if [ -f maven/backend/target/checkstyle-result.xml ]; then
+            cp maven/backend/target/checkstyle-result.xml quality-artifacts/static-analysis/checkstyle-backend.xml
           fi
           if [ -d target/quality-report ]; then
             mkdir -p quality-artifacts/static-analysis/html
@@ -800,11 +810,16 @@ jobs:
       - name: Generate quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools:backend
+          # PMD and Checkstyle run on the core and on the backend runtime, and each
+          # must produce its report: without one, the forbidden-rule gate below it
+          # has nothing to read and passes.
+          QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend
+          QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}

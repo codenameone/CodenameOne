@@ -30,9 +30,6 @@ import com.codename1.util.AsyncResource;
 
 /// Encapsulates a WebView that is contained in its own separate window when run on a Desktop (e.g. Simulator).  Platforms
 /// that don't have "windows", will fall back to loading a Form with a BrowserComponent in it.
-///
-/// @author shannah
-///
 public class BrowserWindow {
 
     /// Implementation for BrowserWindow provided by the platform implementation.  The default

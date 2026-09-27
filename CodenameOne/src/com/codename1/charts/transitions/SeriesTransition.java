@@ -35,8 +35,6 @@ import com.codename1.ui.animations.Motion;
 /// as a buffer for changes to the model so that they don't affect the ChartComponent
 /// immediately.  Changes can either be eased in using animateChart() or updated
 /// in one shot using updateChart().
-///
-/// @author shannah
 public abstract class SeriesTransition implements Animation {
 
     /// The top level this transition registered on, so it is removed from that one

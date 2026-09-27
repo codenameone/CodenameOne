@@ -30,8 +30,6 @@ import java.util.Hashtable;
 
 /**
  * This tool exposes some internal border functionality from the package
- *
- * @author Shai Almog
  */
 public class Accessor {
     public static final int TYPE_EMPTY = 0;

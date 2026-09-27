@@ -22,8 +22,6 @@ package com.codename1.maps;
 import java.util.Vector;
 
 /// This class declares a bounding box of coordinates on the map.
-///
-/// @author Roman Kamyk roman.kamyk@itiner.pl
 public class BoundingBox {
 
     private final Coord _southWest;

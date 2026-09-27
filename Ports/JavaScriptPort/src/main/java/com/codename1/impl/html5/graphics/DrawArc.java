@@ -30,10 +30,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class DrawArc implements ExecutableOp {
 
     final int x, y, w, h, startAngle, arcAngle, color, alpha;

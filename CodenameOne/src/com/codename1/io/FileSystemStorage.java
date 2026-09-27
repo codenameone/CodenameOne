@@ -96,7 +96,6 @@ import java.util.TimerTask;
 ///         String n = (String)child;
 ///         int pos = n.lastIndexOf("/");
 ///         if(pos
-/// @author Shai Almog
 public final class FileSystemStorage {
     /// Represents the type for the get root type method, this type generally represents the main
     /// phone memory

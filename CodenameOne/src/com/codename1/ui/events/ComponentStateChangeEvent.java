@@ -26,8 +26,6 @@ import com.codename1.ui.Component;
 
 /// An event that is fired when the state of a component is changed to and from initialized.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Component#addStateChangeListener(com.codename1.ui.events.ActionListener)

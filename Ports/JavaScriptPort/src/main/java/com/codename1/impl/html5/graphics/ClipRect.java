@@ -27,10 +27,6 @@ import com.codename1.impl.html5.BufferedGraphics;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 public class ClipRect implements ExecutableOp {
     
     final int x, y, w, h;

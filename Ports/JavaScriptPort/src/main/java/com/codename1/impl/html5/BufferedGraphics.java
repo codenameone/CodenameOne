@@ -58,10 +58,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 
-/**
- *
- * @author shannah
- */
 public class BufferedGraphics extends HTML5Graphics {
     ArrayList<ExecutableOp> upcoming = new ArrayList<ExecutableOp>();
     private Rectangle clipRect;

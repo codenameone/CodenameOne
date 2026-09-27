@@ -28,9 +28,6 @@ import com.codename1.util.SuccessCallback;
 
 /// An abstract base class for AsyncMedia. Most media returned from `MediaManager` will
 /// be descendants of this class.
-///
-/// @author shannah
-///
 public abstract class AbstractMedia implements AsyncMedia {
     private final EventDispatcher stateChangeListeners = new EventDispatcher();
     private final EventDispatcher errorListeners = new EventDispatcher();

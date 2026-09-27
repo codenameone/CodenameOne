@@ -47,8 +47,6 @@ import javax.swing.JFrame;
  * straight at the build's theme.res and merges dependency CSS into that same
  * output. That path produces one resource and never sets an overlay constant,
  * so do not describe overlays as how compiled CSS normally reaches a theme.
- *
- * @author shannah
  */
 public class CN1CSSInstallerCLI {
     private static void install(String[] args) throws Exception {
