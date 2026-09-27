@@ -45,7 +45,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import org.objectweb.asm.Opcodes;
 
@@ -3266,12 +3265,6 @@ public class ByteCodeClass {
 
     private boolean pureClinit;
 
-    /// Why each rejected <clinit> was rejected, keyed by its first blocking
-    /// instruction, for the census line Parser prints.
-    static final Map<String, Integer> PURE_CLINIT_BLOCKERS = new TreeMap<String, Integer>();
-    static int pureClinitCount;
-    static int clinitCount;
-
     /// Decides pureClinit for every class, on the RAW bytecode: before optimize() or
     /// any fusion pass has replaced instructions with composite ones, which are
     /// rejected here by construction because only raw instruction classes are
@@ -3282,40 +3275,27 @@ public class ByteCodeClass {
     /// every enum constant), so one class's answer can depend on another's; iterating
     /// up from "nothing is pure" means two classes can never justify each other.
     static void computePureClinits(List<ByteCodeClass> classes) {
-        PURE_CLINIT_BLOCKERS.clear();
-        pureClinitCount = 0;
-        clinitCount = 0;
         for (ByteCodeClass c : classes) {
             c.pureClinit = false;
         }
         boolean changed = true;
         while (changed) {
             changed = false;
-            PURE_CLINIT_BLOCKERS.clear();
-            pureClinitCount = 0;
-            clinitCount = 0;
             for (ByteCodeClass c : classes) {
                 BytecodeMethod clinit = c.clinitMethod();
                 if (clinit == null) {
                     continue;
                 }
-                clinitCount++;
                 if (c.pureClinit) {
-                    pureClinitCount++;
                     continue;
                 }
                 // IDENTITY, not equals: BytecodeMethod.equals compares name and signature only,
                 // so an enum's E.<init>(String,int) and the Enum.<init>(String,int) it
                 // calls are "equal", and a HashMap reads the in-progress subclass
                 // constructor as recursion.
-                String blocker = c.pureBodyBlocker(clinit, false, new java.util.IdentityHashMap<BytecodeMethod, String>());
-                if (blocker == null) {
+                if (c.pureBodyBlocker(clinit, false, new java.util.IdentityHashMap<BytecodeMethod, String>()) == null) {
                     c.pureClinit = true;
-                    pureClinitCount++;
                     changed = true;
-                } else {
-                    Integer n = PURE_CLINIT_BLOCKERS.get(blocker);
-                    PURE_CLINIT_BLOCKERS.put(blocker, n == null ? 1 : n + 1);
                 }
             }
         }

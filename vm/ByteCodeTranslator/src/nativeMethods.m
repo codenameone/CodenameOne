@@ -1052,9 +1052,6 @@ JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THR
 #endif
 }
 
-#ifndef CN1_EXP_SAMEARRAY
-#define CN1_EXP_SAMEARRAY 0
-#endif
 JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
     JAVA_ARRAY srcArr = (JAVA_ARRAY)src;
@@ -1144,7 +1141,7 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // Generational half: a copy between two arrays can put young references into an
     // old destination with no per-element store. Remember the destination once, after
     // the copy, rather than inspecting what was copied. Same-array moves add no edge.
-    if(cn1__satbReg && (CN1_EXP_SAMEARRAY || srcArr != dstArr) && cn1GcGenBarrier
+    if(cn1__satbReg && srcArr != dstArr && cn1GcGenBarrier
        && CN1_OBJ_MARK_LOAD(((JAVA_OBJECT)dstArr), __ATOMIC_RELAXED) > 0) {
         cn1GcRememberSlow((JAVA_OBJECT)dstArr);
     }
@@ -3929,17 +3926,6 @@ static JAVA_INT cn1TaggedHashSlow(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key, ui
 }
 #endif
 
-#ifdef CN1_HM_PROBE_CENSUS
-long cn1HmProbeCalls = 0, cn1HmProbeSteps = 0;
-static void cn1HmProbeReport(void) {
-    if(cn1HmProbeCalls == 0) return;
-    fprintf(stderr, "[HMPROBE] lookups=%ld extraSteps=%ld stepsPerLookup=%.3f\n",
-            cn1HmProbeCalls, cn1HmProbeSteps,
-            (double)cn1HmProbeSteps / (double)cn1HmProbeCalls);
-    fflush(stderr);
-}
-__attribute__((constructor)) static void cn1HmProbeInit(void){ atexit(cn1HmProbeReport); }
-#endif
 
 static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
     if(key == JAVA_NULL) {
@@ -4017,8 +4003,8 @@ static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_ut
  * containsKey and remove, and its prologue saved TWELVE callee-saved registers and
  * materialised a handful of addresses on every call -- register pressure from the cold
  * paths it carries (String equality, the user equals(), the CME throw), paid by the hot
- * path, which is a few instructions: probe discipline is already perfect here, the
- * CN1_HM_PROBE_CENSUS count is 0.000 extra steps per lookup on hashMapChurn. Same shape
+ * path, which is a few instructions: probe discipline is already perfect here (a probe
+ * census measured 0.000 extra steps per lookup on hashMapChurn). Same shape
  * as the static initializer that was inlined into CommonWorkloads.fib.
  *
  * The inline part decides exactly the two first-probe outcomes that need no equality
@@ -4032,9 +4018,6 @@ static inline JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java
     if(__builtin_expect(meta == NULL, 0)) {
         return -(i + 1);
     }
-#ifdef CN1_HM_PROBE_CENSUS
-    cn1HmProbeCalls++;
-#endif
     JAVA_INT m = meta[i];
     if(m == 0) {
         return -(i + 1);
@@ -4042,9 +4025,6 @@ static inline JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java
     if(m == marker && ((JAVA_OBJECT*)(uintptr_t)CN1_HM_BLK(t, Keys))[i] == key) {
         return i;
     }
-#ifdef CN1_HM_PROBE_CENSUS
-    cn1HmProbeCalls--;   // the full probe counts this lookup itself
-#endif
     return cn1HmFindSlotSlow(threadStateData, t, key, marker);
 }
 
@@ -4055,15 +4035,6 @@ static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_ut
     int i = marker & mask;
     if(meta == NULL) return -(i + 1);
     uint32_t perturb = (uint32_t)marker;
-#ifdef CN1_HM_PROBE_CENSUS
-    /* How many slots does one lookup actually touch? A COUNT, so a loaded machine
-     * cannot corrupt it -- unlike every timing taken on this host tonight. Near
-     * 1.0 means the spreading is healthy and the remaining cost is cache
-     * behaviour across the three separate blocks; materially above it means the
-     * marker clusters and the probe recurrence itself is the cost. Those want
-     * opposite fixes, which is why this is measured rather than guessed. */
-    cn1HmProbeCalls++;
-#endif
     int firstTomb = -1;
     JAVA_INT expected = t->java_util_HashMap_modCount;
     /* SHORT-CIRCUITING THE TAG TEST HERE WAS MEASURED SLOWER AND REVERTED.
@@ -4112,9 +4083,6 @@ static JAVA_INT cn1HmFindSlotSlow(CODENAME_ONE_THREAD_STATE, struct obj__java_ut
         }
         perturb >>= 5;
         i = cn1HmNextSlot(i, perturb, mask);
-#ifdef CN1_HM_PROBE_CENSUS
-        cn1HmProbeSteps++;
-#endif
     }
 }
 

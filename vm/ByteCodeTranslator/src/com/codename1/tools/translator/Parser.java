@@ -488,63 +488,6 @@ public class Parser extends ClassVisitor {
                     + " scoped=" + BytecodeMethod.stackIterScoped
                     + " refused=" + BytecodeMethod.stackIterRefused);
         }
-        if ("true".equals(System.getProperty("cn1.sbCensus"))) {
-            int sites = BytecodeMethod.sbCensusSites;
-            System.out.println("[SB] StringBuilder NEW sites=" + sites
-                    + " stackAllocated=" + BytecodeMethod.sbCensusStackAllocated
-                    + " inTryCatchMethods=" + BytecodeMethod.sbCensusBailTryCatch
-                    + " refusedBySynchronized=" + BytecodeMethod.sbCensusBailSync
-                    + (sites > 0 ? "  (try/catch no longer refuses any of the "
-                        + (100 * BytecodeMethod.sbCensusBailTryCatch / sites) + "% of sites it reaches)" : ""));
-        }
-        if (BytecodeMethod.BCE_CENSUS) {
-            int ops = BytecodeMethod.bceArrayOpsTotal;
-            System.out.println("[BCE] methods=" + BytecodeMethod.bceMethods
-                + " withArrayOps=" + BytecodeMethod.bceMethodsWithArrays
-                + " refusedByTryCatch=" + BytecodeMethod.bceRefusedTryCatch
-                + " arrayOps=" + ops
-                + " arrayOpsInRefusedMethods=" + BytecodeMethod.bceArrayOpsRefusedTryCatch
-                + (ops > 0 ? "  (" + (100 * BytecodeMethod.bceArrayOpsRefusedTryCatch / ops)
-                    + "% of array accesses sit in a method that used to be refused whole)" : ""));
-            System.out.println("[BCE] cleared=" + BytecodeMethod.bceAccessesMarked
-                + " ofThoseInTryCatchMethods=" + BytecodeMethod.bceAccessesMarkedInTryCatchMethod
-                + " loopsRefusedByHandlerInside=" + BytecodeMethod.bceLoopsRefusedByHandler);
-            StringBuilder why = new StringBuilder("[BCE] candidateLoops:");
-            for (int i = 0; i < BytecodeMethod.BCE_WHY.length; i++) {
-                why.append(' ').append(BytecodeMethod.BCE_WHY[i]).append('=').append(BytecodeMethod.bceWhy[i]);
-            }
-            System.out.println(why);
-            StringBuilder miss = new StringBuilder("[BCE] inAcceptedLoops:");
-            for (int i = 0; i < BytecodeMethod.BCE_MISS.length; i++) {
-                miss.append(' ').append(BytecodeMethod.BCE_MISS[i]).append('=').append(BytecodeMethod.bceMiss[i]);
-            }
-            System.out.println(miss);
-            StringBuilder ho = new StringBuilder("[BCE] hoistedLength:");
-            for (int i = 0; i < BytecodeMethod.BCE_HOIST.length; i++) {
-                ho.append(' ').append(BytecodeMethod.BCE_HOIST[i]).append('=').append(BytecodeMethod.bceHoist[i]);
-            }
-            System.out.println(ho);
-        }
-        if (BytecodeMethod.FRAMELESS_CENSUS) {
-            System.out.println("[EAGER-INIT] clinits=" + ByteCodeClass.clinitCount
-                + " pure=" + ByteCodeClass.pureClinitCount
-                + " first blocker (reason -> classes): " + ByteCodeClass.PURE_CLINIT_BLOCKERS);
-            int t = BytecodeMethod.censusTotal;
-            System.out.println("[FRAMELESS] methods=" + t
-                + " frameless=" + BytecodeMethod.censusEligible
-                + " excludedByTryCatchALONE=" + BytecodeMethod.censusExcludedTryCatch
-                + " excludedOther=" + BytecodeMethod.censusExcludedOther
-                + (t > 0 ? "  (tryCatchAlone=" + (100 * BytecodeMethod.censusExcludedTryCatch / t)
-                    + "% of all methods)" : ""));
-            System.out.println("[FRAMELESS] excludedOther breakdown:"
-                + " ctorOrClinit=" + BytecodeMethod.censusNoConstructor
-                + " synchronized=" + BytecodeMethod.censusNoSync
-                + " onDeviceDebug=" + BytecodeMethod.censusNoDebug
-                + " unhandledOpcode=" + BytecodeMethod.censusNoOpcode
-                + " empty=" + BytecodeMethod.censusEmpty);
-            System.out.println("[FRAMELESS] first blocking instruction (class:opcode -> methods): "
-                + BytecodeMethod.censusBlockers);
-        }
         LocalReceiverTypes.clear();
         cn1SubclassIndex = null;
         cn1SubclassIndexSize = -1;
@@ -1479,14 +1422,6 @@ public class Parser extends ClassVisitor {
             if (BytecodeMethod.optimizerOn) {
                 LocalReceiverTypes.resolveFactories(getNativeSymbolIndex(nativeSources));
                 iteratorStackCensus();
-                allocationEscapeCensus();
-                // NOTE: the retire counters are deliberately NOT reported from here.
-                // The pass runs per method inside optimize(), so totals are not final at
-                // this point, and a shutdown hook does not compile in this build (the
-                // Runtime/Thread visible to the translator has no addShutdownHook). The
-                // population is measured from the generated C instead, by counting
-                // __cn1retire scopes -- which is the number that actually matters,
-                // because it counts what codegen EMITTED rather than what analysis liked.
                 for (ByteCodeClass ownershipClass : classes) {
                     for (BytecodeMethod method : ownershipClass.getMethods()) method.analyzeBuilderOwnership();
                 }
@@ -3172,29 +3107,9 @@ public class Parser extends ClassVisitor {
         return stackIterClasses.contains(mangledClsName);
     }
 
-    /// How many allocation sites in this corpus are provably frame-local?
-    ///
-    /// The escape analysis behind the iterator scheme is not iterator-specific -- it answers
-    /// "does this reference escape the frame that produced it" for any type. It is only ever
-    /// ASKED about iterators. This census asks it about every NEW in the program, so the size
-    /// of the unexploited population is a measured number rather than an assumption.
-    ///
-    /// Two strictnesses, because they enable different things:
-    ///   LOOSE  (returnIsLeak=false) -- may be returned; suits caller-frame allocation, the
-    ///          shape the iterator work already ships.
-    ///   STRICT (returnIsLeak=true)  -- dies with the allocating method; the population a
-    ///          wholesale page free at method exit could reclaim without the collector.
-    ///
-    /// -Dcn1.allocCensus=true. Measurement only: nothing reads the result yet.
     /// Do all of these callees keep `this` to themselves? The precise form of the
     /// receiver check: only the methods a site ACTUALLY invokes on the tracked object
     /// matter, not every method the class happens to declare.
-    /// Which callees are answering "unsafe", and how often. A resolution bug here is
-    /// indistinguishable from real leakage in the totals, and the first cut of this
-    /// check took the safe count to ZERO -- which is what an unresolvable callee looks
-    /// like, not what a leaky program looks like.
-    static final Map<String, int[]> calleeFailures = new HashMap<String, int[]>();
-
     static boolean calleesKeepThis(List<String> calls, Map<String, Boolean> memo) {
         for (int i = 0; i < calls.size(); i++) {
             String key = calls.get(i);
@@ -3204,9 +3119,6 @@ public class Parser extends ClassVisitor {
                 memo.put(key, cached);
             }
             if (!cached.booleanValue()) {
-                int[] fc = calleeFailures.get(key);
-                if (fc == null) { fc = new int[1]; calleeFailures.put(key, fc); }
-                fc[0]++;
                 return false;
             }
         }
@@ -3247,144 +3159,6 @@ public class Parser extends ClassVisitor {
             return false;   // class found, method not -- inherited or synthetic
         }
         return false;       // not in this closed world
-    }
-
-    static void reportRetireCounters() {
-        System.out.println("[RETIRE] seen=" + BytecodeMethod.retireSeen
-                + " kept=" + BytecodeMethod.retireKept
-                + " dropStackAlloc=" + BytecodeMethod.retireDropStack
-                + " dropEscapes=" + BytecodeMethod.retireDropEscape
-                + " dropNoLocal=" + BytecodeMethod.retireDropNoLocal
-                + " dropCallee=" + BytecodeMethod.retireDropCallee
-                + " dropFrameless=" + BytecodeMethod.retireDropFrameless);
-    }
-
-    static void allocationEscapeCensus() {
-        if (!"true".equals(System.getProperty("cn1.allocCensus"))) {
-            return;
-        }
-        Map<String, List<BytecodeMethod>> allocations = new HashMap<String, List<BytecodeMethod>>();
-        for (ByteCodeClass c : classes) {
-            allocations.put(IteratorEscape.mangle(c.getClsName()), new ArrayList<BytecodeMethod>());
-        }
-        int sites = 0, loose = 0, strict = 0, escapes = 0, unknown = 0;
-        int unsoundReceiver = 0;
-        Map<String, Boolean> thisSafe = new HashMap<String, Boolean>();
-        Map<String, int[]> byType = new HashMap<String, int[]>();
-        // WHY each undecidable site was refused. There are several UNKNOWN exits, not
-        // just the documented branch-liveness one, and they need different fixes: a CFG
-        // fixpoint for the branch case, more modelled opcodes for "consumed by something
-        // unmodelled". Without this split the 197 is a number nobody can act on.
-        Map<String, int[]> reasons = new HashMap<String, int[]>();
-        for (ByteCodeClass c : classes) {
-            for (BytecodeMethod m : c.getMethods()) {
-                String lastSeen = null;
-                for (Instruction instruction : m.getInstructions()) {
-                    if (!(instruction instanceof TypeInstruction)
-                            || instruction.getOpcode() != Opcodes.NEW) {
-                        continue;
-                    }
-                    String owner = IteratorEscape.mangle(((TypeInstruction) instruction).getTypeName());
-                    if (!allocations.containsKey(owner)) {
-                        continue;   // type not in this closed world
-                    }
-                    // One method is one analysis site per allocated type, matching
-                    // iteratorStackCensus: re-allocating the same type in a loop is
-                    // still a single decision.
-                    if (owner.equals(lastSeen)) {
-                        continue;
-                    }
-                    lastSeen = owner;
-                    sites++;
-                    int rLoose = IteratorEscape.newEscapes(m, owner);
-                    int rStrict = IteratorEscape.newEscapesStrict(m, owner);
-                    // SOUNDNESS: newEscapesStrict permits the tracked value to be a
-                    // RECEIVER, because the walk reasons that a receiver is only `this`
-                    // inside the callee "and that callee is checked on its own". For
-                    // iterators that check exists (iteratorStackCensus runs thisEscapes
-                    // over every method of the class). For an arbitrary type it does not,
-                    // so a callee that stashes `this` -- list.register(this) -- would be
-                    // missed. Counting a site as retirable requires BOTH properties.
-                    if (rStrict == IteratorEscape.SAFE) {
-                        List<String> calls = new ArrayList<String>(IteratorEscape.receiverCalls);
-                        if (!calleesKeepThis(calls, thisSafe)) {
-                            rStrict = IteratorEscape.ESCAPES;
-                            unsoundReceiver++;
-                        }
-                    }
-                    if (rLoose == IteratorEscape.SAFE) { loose++; }
-                    if (rStrict == IteratorEscape.SAFE) { strict++; }
-                    else if (rStrict == IteratorEscape.ESCAPES) { escapes++; }
-                    else { unknown++; }
-                    if (rStrict == IteratorEscape.UNKNOWN) {
-                        String why = IteratorEscape.lastReason;
-                        if (why == null || why.length() == 0) { why = "(unset)"; }
-                        int[] rc = reasons.get(why);
-                        if (rc == null) { rc = new int[1]; reasons.put(why, rc); }
-                        rc[0]++;
-                    }
-                    int[] t = byType.get(owner);
-                    if (t == null) { t = new int[3]; byType.put(owner, t); }
-                    t[0]++;
-                    if (rStrict == IteratorEscape.SAFE) { t[1]++; }
-                    else if (rStrict == IteratorEscape.UNKNOWN) { t[2]++; }
-                }
-            }
-        }
-        List<String> fk = new ArrayList<String>(calleeFailures.keySet());
-        Collections.sort(fk, new Comparator<String>() {
-            public int compare(String a, String b) {
-                return calleeFailures.get(b)[0] - calleeFailures.get(a)[0];
-            }
-        });
-        int fshown = 0;
-        for (String k : fk) {
-            if (fshown++ >= 20) { break; }
-            System.out.println("[ALLOC-CALLEE-FAIL] " + calleeFailures.get(k)[0] + "  " + k);
-        }
-        System.out.println("[ALLOC-CENSUS] receiverUnsound=" + unsoundReceiver
-                + "  (strict-safe by the walk, but the class can leak `this` from a callee)");
-        System.out.println("[ALLOC-CENSUS] sites=" + sites
-                + " frameLocalLoose=" + loose + " frameLocalStrict=" + strict
-                + " escapes=" + escapes + " unknown=" + unknown);
-        List<String> keys = new ArrayList<String>(byType.keySet());
-        Collections.sort(keys);
-        int shown = 0;
-        for (String k : keys) {
-            int[] t = byType.get(k);
-            if (t[1] > 0 && shown < 60) {
-                System.out.println("[ALLOC-CENSUS]   " + k + " sites=" + t[0] + " strictSafe=" + t[1]);
-                shown++;
-            }
-        }
-        // UNKNOWN is the interesting column: those sites do not escape, the analysis
-        // simply refuses to decide because the tracked value is live across a branch
-        // (it has no CFG fixpoint). Ranked by count so the question "are the
-        // undecidable ones the HOT types, or cold leaf nodes?" has an answer.
-        List<String> rk = new ArrayList<String>(reasons.keySet());
-        Collections.sort(rk, new Comparator<String>() {
-            public int compare(String a, String b) {
-                return reasons.get(b)[0] - reasons.get(a)[0];
-            }
-        });
-        for (String r : rk) {
-            System.out.println("[ALLOC-REASON]  " + reasons.get(r)[0] + "  " + r);
-        }
-        List<String> unk = new ArrayList<String>();
-        for (String k : keys) {
-            if (byType.get(k)[2] > 0) { unk.add(k); }
-        }
-        Collections.sort(unk, new Comparator<String>() {
-            public int compare(String a, String b) {
-                return byType.get(b)[2] - byType.get(a)[2];
-            }
-        });
-        int un = 0;
-        for (String k : unk) {
-            if (un++ >= 25) { break; }
-            int[] t = byType.get(k);
-            System.out.println("[ALLOC-UNKNOWN]  " + k + " sites=" + t[0] + " undecidable=" + t[2]);
-        }
     }
 
     static void iteratorStackCensus() {

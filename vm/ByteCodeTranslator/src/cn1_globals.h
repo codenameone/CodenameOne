@@ -1829,12 +1829,6 @@ extern void cn1GcRememberBlock(JAVA_LONG block);
             && CN1_OBJ_MARK_IS_FRESH((v), __ATOMIC_RELAXED) \
             && CN1_OBJ_MARK_IS_EPOCH(cn1__gt, __ATOMIC_RELAXED)) \
              cn1GcRememberSlow(cn1__gt); } while(0)
-#ifdef CN1_GC_GEN_CHECK2
-extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
-#define CN1_GEN_NOTE(t, v) cn1GcGenNoteStore((JAVA_OBJECT)(t), (v))
-#else
-#define CN1_GEN_NOTE(t, v) ((void)0)
-#endif
 #if defined(CN1_DISABLE_SATB)
 // No SATB half, but the GENERATIONAL half must stay: single-core minors skip the old
 // generation on the strength of the remembered set, and a barrier that stopped
@@ -1843,7 +1837,6 @@ extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
     do { if(__builtin_expect(cn1GcGenBarrier, 0)) { \
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
              if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
-                 CN1_GEN_NOTE(target, cn1__nv); \
                  CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #else
 #define CN1_WRITE_BARRIER(target, value) \
@@ -1851,7 +1844,6 @@ extern void cn1GcGenNoteStore(JAVA_OBJECT target, JAVA_OBJECT value);
              JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
              if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) { \
                  if(gcSatbActive && !CN1_SATB_FRESH_INLINE(cn1__nv)) cn1SatbEnqueue(cn1__nv); \
-                 CN1_GEN_NOTE(target, cn1__nv); \
                  if(cn1GcGenBarrier) CN1_GEN_REMEMBER(target, cn1__nv); } } } while(0)
 #endif
 
@@ -4183,12 +4175,7 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
  * guard's whole-program ceiling can be computed from a real call count instead of
  * guessed at. Not atomic and not meant to be: the count only needs an order of
  * magnitude, and an atomic here would cost more than the thing being measured. */
-#ifdef CN1_COUNT_SOE_ENTRIES
-extern long long cn1SoeEntryCount;
-#define CN1_SOE_TICK() (cn1SoeEntryCount++)
-#else
 #define CN1_SOE_TICK() ((void)0)
-#endif
 
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \

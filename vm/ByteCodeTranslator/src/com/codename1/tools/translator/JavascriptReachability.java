@@ -150,7 +150,6 @@ final class JavascriptReachability {
         rta.index(classes);
         rta.seedRoots(classes, nativeSources);
         rta.propagate();
-        rta.explainWhy();
         return rta.allocated;
     }
 
@@ -698,9 +697,6 @@ final class JavascriptReachability {
         if (method == null || method.isEliminated() || !live.add(method)) {
             return;
         }
-        if (whyTarget != null) {
-            enqueuedBy.put(method, visiting);
-        }
         worklist.add(method);
     }
 
@@ -724,40 +720,12 @@ final class JavascriptReachability {
     private void markAllocated(String clsName) {
         markClassInstantiated(clsName);
         if (analysisOnly && clsName != null && allocated.add(clsName)) {
-            if (whyTarget != null && !allocatedBy.containsKey(clsName)) {
-                allocatedBy.put(clsName, visiting);
-            }
             Set<String> ancestorChain = new HashSet<String>();
             collectTransitiveAncestors(clsName, ancestorChain);
             for (String ancestor : ancestorChain) {
                 resolvePendingFor(ancestor, clsName);
             }
         }
-    }
-
-    // -Dcn1.dispatchRta.why=<mangled class>: print how the analysis came to allocate it.
-    private final String whyTarget = Util.getProperty("cn1.dispatchRta.why", null);
-    private BytecodeMethod visiting;
-    private final Map<BytecodeMethod, BytecodeMethod> enqueuedBy =
-            new IdentityHashMap<BytecodeMethod, BytecodeMethod>();
-    private final Map<String, BytecodeMethod> allocatedBy = new HashMap<String, BytecodeMethod>();
-
-    private void explainWhy() {
-        if (whyTarget == null) {
-            return;
-        }
-        if (!allocated.contains(whyTarget)) {
-            System.out.println("dispatchRta.why: " + whyTarget + " is not allocated");
-            return;
-        }
-        System.out.println("dispatchRta.why: " + whyTarget + " allocated by:");
-        BytecodeMethod m = allocatedBy.get(whyTarget);
-        Set<BytecodeMethod> seen = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
-        while (m != null && seen.add(m)) {
-            System.out.println("  " + m.getClsName() + "." + m.getMethodName() + m.getSignature());
-            m = enqueuedBy.get(m);
-        }
-        System.out.println("  (root)");
     }
 
     private void markClassInstantiated(String clsName) {
@@ -873,7 +841,6 @@ final class JavascriptReachability {
     }
 
     private void visitMethod(BytecodeMethod method) {
-        visiting = method;
         String clsName = method.getClsName();
         markClassInstantiated(clsName);
         List<Instruction> instructions = method.getInstructions();
