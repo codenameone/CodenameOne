@@ -188,8 +188,10 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 
 Everything the method does through the server's `DataSource` joins the
 transaction without being handed anything, and so does every method it calls on
-the same thread. On a class, `@Transactional` applies to each of its public
-methods.
+the same thread. On a class, `@Transactional` applies to each public method the
+class declares. As in Spring, a method it inherits from a superclass isn't
+covered until the class overrides it, and the build warns about each one. The
+same holds for `@Async` on a class.
 
 ==== How a method joins a transaction
 

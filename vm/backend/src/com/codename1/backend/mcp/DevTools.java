@@ -316,11 +316,13 @@ public final class DevTools implements McpServer.Extension {
             throw new IllegalArgumentException("Send one statement at a time, or pass "
                     + "write=true");
         }
-        if(body.regionMatches(true, 0, "PRAGMA", 0, 6) && body.indexOf('=') >= 0) {
+        if(body.regionMatches(true, 0, "PRAGMA", 0, 6) && !readOnlyPragma(body)) {
             // Setting a pragma changes the pooled connection for whoever borrows
-            // it next -- or the file -- whatever the transaction says.
-            throw new IllegalArgumentException("That pragma sets a value; pass write=true "
-                    + "to run it");
+            // it next -- or the file -- whatever the transaction says, and SQLite
+            // takes the value as `name = v` or as `name(v)`. So only pragmas known
+            // to read run unconfirmed.
+            throw new IllegalArgumentException("That pragma may change a setting; pass "
+                    + "write=true to run it");
         }
         Database db = pool.borrow();
         boolean sqlite = "sqlite".equals(db.dialect().getName());
@@ -330,11 +332,21 @@ public final class DevTools implements McpServer.Extension {
                 db.execute("PRAGMA query_only = ON", null);
             }
             db.beginTransaction(true);
+            List rows;
             try {
-                return db.query(body, params);
+                rows = db.query(body, params);
             } finally {
-                db.rollbackTransaction();
+                try {
+                    db.rollbackTransaction();
+                } catch (IOException err) {
+                    // A connection whose rollback failed still believes it is in
+                    // a transaction, and the next borrower would wait on an owner
+                    // that has left; it is closed, not pooled.
+                    healthy = false;
+                    throw err;
+                }
             }
+            return rows;
         } finally {
             if(sqlite) {
                 try {
@@ -349,6 +361,44 @@ public final class DevTools implements McpServer.Extension {
             }
             pool.release(db);
         }
+    }
+
+    /**
+     * The pragmas that only read -- listing tables, columns, indexes and settings
+     * -- in either spelling: bare, or with a table name in parentheses. Anything
+     * else, and any `=`, needs write=true.
+     */
+    private static final String[] READ_PRAGMAS = {"table_info", "table_xinfo",
+            "table_list", "index_list", "index_info", "index_xinfo", "foreign_key_list",
+            "foreign_key_check", "integrity_check", "quick_check", "database_list",
+            "collation_list", "function_list", "module_list", "pragma_list",
+            "compile_options", "page_count", "page_size", "freelist_count", "encoding",
+            "user_version", "schema_version", "application_id", "foreign_keys",
+            "journal_mode", "busy_timeout", "cache_size", "synchronous", "query_only"};
+
+    /** The pragmas that may take a table or index name in parentheses. */
+    private static final String[] NAMED_PRAGMAS = {"table_info", "table_xinfo",
+            "table_list", "index_list", "index_info", "index_xinfo", "foreign_key_list",
+            "foreign_key_check", "integrity_check", "quick_check"};
+
+    static boolean readOnlyPragma(String statement) {
+        if(statement.indexOf('=') >= 0) {
+            return false;
+        }
+        String rest = statement.substring(6).trim();
+        int paren = rest.indexOf('(');
+        String name = (paren < 0 ? rest : rest.substring(0, paren)).trim();
+        int dot = name.indexOf('.');
+        if(dot >= 0) {
+            name = name.substring(dot + 1);              // schema.name
+        }
+        String[] allowed = paren < 0 ? READ_PRAGMAS : NAMED_PRAGMAS;
+        for(int iter = 0 ; iter < allowed.length ; iter++) {
+            if(allowed[iter].equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Object sql(Map a) throws Exception {

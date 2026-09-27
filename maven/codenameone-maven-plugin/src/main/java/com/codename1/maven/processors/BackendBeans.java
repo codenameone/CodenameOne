@@ -1687,6 +1687,37 @@ final class BackendBeans {
 
     // ---------------------------------------------------------------- aspects
 
+    /// A class-level @Transactional or @Async covers the public methods the class
+    /// DECLARES, as in Spring, whose reference says an inherited method has to be
+    /// redeclared to take part: the weaver rewrites bodies in place, and an
+    /// inherited body lives in another class. Silence would let such a method
+    /// run outside the transaction or on the caller's thread unnoticed, so the
+    /// build names each one.
+    private void warnInheritedOutsideClassAspect(AnnotatedClass cls, String what) {
+        Set<String> declared = new HashSet<String>();
+        for (MethodInfo m : cls.getMethods()) {
+            declared.add(m.getName() + m.getDescriptor());
+        }
+        String sup = cls.getSuperInternalName();
+        AnnotatedClass c = sup == null || "java/lang/Object".equals(sup) ? null
+                : RestControllerAnnotationProcessor.resolveClass(ctx, sup);
+        for (int depth = 0; c != null && depth < 64; depth++) {
+            for (MethodInfo m : c.getMethods()) {
+                String key = m.getName() + m.getDescriptor();
+                if (m.isPublic() && !m.isStatic() && !m.isConstructor() && !m.isSynthetic()
+                        && declared.add(key)) {
+                    ctx.getLog().warn("cn1: " + cls.getSourceName() + " is " + what
+                            + ", which covers the methods it declares; " + m.getName()
+                            + " is inherited from " + c.getSourceName() + " and runs without "
+                            + "it. Override it in " + cls.getSourceName() + " to include it.");
+                }
+            }
+            sup = c.getSuperInternalName();
+            c = sup == null || "java/lang/Object".equals(sup) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, sup);
+        }
+    }
+
     /// Every project class with a transactional, async, timed or counted method:
     /// beans or not, since the rewrite applies to `new` as much as to injection.
     private void collectAspects() {
@@ -1696,6 +1727,10 @@ final class BackendBeans {
             }
             AnnotationValues classTx = cls.getClassAnnotation(TRANSACTIONAL);
             AnnotationValues classAsync = cls.getClassAnnotation(ASYNC);
+            if (classTx != null || classAsync != null) {
+                warnInheritedOutsideClassAspect(cls, classTx != null ? "@Transactional"
+                        : "@Async");
+            }
             Aspects found = null;
             for (MethodInfo m : cls.getMethods()) {
                 if (m.isConstructor() || m.isSynthetic() || "<clinit>".equals(m.getName())

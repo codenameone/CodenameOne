@@ -108,6 +108,20 @@ public abstract class AsyncTask implements Runnable, Future {
         }
     }
 
+    /**
+     * Ends a call whose virtual thread the server freed at shutdown before it
+     * finished: nothing will ever complete it otherwise, and a caller blocked
+     * in get() would wait for ever.
+     */
+    synchronized void abandon(String reason) {
+        if(done) {
+            return;
+        }
+        failure = new IllegalStateException(name + ": " + reason);
+        done = true;
+        notifyAll();
+    }
+
     /** Cancels the call if it has not started. A running call is never interrupted. */
     public synchronized boolean cancel(boolean mayInterruptIfRunning) {
         if(started || done) {

@@ -267,6 +267,29 @@ public final class TaskExecutor {
         Tasks.platform(task);
     }
 
+    /**
+     * A task whose virtual thread was freed at shutdown before it finished. Its
+     * own finally never runs, so what it would have done happens here: the
+     * executor stops counting it active -- or shutdown() waits for it until the
+     * deadline -- and its Future, if it has one, fails instead of never ending.
+     */
+    static void abandoned(Runnable task) {
+        Runnable inner = task;
+        if(task instanceof Counted) {
+            Counted c = (Counted)task;
+            inner = c.task;
+            synchronized(c.owner) {
+                c.owner.active--;
+                c.owner.completed++;
+                c.owner.failed++;
+                c.owner.notifyAll();
+            }
+        }
+        if(inner instanceof AsyncTask) {
+            ((AsyncTask)inner).abandon("abandoned when the server stopped before it finished");
+        }
+    }
+
     private synchronized void requeue(Runnable task) {
         active--;
         if(timedOut) {

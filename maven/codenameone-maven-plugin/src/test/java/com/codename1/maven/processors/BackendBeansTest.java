@@ -812,6 +812,45 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aRequestBeanDestroyedAfterTheHandlerCanStillUseTheSession() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit {\n"
+                + "    @Autowired private HttpServer.Request request;\n"
+                + "    public void touch() { }\n"
+                + "    @PreDestroy public void done() {\n"
+                + "        request.getSession(true).setAttribute(\"seen\", \"yes\");\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Visit visit;\n"
+                + "    @GetMapping(\"/x\") public String x(HttpServer.Request r) {\n"
+                + "        visit.touch();\n"
+                + "        HttpSession session = r.getSession(false);\n"
+                + "        return session == null ? \"none\" : String.valueOf(session.getAttribute(\"seen\"));\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            HttpURLConnection first = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/x").openConnection();
+            assertEquals("none", read(first));
+            String cookie = first.getHeaderField("Set-Cookie");
+            assertNotNull("the session a @PreDestroy started was never sent to the client",
+                    cookie);
+            HttpURLConnection second = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/x").openConnection();
+            second.setRequestProperty("Cookie", cookie.substring(0, cookie.indexOf(';')));
+            assertEquals("yes", read(second));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

@@ -2724,7 +2724,15 @@ public final class HttpServer {
         }
         for(int iter = 0 ; iter < tokens.length ; iter++) {
             long token = tokens[iter].longValue();
+            Runnable queued;
+            synchronized(VIRTUAL_TASKS) {
+                queued = (Runnable)VIRTUAL_TASKS.get(new Long(token));
+            }
             long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
+            if(handle != 0 && queued != null) {
+                // Kept so a task abandoned at shutdown can still be told.
+                me.tasks.put(new Long(handle), queued);
+            }
             if(handle == 0) {
                 Runnable task = takeVirtualTask(token);
                 if(task != null) {
@@ -2745,6 +2753,7 @@ public final class HttpServer {
     private void advanceTask(VtHost me, long handle) {
         int state = VirtualThread.resume(handle);
         if(state == VirtualThread.FINISHED) {
+            me.tasks.remove(new Long(handle));
             VirtualThread.free(handle);
             return;
         }
@@ -2828,6 +2837,12 @@ public final class HttpServer {
 
         /** Set, under the inbox lock, once a stopping host has finished its tasks. */
         boolean tasksDrained;
+
+        /**
+         * The task each background virtual thread on this host runs, by handle.
+         * Touched only by the host thread.
+         */
+        final java.util.HashMap tasks = new java.util.HashMap();
 
         boolean hasQueuedTasks() {
             synchronized(inbox) {
@@ -3155,7 +3170,11 @@ public final class HttpServer {
             while(left-- > 0 && !me.ringEmpty()) {
                 long handle = me.ringTake();
                 if(VirtualThread.descriptorOf(handle) < 0) {
+                    Runnable task = (Runnable)me.tasks.remove(new Long(handle));
                     VirtualThread.free(handle);
+                    if(task != null) {
+                        TaskExecutor.abandoned(task);
+                    }
                     abandoned++;
                 } else {
                     me.ringAdd(handle);

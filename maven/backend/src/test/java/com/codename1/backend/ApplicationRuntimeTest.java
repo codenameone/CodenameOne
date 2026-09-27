@@ -138,6 +138,37 @@ class ApplicationRuntimeTest {
     // -------------------------------------------------------------- scheduler
 
     @Test
+    @DisplayName("a manual trigger after the scheduler stopped starts nothing")
+    void noTriggerAfterStop() throws Exception {
+        Scheduler scheduler = new Scheduler(null);
+        final AtomicInteger runs = new AtomicInteger();
+        scheduler.fixedDelay("job", 1000000, 1000000, null, Tasks.PLATFORM, null, -1,
+                new Runnable() {
+                    public void run() {
+                        runs.incrementAndGet();
+                    }
+                });
+        scheduler.start();
+        scheduler.stop(1000);
+        assertFalse(scheduler.trigger("job"), "a stopped scheduler started a run");
+        Thread.sleep(100);
+        assertEquals(0, runs.get());
+    }
+
+    @Test
+    @DisplayName("an abandoned @Async call fails its Future instead of never finishing")
+    void abandonedAsyncFails() throws Exception {
+        AsyncTask task = new AsyncTask("test.abandoned", false) {
+            protected Object call() {
+                return "never";
+            }
+        };
+        task.abandon("stopped");
+        assertTrue(task.isDone());
+        assertThrows(java.util.concurrent.ExecutionException.class, () -> task.get());
+    }
+
+    @Test
     @DisplayName("fixed-delay jobs run, never overlap, and stop with the scheduler")
     void schedulerRunsAndStops() throws Exception {
         final AtomicInteger runs = new AtomicInteger();

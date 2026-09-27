@@ -443,15 +443,25 @@ public final class Scheduler {
         for(int iter = 0 ; iter < jobs.size() ; iter++) {
             final Job job = (Job)jobs.get(iter);
             if(job.name.equals(name)) {
-                if(job.running || job.executor == null) {
+                // Refused once stopped: stop() promises no run starts after it,
+                // and a management or MCP request still in flight during the
+                // drain must not start one.
+                if(stopped || job.running || job.executor == null) {
                     return false;
                 }
                 job.running = true;
-                job.executor.execute(new Runnable() {
-                    public void run() {
-                        runJob(job);
-                    }
-                });
+                try {
+                    job.executor.execute(new Runnable() {
+                        public void run() {
+                            runJob(job);
+                        }
+                    });
+                } catch (RuntimeException err) {
+                    // The executor is shutting down. Left set, running would
+                    // report the job busy forever and refuse every later trigger.
+                    job.running = false;
+                    return false;
+                }
                 return true;
             }
         }

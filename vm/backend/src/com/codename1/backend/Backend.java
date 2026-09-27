@@ -1000,6 +1000,16 @@ public final class Backend {
             try {
                 server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
                         new HttpServer.Handler() {
+                            /** Destroys the request's scoped beans, once. */
+                            private void endRequestBeans(HttpServer.Request request) {
+                                if(app != null) {
+                                    Object[] beans = request.takeScopedBeans();
+                                    if(beans != null) {
+                                        app.requestEnded(beans);
+                                    }
+                                }
+                            }
+
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
                                 long started = com.codename1.backend.metrics.Metrics
@@ -1030,6 +1040,11 @@ public final class Backend {
                                                 break;
                                             }
                                         }
+                                        // Request beans end BEFORE the session is
+                                        // stored: a @PreDestroy that changes the
+                                        // session, or starts one, would otherwise
+                                        // change it after its only save.
+                                        endRequestBeans(request);
                                         // Inside the logged region: a session
                                         // store that fails to save is a 500 the
                                         // client receives, and the request log
@@ -1041,6 +1056,7 @@ public final class Backend {
                                             response = sessions.finish(session, response);
                                         }
                                     } catch (Exception err) {
+                                        endRequestBeans(request);
                                         HttpSession session = request.resolvedSession();
                                         if(session != null && !sessionFinished) {
                                             // The handler threw, but what it did to
@@ -1078,12 +1094,9 @@ public final class Backend {
                                     // request-scoped bean goes through that bean's
                                     // stand-in, which looks the request up.
                                     try {
-                                        if(app != null) {
-                                            Object[] beans = request.takeScopedBeans();
-                                            if(beans != null) {
-                                                app.requestEnded(beans);
-                                            }
-                                        }
+                                        // Normally done already, and then a
+                                        // no-op: the beans are taken once.
+                                        endRequestBeans(request);
                                     } finally {
                                         if(track) {
                                             CURRENT_REQUEST.set(previous);

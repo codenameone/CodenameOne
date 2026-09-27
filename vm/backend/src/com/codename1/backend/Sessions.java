@@ -204,6 +204,15 @@ public final class Sessions {
             if(found != null && found.isValid() && !found.isExpired(now)) {
                 found.touch(now);
                 found.owner = this;
+                synchronized(this) {
+                    // The beans are in use from now, not from when this request
+                    // ends: a purge by another request during a long one must
+                    // not destroy what this one is still using.
+                    Held held = (Held)beans.get(cookieValue);
+                    if(held != null) {
+                        held.lastAccessed = now;
+                    }
+                }
                 return found;
             }
             if(found != null) {
