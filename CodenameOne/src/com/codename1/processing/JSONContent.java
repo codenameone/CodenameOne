@@ -33,8 +33,6 @@ import java.util.Map;
 /// Internal class, do not use.
 ///
 /// A DOM accessor implementation for working with JSON content.
-///
-/// @author Eric Coolman
 class JSONContent extends MapContent {
     /// Construct from a parsed JSON dom
     ///

@@ -25,8 +25,6 @@ package java.lang.annotation;
 
 /**
  * A mirror of java.lang.Annotation.
- * 
- * @author Toby Reyelts
  */
 public interface Annotation {
 

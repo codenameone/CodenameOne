@@ -52,10 +52,6 @@ import javax.swing.JFrame;
 
 
 
-/**
- *
- * @author shannah
- */
 public class CN1CSSCompiler implements DocumentHandler {
     
     

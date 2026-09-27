@@ -23,7 +23,7 @@
 package com.codename1.security;
 
 /// A matched pair of [PublicKey] / [PrivateKey]. Typically produced by
-/// [KeyGenerator#generateRsaKeyPair(int)].
+/// [KeyGenerator#rsa(int)].
 public final class KeyPair {
     private final PublicKey publicKey;
     private final PrivateKey privateKey;

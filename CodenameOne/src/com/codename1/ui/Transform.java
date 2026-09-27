@@ -31,8 +31,6 @@ import com.codename1.impl.CodenameOneImplementation;
 /// Use the `#isSupported` and `#isPerspectiveSupported` to check if transforms and
 /// perspective transforms are supported on this platform.  If they are not supported, this
 /// class will throw RuntimeExceptions if you try to use it.
-///
-/// @author shannah
 public class Transform {
 
     /// Constant for transform type. Transform is not a special matrix.

@@ -32,24 +32,22 @@ import java.util.Map;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
-/**
- * A MySQL client speaking the client/server protocol directly, for the same
- * reason as {@link Postgres}: a translated server binary has no JDBC.
- *
- * Everything goes through prepared statements (COM_STMT_PREPARE / EXECUTE) and
- * therefore through MySQL's BINARY result format. That is more code than sending
- * COM_QUERY text, and it is the only way to bind a parameter -- a text-protocol
- * client has to build SQL by concatenation, and this API refuses to offer that.
- *
- * Authentication covers what is actually deployed: caching_sha2_password (the
- * MySQL 8 default) and mysql_native_password (5.7 and MariaDB). The caching_sha2
- * FULL exchange -- which the server demands the first time a password is used,
- * before its cache is warm -- sends the password to the server, so this client
- * does it only on a TLS connection and says so rather than falling back to the
- * RSA-wrapped variant, which would be a second cryptographic path to get wrong.
- */
+/// A MySQL client speaking the client/server protocol directly, for the same
+/// reason as [Postgres]: a translated server binary has no JDBC.
+///
+/// Everything goes through prepared statements (COM_STMT_PREPARE / EXECUTE) and
+/// therefore through MySQL's BINARY result format. That is more code than sending
+/// COM_QUERY text, and it is the only way to bind a parameter -- a text-protocol
+/// client has to build SQL by concatenation, and this API refuses to offer that.
+///
+/// Authentication covers what is actually deployed: caching_sha2_password (the
+/// MySQL 8 default) and mysql_native_password (5.7 and MariaDB). The caching_sha2
+/// FULL exchange -- which the server demands the first time a password is used,
+/// before its cache is warm -- sends the password to the server, so this client
+/// does it only on a TLS connection and says so rather than falling back to the
+/// RSA-wrapped variant, which would be a second cryptographic path to get wrong.
 public final class MySql {
-    /** Capability bits, from the protocol's CLIENT_* set. */
+    /// Capability bits, from the protocol's CLIENT_* set.
     private static final int CLIENT_LONG_PASSWORD = 0x00000001;
     private static final int CLIENT_LONG_FLAG = 0x00000004;
     private static final int CLIENT_FOUND_ROWS = 0x00000002;
@@ -69,34 +67,28 @@ public final class MySql {
     private final Wire wire;
     private int sequence;
     private long lastInsertId;
-    /**
-     * VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
-     * session -- a pool, a health check -- and that caller does not hold the
-     * monitor close() publishes under. See Database.sqliteClosed.
-     */
-    private volatile boolean closed;
+    /// VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
+    /// session -- a pool, a health check -- and that caller does not hold the
+    /// monitor close() publishes under. See Database.sqliteClosed.
+    private volatile boolean closed; //NOPMD AvoidUsingVolatile - read by a pool's thread, see above
 
-    /**
-     * Whether the server that answered is MariaDB rather than MySQL.
-     *
-     * <p>Read from the handshake banner, because the two do not offer the same
-     * collations and the URL scheme cannot be trusted to say which is there --
-     * a mysql:// URL points at a MariaDB server perfectly often. See
-     * Dialect.MARIADB.
-     */
+    /// Whether the server that answered is MariaDB rather than MySQL.
+    ///
+    /// Read from the handshake banner, because the two do not offer the same
+    /// collations and the URL scheme cannot be trusted to say which is there --
+    /// a mysql:// URL points at a MariaDB server perfectly often. See
+    /// Dialect.MARIADB.
     private boolean mariaDb;
 
-    /**
-     * Whether {@code haystack} holds {@code needle}, folding ASCII case by hand.
-     *
-     * <p>String.toLowerCase is locale sensitive and this runtime has no Locale
-     * to ask for the root one, so on a Turkish device the I of "MariaDB" folds
-     * to a dotless i and the marker stops matching.
-     */
+    /// Whether `haystack` holds `needle`, folding ASCII case by hand.
+    ///
+    /// String.toLowerCase is locale sensitive and this runtime has no Locale
+    /// to ask for the root one, so on a Turkish device the I of "MariaDB" folds
+    /// to a dotless i and the marker stops matching.
     private static boolean containsIgnoreCaseAscii(String haystack, String needle) {
         int limit = haystack.length() - needle.length();
-        for(int at = 0 ; at <= limit ; at++) {
-            if(haystack.regionMatches(true, at, needle, 0, needle.length())) {
+        for (int at = 0 ; at <= limit ; at++) {
+            if (haystack.regionMatches(true, at, needle, 0, needle.length())) {
                 return true;
             }
         }
@@ -107,16 +99,14 @@ public final class MySql {
         this.wire = wire;
     }
 
-    /** See {@link #mariaDb}. */
+    /// See [#mariaDb].
     public boolean isMariaDb() {
         return mariaDb;
     }
 
-    /**
-     * Connects, optionally upgrades to TLS, and authenticates.
-     *
-     * `sslMode` is "require", "prefer" or "disable", as in {@link Postgres}.
-     */
+    /// Connects, optionally upgrades to TLS, and authenticates.
+    ///
+    /// `sslMode` is "require", "prefer" or "disable", as in [Postgres].
     public static MySql connect(String host, int port, String database, String user,
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
@@ -127,7 +117,7 @@ public final class MySql {
         // governs the conversation, which is where a peer can stall a worker.
         // A TLS upgrade replaces the Java SE socket, and Tcp.rebind carries the
         // deadline across, so this is set once and stays set.
-        if(socketTimeoutMillis > 0) {
+        if (socketTimeoutMillis > 0) {
             connection.setReadTimeout(socketTimeoutMillis);
         }
         try {
@@ -145,10 +135,10 @@ public final class MySql {
         Packet greeting = readPacket();
         Reader reader = new Reader(greeting.body);
         int protocol = reader.u8();
-        if(protocol == ERROR_PACKET) {
+        if (protocol == ERROR_PACKET) {
             throw errorFrom(greeting, null);
         }
-        if(protocol != 10) {
+        if (protocol != 10) {
             throw new IOException("Unsupported MySQL handshake protocol " + protocol);
         }
         // KEPT, not discarded: MariaDB and MySQL differ in which collations they
@@ -157,14 +147,15 @@ public final class MySql {
         // for what it is. MariaDB 10.x sends "5.5.5-10.11.19-MariaDB" for the
         // benefit of old clients, so the marker is looked for anywhere in it.
         String banner = reader.cString();
-        mariaDb = banner != null && containsIgnoreCaseAscii(banner, "mariadb");
+        // cString() never answers null: an unterminated string throws instead.
+        mariaDb = containsIgnoreCaseAscii(banner, "mariadb");
         reader.skip(4);   // connection id
         byte[] scrambleFirst = reader.bytes(8);
         reader.skip(1);   // filler
         int serverCapabilities = reader.u16();
         byte[] scramble = scrambleFirst;
         String plugin = "mysql_native_password";
-        if(reader.remaining() > 0) {
+        if (reader.remaining() > 0) {
             reader.skip(1); // character set
             reader.skip(2); // status flags
             serverCapabilities |= reader.u16() << 16;
@@ -174,7 +165,7 @@ public final class MySql {
             // trailing NUL, and servers disagree about the NUL -- so take what is
             // there rather than what is claimed.
             int secondLength = scrambleLength > 8 ? scrambleLength - 8 : 12;
-            if(secondLength > reader.remaining()) {
+            if (secondLength > reader.remaining()) {
                 secondLength = reader.remaining();
             }
             byte[] scrambleSecond = reader.bytes(secondLength);
@@ -186,14 +177,14 @@ public final class MySql {
             // terminator and took it for an EMPTY plugin name, which nothing
             // implements, so the connection was refused as unsupported instead of
             // using the mysql_native_password this variable already holds.
-            if((serverCapabilities & CLIENT_PLUGIN_AUTH) != 0 && reader.remaining() > 0) {
+            if ((serverCapabilities & CLIENT_PLUGIN_AUTH) != 0 && reader.remaining() > 0) {
                 plugin = reader.cString();
             }
         }
 
         boolean useTls = !"disable".equals(sslMode);
-        if(useTls && (serverCapabilities & CLIENT_SSL) == 0) {
-            if("require".equals(sslMode)) {
+        if (useTls && (serverCapabilities & CLIENT_SSL) == 0) {
+            if ("require".equals(sslMode)) {
                 throw new IOException("The MySQL server at " + host
                         + " does not offer TLS and sslmode=require");
             }
@@ -217,10 +208,10 @@ public final class MySql {
         int capabilities = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_FOUND_ROWS
                 | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
                 | CLIENT_PLUGIN_AUTH | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA;
-        if(database != null && database.length() > 0) {
+        if (database != null && database.length() > 0) {
             capabilities |= CLIENT_CONNECT_WITH_DB;
         }
-        if(useTls) {
+        if (useTls) {
             capabilities |= CLIENT_SSL;
             // The SSLRequest packet is the first 32 bytes of the login packet and
             // nothing else: the credentials must not cross in the clear, which is
@@ -229,7 +220,7 @@ public final class MySql {
             writeIntLE(request, capabilities);
             writeIntLE(request, 0x01000000); // max packet size
             request.write(45);               // utf8mb4_general_ci
-            for(int iter = 0 ; iter < 23 ; iter++) {
+            for (int iter = 0 ; iter < 23 ; iter++) {
                 request.write(0);
             }
             sendPacket(request.toByteArray());
@@ -243,7 +234,7 @@ public final class MySql {
                 throw new IOException("TLS to " + host + " could not be verified ("
                         + err.getMessage() + "). Point sslrootcert at the server's "
                         + "CA, or set sslmode=disable to connect in the clear "
-                        + "deliberately.");
+                        + "deliberately.", err);
             }
         }
         // LOCAL INFILE lets a server ask the client for a file by path. Nothing
@@ -256,7 +247,7 @@ public final class MySql {
         writeIntLE(login, capabilities);
         writeIntLE(login, 0x01000000);
         login.write(45);
-        for(int iter = 0 ; iter < 23 ; iter++) {
+        for (int iter = 0 ; iter < 23 ; iter++) {
             login.write(0);
         }
         // Every one of these refuses a NUL, inside writeCString itself rather
@@ -267,49 +258,51 @@ public final class MySql {
         // whatever is added later beats three that cover what someone remembered.
         writeCString(login, user);
         writeLengthEncoded(login, authResponse);
-        if((capabilities & CLIENT_CONNECT_WITH_DB) != 0) {
+        if ((capabilities & CLIENT_CONNECT_WITH_DB) != 0) {
             writeCString(login, database);
         }
         writeCString(login, plugin);
         sendPacket(login.toByteArray());
 
-        finishAuthentication(password, scramble, useTls);
+        finishAuthentication(password, useTls);
     }
 
-    /**
-     * Drives the post-login exchange: an OK ends it, an AuthSwitchRequest changes
-     * plugin, and caching_sha2_password may ask for the full exchange.
-     */
-    private void finishAuthentication(String password, byte[] scramble, boolean secure)
+    /// Drives the post-login exchange: an OK ends it, an AuthSwitchRequest changes
+    /// plugin, and caching_sha2_password may ask for the full exchange.
+    ///
+    /// No scramble is carried past the login packet. The only later step that
+    /// would need one is the RSA-encrypted full exchange (the password XORed with
+    /// the scramble), and that is refused below in favour of requiring TLS; an
+    /// AuthSwitchRequest brings a fresh scramble of its own.
+    private void finishAuthentication(String password, boolean secure)
             throws IOException {
-        while(true) {
+        while (true) {
             Packet packet = readPacket();
             int head = packet.body[0] & 0xff;
-            if(head == OK_PACKET) {
+            if (head == OK_PACKET) {
                 return;
             }
-            if(head == ERROR_PACKET) {
+            if (head == ERROR_PACKET) {
                 throw errorFrom(packet, null);
             }
-            if(head == EOF_PACKET) {
+            if (head == EOF_PACKET) {
                 // AuthSwitchRequest: plugin name, then a fresh scramble.
                 Reader reader = new Reader(packet.body);
                 reader.skip(1);
                 String plugin = reader.cString();
                 byte[] fresh = trimTrailingNul(reader.rest());
                 sendPacket(authResponse(plugin, password, fresh));
-                scramble = fresh;
                 continue;
             }
-            if(head == 0x01) {
+            if (head == 0x01) {
                 // AuthMoreData. For caching_sha2_password 0x03 means the server's
                 // cache already had this password and 0x04 means it did not.
                 int status = packet.body.length > 1 ? packet.body[1] & 0xff : 0;
-                if(status == 3) {
+                if (status == 3) {
                     continue; // fast path accepted; an OK follows
                 }
-                if(status == 4) {
-                    if(!secure) {
+                if (status == 4) {
+                    if (!secure) {
                         throw new IOException("This MySQL server needs the full "
                                 + "caching_sha2_password exchange, which sends the "
                                 + "password; connect with sslmode=require (or run "
@@ -331,10 +324,10 @@ public final class MySql {
     private static byte[] authResponse(String plugin, String password, byte[] scramble)
             throws IOException {
         byte[] secret = Wire.utf8(password == null ? "" : password);
-        if(secret.length == 0) {
+        if (secret.length == 0) {
             return new byte[0];
         }
-        if("caching_sha2_password".equals(plugin)) {
+        if ("caching_sha2_password".equals(plugin)) {
             // XOR(SHA256(password), SHA256(SHA256(SHA256(password)) + scramble))
             byte[] first = Crypto.sha256(secret);
             byte[] second = Crypto.sha256(first);
@@ -347,7 +340,7 @@ public final class MySql {
         // while the message below already said this client does not speak it. The
         // plugin is removed in MySQL 8.0 and its hash is broken by design, so it
         // falls through to that message rather than being implemented.
-        if("mysql_native_password".equals(plugin)) {
+        if ("mysql_native_password".equals(plugin)) {
             // XOR(SHA1(password), SHA1(scramble + SHA1(SHA1(password))))
             byte[] first = Crypto.sha1(secret);
             byte[] second = Crypto.sha1(first);
@@ -361,7 +354,7 @@ public final class MySql {
     // ---------------- queries ----------------
 
     public int execute(String sql, Object[] params) throws IOException {
-        return (int)runPrepared(sql, params, null);
+        return (int) runPrepared(sql, params, null);
     }
 
     public List query(String sql, Object[] params) throws IOException {
@@ -370,17 +363,15 @@ public final class MySql {
         return rows;
     }
 
-    /**
-     * Runs a statement through COM_QUERY rather than the prepared-statement
-     * protocol, and takes no parameters.
-     *
-     * This exists for exactly one reason: MySQL refuses to prepare its
-     * transaction-control statements ("This command is not supported in the
-     * prepared statement protocol yet"), so BEGIN, COMMIT and ROLLBACK cannot go
-     * through {@link #execute}. It is private, and the three callers below pass
-     * constants -- a text-protocol entry point taking a caller's string is the
-     * concatenation hole this client exists to avoid.
-     */
+    /// Runs a statement through COM_QUERY rather than the prepared-statement
+    /// protocol, and takes no parameters.
+    ///
+    /// This exists for exactly one reason: MySQL refuses to prepare its
+    /// transaction-control statements ("This command is not supported in the
+    /// prepared statement protocol yet"), so BEGIN, COMMIT and ROLLBACK cannot go
+    /// through [#execute]. It is private, and the three callers below pass
+    /// constants -- a text-protocol entry point taking a caller's string is the
+    /// concatenation hole this client exists to avoid.
     private void command(String sql) throws IOException {
         checkOpen();
         sequence = 0;
@@ -392,33 +383,33 @@ public final class MySql {
 
         Packet packet = readPacket();
         int head = packet.body[0] & 0xff;
-        if(head == ERROR_PACKET) {
+        if (head == ERROR_PACKET) {
             throw errorFrom(packet, sql);
         }
-        if(head == OK_PACKET || head == EOF_PACKET) {
+        if (head == OK_PACKET || head == EOF_PACKET) {
             return;
         }
         // A result set. Nothing here wants the rows, but they have to be drained
         // or the next statement reads them as its own answer.
         Reader header = new Reader(packet.body);
         int columns = columnCount(header.lengthEncoded());
-        for(int iter = 0 ; iter < columns ; iter++) {
+        for (int iter = 0 ; iter < columns ; iter++) {
             readPacket();
         }
         readPacket(); // EOF closing the definitions
-        while(true) {
+        while (true) {
             Packet row = readPacket();
             int marker = row.body[0] & 0xff;
-            if(marker == ERROR_PACKET) {
+            if (marker == ERROR_PACKET) {
                 throw errorFrom(row, sql);
             }
-            if(marker == EOF_PACKET && row.body.length < 9) {
+            if (marker == EOF_PACKET && row.body.length < 9) {
                 return;
             }
         }
     }
 
-    /** Opens a transaction. See {@link #command} for why this is not `execute`. */
+    /// Opens a transaction. See [#command] for why this is not `execute`.
     public void begin() throws IOException {
         command("BEGIN");
     }
@@ -431,19 +422,17 @@ public final class MySql {
         command("ROLLBACK");
     }
 
-    /** Opens a transaction that refuses writes. */
+    /// Opens a transaction that refuses writes.
     public void beginReadOnly() throws IOException {
         command("START TRANSACTION READ ONLY");
     }
 
-    /**
-     * Savepoint control, through the text protocol for the same reason as
-     * {@link #begin}. The name is checked to be a plain identifier here as well
-     * as by the caller, because this is the one text-protocol entry point that
-     * takes a value at all.
-     */
+    /// Savepoint control, through the text protocol for the same reason as
+    /// [#begin]. The name is checked to be a plain identifier here as well
+    /// as by the caller, because this is the one text-protocol entry point that
+    /// takes a value at all.
     public void savepoint(String verb, String name) throws IOException {
-        if(!"SAVEPOINT".equals(verb) && !"ROLLBACK TO SAVEPOINT".equals(verb)
+        if (!"SAVEPOINT".equals(verb) && !"ROLLBACK TO SAVEPOINT".equals(verb)
                 && !"RELEASE SAVEPOINT".equals(verb)) {
             throw new IOException("Not a savepoint statement: " + verb);
         }
@@ -454,14 +443,12 @@ public final class MySql {
         return lastInsertId;
     }
 
-    /**
-     * Prepares, executes and closes one statement. Returns the affected-row count
-     * and, when `rows` is not null, appends the decoded result set to it.
-     *
-     * The statement is closed rather than cached: a cache keyed by SQL text is
-     * where a pooled connection starts leaking server-side handles, and preparing
-     * costs one round trip.
-     */
+    /// Prepares, executes and closes one statement. Returns the affected-row count
+    /// and, when `rows` is not null, appends the decoded result set to it.
+    ///
+    /// The statement is closed rather than cached: a cache keyed by SQL text is
+    /// where a pooled connection starts leaking server-side handles, and preparing
+    /// costs one round trip.
     private long runPrepared(String sql, Object[] params, List rows) throws IOException {
         checkOpen();
         sequence = 0;
@@ -472,7 +459,7 @@ public final class MySql {
         sendPacket(prepare.toByteArray());
 
         Packet response = readPacket();
-        if((response.body[0] & 0xff) == ERROR_PACKET) {
+        if ((response.body[0] & 0xff) == ERROR_PACKET) {
             throw errorFrom(response, sql);
         }
         Reader reader = new Reader(response.body);
@@ -483,15 +470,15 @@ public final class MySql {
         // Definitions for the parameters and then the columns, each list closed by
         // an EOF packet. They are read and discarded for parameters -- the values
         // are typed by this client, not by the server's guess.
-        if(parameterCount > 0) {
-            for(int iter = 0 ; iter < parameterCount ; iter++) {
+        if (parameterCount > 0) {
+            for (int iter = 0 ; iter < parameterCount ; iter++) {
                 readPacket();
             }
             readPacket(); // EOF
         }
         Column[] columns = new Column[columnCount];
-        if(columnCount > 0) {
-            for(int iter = 0 ; iter < columnCount ; iter++) {
+        if (columnCount > 0) {
+            for (int iter = 0 ; iter < columnCount ; iter++) {
                 Packet definition = readPacket();
                 try {
                     columns[iter] = parseColumn(definition.body);
@@ -515,7 +502,7 @@ public final class MySql {
             // committed, with nothing said. Inside the try so the COM_STMT_CLOSE
             // below still runs; a refused statement must not also leak one.
             int supplied = params == null ? 0 : params.length;
-            if(supplied != parameterCount) {
+            if (supplied != parameterCount) {
                 throw new IOException("the statement has " + parameterCount + " parameter"
                         + (parameterCount == 1 ? "" : "s") + " and " + supplied
                         + " were supplied [" + sql + "]");
@@ -543,21 +530,21 @@ public final class MySql {
         writeIntLE(execute, statementId);
         execute.write(0);    // no cursor
         writeIntLE(execute, 1); // iteration count, always 1
-        if(count > 0) {
+        if (count > 0) {
             byte[] nulls = new byte[(count + 7) / 8];
-            for(int iter = 0 ; iter < count ; iter++) {
-                if(params[iter] == null) {
-                    nulls[iter / 8] |= (byte)(1 << (iter % 8));
+            for (int iter = 0 ; iter < count ; iter++) {
+                if (params[iter] == null) {
+                    nulls[iter / 8] |= (byte) (1 << (iter % 8));
                 }
             }
             execute.write(nulls, 0, nulls.length);
             execute.write(1); // the types that follow are new
-            for(int iter = 0 ; iter < count ; iter++) {
+            for (int iter = 0 ; iter < count ; iter++) {
                 int type = typeOf(params[iter]);
                 execute.write(type);
                 execute.write(0); // unsigned flag
             }
-            for(int iter = 0 ; iter < count ; iter++) {
+            for (int iter = 0 ; iter < count ; iter++) {
                 writeBinaryValue(execute, params[iter]);
             }
         }
@@ -565,10 +552,10 @@ public final class MySql {
 
         Packet first = readPacket();
         int head = first.body[0] & 0xff;
-        if(head == ERROR_PACKET) {
+        if (head == ERROR_PACKET) {
             throw errorFrom(first, sql);
         }
-        if(head == OK_PACKET && columns.length == 0) {
+        if (head == OK_PACKET && columns.length == 0) {
             Reader reader = new Reader(first.body);
             reader.skip(1);
             long affected = reader.lengthEncoded();
@@ -579,7 +566,7 @@ public final class MySql {
             // after an insert wipe the id, and lastInsertId() is documented as
             // the MOST RECENT INSERT's. The SQLite and Java SE arms both keep
             // the last generated key, and the arms must not disagree.
-            if(generated != 0) {
+            if (generated != 0) {
                 lastInsertId = generated;
             }
             return affected;
@@ -588,7 +575,7 @@ public final class MySql {
         Reader header = new Reader(first.body);
         int resultColumns = columnCount(header.lengthEncoded());
         Column[] resultDefinitions = new Column[resultColumns];
-        for(int iter = 0 ; iter < resultColumns ; iter++) {
+        for (int iter = 0 ; iter < resultColumns ; iter++) {
             Packet definition = readPacket();
             try {
                 resultDefinitions[iter] = parseColumn(definition.body);
@@ -597,18 +584,18 @@ public final class MySql {
             }
         }
         readPacket(); // EOF ending the definitions
-        while(true) {
+        while (true) {
             Packet packet = readPacket();
             int marker = packet.body[0] & 0xff;
-            if(marker == ERROR_PACKET) {
+            if (marker == ERROR_PACKET) {
                 throw errorFrom(packet, sql);
             }
             // An EOF packet is under 9 bytes; a row whose first byte is 0xfe is
             // longer, which is how the two are told apart.
-            if(marker == EOF_PACKET && packet.body.length < 9) {
+            if (marker == EOF_PACKET && packet.body.length < 9) {
                 return 0;
             }
-            if(rows != null) {
+            if (rows != null) {
                 try {
                     rows.add(decodeBinaryRow(packet.body, resultDefinitions));
                 } catch (IOException malformed) {
@@ -618,16 +605,14 @@ public final class MySql {
         }
     }
 
-    /**
-     * A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
-     * non-null value in its column's binary form.
-     */
+    /// A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
+    /// non-null value in its column's binary form.
     private static Map decodeBinaryRow(byte[] body, Column[] columns) throws IOException {
         Reader reader = new Reader(body);
         reader.skip(1);
         byte[] nulls = reader.bytes((columns.length + 9) / 8);
         Map row = new LinkedHashMap();
-        for(int iter = 0 ; iter < columns.length ; iter++) {
+        for (int iter = 0 ; iter < columns.length ; iter++) {
             int bit = iter + 2;
             boolean isNull = (nulls[bit / 8] & (1 << (bit % 8))) != 0;
             row.put(columns[iter].name, isNull ? null : readBinaryValue(reader, columns[iter]));
@@ -635,18 +620,16 @@ public final class MySql {
         return row;
     }
 
-    /**
-     * Decoded to the same Java types the SQLite and PostgreSQL paths produce.
-     * Everything textual is a String unless its column is binary (character set
-     * 63), which is what separates a BLOB from a TEXT on this wire.
-     */
+    /// Decoded to the same Java types the SQLite and PostgreSQL paths produce.
+    /// Everything textual is a String unless its column is binary (character set
+    /// 63), which is what separates a BLOB from a TEXT on this wire.
     private static Object readBinaryValue(Reader reader, Column column) throws IOException {
-        switch(column.type) {
+        switch (column.type) {
             case 0x01: // TINY
-                return Long.valueOf(column.unsigned ? reader.u8() : (byte)reader.u8());
+                return Long.valueOf(column.unsigned ? reader.u8() : (byte) reader.u8());
             case 0x02: // SHORT
             case 0x0d: // YEAR
-                return Long.valueOf(column.unsigned ? reader.u16() : (short)reader.u16());
+                return Long.valueOf(column.unsigned ? reader.u16() : (short) reader.u16());
             case 0x03: // LONG
             case 0x09: // INT24
                 return Long.valueOf(column.unsigned ? (reader.i32() & 0xffffffffL) : reader.i32());
@@ -662,7 +645,7 @@ public final class MySql {
                 // Long, which is every signed BIGINT and every unsigned one below
                 // the boundary.
                 long value = reader.i64();
-                if(column.unsigned && value < 0) {
+                if (column.unsigned && value < 0) {
                     return unsignedText(value);
                 }
                 return Long.valueOf(value);
@@ -690,66 +673,64 @@ public final class MySql {
             }
             default: {
                 byte[] data = reader.lengthEncodedBytes();
-                if(data == null) {
+                if (data == null) {
                     return null;
                 }
-                return column.binary ? (Object)data : (Object)Wire.fromUtf8(data);
+                return column.binary ? (Object) data : (Object) Wire.fromUtf8(data);
             }
         }
     }
 
-    /**
-     * The exact decimal for a 64-bit value read as unsigned. Long.toString would
-     * print the negative wrap, and there is no unsigned formatter to call here,
-     * so it is divided out by hand: the top bit is worth 2^63, and the rest is
-     * an ordinary positive long.
-     */
+    /// The exact decimal for a 64-bit value read as unsigned. Long.toString would
+    /// print the negative wrap, and there is no unsigned formatter to call here,
+    /// so it is divided out by hand: the top bit is worth 2^63, and the rest is
+    /// an ordinary positive long.
     private static String unsignedText(long value) {
         long quotient = (value >>> 1) / 5;          // value / 10, unsigned
         long remainder = value - quotient * 10;
-        if(remainder > 9) {                          // the halving can be one low
+        if (remainder > 9) {                          // the halving can be one low
             quotient += remainder / 10;
             remainder %= 10;
         }
-        return Long.toString(quotient) + (char)('0' + remainder);
+        return Long.toString(quotient) + (char) ('0' + remainder);
     }
 
     private static int typeOf(Object value) {
-        if(value == null) {
+        if (value == null) {
             return 0x06; // NULL
         }
-        if(value instanceof Integer || value instanceof Long || value instanceof Short
+        if (value instanceof Integer || value instanceof Long || value instanceof Short
                 || value instanceof Byte || value instanceof Boolean) {
             return 0x08; // LONGLONG, so one encoder covers every integer width
         }
-        if(value instanceof Double || value instanceof Float) {
+        if (value instanceof Double || value instanceof Float) {
             return 0x05; // DOUBLE
         }
-        if(value instanceof byte[]) {
+        if (value instanceof byte[]) {
             return 0xfc; // BLOB
         }
         return 0xfd; // VAR_STRING
     }
 
     private static void writeBinaryValue(ByteArrayOutputStream out, Object value) {
-        if(value == null) {
+        if (value == null) {
             return; // carried by the null bitmap, with no bytes on the wire
         }
-        if(value instanceof Boolean) {
-            writeLongLE(out, ((Boolean)value).booleanValue() ? 1 : 0);
+        if (value instanceof Boolean) {
+            writeLongLE(out, ((Boolean) value).booleanValue() ? 1 : 0);
             return;
         }
-        if(value instanceof Integer || value instanceof Long || value instanceof Short
+        if (value instanceof Integer || value instanceof Long || value instanceof Short
                 || value instanceof Byte) {
-            writeLongLE(out, ((Number)value).longValue());
+            writeLongLE(out, ((Number) value).longValue());
             return;
         }
-        if(value instanceof Double || value instanceof Float) {
-            writeLongLE(out, Double.doubleToLongBits(((Number)value).doubleValue()));
+        if (value instanceof Double || value instanceof Float) {
+            writeLongLE(out, Double.doubleToLongBits(((Number) value).doubleValue()));
             return;
         }
-        if(value instanceof byte[]) {
-            writeLengthEncoded(out, (byte[])value);
+        if (value instanceof byte[]) {
+            writeLengthEncoded(out, (byte[]) value);
             return;
         }
         writeLengthEncoded(out, Wire.utf8(String.valueOf(value)));
@@ -787,7 +768,7 @@ public final class MySql {
     // ---------------- packets ----------------
 
     public void close() {
-        if(closed) {
+        if (closed) {
             return;
         }
         closed = true;
@@ -805,30 +786,28 @@ public final class MySql {
     }
 
     private void checkOpen() throws IOException {
-        if(closed) {
+        if (closed) {
             throw new IOException("The MySQL connection is closed");
         }
     }
 
-    /** The most one MySQL packet can carry: the length field is 24 bits. */
+    /// The most one MySQL packet can carry: the length field is 24 bits.
     private static final int MAX_PACKET_BODY = 0xffffff;
 
-    /** See columnCount: the width the protocol's own prepare response can state. */
+    /// See columnCount: the width the protocol's own prepare response can state.
     private static final int MAX_RESULT_COLUMNS = 65535;
 
-    /**
-     * Sends a body, split across packets when it does not fit in one.
-     *
-     * A body of 16MB or more -- an ordinary large byte[] parameter -- has to go out
-     * as consecutive full-length packets with running sequence numbers. Writing the
-     * low 24 bits of the length and then the whole body left the server reading the
-     * remainder as the next packet's header, which does not fail: the connection is
-     * simply desynchronised from that point on, and every answer after it is
-     * nonsense.
-     *
-     * A body whose length is an exact multiple of the maximum ends with an empty
-     * packet, which is how the protocol says the sequence is over.
-     */
+    /// Sends a body, split across packets when it does not fit in one.
+    ///
+    /// A body of 16MB or more -- an ordinary large byte\[\] parameter -- has to go out
+    /// as consecutive full-length packets with running sequence numbers. Writing the
+    /// low 24 bits of the length and then the whole body left the server reading the
+    /// remainder as the next packet's header, which does not fail: the connection is
+    /// simply desynchronised from that point on, and every answer after it is
+    /// nonsense.
+    ///
+    /// A body whose length is an exact multiple of the maximum ends with an empty
+    /// packet, which is how the protocol says the sequence is over.
     private void sendPacket(byte[] body) throws IOException {
         try {
             sendPacketFrames(body);
@@ -846,45 +825,43 @@ public final class MySql {
 
     private void sendPacketFrames(byte[] body) throws IOException {
         int offset = 0;
-        while(true) {
+        while (true) {
             int chunk = body.length - offset;
-            if(chunk > MAX_PACKET_BODY) {
+            if (chunk > MAX_PACKET_BODY) {
                 chunk = MAX_PACKET_BODY;
             }
             wire.writeByte(chunk & 0xff);
             wire.writeByte((chunk >> 8) & 0xff);
             wire.writeByte((chunk >> 16) & 0xff);
             wire.writeByte(sequence++ & 0xff);
-            if(chunk > 0) {
+            if (chunk > 0) {
                 wire.writeBytes(body, offset, chunk);
             }
             offset += chunk;
-            if(chunk < MAX_PACKET_BODY) {
+            if (chunk < MAX_PACKET_BODY) {
                 break;
             }
         }
         wire.flush();
     }
 
-    /**
-     * The four header bytes, EVERY ONE of them checked.
-     *
-     * <p>wire.read() answers -1 at end of stream, and only the first byte used to be
-     * tested. A peer that hung up after one or two bytes therefore had its -1 shifted
-     * into the length: "-1 &lt;&lt; 8" makes the result negative, which slips under the
-     * ceiling below -- a bound only rejects values that are too LARGE -- and arrives
-     * at readFully as a negative size. What came back was NegativeArraySizeException,
-     * which is not an IOException, so it went straight past connect()'s cleanup and
-     * left the socket open; retries against a flaky endpoint leaked one descriptor
-     * each. The greeting is read through here before TLS, so the peer doing it need
-     * not be the server.
-     *
-     * <p>Returns a length that is always 0..MAX_PACKET_BODY, which is what lets the
-     * ceiling below be the only check the body size needs.
-     */
+    /// The four header bytes, EVERY ONE of them checked.
+    ///
+    /// wire.read() answers -1 at end of stream, and only the first byte used to be
+    /// tested. A peer that hung up after one or two bytes therefore had its -1 shifted
+    /// into the length: "-1 << 8" makes the result negative, which slips under the
+    /// ceiling below -- a bound only rejects values that are too LARGE -- and arrives
+    /// at readFully as a negative size. What came back was NegativeArraySizeException,
+    /// which is not an IOException, so it went straight past connect()'s cleanup and
+    /// left the socket open; retries against a flaky endpoint leaked one descriptor
+    /// each. The greeting is read through here before TLS, so the peer doing it need
+    /// not be the server.
+    ///
+    /// Returns a length that is always 0..MAX_PACKET_BODY, which is what lets the
+    /// ceiling below be the only check the body size needs.
     private int readPacketHeader(boolean continuation) throws IOException {
         int b0 = wire.read();
-        if(b0 < 0) {
+        if (b0 < 0) {
             // Nothing at all: the peer hung up BETWEEN packets, which is a different
             // thing from tearing one in half and is worth saying differently.
             throw new IOException(continuation
@@ -894,7 +871,7 @@ public final class MySql {
         int b1 = wire.read();
         int b2 = wire.read();
         int b3 = wire.read();
-        if(b1 < 0 || b2 < 0 || b3 < 0) {
+        if (b1 < 0 || b2 < 0 || b3 < 0) {
             throw new IOException("The MySQL connection closed mid-header");
         }
         // CHECKED, not adopted. Trusting the peer's byte meant a stale packet --
@@ -908,7 +885,7 @@ public final class MySql {
         // `sequence++ & 0xff`, so after 256 packets of one exchange -- an
         // ordinary large result set -- the value here is past a byte while the
         // wire has wrapped.
-        if(b3 != (sequence & 0xff)) {
+        if (b3 != (sequence & 0xff)) {
             close();
             throw new IOException("A MySQL packet arrived with sequence " + b3
                     + " where " + (sequence & 0xff) + " was due, so this "
@@ -918,50 +895,46 @@ public final class MySql {
         return b0 | (b1 << 8) | (b2 << 16);
     }
 
-    /**
-     * A column count the peer chose, checked before it sizes anything.
-     *
-     * <p>It arrives length-encoded, which reaches 2^64, and casting that to an int
-     * gave either an enormous positive -- new Column[] then asked for it in one go
-     * and the OutOfMemoryError is not an IOException, so it took the process --
-     * or a negative, which is a NegativeArraySizeException instead. A few bytes of
-     * result-set header was enough, before any column definition arrived, and the
-     * default sslmode=prefer lets whoever answers the connection send them.
-     *
-     * <p>65535 because that is how the server itself describes this quantity in a
-     * prepare response: sixteen bits. A result set with more columns than the
-     * protocol can describe in its other half is not one this client needs to read.
-     */
-    /**
-     * Marks a session whose stream position is no longer known.
-     *
-     * <p>columnCount already does this for a count it will not read; these are the
-     * other half of the same rule. A DECODE failure -- a row whose inner lengths
-     * or temporal fields are malformed, a column definition that does not parse --
-     * is thrown after readPacket has already taken a whole packet off the wire,
-     * so the rest of the result set is still unread. Nothing else closes there:
-     * readPacket closes when the READ fails, and a server ERROR packet is a clean
-     * state that must NOT close, or an ordinary duplicate-key error would destroy
-     * the connection it was reported on.
-     *
-     * <p>Left open, the statement's finally sends COM_STMT_CLOSE over the unread
-     * rows and isClosed() goes on advertising the session as reusable, so the pool
-     * hands it out and the next statement reads a previous one's row as its own
-     * answer -- or fails on a sequence number, several operations away from the
-     * request that broke it.
-     */
+    /// Marks a session whose stream position is no longer known.
+    ///
+    /// columnCount already does this for a count it will not read; these are the
+    /// other half of the same rule. A DECODE failure -- a row whose inner lengths
+    /// or temporal fields are malformed, a column definition that does not parse --
+    /// is thrown after readPacket has already taken a whole packet off the wire,
+    /// so the rest of the result set is still unread. Nothing else closes there:
+    /// readPacket closes when the READ fails, and a server ERROR packet is a clean
+    /// state that must NOT close, or an ordinary duplicate-key error would destroy
+    /// the connection it was reported on.
+    ///
+    /// Left open, the statement's finally sends COM_STMT_CLOSE over the unread
+    /// rows and isClosed() goes on advertising the session as reusable, so the pool
+    /// hands it out and the next statement reads a previous one's row as its own
+    /// answer -- or fails on a sequence number, several operations away from the
+    /// request that broke it.
     private IOException desynchronised(IOException err) {
         close();
         return err;
     }
 
+    /// A column count the peer chose, checked before it sizes anything.
+    ///
+    /// It arrives length-encoded, which reaches 2^64, and casting that to an int
+    /// gave either an enormous positive -- new Column\[\] then asked for it in one go
+    /// and the OutOfMemoryError is not an IOException, so it took the process --
+    /// or a negative, which is a NegativeArraySizeException instead. A few bytes of
+    /// result-set header was enough, before any column definition arrived, and the
+    /// default sslmode=prefer lets whoever answers the connection send them.
+    ///
+    /// 65535 because that is how the server itself describes this quantity in a
+    /// prepare response: sixteen bits. A result set with more columns than the
+    /// protocol can describe in its other half is not one this client needs to read.
     private int columnCount(long declared) throws IOException {
-        if(declared < 0 || declared > MAX_RESULT_COLUMNS) {
+        if (declared < 0 || declared > MAX_RESULT_COLUMNS) {
             close();                    // desynchronised; see readPacketHeader
             throw new IOException("A MySQL result set claims " + declared
                     + " columns, past the " + MAX_RESULT_COLUMNS + " this reads");
         }
-        return (int)declared;
+        return (int) declared;
     }
 
     private Packet readPacket() throws IOException {
@@ -983,7 +956,7 @@ public final class MySql {
         int length = readPacketHeader(false);
         Packet packet = new Packet();
         long allowed = SqlLimits.maxMessageBytes();
-        if(length > allowed) {
+        if (length > allowed) {
             // BEFORE THE ALLOCATION, and before the continuation branch below --
             // which is where this bound used to live, and where it could not reach
             // the packet that matters. One packet carries up to MAX_PACKET_BODY, so
@@ -997,7 +970,7 @@ public final class MySql {
                     + allowed + " CN1_DB_MAX_MESSAGE_MB allows");
         }
         packet.body = wire.readFully(length);
-        if(length == MAX_PACKET_BODY) {
+        if (length == MAX_PACKET_BODY) {
             // A full-length packet is continued by the next one, and the value only
             // ends at a packet shorter than the maximum. Stopping at the first would
             // hand the caller a truncated value and leave the following header to be
@@ -1011,10 +984,10 @@ public final class MySql {
             // negotiated, so sslmode=require is no protection: whoever answers the
             // connection can do it, authenticated or not.
             long accumulated = all.size();
-            while(length == MAX_PACKET_BODY) {
+            while (length == MAX_PACKET_BODY) {
                 length = readPacketHeader(true);
                 accumulated += length;
-                if(accumulated > allowed) {
+                if (accumulated > allowed) {
                     // Closed for the same reason the PostgreSQL bound closes: the
                     // rest of this logical packet is still on the wire and there
                     // is no resync, so a connection left open would hand its tail
@@ -1028,7 +1001,7 @@ public final class MySql {
             }
             packet.body = all.toByteArray();
         }
-        if(packet.body.length == 0) {
+        if (packet.body.length == 0) {
             throw new IOException("An empty MySQL packet");
         }
         return packet;
@@ -1046,7 +1019,7 @@ public final class MySql {
             String state = "";
             // body.length > 3 as well: the marker is read at a fixed offset, and an
             // error packet shorter than that is exactly what a hostile peer sends.
-            if(reader.remaining() > 0 && packet.body.length > 3 && packet.body[3] == '#') {
+            if (reader.remaining() > 0 && packet.body.length > 3 && packet.body[3] == '#') {
                 reader.skip(1);
                 state = Wire.fromUtf8(reader.bytes(5));
             }
@@ -1064,7 +1037,7 @@ public final class MySql {
         }
     }
 
-    /** A cursor over one packet body. MySQL is little endian throughout. */
+    /// A cursor over one packet body. MySQL is little endian throughout.
     private static final class Reader {
         private final byte[] data;
         private int at;
@@ -1077,24 +1050,22 @@ public final class MySql {
             return data.length - at;
         }
 
-        /**
-         * The span about to be read is INSIDE the packet, checked before it is.
-         *
-         * <p>Every accessor below indexes the peer's bytes at an offset the peer's
-         * own fields moved, so a packet whose header is complete and whose body is
-         * short -- a one-byte greeting will do, before TLS and before anything is
-         * authenticated -- ran off the end. What came back was
-         * ArrayIndexOutOfBoundsException, or NegativeArraySizeException from a
-         * length-encoded count, and neither is an IOException: during setup that
-         * escaped connect()'s cleanup and leaked the socket, and afterwards it left
-         * the session desynchronised for whoever borrowed it next.
-         *
-         * <p>Checked here rather than at each call site because there are dozens of
-         * those and one missed is the same bug; a reader that cannot read past its
-         * own buffer is the property worth having.
-         */
+        /// The span about to be read is INSIDE the packet, checked before it is.
+        ///
+        /// Every accessor below indexes the peer's bytes at an offset the peer's
+        /// own fields moved, so a packet whose header is complete and whose body is
+        /// short -- a one-byte greeting will do, before TLS and before anything is
+        /// authenticated -- ran off the end. What came back was
+        /// ArrayIndexOutOfBoundsException, or NegativeArraySizeException from a
+        /// length-encoded count, and neither is an IOException: during setup that
+        /// escaped connect()'s cleanup and leaked the socket, and afterwards it left
+        /// the session desynchronised for whoever borrowed it next.
+        ///
+        /// Checked here rather than at each call site because there are dozens of
+        /// those and one missed is the same bug; a reader that cannot read past its
+        /// own buffer is the property worth having.
         private void need(int count) throws IOException {
-            if(count < 0 || at < 0 || count > data.length - at) {
+            if (count < 0 || at < 0 || count > data.length - at) {
                 throw new IOException("A MySQL packet is shorter than its fields claim");
             }
         }
@@ -1127,8 +1098,8 @@ public final class MySql {
         long i64() throws IOException {
             need(8);
             long value = 0;
-            for(int iter = 0 ; iter < 8 ; iter++) {
-                value |= ((long)(data[at + iter] & 0xff)) << (iter * 8);
+            for (int iter = 0 ; iter < 8 ; iter++) {
+                value |= ((long) (data[at + iter] & 0xff)) << (iter * 8);
             }
             at += 8;
             return value;
@@ -1148,13 +1119,13 @@ public final class MySql {
 
         String cString() throws IOException {
             int end = at;
-            while(end < data.length && data[end] != 0) {
+            while (end < data.length && data[end] != 0) {
                 end++;
             }
             // TERMINATED, not merely run to the end of the packet: a string with no
             // NUL after it leaves "end" at the length, and the next field would
             // start past it.
-            if(end >= data.length) {
+            if (end >= data.length) {
                 throw new IOException("A MySQL string runs past the end of its packet");
             }
             String out = Wire.fromUtf8(data, at, end - at);
@@ -1162,19 +1133,19 @@ public final class MySql {
             return out;
         }
 
-        /** A length-encoded integer; 0xfb is the NULL marker, returned as -1. */
+        /// A length-encoded integer; 0xfb is the NULL marker, returned as -1.
         long lengthEncoded() throws IOException {
             int first = u8();
-            if(first < 0xfb) {
+            if (first < 0xfb) {
                 return first;
             }
-            if(first == 0xfb) {
+            if (first == 0xfb) {
                 return -1;
             }
-            if(first == 0xfc) {
+            if (first == 0xfc) {
                 return u16();
             }
-            if(first == 0xfd) {
+            if (first == 0xfd) {
                 need(3);
                 int value = (data[at] & 0xff) | ((data[at + 1] & 0xff) << 8)
                         | ((data[at + 2] & 0xff) << 16);
@@ -1186,23 +1157,21 @@ public final class MySql {
 
         byte[] lengthEncodedBytes() throws IOException {
             long length = lengthEncoded();
-            if(length > data.length - at) {
+            if (length > data.length - at) {
                 // Checked as a LONG, before the cast. A count near 2^32 narrows to
                 // a negative int, which bytes() would then hand to new byte[].
                 throw new IOException("A MySQL value claims " + length
                         + " bytes in a packet holding " + (data.length - at));
             }
-            return length < 0 ? null : bytes((int)length);
+            return length < 0 ? null : bytes((int) length);
         }
 
-        /**
-         * DATE / DATETIME / TIMESTAMP, returned as an ISO string. A Java date type
-         * would have to be one the translated runtime also has, and every consumer
-         * of this data writes it into JSON anyway.
-         */
+        /// DATE / DATETIME / TIMESTAMP, returned as an ISO string. A Java date type
+        /// would have to be one the translated runtime also has, and every consumer
+        /// of this data writes it into JSON anyway.
         String temporal() throws IOException {
             int length = u8();
-            if(length == 0) {
+            if (length == 0) {
                 return null;
             }
             int year = u16();
@@ -1212,7 +1181,7 @@ public final class MySql {
             pad(out, year, 4).append('-');
             pad(out, month, 2).append('-');
             pad(out, day, 2);
-            if(length > 4) {
+            if (length > 4) {
                 int hour = u8();
                 int minute = u8();
                 int second = u8();
@@ -1220,7 +1189,7 @@ public final class MySql {
                 pad(out, hour, 2).append(':');
                 pad(out, minute, 2).append(':');
                 pad(out, second, 2);
-                if(length > 7) {
+                if (length > 7) {
                     int micros = i32();
                     out.append('.');
                     pad(out, micros, 6);
@@ -1231,7 +1200,7 @@ public final class MySql {
 
         String time() throws IOException {
             int length = u8();
-            if(length == 0) {
+            if (length == 0) {
                 return "00:00:00";
             }
             boolean negative = u8() != 0;
@@ -1240,13 +1209,13 @@ public final class MySql {
             int minute = u8();
             int second = u8();
             StringBuilder out = new StringBuilder();
-            if(negative) {
+            if (negative) {
                 out.append('-');
             }
             pad(out, days * 24 + hour, 2).append(':');
             pad(out, minute, 2).append(':');
             pad(out, second, 2);
-            if(length > 8) {
+            if (length > 8) {
                 int micros = i32();
                 out.append('.');
                 pad(out, micros, 6);
@@ -1256,7 +1225,7 @@ public final class MySql {
 
         private static StringBuilder pad(StringBuilder out, int value, int width) {
             String text = String.valueOf(value);
-            for(int iter = text.length() ; iter < width ; iter++) {
+            for (int iter = text.length() ; iter < width ; iter++) {
                 out.append('0');
             }
             return out.append(text);
@@ -1271,29 +1240,27 @@ public final class MySql {
     }
 
     private static void writeLongLE(ByteArrayOutputStream out, long value) {
-        for(int iter = 0 ; iter < 8 ; iter++) {
-            out.write((int)((value >> (iter * 8)) & 0xff));
+        for (int iter = 0 ; iter < 8 ; iter++) {
+            out.write((int) ((value >> (iter * 8)) & 0xff));
         }
     }
 
-    /**
-     * A field the protocol ends with a NUL, so the value cannot contain one.
-     *
-     * <p>the login packet ends each of its fields with a NUL, which means a NUL inside a value does not truncate
-     * it -- it ENDS that field and what follows becomes the NEXT one. A database
-     * name of "admin", a NUL, "application_name", a NUL and "allowed.tenant"
-     * selects the admin database and sets a startup parameter nobody asked for,
-     * while the string as a whole still passes an application's suffix check on
-     * the name it thought it was connecting to. A URL carrying %00 decodes to
-     * exactly that.
-     *
-     * <p>Checked HERE rather than at the two fields a review named: this is the
-     * one place every such field is written, so a field added later is covered
-     * without anyone remembering to.
-     */
+    /// A field the protocol ends with a NUL, so the value cannot contain one.
+    ///
+    /// the login packet ends each of its fields with a NUL, which means a NUL inside a value does not truncate
+    /// it -- it ENDS that field and what follows becomes the NEXT one. A database
+    /// name of "admin", a NUL, "application_name", a NUL and "allowed.tenant"
+    /// selects the admin database and sets a startup parameter nobody asked for,
+    /// while the string as a whole still passes an application's suffix check on
+    /// the name it thought it was connecting to. A URL carrying %00 decodes to
+    /// exactly that.
+    ///
+    /// Checked HERE rather than at the two fields a review named: this is the
+    /// one place every such field is written, so a field added later is covered
+    /// without anyone remembering to.
     private static void writeCString(ByteArrayOutputStream out, String value)
             throws IOException {
-        if(value != null && value.indexOf(0) >= 0) {
+        if (value != null && value.indexOf(0) >= 0) {
             throw new IOException("A connection field cannot hold a NUL: the "
                     + "protocol ends the field there and reads the rest as "
                     + "another one");
@@ -1305,13 +1272,13 @@ public final class MySql {
 
     private static void writeLengthEncoded(ByteArrayOutputStream out, byte[] data) {
         int length = data == null ? 0 : data.length;
-        if(length < 251) {
+        if (length < 251) {
             out.write(length);
-        } else if(length < 65536) {
+        } else if (length < 65536) {
             out.write(0xfc);
             out.write(length & 0xff);
             out.write((length >> 8) & 0xff);
-        } else if(length <= MAX_PACKET_BODY) {
+        } else if (length <= MAX_PACKET_BODY) {
             out.write(0xfd);
             out.write(length & 0xff);
             out.write((length >> 8) & 0xff);
@@ -1323,11 +1290,11 @@ public final class MySql {
             // next thing in the packet. Fragmenting the packet does not help, because
             // this prefix is inside it.
             out.write(0xfe);
-            for(int iter = 0 ; iter < 8 ; iter++) {
-                out.write((int)((long)length >> (8 * iter)) & 0xff);
+            for (int iter = 0 ; iter < 8 ; iter++) {
+                out.write((int) ((long) length >> (8 * iter)) & 0xff);
             }
         }
-        if(length > 0) {
+        if (length > 0) {
             out.write(data, 0, length);
         }
     }
@@ -1341,15 +1308,15 @@ public final class MySql {
 
     private static byte[] xor(byte[] a, byte[] b) {
         byte[] out = new byte[a.length];
-        for(int iter = 0 ; iter < a.length ; iter++) {
-            out[iter] = (byte)(a[iter] ^ b[iter % b.length]);
+        for (int iter = 0 ; iter < a.length ; iter++) {
+            out[iter] = (byte) (a[iter] ^ b[iter % b.length]);
         }
         return out;
     }
 
     private static byte[] trimTrailingNul(byte[] data) {
         int length = data.length;
-        while(length > 0 && data[length - 1] == 0) {
+        while (length > 0 && data[length - 1] == 0) {
             length--;
         }
         byte[] out = new byte[length];

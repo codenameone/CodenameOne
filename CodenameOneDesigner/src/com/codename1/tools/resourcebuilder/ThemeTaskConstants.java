@@ -25,10 +25,6 @@
 
 package com.codename1.tools.resourcebuilder;
 
-/**
- *
- * @author Shai Almog
- */
 public interface ThemeTaskConstants {
     public static final int TYPE_EMPTY = 0;
     public static final int TYPE_LINE = 1;

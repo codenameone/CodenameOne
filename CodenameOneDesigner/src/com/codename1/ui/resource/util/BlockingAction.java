@@ -44,8 +44,6 @@ import javax.swing.Timer;
 
 /**
  * Abstract action that blocks the UI until it completes
- *
- * @author Shai Almog
  */
 public abstract class BlockingAction extends AbstractAction implements Runnable {
     private static int rotation;

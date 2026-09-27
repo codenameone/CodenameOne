@@ -49,8 +49,6 @@ import javax.swing.event.ChangeListener;
 /**
  * UI and logic to add several multi-images in a single batch and scale them all 
  * to the right sizes for all resolutions.
- *
- * @author Shai Almog
  */
 public class AddAndScaleMultiImage extends javax.swing.JPanel {
     private float aspect;

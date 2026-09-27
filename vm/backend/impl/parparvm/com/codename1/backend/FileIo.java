@@ -22,44 +22,40 @@
  */
 package com.codename1.backend;
 
-/**
- * The file-system calls a static handler needs, isolated so that everything else
- * in [StaticFiles] -- ranges, conditional requests, MIME types, the containment
- * check -- is pure Java and shared by every target. That logic is the part worth
- * getting right once.
- *
- * There is one of these per target: the translated one goes to open/fstat/sendfile
- * directly, the Java SE one to the JDK's channels.
- */
+/// The file-system calls a static handler needs, isolated so that everything else
+/// in [StaticFiles] -- ranges, conditional requests, MIME types, the containment
+/// check -- is pure Java and shared by every target. That logic is the part worth
+/// getting right once.
+///
+/// There is one of these per target: the translated one goes to open/fstat/sendfile
+/// directly, the Java SE one to the JDK's channels.
 public final class FileIo {
     private FileIo() {
     }
 
-    /** Opens for reading. The descriptor, or -1. */
-    /**
-     * A descriptor for `relative` under `root`, or -1. Never a file outside `root`,
-     * and never by checking afterwards: the kernel refuses the escape while it
-     * resolves, so there is no window between the open and the check for a symlink
-     * to move through.
-     *
-     * Returns {@link #BENEATH_UNSUPPORTED} where the platform has no such call, so
-     * the caller can fall back rather than treat it as a missing file.
-     */
+    // Opens for reading. The descriptor, or -1.
+    /// A descriptor for `relative` under `root`, or -1. Never a file outside `root`,
+    /// and never by checking afterwards: the kernel refuses the escape while it
+    /// resolves, so there is no window between the open and the check for a symlink
+    /// to move through.
+    ///
+    /// Returns [#BENEATH_UNSUPPORTED] where the platform has no such call, so
+    /// the caller can fall back rather than treat it as a missing file.
     public static int openBeneath(String root, String relative) {
-        if(holdsNul(root) || holdsNul(relative)) {
+        if (holdsNul(root) || holdsNul(relative)) {
             return -1;
         }
         return openBeneathImpl(root, relative);
     }
 
-    /** openBeneath cannot answer here; fall back to open plus a resolved-path check. */
+    /// openBeneath cannot answer here; fall back to open plus a resolved-path check.
     public static final int BENEATH_UNSUPPORTED = -2;
 
-    /** openRead: the file is there and could not be opened. See openReadImpl. */
+    /// openRead: the file is there and could not be opened. See openReadImpl.
     public static final int OPEN_FAILED = -2;
 
     public static int openRead(String path) {
-        if(holdsNul(path)) {
+        if (holdsNul(path)) {
             // Absent rather than unreadable: a path this runtime truncates at a
             // NUL is not a path to anything, and refusing it is the point.
             return -1;
@@ -67,39 +63,33 @@ public final class FileIo {
         return openReadImpl(path);
     }
 
-    /**
-     * Fills out[0]=size, out[1]=modified-time-millis, out[2]=1 for a directory.
-     * Taken from the OPEN DESCRIPTOR rather than the path: stat-then-open lets the
-     * file change in between, which is how a length header ends up disagreeing
-     * with the body.
-     */
+    /// Fills out\[0\]=size, out\[1\]=modified-time-millis, out\[2\]=1 for a directory.
+    /// Taken from the OPEN DESCRIPTOR rather than the path: stat-then-open lets the
+    /// file change in between, which is how a length header ends up disagreeing
+    /// with the body.
     public static int stat(int fd, long[] out) {
         return statImpl(fd, out);
     }
 
-    /**
-     * The same call, because statImpl is a live fstat on the open descriptor and
-     * so is already current.
-     *
-     * <p>It exists so the two runtimes present one API: the Java SE
-     * implementation answers stat() from an open-time snapshot that asset
-     * serving needs, and therefore cannot answer whether the file has changed
-     * since. See the javadoc there.
-     */
+    /// The same call, because statImpl is a live fstat on the open descriptor and
+    /// so is already current.
+    ///
+    /// It exists so the two runtimes present one API: the Java SE
+    /// implementation answers stat() from an open-time snapshot that asset
+    /// serving needs, and therefore cannot answer whether the file has changed
+    /// since. See the javadoc there.
     public static int statFresh(int fd, long[] out) {
         return statImpl(fd, out);
     }
 
-    /**
-     * Sends bytes from a file straight to a socket, without them entering this
-     * process where the platform allows it. Returns how many moved, which may be
-     * fewer than asked; the caller loops.
-     */
+    /// Sends bytes from a file straight to a socket, without them entering this
+    /// process where the platform allows it. Returns how many moved, which may be
+    /// fewer than asked; the caller loops.
     public static long sendFile(int socketFd, int fileFd, long offset, long count) {
         return sendFileImpl(socketFd, fileFd, offset, count);
     }
 
-    /** True when [#sendFile] is a kernel copy rather than a read/write loop. */
+    /// True when [#sendFile] is a kernel copy rather than a read/write loop.
     public static boolean hasSendFile() {
         return hasSendFileImpl();
     }
@@ -109,13 +99,11 @@ public final class FileIo {
         return readImpl(fd, buffer, offset, length);
     }
 
-    /**
-     * The canonical path, symlinks followed. The static handler proves a resolved
-     * file is inside the document root with this: a check on the request string
-     * alone is defeated by an encoded traversal or by a symlink out of the tree.
-     */
+    /// The canonical path, symlinks followed. The static handler proves a resolved
+    /// file is inside the document root with this: a check on the request string
+    /// alone is defeated by an encoded traversal or by a symlink out of the tree.
     public static String realPath(String path) {
-        if(holdsNul(path)) {
+        if (holdsNul(path)) {
             return null;
         }
         return realPathImpl(path);
@@ -125,22 +113,20 @@ public final class FileIo {
         closeImpl(fd);
     }
 
-    /**
-     * Whether a path would name a different file once it becomes a C string.
-     *
-     * <p>A path crosses to open() and realpath() as a NUL-terminated string, so a
-     * NUL inside it ENDS the path there: "/etc/passwd\u0000.png" opens
-     * /etc/passwd, while an application that checked the name it was given saw a
-     * .png and allowed it. Nothing here is unusual about the caller -- validating
-     * an untrusted name by its extension and then opening it is the ordinary
-     * shape -- and the truncation happens only in the packaged runtime, so the
-     * simulator proves the check works and the device opens the other file.
-     *
-     * <p>Answered as "no such file" rather than thrown, because that is exactly
-     * what the Java SE twin does: Paths.get refuses a NUL, the catch answers -1
-     * and null, and these methods report failure by return value. The two arms
-     * have to give the same answer to the same argument.
-     */
+    /// Whether a path would name a different file once it becomes a C string.
+    ///
+    /// A path crosses to open() and realpath() as a NUL-terminated string, so a
+    /// NUL inside it ENDS the path there: "/etc/passwd\u0000.png" opens
+    /// /etc/passwd, while an application that checked the name it was given saw a
+    /// .png and allowed it. Nothing here is unusual about the caller -- validating
+    /// an untrusted name by its extension and then opening it is the ordinary
+    /// shape -- and the truncation happens only in the packaged runtime, so the
+    /// simulator proves the check works and the device opens the other file.
+    ///
+    /// Answered as "no such file" rather than thrown, because that is exactly
+    /// what the Java SE twin does: Paths.get refuses a NUL, the catch answers -1
+    /// and null, and these methods report failure by return value. The two arms
+    /// have to give the same answer to the same argument.
     private static boolean holdsNul(String value) {
         return value != null && value.indexOf(0) >= 0;
     }
@@ -152,21 +138,19 @@ public final class FileIo {
     private static native long sendFileImpl(int socketFd, int fileFd, long offset, long count);
     private static native boolean hasSendFileImpl();
 
-    /**
-     * Refuses a slice that does not lie inside the array.
-     *
-     * The natives below index the array through the pointer they are handed and
-     * ParparVM adds no bounds check of its own, so a bad offset is a native read
-     * or write of whatever is next in the heap rather than an exception. The
-     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
-     * invisible on the simulator and only appears once packaged. The subtraction
-     * avoids the overflow that `offset + length` has.
-     */
+    /// Refuses a slice that does not lie inside the array.
+    ///
+    /// The natives below index the array through the pointer they are handed and
+    /// ParparVM adds no bounds check of its own, so a bad offset is a native read
+    /// or write of whatever is next in the heap rather than an exception. The
+    /// JavaSE arm gets this free from its stream APIs, which is why such a bug is
+    /// invisible on the simulator and only appears once packaged. The subtraction
+    /// avoids the overflow that `offset + length` has.
     private static void checkRange(byte[] buffer, int offset, int length) {
-        if(buffer == null) {
+        if (buffer == null) {
             throw new NullPointerException("buffer");
         }
-        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+        if (offset < 0 || length < 0 || length > buffer.length - offset) {
             throw new IndexOutOfBoundsException("offset " + offset + ", length "
                     + length + ", buffer " + buffer.length);
         }

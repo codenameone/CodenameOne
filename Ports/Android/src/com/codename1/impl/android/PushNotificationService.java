@@ -38,8 +38,6 @@ import com.codename1.ui.Display;
 /**
  * This class implements a push notification fallback service for applications that require
  * push notification support but don't have Android Market installed
- *
- * @author Shai Almog
  */
 public abstract class PushNotificationService extends Service implements PushCallback {
 

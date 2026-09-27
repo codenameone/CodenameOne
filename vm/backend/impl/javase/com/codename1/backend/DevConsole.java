@@ -27,13 +27,11 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The console lines a development server printed, for the MCP log tool.
- *
- * <p>The Java SE arm tees {@code System.out} and {@code System.err} into a ring of
- * recent lines; the packaged runtime has no way to replace them and keeps
- * nothing, which is why the development tools say so when asked there.
- */
+/// The console lines a development server printed, for the MCP log tool.
+///
+/// The Java SE arm tees `System.out` and `System.err` into a ring of
+/// recent lines; the packaged runtime has no way to replace them and keeps
+/// nothing, which is why the development tools say so when asked there.
 public final class DevConsole {
     private static final int CAPACITY = 2000;
     private static final String[] LINES = new String[CAPACITY];
@@ -44,26 +42,32 @@ public final class DevConsole {
     private DevConsole() {
     }
 
-    /** Whether this runtime can capture the console at all. */
+    /// Whether this runtime can capture the console at all.
     public static boolean supported() {
         return true;
     }
 
-    /** Starts capturing. Idempotent. */
+    /// Starts capturing. Idempotent.
     public static synchronized void install() {
-        if(installed) {
+        if (installed) {
             return;
         }
         installed = true;
-        System.setOut(new PrintStream(new Tee(System.out, "out"), true));
-        System.setErr(new PrintStream(new Tee(System.err, "err"), true));
+        try {
+            // UTF-8 named, not the platform default, which differs between the
+            // machines a developer runs this on.
+            System.setOut(new PrintStream(new Tee(System.out, "out"), true, "UTF-8"));
+            System.setErr(new PrintStream(new Tee(System.err, "err"), true, "UTF-8"));
+        } catch (java.io.UnsupportedEncodingException err) {
+            throw new IllegalStateException("UTF-8 is always supported", err);
+        }
     }
 
-    /** The newest {@code limit} lines, oldest first. */
+    /// The newest `limit` lines, oldest first.
     public static synchronized List recent(int limit) {
         int count = Math.min(limit, size);
         List out = new ArrayList(count);
-        for(int iter = count - 1 ; iter >= 0 ; iter--) {
+        for (int iter = count - 1 ; iter >= 0 ; iter--) {
             out.add(LINES[(next - 1 - iter + CAPACITY) % CAPACITY]);
         }
         return out;
@@ -72,12 +76,12 @@ public final class DevConsole {
     static synchronized void add(String line) {
         LINES[next] = line;
         next = (next + 1) % CAPACITY;
-        if(size < CAPACITY) {
+        if (size < CAPACITY) {
             size++;
         }
     }
 
-    /** Writes through to the real stream and collects whole lines. */
+    /// Writes through to the real stream and collects whole lines.
     private static final class Tee extends OutputStream {
         private final PrintStream target;
         private final String name;
@@ -88,17 +92,19 @@ public final class DevConsole {
             this.name = name;
         }
 
+        @Override
         public synchronized void write(int b) {
             target.write(b);
-            if(b == '\n') {
+            if (b == '\n') {
                 add("[" + name + "] " + new String(line.toByteArray(),
                         java.nio.charset.StandardCharsets.UTF_8));
                 line.reset();
-            } else if(b != '\r' && line.size() < 4000) {
+            } else if (b != '\r' && line.size() < 4000) {
                 line.write(b);
             }
         }
 
+        @Override
         public void flush() {
             target.flush();
         }

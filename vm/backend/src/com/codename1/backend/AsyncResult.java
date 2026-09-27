@@ -26,22 +26,20 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-/**
- * A {@link Future} that is already complete: what an {@code @Async} method
- * returns from its body.
- *
- * <pre>
- *   &#64;Async
- *   public Future&lt;Report&gt; build(String month) {
- *       return AsyncResult.of(compute(month));
- *   }
- * </pre>
- *
- * <p>The caller never sees this object. It receives the Future of the call
- * itself at once, which completes with this value when the body has run --
- * the same arrangement as Spring's {@code AsyncResult} and
- * {@code CompletableFuture.completedFuture}.
- */
+/// A [Future] that is already complete: what an `@Async` method
+/// returns from its body.
+///
+/// ```java
+/// @Async
+///   public Future build(String month) {
+///       return AsyncResult.of(compute(month));
+///   }
+/// ```
+///
+/// The caller never sees this object. It receives the Future of the call
+/// itself at once, which completes with this value when the body has run --
+/// the same arrangement as Spring's `AsyncResult` and
+/// `CompletableFuture.completedFuture`.
 public final class AsyncResult<V> implements Future<V> {
     private final V value;
     private final Throwable failure;
@@ -51,35 +49,40 @@ public final class AsyncResult<V> implements Future<V> {
         this.failure = failure;
     }
 
-    /** A result holding {@code value}. */
+    /// A result holding `value`.
     public static <V> AsyncResult<V> of(V value) {
         return new AsyncResult<V>(value, null);
     }
 
-    /** A result that failed with {@code failure}, for a body that reports rather than throws. */
+    /// A result that failed with `failure`, for a body that reports rather than throws.
     public static <V> AsyncResult<V> failed(Throwable failure) {
         return new AsyncResult<V>(null, failure);
     }
 
+    @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         return false;
     }
 
+    @Override
     public boolean isCancelled() {
         return false;
     }
 
+    @Override
     public boolean isDone() {
         return true;
     }
 
+    @Override
     public V get() throws ExecutionException {
-        if(failure != null) {
+        if (failure != null) {
             throw new ExecutionException(failure);
         }
         return value;
     }
 
+    @Override
     public V get(long timeout, TimeUnit unit) throws ExecutionException {
         return get();
     }

@@ -27,12 +27,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * One named measurement: a counter, a gauge or a histogram.
- *
- * <p>Created once through {@link Metrics} and kept -- the build's generated code
- * holds each in a static field -- so recording a value never looks anything up.
- */
+/// One named measurement: a counter, a gauge or a histogram.
+///
+/// Created once through [Metrics] and kept -- the build's generated code
+/// holds each in a static field -- so recording a value never looks anything up.
 public abstract class Instrument {
     public static final int COUNTER = 0;
     public static final int UP_DOWN_COUNTER = 1;
@@ -63,34 +61,30 @@ public abstract class Instrument {
         return unit;
     }
 
-    /** {@link #COUNTER}, {@link #UP_DOWN_COUNTER}, {@link #GAUGE} or {@link #HISTOGRAM}. */
+    /// [#COUNTER], [#UP_DOWN_COUNTER], [#GAUGE] or [#HISTOGRAM].
     public int getKind() {
         return kind;
     }
 
-    /**
-     * The current points, each a map with {@code attributes} (a map, possibly
-     * empty) and either {@code value} or, for a histogram, {@code count},
-     * {@code sum}, {@code min}, {@code max}, {@code bounds} and {@code buckets}.
-     */
+    /// The current points, each a map with `attributes` (a map, possibly
+    /// empty) and either `value` or, for a histogram, `count`,
+    /// `sum`, `min`, `max`, `bounds` and `buckets`.
     public abstract List points();
 
-    /**
-     * A point with an integral value, kept as a Long: a counter past 2^53 is not
-     * exactly representable as a double, and the exporter sends a Long as
-     * OTLP's integer field rather than rounding it.
-     */
+    /// A point with an integral value, kept as a Long: a counter past 2^53 is not
+    /// exactly representable as a double, and the exporter sends a Long as
+    /// OTLP's integer field rather than rounding it.
     static Map point(Map attributes, long value) {
         Map p = new LinkedHashMap();
         p.put("attributes", attributes == null ? new LinkedHashMap() : attributes);
-        p.put("value", new Long(value));
+        p.put("value", Long.valueOf(value));
         return p;
     }
 
     static Map point(Map attributes, double value) {
         Map p = new LinkedHashMap();
         p.put("attributes", attributes == null ? new LinkedHashMap() : attributes);
-        p.put("value", new Double(value));
+        p.put("value", Double.valueOf(value));
         return p;
     }
 

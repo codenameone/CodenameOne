@@ -24,26 +24,22 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * Readiness notification over epoll (Linux) or kqueue (macOS/BSD).
- *
- * Level-triggered: the poller hands a ready descriptor to a worker and forgets
- * about it until the worker gives it back. Edge-triggered would require draining
- * every descriptor to EAGAIN on each wake-up, which is the opposite of that.
- */
+/// Readiness notification over epoll (Linux) or kqueue (macOS/BSD).
+///
+/// Level-triggered: the poller hands a ready descriptor to a worker and forgets
+/// about it until the worker gives it back. Edge-triggered would require draining
+/// every descriptor to EAGAIN on each wake-up, which is the opposite of that.
 public final class Reactor {
     public static final int READ = 1;
     public static final int WRITE = 2;
-    /**
-     * Deliver an event for this descriptor ONCE and then disarm it, until
-     * {@link #modify} re-arms it.
-     *
-     * This is what lets the worker threads poll the same set directly rather
-     * than a reactor thread dispatching to them: the kernel guarantees exactly
-     * one waiter is handed a given descriptor, so two workers cannot land on one
-     * connection. Without it a level-triggered set reports the same descriptor
-     * ready to every waiter at once.
-     */
+    /// Deliver an event for this descriptor ONCE and then disarm it, until
+    /// [#modify] re-arms it.
+    ///
+    /// This is what lets the worker threads poll the same set directly rather
+    /// than a reactor thread dispatching to them: the kernel guarantees exactly
+    /// one waiter is handed a given descriptor, so two workers cannot land on one
+    /// connection. Without it a level-triggered set reports the same descriptor
+    /// ready to every waiter at once.
     public static final int ONESHOT = 4;
 
     private int poller;
@@ -54,7 +50,7 @@ public final class Reactor {
 
     public static Reactor create() throws IOException {
         int p = createImpl();
-        if(p < 0) {
+        if (p < 0) {
             throw new IOException("No readiness poller on this platform "
                     + "(epoll and kqueue are both unavailable)");
         }
@@ -63,14 +59,14 @@ public final class Reactor {
 
     public void add(int fd, int events) throws IOException {
         int err = registerImpl(poller, fd, events, false);
-        if(err != 0) {
+        if (err != 0) {
             throw new IOException("Could not watch fd " + fd + " (errno " + (-err) + ")");
         }
     }
 
     public void modify(int fd, int events) throws IOException {
         int err = registerImpl(poller, fd, events, true);
-        if(err != 0) {
+        if (err != 0) {
             throw new IOException("Could not re-arm fd " + fd + " (errno " + (-err) + ")");
         }
     }
@@ -79,43 +75,39 @@ public final class Reactor {
         unregisterImpl(poller, fd);
     }
 
-    /**
-     * Blocks until something is ready, then fills readyFds and returns how many.
-     * A timeout below zero waits forever.
-     */
+    /// Blocks until something is ready, then fills readyFds and returns how many.
+    /// A timeout below zero waits forever.
     public int await(int[] readyFds, int timeoutMillis) throws IOException {
         int n = waitImpl(poller, readyFds, timeoutMillis);
-        if(n < 0) {
+        if (n < 0) {
             throw new IOException("Poller failed");
         }
         return n;
     }
 
     public void close() {
-        if(poller >= 0) {
+        if (poller >= 0) {
             int p = poller;
             poller = -1;
             ServerSocket.closeFd(p);
         }
     }
 
-    /**
-     * A non-blocking pipe, {@code {readEnd, writeEnd}}, for waking a thread that
-     * polls: register the read end, and {@link #wake} the write end from any
-     * thread. Null where there is none (Windows, which has no virtual threads to
-     * wake either).
-     */
+    /// A non-blocking pipe, `{readEnd, writeEnd`}, for waking a thread that
+    /// polls: register the read end, and [#wake] the write end from any
+    /// thread. Null where there is none (Windows, which has no virtual threads to
+    /// wake either).
     public static int[] createWakePipe() {
         int[] fds = new int[2];
         return createWakePipeImpl(fds) == 0 ? fds : null;
     }
 
-    /** Wakes whoever polls the pipe's read end. Safe from any thread. */
+    /// Wakes whoever polls the pipe's read end. Safe from any thread.
     public static void wake(int writeFd) {
         wakeImpl(writeFd);
     }
 
-    /** Empties the pipe once its poller has woken. */
+    /// Empties the pipe once its poller has woken.
     public static void drainWake(int readFd) {
         drainWakeImpl(readFd);
     }

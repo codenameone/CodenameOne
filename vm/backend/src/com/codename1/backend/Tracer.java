@@ -25,54 +25,44 @@ package com.codename1.backend;
 import java.io.IOException;
 import java.util.Map;
 
-/**
- * Where spans come from and where they go.
- *
- * <p>The server is instrumented against this interface and nothing else, so a
- * binary that installs no tracer carries no tracing implementation: the
- * translator keeps a class only when something reaches it, and the one
- * implementation, {@code com.codename1.backend.otel.OtlpTracer}, is reached only
- * from the entry point the build generates for a project that asks for it (see
- * {@code @OpenTelemetry}).
- */
+/// Where spans come from and where they go.
+///
+/// The server is instrumented against this interface and nothing else, so a
+/// binary that installs no tracer carries no tracing implementation: the
+/// translator keeps a class only when something reaches it, and the one
+/// implementation, `com.codename1.backend.otel.OtlpTracer`, is reached only
+/// from the entry point the build generates for a project that asks for it (see
+/// `@OpenTelemetry`).
 public interface Tracer {
-    /**
-     * Reads the settings and starts whatever exports spans. Called once, by
-     * {@link Backend.Builder#start} or by the application before
-     * {@link Tracing#install}.
-     *
-     * @return false when the configuration turned tracing off, in which case the
-     *         tracer is not installed and nothing was started
-     */
+    /// Reads the settings and starts whatever exports spans. Called once, by
+    /// [Backend.Builder#start] or by the application before
+    /// [Tracing#install].
+    ///
+    /// @return false when the configuration turned tracing off, in which case the
+    /// tracer is not installed and nothing was started
     boolean open(Config config) throws IOException;
 
-    /**
-     * A new span. Never null: a span the sampler declines is a non-recording one
-     * that still carries its trace context.
-     *
-     * @param parent      the local parent, or null
-     * @param traceparent a remote parent's {@code traceparent} header, used when
-     *                    {@code parent} is null; null or malformed starts a new trace
-     * @param tracestate  the remote parent's {@code tracestate}, or null
-     */
+    /// A new span. Never null: a span the sampler declines is a non-recording one
+    /// that still carries its trace context.
+    ///
+    /// @param parent      the local parent, or null
+    /// @param traceparent a remote parent's `traceparent` header, used when
+    /// `parent` is null; null or malformed starts a new trace
+    /// @param tracestate  the remote parent's `tracestate`, or null
     Span startSpan(String name, int kind, Span parent, String traceparent, String tracestate);
 
-    /**
-     * Blocks until what has ended so far is exported, or the time runs out. A
-     * Lambda host freezes the process between invocations, so a background
-     * exporter there only runs when something waits for it.
-     */
+    /// Blocks until what has ended so far is exported, or the time runs out. A
+    /// Lambda host freezes the process between invocations, so a background
+    /// exporter there only runs when something waits for it.
     void flush(int timeoutMillis);
 
-    /** Flushes, then stops the exporter. */
+    /// Flushes, then stops the exporter.
     void shutdown(int timeoutMillis);
 
-    /**
-     * The handler that relays client spans to the collector, or null when this
-     * deployment does not offer one. The builder puts it ahead of the routers.
-     */
+    /// The handler that relays client spans to the collector, or null when this
+    /// deployment does not offer one. The builder puts it ahead of the routers.
     HttpServer.Handler relay();
 
-    /** Adds this tracer's counters to a metrics snapshot. */
+    /// Adds this tracer's counters to a metrics snapshot.
     void metrics(Map out);
 }

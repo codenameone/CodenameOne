@@ -24,9 +24,6 @@ package com.codename1.util.promise;
 
 
 /// Promise API function `com.codename1.util.promise.Promise`
-///
-/// @author shannah
-///
 public interface ExecutorFunction {
     /// Calls the function.
     ///

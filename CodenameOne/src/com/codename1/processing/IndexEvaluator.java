@@ -51,8 +51,6 @@ import java.util.Vector;
 ///  Get players 0 to 4
 ///
 ///  //player[position() < 5]/name`
-///
-/// @author Eric Coolman
 class IndexEvaluator extends AbstractEvaluator {
 
     static String FUNC_LAST = "last()";

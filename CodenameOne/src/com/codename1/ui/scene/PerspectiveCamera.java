@@ -29,8 +29,6 @@ import com.codename1.ui.Transform;
 
 import java.util.Arrays;
 
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// Internal use only

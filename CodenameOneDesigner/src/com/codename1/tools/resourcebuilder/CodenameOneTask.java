@@ -38,8 +38,6 @@ import org.apache.tools.ant.taskdefs.MatchingTask;
 /**
  * New version of the resource builder ant task is now based on the resource editor
  * to allow a single code base for all persistence related resource file manipulations.
- *
- * @author Shai Almog
  */
 public class CodenameOneTask extends MatchingTask {
     /**

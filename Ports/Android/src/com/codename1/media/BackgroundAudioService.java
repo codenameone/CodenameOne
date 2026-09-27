@@ -62,7 +62,6 @@ import java.util.List;
 /**
  * A service used for communicating with the remote control (on the lock screen) for background
  * media.
- * @author shannah
  */
 
 public class BackgroundAudioService extends MediaBrowserServiceCompat implements MediaPlayer.OnCompletionListener, AudioManager.OnAudioFocusChangeListener  {

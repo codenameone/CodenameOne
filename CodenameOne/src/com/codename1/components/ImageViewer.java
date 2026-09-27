@@ -165,8 +165,6 @@ import com.codename1.ui.TopLevelContainer;
 /// iv.setImageList(imodel);
 /// hi.add(BorderLayout.CENTER, iv);
 /// ```
-///
-/// @author Shai Almog
 public class ImageViewer extends Component {
     /// Indicates the initial position of the image in the viewer to FIT to the
     /// component size

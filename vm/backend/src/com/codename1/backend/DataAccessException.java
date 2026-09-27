@@ -24,22 +24,20 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * A database operation failed: a statement the engine refused, a connection
- * that could not be opened or was lost, a query that returned more rows than
- * one.
- *
- * <p>Named after Spring's, and treated the same way by {@code @Transactional}:
- * it rolls the transaction back although it is a checked exception. Spring's
- * rule is that unchecked exceptions roll back and checked ones commit, and in
- * Spring a failed statement rolls back because its JDBC layer throws the
- * unchecked {@code DataAccessException}. This runtime's data methods declare
- * {@link IOException}, so their failures are this subtype of it, and the build's
- * rollback rule lists it beside {@code RuntimeException} and {@code Error}. A
- * plain {@code IOException} of the application's own -- a file it could not
- * read -- still commits, as in Spring; {@code rollbackFor} and
- * {@code noRollbackFor} change either.
- */
+/// A database operation failed: a statement the engine refused, a connection
+/// that could not be opened or was lost, a query that returned more rows than
+/// one.
+///
+/// Named after Spring's, and treated the same way by `@Transactional`:
+/// it rolls the transaction back although it is a checked exception. Spring's
+/// rule is that unchecked exceptions roll back and checked ones commit, and in
+/// Spring a failed statement rolls back because its JDBC layer throws the
+/// unchecked `DataAccessException`. This runtime's data methods declare
+/// [IOException], so their failures are this subtype of it, and the build's
+/// rollback rule lists it beside `RuntimeException` and `Error`. A
+/// plain `IOException` of the application's own -- a file it could not
+/// read -- still commits, as in Spring; `rollbackFor` and
+/// `noRollbackFor` change either.
 public class DataAccessException extends IOException {
     public DataAccessException(String message) {
         super(message);
@@ -49,10 +47,10 @@ public class DataAccessException extends IOException {
         super(message, cause);
     }
 
-    /** {@code err} as a data access failure, keeping its message and cause. */
+    /// `err` as a data access failure, keeping its message and cause.
     static DataAccessException of(IOException err) {
-        if(err instanceof DataAccessException) {
-            return (DataAccessException)err;
+        if (err instanceof DataAccessException) {
+            return (DataAccessException) err;
         }
         return new DataAccessException(err.getMessage(), err);
     }

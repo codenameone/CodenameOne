@@ -21,6 +21,12 @@ on:
       - 'maven/cn1lib-archetype/**'
       - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
+      - 'maven/integration-tests/cn1app-staged-jar-test.sh'
+      # What a generated project stages for upload also depends on the
+      # dependency versions and aggregators the archetype pulls in.
+      - 'maven/pom.xml'
+      - 'maven/cn1-binaries/**'
+      - 'maven/javase/**'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
   push:
@@ -35,6 +41,12 @@ on:
       - 'maven/cn1lib-archetype/**'
       - 'maven/backend/**'
       - 'maven/integration-tests/cn1app-archetype-test.sh'
+      - 'maven/integration-tests/cn1app-staged-jar-test.sh'
+      # What a generated project stages for upload also depends on the
+      # dependency versions and aggregators the archetype pulls in.
+      - 'maven/pom.xml'
+      - 'maven/cn1-binaries/**'
+      - 'maven/javase/**'
       - 'maven/integration-tests/inc/**'
       - '.github/workflows/archetype-smoke.yml'
 
@@ -109,3 +121,11 @@ jobs:
         run: |
           cd maven/integration-tests
           xvfb-run -a bash cn1app-archetype-test.sh
+      # The jar cn1:build would upload, for every target the generated build.sh
+      # offers. #5380 put ~300 MB of ffmpeg natives into every desktop upload and
+      # the build client refused them; nothing looked at this jar for two months.
+      - name: Check the staged upload jar of every build target
+        run: |
+          cd maven/integration-tests
+          # The project's CSS compile opens an AWT frame, so it needs a display.
+          xvfb-run -a bash cn1app-staged-jar-test.sh

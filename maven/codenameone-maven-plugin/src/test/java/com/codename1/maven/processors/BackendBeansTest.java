@@ -229,6 +229,12 @@ public class BackendBeansTest {
             assertTrue(managed, managed.contains("\"size\":3"));
             String routes = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":"
                     + "\"tools/call\",\"params\":{\"name\":\"backend_routes\"}}");
+            // backend_call sends a request through the running server. Its method
+            // was once named like McpTool.call, and the tool recursed into itself.
+            String sent = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"backend_call\",\"arguments\":"
+                    + "{\"method\":\"GET\",\"path\":\"/hello/Cy\"}}}");
+            assertTrue(sent, sent.contains("Hi, Cy") && sent.contains("\"isError\":false"));
             assertTrue(routes, routes.contains("/hello/{name}"));
             String beans = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":"
                     + "\"tools/call\",\"params\":{\"name\":\"backend_beans\"}}");

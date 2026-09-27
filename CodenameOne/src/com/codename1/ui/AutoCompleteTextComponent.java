@@ -31,8 +31,6 @@ import com.codename1.ui.list.ListModel;
 /// A `TextComponent` version of `com.codename1.ui.AutoCompleteTextField`
 ///
 /// This component was contributed here https://github.com/codenameone/CodenameOne/issues/2705
-///
-/// @author Francesco Galgani
 public class AutoCompleteTextComponent extends TextComponent {
     private static final int animationSpeed = 100;
     private final AutoCompleteTextField field;

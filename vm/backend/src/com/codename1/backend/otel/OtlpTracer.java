@@ -38,44 +38,36 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * OpenTelemetry tracing over OTLP/HTTP, with no OpenTelemetry library behind it.
- *
- * <p>The OpenTelemetry Java SDK cannot run here: the server is translated to C
- * against a Java subset with no reflection and no service loading, and a binary
- * that linked the SDK would be carrying it whether or not anyone traced. This is
- * the part of it a server actually needs -- W3C trace context, the standard
- * samplers, a bounded batch exporter, and the OTLP wire format in both its
- * encodings -- and it is only in the binary when the project enables it.
- *
- * <p>Configured the way every OpenTelemetry SDK is, so operations tooling works
- * unchanged. Each setting has a {@code cn1.otel.*} key, readable from
- * application.properties like any other, and the standard {@code OTEL_*}
- * environment variable is honoured for it too:
- *
- * <table>
- *   <tr><th>key</th><th>variable</th><th>default</th></tr>
- *   <tr><td>cn1.otel.endpoint</td><td>OTEL_EXPORTER_OTLP_ENDPOINT</td>
- *       <td>http://localhost:4318; /v1/traces is appended</td></tr>
- *   <tr><td>cn1.otel.traces.endpoint</td><td>OTEL_EXPORTER_OTLP_TRACES_ENDPOINT</td>
- *       <td>used as it is, and wins over the one above</td></tr>
- *   <tr><td>cn1.otel.headers</td><td>OTEL_EXPORTER_OTLP_HEADERS</td>
- *       <td>none; {@code name=value,name=value}</td></tr>
- *   <tr><td>cn1.otel.protocol</td><td>OTEL_EXPORTER_OTLP_PROTOCOL</td>
- *       <td>http/protobuf, or http/json</td></tr>
- *   <tr><td>cn1.otel.service.name</td><td>OTEL_SERVICE_NAME</td>
- *       <td>what the build named it, else unknown_service</td></tr>
- *   <tr><td>cn1.otel.resource.attributes</td><td>OTEL_RESOURCE_ATTRIBUTES</td><td>none</td></tr>
- *   <tr><td>cn1.otel.sampler</td><td>OTEL_TRACES_SAMPLER</td><td>parentbased_always_on</td></tr>
- *   <tr><td>cn1.otel.sampler.arg</td><td>OTEL_TRACES_SAMPLER_ARG</td><td>the ratio, 1</td></tr>
- *   <tr><td>cn1.otel.disabled</td><td>OTEL_SDK_DISABLED</td><td>false</td></tr>
- * </table>
- *
- * <p>{@code cn1.otel.attributes.exclude} names attributes never to record, as a
- * comma separated list ({@code db.query.text,user_agent.original}), and
- * {@code cn1.otel.relay=true} opens the endpoint the app's own spans are relayed
- * through; see {@link OtlpRelay}.
- */
+/// OpenTelemetry tracing over OTLP/HTTP, with no OpenTelemetry library behind it.
+///
+/// The OpenTelemetry Java SDK cannot run here: the server is translated to C
+/// against a Java subset with no reflection and no service loading, and a binary
+/// that linked the SDK would be carrying it whether or not anyone traced. This is
+/// the part of it a server actually needs -- W3C trace context, the standard
+/// samplers, a bounded batch exporter, and the OTLP wire format in both its
+/// encodings -- and it is only in the binary when the project enables it.
+///
+/// Configured the way every OpenTelemetry SDK is, so operations tooling works
+/// unchanged. Each setting has a `cn1.otel.*` key, readable from
+/// application.properties like any other, and the standard `OTEL_*`
+/// environment variable is honoured for it too:
+///
+/// | key | variable | default |
+/// |---|---|---|
+/// | cn1.otel.endpoint | OTEL_EXPORTER_OTLP_ENDPOINT | http://localhost:4318; /v1/traces is appended |
+/// | cn1.otel.traces.endpoint | OTEL_EXPORTER_OTLP_TRACES_ENDPOINT | used as it is, and wins over the one above |
+/// | cn1.otel.headers | OTEL_EXPORTER_OTLP_HEADERS | none; `name=value,name=value` |
+/// | cn1.otel.protocol | OTEL_EXPORTER_OTLP_PROTOCOL | http/protobuf, or http/json |
+/// | cn1.otel.service.name | OTEL_SERVICE_NAME | what the build named it, else unknown_service |
+/// | cn1.otel.resource.attributes | OTEL_RESOURCE_ATTRIBUTES | none |
+/// | cn1.otel.sampler | OTEL_TRACES_SAMPLER | parentbased_always_on |
+/// | cn1.otel.sampler.arg | OTEL_TRACES_SAMPLER_ARG | the ratio, 1 |
+/// | cn1.otel.disabled | OTEL_SDK_DISABLED | false |
+///
+/// `cn1.otel.attributes.exclude` names attributes never to record, as a
+/// comma separated list (`db.query.text,user_agent.original`), and
+/// `cn1.otel.relay=true` opens the endpoint the app's own spans are relayed
+/// through; see [OtlpRelay].
 public final class OtlpTracer implements Tracer {
     public static final String DISABLED = "cn1.otel.disabled";
     public static final String ENDPOINT = "cn1.otel.endpoint";
@@ -99,7 +91,7 @@ public final class OtlpTracer implements Tracer {
     public static final String RELAY_MAX_SPANS = "cn1.otel.relay.maxSpans";
     public static final String RELAY_CORS_ORIGIN = "cn1.otel.relay.corsOrigin";
 
-    /** What the instrumentation scope is called in every export. */
+    /// What the instrumentation scope is called in every export.
     static final String SCOPE_NAME = "com.codename1.backend";
 
     private final String defaultServiceName;
@@ -107,46 +99,40 @@ public final class OtlpTracer implements Tracer {
     private Set excluded = new HashSet();
     private BatchExporter exporter;
     private OtlpRelay relay;
-    /** Ids fetched per call into the secure generator; see seedIds. */
+    /// Ids fetched per call into the secure generator; see seedIds.
     private static final int ID_BLOCK = 64;
     private final long[] ids = new long[ID_BLOCK];
     private int idsLeft;
     private byte[] idKey;
     private long idCounter;
 
-    /** A tracer whose service name comes from configuration alone. */
+    /// A tracer whose service name comes from configuration alone.
     public OtlpTracer() {
         this(null);
     }
 
-    /**
-     * @param defaultServiceName used when neither {@code cn1.otel.service.name}
-     *        nor {@code OTEL_SERVICE_NAME} is set; the build passes the name
-     *        {@code @OpenTelemetry} gave
-     */
+    /// @param defaultServiceName used when neither `cn1.otel.service.name`
+    /// nor `OTEL_SERVICE_NAME` is set; the build passes the name
+    /// `@OpenTelemetry` gave
     public OtlpTracer(String defaultServiceName) {
         this.defaultServiceName = defaultServiceName;
     }
 
-    /**
-     * A tracer opened against {@code config}, or null when the configuration
-     * turns tracing off. For a program that starts {@link HttpServer} or the
-     * Lambda loop itself:
-     *
-     * <pre>
-     *   Tracing.install(OtlpTracer.open(Config.load(), "orders"));
-     * </pre>
-     */
+    /// A tracer opened against `config`, or null when the configuration
+    /// turns tracing off. For a program that starts [HttpServer] or the
+    /// Lambda loop itself:
+    ///
+    /// ```java
+    /// Tracing.install(OtlpTracer.open(Config.load(), "orders"));
+    /// ```
     public static OtlpTracer open(Config config, String defaultServiceName) throws IOException {
         OtlpTracer tracer = new OtlpTracer(defaultServiceName);
         return tracer.open(config) ? tracer : null;
     }
 
-    /**
-     * The OTLP resource this process reports as: {@code service.name} and the
-     * configured resource attributes. Shared by the trace and metric exporters,
-     * which must describe the same service.
-     */
+    /// The OTLP resource this process reports as: `service.name` and the
+    /// configured resource attributes. Shared by the trace and metric exporters,
+    /// which must describe the same service.
     static Map resource(Config config, String defaultServiceName) throws IOException {
         Map resourceAttributes = new LinkedHashMap();
         parsePairs(config.get(RESOURCE_ATTRIBUTES), resourceAttributes, RESOURCE_ATTRIBUTES);
@@ -155,10 +141,10 @@ public final class OtlpTracer implements Tracer {
         // specification wants unknown_service.
         Object fromResource = resourceAttributes.get("service.name");
         String service = nonBlank(config.get(SERVICE_NAME));
-        if(service == null) {
+        if (service == null) {
             service = nonBlank(fromResource == null ? null : String.valueOf(fromResource));
         }
-        if(service == null) {
+        if (service == null) {
             service = nonBlank(defaultServiceName);
         }
         resourceAttributes.put("service.name", service == null ? "unknown_service" : service);
@@ -169,8 +155,9 @@ public final class OtlpTracer implements Tracer {
         return resource;
     }
 
+    @Override
     public boolean open(Config config) throws IOException {
-        if(config.getBoolean(DISABLED, false)) {
+        if (config.getBoolean(DISABLED, false)) {
             return false;
         }
         sampler = Sampler.parse(config.get(SAMPLER), config.get(SAMPLER_ARG));
@@ -178,9 +165,9 @@ public final class OtlpTracer implements Tracer {
 
         String protocol = config.get(TRACES_PROTOCOL, config.get(PROTOCOL, "http/protobuf")).trim();
         boolean protobuf;
-        if("http/protobuf".equals(protocol)) {
+        if ("http/protobuf".equals(protocol)) {
             protobuf = true;
-        } else if("http/json".equals(protocol)) {
+        } else if ("http/json".equals(protocol)) {
             protobuf = false;
         } else {
             // grpc is the one other value the specification names, and the one a
@@ -192,12 +179,12 @@ public final class OtlpTracer implements Tracer {
         }
 
         String endpoint = config.get(TRACES_ENDPOINT);
-        if(endpoint == null || endpoint.trim().length() == 0) {
+        if (endpoint == null || endpoint.trim().length() == 0) {
             String base = config.get(ENDPOINT, "http://localhost:4318").trim();
             endpoint = appendTracesPath(base);
         }
         endpoint = endpoint.trim();
-        if(!hasHttpAuthority(endpoint)) {
+        if (!hasHttpAuthority(endpoint)) {
             throw new IOException("The trace endpoint must be an http or https URL naming "
                     + "a host and is '" + BatchExporter.redact(endpoint) + "'");
         }
@@ -221,16 +208,19 @@ public final class OtlpTracer implements Tracer {
         seedIds();
         exporter = new BatchExporter(endpoint, headers, protobuf, resource, queue, batch,
                 delay, relayBytes * 4L);
-        if(config.getBoolean(RELAY, false)) {
-            String path = canonicalPath(config.get(RELAY_PATH, "/otel/v1/traces").trim());
-            if(path == null) {
+        if (config.getBoolean(RELAY, false)) {
+            String configuredPath = config.get(RELAY_PATH, "/otel/v1/traces").trim();
+            String path = canonicalPath(configuredPath);
+            if (path == null) {
+                // The configured value, not the canonical one: that is the null
+                // being reported, and the message used to end "it is 'null'".
                 throw new IOException(RELAY_PATH + " must be a path such as /otel/v1/traces: "
                         + "it starts with /, has no query or fragment, and uses only the "
                         + "ASCII characters a URL path allows (percent-encode anything "
-                        + "else); it is '" + path + "'");
+                        + "else); it is '" + configuredPath + "'");
             }
             String token = config.get(RELAY_TOKEN);
-            if(token != null && token.length() > 0 && !sendableFieldValue(token)) {
+            if (token != null && token.length() > 0 && !sendableFieldValue(token)) {
                 // Refused here because no client could ever present it: the request
                 // parser refuses a control character in a header value and trims
                 // surrounding spaces and tabs, so a trailing newline from a mounted
@@ -249,25 +239,24 @@ public final class OtlpTracer implements Tracer {
         return true;
     }
 
-    /**
-     * Whether a request header could carry this value exactly: no control
-     * character but tab, and no space or tab at either end, which the request
-     * parser trims as surrounding whitespace.
-     */
+    /// Whether a request header could carry this value exactly: no control
+    /// character but tab, and no space or tab at either end, which the request
+    /// parser trims as surrounding whitespace.
     static boolean sendableFieldValue(String value) {
         int last = value.length() - 1;
-        for(int iter = 0 ; iter <= last ; iter++) {
+        for (int iter = 0 ; iter <= last ; iter++) {
             char c = value.charAt(iter);
-            if((c < 0x20 && c != '\t') || c == 0x7f) {
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
                 return false;
             }
-            if((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
+            if ((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
                 return false;
             }
         }
         return true;
     }
 
+    @Override
     public Span startSpan(String name, int kind, Span parent, String traceparent,
                           String tracestate) {
         long hi;
@@ -282,9 +271,9 @@ public final class OtlpTracer implements Tracer {
         // and adopting it filed the new tracer's children under the old trace, its
         // sampling decision and its clock -- exported, possibly, to another
         // collector than their parent's. Such a child starts a trace of its own.
-        OtelSpan local = parent instanceof OtelSpan && ((OtelSpan)parent).isFrom(this)
-                ? (OtelSpan)parent : null;
-        if(local != null) {
+        OtelSpan local = parent instanceof OtelSpan && ((OtelSpan) parent).isFrom(this)
+                ? (OtelSpan) parent : null;
+        if (local != null) {
             hi = local.traceHi;
             lo = local.traceLo;
             parentId = local.spanId;
@@ -293,7 +282,7 @@ public final class OtlpTracer implements Tracer {
             hasParent = true;
         } else {
             TraceContext context = TraceContext.parse(traceparent);
-            if(context != null) {
+            if (context != null) {
                 hi = context.traceHi;
                 lo = context.traceLo;
                 parentId = context.spanId;
@@ -311,24 +300,28 @@ public final class OtlpTracer implements Tracer {
                 local);
     }
 
+    @Override
     public void flush(int timeoutMillis) {
-        if(exporter != null) {
+        if (exporter != null) {
             exporter.flush(timeoutMillis);
         }
     }
 
+    @Override
     public void shutdown(int timeoutMillis) {
-        if(exporter != null) {
+        if (exporter != null) {
             exporter.shutdown(timeoutMillis);
         }
     }
 
+    @Override
     public HttpServer.Handler relay() {
         return relay;
     }
 
+    @Override
     public void metrics(Map out) {
-        if(exporter != null) {
+        if (exporter != null) {
             exporter.metrics(out);
         }
     }
@@ -337,35 +330,33 @@ public final class OtlpTracer implements Tracer {
         exporter.add(span);
     }
 
-    /**
-     * {@code path} as the server will compare it, or null when it is not an
-     * origin-form path the relay could ever match.
-     *
-     * <p>Only RFC 3986 pchar and "/": a non-ASCII character used to be folded to
-     * '?', so the relay listened somewhere nobody configured, and a query or
-     * fragment could never match, since only the path is compared.
-     *
-     * <p>Then normalized as the server normalizes every request path before
-     * {@code Request.pathIs} compares it (RFC 3986 6.2.2): an escaped unreserved
-     * character is decoded and a kept escape gets upper-case hex digits. Compared
-     * as configured, {@code /otel/%74races} or {@code /otel/%2f} could never
-     * match any request. A '%' not followed by two hex digits is refused.
-     */
+    /// `path` as the server will compare it, or null when it is not an
+    /// origin-form path the relay could ever match.
+    ///
+    /// Only RFC 3986 pchar and "/": a non-ASCII character used to be folded to
+    /// '?', so the relay listened somewhere nobody configured, and a query or
+    /// fragment could never match, since only the path is compared.
+    ///
+    /// Then normalized as the server normalizes every request path before
+    /// `Request.pathIs` compares it (RFC 3986 6.2.2): an escaped unreserved
+    /// character is decoded and a kept escape gets upper-case hex digits. Compared
+    /// as configured, `/otel/%74races` or `/otel/%2f` could never
+    /// match any request. A '%' not followed by two hex digits is refused.
     static String canonicalPath(String path) {
-        if(path.length() == 0 || path.charAt(0) != '/') {
+        if (path.length() == 0 || path.charAt(0) != '/') {
             return null;
         }
         StringBuilder out = new StringBuilder(path.length());
-        for(int iter = 0 ; iter < path.length() ; iter++) {
+        for (int iter = 0 ; iter < path.length() ; iter++) {
             char c = path.charAt(iter);
-            if(c == '%') {
+            if (c == '%') {
                 int hi = iter + 2 < path.length() ? hexValue(path.charAt(iter + 1)) : -1;
                 int lo = hi < 0 ? -1 : hexValue(path.charAt(iter + 2));
-                if(lo < 0) {
+                if (lo < 0) {
                     return null;
                 }
-                char decoded = (char)((hi << 4) | lo);
-                if(isUnreserved(decoded)) {
+                char decoded = (char) ((hi << 4) | lo);
+                if (isUnreserved(decoded)) {
                     out.append(decoded);
                 } else {
                     out.append('%').append(Character.toUpperCase(path.charAt(iter + 1)))
@@ -374,7 +365,7 @@ public final class OtlpTracer implements Tracer {
                 iter += 2;
                 continue;
             }
-            if(!isUnreserved(c) && "!$&'()*+,;=:@/".indexOf(c) < 0) {
+            if (!isUnreserved(c) && "!$&'()*+,;=:@/".indexOf(c) < 0) {
                 return null;
             }
             out.append(c);
@@ -388,33 +379,31 @@ public final class OtlpTracer implements Tracer {
     }
 
     private static int hexValue(char c) {
-        if(c >= '0' && c <= '9') {
+        if (c >= '0' && c <= '9') {
             return c - '0';
         }
-        if(c >= 'a' && c <= 'f') {
+        if (c >= 'a' && c <= 'f') {
             return c - 'a' + 10;
         }
-        if(c >= 'A' && c <= 'F') {
+        if (c >= 'A' && c <= 'F') {
             return c - 'A' + 10;
         }
         return -1;
     }
 
-    /**
-     * {@code cn1.otel.relay.corsOrigin}, checked: {@code *}, or ONE serialized
-     * origin -- scheme, host and port, nothing after. The value goes verbatim into
-     * Access-Control-Allow-Origin, and a browser matches it character for
-     * character against the page's origin, so a path, a trailing slash or a
-     * comma-separated list matches nothing: every preflight failed while the
-     * backend and the app's fail-silent exporter both looked configured.
-     */
+    /// `cn1.otel.relay.corsOrigin`, checked: `*`, or ONE serialized
+    /// origin -- scheme, host and port, nothing after. The value goes verbatim into
+    /// Access-Control-Allow-Origin, and a browser matches it character for
+    /// character against the page's origin, so a path, a trailing slash or a
+    /// comma-separated list matches nothing: every preflight failed while the
+    /// backend and the app's fail-silent exporter both looked configured.
     static String corsOrigin(Config config) throws IOException {
         String value = config.get(RELAY_CORS_ORIGIN);
-        if(value == null || value.trim().length() == 0) {
+        if (value == null || value.trim().length() == 0) {
             return null;
         }
         value = value.trim();
-        if("*".equals(value)) {
+        if ("*".equals(value)) {
             return value;
         }
         int start = value.regionMatches(true, 0, "https://", 0, 8) ? 8
@@ -423,7 +412,7 @@ public final class OtlpTracer implements Tracer {
                 && value.indexOf('/', start) < 0 && value.indexOf('?') < 0
                 && value.indexOf('#') < 0 && value.indexOf('@') < 0
                 && value.indexOf(',') < 0;
-        if(!valid) {
+        if (!valid) {
             // Redacted: a value refused for its userinfo, query or fragment is
             // refused BECAUSE it carries one, and this message goes to deploy logs.
             throw new IOException(RELAY_CORS_ORIGIN + " must be * or one origin such as "
@@ -433,13 +422,11 @@ public final class OtlpTracer implements Tracer {
         return serializedOrigin(value, start);
     }
 
-    /**
-     * An origin as a browser serializes it -- lower-case scheme and host, no
-     * default port -- since that is the string Access-Control-Allow-Origin is
-     * compared against, character for character. HTTPS://APP.EXAMPLE.COM:443 was
-     * accepted as written and matched no page. Called on a value already checked
-     * to be scheme://host[:port].
-     */
+    /// An origin as a browser serializes it -- lower-case scheme and host, no
+    /// default port -- since that is the string Access-Control-Allow-Origin is
+    /// compared against, character for character. HTTPS://APP.EXAMPLE.COM:443 was
+    /// accepted as written and matched no page. Called on a value already checked
+    /// to be scheme://host\[:port\].
     private static String serializedOrigin(String value, int start) {
         String scheme = start == 8 ? "https" : "http";
         String hostPort = value.substring(start);
@@ -447,84 +434,82 @@ public final class OtlpTracer implements Tracer {
         int colon = hostPort.lastIndexOf(':');
         String host = hostPort;
         String port = null;
-        if(colon > close) {
+        if (colon > close) {
             host = hostPort.substring(0, colon);
             port = hostPort.substring(colon + 1);
         }
         StringBuilder out = new StringBuilder(value.length());
         out.append(scheme).append("://");
-        for(int iter = 0 ; iter < host.length() ; iter++) {
+        for (int iter = 0 ; iter < host.length() ; iter++) {
             char c = host.charAt(iter);
-            out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
         }
-        if(port != null && port.length() > 0) {
+        if (port != null && port.length() > 0) {
             int number = Integer.parseInt(port);
-            if(number != (start == 8 ? 443 : 80)) {
+            if (number != (start == 8 ? 443 : 80)) {
                 out.append(':').append(number);
             }
         }
         return out.toString();
     }
 
-    /**
-     * Whether {@code url} is http or https with a host, and a valid port if it
-     * names one. A bare {@code https://} passed a scheme check and started an
-     * exporter whose every POST then failed: the server ran, validated, and
-     * produced no traces.
-     */
+    /// Whether `url` is http or https with a host, and a valid port if it
+    /// names one. A bare `https://` passed a scheme check and started an
+    /// exporter whose every POST then failed: the server ran, validated, and
+    /// produced no traces.
     static boolean hasHttpAuthority(String url) {
         // No fragment. HTTP never sends one, so a credential kept there never
         // reached the collector, and every export was refused silently.
-        if(url.indexOf('#') >= 0) {
+        if (url.indexOf('#') >= 0) {
             return false;
         }
         // The WHOLE URL first, by the rule Web applies when it sends: no space,
         // control or DEL anywhere. Only the authority was checked, so a space in
         // the path passed and every export then failed at transport, silently.
-        for(int iter = 0 ; iter < url.length() ; iter++) {
+        for (int iter = 0 ; iter < url.length() ; iter++) {
             char c = url.charAt(iter);
-            if(c <= 0x20 || c == 0x7f) {
+            if (c <= 0x20 || c == 0x7f) {
                 return false;
             }
         }
         int start;
-        if(url.regionMatches(true, 0, "http://", 0, 7)) {
+        if (url.regionMatches(true, 0, "http://", 0, 7)) {
             start = 7;
-        } else if(url.regionMatches(true, 0, "https://", 0, 8)) {
+        } else if (url.regionMatches(true, 0, "https://", 0, 8)) {
             start = 8;
         } else {
             return false;
         }
         int end = url.length();
-        for(int iter = start ; iter < url.length() ; iter++) {
+        for (int iter = start ; iter < url.length() ; iter++) {
             char c = url.charAt(iter);
-            if(c == '/' || c == '?' || c == '#') {
+            if (c == '/' || c == '?' || c == '#') {
                 end = iter;
                 break;
             }
         }
         String authority = url.substring(start, end);
         int at = authority.lastIndexOf('@');
-        if(at >= 0 && !validUserinfo(authority.substring(0, at))) {
+        if (at >= 0 && !validUserinfo(authority.substring(0, at))) {
             return false;
         }
         String hostPort = at < 0 ? authority : authority.substring(at + 1);
         String host;
         String port = null;
-        if(hostPort.startsWith("[")) {
+        if (hostPort.startsWith("[")) {
             int close = hostPort.indexOf(']');
-            if(close < 0) {
+            if (close < 0) {
                 return false;
             }
             host = hostPort.substring(1, close);
             // An IPv6 literal: hex digits and colons, with dots for an embedded
             // IPv4 tail. Anything else is not an address any stack will parse.
-            if(!isIpv6(host)) {
+            if (!isIpv6(host)) {
                 return false;
             }
             String rest = hostPort.substring(close + 1);
-            if(rest.length() > 0) {
-                if(rest.charAt(0) != ':') {
+            if (rest.length() > 0) {
+                if (rest.charAt(0) != ':') {
                     return false;
                 }
                 port = rest.substring(1);
@@ -537,22 +522,22 @@ public final class OtlpTracer implements Tracer {
             // other unreserved characters. A space, a control, a backslash or a
             // stray bracket passed the emptiness check and started an exporter no
             // resolver or libcurl could connect with, so every span was lost.
-            if(!onlyChars(host, "-._~")) {
+            if (!onlyChars(host, "-._~")) {
                 return false;
             }
         }
-        if(host.length() == 0) {
+        if (host.length() == 0) {
             return false;
         }
         // An empty port ("host:") is the scheme's default, as RFC 3986 allows.
-        if(port != null && port.length() > 0) {
-            if(port.length() > 5) {
+        if (port != null && port.length() > 0) {
+            if (port.length() > 5) {
                 return false;
             }
             int value = 0;
-            for(int iter = 0 ; iter < port.length() ; iter++) {
+            for (int iter = 0 ; iter < port.length() ; iter++) {
                 char c = port.charAt(iter);
-                if(c < '0' || c > '9') {
+                if (c < '0' || c > '9') {
                     return false;
                 }
                 value = value * 10 + (c - '0');
@@ -655,43 +640,41 @@ public final class OtlpTracer implements Tracer {
         return parts == 4;
     }
 
-    /** {@code value} trimmed, or null when that leaves nothing. */
+    /// `value` trimmed, or null when that leaves nothing.
     static String nonBlank(String value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.length() == 0 ? null : trimmed;
     }
 
-    /**
-     * RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete
-     * percent escapes. Skipped over, a space, a control or a stray '%' in it
-     * passed validation and failed only at transport, where exports fail silently.
-     */
+    /// RFC 3986 userinfo: unreserved characters, sub-delims, ':' and complete
+    /// percent escapes. Skipped over, a space, a control or a stray '%' in it
+    /// passed validation and failed only at transport, where exports fail silently.
     static boolean validUserinfo(String userinfo) {
-        for(int iter = 0 ; iter < userinfo.length() ; iter++) {
+        for (int iter = 0 ; iter < userinfo.length() ; iter++) {
             char c = userinfo.charAt(iter);
-            if(c == '%') {
-                if(iter + 2 >= userinfo.length() || OtlpSchema.hexDigit(userinfo.charAt(iter + 1)) < 0
+            if (c == '%') {
+                if (iter + 2 >= userinfo.length() || OtlpSchema.hexDigit(userinfo.charAt(iter + 1)) < 0
                         || OtlpSchema.hexDigit(userinfo.charAt(iter + 2)) < 0) {
                     return false;
                 }
                 iter += 2;
                 continue;
             }
-            if(!onlyChars(String.valueOf(c), "-._~!$&'()*+,;=:")) {
+            if (!onlyChars(String.valueOf(c), "-._~!$&'()*+,;=:")) {
                 return false;
             }
         }
         return true;
     }
 
-    /** Whether every character of {@code value} is an ASCII letter, a digit, or one of {@code extra}. */
+    /// Whether every character of `value` is an ASCII letter, a digit, or one of `extra`.
     private static boolean onlyChars(String value, String extra) {
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
                     || extra.indexOf(c) >= 0)) {
                 return false;
             }
@@ -707,26 +690,24 @@ public final class OtlpTracer implements Tracer {
     // Ids
     // ------------------------------------------------------------------
 
-    /**
-     * Ids come straight from the platform's secure generator, fetched a block at a
-     * time so the native call is paid once per ID_BLOCK ids rather than per span.
-     *
-     * They used to be the output of SplitMix64 over a securely seeded counter. That
-     * is a bijection with a public inverse: one span id seen in a response header or
-     * a log recovers the state, and from it every id this process issues next --
-     * other users' trace ids included, which is exactly what makes a trace id worth
-     * guessing (joining someone else's trace, or predicting a correlation id another
-     * system trusts).
-     *
-     * A refill that fails after open() succeeded falls back to HMAC-SHA256 under a
-     * key drawn from the same generator at open() and never emitted, over a counter.
-     * That is still unpredictable without the key; it exists because nextId() runs
-     * on the request path, where throwing would fail the request being traced.
-     * open() itself fails when there is no secure generator at all.
-     */
+    /// Ids come straight from the platform's secure generator, fetched a block at a
+    /// time so the native call is paid once per ID_BLOCK ids rather than per span.
+    ///
+    /// They used to be the output of SplitMix64 over a securely seeded counter. That
+    /// is a bijection with a public inverse: one span id seen in a response header or
+    /// a log recovers the state, and from it every id this process issues next --
+    /// other users' trace ids included, which is exactly what makes a trace id worth
+    /// guessing (joining someone else's trace, or predicting a correlation id another
+    /// system trusts).
+    ///
+    /// A refill that fails after open() succeeded falls back to HMAC-SHA256 under a
+    /// key drawn from the same generator at open() and never emitted, over a counter.
+    /// That is still unpredictable without the key; it exists because nextId() runs
+    /// on the request path, where throwing would fail the request being traced.
+    /// open() itself fails when there is no secure generator at all.
     private void seedIds() throws IOException {
         byte[] key = Crypto.randomBytes(32);
-        synchronized(this) {
+        synchronized (this) {
             idKey = key;
             idsLeft = 0;
         }
@@ -735,11 +716,11 @@ public final class OtlpTracer implements Tracer {
     private synchronized long nextId() {
         long z;
         do {
-            if(idsLeft == 0) {
+            if (idsLeft == 0) {
                 refillIds();
             }
             z = ids[--idsLeft];
-        } while(z == 0);
+        } while (z == 0);
         return z;
     }
 
@@ -747,27 +728,27 @@ public final class OtlpTracer implements Tracer {
         byte[] block;
         try {
             block = Crypto.randomBytes(ID_BLOCK * 8);
-        } catch(IOException err) {
+        } catch (IOException err) {
             block = null;
         }
-        if(block == null || block.length < ID_BLOCK * 8) {
+        if (block == null || block.length < ID_BLOCK * 8) {
             block = new byte[ID_BLOCK * 8];
             byte[] counter = new byte[8];
-            for(int off = 0 ; off < block.length ; off += 32) {
+            for (int off = 0 ; off < block.length ; off += 32) {
                 long c = ++idCounter;
-                for(int b = 0 ; b < 8 ; b++) {
-                    counter[b] = (byte)(c >>> (56 - 8 * b));
+                for (int b = 0 ; b < 8 ; b++) {
+                    counter[b] = (byte) (c >>> (56 - 8 * b));
                 }
                 byte[] mac = Crypto.hmacSha256(idKey, counter);
-                if(mac == null || mac.length < 32) {
+                if (mac == null || mac.length < 32) {
                     throw new IllegalStateException("No secure randomness for trace ids");
                 }
                 System.arraycopy(mac, 0, block, off, Math.min(32, block.length - off));
             }
         }
-        for(int iter = 0 ; iter < ID_BLOCK ; iter++) {
+        for (int iter = 0 ; iter < ID_BLOCK ; iter++) {
             long v = 0;
-            for(int b = 0 ; b < 8 ; b++) {
+            for (int b = 0 ; b < 8 ; b++) {
                 v = (v << 8) | (block[iter * 8 + b] & 0xff);
             }
             ids[iter] = v;
@@ -779,13 +760,12 @@ public final class OtlpTracer implements Tracer {
     // The export tree
     // ------------------------------------------------------------------
 
-    /** An ExportTraceServiceRequest for these spans, as OTLP/JSON's tree. */
+    /// An ExportTraceServiceRequest for these spans, as OTLP/JSON's tree.
     static Map exportRequest(Map resource, List spans) {
         List encoded = new ArrayList(spans.size());
-        for(int iter = 0 ; iter < spans.size() ; iter++) {
-            Object span = spans.get(iter);
-            if(span instanceof OtelSpan) {
-                encoded.add(spanTree((OtelSpan)span));
+        for (Object span : spans) {
+            if (span instanceof OtelSpan) {
+                encoded.add(spanTree((OtelSpan) span));
             }
         }
         Map scope = new LinkedHashMap();
@@ -809,10 +789,10 @@ public final class OtlpTracer implements Tracer {
         Map out = new LinkedHashMap();
         out.put("traceId", TraceContext.hex(span.traceHi) + TraceContext.hex(span.traceLo));
         out.put("spanId", TraceContext.hex(span.spanId));
-        if(span.tracestate != null) {
+        if (span.tracestate != null) {
             out.put("traceState", span.tracestate);
         }
-        if(span.parentId != 0) {
+        if (span.parentId != 0) {
             out.put("parentSpanId", TraceContext.hex(span.parentId));
         }
         // Trace flags in the low byte, then HAS_IS_REMOTE and IS_REMOTE: whether
@@ -821,7 +801,7 @@ public final class OtlpTracer implements Tracer {
         // parent's context (trace.proto: "unknown, is not remote, is remote"), and
         // setting HAS_IS_REMOTE on a root claimed a local parent it does not have.
         long flags = span.sampled ? 1 : 0;
-        if(span.parentId != 0) {
+        if (span.parentId != 0) {
             flags |= 0x100 | (span.parentRemote ? 0x200 : 0);
         }
         out.put("flags", Long.valueOf(flags));
@@ -831,27 +811,27 @@ public final class OtlpTracer implements Tracer {
         out.put("startTimeUnixNano", String.valueOf(span.startEpochNanos));
         out.put("endTimeUnixNano", String.valueOf(span.endEpochNanos));
         out.put("attributes", keyValues(span.attributes));
-        if(span.droppedAttributes > 0) {
+        if (span.droppedAttributes > 0) {
             out.put("droppedAttributesCount", Integer.valueOf(span.droppedAttributes));
         }
-        if(span.events != null && !span.events.isEmpty()) {
+        if (span.events != null && !span.events.isEmpty()) {
             List events = new ArrayList(span.events.size());
-            for(int iter = 0 ; iter < span.events.size() ; iter++) {
-                Object[] event = (Object[])span.events.get(iter);
+            for (int iter = 0 ; iter < span.events.size() ; iter++) {
+                Object[] event = (Object[]) span.events.get(iter);
                 Map e = new LinkedHashMap();
                 e.put("timeUnixNano", String.valueOf(event[0]));
                 e.put("name", event[1]);
-                e.put("attributes", keyValues((Map)event[2]));
+                e.put("attributes", keyValues((Map) event[2]));
                 events.add(e);
             }
             out.put("events", events);
         }
-        if(span.droppedEvents > 0) {
+        if (span.droppedEvents > 0) {
             out.put("droppedEventsCount", Integer.valueOf(span.droppedEvents));
         }
-        if(span.statusCode != 0) {
+        if (span.statusCode != 0) {
             Map status = new LinkedHashMap();
-            if(span.statusMessage != null) {
+            if (span.statusMessage != null) {
                 status.put("message", span.statusMessage);
             }
             status.put("code", Integer.valueOf(span.statusCode));
@@ -862,19 +842,19 @@ public final class OtlpTracer implements Tracer {
 
     static List keyValues(Map attributes) {
         List out = new ArrayList(attributes == null ? 0 : attributes.size());
-        if(attributes == null) {
+        if (attributes == null) {
             return out;
         }
         Iterator it = attributes.entrySet().iterator();
-        while(it.hasNext()) {
-            Map.Entry entry = (Map.Entry)it.next();
+        while (it.hasNext()) {
+            Map.Entry entry = (Map.Entry) it.next();
             Object v = entry.getValue();
             Map value = new LinkedHashMap();
-            if(v instanceof Boolean) {
+            if (v instanceof Boolean) {
                 value.put("boolValue", v);
-            } else if(v instanceof Long || v instanceof Integer) {
+            } else if (v instanceof Long || v instanceof Integer) {
                 value.put("intValue", String.valueOf(v));
-            } else if(v instanceof Double) {
+            } else if (v instanceof Double) {
                 value.put("doubleValue", v);
             } else {
                 value.put("stringValue", String.valueOf(v));
@@ -891,29 +871,27 @@ public final class OtlpTracer implements Tracer {
     // Configuration parsing
     // ------------------------------------------------------------------
 
-    /**
-     * The generic endpoint plus /v1/traces, appended to the PATH. An endpoint can
-     * carry its credential in the query ({@code https://c.example/otlp?api-key=...});
-     * appending to the whole string put the path inside the key's value and sent
-     * the export to the base path with a corrupted credential.
-     */
+    /// The generic endpoint plus /v1/traces, appended to the PATH. An endpoint can
+    /// carry its credential in the query (`https://c.example/otlp?api-key=...`);
+    /// appending to the whole string put the path inside the key's value and sent
+    /// the export to the base path with a corrupted credential.
     static String appendTracesPath(String base) {
         return appendSignalPath(base, "/v1/traces");
     }
 
-    /** The generic endpoint plus a signal's path, appended to the PATH. */
+    /// The generic endpoint plus a signal's path, appended to the PATH.
     static String appendSignalPath(String base, String signal) {
         int cut = base.length();
         int query = base.indexOf('?');
         int fragment = base.indexOf('#');
-        if(query >= 0) {
+        if (query >= 0) {
             cut = query;
         }
-        if(fragment >= 0 && fragment < cut) {
+        if (fragment >= 0 && fragment < cut) {
             cut = fragment;
         }
         String path = base.substring(0, cut);
-        while(path.endsWith("/")) {
+        while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
         return path + signal + base.substring(cut);
@@ -921,7 +899,7 @@ public final class OtlpTracer implements Tracer {
 
     static int positive(Config config, String key, int fallback) throws IOException {
         int value = config.getInt(key, fallback);
-        if(value <= 0) {
+        if (value <= 0) {
             throw new IOException(key + " must be a positive number and is " + value);
         }
         return value;
@@ -929,17 +907,17 @@ public final class OtlpTracer implements Tracer {
 
     private static Set splitSet(String list) {
         Set out = new HashSet();
-        if(list == null) {
+        if (list == null) {
             return out;
         }
         int at = 0;
-        while(at <= list.length()) {
+        while (at <= list.length()) {
             int comma = list.indexOf(',', at);
-            if(comma < 0) {
+            if (comma < 0) {
                 comma = list.length();
             }
             String item = list.substring(at, comma).trim();
-            if(item.length() > 0) {
+            if (item.length() > 0) {
                 out.add(item);
             }
             at = comma + 1;
@@ -947,29 +925,29 @@ public final class OtlpTracer implements Tracer {
         return out;
     }
 
-    /** OTEL_EXPORTER_OTLP_HEADERS: {@code name=value,...}, values percent-encoded. */
+    /// OTEL_EXPORTER_OTLP_HEADERS: `name=value,...`, values percent-encoded.
     static void parseHeaders(String text, List out) throws IOException {
         Map pairs = new LinkedHashMap();
         parsePairs(text, pairs, HEADERS);
         Iterator it = pairs.entrySet().iterator();
-        while(it.hasNext()) {
-            Map.Entry entry = (Map.Entry)it.next();
+        while (it.hasNext()) {
+            Map.Entry entry = (Map.Entry) it.next();
             String name = String.valueOf(entry.getKey());
-            if(name.length() == 0) {
+            if (name.length() == 0) {
                 throw new IOException(HEADERS + " has an entry with no header name");
             }
-            if(name.equalsIgnoreCase("content-type")) {
+            if ("content-type".equalsIgnoreCase(name)) {
                 // The exporter sets it from the protocol, and Web sends every line,
                 // so a configured one went out as a SECOND Content-Type -- one of
                 // which contradicts the body.
                 throw new IOException(HEADERS + " sets Content-Type, which the exporter "
                         + "sets from " + PROTOCOL);
             }
-            for(int iter = 0 ; iter < name.length() ; iter++) {
+            for (int iter = 0 ; iter < name.length() ; iter++) {
                 char c = name.charAt(iter);
                 boolean token = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                         || (c >= '0' && c <= '9') || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
-                if(!token) {
+                if (!token) {
                     throw new IOException(HEADERS + " names a header '" + name
                             + "' that is not a valid header name");
                 }
@@ -990,30 +968,28 @@ public final class OtlpTracer implements Tracer {
         }
     }
 
-    /**
-     * The W3C Baggage-style list both OTEL_EXPORTER_OTLP_HEADERS and
-     * OTEL_RESOURCE_ATTRIBUTES use. A malformed entry is an error, not skipped:
-     * the usual one is an Authorization header whose value was pasted with a
-     * space where the specification wants %20, and silently dropping it is a
-     * collector that answers 401 to every export.
-     */
+    /// The W3C Baggage-style list both OTEL_EXPORTER_OTLP_HEADERS and
+    /// OTEL_RESOURCE_ATTRIBUTES use. A malformed entry is an error, not skipped:
+    /// the usual one is an Authorization header whose value was pasted with a
+    /// space where the specification wants %20, and silently dropping it is a
+    /// collector that answers 401 to every export.
     static void parsePairs(String text, Map out, String key) throws IOException {
-        if(text == null) {
+        if (text == null) {
             return;
         }
         int at = 0;
-        while(at < text.length()) {
+        while (at < text.length()) {
             int comma = text.indexOf(',', at);
-            if(comma < 0) {
+            if (comma < 0) {
                 comma = text.length();
             }
             String item = text.substring(at, comma).trim();
             at = comma + 1;
-            if(item.length() == 0) {
+            if (item.length() == 0) {
                 continue;
             }
             int eq = item.indexOf('=');
-            if(eq <= 0) {
+            if (eq <= 0) {
                 throw new IOException(key + " must be name=value pairs separated by commas");
             }
             out.put(item.substring(0, eq).trim(), percentDecode(item.substring(eq + 1).trim(), key));
@@ -1021,18 +997,18 @@ public final class OtlpTracer implements Tracer {
     }
 
     private static String percentDecode(String value, String key) throws IOException {
-        if(value.indexOf('%') < 0) {
+        if (value.indexOf('%') < 0) {
             return value;
         }
         com.codename1.backend.ByteSink bytes = new com.codename1.backend.ByteSink(value.length());
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(c != '%') {
+            if (c != '%') {
                 // By CODE POINT: a supplementary character is two chars here, and
                 // encoding each half on its own wrote invalid UTF-8 that the String
                 // constructor below replaced -- corrupting a resource value, or a
                 // credential so that every export was refused.
-                if(Character.isHighSurrogate(c) && iter + 1 < value.length()
+                if (Character.isHighSurrogate(c) && iter + 1 < value.length()
                         && Character.isLowSurrogate(value.charAt(iter + 1))) {
                     bytes.putCodePoint(Character.toCodePoint(c, value.charAt(iter + 1)));
                     iter++;
@@ -1041,12 +1017,12 @@ public final class OtlpTracer implements Tracer {
                 bytes.putCodePoint(c);
                 continue;
             }
-            if(iter + 2 >= value.length()) {
+            if (iter + 2 >= value.length()) {
                 throw new IOException(key + " has a malformed percent escape");
             }
             int hi = OtlpSchema.hexDigit(value.charAt(iter + 1));
             int lo = OtlpSchema.hexDigit(value.charAt(iter + 2));
-            if(hi < 0 || lo < 0) {
+            if (hi < 0 || lo < 0) {
                 throw new IOException(key + " has a malformed percent escape");
             }
             bytes.put((hi << 4) | lo);
@@ -1061,7 +1037,7 @@ public final class OtlpTracer implements Tracer {
         byte[] raw = new byte[bytes.length()];
         System.arraycopy(bytes.bytes(), 0, raw, 0, raw.length);
         String decoded = new String(raw, "UTF-8");
-        if(!java.util.Arrays.equals(raw, decoded.getBytes("UTF-8"))) {
+        if (!java.util.Arrays.equals(raw, decoded.getBytes("UTF-8"))) {
             throw new IOException(key + " has a percent escape that is not well-formed UTF-8");
         }
         return decoded;

@@ -36,8 +36,6 @@ import javax.swing.JOptionPane;
 /**
  * The data entry in the resource editor, allows placing an arbitrary file
  * in the resource file
- *
- * @author  Shai Almog
  */
 public class DataEditor extends BaseForm {
     private EditableResources resources;

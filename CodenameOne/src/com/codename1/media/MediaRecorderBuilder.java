@@ -27,9 +27,6 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 
 /// A builder class to generate a Media recorder with specific settings.
-///
-/// @author shannah
-///
 public class MediaRecorderBuilder {
     private int audioChannels = 1,
             bitRate = 64000,

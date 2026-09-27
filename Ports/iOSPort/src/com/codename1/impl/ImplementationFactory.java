@@ -29,8 +29,6 @@ import com.codename1.impl.ios.IOSImplementation;
  * Generic class allowing 3rd parties to replace the underlying implementation in
  * CodenameOne seamlessly. The factory can be replaced by 3rd parties to install a new
  * underlying implementation using elaborate logic. 
- *
- * @author Shai Almog
  */
 public class ImplementationFactory {
     private static ImplementationFactory instance = new ImplementationFactory();

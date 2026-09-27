@@ -24,8 +24,6 @@ package com.codename1.ui.validation;
 
 /// To perform validation we add a constraint to a validator, a constraint defines whether a value if valid
 /// for a given object
-///
-/// @author Shai Almog
 public interface Constraint {
     /// Indicates if the given value is valid or not
     ///

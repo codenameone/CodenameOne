@@ -39,8 +39,6 @@ import java.util.Map;
 /// This class provides a similar API to `URL` making it almost into a "drop in" replacement.
 /// It is placed in a different package because it is incompatible to `URL` by definition.  It is useful
 /// in getting some simple code to work without too many changes
-///
-/// @author Shai Almog
 public class URL {
     private final URI u;
 

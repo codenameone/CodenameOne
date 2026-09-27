@@ -70,8 +70,6 @@ import java.util.HashMap;
 /// `Desktop#isSupported()`. There is deliberately no silent fallback to showing a
 /// `Form`: a window that quietly is not a window produces layout and lifecycle bugs
 /// that are far harder to find than an exception on the first line.
-///
-/// @author Shai Almog
 public class Window extends Container implements TopLevelContainer {
 
     /// Closing the window disposes it and releases the native window. The default.

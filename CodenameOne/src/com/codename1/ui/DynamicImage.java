@@ -27,8 +27,6 @@ import com.codename1.ui.plaf.Style;
 /// A base class for images that dynamically painted, just like a normal component. Subclasses
 /// just need to implement the `java.lang.Object, int, int, int, int)`
 /// method.
-///
-/// @author shannah
 public abstract class DynamicImage extends Image {
 
     private int w = 250;

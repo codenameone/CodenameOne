@@ -27,20 +27,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Marks a class the backend processors wrote, so a later pass knows its own work.
- *
- * Both processors refuse to generate a class whose name is already taken, because
- * the generated one would silently overwrite the developer's in the output
- * directory. That guard read its OWN previous output as such a class: an
- * incremental build -- `mvn process-classes` a second time, without a clean --
- * scans target/classes, finds the router or dispatcher written by the first pass,
- * and reports a collision. Every project using @RestController failed its second
- * build and only a clean would fix it.
- *
- * CLASS retention: the class file has to carry it so the next pass's scanner can
- * see it, and nothing reads it at runtime.
- */
+/// Marks a class the backend processors wrote, so a later pass knows its own work.
+///
+/// Both processors refuse to generate a class whose name is already taken, because
+/// the generated one would silently overwrite the developer's in the output
+/// directory. That guard read its OWN previous output as such a class: an
+/// incremental build -- `mvn process-classes` a second time, without a clean --
+/// scans target/classes, finds the router or dispatcher written by the first pass,
+/// and reports a collision. Every project using @RestController failed its second
+/// build and only a clean would fix it.
+///
+/// CLASS retention: the class file has to carry it so the next pass's scanner can
+/// see it, and nothing reads it at runtime.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Generated {

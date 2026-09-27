@@ -32,10 +32,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.JSProperty;
 
-/**
- *
- * @author shannah
- */
 public class JSDateFormat  {
 
     private IntlDateTimeFormat fmt;

@@ -159,8 +159,6 @@ import java.util.Map;
 ///     return data;
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRenderer<T> {
 
     /// If this flag exists in a Map of data the renderer will enable/disable

@@ -31,8 +31,6 @@ import java.util.List;
 
 /// An easy API for working with threads similar to call serially/and wait that allows us to
 /// create a thread and dispatch tasks to it.
-///
-/// @author Shai Almog
 public final class EasyThread {
     private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
     private final Object LOCK = new Object();

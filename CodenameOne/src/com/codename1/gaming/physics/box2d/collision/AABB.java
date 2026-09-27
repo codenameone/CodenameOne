@@ -52,7 +52,7 @@ public class AABB {
   /// Creates an AABB object using the given bounding vertices.
   ///
   /// @param lowerVertex the bottom left vertex of the bounding box
-  /// @param maxVertex the top right vertex of the bounding box
+  /// @param upperVertex the top right vertex of the bounding box
   public AABB(final Vec2 lowerVertex, final Vec2 upperVertex) {
     this.lowerBound = lowerVertex.clone(); // clone to be safe
     this.upperBound = upperVertex.clone();

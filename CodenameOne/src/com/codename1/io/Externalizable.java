@@ -131,8 +131,6 @@ import java.io.IOException;
 ///
 /// **WARNING:** The externalization process caches objects so the app will seem to work and only fail on restart!
 ///
-/// @author Shai Almog
-///
 /// #### See also
 ///
 /// - [Object Persistence in Codename One](https://sjhannah.com/blog/2013/02/08/object-persistence-in-codename-one/)

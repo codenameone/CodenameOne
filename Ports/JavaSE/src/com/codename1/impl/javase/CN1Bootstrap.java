@@ -33,7 +33,6 @@ import org.cef.CN1JcefRuntime;
  * Bootstraps the reloadable JavaSE classpath while keeping native-backed
  * libraries such as JCEF in the parent classloader. This is used by the CSS
  * compiler and desktop Codename One applications.
- * @author shannah
  */
 public class CN1Bootstrap {
     private static ClassPathLoader rootClassLoader;

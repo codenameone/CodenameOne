@@ -34,8 +34,6 @@ import java.util.Date;
 
 /// Represents a date model for the spinner
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

@@ -54,8 +54,6 @@ import java.util.Vector;
 
 /// Central point singleton managing the look of the application, this class allows us to
 /// customize the styles (themes) as well as the look instance.
-///
-/// @author Chen Fishbein
 public class UIManager {
 
     static UIManager instance;

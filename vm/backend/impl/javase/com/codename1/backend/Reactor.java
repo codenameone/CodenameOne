@@ -33,33 +33,29 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Java SE twin of the epoll/kqueue reactor, over a Selector.
- *
- * Two things about NIO that the native side gets for free and this has to work
- * around, both of them thread-related:
- *
- * - register() from a thread other than the one inside select() blocks until the
- *   select returns. Workers hand descriptors back after finishing a request, so
- *   registrations are queued and applied by the selecting thread instead.
- * - cancel() is lazy: the key survives until the next select, and a channel with a
- *   live key throws IllegalBlockingModeException when a worker flips it to
- *   blocking. remove() therefore flushes with selectNow(); it is only ever called
- *   from the selecting thread (the reactor loop) or for the listener during stop.
- */
+/// Java SE twin of the epoll/kqueue reactor, over a Selector.
+///
+/// Two things about NIO that the native side gets for free and this has to work
+/// around, both of them thread-related:
+///
+/// - register() from a thread other than the one inside select() blocks until the
+/// select returns. Workers hand descriptors back after finishing a request, so
+/// registrations are queued and applied by the selecting thread instead.
+/// - cancel() is lazy: the key survives until the next select, and a channel with a
+/// live key throws IllegalBlockingModeException when a worker flips it to
+/// blocking. remove() therefore flushes with selectNow(); it is only ever called
+/// from the selecting thread (the reactor loop) or for the listener during stop.
 public final class Reactor {
     public static final int READ = 1;
     public static final int WRITE = 2;
-    /**
-     * Deliver an event for this descriptor ONCE and then disarm it, until
-     * {@link #modify} re-arms it.
-     *
-     * This is what lets the worker threads poll the same set directly rather
-     * than a reactor thread dispatching to them: the kernel guarantees exactly
-     * one waiter is handed a given descriptor, so two workers cannot land on one
-     * connection. Without it a level-triggered set reports the same descriptor
-     * ready to every waiter at once.
-     */
+    /// Deliver an event for this descriptor ONCE and then disarm it, until
+    /// [#modify] re-arms it.
+    ///
+    /// This is what lets the worker threads poll the same set directly rather
+    /// than a reactor thread dispatching to them: the kernel guarantees exactly
+    /// one waiter is handed a given descriptor, so two workers cannot land on one
+    /// connection. Without it a level-triggered set reports the same descriptor
+    /// ready to every waiter at once.
     public static final int ONESHOT = 4;
 
     private final Selector selector;
@@ -70,10 +66,8 @@ public final class Reactor {
         this.selector = selector;
     }
 
-    /**
-     * Null: this runtime has no virtual-thread hosts to wake. See the packaged
-     * runtime's Reactor.
-     */
+    /// Null: this runtime has no virtual-thread hosts to wake. See the packaged
+    /// runtime's Reactor.
     public static int[] createWakePipe() {
         return null;
     }
@@ -88,7 +82,7 @@ public final class Reactor {
         return new Reactor(Selector.open());
     }
 
-    /** Descriptors registered with {@link #ONESHOT}, so await() knows to disarm them. */
+    /// Descriptors registered with [#ONESHOT], so await() knows to disarm them.
     private final java.util.Set oneshot =
             java.util.Collections.synchronizedSet(new java.util.HashSet());
 
@@ -100,12 +94,10 @@ public final class Reactor {
         selector.wakeup();
     }
 
-    /**
-     * Records whether this descriptor is armed one-shot, which is a property of
-     * the LAST call that set its interest -- add() or modify() alike.
-     */
+    /// Records whether this descriptor is armed one-shot, which is a property of
+    /// the LAST call that set its interest -- add() or modify() alike.
     private void rememberOneshot(Integer key, int events) {
-        if((events & ONESHOT) != 0) {
+        if ((events & ONESHOT) != 0) {
             oneshot.add(key);
         } else {
             oneshot.remove(key);
@@ -124,7 +116,7 @@ public final class Reactor {
         // answering a documented call differently.
         rememberOneshot(Integer.valueOf(fd), events);
         SelectionKey key = keys.get(Integer.valueOf(fd));
-        if(key == null) {
+        if (key == null) {
             add(fd, events);
             return;
         }
@@ -139,7 +131,7 @@ public final class Reactor {
     public void remove(int fd) {
         oneshot.remove(Integer.valueOf(fd));
         SelectionKey key = keys.remove(Integer.valueOf(fd));
-        if(key == null) {
+        if (key == null) {
             return;
         }
         key.cancel();
@@ -167,32 +159,32 @@ public final class Reactor {
         // third case and are CORRECT as they stand: there a zero timeout is a
         // socket deadline of zero, which means no deadline on the translated arm
         // too (SO_RCVTIMEO of zero blocks), so select(0) already agrees.
-        if(timeoutMillis == 0) {
+        if (timeoutMillis == 0) {
             selector.selectNow();
-        } else if(timeoutMillis < 0) {
+        } else if (timeoutMillis < 0) {
             selector.select();
         } else {
             selector.select(timeoutMillis);
         }
         int count = 0;
         Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-        while(iterator.hasNext()) {
+        while (iterator.hasNext()) {
             SelectionKey key = iterator.next();
             iterator.remove();
-            if(count >= readyFds.length) {
+            if (count >= readyFds.length) {
                 break;
             }
             Object attachment = key.attachment();
-            if(attachment instanceof Integer) {
+            if (attachment instanceof Integer) {
                 // ONESHOT emulation: NIO has no equivalent, so clear the interest
                 // set the way epoll disarms a one-shot descriptor. modify()
                 // re-arms it. Without this the flag would be silently inert here
                 // and two threads polling one selector would both be handed the
                 // same connection -- the exact hazard ONESHOT exists to remove.
-                if(oneshot.contains(attachment)) {
+                if (oneshot.contains(attachment)) {
                     key.interestOps(0);
                 }
-                readyFds[count++] = ((Integer)attachment).intValue();
+                readyFds[count++] = ((Integer) attachment).intValue();
             }
         }
         return count;
@@ -208,19 +200,19 @@ public final class Reactor {
     }
 
     private void applyPending() {
-        while(true) {
+        while (true) {
             int[] entry;
             synchronized (pending) {
                 entry = pending.poll();
             }
-            if(entry == null) {
+            if (entry == null) {
                 return;
             }
             Object channel = Descriptors.get(entry[0]);
-            if(!(channel instanceof SelectableChannel)) {
+            if (!(channel instanceof SelectableChannel)) {
                 continue;
             }
-            SelectableChannel selectable = (SelectableChannel)channel;
+            SelectableChannel selectable = (SelectableChannel) channel; //NOPMD CloseResource - owned by the descriptor table
             try {
                 // NON-BLOCKING FIRST, because register() refuses a blocking
                 // channel -- IllegalBlockingModeException -- and the catch below
@@ -235,7 +227,7 @@ public final class Reactor {
                 SelectionKey key = selectable.register(selector,
                         toOps(entry[1], selectable), Integer.valueOf(entry[0]));
                 keys.put(Integer.valueOf(entry[0]), key);
-            } catch (Exception err) {
+            } catch (IOException | RuntimeException err) {
                 // A closed or already-cancelled channel simply does not come back.
                 keys.remove(Integer.valueOf(entry[0]));
             }
@@ -244,13 +236,13 @@ public final class Reactor {
 
     private static int toOps(int events, SelectableChannel channel) {
         int ops = 0;
-        if((events & READ) != 0) {
+        if ((events & READ) != 0) {
             // A server socket reports readiness to accept, not to read; the shared
             // code above says READ for both, as poll does.
             ops |= (channel.validOps() & SelectionKey.OP_ACCEPT) != 0
                     ? SelectionKey.OP_ACCEPT : SelectionKey.OP_READ;
         }
-        if((events & WRITE) != 0 && (channel.validOps() & SelectionKey.OP_WRITE) != 0) {
+        if ((events & WRITE) != 0 && (channel.validOps() & SelectionKey.OP_WRITE) != 0) {
             ops |= SelectionKey.OP_WRITE;
         }
         return ops;

@@ -29,7 +29,6 @@ import com.codename1.gaming.physics.box2d.dynamics.joints.JointType;
 
 /// Created at 3:38:52 AM Jan 15, 2011
 
-/// @author Daniel Murphy
 public class WeldJointDef extends JointDef {
 	/// The local anchor point relative to body1's origin.
 	public final Vec2 localAnchorA;

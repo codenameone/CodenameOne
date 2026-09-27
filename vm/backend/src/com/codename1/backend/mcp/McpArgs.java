@@ -27,47 +27,45 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The conversions the build's generated tool and operation adapters use: one
- * argument out of a call's argument map, as the type the method declares.
- *
- * <p>Accepts what an agent or an HTTP client actually sends -- a JSON number or a
- * numeric string, a JSON boolean or "true" -- and refuses anything else with an
- * {@link IllegalArgumentException} naming the argument, which the MCP endpoint
- * reports to the agent as a tool error it can correct.
- */
+/// The conversions the build's generated tool and operation adapters use: one
+/// argument out of a call's argument map, as the type the method declares.
+///
+/// Accepts what an agent or an HTTP client actually sends -- a JSON number or a
+/// numeric string, a JSON boolean or "true" -- and refuses anything else with an
+/// [IllegalArgumentException] naming the argument, which the MCP endpoint
+/// reports to the agent as a tool error it can correct.
 public final class McpArgs {
     private McpArgs() {
     }
 
-    /** One property of an input schema. */
+    /// One property of an input schema.
     public static Map property(String type, String description, String[] values) {
         Map p = new LinkedHashMap();
-        if(type != null && type.length() > 0) {
+        if (type != null && type.length() > 0) {
             p.put("type", type);
         }
-        if(description != null && description.length() > 0) {
+        if (description != null && description.length() > 0) {
             p.put("description", description);
         }
-        if(values != null) {
+        if (values != null) {
             List list = new ArrayList();
-            for(int iter = 0 ; iter < values.length ; iter++) {
-                list.add(values[iter]);
+            for (String element : values) {
+                list.add(element);
             }
             p.put("enum", list);
         }
         return p;
     }
 
-    /** An object schema. */
+    /// An object schema.
     public static Map object(Map properties, String[] required) {
         Map out = new LinkedHashMap();
         out.put("type", "object");
         out.put("properties", properties);
-        if(required != null && required.length > 0) {
+        if (required != null && required.length > 0) {
             List list = new ArrayList();
-            for(int iter = 0 ; iter < required.length ; iter++) {
-                list.add(required[iter]);
+            for (String element : required) {
+                list.add(element);
             }
             out.put("required", list);
         }
@@ -76,7 +74,7 @@ public final class McpArgs {
 
     private static Object raw(Map args, String name, boolean required) {
         Object v = args == null ? null : args.get(name);
-        if(v == null && required) {
+        if (v == null && required) {
             throw new IllegalArgumentException("Missing required argument \"" + name + "\"");
         }
         return v;
@@ -98,32 +96,30 @@ public final class McpArgs {
 
     public static int intValue(Map args, String name, boolean required) {
         long v = longValue(args, name, required);
-        if(v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {
+        if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("\"" + name + "\" is out of range");
         }
-        return (int)v;
+        return (int) v;
     }
 
-    /**
-     * A short argument, refused outside the short range rather than narrowed:
-     * a cast would turn 40000 into -25536 and run the tool with a number
-     * nobody sent.
-     */
+    /// A short argument, refused outside the short range rather than narrowed:
+    /// a cast would turn 40000 into -25536 and run the tool with a number
+    /// nobody sent.
     public static short shortValue(Map args, String name, boolean required) {
         int v = intValue(args, name, required);
-        if(v < Short.MIN_VALUE || v > Short.MAX_VALUE) {
+        if (v < Short.MIN_VALUE || v > Short.MAX_VALUE) {
             throw new IllegalArgumentException("\"" + name + "\" is out of range");
         }
-        return (short)v;
+        return (short) v;
     }
 
-    /** A byte argument, refused outside the byte range for the same reason. */
+    /// A byte argument, refused outside the byte range for the same reason.
     public static byte byteValue(Map args, String name, boolean required) {
         int v = intValue(args, name, required);
-        if(v < Byte.MIN_VALUE || v > Byte.MAX_VALUE) {
+        if (v < Byte.MIN_VALUE || v > Byte.MAX_VALUE) {
             throw new IllegalArgumentException("\"" + name + "\" is out of range");
         }
-        return (byte)v;
+        return (byte) v;
     }
 
     public static double doubleValue(Map args, String name, boolean required) {
@@ -133,17 +129,17 @@ public final class McpArgs {
 
     public static boolean booleanValue(Map args, String name, boolean required) {
         Object v = raw(args, name, required);
-        if(v == null) {
+        if (v == null) {
             return false;
         }
-        if(v instanceof Boolean) {
-            return ((Boolean)v).booleanValue();
+        if (v instanceof Boolean) {
+            return ((Boolean) v).booleanValue();
         }
         String s = String.valueOf(v);
-        if("true".equalsIgnoreCase(s)) {
+        if ("true".equalsIgnoreCase(s)) {
             return true;
         }
-        if("false".equalsIgnoreCase(s)) {
+        if ("false".equalsIgnoreCase(s)) {
             return false;
         }
         throw new IllegalArgumentException("\"" + name + "\" must be true or false");
@@ -151,10 +147,10 @@ public final class McpArgs {
 
     public static char charValue(Map args, String name, boolean required) {
         String s = string(args, name, required);
-        if(s == null) {
+        if (s == null) {
             return 0;
         }
-        if(s.length() != 1) {
+        if (s.length() != 1) {
             throw new IllegalArgumentException("\"" + name + "\" must be one character");
         }
         return s.charAt(0);
@@ -162,45 +158,43 @@ public final class McpArgs {
 
     public static Integer integerObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Integer(intValue(args, name, required));
+                : Integer.valueOf(intValue(args, name, required));
     }
 
     public static Long longObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Long(longValue(args, name, required));
+                : Long.valueOf(longValue(args, name, required));
     }
 
     public static Short shortObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Short(shortValue(args, name, required));
+                : Short.valueOf(shortValue(args, name, required));
     }
 
     public static Byte byteObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Byte(byteValue(args, name, required));
+                : Byte.valueOf(byteValue(args, name, required));
     }
 
     public static Double doubleObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Double(doubleValue(args, name, required));
+                : Double.valueOf(doubleValue(args, name, required));
     }
 
     public static Float floatObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Float(floatValue(args, name, required));
+                : Float.valueOf(floatValue(args, name, required));
     }
 
-    /**
-     * A float argument, refused when it has no float value: a finite number
-     * such as 1e100 would otherwise narrow to infinity, and the method would
-     * run with a number nobody sent.
-     */
+    /// A float argument, refused when it has no float value: a finite number
+    /// such as 1e100 would otherwise narrow to infinity, and the method would
+    /// run with a number nobody sent.
     public static float floatValue(Map args, String name, boolean required) {
         double d = doubleValue(args, name, required);
-        if(Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE) {
+        if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE) {
             throw new IllegalArgumentException("\"" + name + "\" is out of range");
         }
-        return (float)d;
+        return (float) d;
     }
 
     public static Boolean booleanObject(Map args, String name, boolean required) {
@@ -210,86 +204,86 @@ public final class McpArgs {
 
     public static Character characterObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Character(charValue(args, name, required));
+                : Character.valueOf(charValue(args, name, required));
     }
 
     public static Map map(Map args, String name, boolean required) {
         Object v = raw(args, name, required);
-        if(v == null || v instanceof Map) {
-            return (Map)v;
+        if (v == null || v instanceof Map) {
+            return (Map) v;
         }
         throw new IllegalArgumentException("\"" + name + "\" must be an object");
     }
 
     public static List list(Map args, String name, boolean required) {
         Object v = raw(args, name, required);
-        if(v == null || v instanceof List) {
-            return (List)v;
+        if (v == null || v instanceof List) {
+            return (List) v;
         }
         throw new IllegalArgumentException("\"" + name + "\" must be an array");
     }
 
     private static String constantName(Object constant) {
-        return constant instanceof Enum ? ((Enum)constant).name() : String.valueOf(constant);
+        return constant instanceof Enum ? ((Enum) constant).name() : String.valueOf(constant);
     }
 
-    /** The constant of {@code values} -- an enum's values() -- that the argument names. */
+    /// The constant of `values` -- an enum's values() -- that the argument names.
     public static Object enumValue(Object[] values, Map args, String name, boolean required) {
         String s = string(args, name, required);
-        if(s == null) {
+        if (s == null) {
             return null;
         }
         // By name(), which is what the generated schema advertises; toString()
         // may be overridden into a display label no schema lists.
-        for(int iter = 0 ; iter < values.length ; iter++) {
-            if(constantName(values[iter]).equals(s)) {
-                return values[iter];
+        for (Object element : values) {
+            if (constantName(element).equals(s)) {
+                return element;
             }
         }
         StringBuilder allowed = new StringBuilder();
-        for(int iter = 0 ; iter < values.length ; iter++) {
+        for (int iter = 0 ; iter < values.length ; iter++) {
             allowed.append(iter == 0 ? "" : ", ").append(constantName(values[iter]));
         }
         throw new IllegalArgumentException("\"" + name + "\" must be one of " + allowed);
     }
 
-    /** A boxed number as a double, NaN for null. */
+    /// A boxed number as a double, NaN for null.
     public static double toDouble(Object value) {
-        return value instanceof Number ? ((Number)value).doubleValue() : Double.NaN;
+        return value instanceof Number ? ((Number) value).doubleValue() : Double.NaN;
     }
 
     private static long toLong(Object v, String name) {
-        if(v instanceof Long || v instanceof Integer || v instanceof Short
+        if (v instanceof Long || v instanceof Integer || v instanceof Short
                 || v instanceof Byte) {
-            return ((Number)v).longValue();
+            return ((Number) v).longValue();
         }
-        if(v instanceof Number) {
-            double d = ((Number)v).doubleValue();
-            if(Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
+        if (v instanceof Number) {
+            double d = ((Number) v).doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
                 throw new IllegalArgumentException("\"" + name + "\" must be a whole number");
             }
             // longValue() saturates: 1e20 would become Long.MAX_VALUE and the tool
             // would act on a number nobody sent. 2^63 itself is out of range.
-            if(d < -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
+            if (d < -9.223372036854775808E18 || d >= 9.223372036854775808E18) {
                 throw new IllegalArgumentException("\"" + name + "\" is out of range");
             }
-            return (long)d;
+            return (long) d;
         }
         try {
             return Long.parseLong(String.valueOf(v).trim());
         } catch (NumberFormatException err) {
-            throw new IllegalArgumentException("\"" + name + "\" must be a whole number");
+            throw new IllegalArgumentException("\"" + name + "\" must be a whole number", err);
         }
     }
 
     private static double toDouble(Object v, String name) {
-        if(v instanceof Number) {
-            return ((Number)v).doubleValue();
+        if (v instanceof Number) {
+            return ((Number) v).doubleValue();
         }
         try {
             return Double.parseDouble(String.valueOf(v).trim());
         } catch (NumberFormatException err) {
-            throw new IllegalArgumentException("\"" + name + "\" must be a number");
+            throw new IllegalArgumentException("\"" + name + "\" must be a number", err);
         }
     }
 }

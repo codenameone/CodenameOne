@@ -27,21 +27,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * One HTTP/2 connection, on nghttp2.
- *
- * The framing is not implemented here and should not be: HPACK alone is a static
- * table, a dynamic table with eviction and Huffman coding, and flow control,
- * stream state, CONTINUATION reassembly and GOAWAY are all their own problems.
- * nghttp2 owns those. This class owns the shape of the boundary.
- *
- * Java PULLS from the session rather than being called back into. nghttp2 is
- * callback-driven, but a C callback that reaches into the VM has to survive
- * dead-code elimination and must not run while the collector is moving; the
- * callbacks instead accumulate completed requests and this class takes them.
- */
+/// One HTTP/2 connection, on nghttp2.
+///
+/// The framing is not implemented here and should not be: HPACK alone is a static
+/// table, a dynamic table with eviction and Huffman coding, and flow control,
+/// stream state, CONTINUATION reassembly and GOAWAY are all their own problems.
+/// nghttp2 owns those. This class owns the shape of the boundary.
+///
+/// Java PULLS from the session rather than being called back into. nghttp2 is
+/// callback-driven, but a C callback that reaches into the VM has to survive
+/// dead-code elimination and must not run while the collector is moving; the
+/// callbacks instead accumulate completed requests and this class takes them.
 public final class Http2 {
-    /** The ALPN identifier. There is no upgrade handshake for h2 over TLS. */
+    /// The ALPN identifier. There is no upgrade handshake for h2 over TLS.
     public static final String ALPN = "h2";
 
     private long session;
@@ -50,16 +48,16 @@ public final class Http2 {
         this.session = session;
     }
 
-    /** A new server session, with the SETTINGS preface already queued. */
+    /// A new server session, with the SETTINGS preface already queued.
     public static Http2 create() throws IOException {
         long s = createImpl();
-        if(s == 0) {
+        if (s == 0) {
             throw new IOException("Could not create an HTTP/2 session");
         }
         return new Http2(s);
     }
 
-    /** One request, once the client has finished sending it. */
+    /// One request, once the client has finished sending it.
     public static final class Stream {
         final int id;
         final String method;
@@ -85,28 +83,28 @@ public final class Http2 {
             return method;
         }
 
-        /** Path and query, from the :path pseudo-header. */
+        /// Path and query, from the :path pseudo-header.
         public String getPath() {
             return path;
         }
 
-        /** From :authority, which is what Host is in HTTP/1.1. */
+        /// From :authority, which is what Host is in HTTP/1.1.
         public String getAuthority() {
             return authority;
         }
 
-        /** Lower-cased names, as HTTP/2 requires them on the wire. */
+        /// Lower-cased names, as HTTP/2 requires them on the wire.
         public Map getHeaders() {
             return headers;
         }
 
-        /** The body as it ARRIVED, so the caller can check it before decoding. */
+        /// The body as it ARRIVED, so the caller can check it before decoding.
         public byte[] getBody() {
             return body;
         }
 
         public String getBodyAsString() {
-            if(body == null || body.length == 0) {
+            if (body == null || body.length == 0) {
                 return null;
             }
             try {
@@ -117,32 +115,30 @@ public final class Http2 {
         }
     }
 
-    /** Feeds received bytes to the session. */
+    /// Feeds received bytes to the session.
     public void receive(byte[] buffer, int offset, int length) throws IOException {
         checkRange(buffer, offset, length);
-        if(receiveImpl(session, buffer, offset, length) < 0) {
+        if (receiveImpl(session, buffer, offset, length) < 0) {
             throw new IOException("HTTP/2 framing error");
         }
     }
 
-    /**
-     * The next completed request, or null. A stream is complete only when
-     * END_STREAM arrives -- on the HEADERS frame for a request with no body, on
-     * the last DATA frame otherwise.
-     */
+    /// The next completed request, or null. A stream is complete only when
+    /// END_STREAM arrives -- on the HEADERS frame for a request with no body, on
+    /// the last DATA frame otherwise.
     public Stream nextRequest() {
         int id = nextRequestImpl(session);
-        if(id < 0) {
+        if (id < 0) {
             return null;
         }
         Map headers = new LinkedHashMap();
         int count = headerCountImpl(session);
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0 ; iter < count ; iter++) {
             String name = headerNameImpl(session, iter);
-            if(name != null) {
+            if (name != null) {
                 String value = headerValueImpl(session, iter);
                 Object existing = headers.get(name);
-                if(existing == null) {
+                if (existing == null) {
                     headers.put(name, value);
                 } else {
                     // A repeated field is COMBINED, not replaced. HTTP/2 lets a client
@@ -151,7 +147,7 @@ public final class Http2 {
                     // vanished -- an authenticated request answered as anonymous.
                     // Cookie joins on "; " and everything else on ",", which is what
                     // RFC 9110 says a repeated field line means.
-                    String separator = name.equalsIgnoreCase("cookie") ? "; " : ",";
+                    String separator = "cookie".equalsIgnoreCase(name) ? "; " : ",";
                     headers.put(name, String.valueOf(existing) + separator + value);
                 }
             }
@@ -160,16 +156,14 @@ public final class Http2 {
                 authorityImpl(session), headers, bodyImpl(session));
     }
 
-    /**
-     * - `extraHeaders`: "name: value" strings. Connection-specific headers are
-     *   dropped, because HTTP/2 forbids them, and names are lower-cased, because a
-     *   capital letter is a protocol error the peer resets the stream over.
-     */
+    /// - `extraHeaders`: "name: value" strings. Connection-specific headers are
+    /// dropped, because HTTP/2 forbids them, and names are lower-cased, because a
+    /// capital letter is a protocol error the peer resets the stream over.
     public boolean respond(int streamId, int status, String contentType, List extraHeaders, byte[] body)
             throws IOException {
         int rc = respondImpl(session, streamId, String.valueOf(status),
                 headerBytes(contentType, extraHeaders), body);
-        if(rc == OVER_BODY_BUDGET) {
+        if (rc == OVER_BODY_BUDGET) {
             // Not a failure: the body was refused because submitting it would
             // cross the process-wide ceiling, and NOTHING was allocated or
             // charged. The caller answers 503 instead. Reported rather than
@@ -180,131 +174,115 @@ public final class Http2 {
             // 80MB between them.
             return false;
         }
-        if(rc != 0) {
+        if (rc != 0) {
             throw new IOException("Could not submit an HTTP/2 response on stream " + streamId);
         }
         return true;
     }
 
-    /** respondImpl's answer when the body would cross the ceiling. */
+    /// respondImpl's answer when the body would cross the ceiling.
     static final int OVER_BODY_BUDGET = -2;
 
-    /**
-     * The ceiling for outstanding response bodies across the process.
-     *
-     * Set once, and enforced natively where the memory is actually taken.
-     */
+    /// The ceiling for outstanding response bodies across the process.
+    ///
+    /// Set once, and enforced natively where the memory is actually taken.
     public static void setMaxBodyBytes(long limit) {
         setMaxBodyBytesImpl(limit);
     }
 
-    /**
-     * The ceiling for outstanding FILE-backed bodies across the process.
-     *
-     * Enforced natively for the same reason as the byte ceiling: the slot has to
-     * be taken in the same step as the descriptor, or every worker finishing at
-     * once passes the check before any of them counts.
-     */
+    /// The ceiling for outstanding FILE-backed bodies across the process.
+    ///
+    /// Enforced natively for the same reason as the byte ceiling: the slot has to
+    /// be taken in the same step as the descriptor, or every worker finishing at
+    /// once passes the check before any of them counts.
     public static void setMaxFileBodies(int limit) {
         setMaxFileBodiesImpl(limit);
     }
 
-    /**
-     * Responds with a range of an open file, without reading it into the heap.
-     *
-     * HTTP/2 cannot use sendfile -- the bytes have to become DATA frames -- but that
-     * is not a reason to materialise the whole file first. Reading it in cost the
-     * file's size in Java plus the same again in the native copy, so a large enough
-     * public file turned one request into an OutOfMemoryError, which the handler's
-     * `catch (Exception)` does not catch. The provider reads each frame straight out
-     * of the descriptor instead, so the memory is one frame regardless of size, and
-     * nghttp2's flow control decides the pace.
-     *
-     * The descriptor is owned by the session from here: it is closed when the stream
-     * reaches EOF, when it is reset early, and when the session is torn down.
-     */
+    /// Responds with a range of an open file, without reading it into the heap.
+    ///
+    /// HTTP/2 cannot use sendfile -- the bytes have to become DATA frames -- but that
+    /// is not a reason to materialise the whole file first. Reading it in cost the
+    /// file's size in Java plus the same again in the native copy, so a large enough
+    /// public file turned one request into an OutOfMemoryError, which the handler's
+    /// `catch (Exception)` does not catch. The provider reads each frame straight out
+    /// of the descriptor instead, so the memory is one frame regardless of size, and
+    /// nghttp2's flow control decides the pace.
+    ///
+    /// The descriptor is owned by the session from here: it is closed when the stream
+    /// reaches EOF, when it is reset early, and when the session is torn down.
     public boolean respondFile(int streamId, int status, String contentType, List extraHeaders,
             int fd, long offset, long length) throws IOException {
         int rc = respondFileImpl(session, streamId, String.valueOf(status),
                 headerBytes(contentType, extraHeaders), fd, offset, length);
-        if(rc == OVER_BODY_BUDGET) {
+        if (rc == OVER_BODY_BUDGET) {
             // The descriptor ceiling was reached and NOTHING was taken -- the
             // caller still owns the fd and has to close it. Reported rather than
             // thrown because it is an ordinary load condition.
             return false;
         }
-        if(rc != 0) {
+        if (rc != 0) {
             throw new IOException("Could not submit an HTTP/2 file response on stream "
                     + streamId);
         }
         return true;
     }
 
-    /**
-     * Runs the session's output side and returns the bytes to put on the wire.
-     * Empty when there is nothing pending.
-     */
+    /// Runs the session's output side and returns the bytes to put on the wire.
+    /// Empty when there is nothing pending.
     public byte[] drain() throws IOException {
-        if(pumpImpl(session) != 0) {
+        if (pumpImpl(session) != 0) {
             throw new IOException("HTTP/2 session failed");
         }
         return drainImpl(session);
     }
 
-    /**
-     * The streams that have closed since the last call, as (stream id, HTTP/2
-     * error code) pairs; null when none have. Code 0 is a stream whose response
-     * was sent in full; anything else is one reset before it was. A reset the
-     * PEER sent with NO_ERROR is reported as -1, not 0: it closes with code 0 too,
-     * and is no proof the response arrived. The server ends
-     * a request's span here, since a body the peer's flow-control window holds
-     * back is sent turns after it was submitted.
-     */
+    /// The streams that have closed since the last call, as (stream id, HTTP/2
+    /// error code) pairs; null when none have. Code 0 is a stream whose response
+    /// was sent in full; anything else is one reset before it was. A reset the
+    /// PEER sent with NO_ERROR is reported as -1, not 0: it closes with code 0 too,
+    /// and is no proof the response arrived. The server ends
+    /// a request's span here, since a body the peer's flow-control window holds
+    /// back is sent turns after it was submitted.
     public int[] closedStreams() {
         return session == 0 ? null : closedStreamsImpl(session);
     }
 
-    /** False once the session is finished and the connection can be closed. */
+    /// False once the session is finished and the connection can be closed.
     public boolean isAlive() {
         return wantsMoreImpl(session);
     }
 
-    /**
-     * Heap held by response bodies that have been submitted and not yet fully
-     * written, which is NOT what drain() empties: that buffer is what nghttp2
-     * has already serialised. nghttp2 pulls from a submitted body only as the
-     * peer's flow-control window allows, so a client that stops sending
-     * WINDOW_UPDATE leaves every body it asked for sitting here. A caller that
-     * keeps submitting has to look at this figure rather than at what it just
-     * handed over, because a flush that could write nothing frees nothing.
-     */
+    /// Heap held by response bodies that have been submitted and not yet fully
+    /// written, which is NOT what drain() empties: that buffer is what nghttp2
+    /// has already serialised. nghttp2 pulls from a submitted body only as the
+    /// peer's flow-control window allows, so a client that stops sending
+    /// WINDOW_UPDATE leaves every body it asked for sitting here. A caller that
+    /// keeps submitting has to look at this figure rather than at what it just
+    /// handed over, because a flush that could write nothing frees nothing.
     public long pendingBodyBytes() {
         return session == 0 ? 0 : pendingBodyBytesImpl(session);
     }
 
-    /**
-     * File-backed response bodies outstanding across the PROCESS, not this
-     * session. Such a body holds a descriptor and no heap, so it is invisible to
-     * pendingBodyBytes, and descriptors are a process resource: bounding them
-     * per connection still multiplies by the connection count, and exhausting
-     * them stops the process opening sockets or files at all.
-     */
+    /// File-backed response bodies outstanding across the PROCESS, not this
+    /// session. Such a body holds a descriptor and no heap, so it is invisible to
+    /// pendingBodyBytes, and descriptors are a process resource: bounding them
+    /// per connection still multiplies by the connection count, and exhausting
+    /// them stops the process opening sockets or files at all.
     public static int pendingBodyFiles() {
         return pendingBodyFilesImpl();
     }
 
-    /**
-     * Response-body heap outstanding across the PROCESS rather than this session.
-     * The per-session figure says what one connection holds; a limit on that is a
-     * limit per connection, and the connection ceiling is in the thousands, so it
-     * bounds nothing about the machine.
-     */
+    /// Response-body heap outstanding across the PROCESS rather than this session.
+    /// The per-session figure says what one connection holds; a limit on that is a
+    /// limit per connection, and the connection ceiling is in the thousands, so it
+    /// bounds nothing about the machine.
     public static long pendingBodyBytesAll() {
         return pendingBodyBytesAllImpl();
     }
 
     public void close() {
-        if(session != 0) {
+        if (session != 0) {
             long s = session;
             session = 0;
             destroyImpl(s);
@@ -313,21 +291,19 @@ public final class Http2 {
 
     private static native long createImpl();
 
-    /**
-     * Refuses a slice that does not lie inside the array.
-     *
-     * The natives below index the array through the pointer they are handed and
-     * ParparVM adds no bounds check of its own, so a bad offset is a native read
-     * or write of whatever is next in the heap rather than an exception. The
-     * JavaSE arm gets this free from its stream APIs, which is why such a bug is
-     * invisible on the simulator and only appears once packaged. The subtraction
-     * avoids the overflow that `offset + length` has.
-     */
+    /// Refuses a slice that does not lie inside the array.
+    ///
+    /// The natives below index the array through the pointer they are handed and
+    /// ParparVM adds no bounds check of its own, so a bad offset is a native read
+    /// or write of whatever is next in the heap rather than an exception. The
+    /// JavaSE arm gets this free from its stream APIs, which is why such a bug is
+    /// invisible on the simulator and only appears once packaged. The subtraction
+    /// avoids the overflow that `offset + length` has.
     private static void checkRange(byte[] buffer, int offset, int length) {
-        if(buffer == null) {
+        if (buffer == null) {
             throw new NullPointerException("buffer");
         }
-        if(offset < 0 || length < 0 || length > buffer.length - offset) {
+        if (offset < 0 || length < 0 || length > buffer.length - offset) {
             throw new IndexOutOfBoundsException("offset " + offset + ", length "
                     + length + ", buffer " + buffer.length);
         }
@@ -346,29 +322,27 @@ public final class Http2 {
     private static native String headerNameImpl(long session, int index);
     private static native String headerValueImpl(long session, int index);
     private static native byte[] bodyImpl(long session);
-    /**
-     * The header block both response forms send, as "name: value" lines.
-     *
-     * <p>BYTES, one per character, and not a String for the native to encode. A
-     * field value is octets: the server's own validation accepts anything from
-     * 0x20 to 0xff except 0x7f -- obs-text included -- and says it tests "the
-     * byte that will be emitted", which is exactly what the HTTP/1.1 writer does
-     * when it narrows each char with a cast. Handing the native a String meant
-     * stringToUTF8 encoded it instead, so a handler returning U+00E9 sent one
-     * byte over HTTP/1.1 and two over h2: the same response, different octets,
-     * decided by which protocol the client negotiated.
-     *
-     * <p>This is the exact inverse of newStringFromAsciiLen, which is how the
-     * inbound natives turn a request's header bytes into chars -- so the two
-     * directions agree again.
-     */
+    /// The header block both response forms send, as "name: value" lines.
+    ///
+    /// BYTES, one per character, and not a String for the native to encode. A
+    /// field value is octets: the server's own validation accepts anything from
+    /// 0x20 to 0xff except 0x7f -- obs-text included -- and says it tests "the
+    /// byte that will be emitted", which is exactly what the HTTP/1.1 writer does
+    /// when it narrows each char with a cast. Handing the native a String meant
+    /// stringToUTF8 encoded it instead, so a handler returning U+00E9 sent one
+    /// byte over HTTP/1.1 and two over h2: the same response, different octets,
+    /// decided by which protocol the client negotiated.
+    ///
+    /// This is the exact inverse of newStringFromAsciiLen, which is how the
+    /// inbound natives turn a request's header bytes into chars -- so the two
+    /// directions agree again.
     private static byte[] headerBytes(String contentType, List extraHeaders) {
         StringBuilder joined = new StringBuilder();
         joined.append("content-type: ").append(contentType == null
                 ? "application/octet-stream" : contentType);
-        if(extraHeaders != null) {
-            for(int iter = 0 ; iter < extraHeaders.size() ; iter++) {
-                joined.append('\n').append(String.valueOf(extraHeaders.get(iter)));
+        if (extraHeaders != null) {
+            for (Object header : extraHeaders) {
+                joined.append('\n').append(String.valueOf(header));
             }
         }
         return HeaderLines.narrowed(joined.toString());

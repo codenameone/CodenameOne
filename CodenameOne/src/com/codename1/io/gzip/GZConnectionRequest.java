@@ -40,8 +40,6 @@ import java.io.InputStream;
 /// GZConnectionRequest con = new GZConnectionRequest();
 /// con.addRequestHeader("Accept-Encoding", "gzip");
 /// ```
-///
-/// @author Shai Almog
 public class GZConnectionRequest extends ConnectionRequest {
     private boolean isGzipped;
 

@@ -106,7 +106,6 @@ import java.util.ArrayList;
 ///     return null;
 /// }
 /// ```
-/// @author Chen
 public class AutoCompleteTextField extends TextField {
 
     public static final int POPUP_POSITION_AUTO = 0;

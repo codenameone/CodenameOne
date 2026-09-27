@@ -33,8 +33,6 @@ import java.util.Map;
 
 /**
  * Implementation of the purchase API
- *
- * @author Shai Almog
  */
 class ZoozPurchase extends Purchase implements Runnable {
 

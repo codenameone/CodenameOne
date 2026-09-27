@@ -25,9 +25,6 @@ package com.codename1.ui.geom;
 import com.codename1.ui.Transform;
 
 /// A utility class for expressing 2-D affine transforms in Codename One.
-///
-/// @author shannah
-///
 public class AffineTransform {
     private double m00;
     private double m10;

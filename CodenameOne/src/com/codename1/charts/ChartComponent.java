@@ -71,8 +71,6 @@ import java.util.ArrayList;
 ///
 ///   *
 ///
-///
-///
 ///   **
 ///
 /// The above screenshots were taken from the
@@ -174,8 +172,6 @@ import java.util.ArrayList;
 ///
 /// The charts package is derived work from the excellent
 /// [open source aChartEngine API.](http://www.achartengine.org/)
-///
-/// @author shannah
 public class ChartComponent extends Component {
 
     /// Util object for rendering the chart.

@@ -48,8 +48,6 @@ import java.util.Vector;
 /// The Android type (the default) is just a button with a label that can be moved/dragged between
 /// the two states. The iOS version is more elaborate due to the look of that platform.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// Use new `Switch` class instead as it conforms to the latest platform looks and feels.

@@ -47,8 +47,6 @@ import java.util.List;
 /// since not all devices feature in-app-purchase API's. An application dealing with physical
 /// goods & services must use the latter according to the TOS of current in-app-purchase
 /// solutions.
-///
-/// @author Shai Almog
 public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";

@@ -41,10 +41,6 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLVideoElement;
 
-/**
- *
- * @author shannah
- */
 public class VideoJS {
     private static final String VIDEO_ID="cn1-video-capture";
     private List<VideoListener> listeners = new ArrayList<VideoListener>();

@@ -39,10 +39,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- *
- * @author Shai Almog
- */
 public class ByteCodeTranslator {
     public enum OutputType {
         

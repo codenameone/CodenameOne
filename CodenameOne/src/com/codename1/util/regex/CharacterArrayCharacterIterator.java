@@ -18,9 +18,6 @@
 package com.codename1.util.regex;
 
 /// Encapsulates char[] as CharacterIterator
-///
-/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
-/// @version CVS $Id: CharacterArrayCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class CharacterArrayCharacterIterator implements CharacterIterator {
     /// encapsulated
     private final char[] src;

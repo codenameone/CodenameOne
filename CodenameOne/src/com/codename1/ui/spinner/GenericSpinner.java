@@ -31,8 +31,6 @@ import com.codename1.ui.list.ListModel;
 /// A spinner class that allows arbitrary values, this is effectively a combo box replacement for platforms
 /// where a combo box is not available
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

@@ -25,12 +25,10 @@ package com.codename1.backend.metrics;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * A count that only goes up -- requests served, jobs run, errors seen. Exported
- * as a cumulative monotonic sum.
- *
- * <p>Recording is one atomic add: no lock, no allocation.
- */
+/// A count that only goes up -- requests served, jobs run, errors seen. Exported
+/// as a cumulative monotonic sum.
+///
+/// Recording is one atomic add: no lock, no allocation.
 public final class Counter extends Instrument {
     private final AtomicLong total = new AtomicLong();
 
@@ -38,32 +36,30 @@ public final class Counter extends Instrument {
         super(name, description, unit, upDown ? UP_DOWN_COUNTER : COUNTER);
     }
 
-    /** Adds one. */
+    /// Adds one.
     public void increment() {
         add(1);
     }
 
-    /**
-     * Adds {@code amount}. A counter refuses a negative amount, since a
-     * cumulative monotonic sum that falls reads as a reset to every backend; an
-     * up-down counter takes either sign.
-     */
+    /// Adds `amount`. A counter refuses a negative amount, since a
+    /// cumulative monotonic sum that falls reads as a reset to every backend; an
+    /// up-down counter takes either sign.
     public void add(long amount) {
-        if(amount < 0 && getKind() == COUNTER) {
+        if (amount < 0 && getKind() == COUNTER) {
             throw new IllegalArgumentException("Counter " + getName()
                     + " only goes up; use an up-down counter");
         }
         // Refused rather than wrapped: addAndGet past Long.MAX_VALUE turns a
         // total that only ever rises into a large negative one, which both
         // exports then report as the counter's value.
-        while(true) {
+        while (true) {
             long current = total.get();
             long next = current + amount;
-            if(((current ^ next) & (amount ^ next)) < 0) {
+            if (((current ^ next) & (amount ^ next)) < 0) {
                 throw new IllegalStateException("Counter " + getName()
                         + " would overflow a 64-bit total");
             }
-            if(total.compareAndSet(current, next)) {
+            if (total.compareAndSet(current, next)) {
                 return;
             }
         }
@@ -73,6 +69,7 @@ public final class Counter extends Instrument {
         return total.get();
     }
 
+    @Override
     public List points() {
         return single(point(null, total.get()));
     }

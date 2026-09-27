@@ -26,80 +26,74 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Distributed tracing for the server, and the hooks it is instrumented through.
- *
- * <p>Nothing here does anything until a {@link Tracer} is installed. The build
- * installs one when a project asks for it -- {@code @OpenTelemetry} on any class,
- * or {@code cn1.otel.enabled=true} in application.properties -- and from then on
- * every request, outbound {@link Web} call and {@link Database} statement is a
- * span, W3C trace context travels on every outbound request, and an incoming
- * {@code traceparent} makes the request part of the caller's trace. No code in
- * the application changes for any of that.
- *
- * <p>What an application may still want is here: {@link #current()} to decorate
- * the request's span, and {@link #inSpan} to time a block of its own work.
- *
- * <p>THE CURRENT SPAN IS PER THREAD, and that is per REQUEST here: a virtual
- * thread serves one request at a time and ThreadLocal is per virtual thread (see
- * the measurement recorded beside HttpServer.SERVING_FD). The server sets it
- * before the handler runs and clears it in the same finally that ends the
- * request, because the next request on a kept-alive connection runs on the same
- * thread and must not inherit it.
- *
- * <p>Every hook is guarded: a tracer that throws is reported once and the
- * request goes on untraced, because a monitoring fault must never become an
- * outage.
- */
+/// Distributed tracing for the server, and the hooks it is instrumented through.
+///
+/// Nothing here does anything until a [Tracer] is installed. The build
+/// installs one when a project asks for it -- `@OpenTelemetry` on any class,
+/// or `cn1.otel.enabled=true` in application.properties -- and from then on
+/// every request, outbound [Web] call and [Database] statement is a
+/// span, W3C trace context travels on every outbound request, and an incoming
+/// `traceparent` makes the request part of the caller's trace. No code in
+/// the application changes for any of that.
+///
+/// What an application may still want is here: [#current()] to decorate
+/// the request's span, and [#inSpan] to time a block of its own work.
+///
+/// THE CURRENT SPAN IS PER THREAD, and that is per REQUEST here: a virtual
+/// thread serves one request at a time and ThreadLocal is per virtual thread (see
+/// the measurement recorded beside HttpServer.SERVING_FD). The server sets it
+/// before the handler runs and clears it in the same finally that ends the
+/// request, because the next request on a kept-alive connection runs on the same
+/// thread and must not inherit it.
+///
+/// Every hook is guarded: a tracer that throws is reported once and the
+/// request goes on untraced, because a monitoring fault must never become an
+/// outage.
 public final class Tracing {
-    /** The installed tracer, or null. Volatile: installed once, read by every host. */
-    private static volatile Tracer tracer;
+    /// The installed tracer, or null. Volatile: installed once, read by every host.
+    private static volatile Tracer tracer; //NOPMD AvoidUsingVolatile - read on every request without the lock
     private static final ThreadLocal CURRENT = new ThreadLocal();
     private static final ThreadLocal SUPPRESSED = new ThreadLocal();
-    private static volatile boolean reportedFailure;
+    private static volatile boolean reportedFailure; //NOPMD AvoidUsingVolatile - set once from any host thread
     private static final Span NOOP = new NoopSpan();
 
-    /** The W3C header names, lower case as HTTP/2 requires. */
+    /// The W3C header names, lower case as HTTP/2 requires.
     static final String TRACEPARENT = "traceparent";
     static final String TRACESTATE = "tracestate";
 
     private Tracing() {
     }
 
-    /** What {@link #inSpan} runs. */
+    /// What [#inSpan] runs.
     public interface Work {
         Object run(Span span) throws Exception;
     }
 
-    /** How long a replaced tracer gets to export what it already holds. */
+    /// How long a replaced tracer gets to export what it already holds.
     static final int REPLACED_SHUTDOWN_MILLIS = 2000;
 
-    /**
-     * Installs the tracer every hook reports to, replacing any earlier one. Pass
-     * null to turn tracing off. The builder does this itself; a program that
-     * starts {@link HttpServer} or {@link LambdaRuntime} directly calls it after
-     * {@link Tracer#open}.
-     *
-     * <p>A tracer this replaces is shut down: its spans so far are exported, for
-     * up to {@link #REPLACED_SHUTDOWN_MILLIS}, and its exporter stops. Nothing
-     * else holds it once it is out of this slot, so leaving it running leaked its
-     * export thread and queues on every reconfiguration.
-     */
+    /// Installs the tracer every hook reports to, replacing any earlier one. Pass
+    /// null to turn tracing off. The builder does this itself; a program that
+    /// starts [HttpServer] or [LambdaRuntime] directly calls it after
+    /// [Tracer#open].
+    ///
+    /// A tracer this replaces is shut down: its spans so far are exported, for
+    /// up to [#REPLACED_SHUTDOWN_MILLIS], and its exporter stops. Nothing
+    /// else holds it once it is out of this slot, so leaving it running leaked its
+    /// export thread and queues on every reconfiguration.
     public static void install(Tracer installed) {
         commit(swap(installed));
     }
 
-    /**
-     * A start-up's claim on the slot, from {@link #swap} until {@link #commit} or
-     * {@link #rollBack}: what it installed, and what that displaced.
-     *
-     * <p>{@code previous} can CHANGE while the claim is open. Two start-ups that
-     * overlap chain: A swaps X out for F, B swaps F out for G. If A then fails, F
-     * is gone but X is not coming back yet -- B is still starting over it -- so
-     * A's rollback hands X to B's claim. B's rollback then restores X and its
-     * commit retires X, and each failed tracer is stopped exactly once. Without
-     * the chain, A retired X and B's rollback restored A's failed F.
-     */
+    /// A start-up's claim on the slot, from [#swap] until [#commit] or
+    /// [#rollBack]: what it installed, and what that displaced.
+    ///
+    /// `previous` can CHANGE while the claim is open. Two start-ups that
+    /// overlap chain: A swaps X out for F, B swaps F out for G. If A then fails, F
+    /// is gone but X is not coming back yet -- B is still starting over it -- so
+    /// A's rollback hands X to B's claim. B's rollback then restores X and its
+    /// commit retires X, and each failed tracer is stopped exactly once. Without
+    /// the chain, A retired X and B's rollback restored A's failed F.
     static final class Swap {
         final Tracer installed;
         Tracer previous;
@@ -110,18 +104,16 @@ public final class Tracing {
         }
     }
 
-    /** Claims made by swap() and not yet committed or rolled back. Under LIFECYCLE. */
+    /// Claims made by swap() and not yet committed or rolled back. Under LIFECYCLE.
     private static final List PENDING = new ArrayList();
 
-    /**
-     * Installs {@code installed} WITHOUT stopping the tracer it replaces. For a
-     * start-up that can still fail: it traces its own start-up with the new
-     * tracer, then {@link #commit}s if it completed or {@link #rollBack}s if it
-     * did not. Shutting the old one down up front left a failed second server's
-     * process with no tracer at all, while the first server kept running untraced.
-     */
+    /// Installs `installed` WITHOUT stopping the tracer it replaces. For a
+    /// start-up that can still fail: it traces its own start-up with the new
+    /// tracer, then [#commit]s if it completed or [#rollBack]s if it
+    /// did not. Shutting the old one down up front left a failed second server's
+    /// process with no tracer at all, while the first server kept running untraced.
     static Swap swap(Tracer installed) {
-        synchronized(LIFECYCLE) {
+        synchronized (LIFECYCLE) {
             Swap claim = new Swap(installed, tracer);
             tracer = installed;
             PENDING.add(claim);
@@ -129,53 +121,47 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Guards every read-and-replace of the slot, and the chain of open claims.
-     * Two servers starting at once each read the same previous tracer before
-     * either write landed, so each retired that one, and the tracer the FIRST
-     * installed -- overwritten by the second -- was never shut down. The server
-     * is multi-threaded here; the lock is never held across a shutdown, which
-     * can block for seconds.
-     */
+    /// Guards every read-and-replace of the slot, and the chain of open claims.
+    /// Two servers starting at once each read the same previous tracer before
+    /// either write landed, so each retired that one, and the tracer the FIRST
+    /// installed -- overwritten by the second -- was never shut down. The server
+    /// is multi-threaded here; the lock is never held across a shutdown, which
+    /// can block for seconds.
     private static final Object LIFECYCLE = new Object();
 
-    /**
-     * Tracers of servers that are running. A server's start used to retire
-     * whatever tracer it displaced -- including a live server's, whose requests
-     * then went out under the newcomer's name and endpoint while its own
-     * exporter was stopped. An owned tracer is left alone and stopped by its
-     * server.
-     */
+    /// Tracers of servers that are running. A server's start used to retire
+    /// whatever tracer it displaced -- including a live server's, whose requests
+    /// then went out under the newcomer's name and endpoint while its own
+    /// exporter was stopped. An owned tracer is left alone and stopped by its
+    /// server.
     private static final List OWNED = new ArrayList();
 
-    /** A start-up completed: what its tracer displaced is stopped. */
+    /// A start-up completed: what its tracer displaced is stopped.
     static void commit(Swap claim) {
         commit(claim, false);
     }
 
-    /**
-     * A start-up completed. With {@code owned} the installed tracer belongs to
-     * the server that just started and lives until that server stops it with
-     * {@link #shutdown}; a displaced tracer another running server owns is kept.
-     */
+    /// A start-up completed. With `owned` the installed tracer belongs to
+    /// the server that just started and lives until that server stops it with
+    /// [#shutdown]; a displaced tracer another running server owns is kept.
     static void commit(Swap claim, boolean owned) {
         Tracer displaced;
-        synchronized(LIFECYCLE) {
+        synchronized (LIFECYCLE) {
             PENDING.remove(claim);
             displaced = claim.previous;
-            if(owned && claim.installed != null && !OWNED.contains(claim.installed)) {
+            if (owned && claim.installed != null && !OWNED.contains(claim.installed)) {
                 OWNED.add(claim.installed);
             }
-            if(displaced != null && OWNED.contains(displaced)) {
+            if (displaced != null && OWNED.contains(displaced)) {
                 displaced = null;
             }
         }
         retire(displaced, claim.installed);
     }
 
-    /** Stops {@code previous}, replaced by {@code installed}, exporting what it held. */
+    /// Stops `previous`, replaced by `installed`, exporting what it held.
     static void retire(Tracer previous, Tracer installed) {
-        if(previous != null && previous != installed) {
+        if (previous != null && previous != installed) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
             try {
                 previous.shutdown(REPLACED_SHUTDOWN_MILLIS);
             } catch (RuntimeException err) {
@@ -184,37 +170,36 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Undoes a {@link #swap}. Three cases, decided under the lock:
-     * <ul>
-     *   <li>its tracer is still installed: what it displaced goes back, and the
-     *       failed tracer stops;</li>
-     *   <li>a start-up that is still open swapped over it: that claim inherits
-     *       what this one displaced (see {@link Swap}), and the failed tracer
-     *       stops;</li>
-     *   <li>an install or a commit replaced it, and retired it doing so: what it
-     *       displaced is not coming back, and is retired here, since nothing else
-     *       holds it.</li>
-     * </ul>
-     */
+    /// Undoes a [#swap]. Three cases, decided under the lock:
+    ///
+    /// - its tracer is still installed: what it displaced goes back, and the
+    ///   failed tracer stops;
+    ///
+    /// - a start-up that is still open swapped over it: that claim inherits
+    ///   what this one displaced (see [Swap]), and the failed tracer
+    ///   stops;
+    ///
+    /// - an install or a commit replaced it, and retired it doing so: what it
+    ///   displaced is not coming back, and is retired here, since nothing else
+    ///   holds it.
     static void rollBack(Swap claim) {
         Tracer stopFailed = null;
         Tracer orphan = null;
-        synchronized(LIFECYCLE) {
+        synchronized (LIFECYCLE) {
             PENDING.remove(claim);
-            if(tracer == claim.installed) {
+            if (tracer == claim.installed) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
                 tracer = claim.previous;
                 stopFailed = claim.installed;
             } else {
                 Swap later = null;
-                for(int iter = 0 ; iter < PENDING.size() ; iter++) {
-                    Swap open = (Swap)PENDING.get(iter);
-                    if(open.previous == claim.installed) {
+                for (Object pending : PENDING) {
+                    Swap open = (Swap) pending;
+                    if (open.previous == claim.installed) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
                         later = open;
                         break;
                     }
                 }
-                if(later != null) {
+                if (later != null) {
                     later.previous = claim.previous;
                     stopFailed = claim.installed;
                 } else {
@@ -222,7 +207,7 @@ public final class Tracing {
                 }
             }
         }
-        if(stopFailed != null && stopFailed != claim.previous) {
+        if (stopFailed != null && stopFailed != claim.previous) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
             try {
                 // The same window a replaced tracer gets, not none: a start-up that
                 // failed after its database initialisation holds exactly the spans
@@ -232,48 +217,42 @@ public final class Tracing {
                 failed(err);
             }
         }
-        if(orphan != null) {
+        if (orphan != null) {
             retire(orphan, claim.installed);
         }
     }
 
-    /** The installed tracer, or null. */
+    /// The installed tracer, or null.
     public static Tracer getTracer() {
         return tracer;
     }
 
-    /** Whether a tracer is installed. */
+    /// Whether a tracer is installed.
     public static boolean isEnabled() {
         return tracer != null;
     }
 
-    /**
-     * The span of the work this thread is doing: the request's, inside a handler.
-     * Never null -- with no tracer, or outside a request, it is a no-op span.
-     */
+    /// The span of the work this thread is doing: the request's, inside a handler.
+    /// Never null -- with no tracer, or outside a request, it is a no-op span.
     public static Span current() {
         Span span = currentOrNull();
         return span == null ? NOOP : span;
     }
 
-    /**
-     * The current trace as a W3C {@code traceparent} value, for a transport the
-     * server does not instrument itself -- a message queue, a raw socket. Null
-     * when there is no trace.
-     */
+    /// The current trace as a W3C `traceparent` value, for a transport the
+    /// server does not instrument itself -- a message queue, a raw socket. Null
+    /// when there is no trace.
     public static String currentTraceparent() {
         Span span = currentOrNull();
         return span == null ? null : span.traceparent();
     }
 
-    /**
-     * Runs {@code work} inside a new span that is a child of the current one, and
-     * is current itself while it runs. An exception is recorded on the span and
-     * rethrown.
-     */
+    /// Runs `work` inside a new span that is a child of the current one, and
+    /// is current itself while it runs. An exception is recorded on the span and
+    /// rethrown.
     public static Object inSpan(String name, Work work) throws Exception {
         Span span = begin(name, Span.KIND_INTERNAL, null, null);
-        if(span == null) {
+        if (span == null) {
             return work.run(NOOP);
         }
         try {
@@ -286,58 +265,48 @@ public final class Tracing {
         }
     }
 
-    /**
-     * A new child of the current span that is NOT made current, for work whose
-     * start and end are in different places. The caller must end it.
-     */
-    /**
-     * The current span when tracing is on, for handing to work that runs on
-     * another thread; null otherwise.
-     */
+    /// A new child of the current span that is NOT made current, for work whose
+    /// start and end are in different places. The caller must end it.
+    /// The current span when tracing is on, for handing to work that runs on
+    /// another thread; null otherwise.
     static Span captureParent() {
         return active() == null ? null : currentOrNull();
     }
 
-    /**
-     * The tracer a span started now reports to: the one that made the current
-     * span, so everything a request does is exported by the tracer of the server
-     * serving it -- with two servers in one process, the installed one is only
-     * the latest -- and otherwise the installed one.
-     */
+    /// The tracer a span started now reports to: the one that made the current
+    /// span, so everything a request does is exported by the tracer of the server
+    /// serving it -- with two servers in one process, the installed one is only
+    /// the latest -- and otherwise the installed one.
     static Tracer active() {
         Span current = currentOrNull();
-        if(current != null && current.owner != null) {
+        if (current != null && current.owner != null) {
             return current.owner;
         }
         return tracer;
     }
 
-    /**
-     * Runs {@code work} on this thread as a span whose parent is {@code parent},
-     * captured on the thread that scheduled it -- an {@code @Async} method's
-     * caller -- or as a root span when that is null, as a scheduled job's run is.
-     */
+    /// Runs `work` on this thread as a span whose parent is `parent`,
+    /// captured on the thread that scheduled it -- an `@Async` method's
+    /// caller -- or as a root span when that is null, as a scheduled job's run is.
     static Object inBackground(String name, Span parent, Work work) throws Exception {
         return inBackground(name, parent, null, work);
     }
 
-    /**
-     * {@link #inBackground(String, Span, Work)} reporting to {@code own} when
-     * there is no parent to take the tracer from -- a scheduled run, whose
-     * scheduler knows which server it belongs to.
-     */
+    /// [#inBackground(String,Span,Work)] reporting to `own` when
+    /// there is no parent to take the tracer from -- a scheduled run, whose
+    /// scheduler knows which server it belongs to.
     static Object inBackground(String name, Span parent, Tracer own, Work work)
             throws Exception {
         // The parent's tracer: the run belongs to whoever started it.
         Tracer t = parent != null && parent.owner != null ? parent.owner
                 : own != null ? own : tracer;
-        if(t == null || isSuppressed()) {
+        if (t == null || isSuppressed()) {
             return work.run(NOOP);
         }
         Span span = null;
         try {
             span = t.startSpan(name, Span.KIND_INTERNAL, parent, null, null);
-            if(span != null) {
+            if (span != null) {
                 span.owner = t;
                 enter(span);
             }
@@ -345,7 +314,7 @@ public final class Tracing {
             failed(err);
             span = null;
         }
-        if(span == null) {
+        if (span == null) {
             return work.run(NOOP);
         }
         try {
@@ -360,12 +329,12 @@ public final class Tracing {
 
     public static Span startSpan(String name) {
         Tracer t = active();
-        if(t == null || isSuppressed()) {
+        if (t == null || isSuppressed()) {
             return NOOP;
         }
         try {
             Span span = t.startSpan(name, Span.KIND_INTERNAL, currentOrNull(), null, null);
-            if(span != null) {
+            if (span != null) {
                 span.owner = t;
             }
             return span == null ? NOOP : span;
@@ -375,66 +344,60 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Turns span creation off, or back on, for the calling thread. The exporter
-     * uses it so its own requests to the collector are not traced -- each export
-     * would otherwise produce a span, and exporting that one another.
-     */
+    /// Turns span creation off, or back on, for the calling thread. The exporter
+    /// uses it so its own requests to the collector are not traced -- each export
+    /// would otherwise produce a span, and exporting that one another.
     public static void setSuppressed(boolean suppressed) {
         SUPPRESSED.set(suppressed ? Boolean.TRUE : null);
     }
 
-    /**
-     * Applies the rules {@link Web} enforces on request header lines to lines an
-     * exporter will send, so a tracer can refuse a bad configuration when it is
-     * opened. Otherwise the server starts, and every export then fails on the
-     * same check. One rule set, not a copy of it.
-     *
-     * @param lines {@code "Name: value"} strings
-     * @throws java.io.IOException naming the first line that could not be sent;
-     *         the message never quotes a value, since values carry credentials
-     */
+    /// Applies the rules [Web] enforces on request header lines to lines an
+    /// exporter will send, so a tracer can refuse a bad configuration when it is
+    /// opened. Otherwise the server starts, and every export then fails on the
+    /// same check. One rule set, not a copy of it.
+    ///
+    /// @param lines `"Name: value"` strings
+    /// @throws java.io.IOException naming the first line that could not be sent;
+    /// the message never quotes a value, since values carry credentials
     public static void checkHeaderLines(List lines) throws java.io.IOException {
         HeaderLines.validate(lines);
     }
 
-    /** Whether {@link #setSuppressed} is in force on this thread. */
+    /// Whether [#setSuppressed] is in force on this thread.
     public static boolean isSuppressed() {
         return SUPPRESSED.get() != null;
     }
 
-    /**
-     * Names the current server span after the route that matched. Called by the
-     * generated routers, which are the only code that knows the TEMPLATE -- the
-     * path alone would make every pet id its own operation.
-     */
+    /// Names the current server span after the route that matched. Called by the
+    /// generated routers, which are the only code that knows the TEMPLATE -- the
+    /// path alone would make every pet id its own operation.
     public static void route(String template) {
         // The request histogram's label, when metrics are on: one static read
         // when they are not.
         com.codename1.backend.metrics.Metrics.route(template);
         // Every generated router calls this on every matched request, traced or
         // not; with no tracer that is this one read and nothing else.
-        if(tracer == null && currentOrNull() == null) {
+        if (tracer == null && currentOrNull() == null) {
             return;
         }
         Span span = currentOrNull();
-        if(span == null || template == null) {
+        if (span == null || template == null) {
             return;
         }
         try {
             // Inside the guard: the generated routers call this on every matched
             // request, so a tracer whose getKind throws would otherwise turn a
             // request that succeeded into a 500.
-            if(span.getKind() != Span.KIND_SERVER) {
+            if (span.getKind() != Span.KIND_SERVER) {
                 return;
             }
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute("http.route", template);
             }
             String name = span.getName();
             // The name is the method until a route is known. Only the first match
             // renames it, so two chained routers cannot append twice.
-            if(name != null && name.indexOf(' ') < 0) {
+            if (name != null && name.indexOf(' ') < 0) {
                 span.updateName(name + " " + template);
             }
         } catch (RuntimeException err) {
@@ -447,23 +410,19 @@ public final class Tracing {
     // off.
     // ------------------------------------------------------------------
 
-    /**
-     * The span for one request, made current. Everything is read from the
-     * request NOW, because a Request is valid only while its handler runs.
-     */
+    /// The span for one request, made current. Everything is read from the
+    /// request NOW, because a Request is valid only while its handler runs.
     static Span startServer(HttpServer.Request request, boolean secure) {
         return startServer(request, secure, null);
     }
 
-    /**
-     * {@link #startServer(HttpServer.Request, boolean)} with the tracer of the
-     * server the request reached, when it has one of its own: a second server in
-     * the process installs its tracer over the first's, and the first's requests
-     * must still go to the first's endpoint under its service name.
-     */
+    /// [#startServer(HttpServer.Request,boolean)] with the tracer of the
+    /// server the request reached, when it has one of its own: a second server in
+    /// the process installs its tracer over the first's, and the first's requests
+    /// must still go to the first's endpoint under its service name.
     static Span startServer(HttpServer.Request request, boolean secure, Tracer own) {
         Tracer t = own != null ? own : tracer;
-        if(t == null || request == null) {
+        if (t == null || request == null) {
             return null;
         }
         Span span = null;
@@ -471,14 +430,14 @@ public final class Tracing {
             String method = request.getMethod();
             span = t.startSpan(method == null ? "HTTP" : method, Span.KIND_SERVER, null,
                     request.getHeader(TRACEPARENT), request.getHeader(TRACESTATE));
-            if(span == null) {
+            if (span == null) {
                 return null;
             }
             span.owner = t;
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute("http.request.method", method);
                 String target = request.getTarget();
-                if(target != null) {
+                if (target != null) {
                     // The PATH only. The query string is where tokens and
                     // personal data travel, and a trace backend is not where
                     // either belongs.
@@ -487,15 +446,15 @@ public final class Tracing {
                 }
                 span.setAttribute("url.scheme", secure ? "https" : "http");
                 String version = request.getVersion();
-                if(version != null && version.startsWith("HTTP/")) {
+                if (version != null && version.startsWith("HTTP/")) {
                     span.setAttribute("network.protocol.version", version.substring(5));
                 }
                 String host = request.getHeader("host");
-                if(host != null) {
+                if (host != null) {
                     span.setAttribute("server.address", hostOnly(host));
                 }
                 String agent = request.getHeader("user-agent");
-                if(agent != null) {
+                if (agent != null) {
                     span.setAttribute("user_agent.original", agent);
                 }
             }
@@ -508,28 +467,26 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Ends a request's span once the response is written -- or failed to be -- and
-     * clears the current span for the next request on the thread.
-     *
-     * @param status the status sent, or -1 when the write failed
-     */
+    /// Ends a request's span once the response is written -- or failed to be -- and
+    /// clears the current span for the next request on the thread.
+    ///
+    /// @param status the status sent, or -1 when the write failed
     static void endServer(Span span, int status, Throwable error) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
         try {
-            if(span.isRecording()) {
-                if(status > 0) {
-                    span.setAttribute("http.response.status_code", (long)status);
+            if (span.isRecording()) {
+                if (status > 0) {
+                    span.setAttribute("http.response.status_code", (long) status);
                 }
-                if(error != null) {
+                if (error != null) {
                     span.recordException(error);
-                } else if(status >= 500) {
+                } else if (status >= 500) {
                     // Server spans fail on 5xx only. A 404 is this server answering
                     // correctly about something that is not there.
                     span.setError(String.valueOf(status));
-                } else if(status < 0) {
+                } else if (status < 0) {
                     span.setError("the response could not be written");
                 }
             }
@@ -540,22 +497,20 @@ public final class Tracing {
         // The request that stopped the server has now ended, and its span with it:
         // only now can the tracer go without taking that span down unexported.
         Tracer after = span.shutdownOnEnd;
-        if(after != null) {
+        if (after != null) {
             span.shutdownOnEnd = null;
             shutdown(after, span.shutdownOnEndMillis);
         }
     }
 
-    /**
-     * Stops {@code owned} -- now, or, when this thread is serving a request, once
-     * that request's span has ended. A handler that calls Backend.stop() is exempt
-     * from the drain precisely so its response can still be written, and its span
-     * ends after that write; shutting the tracer down first made the exporter
-     * refuse that span, so every shutdown requested over HTTP lost its own trace.
-     */
+    /// Stops `owned` -- now, or, when this thread is serving a request, once
+    /// that request's span has ended. A handler that calls Backend.stop() is exempt
+    /// from the drain precisely so its response can still be written, and its span
+    /// ends after that write; shutting the tracer down first made the exporter
+    /// refuse that span, so every shutdown requested over HTTP lost its own trace.
     static void shutdownAfterServing(Tracer owned, int timeoutMillis) {
         Span serving = servingSpan();
-        if(serving != null) {
+        if (serving != null) {
             serving.shutdownOnEnd = owned;
             serving.shutdownOnEndMillis = timeoutMillis;
             return;
@@ -563,13 +518,13 @@ public final class Tracing {
         shutdown(owned, timeoutMillis);
     }
 
-    /** The server span of the request this thread is serving, or null. */
+    /// The server span of the request this thread is serving, or null.
     private static Span servingSpan() {
         Span span = currentOrNull();
         int depth = 0;
-        while(span != null && depth++ < 64) {
+        while (span != null && depth++ < 64) {
             try {
-                if(span.getKind() == Span.KIND_SERVER) {
+                if (span.getKind() == Span.KIND_SERVER) {
                     return span;
                 }
             } catch (RuntimeException err) {
@@ -581,17 +536,15 @@ public final class Tracing {
         return null;
     }
 
-    /**
-     * An outbound HTTP span, made current while the call runs. Null when tracing
-     * is off, suppressed on this thread, or already inside a client span -- one
-     * outbound operation is one span, whatever it happens to be built from.
-     */
+    /// An outbound HTTP span, made current while the call runs. Null when tracing
+    /// is off, suppressed on this thread, or already inside a client span -- one
+    /// outbound operation is one span, whatever it happens to be built from.
     static Span startHttpClient(String method, String url, List callerHeaders) {
         Tracer t = active();
-        if(t == null || isSuppressed()) {
+        if (t == null || isSuppressed()) {
             return null;
         }
-        if(callerTraceparent(callerHeaders)) {
+        if (callerTraceparent(callerHeaders)) {
             // The caller chose which trace this request belongs to, and the service
             // it reaches joins that one. A span recorded here would sit in the
             // CURRENT trace and describe a request whose context it never sent.
@@ -599,18 +552,18 @@ public final class Tracing {
         }
         String verb = method == null ? "GET" : method;
         Span span = begin(verb, Span.KIND_CLIENT, null, null);
-        if(span == null) {
+        if (span == null) {
             return null;
         }
         try {
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute("http.request.method", verb);
-                if(url != null) {
+                if (url != null) {
                     // Redacted the way every log line here redacts it: a presigned
                     // URL's query IS the credential, and userinfo is a password.
                     span.setAttribute("url.full", Urls.forMessage(url));
                     String host = authority(url);
-                    if(host != null) {
+                    if (host != null) {
                         span.setAttribute("server.address", hostOnly(host));
                     }
                 }
@@ -621,27 +574,25 @@ public final class Tracing {
         return span;
     }
 
-    /**
-     * The header lines that carry the trace to the service being called, or null
-     * for none. None when the caller already set a traceparent of its own: that
-     * is a deliberate choice about which trace the request belongs to.
-     */
+    /// The header lines that carry the trace to the service being called, or null
+    /// for none. None when the caller already set a traceparent of its own: that
+    /// is a deliberate choice about which trace the request belongs to.
     static List propagationHeaders(Span span, List callerHeaders) {
-        if(span == null) {
+        if (span == null) {
             return null;
         }
-        if(callerTraceparent(callerHeaders)) {
+        if (callerTraceparent(callerHeaders)) {
             return null;
         }
         try {
             String parent = span.traceparent();
-            if(parent == null) {
+            if (parent == null) {
                 return null;
             }
             List out = new ArrayList(2);
             out.add(TRACEPARENT + ": " + parent);
             String state = span.tracestate();
-            if(state != null && state.length() > 0) {
+            if (state != null && state.length() > 0) {
                 out.add(TRACESTATE + ": " + state);
             }
             return out;
@@ -651,23 +602,21 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Ends an outbound span.
-     *
-     * @param status the response status, or -1 when there was none
-     */
+    /// Ends an outbound span.
+    ///
+    /// @param status the response status, or -1 when there was none
     static void endHttpClient(Span span, int status, Throwable error) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
         try {
-            if(span.isRecording()) {
-                if(status > 0) {
-                    span.setAttribute("http.response.status_code", (long)status);
+            if (span.isRecording()) {
+                if (status > 0) {
+                    span.setAttribute("http.response.status_code", (long) status);
                 }
-                if(error != null) {
+                if (error != null) {
                     span.recordException(error);
-                } else if(status >= 400) {
+                } else if (status >= 400) {
                     // A client span fails on 4xx as well: the call did not get
                     // what it asked for, whoever was wrong.
                     span.setError(String.valueOf(status));
@@ -679,32 +628,30 @@ public final class Tracing {
         finish(span);
     }
 
-    /**
-     * A span for one database statement, made current while it runs.
-     *
-     * <p>The statement is recorded as the application wrote it, placeholders and
-     * all. The bound VALUES never are: they are the rows. A deployment that also
-     * inlines literals into its SQL can drop the text with
-     * {@code cn1.otel.attributes.exclude=db.query.text}.
-     */
+    /// A span for one database statement, made current while it runs.
+    ///
+    /// The statement is recorded as the application wrote it, placeholders and
+    /// all. The bound VALUES never are: they are the rows. A deployment that also
+    /// inlines literals into its SQL can drop the text with
+    /// `cn1.otel.attributes.exclude=db.query.text`.
     static Span startDatabase(String system, String sql) {
         Tracer t = active();
-        if(t == null || isSuppressed()) {
+        if (t == null || isSuppressed()) {
             return null;
         }
         String operation = firstKeyword(sql);
         Span span = begin(operation == null ? system : operation, Span.KIND_CLIENT, null, null);
-        if(span == null) {
+        if (span == null) {
             return null;
         }
         try {
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute("db.system", system);
                 span.setAttribute("db.system.name", system);
-                if(operation != null) {
+                if (operation != null) {
                     span.setAttribute("db.operation.name", operation);
                 }
-                if(sql != null) {
+                if (sql != null) {
                     span.setAttribute("db.query.text", sql);
                 }
             }
@@ -714,13 +661,13 @@ public final class Tracing {
         return span;
     }
 
-    /** An integer attribute on a span, guarded like every other hook. */
+    /// An integer attribute on a span, guarded like every other hook.
     static void setAttribute(Span span, String key, long value) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
         try {
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute(key, value);
             }
         } catch (RuntimeException err) {
@@ -728,20 +675,18 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Whether the caller's own header lines already carry trace context -- a
-     * traceparent, or a tracestate alone. The state is part of the caller's
-     * context too: a traceparent of ours added beside it paired the caller's
-     * vendor state with an unrelated trace id, or, with state of our own, sent
-     * two tracestate headers.
-     */
+    /// Whether the caller's own header lines already carry trace context -- a
+    /// traceparent, or a tracestate alone. The state is part of the caller's
+    /// context too: a traceparent of ours added beside it paired the caller's
+    /// vendor state with an unrelated trace id, or, with state of our own, sent
+    /// two tracestate headers.
     static boolean callerTraceparent(List callerHeaders) {
-        if(callerHeaders == null) {
+        if (callerHeaders == null) {
             return false;
         }
-        for(int iter = 0 ; iter < callerHeaders.size() ; iter++) {
-            String line = String.valueOf(callerHeaders.get(iter)).trim();
-            if(isHeaderLine(line, TRACEPARENT) || isHeaderLine(line, TRACESTATE)) {
+        for (Object header : callerHeaders) {
+            String line = String.valueOf(header).trim();
+            if (isHeaderLine(line, TRACEPARENT) || isHeaderLine(line, TRACESTATE)) {
                 return true;
             }
         }
@@ -754,29 +699,27 @@ public final class Tracing {
                 && (line.charAt(name.length()) == ':' || line.charAt(name.length()) == ' ');
     }
 
-    /** Ends a statement's span. */
+    /// Ends a statement's span.
     static void endDatabase(Span span, Throwable error) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
-        if(error != null) {
+        if (error != null) {
             guardedException(span, error);
         }
         finish(span);
     }
 
-    /**
-     * The span for one Lambda invocation, made current.
-     *
-     * <p>The host hands the invocation's trace over in X-Ray's own format rather
-     * than W3C's; when that is all there is, it is translated so the invocation
-     * still joins the caller's trace. The two describe the same 128-bit id: X-Ray
-     * writes it as a version, 8 hex digits of time and 24 of randomness, and W3C
-     * as the 32 of them run together.
-     */
+    /// The span for one Lambda invocation, made current.
+    ///
+    /// The host hands the invocation's trace over in X-Ray's own format rather
+    /// than W3C's; when that is all there is, it is translated so the invocation
+    /// still joins the caller's trace. The two describe the same 128-bit id: X-Ray
+    /// writes it as a version, 8 hex digits of time and 24 of randomness, and W3C
+    /// as the 32 of them run together.
     static Span startLambda(String traceHeader, String requestId) {
         Tracer t = tracer;
-        if(t == null) {
+        if (t == null) {
             return null;
         }
         Span span = null;
@@ -784,13 +727,13 @@ public final class Tracing {
             String name = System.getenv("AWS_LAMBDA_FUNCTION_NAME");
             span = t.startSpan(name == null ? "invoke" : name, Span.KIND_SERVER, null,
                     fromXRay(traceHeader), null);
-            if(span == null) {
+            if (span == null) {
                 return null;
             }
-            if(span.isRecording()) {
+            if (span.isRecording()) {
                 span.setAttribute("cloud.provider", "aws");
                 span.setAttribute("faas.trigger", "other");
-                if(requestId != null) {
+                if (requestId != null) {
                     span.setAttribute("faas.invocation_id", requestId);
                 }
             }
@@ -803,36 +746,32 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Ends an invocation's span. The runtime loop then flushes before it polls
-     * again, rather than here, so the result is posted without waiting on the
-     * collector.
-     */
+    /// Ends an invocation's span. The runtime loop then flushes before it polls
+    /// again, rather than here, so the result is posted without waiting on the
+    /// collector.
     static void endLambda(Span span, Throwable error) {
         endLambda(span, error, null);
     }
 
-    /**
-     * Ends an invocation span with what went wrong, in order: the invocation's own
-     * failure, then a failure to tell the host about it. Either may be null.
-     */
+    /// Ends an invocation span with what went wrong, in order: the invocation's own
+    /// failure, then a failure to tell the host about it. Either may be null.
     static void endLambda(Span span, Throwable error, Throwable reporting) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
-        if(error != null) {
+        if (error != null) {
             guardedException(span, error);
         }
-        if(reporting != null) {
+        if (reporting != null) {
             guardedException(span, reporting);
         }
         finish(span);
     }
 
-    /** Flushes the installed tracer, if any. */
+    /// Flushes the installed tracer, if any.
     static void flush(int timeoutMillis) {
         Tracer t = tracer;
-        if(t == null) {
+        if (t == null) {
             return;
         }
         try {
@@ -842,45 +781,44 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Flushes, stops and uninstalls {@code owned}, the tracer of a server that is
-     * stopping. Three places it can be:
-     * <ul>
-     *   <li>installed: taken out of the slot and stopped;</li>
-     *   <li>displaced by a start-up still in progress, which holds it as the
-     *       tracer to restore if it fails: taken out of that claim -- so a failed
-     *       start-up cannot put back the tracer of a server that has stopped -- and
-     *       stopped, since nothing is running it any more;</li>
-     *   <li>neither: replaced by an install or a commit, which already stopped it,
-     *       and whatever replaced it belongs to someone else.</li>
-     * </ul>
-     */
+    /// Flushes, stops and uninstalls `owned`, the tracer of a server that is
+    /// stopping. Three places it can be:
+    ///
+    /// - installed: taken out of the slot and stopped;
+    ///
+    /// - displaced by a start-up still in progress, which holds it as the
+    ///   tracer to restore if it fails: taken out of that claim -- so a failed
+    ///   start-up cannot put back the tracer of a server that has stopped -- and
+    ///   stopped, since nothing is running it any more;
+    ///
+    /// - neither: replaced by an install or a commit, which already stopped it,
+    ///   and whatever replaced it belongs to someone else.
     static void shutdown(Tracer owned, int timeoutMillis) {
-        if(owned == null) {
+        if (owned == null) {
             return;
         }
         boolean stop = false;
-        synchronized(LIFECYCLE) {
+        synchronized (LIFECYCLE) {
             boolean wasOwned = OWNED.remove(owned);
-            if(tracer == owned) {
+            if (tracer == owned) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
                 // Another running server's tracer takes the slot, so the work a
                 // thread does outside any request is still traced somewhere.
-                tracer = OWNED.isEmpty() ? null : (Tracer)OWNED.get(OWNED.size() - 1);
+                tracer = OWNED.isEmpty() ? null : (Tracer) OWNED.get(OWNED.size() - 1);
                 stop = true;
-            } else if(wasOwned) {
+            } else if (wasOwned) {
                 // Displaced by a later server, left running for its own; stopped
                 // now that its server is.
                 stop = true;
             }
-            for(int iter = 0 ; iter < PENDING.size() ; iter++) {
-                Swap open = (Swap)PENDING.get(iter);
-                if(open.previous == owned) {
+            for (Object pending : PENDING) {
+                Swap open = (Swap) pending;
+                if (open.previous == owned) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
                     open.previous = null;
                     stop = true;
                 }
             }
         }
-        if(!stop) {
+        if (!stop) {
             return;
         }
         try {
@@ -890,10 +828,10 @@ public final class Tracing {
         }
     }
 
-    /** The tracer's counters, when one is installed. */
+    /// The tracer's counters, when one is installed.
     static void metrics(Map out) {
         Tracer t = tracer;
-        if(t == null) {
+        if (t == null) {
             return;
         }
         try {
@@ -907,18 +845,16 @@ public final class Tracing {
 
     private static Span currentOrNull() {
         Object value = CURRENT.get();
-        return value instanceof Span ? (Span)value : null;
+        return value instanceof Span ? (Span) value : null;
     }
 
-    /**
-     * A child of the current span, made current. Null when tracing is off,
-     * suppressed, or when a CLIENT span is already current: an insert that runs a
-     * query of its own to learn its key is one statement to the caller, and an
-     * outbound call cannot have another outbound call inside it.
-     */
+    /// A child of the current span, made current. Null when tracing is off,
+    /// suppressed, or when a CLIENT span is already current: an insert that runs a
+    /// query of its own to learn its key is one statement to the caller, and an
+    /// outbound call cannot have another outbound call inside it.
     private static Span begin(String name, int kind, String traceparent, String tracestate) {
         Tracer t = active();
-        if(t == null || isSuppressed()) {
+        if (t == null || isSuppressed()) {
             return null;
         }
         Span parent = currentOrNull();
@@ -926,14 +862,14 @@ public final class Tracing {
             // Inside the guard, like every other call into the tracer: this runs for
             // every outbound call and statement, and a span whose getKind throws must
             // not fail the operation it was only meant to observe.
-            if(kind == Span.KIND_CLIENT && parent != null && parent.getKind() == Span.KIND_CLIENT) {
+            if (kind == Span.KIND_CLIENT && parent != null && parent.getKind() == Span.KIND_CLIENT) {
                 return null;
             }
             Span span = t.startSpan(name, kind, parent, traceparent, tracestate);
-            if(span != null) {
+            if (span != null) {
                 span.owner = t;
             }
-            if(span == null) {
+            if (span == null) {
                 return null;
             }
             enter(span);
@@ -950,23 +886,21 @@ public final class Tracing {
         CURRENT.set(span);
     }
 
-    /**
-     * Makes {@code span} stop being this thread's current span WITHOUT ending it.
-     * HTTP/2 serves several streams in one turn and writes their responses after
-     * the last handler, so a span has to leave -- or the next stream's span would
-     * start as its child -- before it can end.
-     */
+    /// Makes `span` stop being this thread's current span WITHOUT ending it.
+    /// HTTP/2 serves several streams in one turn and writes their responses after
+    /// the last handler, so a span has to leave -- or the next stream's span would
+    /// start as its child -- before it can end.
     static void leave(Span span) {
-        if(span != null && span.entered) {
+        if (span != null && span.entered) {
             span.entered = false;
             CURRENT.set(span.previous);
             span.previous = null;
         }
     }
 
-    /** Ends a span and restores what was current before it. */
+    /// Ends a span and restores what was current before it.
     private static void finish(Span span) {
-        if(span.entered) {
+        if (span.entered) {
             span.entered = false;
             CURRENT.set(span.previous);
             span.previous = null;
@@ -978,15 +912,13 @@ public final class Tracing {
         }
     }
 
-    /**
-     * Finishes a span the tracer handed out before a later call into it failed.
-     * Dropping the reference instead would leave the tracer holding whatever state
-     * it keeps for an open span -- once per request, for as long as the fault lasts.
-     * Discarded, because what it recorded is incomplete; each step guarded, because
-     * the tracer is already known to be failing.
-     */
+    /// Finishes a span the tracer handed out before a later call into it failed.
+    /// Dropping the reference instead would leave the tracer holding whatever state
+    /// it keeps for an open span -- once per request, for as long as the fault lasts.
+    /// Discarded, because what it recorded is incomplete; each step guarded, because
+    /// the tracer is already known to be failing.
     private static void abandon(Span span) {
-        if(span == null) {
+        if (span == null) {
             return;
         }
         try {
@@ -1010,18 +942,18 @@ public final class Tracing {
         }
     }
 
-    /** Once per process: a broken tracer must not also flood the log. */
+    /// Once per process: a broken tracer must not also flood the log.
     private static void failed(RuntimeException err) {
-        if(!reportedFailure) {
+        if (!reportedFailure) {
             reportedFailure = true;
             System.err.println("tracing failed and the operation continued untraced: " + err);
         }
     }
 
-    /** "example.com:8080" to "example.com", "[::1]:80" to "::1". */
+    /// "example.com:8080" to "example.com", "\[::1\]:80" to "::1".
     static String hostOnly(String host) {
         String h = host.trim();
-        if(h.startsWith("[")) {
+        if (h.startsWith("[")) {
             int close = h.indexOf(']');
             return close > 0 ? h.substring(1, close) : h;
         }
@@ -1029,17 +961,17 @@ public final class Tracing {
         return colon >= 0 ? h.substring(0, colon) : h;
     }
 
-    /** The host[:port] of an absolute URL, without userinfo; null when there is none. */
+    /// The host\[:port\] of an absolute URL, without userinfo; null when there is none.
     static String authority(String url) {
         int scheme = url.indexOf("://");
-        if(scheme < 0) {
+        if (scheme < 0) {
             return null;
         }
         int start = scheme + 3;
         int end = url.length();
-        for(int iter = start ; iter < url.length() ; iter++) {
+        for (int iter = start ; iter < url.length() ; iter++) {
             char c = url.charAt(iter);
-            if(c == '/' || c == '?' || c == '#') {
+            if (c == '/' || c == '?' || c == '#') {
                 end = iter;
                 break;
             }
@@ -1049,26 +981,24 @@ public final class Tracing {
         return at >= 0 ? authority.substring(at + 1) : authority;
     }
 
-    /**
-     * The SQL keyword a statement opens with, upper-cased, or null. Folded by
-     * hand: String.toUpperCase is locale sensitive, and on a Turkish host
-     * "insert" would come back with a dotted capital I.
-     */
+    /// The SQL keyword a statement opens with, upper-cased, or null. Folded by
+    /// hand: String.toUpperCase is locale sensitive, and on a Turkish host
+    /// "insert" would come back with a dotted capital I.
     static String firstKeyword(String sql) {
-        if(sql == null) {
+        if (sql == null) {
             return null;
         }
         int at = 0;
         int n = sql.length();
-        while(at < n && (sql.charAt(at) <= ' ' || sql.charAt(at) == '(')) {
+        while (at < n && (sql.charAt(at) <= ' ' || sql.charAt(at) == '(')) {
             at++;
         }
         StringBuilder out = new StringBuilder();
-        while(at < n && out.length() < 16) {
+        while (at < n && out.length() < 16) {
             char c = sql.charAt(at);
-            if(c >= 'a' && c <= 'z') {
-                out.append((char)(c - 32));
-            } else if(c >= 'A' && c <= 'Z') {
+            if (c >= 'a' && c <= 'z') {
+                out.append((char) (c - 32));
+            } else if (c >= 'A' && c <= 'Z') {
                 out.append(c);
             } else {
                 break;
@@ -1078,108 +1008,120 @@ public final class Tracing {
         return out.length() == 0 ? null : out.toString();
     }
 
-    /**
-     * X-Ray's {@code Root=1-5759e988-bd862e3fe1be46a994272793;Parent=53995c3f42cd8ad8;Sampled=1}
-     * as a W3C traceparent, or null when it is absent or not in that shape.
-     */
+    /// X-Ray's `Root=1-5759e988-bd862e3fe1be46a994272793;Parent=53995c3f42cd8ad8;Sampled=1`
+    /// as a W3C traceparent, or null when it is absent or not in that shape.
     static String fromXRay(String header) {
-        if(header == null) {
+        if (header == null) {
             return null;
         }
         String root = null;
         String parent = null;
         String sampled = "0";
         int at = 0;
-        while(at < header.length()) {
+        while (at < header.length()) {
             int end = header.indexOf(';', at);
-            if(end < 0) {
+            if (end < 0) {
                 end = header.length();
             }
             String part = header.substring(at, end).trim();
             at = end + 1;
-            if(part.startsWith("Root=")) {
+            if (part.startsWith("Root=")) {
                 root = part.substring(5);
-            } else if(part.startsWith("Parent=")) {
+            } else if (part.startsWith("Parent=")) {
                 parent = part.substring(7);
-            } else if(part.startsWith("Sampled=")) {
+            } else if (part.startsWith("Sampled=")) {
                 sampled = part.substring(8);
             }
         }
         // 1-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx: version, 8 hex, 24 hex.
-        if(root == null || parent == null || root.length() != 35 || !root.startsWith("1-")
+        if (root == null || parent == null || root.length() != 35 || !root.startsWith("1-")
                 || root.charAt(10) != '-' || parent.length() != 16) {
             return null;
         }
         String traceId = root.substring(2, 10) + root.substring(11);
-        if(!isLowerHex(traceId) || !isLowerHex(parent)) {
+        if (!isLowerHex(traceId) || !isLowerHex(parent)) {
             return null;
         }
         return "00-" + traceId + "-" + parent + "-" + ("1".equals(sampled) ? "01" : "00");
     }
 
     private static boolean isLowerHex(String value) {
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) {
+            if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f')) {
                 return false;
             }
         }
         return true;
     }
 
-    /** What every hook answers with when there is no tracer. */
+    /// What every hook answers with when there is no tracer.
     private static final class NoopSpan extends Span {
+        @Override
         public Span setAttribute(String key, String value) {
             return this;
         }
 
+        @Override
         public Span setAttribute(String key, long value) {
             return this;
         }
 
+        @Override
         public Span setAttribute(String key, double value) {
             return this;
         }
 
+        @Override
         public Span setAttribute(String key, boolean value) {
             return this;
         }
 
+        @Override
         public Span recordException(Throwable error) {
             return this;
         }
 
+        @Override
         public Span setError(String description) {
             return this;
         }
 
+        @Override
         public Span updateName(String name) {
             return this;
         }
 
+        @Override
         public String getName() {
             return "";
         }
 
+        @Override
         public int getKind() {
             return KIND_INTERNAL;
         }
 
+        @Override
         public boolean isRecording() {
             return false;
         }
 
+        @Override
         public String traceparent() {
             return null;
         }
 
+        @Override
         public String tracestate() {
             return null;
         }
 
+        @Override
         public void discard() {
         }
 
+        @Override
         public void end() {
         }
     }

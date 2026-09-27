@@ -91,11 +91,6 @@ import java.util.Objects;
 //import java.util.logging.Level;
 //import java.util.logging.Logger;
 
-/**
- *
- * @author lior.gonnen
- *
- */
 public class InPlaceEditView extends FrameLayout{
 
     private static final String TAG = "InPlaceEditView";

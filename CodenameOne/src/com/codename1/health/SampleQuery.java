@@ -196,7 +196,7 @@ public final class SampleQuery {
 
     /// The gap that separates two sleep sessions.
     ///
-    /// The [Duration] form of [#setSleepSessionGapMillis(long)], which is the type the rest of
+    /// The [Duration][java.time.Duration] form of [#setSleepSessionGapMillis(long)], which is the type the rest of
     /// the framework speaks; the millis form stays for the ports and the
     /// wire format.
     public SampleQuery setSleepSessionGap(java.time.Duration value) {
@@ -206,7 +206,7 @@ public final class SampleQuery {
         return setSleepSessionGapMillis((long) value.toMillis());
     }
 
-    /// The gap that separates two sleep sessions, as a [Duration].
+    /// The gap that separates two sleep sessions, as a [Duration][java.time.Duration].
     public java.time.Duration getSleepSessionGap() {
         return java.time.Duration.ofMillis(getSleepSessionGapMillis());
     }

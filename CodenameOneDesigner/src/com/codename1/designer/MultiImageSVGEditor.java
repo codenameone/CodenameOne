@@ -40,8 +40,6 @@ import javax.swing.event.TableModelListener;
 
 /**
  * Editor for editing SVG files in the resource file
- *
- * @author Shai Almog
  */
 public class MultiImageSVGEditor extends BaseForm {
     private EditableResources res;

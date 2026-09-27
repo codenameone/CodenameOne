@@ -59,7 +59,7 @@ ROOT_RELATIVE_RE = re.compile(
 # Javadoc is produced from the framework sources at build time. Everything else,
 # /developer-guide/ included, is derived below -- whitelisting a prefix silently
 # exempts every path under it from the check.
-GENERATED_PREFIXES = ("/javadoc/",)
+GENERATED_PREFIXES = ("/javadoc/", "/backend/javadoc/")
 _JAVADOC_ROOT: Path | None = None
 # http:// is correct for these: RFC 3161 timestamping servers reject TLS, and
 # example.com URLs are illustrative rather than fetched.
@@ -259,6 +259,33 @@ def exact_redirect_pattern(source: str) -> re.Pattern[str] | None:
 # build_javadocs.sh generates the API docs from these two roots, so the published
 # tree is derivable from the repository without building it.
 JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
+# The backend API reference, which the same script generates under
+# /backend/javadoc/ from the server runtime: its shared tree, its production
+# implementation classes, and the core classes marked @SharedWithBackend (the ORM
+# session API and the entity annotations), which are documented in both
+# references. Only the marked core classes count on this side; the rest of
+# CodenameOne/src has no page there. The CLDC java.* classes are shared whole:
+# the backend's class library provides every public member of every one.
+BACKEND_JAVADOC_SOURCE_ROOTS = ("vm/backend/src", "vm/backend/impl/parparvm", "CodenameOne/src",
+                                "Ports/CLDC11/src")
+SHARED_CORE_ROOT = "CodenameOne/src"
+SHARED_WITH_BACKEND_RE = re.compile(r"^@(?:com\.codename1\.impl\.)?SharedWithBackend\s*$", re.M)
+BACKEND_PREFIX = "/backend/javadoc/"
+
+
+def javadoc_roots(prefix: str) -> tuple[str, ...]:
+    """The source roots the reference published under this prefix is built from."""
+    return BACKEND_JAVADOC_SOURCE_ROOTS if prefix == BACKEND_PREFIX else JAVADOC_SOURCE_ROOTS
+
+
+def in_reference(prefix: str, root_name: str, source: Path) -> bool:
+    """Whether a source file under one of the roots is part of that reference."""
+    if prefix != BACKEND_PREFIX or root_name != SHARED_CORE_ROOT:
+        return True
+    try:
+        return bool(SHARED_WITH_BACKEND_RE.search(source.read_text(encoding="utf-8", errors="ignore")))
+    except OSError:
+        return False
 # Pages javadoc emits for a package rather than for a type.
 # build_javadocs.sh filters these out of its source list, passes -exclude for them
 # and then guards that they never reached the output. Recording them here would
@@ -313,7 +340,7 @@ JAVADOC_ROOT_PAGES = {
 # not build and would rot at the next JDK bump. The guide links into none of them,
 # and documentation prose has no business pointing at javadoc's internals, so a
 # path into one is rejected rather than waved through on its first segment.
-_javadoc_index: tuple[set[str], set[str]] | None = None
+_javadoc_index: dict[str, tuple[set[str], set[str]]] = {}
 
 
 def is_public_type(source: Path, stem: str) -> bool:
@@ -358,14 +385,13 @@ def doc_comment_before(text: str, position: int) -> str:
     return "\n".join(collected)
 
 
-def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
+def javadoc_index(repo_root: Path, prefix: str = "/javadoc/") -> tuple[set[str], set[str]]:
     """Package directories and class names the generated Javadoc will contain."""
-    global _javadoc_index
-    if _javadoc_index is not None:
-        return _javadoc_index
+    if prefix in _javadoc_index:
+        return _javadoc_index[prefix]
     packages: set[str] = set()
     classes: set[str] = set()
-    for root_name in JAVADOC_SOURCE_ROOTS:
+    for root_name in javadoc_roots(prefix):
         root = repo_root / root_name
         if not root.exists():
             continue
@@ -377,11 +403,13 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
                 for excluded in JAVADOC_EXCLUDED_PACKAGES
             ):
                 continue
+            if not in_reference(prefix, root_name, source):
+                continue
             packages.add(package)
             if is_public_type(source, relative.stem):
                 classes.add(f"{package}/{relative.stem}")
-    _javadoc_index = (packages, classes)
-    return _javadoc_index
+    _javadoc_index[prefix] = (packages, classes)
+    return _javadoc_index[prefix]
 
 
 JAVA_TOKEN_RE = re.compile(
@@ -483,13 +511,13 @@ def documented_type_chains(source: Path) -> set[str]:
     return chains
 
 
-def documented_chain_exists(package: str, chain: list[str]) -> bool:
+def documented_chain_exists(package: str, chain: list[str], prefix: str = "/javadoc/") -> bool:
     """Whether javadoc emits a page for this dotted chain in this package."""
     if _JAVADOC_ROOT is None:
         return True
-    for root_name in JAVADOC_SOURCE_ROOTS:
+    for root_name in javadoc_roots(prefix):
         source = _JAVADOC_ROOT / root_name / package / f"{chain[0]}.java"
-        if source.exists():
+        if source.exists() and in_reference(prefix, root_name, source):
             return ".".join(chain) in documented_type_chains(source)
     return True  # the outer source moved; the class check above already spoke
 
@@ -536,14 +564,17 @@ def javadoc_path_exists(target: str) -> bool:
     # /javadoc in the content tree, because a path found there never reaches this
     # function; deleting that page in favour of a generated overview is what
     # exposed it, and the guide links to the root nine times.
-    if target in ("/javadoc", "/javadoc/"):
+    # Two references share this model: the client API at /javadoc/ and the
+    # backend API at /backend/javadoc/, each generated from its own roots.
+    prefix = BACKEND_PREFIX if (target + "/").startswith(BACKEND_PREFIX) else "/javadoc/"
+    if target in (prefix.rstrip("/"), prefix):
         path = ""
-    elif target.startswith("/javadoc/"):
-        path = target[len("/javadoc/"):]
+    elif target.startswith(prefix):
+        path = target[len(prefix):]
     else:
         path = target
     path = path.strip("/")
-    packages, classes = javadoc_index(_JAVADOC_ROOT)
+    packages, classes = javadoc_index(_JAVADOC_ROOT, prefix)
     if not path.endswith(".html"):
         # A directory: the tree root, one of javadoc's own asset directories, or a
         # package. Anything else names a directory the generator never creates --
@@ -588,7 +619,7 @@ def javadoc_path_exists(target: str) -> bool:
     # now. What this still does not verify is that they nest in the ORDER given --
     # that needs brace-depth parsing, and a page naming two real siblings the wrong
     # way round is a far less likely mistake than naming one that does not exist.
-    return documented_chain_exists(package, parts)
+    return documented_chain_exists(package, parts, prefix)
 
 
 def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
@@ -943,7 +974,7 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 # is the Ollama endpoint the AI chapter documents on purpose.
                 out.append((url, f"port {port} is not where the site is served"))
                 continue
-            if host in SITE_HOSTS and split.path.startswith("/javadoc/"):
+            if host in SITE_HOSTS and split.path.startswith(GENERATED_PREFIXES):
                 if not javadoc_fragment_is_current(split.fragment):
                     out.append((url, "a javadoc anchor in the retired JDK 9 dashed form; modern javadoc emits name(Type)"))
                     continue

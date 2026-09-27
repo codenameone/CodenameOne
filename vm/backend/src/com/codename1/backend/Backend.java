@@ -24,101 +24,91 @@ package com.codename1.backend;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
 
-/**
- * A configured, running server: the twenty lines every main used to open with,
- * written once.
- *
- * <pre>
- *   Backend.builder()
- *          .handler(new ApiRouter(new Api()))
- *          .run();
- * </pre>
- *
- * <p>That reads the configuration, opens the database the deployment named,
- * registers the generated daos, binds the port, installs a shutdown handler that
- * drains what is in flight, and waits. Each of those was previously the
- * developer's to write and to get wrong -- a main that returns ends the process
- * without a word, because the host threads are detached, and a server with no
- * signal handler loses every connection it was serving when the orchestrator
- * stops it.
- *
- * <h2>What comes from where</h2>
- *
- * <p>Anything the builder is TOLD is used as given. Anything it is not told, it
- * reads from {@link Config}: the port, the worker count, TLS, static files and
- * the database, in that layered order of system property, environment variable,
- * profile file, base file. The rule is worth stating once because the opposite
- * rule is also defensible: a value in the source wins over a value in the
- * environment, so a port written here is the port, and a port that should follow
- * the deployment is one nobody writes here.
- *
- * <p>The database is opened when there is one to open: a URL is configured, a
- * pool was handed in, or the build generated at least one entity and the ORM
- * therefore needs one. A server with no database opens none, which is what makes
- * this the same entry point for both kinds.
- *
- * <pre>
- *   # a laptop
- *   CN1_PROFILE=dev ./server
- *   # production
- *   DATABASE_URL=postgres://app:secret@db.internal/app PORT=8080 ./server
- * </pre>
- */
+/// A configured, running server: the twenty lines every main used to open with,
+/// written once.
+///
+/// ```java
+/// Backend.builder()
+///        .handler(new ApiRouter(new Api()))
+///        .run();
+/// ```
+///
+/// That reads the configuration, opens the database the deployment named,
+/// registers the generated daos, binds the port, installs a shutdown handler that
+/// drains what is in flight, and waits. Each of those was previously the
+/// developer's to write and to get wrong -- a main that returns ends the process
+/// without a word, because the host threads are detached, and a server with no
+/// signal handler loses every connection it was serving when the orchestrator
+/// stops it.
+///
+/// ### What comes from where
+///
+/// Anything the builder is TOLD is used as given. Anything it is not told, it
+/// reads from [Config]: the port, the worker count, TLS, static files and
+/// the database, in that layered order of system property, environment variable,
+/// profile file, base file. The rule is worth stating once because the opposite
+/// rule is also defensible: a value in the source wins over a value in the
+/// environment, so a port written here is the port, and a port that should follow
+/// the deployment is one nobody writes here.
+///
+/// The database is opened when there is one to open: a URL is configured, a
+/// pool was handed in, or the build generated at least one entity and the ORM
+/// therefore needs one. A server with no database opens none, which is what makes
+/// this the same entry point for both kinds.
+///
+/// ```
+/// # a laptop
+/// CN1_PROFILE=dev ./server
+/// # production
+/// DATABASE_URL=postgres://app:secret@db.internal/app PORT=8080 ./server
+/// ```
 public final class Backend {
     private final HttpServer server;
     private final DataSource dataSource;
     private final EntityManager entities;
     private final Config config;
     private final int shutdownMillis;
-    /**
-     * The tracer this server installed, or null. The INSTANCE, not a flag: the
-     * global slot may hold another tracer by the time this server stops -- a
-     * second server in the same process, or one the application installed -- and
-     * stopping this one must not shut that down.
-     */
+    /// The tracer this server installed, or null. The INSTANCE, not a flag: the
+    /// global slot may hold another tracer by the time this server stops -- a
+    /// second server in the same process, or one the application installed -- and
+    /// stopping this one must not shut that down.
     private final Tracer ownTracer;
-    /** The generated wiring of this server's beans, or null. */
+    /// The generated wiring of this server's beans, or null.
     private final Application application;
-    /** The metrics exporter this server started, or null. */
+    /// The metrics exporter this server started, or null.
     private final com.codename1.backend.metrics.MetricReader metricReader;
-    /** This server's managed beans; see {@link #getManagedBeans}. */
+    /// This server's managed beans; see [#getManagedBeans].
     private final List managedBeans;
-    /** This server's session settings and store. */
+    /// This server's session settings and store.
     private final Sessions sessions;
-    /** This server's executors. */
+    /// This server's executors.
     private final Tasks.Registry tasks;
-    /** This server's managed-attribute gauges, removed from the process's when it stops. */
+    /// This server's managed-attribute gauges, removed from the process's when it stops.
     private final List gauges;
-    /**
-     * Whether this server records metrics, which its scheduler reads when the
-     * application builds it. Set once, before the Backend is handed to anyone.
-     */
+    /// Whether this server records metrics, which its scheduler reads when the
+    /// application builds it. Set once, before the Backend is handed to anyone.
     private boolean measured;
 
-    /** Whether this server records request and job metrics. */
+    /// Whether this server records request and job metrics.
     public boolean isMeasured() {
         return measured;
     }
 
-    /** The tracer this server installed, or null: its scheduled jobs are traced by it. */
+    /// The tracer this server installed, or null: its scheduled jobs are traced by it.
     public Tracer getTracer() {
         return ownTracer;
     }
 
-    /** The recent requests of this server, kept once the development tools ask. */
+    /// The recent requests of this server, kept once the development tools ask.
     private final RequestLog requestLog;
-    /**
-     * Whether start-up has finished -- the application's started() hook
-     * included. The listener accepts before that hook runs, so health must not
-     * report the server ready to a load balancer until it has returned.
-     */
+    /// Whether start-up has finished -- the application's started() hook
+    /// included. The listener accepts before that hook runs, so health must not
+    /// report the server ready to a load balancer until it has returned.
     private boolean ready;
 
     private Backend(HttpServer server, DataSource dataSource, EntityManager entities,
@@ -130,17 +120,17 @@ public final class Backend {
         this.gauges = gauges;
         int added = 0;
         try {
-            for( ; added < gauges.size() ; added++) {
-                Object[] g = (Object[])gauges.get(added);
-                com.codename1.backend.metrics.Metrics.addSource((String)g[0], (String)g[1],
-                        (String)g[2], (com.codename1.backend.metrics.Gauge.Source)g[3]);
+            for ( ; added < gauges.size() ; added++) {
+                Object[] g = (Object[]) gauges.get(added);
+                com.codename1.backend.metrics.Metrics.addSource((String) g[0], (String) g[1],
+                        (String) g[2], (com.codename1.backend.metrics.Gauge.Source) g[3]);
             }
         } catch (RuntimeException err) {
             // A start that fails here must not leave the gauges it did add.
-            for(int iter = 0 ; iter < added ; iter++) {
-                Object[] g = (Object[])gauges.get(iter);
-                com.codename1.backend.metrics.Metrics.removeSource((String)g[0],
-                        (com.codename1.backend.metrics.Gauge.Source)g[3]);
+            for (int iter = 0 ; iter < added ; iter++) {
+                Object[] g = (Object[]) gauges.get(iter);
+                com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
+                        (com.codename1.backend.metrics.Gauge.Source) g[3]);
             }
             throw err;
         }
@@ -158,51 +148,49 @@ public final class Backend {
         this.application = application;
     }
 
-    /** A builder whose defaults come from the configuration this process sees. */
+    /// A builder whose defaults come from the configuration this process sees.
     public static Builder builder() {
         return new Builder(null);
     }
 
-    /** A builder over a configuration the caller already loaded or built. */
+    /// A builder over a configuration the caller already loaded or built.
     public static Builder builder(Config config) {
         return new Builder(config);
     }
 
-    /** The running server, for its metrics or to stop it. */
+    /// The running server, for its metrics or to stop it.
     public HttpServer getServer() {
         return server;
     }
 
-    /** The connection pool, or null when this server has no database. */
+    /// The connection pool, or null when this server has no database.
     public DataSource getDataSource() {
         return dataSource;
     }
 
-    /** The entity manager, or null when this build generated no entities. */
+    /// The entity manager, or null when this build generated no entities.
     public EntityManager getEntityManager() {
         return entities;
     }
 
-    /** The configuration this server resolved its settings from. */
+    /// The configuration this server resolved its settings from.
     public Config getConfig() {
         return config;
     }
 
-    /** The build-generated wiring of this server's beans, or null when it has none. */
+    /// The build-generated wiring of this server's beans, or null when it has none.
     public Application getApplication() {
         return application;
     }
 
-    /**
-     * The managed beans THIS server registered, as a copy. Per server rather than
-     * per process: a second server in the same process -- or this one started
-     * again -- must not list or invoke the beans of one that has stopped.
-     */
+    /// The managed beans THIS server registered, as a copy. Per server rather than
+    /// per process: a second server in the same process -- or this one started
+    /// again -- must not list or invoke the beans of one that has stopped.
     public List getManagedBeans() {
         return new ArrayList(managedBeans);
     }
 
-    /** Whether the server has finished starting and serves its application. */
+    /// Whether the server has finished starting and serves its application.
     public synchronized boolean isReady() {
         return ready;
     }
@@ -211,36 +199,34 @@ public final class Backend {
         ready = true;
     }
 
-    /** The log of this server's recent requests, off until something enables it. */
+    /// The log of this server's recent requests, off until something enables it.
     public RequestLog getRequestLog() {
         return requestLog;
     }
 
-    /** This server's sessions: their settings and the store they are kept in. */
+    /// This server's sessions: their settings and the store they are kept in.
     public Sessions getSessions() {
         return sessions;
     }
 
-    /** Blocks until the server stops. */
+    /// Blocks until the server stops.
     public void awaitTermination() {
         server.awaitTermination();
     }
 
-    /**
-     * Stops accepting, lets what is in flight finish, and closes the database.
-     *
-     * <p>The order matters and is the reason this exists rather than two calls:
-     * closing the pool first would fail the requests that were still being
-     * served with it.
-     */
+    /// Stops accepting, lets what is in flight finish, and closes the database.
+    ///
+    /// The order matters and is the reason this exists rather than two calls:
+    /// closing the pool first would fail the requests that were still being
+    /// served with it.
     public void stop() {
         // Once: a program that calls stop() and a signal hook that calls it
         // again would otherwise run every @PreDestroy and destroyMethod twice,
         // closing resources twice or repeating a shutdown write. A second caller
         // waits for the first to finish rather than returning while the server
         // is still draining.
-        synchronized(this) {
-            while(stopping) {
+        synchronized (this) {
+            while (stopping) {
                 try {
                     wait();
                 } catch (InterruptedException err) {
@@ -248,7 +234,7 @@ public final class Backend {
                     return;
                 }
             }
-            if(stopped) {
+            if (stopped) {
                 return;
             }
             stopping = true;
@@ -259,7 +245,7 @@ public final class Backend {
             stopOnce();
         } finally {
             Tasks.leave(callerTasks);
-            synchronized(this) {
+            synchronized (this) {
                 stopping = false;
                 stopped = true;
                 notifyAll();
@@ -273,7 +259,7 @@ public final class Backend {
     private void stopOnce() {
         // Scheduled jobs first, so none starts while the server drains; the
         // jobs already running are waited for with the requests.
-        if(application != null) {
+        if (application != null) {
             try {
                 application.stopping();
             } catch (Throwable err) {
@@ -284,10 +270,10 @@ public final class Backend {
         // Out of the process's server gauges, which would otherwise keep reading
         // a stopped server and pool.
         com.codename1.backend.metrics.Metrics.disableServer(server, dataSource);
-        for(int iter = 0 ; iter < gauges.size() ; iter++) {
-            Object[] g = (Object[])gauges.get(iter);
-            com.codename1.backend.metrics.Metrics.removeSource((String)g[0],
-                    (com.codename1.backend.metrics.Gauge.Source)g[3]);
+        for (Object element : gauges) {
+            Object[] g = (Object[]) element;
+            com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
+                    (com.codename1.backend.metrics.Gauge.Source) g[3]);
         }
         // Background work next: @Async calls and scheduled runs still going get
         // the same grace the requests did, while the beans they use are alive.
@@ -297,40 +283,38 @@ public final class Backend {
         // the database on its way out. Session beans first: they may use the
         // singletons, never the other way round.
         sessions.close();
-        if(application != null) {
+        if (application != null) {
             try {
                 application.stopped();
             } catch (Throwable err) {
                 System.err.println("Destroying the application's beans failed: " + err);
             }
         }
-        if(dataSource != null) {
+        if (dataSource != null) {
             dataSource.close();
         }
-        if(metricReader != null) {
+        if (metricReader != null) {
             metricReader.shutdown(shutdownMillis);
         }
         // LAST, so the spans of the requests the drain let finish are exported
         // rather than lost with the process -- and, when a request handler is the
         // caller, after THAT request's span has ended, which is after this returns.
-        if(ownTracer != null) {
+        if (ownTracer != null) {
             Tracing.shutdownAfterServing(ownTracer, shutdownMillis);
         }
     }
 
-    /**
-     * The pool, or a refusal naming the handler that asked for one.
-     *
-     * <p>Called from generated wiring: a controller declaring a
-     * {@link DataSource} constructor is declaring a DEPENDENCY, and handing it
-     * null because nothing configured a database turns that into a server that
-     * starts, reports healthy and fails on the first request that touches the
-     * database. The deployment is missing a setting, and start-up is where that
-     * is cheap to see.
-     */
+    /// The pool, or a refusal naming the handler that asked for one.
+    ///
+    /// Called from generated wiring: a controller declaring a
+    /// [DataSource] constructor is declaring a DEPENDENCY, and handing it
+    /// null because nothing configured a database turns that into a server that
+    /// starts, reports healthy and fails on the first request that touches the
+    /// database. The deployment is missing a setting, and start-up is where that
+    /// is cheap to see.
     public static DataSource requireDataSource(DataSource dataSource, String handler)
             throws IOException {
-        if(dataSource == null) {
+        if (dataSource == null) {
             throw new IOException(handler + " takes a DataSource, so it needs a database, and "
                     + "none is configured. Set " + Config.DATASOURCE_URL + " (or DATABASE_URL), "
                     + "or run on a development profile, which substitutes an in-memory one.");
@@ -338,10 +322,10 @@ public final class Backend {
         return dataSource;
     }
 
-    /** The entity manager, or a refusal naming the handler that asked for one. */
+    /// The entity manager, or a refusal naming the handler that asked for one.
     public static EntityManager requireEntities(EntityManager entities, String handler)
             throws IOException {
-        if(entities == null) {
+        if (entities == null) {
             throw new IOException(handler + " takes an EntityManager, so it needs the generated "
                     + "daos and a database to reach them through. Either no class in this build "
                     + "carries @Entity, or no database is configured: set "
@@ -351,110 +335,95 @@ public final class Backend {
         return entities;
     }
 
-    /**
-     * Where the handlers are built, once the things they need exist.
-     *
-     * <p>A handler that talks to a database cannot be constructed before the pool
-     * is open, and the pool is opened from configuration this builder resolves --
-     * so a builder that took ready-made handlers could not inject anything into
-     * them. This is the hook the generated entry point uses to construct a
-     * controller with the dao it asked for.
-     */
+    /// Where the handlers are built, once the things they need exist.
+    ///
+    /// A handler that talks to a database cannot be constructed before the pool
+    /// is open, and the pool is opened from configuration this builder resolves --
+    /// so a builder that took ready-made handlers could not inject anything into
+    /// them. This is the hook the generated entry point uses to construct a
+    /// controller with the dao it asked for.
     public interface Handlers {
         HttpServer.Handler[] create(DataSource dataSource, EntityManager entities)
                 throws Exception;
     }
 
-    /**
-     * The build-generated wiring of an application: every bean, constructed and
-     * injected by straight-line code the build wrote, and the lifecycle calls
-     * around them.
-     *
-     * <p>Nothing here is looked up or reflected. The build resolves which
-     * constructor each bean gets, which bean each injection point receives and
-     * in what order they are built, and writes that down as {@code new} and
-     * setter calls; this interface is only where the server calls into it.
-     */
+    /// The build-generated wiring of an application: every bean, constructed and
+    /// injected by straight-line code the build wrote, and the lifecycle calls
+    /// around them.
+    ///
+    /// Nothing here is looked up or reflected. The build resolves which
+    /// constructor each bean gets, which bean each injection point receives and
+    /// in what order they are built, and writes that down as `new` and
+    /// setter calls; this interface is only where the server calls into it.
     public interface Application {
-        /**
-         * Constructs the beans and returns the routers, once the database, if
-         * any, is open.
-         */
+        /// Constructs the beans and returns the routers, once the database, if
+        /// any, is open.
         HttpServer.Handler[] create(Environment environment) throws Exception;
 
-        /** Registers the websocket endpoints, which are beans too. */
+        /// Registers the websocket endpoints, which are beans too.
         void registerWebSockets(HttpServer.WebSocketRegistry registry) throws Exception;
 
-        /** The server is accepting: scheduled jobs and exporters start here. */
+        /// The server is accepting: scheduled jobs and exporters start here.
         void started(Backend backend) throws Exception;
 
-        /** The server is about to drain: no new scheduled run starts after this. */
+        /// The server is about to drain: no new scheduled run starts after this.
         void stopping();
 
-        /** The server has drained: the beans' destroy methods run here. */
+        /// The server has drained: the beans' destroy methods run here.
         void stopped();
 
-        /**
-         * Whether a generated class needs {@link Backend#currentRequest}: a
-         * request- or session-scoped bean reached from a singleton. False keeps
-         * the per-request thread-local write out of servers that have none.
-         */
+        /// Whether a generated class needs [Backend#currentRequest]: a
+        /// request- or session-scoped bean reached from a singleton. False keeps
+        /// the per-request thread-local write out of servers that have none.
         boolean tracksCurrentRequest();
 
-        /**
-         * A request has been answered; {@code beans} are its
-         * {@code @RequestScope} beans, whose destroy methods run here.
-         */
+        /// A request has been answered; `beans` are its
+        /// `@RequestScope` beans, whose destroy methods run here.
         void requestEnded(Object[] beans);
 
-        /**
-         * A session has ended -- invalidated, expired, or the server stopped;
-         * {@code beans} are its {@code @SessionScope} beans, whose destroy
-         * methods run here.
-         */
+        /// A session has ended -- invalidated, expired, or the server stopped;
+        /// `beans` are its `@SessionScope` beans, whose destroy
+        /// methods run here.
         void sessionEnded(Object[] beans);
 
-        /** The scheduler running this application's {@code @Scheduled} jobs, or null. */
+        /// The scheduler running this application's `@Scheduled` jobs, or null.
         Scheduler getScheduler();
 
-        /**
-         * Every bean the build wired: name, type, scope and what it was given.
-         * For the management endpoint and the development MCP server.
-         */
+        /// Every bean the build wired: name, type, scope and what it was given.
+        /// For the management endpoint and the development MCP server.
         List describeBeans();
 
-        /** Every route the build generated: method, path and handler. */
+        /// Every route the build generated: method, path and handler.
         List describeRoutes();
     }
 
-    /** The request the calling thread is serving, for generated scoped proxies. */
+    /// The request the calling thread is serving, for generated scoped proxies.
     private static final ThreadLocal CURRENT_REQUEST = new ThreadLocal();
 
-    /**
-     * The request the calling thread is serving, or null outside one. Maintained
-     * only for applications whose build asked for it -- see
-     * {@link Application#tracksCurrentRequest}.
-     */
+    /// The request the calling thread is serving, or null outside one. Maintained
+    /// only for applications whose build asked for it -- see
+    /// [Application#tracksCurrentRequest].
     public static HttpServer.Request currentRequest() {
-        return (HttpServer.Request)CURRENT_REQUEST.get();
+        return (HttpServer.Request) CURRENT_REQUEST.get();
     }
 
-    /**
-     * {@code registry}, with every endpoint it is handed wrapped so its callbacks
-     * run carrying {@code tasks}. A websocket callback runs inside HttpServer,
-     * outside the request wrapper that sets the executors, so with two servers in
-     * one process an @Async call from onText would otherwise go to whichever
-     * server started last -- and be stopped with it.
-     */
+    /// `registry`, with every endpoint it is handed wrapped so its callbacks
+    /// run carrying `tasks`. A websocket callback runs inside HttpServer,
+    /// outside the request wrapper that sets the executors, so with two servers in
+    /// one process an @Async call from onText would otherwise go to whichever
+    /// server started last -- and be stopped with it.
     static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
                                                   final Tasks.Registry tasks) {
         return new HttpServer.WebSocketRegistry() {
+            @Override
             public void route(String path, WebSocket endpoint) {
                 registry.route(path, endpoint == null ? null : new TaskBound(endpoint, tasks));
             }
 
+            @Override
             public void fallback(final HttpServer.WebSocketHandler router) {
                 registry.fallback(router == null ? null : new HttpServer.WebSocketHandler() {
+                    @Override
                     public WebSocket open(HttpServer.Request request) throws Exception {
                         Object previous = Tasks.enter(tasks);
                         try {
@@ -469,7 +438,7 @@ public final class Backend {
         };
     }
 
-    /** An endpoint whose every callback runs carrying its server's executors. */
+    /// An endpoint whose every callback runs carrying its server's executors.
     static final class TaskBound implements WebSocket {
         private final WebSocket endpoint;
         private final Tasks.Registry tasks;
@@ -479,6 +448,7 @@ public final class Backend {
             this.tasks = tasks;
         }
 
+        @Override
         public void onOpen(WebSocketSession session) throws Exception {
             Object previous = Tasks.enter(tasks);
             try {
@@ -488,6 +458,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onText(WebSocketSession session, String message) throws Exception {
             Object previous = Tasks.enter(tasks);
             try {
@@ -497,6 +468,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onBinary(WebSocketSession session, byte[] message, int offset, int length)
                 throws Exception {
             Object previous = Tasks.enter(tasks);
@@ -507,6 +479,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onPing(WebSocketSession session, byte[] payload, int offset, int length)
                 throws Exception {
             Object previous = Tasks.enter(tasks);
@@ -517,6 +490,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onPong(WebSocketSession session, byte[] payload, int offset, int length)
                 throws Exception {
             Object previous = Tasks.enter(tasks);
@@ -527,6 +501,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onClose(WebSocketSession session, int code, String reason)
                 throws Exception {
             Object previous = Tasks.enter(tasks);
@@ -537,6 +512,7 @@ public final class Backend {
             }
         }
 
+        @Override
         public void onError(WebSocketSession session, Exception error) {
             Object previous = Tasks.enter(tasks);
             try {
@@ -547,7 +523,178 @@ public final class Backend {
         }
     }
 
-    /** What an {@link Application} is built from. */
+    /// The handler a Backend puts in front of the server's handlers: it sets up
+    /// what a request carries -- this server's sessions, executors and current
+    /// request -- runs the chain, finishes the session and records metrics and
+    /// the log. Named and static rather than an anonymous class holding the
+    /// builder.
+    private static final class Serving implements HttpServer.Handler {
+        private final HttpServer.Handler[] chain;
+        private final Sessions sessions;
+        private final Tasks.Registry tasks;
+        private final RequestLog requestLog;
+        private final java.util.concurrent.atomic.AtomicBoolean instrumented;
+        private final Application app;
+        private final boolean track;
+
+        Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
+                RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,
+                Application app, boolean track) {
+            this.chain = chain;
+            this.sessions = sessions;
+            this.tasks = tasks;
+            this.requestLog = requestLog;
+            this.instrumented = instrumented;
+            this.app = app;
+            this.track = track;
+        }
+
+        /// What a request that threw still owes: its request beans
+        /// destroyed, and the sessions it ended or changed stored.
+        private void failed(HttpServer.Request request,
+                            boolean sessionFinished, long startedMillis,
+                            Throwable err) {
+            endRequestBeans(request);
+            List ended = request.endedSessions();
+            for (int e = 0 ; ended != null && !sessionFinished
+                    && e < ended.size() ; e++) {
+                try {
+                    sessions.finish((HttpSession) ended.get(e),
+                            null);
+                } catch (Exception storeErr) {
+                    System.err.println("Could not end the "
+                            + "session of a failed request: "
+                            + storeErr);
+                }
+            }
+            HttpSession session = request.resolvedSession();
+            if (session != null && !sessionFinished) {
+                // The handler threw, but what it did to
+                // the session stands, as in a servlet
+                // container -- and a session-scoped bean
+                // it built must be kept or destroyed, not
+                // dropped with the request unreleased.
+                try {
+                    sessions.finish(session, null);
+                } catch (Exception storeErr) {
+                    System.err.println("Could not store the "
+                            + "session of a failed request: "
+                            + storeErr);
+                }
+            }
+            requestLog.record(request, 500, startedMillis, err);
+        }
+
+        /// Destroys the request's scoped beans, once.
+        private void endRequestBeans(HttpServer.Request request) {
+            if (app != null) {
+                Object[] beans = request.takeScopedBeans();
+                if (beans != null) {
+                    app.requestEnded(beans);
+                }
+            }
+        }
+
+        @Override
+        public HttpServer.Response handle(HttpServer.Request request)
+                throws Exception {
+            long started = instrumented.get()
+                    ? com.codename1.backend.metrics.Metrics.requestStarted()
+                    : 0L;
+            Object previous = null;
+            // This server's sessions, not a process-wide set:
+            // cookies are not scoped by port, so a client of
+            // two servers on one host would otherwise present
+            // one's session to the other and be let in.
+            request.sessions = sessions;
+            Object previousTasks = Tasks.enter(tasks);
+            if (track) {
+                previous = CURRENT_REQUEST.get();
+                CURRENT_REQUEST.set(request);
+            }
+            long startedMillis = requestLog.enabled
+                    ? System.currentTimeMillis() : 0L;
+            // What the metrics record; stays 500 when a
+            // handler or the session store throws.
+            int status = 500;
+            try {
+                HttpServer.Response response = null;
+                boolean sessionFinished = false;
+                try {
+                    for (HttpServer.Handler element : chain) {
+                        response = element.handle(request);
+                        if (response != null) {
+                            break;
+                        }
+                    }
+                    // Request beans end BEFORE the session is
+                    // stored: a @PreDestroy that changes the
+                    // session, or starts one, would otherwise
+                    // change it after its only save.
+                    endRequestBeans(request);
+                    // Inside the logged region: a session
+                    // store that fails to save is a 500 the
+                    // client receives, and the request log
+                    // must say so rather than record the
+                    // handler's own status.
+                    List ended = request.endedSessions();
+                    HttpSession session = request.resolvedSession();
+                    if (ended != null || session != null) {
+                        sessionFinished = true;
+                    }
+                    // First, so their clearing cookies come
+                    // before the new session's.
+                    for (int e = 0 ; ended != null && e < ended.size() ; e++) {
+                        response = sessions.finish(
+                                (HttpSession) ended.get(e), response);
+                    }
+                    if (session != null) {
+                        response = sessions.finish(session, response);
+                    }
+                } catch (Exception err) {
+                    failed(request, sessionFinished, startedMillis, err);
+                    throw err;
+                } catch (Error err) {
+                    // The same clean-up: an invalidated session
+                    // must still be deleted, or the client's old
+                    // cookie keeps its signed-in state.
+                    failed(request, sessionFinished, startedMillis, err);
+                    throw err;
+                }
+                // Null is a 404 from here, which is what a
+                // router answers for a path it does not route.
+                requestLog.record(request, response == null ? 404
+                        : response.getStatus(), startedMillis, null);
+                status = response == null ? 404 : response.getStatus();
+                return response;
+            } finally {
+                // In the finally so a failed request is in
+                // the duration histogram too, and so the
+                // route label it set is cleared -- left
+                // behind, the worker's next unrouted
+                // request would be recorded under it.
+                com.codename1.backend.metrics.Metrics.requestEnded(started,
+                        request.getMethod(), status);
+                // Destroyed while this is still the current
+                // request: a @PreDestroy that calls another
+                // request-scoped bean goes through that bean's
+                // stand-in, which looks the request up.
+                try {
+                    // Normally done already, and then a
+                    // no-op: the beans are taken once.
+                    endRequestBeans(request);
+                } finally {
+                    if (track) {
+                        CURRENT_REQUEST.set(previous);
+                    }
+                    Tasks.leave(previousTasks);
+                    sessions.leave(request);
+                }
+            }
+        }
+    }
+
+    /// What an [Application] is built from.
     public static final class Environment {
         private final Config config;
         private final DataSource dataSource;
@@ -555,7 +702,7 @@ public final class Backend {
 
         private final List tools;
         private final List managed;
-        /** {name, description, unit, Gauge.Source}, for the server to add and later remove. */
+        /// {name, description, unit, Gauge.Source}, for the server to add and later remove.
         final List gauges = new ArrayList();
 
         Environment(Config config, DataSource dataSource, EntityManager entities,
@@ -567,15 +714,13 @@ public final class Backend {
             this.managed = managed;
         }
 
-        /**
-         * Publishes an {@code @McpTool} on this server's MCP endpoint. Generated
-         * code calls this while it builds the beans; the tool belongs to this
-         * server only, so a server started later in the same process does not
-         * serve a tool bound to a bean that has been destroyed.
-         */
+        /// Publishes an `@McpTool` on this server's MCP endpoint. Generated
+        /// code calls this while it builds the beans; the tool belongs to this
+        /// server only, so a server started later in the same process does not
+        /// serve a tool bound to a bean that has been destroyed.
         public void registerTool(com.codename1.backend.mcp.McpTool tool) {
-            for(int iter = 0 ; iter < tools.size() ; iter++) {
-                if(((com.codename1.backend.mcp.McpTool)tools.get(iter)).name()
+            for (Object element : tools) {
+                if (((com.codename1.backend.mcp.McpTool) element).name()
                         .equals(tool.name())) {
                     // Two active beans publishing one name: one would be
                     // unreachable, and which depends on construction order.
@@ -586,33 +731,31 @@ public final class Backend {
             tools.add(tool);
         }
 
-        /**
-         * Publishes a managed attribute as a gauge of this server's: added when
-         * the server starts and removed when it stops. Generated code calls this.
-         */
+        /// Publishes a managed attribute as a gauge of this server's: added when
+        /// the server starts and removed when it stops. Generated code calls this.
         public void registerGauge(String name, String description, String unit,
                                   com.codename1.backend.metrics.Gauge.Source source) {
             gauges.add(new Object[] {name, description, unit, source});
         }
 
-        /** Registers a managed bean with this server. Generated code calls this. */
+        /// Registers a managed bean with this server. Generated code calls this.
         public void registerManaged(ManagedBean bean) {
             String objectName = bean.getObjectName();
-            if(objectName == null || objectName.length() == 0 || objectName.length() > 128) {
+            if (objectName == null || objectName.length() == 0 || objectName.length() > 128) {
                 throw new IllegalArgumentException("A managed bean needs a name of 1 to 128 "
                         + "characters");
             }
-            for(int iter = 0 ; iter < objectName.length() ; iter++) {
+            for (int iter = 0 ; iter < objectName.length() ; iter++) {
                 char c = objectName.charAt(iter);
-                if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
                         || c == '_' || c == '.' || c == '-')) {
                     // One URL segment, matched undecoded; see the build's check.
                     throw new IllegalArgumentException("Managed bean \"" + objectName
                             + "\": a name is letters, digits, _, - and . only");
                 }
             }
-            for(int iter = 0 ; iter < managed.size() ; iter++) {
-                if(((ManagedBean)managed.get(iter)).getObjectName()
+            for (Object element : managed) {
+                if (((ManagedBean) element).getObjectName()
                         .equals(bean.getObjectName())) {
                     throw new IllegalStateException("Two managed resources are named \""
                             + bean.getObjectName() + "\"; set objectName on one");
@@ -625,41 +768,37 @@ public final class Backend {
             return config;
         }
 
-        /** The pool, or null when this server has no database. */
+        /// The pool, or null when this server has no database.
         public DataSource getDataSource() {
             return dataSource;
         }
 
-        /** The entity manager, or null when the build generated no entities. */
+        /// The entity manager, or null when the build generated no entities.
         public EntityManager getEntityManager() {
             return entities;
         }
     }
 
-    /**
-     * Where a server's websocket endpoints come from.
-     *
-     * Deliberately the same shape as {@link Handlers}: the server calls this once
-     * while it is starting, with whatever it opened, and the callback registers
-     * what it wants. A controller is found by the build, a Handler is called, a
-     * DataSource is handed over -- nothing in this runtime is configured by an
-     * application reaching into a started server, and websockets are not the
-     * exception.
-     */
+    /// Where a server's websocket endpoints come from.
+    ///
+    /// Deliberately the same shape as [Handlers]: the server calls this once
+    /// while it is starting, with whatever it opened, and the callback registers
+    /// what it wants. A controller is found by the build, a Handler is called, a
+    /// DataSource is handed over -- nothing in this runtime is configured by an
+    /// application reaching into a started server, and websockets are not the
+    /// exception.
     public interface WebSocketEndpoints {
         void register(HttpServer.WebSocketRegistry registry, DataSource dataSource,
                       EntityManager entities) throws Exception;
     }
 
-    /** Collects what a server needs and starts one. */
+    /// Collects what a server needs and starts one.
     public static final class Builder {
         private Config config;
         private final List handlers = new ArrayList();
         private Handlers factory;
         private DataSource dataSource;
         private String dataSourceUrl;
-        private boolean dataSourceGiven;
-        private EntityManager entities;
         private int port = -1;
         private int backlog = -1;
         private int workers = -1;
@@ -672,9 +811,9 @@ public final class Backend {
         private WebSocketEndpoints webSocketEndpoints;
         private boolean createTables;
         private final List mcpTools = new ArrayList();
-        /** The application a start in progress has begun building, until a Backend owns it. */
+        /// The application a start in progress has begun building, until a Backend owns it.
         private Application createdApplication;
-        /** The executors a start in progress opened, until a Backend owns them. */
+        /// The executors a start in progress opened, until a Backend owns them.
         private Tasks.Registry startingTasks;
         private boolean createTablesGiven;
         private boolean handlersNeedADatabase;
@@ -690,257 +829,227 @@ public final class Backend {
             this.config = config;
         }
 
-        /**
-         * Adds a handler. They are tried in the order they were added and the
-         * first that answers wins, so the generated routers go in before any
-         * catch-all.
-         */
+        /// Adds a handler. They are tried in the order they were added and the
+        /// first that answers wins, so the generated routers go in before any
+        /// catch-all.
         public Builder handler(HttpServer.Handler handler) {
-            if(handler != null) {
+            if (handler != null) {
                 handlers.add(handler);
             }
             return this;
         }
 
-        /**
-         * The build-generated wiring of this server's beans. See
-         * {@link Application}; the generated entry point calls this.
-         */
+        /// The build-generated wiring of this server's beans. See
+        /// [Application]; the generated entry point calls this.
         public Builder application(Application application) {
             this.application = application;
             return this;
         }
 
-        /** Adds handlers built once the database exists. See {@link Handlers}. */
+        /// Adds handlers built once the database exists. See [Handlers].
         public Builder handlers(Handlers factory) {
             this.factory = factory;
             return this;
         }
 
-        /**
-         * Registers this server's websocket endpoints when it starts.
-         *
-         * Called once, before the listener accepts anything, so there is no window
-         * in which a route exists in the application's mind and not in the
-         * server's -- which is what a `websocket(path, endpoint)` setter on a
-         * started server left open.
-         */
+        /// Registers this server's websocket endpoints when it starts.
+        ///
+        /// Called once, before the listener accepts anything, so there is no window
+        /// in which a route exists in the application's mind and not in the
+        /// server's -- which is what a `websocket(path, endpoint)` setter on a
+        /// started server left open.
         public Builder webSockets(WebSocketEndpoints endpoints) {
             this.webSocketEndpoints = endpoints;
             return this;
         }
 
-        /** The port. Otherwise cn1.server.port, PORT, or 8080. */
+        /// The port. Otherwise cn1.server.port, PORT, or 8080.
         public Builder port(int port) {
             this.port = port;
             return this;
         }
 
-        /** The address to bind, or null for every interface. */
+        /// The address to bind, or null for every interface.
         public Builder host(String host) {
             this.host = host;
             return this;
         }
 
-        /** The listen backlog. Otherwise cn1.server.backlog, or 512. */
+        /// The listen backlog. Otherwise cn1.server.backlog, or 512.
         public Builder backlog(int backlog) {
             this.backlog = backlog;
             return this;
         }
 
-        /** The size of the request thread pool. Otherwise cn1.server.workers, or 16. */
+        /// The size of the request thread pool. Otherwise cn1.server.workers, or 16.
         public Builder workers(int workers) {
             this.workers = workers;
             return this;
         }
 
-        /** How long a stop waits for requests in flight. */
+        /// How long a stop waits for requests in flight.
         public Builder shutdownTimeoutMillis(int millis) {
             this.shutdownMillis = millis;
             return this;
         }
 
-        /**
-         * Terminates TLS with this certificate and key.
-         *
-         * <p>Drops a context given to the other overload earlier, because
-         * resolveTls answers from the context FIRST: without this, a builder
-         * configured conditionally kept serving the old certificate and this call
-         * did nothing at all -- silently, which is the part that matters, since
-         * an obsolete certificate looks like a working server until it expires.
-         * The last TLS choice wins, as it does for every other setter here.
-         *
-         * <p>Only when something is actually supplied. tls(null, null) is not a
-         * way to turn a context off; it would make an argument nobody meant as a
-         * choice erase one that was.
-         */
+        /// Terminates TLS with this certificate and key.
+        ///
+        /// Drops a context given to the other overload earlier, because
+        /// resolveTls answers from the context FIRST: without this, a builder
+        /// configured conditionally kept serving the old certificate and this call
+        /// did nothing at all -- silently, which is the part that matters, since
+        /// an obsolete certificate looks like a working server until it expires.
+        /// The last TLS choice wins, as it does for every other setter here.
+        ///
+        /// Only when something is actually supplied. tls(null, null) is not a
+        /// way to turn a context off; it would make an argument nobody meant as a
+        /// choice erase one that was.
         public Builder tls(String certificatePath, String keyPath) {
             this.tlsCertificate = certificatePath;
             this.tlsKey = keyPath;
-            if(certificatePath != null || keyPath != null) {
+            if (certificatePath != null || keyPath != null) {
                 this.tls = null;
             }
             return this;
         }
 
-        /**
-         * Terminates TLS with a context the caller built.
-         *
-         * <p>Drops paths given to the other overload earlier, for the reason
-         * stated there, and on the same terms: a null context is not a choice and
-         * erases nothing.
-         */
+        /// Terminates TLS with a context the caller built.
+        ///
+        /// Drops paths given to the other overload earlier, for the reason
+        /// stated there, and on the same terms: a null context is not a choice and
+        /// erases nothing.
         public Builder tls(Tls tls) {
             this.tls = tls;
-            if(tls != null) {
+            if (tls != null) {
                 this.tlsCertificate = null;
                 this.tlsKey = null;
             }
             return this;
         }
 
-        /** Serves a directory, after every handler, so a file cannot shadow a route. */
+        /// Serves a directory, after every handler, so a file cannot shadow a route.
         public Builder staticFiles(String root, String prefix, String indexFile,
                                    String cacheControl) throws IOException {
             this.staticFiles = new StaticFiles(root, prefix, indexFile, cacheControl);
             return this;
         }
 
-        /**
-         * The database, as a SQLite path or a postgres:// or mysql:// URL.
-         *
-         * <p>Drops a pool given to the other overload earlier: openDataSource
-         * answers from the pool FIRST, so without this a builder configured
-         * conditionally kept the earlier pool and this call was ignored -- which
-         * is a server reading and WRITING to the wrong database while its
-         * configuration says otherwise. The last choice wins.
-         *
-         * <p>Ownership follows the same rule and stays correct either way: the
-         * builder opens this URL itself and therefore closes it, while a pool
-         * handed in belongs to the caller.
-         */
+        /// The database, as a SQLite path or a postgres:// or mysql:// URL.
+        ///
+        /// Drops a pool given to the other overload earlier: openDataSource
+        /// answers from the pool FIRST, so without this a builder configured
+        /// conditionally kept the earlier pool and this call was ignored -- which
+        /// is a server reading and WRITING to the wrong database while its
+        /// configuration says otherwise. The last choice wins.
+        ///
+        /// Ownership follows the same rule and stays correct either way: the
+        /// builder opens this URL itself and therefore closes it, while a pool
+        /// handed in belongs to the caller.
         public Builder dataSource(String url) {
             this.dataSourceUrl = url;
-            this.dataSourceGiven = true;
-            if(url != null) {
+            if (url != null) {
                 this.dataSource = null;
             }
             return this;
         }
 
-        /**
-         * A pool the caller opened. It is closed when this server stops.
-         *
-         * <p>Drops a URL given to the other overload earlier, for the reason
-         * stated there. A null pool is not a choice and erases nothing.
-         */
+        /// A pool the caller opened. It is closed when this server stops.
+        ///
+        /// Drops a URL given to the other overload earlier, for the reason
+        /// stated there. A null pool is not a choice and erases nothing.
         public Builder dataSource(DataSource dataSource) {
             this.dataSource = dataSource;
-            this.dataSourceGiven = true;
-            if(dataSource != null) {
+            if (dataSource != null) {
                 this.dataSourceUrl = null;
             }
             return this;
         }
 
-        /**
-         * Whether to create the table of every generated entity at start-up.
-         * Otherwise cn1.orm.createTables, which defaults to true on a development
-         * profile and false everywhere else.
-         */
+        /// Whether to create the table of every generated entity at start-up.
+        /// Otherwise cn1.orm.createTables, which defaults to true on a development
+        /// profile and false everywhere else.
         public Builder createTables(boolean create) {
             this.createTables = create;
             this.createTablesGiven = true;
             return this;
         }
 
-        /**
-         * Says that the handlers this server builds need a database, so one is
-         * opened even when nothing else asks for it.
-         *
-         * <p>The generated entry point calls this when any controller declares a
-         * constructor taking a {@link DataSource} or an
-         * {@link EntityManager}. Without it, a controller that declares a
-         * database dependency, has no entities behind it, and runs on a
-         * development profile with no URL configured was refused at start-up by
-         * {@link #requireDataSource} -- whose message suggests running on a
-         * development profile, which is what was already happening.
-         *
-         * <p>The alternative was to open the development default whenever the
-         * profile allows it. That is the wrong fix: it would give a database to
-         * every server that has no use for one, which contradicts "a server with
-         * no database opens none" and costs a file handle to prove it. What was
-         * actually missing is that a DECLARED dependency did not drive the
-         * decision, and the build knows exactly which controllers declare one.
-         */
+        /// Says that the handlers this server builds need a database, so one is
+        /// opened even when nothing else asks for it.
+        ///
+        /// The generated entry point calls this when any controller declares a
+        /// constructor taking a [DataSource] or an
+        /// [EntityManager]. Without it, a controller that declares a
+        /// database dependency, has no entities behind it, and runs on a
+        /// development profile with no URL configured was refused at start-up by
+        /// [#requireDataSource] -- whose message suggests running on a
+        /// development profile, which is what was already happening.
+        ///
+        /// The alternative was to open the development default whenever the
+        /// profile allows it. That is the wrong fix: it would give a database to
+        /// every server that has no use for one, which contradicts "a server with
+        /// no database opens none" and costs a file handle to prove it. What was
+        /// actually missing is that a DECLARED dependency did not drive the
+        /// decision, and the build knows exactly which controllers declare one.
         public Builder requiresDataSource() {
             this.handlersNeedADatabase = true;
             return this;
         }
 
-        /**
-         * Traces every request with this tracer, once {@link Tracer#open} has read
-         * the configuration and agreed to. The build calls this from the entry
-         * point it generates for a project that enables OpenTelemetry, which is
-         * why nothing else refers to a tracer implementation.
-         */
+        /// Traces every request with this tracer, once [Tracer#open] has read
+        /// the configuration and agreed to. The build calls this from the entry
+        /// point it generates for a project that enables OpenTelemetry, which is
+        /// why nothing else refers to a tracer implementation.
         public Builder tracing(Tracer tracer) {
             this.tracer = tracer;
             return this;
         }
 
-        /**
-         * Exports metrics with this reader, once {@code open} has read the
-         * configuration and agreed to. The build calls this from the entry point
-         * of a project that enables OpenTelemetry.
-         */
+        /// Exports metrics with this reader, once `open` has read the
+        /// configuration and agreed to. The build calls this from the entry point
+        /// of a project that enables OpenTelemetry.
         public Builder metrics(com.codename1.backend.metrics.MetricReader reader) {
             this.metricReader = reader;
             return this;
         }
 
-        /**
-         * Serves the MCP endpoint, with the application's {@code @McpTool}
-         * methods and, when {@code devTools} is given and the profile is a
-         * development one, the development tools. The build calls this; see
-         * {@link com.codename1.backend.mcp.McpServer}.
-         */
+        /// Serves the MCP endpoint, with the application's `@McpTool`
+        /// methods and, when `devTools` is given and the profile is a
+        /// development one, the development tools. The build calls this; see
+        /// [com.codename1.backend.mcp.McpServer].
         public Builder mcp(com.codename1.backend.mcp.McpServer.Extension devTools) {
             this.mcp = true;
             this.mcpDevTools = devTools;
             return this;
         }
 
-        /**
-         * Adds a tool of the program's own to the MCP endpoint, beside the
-         * {@code @McpTool} methods the build found. Needs {@link #mcp}.
-         */
+        /// Adds a tool of the program's own to the MCP endpoint, beside the
+        /// `@McpTool` methods the build found. Needs [#mcp].
         public Builder mcpTool(com.codename1.backend.mcp.McpTool tool) {
-            if(tool == null) {
+            if (tool == null) {
                 throw new IllegalArgumentException("No tool");
             }
             mcpTools.add(tool);
             return this;
         }
 
-        /** The name this server reports itself as, to MCP clients. */
+        /// The name this server reports itself as, to MCP clients.
         public Builder serviceName(String name) {
             this.serviceName = name;
             return this;
         }
 
-        /** Suppresses the line this prints when the server comes up. */
+        /// Suppresses the line this prints when the server comes up.
         public Builder quiet() {
             this.quiet = true;
             return this;
         }
 
-        /**
-         * Starts the server and returns, without installing a signal handler or
-         * waiting. Tests want this; a process wants {@link #run}.
-         */
+        /// Starts the server and returns, without installing a signal handler or
+        /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
-            if(config == null) {
+            if (config == null) {
                 config = Config.load();
             }
             // BEFORE the database, so the statements start-up runs -- the ORM's
@@ -958,14 +1067,16 @@ public final class Backend {
             // anything but what they caught.
             boolean ok = false;
             try {
-                started = startTraced(tracing);
+                // The tracer itself rather than a flag, so the start-up below
+                // cannot ask a flag and then dereference a field on its word.
+                started = startTraced(tracing ? tracer : null);
                 ok = true;
             } finally {
-                if(!ok && tracing) {
+                if (!ok && tracing) {
                     Tracing.rollBack(claim);
                 }
             }
-            if(tracing) {
+            if (tracing) {
                 // Owned: this server's tracer runs until this server stops it,
                 // whatever server starts after it in the same process.
                 Tracing.commit(claim, true);
@@ -973,30 +1084,30 @@ public final class Backend {
             return started;
         }
 
-        private Backend startTraced(boolean tracing) throws Exception {
+        private Backend startTraced(Tracer active) throws Exception {
             Object callerTasks = Tasks.peek();
             try {
-                return startTracedOnce(tracing);
+                return startTracedOnce(active);
             } finally {
                 Tasks.leave(callerTasks);
             }
         }
 
-        private Backend startTracedOnce(boolean tracing) throws Exception {
+        private Backend startTracedOnce(Tracer active) throws Exception {
             DataSource pool = openDataSource();
             boolean ok = false;
             try {
-                Backend started = startWith(pool, tracing);
+                Backend started = startWith(pool, active);
                 ok = true;
                 return started;
             } finally {
-                if(!ok) {
+                if (!ok) {
                     abandonStart(pool);
                 }
             }
         }
 
-        /** Undoes a start that failed after the pool opened, however it failed. */
+        /// Undoes a start that failed after the pool opened, however it failed.
         private void abandonStart(DataSource pool) {
             // EVERY failure after the pool is open, not just the bind. A
             // controller constructor that rejects its configuration, a
@@ -1009,18 +1120,18 @@ public final class Backend {
             // caller and is theirs to close.
             // Ownership is whether THIS BUILDER opened it, which is not the
             // same as whether anything was configured: .dataSource(url)
-            // makes the builder open one, and reading dataSourceGiven here
+            // makes the builder open one, and reading "was one configured" here
             // left exactly that case leaking on a failed start.
             Application built = createdApplication;
             createdApplication = null;
             Tasks.Registry tasks = startingTasks;
             startingTasks = null;
-            if(tasks != null) {
+            if (tasks != null) {
                 // Whatever @PostConstruct submitted stops before the beans it
                 // uses are destroyed, as in stop().
                 Tasks.shutdown(tasks, 0);
             }
-            if(built != null) {
+            if (built != null) {
                 // Before the pool closes, as Backend.stop() orders it, so a
                 // bean can still flush to the database on its way out.
                 try {
@@ -1030,17 +1141,17 @@ public final class Backend {
                             + destroyErr);
                 }
             }
-            if(pool != null && dataSource == null) {
+            if (pool != null && dataSource == null) {
                 pool.close();
             }
         }
 
-        /** {@link #start} once the database, if any, is open. */
-        private Backend startWith(DataSource pool, boolean tracing) throws Exception {
+        /// [#start] once the database, if any, is open.
+        private Backend startWith(DataSource pool, Tracer active) throws Exception {
             EntityManager manager = openEntityManager(pool);
             List routers = new ArrayList();
-            HttpServer.Handler relay = tracing ? tracer.relay() : null;
-            if(relay != null) {
+            HttpServer.Handler relay = active != null ? active.relay() : null;
+            if (relay != null) {
                 // FIRST: it answers one exact path, and a catch-all handler
                 // added before it would otherwise take the app's exports.
                 routers.add(relay);
@@ -1049,7 +1160,7 @@ public final class Backend {
             // FIRST among the routers, after the relay: its paths are its own, and
             // a catch-all controller route must not answer a health check.
             Management management = Management.fromConfig(config);
-            if(management != null) {
+            if (management != null) {
                 // At the front, not appended: the handlers above are already in
                 // the list, and a catch-all one would otherwise answer
                 // /manage/health or a managed operation's path first.
@@ -1071,13 +1182,13 @@ public final class Backend {
             List tools = new ArrayList(mcpTools);
             List managedBeans = new ArrayList();
             Environment environment = null;
-            if(application != null) {
+            if (application != null) {
                 environment = new Environment(config, pool, manager, tools, managedBeans);
                 HttpServer.Handler[] built = application.create(environment);
-                if(built != null) {
-                    for(int iter = 0 ; iter < built.length ; iter++) {
-                        if(built[iter] != null) {
-                            routers.add(built[iter]);
+                if (built != null) {
+                    for (HttpServer.Handler element : built) {
+                        if (element != null) {
+                            routers.add(element);
                         }
                     }
                 }
@@ -1088,29 +1199,29 @@ public final class Backend {
             com.codename1.backend.mcp.McpServer mcpServer = mcp
                     ? com.codename1.backend.mcp.McpServer.fromConfig(config, mcpDevTools,
                             serviceName, tools) : null;
-            if(mcpServer != null) {
+            if (mcpServer != null) {
                 routers.add(0, mcpServer);
             }
-            if(factory != null) {
+            if (factory != null) {
                 HttpServer.Handler[] built = factory.create(pool, manager);
-                if(built != null) {
-                    for(int iter = 0 ; iter < built.length ; iter++) {
-                        if(built[iter] != null) {
-                            routers.add(built[iter]);
+                if (built != null) {
+                    for (HttpServer.Handler handler : built) {
+                        if (handler != null) {
+                            routers.add(handler);
                         }
                     }
                 }
             }
-            if(staticFiles == null) {
+            if (staticFiles == null) {
                 String root = config.get(Config.STATIC_ROOT);
-                if(root != null && root.length() > 0) {
+                if (root != null && root.length() > 0) {
                     staticFiles = new StaticFiles(root,
                             config.get(Config.STATIC_PREFIX, "/static"),
                             config.get(Config.STATIC_INDEX, "index.html"),
                             config.get(Config.STATIC_CACHE_CONTROL, "public, max-age=3600"));
                 }
             }
-            if(staticFiles != null) {
+            if (staticFiles != null) {
                 // LAST, always. A file that answered before the routers could
                 // shadow a route by being named like one, and which of them won
                 // would depend on what happened to be in a directory.
@@ -1121,32 +1232,28 @@ public final class Backend {
             // application's: a server whose only routes are those still answers
             // every request of its users with a 404.
             int ownRoutes = (management != null ? 1 : 0) + (mcpServer != null ? 1 : 0);
-            if(routers.size() == ownRoutes && !servesWebSockets) {
+            if (routers.size() == ownRoutes && !servesWebSockets) {
                 throw new IOException("This server has no handlers, so every request would "
                         + "be a 404. Add one with handler(), webSockets(), or a "
                         + "@RestController class for the build to generate one from.");
             }
-            if(routers.isEmpty()) {
+            if (routers.isEmpty()) {
                 // A WEBSOCKET-ONLY SERVER IS A REAL SERVER, and it is what the
                 // build generates for a module whose only endpoints are
                 // @WebSocketMapping. Without this that generated application
                 // compiled, started, and threw before it ever bound a port.
                 // Ordinary HTTP requests get the 404 they would have got anyway;
                 // the upgrade path is consulted before this chain runs.
-                routers.add(new HttpServer.Handler() {
-                    public HttpServer.Response handle(HttpServer.Request request) {
-                        return null;          // null is a 404 from the chain below
-                    }
-                });
+                routers.add(new NotFound());
             }
             final HttpServer.Handler[] chain =
-                    (HttpServer.Handler[])routers.toArray(new HttpServer.Handler[routers.size()]);
+                    (HttpServer.Handler[]) routers.toArray(new HttpServer.Handler[routers.size()]);
             int listenPort = port >= 0 ? port : config.getInt(Config.SERVER_PORT, 8080);
             int listenBacklog = backlog >= 0 ? backlog : config.getInt(Config.SERVER_BACKLOG, 512);
             int workerCount = workers >= 0 ? workers : config.getInt(Config.SERVER_WORKERS, 16);
             int drain = shutdownMillis >= 0 ? shutdownMillis
                     : config.getInt(Config.SERVER_SHUTDOWN_MILLIS, 10000);
-            if(drain < 0) {
+            if (drain < 0) {
                 // HttpServer.stop takes this as a duration and computes its
                 // deadline as now + drain, so a negative one is a deadline
                 // already past: the drain is skipped and every request in flight
@@ -1163,7 +1270,7 @@ public final class Backend {
                         + "close the sockets of every request in flight instead of waiting "
                         + "for them. Use 0 to stop immediately on purpose.");
             }
-            if(listenBacklog <= 0) {
+            if (listenBacklog <= 0) {
                 // THE TWO RUNTIMES DO NOT AGREE ABOUT A NON-POSITIVE ONE, and
                 // both start anyway. Java SE hands it to ServerSocketChannel.bind,
                 // where anything not positive selects an implementation default;
@@ -1216,185 +1323,44 @@ public final class Backend {
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
+                HttpServer.WebSocketRoutes routes = null;
+                if (webSocketEndpoints != null || application != null) {
+                    routes = new HttpServer.WebSocketRoutes() {
+                        @Override
+                        public void register(HttpServer.WebSocketRegistry direct)
+                                throws Exception {
+                            // Every endpoint's callbacks carry this server's
+                            // executors, as its HTTP requests do.
+                            HttpServer.WebSocketRegistry registry = withTasks(direct, tasks);
+                            // The same two arguments a Handlers factory gets,
+                            // and for the same reason: an endpoint that needs
+                            // the database declares it rather than reaching
+                            // for a static.
+                            if (webSocketEndpoints != null) {
+                                webSocketEndpoints.register(registry, pool, manager);
+                            }
+                            if (application != null) {
+                                application.registerWebSockets(registry);
+                            }
+                        }
+                    };
+                }
                 server = HttpServer.start(host, listenPort, listenBacklog, workerCount,
-                        new HttpServer.Handler() {
-                            /**
-                             * What a request that threw still owes: its request beans
-                             * destroyed, and the sessions it ended or changed stored.
-                             */
-                            private void failed(HttpServer.Request request,
-                                                boolean sessionFinished, long startedMillis,
-                                                Throwable err) {
-                                endRequestBeans(request);
-                                List ended = request.endedSessions();
-                                for(int e = 0 ; ended != null && !sessionFinished
-                                        && e < ended.size() ; e++) {
-                                    try {
-                                        sessions.finish((HttpSession)ended.get(e),
-                                                null);
-                                    } catch (Exception storeErr) {
-                                        System.err.println("Could not end the "
-                                                + "session of a failed request: "
-                                                + storeErr);
-                                    }
-                                }
-                                HttpSession session = request.resolvedSession();
-                                if(session != null && !sessionFinished) {
-                                    // The handler threw, but what it did to
-                                    // the session stands, as in a servlet
-                                    // container -- and a session-scoped bean
-                                    // it built must be kept or destroyed, not
-                                    // dropped with the request unreleased.
-                                    try {
-                                        sessions.finish(session, null);
-                                    } catch (Exception storeErr) {
-                                        System.err.println("Could not store the "
-                                                + "session of a failed request: "
-                                                + storeErr);
-                                    }
-                                }
-                                requestLog.record(request, 500, startedMillis, err);
-                            }
-
-                            /** Destroys the request's scoped beans, once. */
-                            private void endRequestBeans(HttpServer.Request request) {
-                                if(app != null) {
-                                    Object[] beans = request.takeScopedBeans();
-                                    if(beans != null) {
-                                        app.requestEnded(beans);
-                                    }
-                                }
-                            }
-
-                            public HttpServer.Response handle(HttpServer.Request request)
-                                    throws Exception {
-                                long started = instrumented.get()
-                                        ? com.codename1.backend.metrics.Metrics.requestStarted()
-                                        : 0L;
-                                Object previous = null;
-                                // This server's sessions, not a process-wide set:
-                                // cookies are not scoped by port, so a client of
-                                // two servers on one host would otherwise present
-                                // one's session to the other and be let in.
-                                request.sessions = sessions;
-                                Object previousTasks = Tasks.enter(tasks);
-                                if(track) {
-                                    previous = CURRENT_REQUEST.get();
-                                    CURRENT_REQUEST.set(request);
-                                }
-                                long startedMillis = requestLog.enabled
-                                        ? System.currentTimeMillis() : 0L;
-                                // What the metrics record; stays 500 when a
-                                // handler or the session store throws.
-                                int status = 500;
-                                try {
-                                    HttpServer.Response response = null;
-                                    boolean sessionFinished = false;
-                                    try {
-                                        for(int iter = 0 ; iter < chain.length ; iter++) {
-                                            response = chain[iter].handle(request);
-                                            if(response != null) {
-                                                break;
-                                            }
-                                        }
-                                        // Request beans end BEFORE the session is
-                                        // stored: a @PreDestroy that changes the
-                                        // session, or starts one, would otherwise
-                                        // change it after its only save.
-                                        endRequestBeans(request);
-                                        // Inside the logged region: a session
-                                        // store that fails to save is a 500 the
-                                        // client receives, and the request log
-                                        // must say so rather than record the
-                                        // handler's own status.
-                                        List ended = request.endedSessions();
-                                        HttpSession session = request.resolvedSession();
-                                        if(ended != null || session != null) {
-                                            sessionFinished = true;
-                                        }
-                                        // First, so their clearing cookies come
-                                        // before the new session's.
-                                        for(int e = 0 ; ended != null && e < ended.size() ; e++) {
-                                            response = sessions.finish(
-                                                    (HttpSession)ended.get(e), response);
-                                        }
-                                        if(session != null) {
-                                            response = sessions.finish(session, response);
-                                        }
-                                    } catch (Exception err) {
-                                        failed(request, sessionFinished, startedMillis, err);
-                                        throw err;
-                                    } catch (Error err) {
-                                        // The same clean-up: an invalidated session
-                                        // must still be deleted, or the client's old
-                                        // cookie keeps its signed-in state.
-                                        failed(request, sessionFinished, startedMillis, err);
-                                        throw err;
-                                    }
-                                    // Null is a 404 from here, which is what a
-                                    // router answers for a path it does not route.
-                                    requestLog.record(request, response == null ? 404
-                                            : response.getStatus(), startedMillis, null);
-                                    status = response == null ? 404 : response.getStatus();
-                                    return response;
-                                } finally {
-                                    // In the finally so a failed request is in
-                                    // the duration histogram too, and so the
-                                    // route label it set is cleared -- left
-                                    // behind, the worker's next unrouted
-                                    // request would be recorded under it.
-                                    com.codename1.backend.metrics.Metrics.requestEnded(started,
-                                            request.getMethod(), status);
-                                    // Destroyed while this is still the current
-                                    // request: a @PreDestroy that calls another
-                                    // request-scoped bean goes through that bean's
-                                    // stand-in, which looks the request up.
-                                    try {
-                                        // Normally done already, and then a
-                                        // no-op: the beans are taken once.
-                                        endRequestBeans(request);
-                                    } finally {
-                                        if(track) {
-                                            CURRENT_REQUEST.set(previous);
-                                        }
-                                        Tasks.leave(previousTasks);
-                                        sessions.leave(request);
-                                    }
-                                }
-                            }
-                        }, context, webSocketEndpoints == null && application == null ? null
-                                : new HttpServer.WebSocketRoutes() {
-                            public void register(HttpServer.WebSocketRegistry direct)
-                                    throws Exception {
-                                // Every endpoint's callbacks carry this server's
-                                // executors, as its HTTP requests do.
-                                HttpServer.WebSocketRegistry registry =
-                                        withTasks(direct, tasks);
-                                // The same two arguments a Handlers factory gets,
-                                // and for the same reason: an endpoint that needs
-                                // the database declares it rather than reaching
-                                // for a static.
-                                if(webSocketEndpoints != null) {
-                                    webSocketEndpoints.register(registry, pool, manager);
-                                }
-                                if(application != null) {
-                                    application.registerWebSockets(registry);
-                                }
-                            }
-                        });
+                        new Serving(chain, sessions, tasks, requestLog, instrumented, app, track),
+                        context, routes);
                 bound = true;
             } finally {
-                if(!bound && ownsContext) {
+                if (!bound && ownsContext) {
                     context.close();
                 }
             }
             // From now on this server's virtual tasks run on its own hosts, and
             // its requests are traced by its own tracer.
-            synchronized(tasks) {
+            synchronized (tasks) {
                 tasks.server = server;
             }
-            if(tracing) {
-                server.setTracer(tracer);
+            if (active != null) {
+                server.setTracer(active);
             }
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
@@ -1409,24 +1375,24 @@ public final class Backend {
             // with a built-in one, a managed gauge whose Prometheus name clashes.
             boolean owned = false;
             try {
-                if(metricReader != null) {
+                if (metricReader != null) {
                     measuring |= metricReader.open(config);
                 }
-                if(measuring) {
+                if (measuring) {
                     com.codename1.backend.metrics.Metrics.enableServer(server, pool);
                     instrumented.set(true);
                 }
                 backend = new Backend(server, pool, manager, config, drain,
-                        tracing ? tracer : null, application,
+                        active, application,
                         metricReader != null && measuring ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
                         environment == null ? new ArrayList() : environment.gauges);
                 owned = true;
             } finally {
-                if(!owned) {
+                if (!owned) {
                     server.stop(0);
                     com.codename1.backend.metrics.Metrics.disableServer(server, pool);
-                    if(metricReader != null) {
+                    if (metricReader != null) {
                         metricReader.shutdown(0);
                     }
                 }
@@ -1441,12 +1407,12 @@ public final class Backend {
             // longer knows the listener, the executors or the beans.
             boolean running = false;
             try {
-                if(management != null) {
+                if (management != null) {
                     management.attach(backend);
                 }
-                if(mcpServer != null) {
+                if (mcpServer != null) {
                     mcpServer.attach(backend);
-                    if(!quiet) {
+                    if (!quiet) {
                         // The line an agent's setup instructions point at.
                         System.out.println("cn1: MCP endpoint at http"
                                 + (context != null ? "s" : "") + "://127.0.0.1:"
@@ -1454,38 +1420,34 @@ public final class Backend {
                                 + (mcpServer.hasDevTools() ? " (with development tools)" : ""));
                     }
                 }
-                if(application != null) {
+                if (application != null) {
                     application.started(backend);
                 }
                 running = true;
             } finally {
-                if(!running) {
+                if (!running) {
                     backend.stop();
                 }
             }
             backend.markReady();
-            if(!quiet) {
+            if (!quiet) {
                 announce(backend, listenPort, context != null);
             }
             return backend;
         }
 
-        /**
-         * Starts the server, drains it on SIGTERM or SIGINT, and blocks until it
-         * stops. This is what a main does.
-         */
+        /// Starts the server, drains it on SIGTERM or SIGINT, and blocks until it
+        /// stops. This is what a main does.
         public void run() throws Exception {
             run(Signals.installShutdownHandler());
         }
 
-        /**
-         * {@link #run} with the answer the signal install gave.
-         *
-         * <p>Package visible so a test can pass false. The Java SE arm's
-         * installShutdownHandler cannot fail -- the JVM registers the hook -- so
-         * the refusal below is otherwise reachable only on a translated binary
-         * under descriptor exhaustion, which is to say never, in a test.
-         */
+        /// [#run] with the answer the signal install gave.
+        ///
+        /// Package visible so a test can pass false. The Java SE arm's
+        /// installShutdownHandler cannot fail -- the JVM registers the hook -- so
+        /// the refusal below is otherwise reachable only on a translated binary
+        /// under descriptor exhaustion, which is to say never, in a test.
         void run(boolean shutdownHandlerInstalled) throws Exception {
             // CHECKED, because the failure is otherwise a server that exits
             // saying it succeeded: installShutdownHandler answers false when the
@@ -1495,34 +1457,53 @@ public final class Backend {
             // reporting success.
             //
             // And BEFORE start(), so a refusal has not already bound the port.
-            if(!shutdownHandlerInstalled) {
+            if (!shutdownHandlerInstalled) {
                 throw new IOException("Could not install the shutdown handler, so a stop "
                         + "signal could not be waited for; refusing to start rather than "
                         + "exiting silently once it is registered");
             }
             final Backend backend = start();
-            Signals.onShutdown(new Runnable() {
-                public void run() {
-                    // Stop accepting and let what is in flight finish. Signals
-                    // ends the process; exiting from here would deadlock the
-                    // shutdown hook this runs from.
-                    backend.stop();
-                }
-            });
+            Signals.onShutdown(new StopOnSignal(backend));
             // Required: the host threads are detached, so a main that returned
             // would end the process without a word.
             backend.awaitTermination();
         }
 
+        /// Answers nothing, so every request is a 404: the handler chain of a
+        /// websocket-only server.
+        private static final class NotFound implements HttpServer.Handler {
+            @Override
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;          // null is a 404 from the chain below
+            }
+        }
+
+        /// Stops a server when the process is asked to shut down.
+        private static final class StopOnSignal implements Runnable {
+            private final Backend backend;
+
+            StopOnSignal(Backend backend) {
+                this.backend = backend;
+            }
+
+            @Override
+            public void run() {
+                // Stop accepting and let what is in flight finish. Signals
+                // ends the process; exiting from here would deadlock the
+                // shutdown hook this runs from.
+                backend.stop();
+            }
+        }
+
         private Tls resolveTls() throws IOException {
-            if(tls != null) {
+            if (tls != null) {
                 return tls;
             }
             String certificate = tlsCertificate != null ? tlsCertificate
                     : config.get(Config.TLS_CERTIFICATE);
             String key = tlsKey != null ? tlsKey : config.get(Config.TLS_KEY);
-            if(certificate == null || key == null) {
-                if(certificate != null || key != null) {
+            if (certificate == null || key == null) {
+                if (certificate != null || key != null) {
                     // One without the other is a deployment that believes it is
                     // serving TLS. Plaintext on the port a browser will reach
                     // over https is a failure to connect at best.
@@ -1535,20 +1516,18 @@ public final class Backend {
             return Tls.create(certificate, key, config.getBoolean(Config.TLS_HTTP2, true));
         }
 
-        /**
-         * The pool, or null when this server has no database.
-         *
-         * <p>One is opened when the deployment named a database, when the caller
-         * handed one in, when a handler said it needs one (see
-         * {@link #requiresDataSource}), or when the build generated an entity --
-         * because an entity with nowhere to live is a server that would fail on
-         * its first query instead of at start-up.
-         */
+        /// The pool, or null when this server has no database.
+        ///
+        /// One is opened when the deployment named a database, when the caller
+        /// handed one in, when a handler said it needs one (see
+        /// [#requiresDataSource]), or when the build generated an entity --
+        /// because an entity with nowhere to live is a server that would fail on
+        /// its first query instead of at start-up.
         private DataSource openDataSource() throws IOException {
-            if(dataSource != null) {
+            if (dataSource != null) {
                 return dataSource;
             }
-            if(dataSourceUrl != null) {
+            if (dataSourceUrl != null) {
                 // Empty is an explicit choice too: let DataSource reject it
                 // instead of silently opening a different configured database.
                 // The URL is the builder's, the POOL SETTINGS are still the
@@ -1563,44 +1542,39 @@ public final class Backend {
                         config.getInt(Config.DATASOURCE_BORROW_MILLIS, 10000));
             }
             boolean configured = config.get(Config.DATASOURCE_URL) != null;
-            if(!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
+            if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
                 return null;
             }
             return DataSource.fromConfig(config);
         }
 
         private EntityManager openEntityManager(DataSource pool) throws IOException {
-            if(entities != null) {
-                return entities;
-            }
             EntityDefinition[] known = EntityManager.registered();
-            if(known.length == 0 || pool == null) {
+            if (known.length == 0 || pool == null) {
                 return null;
             }
             EntityManager manager = EntityManager.open(pool);
             boolean create = createTablesGiven ? createTables
                     : config.getBoolean(Config.ORM_CREATE_TABLES, config.isDevelopmentProfile());
-            if(create) {
+            if (create) {
                 manager.createTables();
             }
             return manager;
         }
 
-        /**
-         * One line saying what came up and where its data is.
-         *
-         * <p>Through the pool's own description rather than the URL, which holds
-         * the password. A start-up line is the easiest way for a credential to
-         * reach a log aggregator.
-         */
+        /// One line saying what came up and where its data is.
+        ///
+        /// Through the pool's own description rather than the URL, which holds
+        /// the password. A start-up line is the easiest way for a credential to
+        /// reach a log aggregator.
         private void announce(Backend backend, int listenPort, boolean secure) {
             StringBuilder line = new StringBuilder("listening on ");
             line.append(secure ? "https" : "http").append(" port ").append(listenPort);
             line.append(", ").append(config.describe());
-            if(backend.getDataSource() != null) {
+            if (backend.getDataSource() != null) {
                 line.append(", database ").append(backend.getDataSource());
             }
-            if(backend.getEntityManager() != null) {
+            if (backend.getEntityManager() != null) {
                 line.append(", ").append(EntityManager.registered().length).append(" entities");
             }
             System.out.println(line.toString());

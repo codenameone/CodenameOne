@@ -63,8 +63,6 @@ import javax.swing.SwingUtilities;
 /**
  * UI and logic allowing us to pick the MIDlet which will appear in the preview
  * pane
- *
- * @author  Shai Almog
  */
 public class PickMIDlet extends javax.swing.JPanel {
     private static CustomComponent[] customComponents;

@@ -54,8 +54,6 @@ import javax.swing.plaf.metal.MetalLookAndFeel;
  * {@link #setAddon(String)}method. For example, to install the
  * Windows addons, add the following statement
  * <code>LookAndFeelAddons.setAddon("com.l2fprod.common.swing.plaf.windows.WindowsLookAndFeelAddons");</code>.
- * 
- * @author <a href="mailto:fred@L2FProd.com">Frederic Lavigne</a> 
  */
 public class LookAndFeelAddons {
 

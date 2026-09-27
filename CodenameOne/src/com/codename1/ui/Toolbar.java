@@ -191,8 +191,6 @@ import java.util.Vector;
 /// hi.getAnimationManager().onTitleScrollAnimation(title);
 /// hi.show();
 /// ```
-///
-/// @author Chen, Francesco Galgani
 public class Toolbar extends Container {
 
     /// Enables/Disables the side menu bar swipe, defaults to true

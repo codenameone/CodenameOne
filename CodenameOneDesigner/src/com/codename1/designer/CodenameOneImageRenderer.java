@@ -51,8 +51,6 @@ import javax.swing.SwingUtilities;
 
 /**
  * Renders an image from Codename One on a Swing canvas including support for CodenameOne animations
- *
- * @author Shai Almog
  */
 public class CodenameOneImageRenderer extends JComponent implements MouseListener, MouseMotionListener {
     private com.codename1.ui.Image image;

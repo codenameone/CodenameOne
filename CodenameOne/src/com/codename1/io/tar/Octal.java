@@ -16,7 +16,6 @@
 
 package com.codename1.io.tar;
 
-/// @author Kamran Zafar
 public final class Octal {
 
     private Octal() {}

@@ -27,10 +27,6 @@ import com.codename1.impl.html5.HTML5Graphics;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 
-/**
- *
- * @author shannah
- */
 public class DrawLine implements ExecutableOp{
 
     final int x1, y1, x2, y2, color, alpha;

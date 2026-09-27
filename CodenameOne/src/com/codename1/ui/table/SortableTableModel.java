@@ -31,8 +31,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 /// A proxy that wraps the table model providing sorting API that can be leveraged by the table
-///
-/// @author Shai Almog
 public class SortableTableModel extends AbstractTableModel {
     private final TableModel model;
     private final boolean asc;

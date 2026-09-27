@@ -69,8 +69,6 @@ import com.codename1.ui.plaf.Style;
 /// There are quite a few differences between `FlowLayout` and `BoxLayout`. When it doesn't
 /// matter to you we tend to recommend `BoxLayout` as it acts more consistently in all situations since
 /// its far simpler. Another advantage of `BoxLayout` is the fact that it grows and thus aligns nicely.
-///
-/// @author Chen Fishbein
 public class BoxLayout extends Layout {
 
     /// Horizontal layout where components are arranged from left to right

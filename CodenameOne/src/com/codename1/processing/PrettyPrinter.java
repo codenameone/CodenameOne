@@ -48,8 +48,6 @@ import java.util.Map;
 ///
 /// An internal utility method used by toString() methods to produce a JSON document
 /// from a given Map or List.
-///
-/// @author Eric Coolman (2012-03 - derivative work from original Sun source).
 final class PrettyPrinter {
     Map<?, ?> myHashMap;
 

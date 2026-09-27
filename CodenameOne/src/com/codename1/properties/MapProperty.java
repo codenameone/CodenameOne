@@ -30,8 +30,6 @@ import java.util.Map;
 import java.util.Set;
 
 /// Base class for a property as a Map which can contain multiple elements within it
-///
-/// @author Shai Almog
 public class MapProperty<T, J, K> extends PropertyBase<Map.Entry<T, J>, K> implements Iterable<Map.Entry<T, J>> {
     private final LinkedHashMap<T, J> value = new LinkedHashMap<T, J>();
     private Class keyType;

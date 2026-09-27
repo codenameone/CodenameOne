@@ -28,8 +28,6 @@ import com.codename1.io.Preferences;
 /// Binds an object to the `com.codename1.io.Preferences` API for automatic persistent storage.
 /// You can use this API like the builder pattern by using the create method and chaining it with setters until
 /// bind is invoked.
-///
-/// @author Shai Almog
 public final class PreferencesObject {
     private PropertyBusinessObject bo;
     private String prefix;

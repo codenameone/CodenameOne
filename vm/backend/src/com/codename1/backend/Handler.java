@@ -22,18 +22,14 @@
  */
 package com.codename1.backend;
 
-/**
- * What a Lambda-style handler implements. The event and the return value are raw
- * JSON strings at this layer; the generated dispatcher from a @RestClient
- * interface is what turns them into typed calls.
- */
+/// What a Lambda-style handler implements. The event and the return value are raw
+/// JSON strings at this layer; the generated dispatcher from a @RestClient
+/// interface is what turns them into typed calls.
 public interface Handler {
-    /**
-     * - `event`: the invocation payload, as JSON
-     * - `requestId`: the host runtime's id for this invocation, for correlating logs
-     *
-     * Returns the response payload as JSON. Throwing is reported to the host
-     * runtime as an invocation error.
-     */
+    /// - `event`: the invocation payload, as JSON
+    /// - `requestId`: the host runtime's id for this invocation, for correlating logs
+    ///
+    /// Returns the response payload as JSON. Throwing is reported to the host
+    /// runtime as an invocation error.
     String handle(String event, String requestId) throws Exception;
 }

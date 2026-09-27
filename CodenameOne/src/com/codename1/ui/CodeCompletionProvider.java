@@ -47,8 +47,6 @@ import java.util.List;
 ///     results.onSucess(out);
 /// });
 /// ```
-///
-/// @author Shai Almog
 public interface CodeCompletionProvider {
     /// Requests completion proposals for the given editor state. Implementations must eventually invoke
     /// `results.onSucess(list)` (possibly asynchronously); passing an empty list or null hides the

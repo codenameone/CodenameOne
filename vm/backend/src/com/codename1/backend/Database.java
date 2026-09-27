@@ -32,78 +32,72 @@ import com.codename1.backend.sql.Dialect;
 import com.codename1.backend.sql.MySql;
 import com.codename1.backend.sql.Postgres;
 
-/**
- * One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
- *
- * <pre>
- *   Database.open("/var/lib/app/app.db")
- *   Database.open(":memory:")
- *   Database.open("postgres://user:secret@db.internal:5432/app?sslmode=require")
- *   Database.open("mysql://user:secret@db.internal/app?sslmode=require"
- *                 + "&amp;sslrootcert=/etc/ssl/rds-ca.pem")
- * </pre>
- *
- * The point of the single type is that a handler cannot tell which engine
- * answered it. Rows come back as column-name to value maps whose values are
- * always Long, Double, String, byte[] or null, whichever engine produced them --
- * so the same code developed against a local SQLite file runs against a managed
- * PostgreSQL without a branch. Parameters are always bound, never interpolated,
- * on all three.
- *
- * TLS has three settings, and none of them is "encrypted but unverified".
- * `sslmode=require` demands TLS whose certificate chains to a trusted root AND
- * carries the host's name; `sslmode=disable` is plaintext, deliberately;
- * `sslmode=prefer` uses TLS when the server offers it and fails loudly rather
- * than silently downgrading when verification does not hold. A managed instance
- * or a development container that presents a private CA is reached by naming it:
- * `sslrootcert=/path/to/ca.pem`.
- *
- * SQLite goes through {@link Db}, which is per-target: the engine is linked into
- * the binary on the translated side and reached through a JDBC driver on the
- * local Java SE side. PostgreSQL and MySQL are the SAME code on both targets --
- * they speak the wire protocol over {@link Tcp}, so there is no driver to install
- * and nothing that can behave differently between the two.
- *
- * Statements are written ONCE, in the portable form: ? for every parameter and
- * plain unquoted names. PostgreSQL binds $1 rather than ?, and that difference
- * stops inside {@link #execute} and {@link #query} -- see {@link Dialect#bind} --
- * rather than at every call site. SQL already written for one engine keeps
- * working: a statement carrying no ? at all is passed through untouched, so
- * hand-written $1 is left alone.
- *
- * What differs between engines and used to be papered over by the caller:
- * {@link #lastInsertId} is meaningful for SQLite and MySQL and always 0 for
- * PostgreSQL, which has no such concept. {@link #insert} is the portable form of
- * that question -- it asks whichever way this engine answers -- and
- * {@link #dialect} exposes the rest of the differences for code that generates
- * schema.
- */
+/// One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
+///
+/// ```
+/// Database.open("/var/lib/app/app.db")
+/// Database.open(":memory:")
+/// Database.open("postgres://user:secret@db.internal:5432/app?sslmode=require")
+/// Database.open("mysql://user:secret@db.internal/app?sslmode=require"
+///               + "&sslrootcert=/etc/ssl/rds-ca.pem")
+/// ```
+///
+/// The point of the single type is that a handler cannot tell which engine
+/// answered it. Rows come back as column-name to value maps whose values are
+/// always Long, Double, String, byte\[\] or null, whichever engine produced them --
+/// so the same code developed against a local SQLite file runs against a managed
+/// PostgreSQL without a branch. Parameters are always bound, never interpolated,
+/// on all three.
+///
+/// TLS has three settings, and none of them is "encrypted but unverified".
+/// `sslmode=require` demands TLS whose certificate chains to a trusted root AND
+/// carries the host's name; `sslmode=disable` is plaintext, deliberately;
+/// `sslmode=prefer` uses TLS when the server offers it and fails loudly rather
+/// than silently downgrading when verification does not hold. A managed instance
+/// or a development container that presents a private CA is reached by naming it:
+/// `sslrootcert=/path/to/ca.pem`.
+///
+/// SQLite goes through [Db], which is per-target: the engine is linked into
+/// the binary on the translated side and reached through a JDBC driver on the
+/// local Java SE side. PostgreSQL and MySQL are the SAME code on both targets --
+/// they speak the wire protocol over [Tcp], so there is no driver to install
+/// and nothing that can behave differently between the two.
+///
+/// Statements are written ONCE, in the portable form: ? for every parameter and
+/// plain unquoted names. PostgreSQL binds $1 rather than ?, and that difference
+/// stops inside [#execute] and [#query] -- see [Dialect#bind] --
+/// rather than at every call site. SQL already written for one engine keeps
+/// working: a statement carrying no ? at all is passed through untouched, so
+/// hand-written $1 is left alone.
+///
+/// What differs between engines and used to be papered over by the caller:
+/// [#lastInsertId] is meaningful for SQLite and MySQL and always 0 for
+/// PostgreSQL, which has no such concept. [#insert] is the portable form of
+/// that question -- it asks whichever way this engine answers -- and
+/// [#dialect] exposes the rest of the differences for code that generates
+/// schema.
 public final class Database {
     private final Db sqlite;
-    /**
-     * Db has no isClosed, so closure is recorded where it happens -- and VOLATILE,
-     * because isOpen() reads it without the monitor.
-     *
-     * <p>close() is synchronized like every other operation on this class, so a
-     * closing thread publishes this under the lock -- but the pool or health check
-     * asking isOpen() never takes that lock, and without a happens-before edge the
-     * memory model lets it keep seeing false indefinitely. The connection is then
-     * handed out again and fails on its next use.
-     *
-     * <p>Volatile rather than synchronizing isOpen(): the caller asking whether a
-     * connection is usable is exactly the caller that must not block behind a
-     * statement already running on it. HttpServer publishes its own `running` flag
-     * the same way.
-     */
-    private volatile boolean sqliteClosed;
+    /// Db has no isClosed, so closure is recorded where it happens -- and VOLATILE,
+    /// because isOpen() reads it without the monitor.
+    ///
+    /// close() is synchronized like every other operation on this class, so a
+    /// closing thread publishes this under the lock -- but the pool or health check
+    /// asking isOpen() never takes that lock, and without a happens-before edge the
+    /// memory model lets it keep seeing false indefinitely. The connection is then
+    /// handed out again and fails on its next use.
+    ///
+    /// Volatile rather than synchronizing isOpen(): the caller asking whether a
+    /// connection is usable is exactly the caller that must not block behind a
+    /// statement already running on it. HttpServer publishes its own `running` flag
+    /// the same way.
+    private volatile boolean sqliteClosed; //NOPMD AvoidUsingVolatile - read without the monitor, see above
     private final Postgres postgres;
     private final MySql mysql;
     private final String describedAs;
-    /**
-     * WHICH ENGINE THIS IS, as the things that differ between them rather than as
-     * a name to branch on. Chosen from the URL before anything is connected, and
-     * immutable afterwards, so asking is free on the request path.
-     */
+    /// WHICH ENGINE THIS IS, as the things that differ between them rather than as
+    /// a name to branch on. Chosen from the URL before anything is connected, and
+    /// immutable afterwards, so asking is free on the request path.
     private final Dialect dialect;
 
     private Database(Db sqlite, Postgres postgres, MySql mysql, String describedAs,
@@ -115,45 +109,41 @@ public final class Database {
         this.dialect = dialect;
     }
 
-    /** A unit of work run inside {@link #transaction}. */
+    /// A unit of work run inside [#transaction].
     public interface Work {
         Object run(Database db) throws Exception;
     }
 
-    /**
-     * Opens the database the URL names. Anything that is not a recognised scheme
-     * is taken as a SQLite path, so an ordinary file name keeps working.
-     */
-    /**
-     * Whether the URL opens with this scheme, IGNORING CASE.
-     *
-     * <p>RFC 3986 makes a scheme case-insensitive, and anything unrecognised here
-     * is taken as a SQLite path -- so "PostgreSQL://user@host/db" was not a
-     * mismatch that got reported, it was a file name. The caller ended up
-     * creating or opening a local database, or failing on a pathname containing
-     * "//", with nothing saying the server had never been contacted.
-     *
-     * <p>regionMatches rather than toLowerCase: String.toLowerCase is locale
-     * sensitive and this runtime has no Locale to ask for the root one, so on a
-     * Turkish device the I of a scheme folds to a dotless i and stops matching.
-     */
+    /// Whether the URL opens with this scheme, IGNORING CASE.
+    ///
+    /// RFC 3986 makes a scheme case-insensitive, and anything unrecognised here
+    /// is taken as a SQLite path -- so "PostgreSQL://user@host/db" was not a
+    /// mismatch that got reported, it was a file name. The caller ended up
+    /// creating or opening a local database, or failing on a pathname containing
+    /// "//", with nothing saying the server had never been contacted.
+    ///
+    /// regionMatches rather than toLowerCase: String.toLowerCase is locale
+    /// sensitive and this runtime has no Locale to ask for the root one, so on a
+    /// Turkish device the I of a scheme folds to a dotless i and stops matching.
     private static boolean hasScheme(String url, String scheme) {
         return url.length() >= scheme.length()
                 && url.regionMatches(true, 0, scheme, 0, scheme.length());
     }
 
+    /// Opens the database the URL names. Anything that is not a recognised scheme
+    /// is taken as a SQLite path, so an ordinary file name keeps working.
     public static Database open(String url) throws IOException {
-        if(url == null) {
+        if (url == null) {
             throw new IOException("No database URL");
         }
-        if(hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")) {
+        if (hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")) {
             Url parsed = Url.parse(url, 5432);
             return new Database(null, Postgres.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
                     null, parsed.describe("postgres"), Dialect.POSTGRES);
         }
-        if(hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
+        if (hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
             Url parsed = Url.parse(url, 3306);
             // The DIALECT COMES FROM THE SERVER, not from the scheme: MariaDB
             // and MySQL do not have the same collations, and a mysql:// URL
@@ -168,24 +158,22 @@ public final class Database {
         return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
     }
 
-    /**
-     * Refuses a SQLite file: URI, because only one of the two runtimes reads it.
-     *
-     * <p>sqlite-jdbc parses "file:app?mode=memory&cache=shared" as a URI and
-     * gives the local development loop a shared in-memory database. sqlite3_open
-     * does NOT unless the build turns URI handling on, so the SAME url in a
-     * packaged binary opens a disk file whose name is that whole string -- and
-     * the server persists where development was ephemeral, or fails outright in
-     * a read-only working directory.
-     *
-     * <p>This class refuses jdbc:postgresql: for exactly this reason, and it is
-     * why the jdbc:sqlite: prefix is stripped on both arms rather than honoured
-     * on one. A spelling that cannot mean the same thing in both places is worth
-     * less than the confidence that they agree, so it is refused in both.
-     */
+    /// Refuses a SQLite file: URI, because only one of the two runtimes reads it.
+    ///
+    /// sqlite-jdbc parses "file:app?mode=memory&cache=shared" as a URI and
+    /// gives the local development loop a shared in-memory database. sqlite3_open
+    /// does NOT unless the build turns URI handling on, so the SAME url in a
+    /// packaged binary opens a disk file whose name is that whole string -- and
+    /// the server persists where development was ephemeral, or fails outright in
+    /// a read-only working directory.
+    ///
+    /// This class refuses jdbc:postgresql: for exactly this reason, and it is
+    /// why the jdbc:sqlite: prefix is stripped on both arms rather than honoured
+    /// on one. A spelling that cannot mean the same thing in both places is worth
+    /// less than the confidence that they agree, so it is refused in both.
     private static void refuseUnportableSqliteUri(String url) throws IOException {
         String path = url;
-        if(path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
+        if (path.regionMatches(true, 0, "jdbc:sqlite:", 0, 12)) {
             path = path.substring(12);
         }
         // EVERY FORM THE DRIVER PARSES, not just the first one anybody reported.
@@ -208,20 +196,20 @@ public final class Database {
         // This is Database's door rather than Db's on purpose: Db is the
         // per-arm primitive and its two implementations are ALLOWED to differ,
         // while Database is the one API that promises the same answer on both.
-        if(path.regionMatches(true, 0, "file:", 0, 5)) {
+        if (path.regionMatches(true, 0, "file:", 0, 5)) {
             throw new IOException("A SQLite file: URI is not portable here: the local Java SE "
                     + "loop hands it to a driver that parses it, and a packaged binary hands "
                     + "it to sqlite3_open, which reads the whole string as a FILE NAME -- so "
                     + "the same URL is an in-memory database in development and a file on "
                     + "disk in production. Use a plain path, or \":memory:\".");
         }
-        if(path.regionMatches(true, 0, ":resource:", 0, 10)) {
+        if (path.regionMatches(true, 0, ":resource:", 0, 10)) {
             throw new IOException("A SQLite :resource: URL is not portable here: the local "
                     + "Java SE loop reads it from the classpath and a packaged binary opens a "
                     + "FILE of that name. Use a plain path, or \":memory:\".");
         }
         int query = path.indexOf('?');
-        if(query >= 0) {
+        if (query >= 0) {
             throw new IOException("A SQLite URL cannot carry " + path.substring(query)
                     + ": the local Java SE loop reads it as driver settings and opens "
                     + path.substring(0, query) + ", while a packaged binary opens a FILE "
@@ -231,32 +219,30 @@ public final class Database {
         }
     }
 
-    /** Wraps an already-open SQLite handle, for code that opened one directly. */
+    /// Wraps an already-open SQLite handle, for code that opened one directly.
     public static Database of(Db db) throws IOException {
         return new Database(db, null, null, "sqlite", Dialect.SQLITE);
     }
 
-    /**
-     * Synchronized, like the two below, because a shared session is not safe to
-     * interleave -- and for the network engines it is worse than interleaved
-     * transactions.
-     *
-     * Postgres and MySql each own a Wire, and a Wire owns ONE 16KB buffer with a
-     * position and a limit, plus one output stream it builds every message in.
-     * MySql also carries the packet sequence number. Two handlers calling at once
-     * therefore write into the same message buffer, move each other's parse
-     * position and desynchronize the sequence: that is protocol corruption, not
-     * merely one request's work committed by another's COMMIT.
-     *
-     * The SQLite path delegates to Db, which is synchronized on its own monitor.
-     * Holding this one first is safe -- the order is always Database then Db,
-     * never the reverse -- and Db's monitor is reentrant for the callbacks.
-     */
+    /// Synchronized, like the two below, because a shared session is not safe to
+    /// interleave -- and for the network engines it is worse than interleaved
+    /// transactions.
+    ///
+    /// Postgres and MySql each own a Wire, and a Wire owns ONE 16KB buffer with a
+    /// position and a limit, plus one output stream it builds every message in.
+    /// MySql also carries the packet sequence number. Two handlers calling at once
+    /// therefore write into the same message buffer, move each other's parse
+    /// position and desynchronize the sequence: that is protocol corruption, not
+    /// merely one request's work committed by another's COMMIT.
+    ///
+    /// The SQLite path delegates to Db, which is synchronized on its own monitor.
+    /// Holding this one first is safe -- the order is always Database then Db,
+    /// never the reverse -- and Db's monitor is reentrant for the callbacks.
     public synchronized int execute(String sql, Object[] params) throws IOException {
         awaitTransactionOwner();
         // A span per statement when a tracer is installed; see Tracing.startDatabase.
         Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if(span == null) {
+        if (span == null) {
             return executeUntraced(sql, params);
         }
         Throwable failure = null;
@@ -279,10 +265,10 @@ public final class Database {
         try {
             params = portableParameters(params);
             String rendered = bind(sql, params);
-            if(sqlite != null) {
+            if (sqlite != null) {
                 return sqlite.execute(rendered, params);
             }
-            if(postgres != null) {
+            if (postgres != null) {
                 return postgres.execute(rendered, params);
             }
             return mysql.execute(rendered, params);
@@ -291,11 +277,11 @@ public final class Database {
         }
     }
 
-    /** Runs a query and returns every row as a column-name to value map. */
+    /// Runs a query and returns every row as a column-name to value map.
     public synchronized List query(String sql, Object[] params) throws IOException {
         awaitTransactionOwner();
         Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if(span == null) {
+        if (span == null) {
             return queryUntraced(sql, params);
         }
         Throwable failure = null;
@@ -320,10 +306,10 @@ public final class Database {
         try {
             params = portableParameters(params);
             String rendered = bind(sql, params);
-            if(sqlite != null) {
+            if (sqlite != null) {
                 return sqlite.query(rendered, params);
             }
-            if(postgres != null) {
+            if (postgres != null) {
                 return postgres.query(rendered, params);
             }
             return mysql.query(rendered, params);
@@ -332,56 +318,52 @@ public final class Database {
         }
     }
 
-    /**
-     * The one row a query is expected to return, or null when it returns none.
-     *
-     * <p>Its own method because the alternative is written at every call site and
-     * is wrong in the same way each time: reading get(0) off a list without
-     * looking at its size, which is an IndexOutOfBoundsException on the day the
-     * row is missing rather than the null the code above it is already written to
-     * handle. More than one row is a bug in the statement, and it is reported as
-     * one rather than silently discarded.
-     */
+    /// The one row a query is expected to return, or null when it returns none.
+    ///
+    /// Its own method because the alternative is written at every call site and
+    /// is wrong in the same way each time: reading get(0) off a list without
+    /// looking at its size, which is an IndexOutOfBoundsException on the day the
+    /// row is missing rather than the null the code above it is already written to
+    /// handle. More than one row is a bug in the statement, and it is reported as
+    /// one rather than silently discarded.
     public synchronized Map queryOne(String sql, Object[] params) throws IOException {
         List rows = query(sql, params);
-        if(rows.isEmpty()) {
+        if (rows.isEmpty()) {
             return null;
         }
-        if(rows.size() > 1) {
+        if (rows.size() > 1) {
             throw new DataAccessException("Expected at most one row and the query returned "
                     + rows.size() + ": [" + sql + "]");
         }
-        return (Map)rows.get(0);
+        return (Map) rows.get(0);
     }
 
-    /**
-     * Runs an INSERT and answers the key the database generated for it.
-     *
-     * <p>This is the operation the engines disagree about most and the one an
-     * application needs most often. SQLite and MySQL assign the key and hold it
-     * until asked -- {@link #lastInsertId} -- while PostgreSQL has no such
-     * concept at all, and the only way to learn the key there is to ask the
-     * INSERT itself for it with a RETURNING clause. Written by hand that is a
-     * branch on the engine at every insert; here the dialect knows which it is.
-     *
-     * <p>{@code idColumn} names the generated column, which is what RETURNING
-     * needs. It is quoted for the engine, so a column named "order" or one whose
-     * case matters is spelled correctly rather than folded.
-     *
-     * <p>ONE ROW. A statement whose VALUES clause names more than one tuple is
-     * refused before it runs, because the three engines key a multi-row insert
-     * differently and there is no answer that means the same thing on all of
-     * them. A statement whose row count its text does NOT show -- an
-     * INSERT ... SELECT -- is refused on PostgreSQL, where RETURNING counts the
-     * rows for certain, and answers with the engine's last-insert-id on the
-     * other two, where asking would mean trusting MySQL's affected-row count,
-     * which says two for an upsert that touched one row. Use execute() for a
-     * statement that inserts an unknown number of rows.
-     *
-     * @param sql an INSERT in the portable form, with no RETURNING of its own
-     * @return the generated key, or 0 where the statement inserted no row -- an
-     *         ignored conflict, most often -- or where the engine generated none
-     */
+    /// Runs an INSERT and answers the key the database generated for it.
+    ///
+    /// This is the operation the engines disagree about most and the one an
+    /// application needs most often. SQLite and MySQL assign the key and hold it
+    /// until asked -- [#lastInsertId] -- while PostgreSQL has no such
+    /// concept at all, and the only way to learn the key there is to ask the
+    /// INSERT itself for it with a RETURNING clause. Written by hand that is a
+    /// branch on the engine at every insert; here the dialect knows which it is.
+    ///
+    /// `idColumn` names the generated column, which is what RETURNING
+    /// needs. It is quoted for the engine, so a column named "order" or one whose
+    /// case matters is spelled correctly rather than folded.
+    ///
+    /// ONE ROW. A statement whose VALUES clause names more than one tuple is
+    /// refused before it runs, because the three engines key a multi-row insert
+    /// differently and there is no answer that means the same thing on all of
+    /// them. A statement whose row count its text does NOT show -- an
+    /// INSERT ... SELECT -- is refused on PostgreSQL, where RETURNING counts the
+    /// rows for certain, and answers with the engine's last-insert-id on the
+    /// other two, where asking would mean trusting MySQL's affected-row count,
+    /// which says two for an upsert that touched one row. Use execute() for a
+    /// statement that inserts an unknown number of rows.
+    ///
+    /// @param sql an INSERT in the portable form, with no RETURNING of its own
+    /// @return the generated key, or 0 where the statement inserted no row -- an
+    /// ignored conflict, most often -- or where the engine generated none
     public synchronized long insert(String sql, Object[] params, String idColumn)
             throws IOException {
         awaitTransactionOwner();
@@ -389,7 +371,7 @@ public final class Database {
         // statements it issues through execute and query find this one current
         // and add none of their own.
         Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if(span == null) {
+        if (span == null) {
             try {
                 return insertUntraced(sql, params, idColumn);
             } catch (IOException err) {
@@ -412,7 +394,7 @@ public final class Database {
 
     private long insertUntraced(String sql, Object[] params, String idColumn)
             throws IOException {
-        if(idColumn == null || idColumn.length() == 0) {
+        if (idColumn == null || idColumn.length() == 0) {
             throw new IOException("insert needs the name of the generated key column");
         }
         // ONE ROW, OR THE ANSWER IS THREE DIFFERENT ANSWERS. A multi-row insert
@@ -423,13 +405,13 @@ public final class Database {
         // means the same thing on all three, so the statement is refused instead,
         // before it runs.
         int tuples = dialect.countInsertRows(sql);
-        if(tuples == Dialect.VERSION_GATED) {
+        if (tuples == Dialect.VERSION_GATED) {
             throw new IOException("This statement's tuples sit behind a MySQL version-gated "
                     + "comment, so how many rows it inserts depends on the server and this "
                     + "client cannot ask. insert() answers with ONE generated key; use "
                     + "execute() for a statement whose shape the server decides: [" + sql + "]");
         }
-        if(tuples < 0 && tuples != Dialect.VERSION_GATED) {
+        if (tuples < 0) {
             // AN INSERT WHOSE ROWS COME FROM A QUERY -- INSERT ... SELECT, or
             // MySQL's INSERT ... TABLE. How many rows it writes is the server's
             // answer, so the one key this method promises is not available:
@@ -444,14 +426,14 @@ public final class Database {
                     + "generated key. Use execute(), and read the keys back with a query: ["
                     + sql + "]");
         }
-        if(tuples > 1) {
+        if (tuples > 1) {
             throw new IOException("insert() answers with ONE generated key and this "
                     + "statement inserts " + tuples + " rows, which the three engines key "
                     + "differently (SQLite reports the last, MySQL the first, PostgreSQL "
                     + "every one). Use execute() for a multi-row insert, or insert the rows "
                     + "one at a time: [" + sql + "]");
         }
-        if(!dialect.generatedKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
+        if (!dialect.generatedKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
             // AN UPSERT HAS NO GENERATED KEY TO READ on these two. When the
             // UPDATE branch runs, SQLite leaves last_insert_rowid() holding
             // whatever this connection inserted before and MySQL's
@@ -472,7 +454,7 @@ public final class Database {
                     + "CONNECTION, so insert() would return a key belonging to some earlier "
                     + "row. Use execute() and read the key back with a query: [" + sql + "]");
         }
-        if(!dialect.generatedKeysThroughReturning()) {
+        if (!dialect.generatedKeysThroughReturning()) {
             // THE ROW COUNT DECIDES. last_insert_rowid() and LAST_INSERT_ID()
             // answer for the CONNECTION, not for the statement: after an
             // "INSERT OR IGNORE" (or MySQL's "INSERT IGNORE") that conflicted,
@@ -481,7 +463,7 @@ public final class Database {
             // believes it just stored. Zero is what PostgreSQL already answers
             // here -- a RETURNING that matched nothing -- so the three agree.
             int changed = execute(sql, params);
-            if(changed == 0) {
+            if (changed == 0) {
                 return 0;
             }
             // NOT CHECKED AGAINST THE TUPLE COUNT. MySQL reports TWO affected
@@ -502,10 +484,10 @@ public final class Database {
         // row" check with a message about a query, for an insert that committed.
         // The count says the same thing in the caller's terms.
         List returned = query(withReturning(sql, idColumn), params);
-        if(returned.isEmpty()) {
+        if (returned.isEmpty()) {
             return 0;
         }
-        if(returned.size() > 1) {
+        if (returned.size() > 1) {
             // RETURNING yields one row per row inserted, which is a count of
             // rows rather than of MySQL's accounting, so this one is sound. It
             // catches what the preflight cannot read -- an INSERT ... SELECT --
@@ -516,13 +498,13 @@ public final class Database {
                     + "Use execute() for a statement that inserts more than one row: ["
                     + sql + "]");
         }
-        Map row = (Map)returned.get(0);
+        Map row = (Map) returned.get(0);
         Object value = row.values().iterator().next();
-        if(value instanceof Number) {
+        if (value instanceof Number) {
             // instanceof rather than a cast whose failure is caught: a failed cast
             // does not throw under ParparVM, it hands the wrong object on and the
             // next instruction reads a native crash out of it.
-            return ((Number)value).longValue();
+            return ((Number) value).longValue();
         }
         // A NUMERIC key comes back as exact TEXT, on purpose: PostgreSQL's decoder
         // will not put an arbitrary-precision value through a double, and
@@ -531,55 +513,49 @@ public final class Database {
         // place that parses such text exactly -- it is a leaf converter with no
         // reference back to this class, so using it here adds no cycle.
         Long parsed = com.codename1.impl.orm.Values.asLongObject(value);
-        if(parsed != null) {
+        if (parsed != null) {
             return parsed.longValue();
         }
         throw new IOException("The generated key came back as null, so the column named is "
                 + "not the generated one: " + idColumn);
     }
 
-    /**
-     * {@code sql} with a RETURNING clause, placed INSIDE the statement.
-     *
-     * <p>A trailing semicolon is where this goes wrong if nobody looks for it:
-     * appending to "INSERT INTO t (a) VALUES (?);" gives
-     * "INSERT INTO t (a) VALUES (?); RETURNING id", which is two statements, the
-     * second of which is not SQL. A trailing comment is the same defect wearing
-     * a different hat -- "INSERT ... VALUES (?) -- why" swallows the clause and
-     * the insert then reports a key of zero for a row it wrote. The same call
-     * works on SQLite and MySQL, which never append anything, so either one is a
-     * portability hole in exactly the engine this method exists for.
-     *
-     * <p>Whatever followed the statement is kept and follows the clause, so the
-     * terminator still terminates and the comment still explains.
-     */
+    /// `sql` with a RETURNING clause, placed INSIDE the statement.
+    ///
+    /// A trailing semicolon is where this goes wrong if nobody looks for it:
+    /// appending to "INSERT INTO t (a) VALUES (?);" gives
+    /// "INSERT INTO t (a) VALUES (?); RETURNING id", which is two statements, the
+    /// second of which is not SQL. A trailing comment is the same defect wearing
+    /// a different hat -- "INSERT ... VALUES (?) -- why" swallows the clause and
+    /// the insert then reports a key of zero for a row it wrote. The same call
+    /// works on SQLite and MySQL, which never append anything, so either one is a
+    /// portability hole in exactly the engine this method exists for.
+    ///
+    /// Whatever followed the statement is kept and follows the clause, so the
+    /// terminator still terminates and the comment still explains.
     private String withReturning(String sql, String idColumn) throws IOException {
         int end = dialect.endOfStatement(sql);
         return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn)
                 + sql.substring(end);
     }
 
-    /**
-     * How this connection's engine spells what the three of them spell
-     * differently: parameter placeholders, identifier quoting, column types, the
-     * declaration of a generated key.
-     *
-     * <p>Statements passed to {@link #execute} and {@link #query} are already
-     * rendered through it, so ordinary code never needs this. Schema generation
-     * does -- it has to ask what this engine calls a 64-bit integer.
-     */
+    /// How this connection's engine spells what the three of them spell
+    /// differently: parameter placeholders, identifier quoting, column types, the
+    /// declaration of a generated key.
+    ///
+    /// Statements passed to [#execute] and [#query] are already
+    /// rendered through it, so ordinary code never needs this. Schema generation
+    /// does -- it has to ask what this engine calls a 64-bit integer.
     public Dialect dialect() {
         return dialect;
     }
 
-    /**
-     * The statement as this engine wants it. See {@link Dialect#bind}: a portable
-     * statement binds ? and PostgreSQL is handed $1, $2; a statement that carries
-     * no placeholder at all is passed through untouched, which is what keeps SQL
-     * written for one engine working.
-     */
+    /// The statement as this engine wants it. See [Dialect#bind]: a portable
+    /// statement binds ? and PostgreSQL is handed $1, $2; a statement that carries
+    /// no placeholder at all is passed through untouched, which is what keeps SQL
+    /// written for one engine working.
     private String bind(String sql, Object[] params) throws IOException {
-        if(dialect.hasTrailingStatement(sql)) {
+        if (dialect.hasTrailingStatement(sql)) {
             // SQLITE RUNS THE FIRST ONE AND DROPS THE REST, reporting success:
             // sqlite3_prepare_v2 is called with a null tail pointer, so
             // "INSERT INTO audit(v) VALUES (?); DELETE FROM jobs" inserts the
@@ -596,51 +572,47 @@ public final class Database {
         return dialect.bind(sql, params == null ? 0 : params.length);
     }
 
-    /**
-     * Refuses a NUL inside a bound string, on every engine.
-     *
-     * <p>PostgreSQL cannot hold a zero byte in a text value -- it answers
-     * "invalid byte sequence for encoding UTF8: 0x00" -- while SQLite and MySQL
-     * store one, because both keep text with a length rather than a terminator.
-     * Measured on all three. So the same parameter wrote a row on two engines
-     * and failed on the third, which is the divergence this layer exists to
-     * remove.
-     *
-     * <p>Here rather than only in the ORM: {@link #execute}, {@link #query} and
-     * {@link #insert} all pass through this method, and a caller writing its own
-     * SQL through Database or DataSource has exactly the same claim on a
-     * portable answer as one going through a dao. The ORM keeps its own check
-     * because it can name the FIELD, which this cannot.
-     *
-     * <p>A byte[] parameter is untouched: that is where a NUL belongs, and all
-     * three store one.
-     */
-    /**
-     * {@code params} with the values the engines encode differently replaced by
-     * ones they agree on.
-     *
-     * <p>A Boolean is the case. The generated entity access already binds 0 or 1
-     * -- every engine stores a boolean as an integer here, which is what lets
-     * one decoding path read it back -- but a caller writing its own SQL binds
-     * the Boolean itself, and then the encoders disagree: measured, SQLite and
-     * MySQL bind it as 1 while PostgreSQL sends "t" and its own SMALLINT column
-     * refuses it with "invalid input syntax for type smallint". The raw path has
-     * the same claim on a portable answer as the ORM, so it gets the same
-     * encoding.
-     *
-     * <p>The caller's array is never written to: a new one is made only when
-     * there is something to change, so the common case allocates nothing and a
-     * caller reusing its array across calls is unaffected.
-     */
+    // Refuses a NUL inside a bound string, on every engine.
+    //
+    // PostgreSQL cannot hold a zero byte in a text value -- it answers
+    // "invalid byte sequence for encoding UTF8: 0x00" -- while SQLite and MySQL
+    // store one, because both keep text with a length rather than a terminator.
+    // Measured on all three. So the same parameter wrote a row on two engines
+    // and failed on the third, which is the divergence this layer exists to
+    // remove.
+    //
+    // Here rather than only in the ORM: [#execute], [#query] and
+    // [#insert] all pass through this method, and a caller writing its own
+    // SQL through Database or DataSource has exactly the same claim on a
+    // portable answer as one going through a dao. The ORM keeps its own check
+    // because it can name the FIELD, which this cannot.
+    //
+    // A byte\[\] parameter is untouched: that is where a NUL belongs, and all
+    // three store one.
+    /// `params` with the values the engines encode differently replaced by
+    /// ones they agree on.
+    ///
+    /// A Boolean is the case. The generated entity access already binds 0 or 1
+    /// -- every engine stores a boolean as an integer here, which is what lets
+    /// one decoding path read it back -- but a caller writing its own SQL binds
+    /// the Boolean itself, and then the encoders disagree: measured, SQLite and
+    /// MySQL bind it as 1 while PostgreSQL sends "t" and its own SMALLINT column
+    /// refuses it with "invalid input syntax for type smallint". The raw path has
+    /// the same claim on a portable answer as the ORM, so it gets the same
+    /// encoding.
+    ///
+    /// The caller's array is never written to: a new one is made only when
+    /// there is something to change, so the common case allocates nothing and a
+    /// caller reusing its array across calls is unaffected.
     private static Object[] portableParameters(Object[] params) {
-        if(params == null) {
+        if (params == null) {
             return null;
         }
         Object[] out = params;
-        for(int iter = 0 ; iter < params.length ; iter++) {
+        for (int iter = 0 ; iter < params.length ; iter++) {
             Object canonical = canonical(params[iter]);
-            if(canonical != params[iter]) {
-                if(out == params) {
+            if (canonical != params[iter]) { //NOPMD CompareObjectsWithEquals - copy only when canonical() replaced the object
+                if (out == params) { //NOPMD CompareObjectsWithEquals - whether the array was already copied
                     out = new Object[params.length];
                     System.arraycopy(params, 0, out, 0, params.length);
                 }
@@ -650,44 +622,42 @@ public final class Database {
         return out;
     }
 
-    /**
-     * A scalar as the SCHEMA stores it, or the value itself when nothing needs
-     * changing.
-     *
-     * <p>ALL THREE of the types whose Java form is not what the column holds,
-     * not just Boolean. The generated entity access and Query.bound already
-     * encode a Date as its millisecond value and a Character as its code unit,
-     * because the server-side mapping gives both an integer column -- so raw SQL
-     * through execute() against the SAME schema has to encode them the same way
-     * or the two paths disagree about what a row means.
-     *
-     * <p>Left unconverted they reached the driver as objects the engines render
-     * with String.valueOf, and the three then disagree: SQLite's integer
-     * affinity stores the text quite happily, while PostgreSQL and a strict
-     * MySQL refuse it as invalid integer input. One statement, a row on one
-     * engine and an error on the others, which is the whole of what this layer
-     * is for.
-     */
+    /// A scalar as the SCHEMA stores it, or the value itself when nothing needs
+    /// changing.
+    ///
+    /// ALL THREE of the types whose Java form is not what the column holds,
+    /// not just Boolean. The generated entity access and Query.bound already
+    /// encode a Date as its millisecond value and a Character as its code unit,
+    /// because the server-side mapping gives both an integer column -- so raw SQL
+    /// through execute() against the SAME schema has to encode them the same way
+    /// or the two paths disagree about what a row means.
+    ///
+    /// Left unconverted they reached the driver as objects the engines render
+    /// with String.valueOf, and the three then disagree: SQLite's integer
+    /// affinity stores the text quite happily, while PostgreSQL and a strict
+    /// MySQL refuse it as invalid integer input. One statement, a row on one
+    /// engine and an error on the others, which is the whole of what this layer
+    /// is for.
     private static Object canonical(Object value) {
-        if(value instanceof Boolean) {
-            return Long.valueOf(((Boolean)value).booleanValue() ? 1L : 0L);
+        if (value instanceof Boolean) {
+            return Long.valueOf(((Boolean) value).booleanValue() ? 1L : 0L);
         }
-        if(value instanceof java.util.Date) {
-            return Long.valueOf(((java.util.Date)value).getTime());
+        if (value instanceof java.util.Date) {
+            return Long.valueOf(((java.util.Date) value).getTime());
         }
-        if(value instanceof Character) {
-            return Long.valueOf(((Character)value).charValue());
+        if (value instanceof Character) {
+            return Long.valueOf(((Character) value).charValue());
         }
         return value;
     }
 
     private static void refuseNulInTextParameters(Object[] params) throws IOException {
-        if(params == null) {
+        if (params == null) {
             return;
         }
-        for(int iter = 0 ; iter < params.length ; iter++) {
-            if(params[iter] instanceof Double
-                    && (((Double)params[iter]).isNaN() || ((Double)params[iter]).isInfinite())) {
+        for (int iter = 0 ; iter < params.length ; iter++) {
+            if (params[iter] instanceof Double
+                    && (((Double) params[iter]).isNaN() || ((Double) params[iter]).isInfinite())) {
                 // NEITHER NaN NOR AN INFINITY CAN BE WRITTEN THE SAME WAY ON
                 // ALL THREE, measured:
                 //
@@ -710,14 +680,14 @@ public final class Database {
                         + "and PostgreSQL keeps both. Decide what it means -- a null column, "
                         + "or a sentinel you choose -- and bind that instead.");
             }
-            if(params[iter] instanceof Float
-                    && (((Float)params[iter]).isNaN() || ((Float)params[iter]).isInfinite())) {
+            if (params[iter] instanceof Float
+                    && (((Float) params[iter]).isNaN() || ((Float) params[iter]).isInfinite())) {
                 throw new IOException("Parameter " + (iter + 1) + " is " + params[iter]
                         + "; see the message for a double -- MySQL refuses NaN and "
                         + "infinities, SQLite turns NaN into NULL, and PostgreSQL keeps "
                         + "both, so none of the three agree.");
             }
-            if(params[iter] instanceof String && ((String)params[iter]).indexOf(0) >= 0) {
+            if (params[iter] instanceof String && ((String) params[iter]).indexOf(0) >= 0) {
                 throw new IOException("Parameter " + (iter + 1) + " holds a NUL, which "
                         + "PostgreSQL cannot store in a text column at all -- SQLite and "
                         + "MySQL would take it, so this statement would succeed in "
@@ -727,21 +697,19 @@ public final class Database {
         }
     }
 
-    /**
-     * Runs body inside a transaction, committing when it returns and rolling back
-     * if it throws.
-     *
-     * SQLite gets BEGIN IMMEDIATE, which takes the write lock up front rather than
-     * discovering the conflict at the first write; the other two get a plain
-     * BEGIN, which is what they support.
-     */
+    /// Runs body inside a transaction, committing when it returns and rolling back
+    /// if it throws.
+    ///
+    /// SQLite gets BEGIN IMMEDIATE, which takes the write lock up front rather than
+    /// discovering the conflict at the first write; the other two get a plain
+    /// BEGIN, which is what they support.
     private boolean managedTransaction;
     private Thread transactionOwner;
 
     // Match monitor acquisition semantics: waiting does not discard an interrupt.
     private void awaitTransactionOwner() {
         boolean interrupted = false;
-        while (transactionOwner != null && transactionOwner != Thread.currentThread()) {
+        while (transactionOwner != null && transactionOwner != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals - thread identity
             try {
                 wait();
             } catch (InterruptedException error) {
@@ -753,12 +721,10 @@ public final class Database {
         }
     }
 
-    /**
-     * Begins a transaction reserved to the calling thread until commit, rollback,
-     * or close. Other threads' database operations wait for that boundary, as they
-     * do while {@link #transaction} holds the monitor around its callback.
-     * The owning thread must complete this transaction; do not hand it to another thread.
-     */
+    /// Begins a transaction reserved to the calling thread until commit, rollback,
+    /// or close. Other threads' database operations wait for that boundary, as they
+    /// do while [#transaction] holds the monitor around its callback.
+    /// The owning thread must complete this transaction; do not hand it to another thread.
     public synchronized void beginExclusiveTransaction() throws IOException {
         beginTransaction();
     }
@@ -769,47 +735,45 @@ public final class Database {
         notifyAll();
     }
 
-    /**
-     * Whether a transaction opened through this Database API is active.
-     * Waits for another thread's transaction to finish before checking,
-     * like other operations on this connection.
-     */
+    /// Whether a transaction opened through this Database API is active.
+    /// Waits for another thread's transaction to finish before checking,
+    /// like other operations on this connection.
     public synchronized boolean isInTransaction() {
         awaitTransactionOwner();
         return managedTransaction;
     }
 
-    /**
-     * Begins a transaction reserved to the calling thread until commit, rollback,
-     * or close. Other threads wait before using this connection. The initiating
-     * thread must complete the transaction; it cannot be handed to another thread.
-     * SQLite's write lock is acquired immediately.
-     */
+    /// Begins a transaction reserved to the calling thread until commit, rollback,
+    /// or close. Other threads wait before using this connection. The initiating
+    /// thread must complete the transaction; it cannot be handed to another thread.
+    /// SQLite's write lock is acquired immediately.
     public synchronized void beginTransaction() throws IOException {
         awaitTransactionOwner();
-        if (managedTransaction) throw new IOException("Transaction already active");
+        if (managedTransaction) {
+            throw new IOException("Transaction already active");
+        }
         control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
         managedTransaction = true;
         transactionOwner = Thread.currentThread();
     }
 
-    /**
-     * Begins a transaction like {@link #beginTransaction}, telling the engine
-     * when it will only read.
-     *
-     * <p>A read-only one is a real promise on two of the engines: PostgreSQL and
-     * MySQL refuse a write inside it, and SQLite takes no write lock up front
-     * (BEGIN DEFERRED rather than IMMEDIATE), so it does not queue other writers
-     * behind a transaction that will never write.
-     */
+    /// Begins a transaction like [#beginTransaction], telling the engine
+    /// when it will only read.
+    ///
+    /// A read-only one is a real promise on two of the engines: PostgreSQL and
+    /// MySQL refuse a write inside it, and SQLite takes no write lock up front
+    /// (BEGIN DEFERRED rather than IMMEDIATE), so it does not queue other writers
+    /// behind a transaction that will never write.
     public synchronized void beginTransaction(boolean readOnly) throws IOException {
-        if(!readOnly) {
+        if (!readOnly) {
             beginTransaction();
             return;
         }
         awaitTransactionOwner();
-        if (managedTransaction) throw new IOException("Transaction already active");
-        if(mysql != null) {
+        if (managedTransaction) {
+            throw new IOException("Transaction already active");
+        }
+        if (mysql != null) {
             mysql.beginReadOnly();
         } else {
             execute(sqlite == null ? "BEGIN READ ONLY" : "BEGIN DEFERRED", null);
@@ -818,48 +782,52 @@ public final class Database {
         transactionOwner = Thread.currentThread();
     }
 
-    /**
-     * Marks a savepoint inside the open transaction, which
-     * {@link #rollbackToSavepoint} can return to without ending the transaction.
-     * The name must be a plain identifier; it is written into the statement.
-     */
+    /// Marks a savepoint inside the open transaction, which
+    /// [#rollbackToSavepoint] can return to without ending the transaction.
+    /// The name must be a plain identifier; it is written into the statement.
     public synchronized void savepoint(String name) throws IOException {
         savepointControl("SAVEPOINT", name);
     }
 
-    /** Undoes everything since the savepoint, keeping the transaction open. */
+    /// Undoes everything since the savepoint, keeping the transaction open.
     public synchronized void rollbackToSavepoint(String name) throws IOException {
         savepointControl("ROLLBACK TO SAVEPOINT", name);
     }
 
-    /** Forgets a savepoint, keeping what was done since it. */
+    /// Forgets a savepoint, keeping what was done since it.
     public synchronized void releaseSavepoint(String name) throws IOException {
         savepointControl("RELEASE SAVEPOINT", name);
     }
 
     private void savepointControl(String verb, String name) throws IOException {
         awaitTransactionOwner();
-        if (!managedTransaction) throw new IOException("No active transaction");
+        if (!managedTransaction) {
+            throw new IOException("No active transaction");
+        }
         String checked = Dialect.checkIdentifier(name);
-        if(mysql != null) {
+        if (mysql != null) {
             mysql.savepoint(verb, checked);
             return;
         }
         execute(verb + " " + checked, null);
     }
 
-    /** Commits the transaction opened through this API. */
+    /// Commits the transaction opened through this API.
     public synchronized void commitTransaction() throws IOException {
         awaitTransactionOwner();
-        if (!managedTransaction) throw new IOException("No active transaction");
+        if (!managedTransaction) {
+            throw new IOException("No active transaction");
+        }
         control("COMMIT");
         transactionFinished();
     }
 
-    /** Rolls back the transaction opened through this API. */
+    /// Rolls back the transaction opened through this API.
     public synchronized void rollbackTransaction() throws IOException {
         awaitTransactionOwner();
-        if (!managedTransaction) throw new IOException("No active transaction");
+        if (!managedTransaction) {
+            throw new IOException("No active transaction");
+        }
         control("ROLLBACK");
         transactionFinished();
     }
@@ -888,17 +856,15 @@ public final class Database {
         }
     }
 
-    /**
-     * Transaction control. MySQL will not PREPARE these statements, so they go
-     * through its text protocol; PostgreSQL prepares them like anything else. The
-     * strings are constants in this file, never a caller's, which is what keeps
-     * the text path from being an injection route.
-     */
+    /// Transaction control. MySQL will not PREPARE these statements, so they go
+    /// through its text protocol; PostgreSQL prepares them like anything else. The
+    /// strings are constants in this file, never a caller's, which is what keeps
+    /// the text path from being an injection route.
     private void control(String sql) throws IOException {
-        if(mysql != null) {
-            if("BEGIN".equals(sql)) {
+        if (mysql != null) {
+            if ("BEGIN".equals(sql)) {
                 mysql.begin();
-            } else if("COMMIT".equals(sql)) {
+            } else if ("COMMIT".equals(sql)) {
                 mysql.commit();
             } else {
                 mysql.rollback();
@@ -908,61 +874,55 @@ public final class Database {
         execute(sql, null);
     }
 
-    /**
-     * The id the most recent insert produced, or 0 where the engine has no such
-     * concept. PostgreSQL is the case that has none: use INSERT ... RETURNING.
-     *
-     * <p>SYNCHRONIZED like every other operation on this class, which is the
-     * point: it was the one that was not. A close on another thread -- a pool
-     * shutting down, a reconnect -- could therefore run between this reading the
-     * engine and the engine reading its own state.
-     */
+    /// The id the most recent insert produced, or 0 where the engine has no such
+    /// concept. PostgreSQL is the case that has none: use INSERT ... RETURNING.
+    ///
+    /// SYNCHRONIZED like every other operation on this class, which is the
+    /// point: it was the one that was not. A close on another thread -- a pool
+    /// shutting down, a reconnect -- could therefore run between this reading the
+    /// engine and the engine reading its own state.
     public synchronized long lastInsertId() {
         awaitTransactionOwner();
-        if(sqlite != null) {
+        if (sqlite != null) {
             return sqlite.lastInsertId();
         }
-        if(mysql != null) {
+        if (mysql != null) {
             return mysql.lastInsertId();
         }
         return 0;
     }
 
-    /**
-     * SQLite-only tuning, ignored elsewhere. Write-ahead logging is what lets
-     * readers run while a writer is active, and it has no counterpart on a server
-     * engine that already does.
-     */
+    /// SQLite-only tuning, ignored elsewhere. Write-ahead logging is what lets
+    /// readers run while a writer is active, and it has no counterpart on a server
+    /// engine that already does.
     public synchronized void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
         awaitTransactionOwner();
-        if(sqlite != null) {
+        if (sqlite != null) {
             sqlite.enableWriteAheadLog();
             sqlite.setBusyTimeout(busyTimeoutMillis);
         }
     }
 
-    /** The underlying SQLite handle, or null when this is a server engine. */
+    /// The underlying SQLite handle, or null when this is a server engine.
     public Db asSqlite() {
         return sqlite;
     }
 
-    /**
-     * SYNCHRONIZED, like execute, query and transaction on this class.
-     *
-     * <p>Without it a shutdown or a reconnect could close the engine while another
-     * handler was inside an operation, so Postgres.close or MySql.close wrote its
-     * termination packet into a Wire another thread was mid-exchange on -- and on
-     * the packaged TLS path freed the native session while that thread was reading
-     * through it. The engines' own close() methods were given this lock already;
-     * the facade that fronts them was not, which left the same race one level up.
-     */
+    /// SYNCHRONIZED, like execute, query and transaction on this class.
+    ///
+    /// Without it a shutdown or a reconnect could close the engine while another
+    /// handler was inside an operation, so Postgres.close or MySql.close wrote its
+    /// termination packet into a Wire another thread was mid-exchange on -- and on
+    /// the packaged TLS path freed the native session while that thread was reading
+    /// through it. The engines' own close() methods were given this lock already;
+    /// the facade that fronts them was not, which left the same race one level up.
     public synchronized void close() {
         awaitTransactionOwner();
         try {
-            if(sqlite != null) {
+            if (sqlite != null) {
                 sqliteClosed = true;
                 sqlite.close();
-            } else if(postgres != null) {
+            } else if (postgres != null) {
                 postgres.close();
             } else {
                 mysql.close();
@@ -972,12 +932,12 @@ public final class Database {
         }
     }
 
-    /** Whether this connection is still usable, which a pool has to know. */
+    /// Whether this connection is still usable, which a pool has to know.
     public boolean isOpen() {
-        if(postgres != null) {
+        if (postgres != null) {
             return !postgres.isClosed();
         }
-        if(mysql != null) {
+        if (mysql != null) {
             return !mysql.isClosed();
         }
         // The SQLite arm used to answer "yes" whatever had happened to it, so a
@@ -987,16 +947,15 @@ public final class Database {
         return sqlite != null && !sqliteClosed;
     }
 
+    @Override
     public String toString() {
         return describedAs;
     }
 
-    /**
-     * The bit of URL parsing these two schemes need, written here rather than
-     * pulled from java.net: URI is not on the server-safe surface, and the
-     * password in the userinfo has to be percent-decoded, which a hand-rolled
-     * split usually forgets.
-     */
+    /// The bit of URL parsing these two schemes need, written here rather than
+    /// pulled from java.net: URI is not on the server-safe surface, and the
+    /// password in the userinfo has to be percent-decoded, which a hand-rolled
+    /// split usually forgets.
     private static final class Url {
         String host = "localhost";
         int port;
@@ -1015,33 +974,33 @@ public final class Database {
             String rest = url.substring(schemeEnd + 3);
             String query = "";
             int queryAt = rest.indexOf('?');
-            if(queryAt >= 0) {
+            if (queryAt >= 0) {
                 query = rest.substring(queryAt + 1);
                 rest = rest.substring(0, queryAt);
             }
             int slash = rest.indexOf('/');
-            if(slash >= 0) {
+            if (slash >= 0) {
                 out.path = decode(rest.substring(slash + 1));
                 rest = rest.substring(0, slash);
             }
             int at = rest.lastIndexOf('@');
-            if(at >= 0) {
+            if (at >= 0) {
                 String credentials = rest.substring(0, at);
                 rest = rest.substring(at + 1);
                 int colon = credentials.indexOf(':');
-                if(colon >= 0) {
+                if (colon >= 0) {
                     out.user = decode(credentials.substring(0, colon));
                     out.password = decode(credentials.substring(colon + 1));
                 } else {
                     out.user = decode(credentials);
                 }
             }
-            if(rest.length() > 0) {
+            if (rest.length() > 0) {
                 int colon = rest.lastIndexOf(':');
                 // A bare IPv6 literal has colons of its own; only a colon after the
                 // closing bracket is a port.
                 int bracket = rest.lastIndexOf(']');
-                if(colon > bracket) {
+                if (colon > bracket) {
                     out.host = strip(rest.substring(0, colon));
                     // An EXPLICIT port has to be a real one. Integer.parseInt accepts
                     // a sign, so "host:-1" parsed cleanly and handed -1 downstream,
@@ -1054,7 +1013,7 @@ public final class Database {
                     // branch runs only when the URL spelled one out.
                     String portText = rest.substring(colon + 1).trim();
                     out.port = portNumber(portText);
-                    if(out.port < 1) {
+                    if (out.port < 1) {
                         // The URL carries the PASSWORD, and this string goes to a
                         // log. describe() exists because of that and omits it; an
                         // error path that pastes the whole URL undoes the care
@@ -1070,21 +1029,19 @@ public final class Database {
             return out;
         }
 
-        /**
-         * {@code text} as a TCP port, or -1 unless it is 1 to 65535 written in
-         * plain ASCII digits. Every rejected spelling -- a sign, a decimal point,
-         * an empty string, a number past the port space -- answers the same way,
-         * so the caller has one test rather than a parse plus a range check that
-         * could disagree.
-         */
+        /// `text` as a TCP port, or -1 unless it is 1 to 65535 written in
+        /// plain ASCII digits. Every rejected spelling -- a sign, a decimal point,
+        /// an empty string, a number past the port space -- answers the same way,
+        /// so the caller has one test rather than a parse plus a range check that
+        /// could disagree.
         private static int portNumber(String text) {
-            if(text.length() < 1 || text.length() > 5) {
+            if (text.length() < 1 || text.length() > 5) {
                 return -1;
             }
             int out = 0;
-            for(int iter = 0 ; iter < text.length() ; iter++) {
+            for (int iter = 0 ; iter < text.length() ; iter++) {
                 char c = text.charAt(iter);
-                if(c < '0' || c > '9') {
+                if (c < '0' || c > '9') {
                     return -1;
                 }
                 out = out * 10 + (c - '0');
@@ -1094,38 +1051,38 @@ public final class Database {
 
         private static void applyQuery(Url out, String query) throws IOException {
             int at = 0;
-            while(at < query.length()) {
+            while (at < query.length()) {
                 int end = query.indexOf('&', at);
-                if(end < 0) {
+                if (end < 0) {
                     end = query.length();
                 }
                 String pair = query.substring(at, end);
                 at = end + 1;
                 int equals = pair.indexOf('=');
-                if(equals < 0) {
+                if (equals < 0) {
                     continue;
                 }
                 String key = pair.substring(0, equals);
                 String value = decode(pair.substring(equals + 1));
-                if("sslmode".equals(key) || "ssl".equals(key)) {
-                    if(!"require".equals(value) && !"prefer".equals(value)
+                if ("sslmode".equals(key) || "ssl".equals(key)) {
+                    if (!"require".equals(value) && !"prefer".equals(value)
                             && !"disable".equals(value)) {
                         throw new IOException("sslmode must be require, prefer or "
                                 + "disable, not '" + value + "'");
                     }
                     out.sslMode = value;
-                } else if("user".equals(key)) {
+                } else if ("user".equals(key)) {
                     out.user = value;
-                } else if("password".equals(key)) {
+                } else if ("password".equals(key)) {
                     out.password = value;
-                } else if("sslrootcert".equals(key) || "sslca".equals(key)) {
+                } else if ("sslrootcert".equals(key) || "sslca".equals(key)) {
                     out.caFile = value;
-                } else if("connectTimeout".equals(key)) {
+                } else if ("connectTimeout".equals(key)) {
                     try {
                         out.timeoutMillis = Integer.parseInt(value.trim());
                     } catch (NumberFormatException err) {
                         throw new IOException("connectTimeout must be a number of "
-                                + "milliseconds, not '" + value + "'");
+                                + "milliseconds, not '" + value + "'", err);
                     }
                     // A negative one is refused here so the two arms cannot fail
                     // differently: Java SE throws IllegalArgumentException out of
@@ -1133,11 +1090,11 @@ public final class Database {
                     // non-positive value as "block forever" and waits out the
                     // OS TCP timeout. Same URL, one an error and the other a
                     // hang, which is the worst kind of difference to debug.
-                    if(out.timeoutMillis < 0) {
+                    if (out.timeoutMillis < 0) {
                         throw new IOException("connectTimeout must not be negative: '"
                                 + value + "'. Use 0 for the platform default.");
                     }
-                } else if("socketTimeout".equals(key)) {
+                } else if ("socketTimeout".equals(key)) {
                     // A DEADLINE ON THE CONVERSATION, not on reaching the host.
                     // connectTimeout is spent by the time a query goes out, and a
                     // peer that answers the handshake and then stops replying
@@ -1154,9 +1111,9 @@ public final class Database {
                         out.socketTimeoutMillis = Integer.parseInt(value.trim());
                     } catch (NumberFormatException err) {
                         throw new IOException("socketTimeout must be a number of "
-                                + "milliseconds, not '" + value + "'");
+                                + "milliseconds, not '" + value + "'", err);
                     }
-                    if(out.socketTimeoutMillis < 0) {
+                    if (out.socketTimeoutMillis < 0) {
                         throw new IOException("socketTimeout must not be negative: '"
                                 + value + "'. Use 0 for no deadline.");
                     }
@@ -1164,7 +1121,7 @@ public final class Database {
             }
         }
 
-        /** Never includes the password: this ends up in logs. */
+        /// Never includes the password: this ends up in logs.
         String describe(String scheme) {
             return scheme + "://" + user + "@" + host + ":" + port + "/" + path
                     + " (sslmode=" + sslMode
@@ -1172,7 +1129,7 @@ public final class Database {
         }
 
         private static String strip(String host) {
-            if(host.length() > 1 && host.charAt(0) == '['
+            if (host.length() > 1 && host.charAt(0) == '['
                     && host.charAt(host.length() - 1) == ']') {
                 return host.substring(1, host.length() - 1);
             }
@@ -1180,7 +1137,7 @@ public final class Database {
         }
 
         private static String decode(String value) throws IOException {
-            if(value.indexOf('%') < 0) {
+            if (value.indexOf('%') < 0) {
                 return value;
             }
             // A LITERAL CHARACTER IS ENCODED, not narrowed. Writing (byte)c put
@@ -1197,14 +1154,14 @@ public final class Database {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             StringBuilder literal = new StringBuilder();
             try {
-                for(int iter = 0 ; iter < value.length() ; iter++) {
+                for (int iter = 0 ; iter < value.length() ; iter++) {
                     char c = value.charAt(iter);
-                    if(c == '%') {
+                    if (c == '%') {
                         int high = iter + 2 < value.length()
                                 ? digit(value.charAt(iter + 1)) : -1;
                         int low = iter + 2 < value.length()
                                 ? digit(value.charAt(iter + 2)) : -1;
-                        if(high < 0 || low < 0) {
+                        if (high < 0 || low < 0) {
                             // A '%' INTRODUCES TWO HEX DIGITS OR THE URL IS
                             // MALFORMED. RFC 3986 2.1 leaves no other reading, and
                             // this used to append the '%' as a literal: "p%ZZ" and
@@ -1244,7 +1201,7 @@ public final class Database {
                 // then authenticates with a password the URL does not contain and
                 // the operator reads a remote authentication failure instead of a
                 // malformed setting.
-                if(!Utf8.isValid(bytes, 0, bytes.length)) {
+                if (!Utf8.isValid(bytes, 0, bytes.length)) {
                     throw new IOException("A percent-escape in the database URL is "
                             + "not valid UTF-8, so the value it names cannot be "
                             + "read; check the escaping of the user, password, "
@@ -1256,10 +1213,10 @@ public final class Database {
             }
         }
 
-        /** Writes the pending literal run as UTF-8 and empties it. */
+        /// Writes the pending literal run as UTF-8 and empties it.
         private static void flushLiteral(StringBuilder literal, ByteArrayOutputStream out)
                 throws UnsupportedEncodingException {
-            if(literal.length() == 0) {
+            if (literal.length() == 0) {
                 return;
             }
             byte[] encoded = literal.toString().getBytes("UTF-8");
@@ -1268,13 +1225,13 @@ public final class Database {
         }
 
         private static int digit(char c) {
-            if(c >= '0' && c <= '9') {
+            if (c >= '0' && c <= '9') {
                 return c - '0';
             }
-            if(c >= 'a' && c <= 'f') {
+            if (c >= 'a' && c <= 'f') {
                 return c - 'a' + 10;
             }
-            if(c >= 'A' && c <= 'F') {
+            if (c >= 'A' && c <= 'F') {
                 return c - 'A' + 10;
             }
             return -1;

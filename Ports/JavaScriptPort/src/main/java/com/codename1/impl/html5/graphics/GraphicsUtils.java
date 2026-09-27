@@ -25,10 +25,6 @@ package com.codename1.impl.html5.graphics;
 
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-/**
- *
- * @author shannah
- */
 class GraphicsUtils {
     static void addBezierArcTo(CanvasRenderingContext2D path, double cx, double cy,
                                           double startX, double startY, double endX, double endY)

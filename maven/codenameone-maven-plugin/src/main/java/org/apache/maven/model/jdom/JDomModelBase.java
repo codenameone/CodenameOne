@@ -55,9 +55,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.insertNewNestedElements
 import static org.apache.maven.model.jdom.util.JDomUtils.newDetachedElement;
 import static org.apache.maven.model.jdom.util.JDomUtils.rewriteElement;
 
-/**
- * @author Robert Scholte (for <a href="https://github.com/apache/maven-release/">Maven Release projct</a>, version 3.0)
- */
 public class JDomModelBase extends ModelBase implements JDomBacked {
 
   private final Element jdomElement;

@@ -26,7 +26,6 @@ package java.text;
  * An abstract class for parsing and formatting localisation sensitive information, compatible with JDK 6.
  * 
  * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/Format.html">http://docs.oracle.com/javase/6/docs/api/java/text/Format.html</a>
- * @author Eric Coolman
  */
 public abstract class Format implements Cloneable {
 	/**

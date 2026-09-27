@@ -24,8 +24,6 @@ package com.codename1.testing;
 
 /// A Codename One unit test interface, you would normally like to derive from
 /// AbstractTest which is less verbose and contains many helper methods.
-///
-/// @author Shai Almog
 public interface UnitTest {
     /// Runs a unit test, if it returns true it passed. If it threw an exception or returned
     /// false it failed.

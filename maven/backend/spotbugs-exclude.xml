@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+    SpotBugs exclusions for the backend runtime (vm/backend, built by this module).
+
+    The gate in .github/scripts/generate-quality-report.py fails on ANY finding,
+    so an intentional exception is recorded here, scoped to the class or method
+    it applies to, with the reason beside it.
+
+    Note this file fails OPEN: if it does not parse, SpotBugs ignores every
+    exclusion in it and the build still succeeds. Never write two hyphens in a
+    row inside an XML comment, which is the usual way it stops parsing.
+    -->
+
+    <!--
+    Framework-wide conventions, with the reasons given in
+    core-unittests/spotbugs-exclude.xml: no Java serialization, no clone(), and
+    null over zero-length arrays and defensive copies.
+
+    DM_CONVERT_CASE is deliberately NOT among them, although the core excludes
+    it. A server case-folds protocol tokens (header names, schemes, methods), and
+    a locale-sensitive toLowerCase on a Turkish-locale host folds "I" to a dotless
+    i and quietly stops matching; see "Never case-fold a protocol token" in
+    CLAUDE.md.
+    -->
+    <Match><Bug pattern="SE_NO_SERIALVERSIONID" /></Match>
+    <Match><Bug pattern="SE_COMPARATOR_SHOULD_BE_SERIALIZABLE" /></Match>
+    <Match><Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE" /></Match>
+    <Match><Bug pattern="CN_IDIOM_NO_SUPER_CALL" /></Match>
+    <Match><Bug pattern="EI_EXPOSE_REP" /></Match>
+    <Match><Bug pattern="EI_EXPOSE_REP2" /></Match>
+    <Match><Bug pattern="MS_EXPOSE_REP" /></Match>
+    <Match><Bug pattern="EI_EXPOSE_STATIC_REP2" /></Match>
+    <Match><Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS" /></Match>
+
+    <!--
+    The database API runs the statement its caller wrote. Parameters are always
+    bound through the prepared statement and never interpolated, which is the
+    property this pattern exists to protect.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.Database" />
+        <Or>
+            <Method name="executeUntraced" />
+            <Method name="queryUntraced" />
+        </Or>
+        <Bug pattern="SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING" />
+    </Match>
+
+    <!--
+    Identity caches on the request path: a hit is the SAME String instance the
+    previous response or fold used, and comparing by identity is the whole
+    saving. A miss falls through to the full computation, so equal-but-distinct
+    strings are still answered correctly.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.HttpServer" />
+        <Method name="foldedBytes" />
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.backend.HttpServer$Conn" />
+        <Method name="putContentType" />
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ" />
+    </Match>
+
+    <!--
+    SpotBugs analyses the Java SE build, whose Http2 stub never returns from
+    drain() because the local runtime has no HTTP/2. The production class answers
+    with its native's result, which can be null, so the check is not redundant
+    where it actually runs.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.HttpServer" />
+        <Method name="flushHttp2" />
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+    </Match>
+
+    <!--
+    ACTIVE_SERVER is the one virtual thread scheduler slot a process has. The
+    server that claimed it is the only one that clears it, from its own stop().
+    -->
+    <Match>
+        <Class name="com.codename1.backend.HttpServer" />
+        <Method name="releaseVirtualThreadSlot" />
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+    </Match>
+
+    <!--
+    Published by replacing the reference: each array is built completely and
+    never written again once another thread can see it, so the volatile read of
+    the reference is all the synchronisation the contents need.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.HttpServer" />
+        <Or>
+            <Field name="dateStampBytes" />
+            <Field name="foldCache" />
+        </Or>
+        <Bug pattern="VO_VOLATILE_REFERENCE_TO_ARRAY" />
+    </Match>
+
+    <!--
+    Any failure to post an invocation's result, unchecked ones included, has to
+    be reported back to the Lambda host, or the invocation stays outstanding
+    until it times out. One recovery path for every cause is the point.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.LambdaRuntime" />
+        <Method name="answer" />
+        <Bug pattern="REC_CATCH_EXCEPTION" />
+    </Match>
+
+    <!--
+    Core classes compiled into this jar because they carry
+    @com.codename1.impl.SharedWithBackend. SpotBugs reads bytecode, so it sees
+    them here as well as in core-unittests; their exceptions are the core's and
+    are copied from core-unittests/spotbugs-exclude.xml with the same scope.
+    Anything else found in a shared class is a finding for the core to fix, not
+    one to exclude here.
+    -->
+    <!-- Nullable Boolean columns must preserve SQL NULL rather than coerce it to false. -->
+    <Match>
+        <Class name="com.codename1.impl.orm.Values" />
+        <Method name="asBooleanObject" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
+    <!--
+      The tz database is where the host keeps its zones: a zone the file for
+      which is missing is one this runtime cannot really use, so checking that
+      path is the point, not a portability slip. Absent (Windows, a minimal
+      image), the check is skipped.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.CronSchedule" />
+        <Method name="knownZone" />
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+    </Match>
+</FindBugsFilter>

@@ -35,8 +35,6 @@ import java.util.List;
  * standard URI class. Includes methods for decoding/encoding URI segments,
  * parsing URI queries to maps or lists, and building URI query strings from
  * maps or lists.
- * 
- * @author Eric Coolman
  */
 public class URIHelper {
 	/**

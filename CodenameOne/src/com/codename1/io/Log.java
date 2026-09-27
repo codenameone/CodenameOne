@@ -46,8 +46,6 @@ import java.io.Writer;
 /// using the file connector API. It is highly recommended to use this
 /// class coupled with Netbeans preprocessing tags to reduce its overhead
 /// completely in runtime.
-///
-/// @author Shai Almog
 public class Log {
     /// Constant indicating the logging level Debug is the default and the lowest level
     /// followed by info, warning and error

@@ -45,8 +45,6 @@ import java.util.Set;
 /// Encapsulates a Node in the scene-graph.  This wraps a component (the "renderer" of the Node) and an associated transform
 /// that describes where, in the 3D space of the scene graph the component should be rendered.
 ///
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// For internal use only.

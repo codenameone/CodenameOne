@@ -77,8 +77,6 @@ import org.jdesktop.application.SingleFrameApplication;
 
 /**
  * The main class of the application.
- *
- * @author Shai Almog
  */
 public class ResourceEditorApp extends SingleFrameApplication {
     private File fileToLoad;

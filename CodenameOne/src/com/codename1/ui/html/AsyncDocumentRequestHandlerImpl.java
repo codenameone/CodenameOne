@@ -36,8 +36,6 @@ import java.util.Arrays;
 
 /// Implementation of the HTML components document request handler to allow simple
 /// HTML support in CodenameOne.
-///
-/// @author Shai Almog
 public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandler {
     protected static final Object LOCK = new Object();
 

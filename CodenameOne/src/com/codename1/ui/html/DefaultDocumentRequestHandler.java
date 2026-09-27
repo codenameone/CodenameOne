@@ -37,8 +37,6 @@ import java.util.Vector;
 /// Default implementation of the HTML components document request handler to allow simple
 /// HTML support in Codename One. This version includes only the basics
 /// e.g. resources and jar file URL's such as jar:// and res://
-///
-/// @author Shai Almog
 public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandler {
     private static Resources resFile;
     private boolean trackVisitedURLs;

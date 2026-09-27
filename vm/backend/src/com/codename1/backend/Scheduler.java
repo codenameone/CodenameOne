@@ -30,25 +30,23 @@ import java.util.Map;
 
 import com.codename1.backend.sql.Dialect;
 
-/**
- * Runs the {@code @Scheduled} methods of a server.
- *
- * <p>The build registers each job from the entry point it generates -- the cron
- * masks already computed, the executor and thread kind already chosen -- and
- * starts this once the server is accepting. One platform thread keeps the
- * timetable; the jobs themselves run on their executors, so a slow job delays
- * nothing but its own next run.
- *
- * <p>A run never overlaps the previous run of the same job. A fire that finds
- * the previous run still going is skipped, and the job is next due at its
- * following time, which is what keeps a job that has fallen behind from
- * stacking up copies of itself.
- *
- * <p>With a {@code lock}, a run first claims a row in {@code cn1_scheduler_lock}
- * and is skipped when another instance holds it, so a job runs on one replica
- * at a time. The claim expires after {@code lockAtMostFor} milliseconds, so a
- * replica that dies mid-run does not keep it.
- */
+/// Runs the `@Scheduled` methods of a server.
+///
+/// The build registers each job from the entry point it generates -- the cron
+/// masks already computed, the executor and thread kind already chosen -- and
+/// starts this once the server is accepting. One platform thread keeps the
+/// timetable; the jobs themselves run on their executors, so a slow job delays
+/// nothing but its own next run.
+///
+/// A run never overlaps the previous run of the same job. A fire that finds
+/// the previous run still going is skipped, and the job is next due at its
+/// following time, which is what keeps a job that has fallen behind from
+/// stacking up copies of itself.
+///
+/// With a `lock`, a run first claims a row in `cn1_scheduler_lock`
+/// and is skipped when another instance holds it, so a job runs on one replica
+/// at a time. The claim expires after `lockAtMostFor` milliseconds, so a
+/// replica that dies mid-run does not keep it.
 public final class Scheduler {
     public static final int CRON = 0;
     public static final int FIXED_RATE = 1;
@@ -57,7 +55,7 @@ public final class Scheduler {
     private static final String LOCK_TABLE = "cn1_scheduler_lock";
     private static final long DEFAULT_LOCK_MILLIS = 10 * 60 * 1000L;
 
-    /** One registered job and what has happened to it. */
+    /// One registered job and what has happened to it.
     public static final class Job {
         final String name;
         final int kind;
@@ -80,8 +78,8 @@ public final class Scheduler {
         String lastError;
 
         Job(String name, int kind, CronSchedule cron, long period, long initialDelay,
-            String executorName, int threadKind, String lock, long lockAtMostFor,
-            Runnable body) {
+                String executorName, int threadKind, String lock, long lockAtMostFor,
+                Runnable body) {
             this.name = name;
             this.kind = kind;
             this.cron = cron;
@@ -101,9 +99,9 @@ public final class Scheduler {
             return name;
         }
 
-        /** What the schedule is, for a listing. */
+        /// What the schedule is, for a listing.
         public String describeSchedule() {
-            if(kind == CRON) {
+            if (kind == CRON) {
                 return "cron " + cron;
             }
             return (kind == FIXED_RATE ? "every " : "delay ") + period + "ms";
@@ -113,42 +111,35 @@ public final class Scheduler {
     private final List jobs = new ArrayList();
     private final DataSource locks;
     private final String instance;
-    private Thread thread;
     private boolean started;
     private boolean stopped;
-    /**
-     * Whether this scheduler's server records metrics. Per scheduler: the job
-     * histogram is the process's, and a second server that turned metrics off
-     * must not add its jobs to the first one's.
-     */
+    /// Whether this scheduler's server records metrics. Per scheduler: the job
+    /// histogram is the process's, and a second server that turned metrics off
+    /// must not add its jobs to the first one's.
     private boolean measured;
 
-    /**
-     * The tracer this scheduler's runs report to: its server's, so with two
-     * traced servers in one process a job is exported under its own server's
-     * name rather than the one installed last. Null for the installed one.
-     */
+    /// The tracer this scheduler's runs report to: its server's, so with two
+    /// traced servers in one process a job is exported under its own server's
+    /// name rather than the one installed last. Null for the installed one.
     private Tracer tracer;
 
-    /** Set by the server once it knows whether it records metrics. */
+    /// Set by the server once it knows whether it records metrics.
     public void setMeasured(boolean measured) {
         this.measured = measured;
     }
 
-    /**
-     * Takes the measuring and tracing of the server that runs this scheduler.
-     * Called by the generated application before it starts the scheduler.
-     */
+    /// Takes the measuring and tracing of the server that runs this scheduler.
+    /// Called by the generated application before it starts the scheduler.
     public synchronized void bind(Backend backend) {
         this.measured = backend.isMeasured();
         this.tracer = backend.getTracer();
     }
     private boolean lockTableReady;
 
-    /**
-     * @param locks the pool locked jobs claim their row in, or null when this
-     *        server has no database -- the build refuses a lock without one
-     */
+    /// #### Parameters
+    ///
+    /// - `locks`: @param locks the pool locked jobs claim their row in, or null when this
+    /// server has no database -- the build refuses a lock without one
     public Scheduler(DataSource locks) {
         this.locks = locks;
         String id;
@@ -162,14 +153,14 @@ public final class Scheduler {
 
     private static String hex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for(int iter = 0 ; iter < bytes.length ; iter++) {
-            sb.append("0123456789abcdef".charAt((bytes[iter] >> 4) & 15));
-            sb.append("0123456789abcdef".charAt(bytes[iter] & 15));
+        for (byte element : bytes) {
+            sb.append("0123456789abcdef".charAt((element >> 4) & 15));
+            sb.append("0123456789abcdef".charAt(element & 15));
         }
         return sb.toString();
     }
 
-    /** Registers a cron job. Generated code calls this before {@link #start}. */
+    /// Registers a cron job. Generated code calls this before [#start].
     public synchronized void cron(String name, CronSchedule schedule, String executor,
                                   int threadKind, String lock, long lockAtMostFor,
                                   Runnable body) {
@@ -177,7 +168,7 @@ public final class Scheduler {
                 body));
     }
 
-    /** Registers a job that starts every {@code period} milliseconds. */
+    /// Registers a job that starts every `period` milliseconds.
     public synchronized void fixedRate(String name, long initialDelay, long period,
                                        String executor, int threadKind, String lock,
                                        long lockAtMostFor, Runnable body) {
@@ -186,7 +177,7 @@ public final class Scheduler {
                 lockAtMostFor, body));
     }
 
-    /** Registers a job that starts {@code period} milliseconds after the last run ended. */
+    /// Registers a job that starts `period` milliseconds after the last run ended.
     public synchronized void fixedDelay(String name, long initialDelay, long period,
                                         String executor, int threadKind, String lock,
                                         long lockAtMostFor, Runnable body) {
@@ -196,7 +187,7 @@ public final class Scheduler {
     }
 
     private static void checkPeriod(String name, long period) {
-        if(period <= 0) {
+        if (period <= 0) {
             // Only a value read from configuration can be wrong here: the build
             // checks the literal ones.
             throw new IllegalArgumentException("Scheduled job " + name + " has period "
@@ -205,15 +196,15 @@ public final class Scheduler {
     }
 
     private void add(Job job) {
-        if(started) {
+        if (started) {
             throw new IllegalStateException("Jobs are registered before the scheduler starts");
         }
-        if(job.lock != null && locks == null) {
+        if (job.lock != null && locks == null) {
             throw new IllegalStateException("Scheduled job " + job.name + " takes lock \""
                     + job.lock + "\", which needs a database, and this server has none");
         }
-        for(int iter = 0 ; iter < jobs.size() ; iter++) {
-            if(((Job)jobs.get(iter)).name.equals(job.name)) {
+        for (Object element : jobs) {
+            if (((Job) element).name.equals(job.name)) {
                 // A job is triggered, listed and measured by name: a second one
                 // with it could not be triggered, and the two could overlap while
                 // reported as one.
@@ -224,19 +215,19 @@ public final class Scheduler {
         jobs.add(job);
     }
 
-    /** Starts the timetable. */
+    /// Starts the timetable.
     public synchronized void start() {
-        if(started) {
+        if (started) {
             return;
         }
         started = true;
         long now = System.currentTimeMillis();
-        for(int iter = 0 ; iter < jobs.size() ; iter++) {
-            Job job = (Job)jobs.get(iter);
+        for (Object element : jobs) {
+            Job job = (Job) element;
             job.executor = Tasks.executor(job.executorName, job.threadKind);
-            if(job.kind == CRON) {
+            if (job.kind == CRON) {
                 job.next = job.cron.next(now);
-                if(job.next < 0) {
+                if (job.next < 0) {
                     job.next = Long.MAX_VALUE;
                     System.err.println("Scheduled job " + job.name + " never fires: "
                             + job.cron);
@@ -245,10 +236,11 @@ public final class Scheduler {
                 job.next = now + Math.max(0, job.initialDelay);
             }
         }
-        if(jobs.isEmpty()) {
+        if (jobs.isEmpty()) {
             return;
         }
-        thread = new Thread(new Runnable() {
+        Thread thread = new Thread(new Runnable() {
+            @Override
             public void run() {
                 loop();
             }
@@ -257,20 +249,18 @@ public final class Scheduler {
         thread.start();
     }
 
-    /**
-     * Stops starting runs and waits up to {@code waitMillis} for the ones in
-     * progress.
-     */
+    /// Stops starting runs and waits up to `waitMillis` for the ones in
+    /// progress.
     public void stop(long waitMillis) {
-        synchronized(this) {
+        synchronized (this) {
             stopped = true;
             notifyAll();
         }
         long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
-        synchronized(this) {
-            while(anyRunning()) {
+        synchronized (this) {
+            while (anyRunning()) {
                 long left = deadline - System.currentTimeMillis();
-                if(left <= 0) {
+                if (left <= 0) {
                     break;
                 }
                 try {
@@ -283,8 +273,8 @@ public final class Scheduler {
     }
 
     private boolean anyRunning() {
-        for(int iter = 0 ; iter < jobs.size() ; iter++) {
-            if(((Job)jobs.get(iter)).running) {
+        for (Object element : jobs) {
+            if (((Job) element).running) {
                 return true;
             }
         }
@@ -292,21 +282,21 @@ public final class Scheduler {
     }
 
     private void loop() {
-        synchronized(this) {
-            while(!stopped) {
+        synchronized (this) {
+            while (!stopped) {
                 long now = System.currentTimeMillis();
                 Job due = null;
                 long soonest = Long.MAX_VALUE;
-                for(int iter = 0 ; iter < jobs.size() ; iter++) {
-                    Job job = (Job)jobs.get(iter);
-                    if(job.next < soonest) {
+                for (Object element : jobs) {
+                    Job job = (Job) element;
+                    if (job.next < soonest) {
                         soonest = job.next;
                         due = job;
                     }
                 }
-                if(due == null || soonest > now) {
+                if (due == null || soonest > now) {
                     try {
-                        if(due == null) {
+                        if (due == null) {
                             wait();
                         } else {
                             wait(Math.min(soonest - now, 60000L));
@@ -321,17 +311,23 @@ public final class Scheduler {
         }
     }
 
-    /** Called holding the monitor. */
+    /// Called holding the monitor.
     private void fire(final Job job, long now) {
-        if(job.running) {
+        if (job.running) {
             job.skipped++;
             job.next = following(job, now);
+            return;
+        }
+        TaskExecutor executor = job.executor;
+        if (executor == null) {
+            // Not started: start() gives every job its executor before any fires.
             return;
         }
         job.running = true;
         job.next = job.kind == FIXED_DELAY ? Long.MAX_VALUE : following(job, now);
         try {
-            job.executor.execute(new Runnable() {
+            executor.execute(new Runnable() {
+                @Override
                 public void run() {
                     runJob(job);
                 }
@@ -340,27 +336,27 @@ public final class Scheduler {
             job.running = false;
             job.failures++;
             job.lastError = String.valueOf(err);
-            if(job.kind == FIXED_DELAY) {
+            if (job.kind == FIXED_DELAY) {
                 job.next = now + job.period;
             }
         }
     }
 
     private long following(Job job, long now) {
-        if(job.kind == CRON) {
+        if (job.kind == CRON) {
             long next = job.cron.next(now);
             return next < 0 ? Long.MAX_VALUE : next;
         }
-        if(job.kind == FIXED_RATE) {
+        if (job.kind == FIXED_RATE) {
             long next = job.next;
-            if(next == Long.MAX_VALUE) {
+            if (next == Long.MAX_VALUE) {
                 next = now;
             }
             // Catch up without a burst: the next START after now on the rate's
             // own grid -- in one step, never one period at a time, which after a
             // suspended VM or a clock jumped forward is millions of iterations
             // under the monitor every other job and management call waits on.
-            if(next <= now) {
+            if (next <= now) {
                 long missed = (now - next) / job.period + 1;
                 next += missed * job.period;
             }
@@ -369,46 +365,61 @@ public final class Scheduler {
         return now + job.period;
     }
 
+    /// A job's body as a traced unit of work.
+    private static final class RunBody implements Tracing.Work {
+        private final Runnable body;
+
+        RunBody(Runnable body) {
+            this.body = body;
+        }
+
+        @Override
+        public Object run(Span span) throws Exception {
+            body.run();
+            return null;
+        }
+    }
+
     private void runJob(final Job job) {
         long start = System.currentTimeMillis();
         String error = null;
         boolean ran = false;
+        Tracer runTracer;
+        synchronized (this) {
+            runTracer = tracer;
+        }
         try {
-            if(job.lock == null || claim(job, start)) {
+            if (job.lock == null || claim(job)) {
                 ran = true;
-                Tracing.inBackground("scheduled " + job.name, null, tracer, new Tracing.Work() {
-                    public Object run(Span span) throws Exception {
-                        job.body.run();
-                        return null;
-                    }
-                });
+                Tracing.inBackground("scheduled " + job.name, null, runTracer,
+                        new RunBody(job.body));
             }
         } catch (Throwable err) {
             error = String.valueOf(err);
             System.err.println("Scheduled job " + job.name + " failed: " + err);
         } finally {
-            if(ran && job.lock != null) {
+            if (ran && job.lock != null) {
                 release(job);
             }
             long end = System.currentTimeMillis();
-            if(ran && measured) {
+            if (ran && measured) {
                 com.codename1.backend.metrics.Metrics.jobRan(job.name, end - start,
                         error != null);
             }
-            synchronized(this) {
+            synchronized (this) {
                 job.running = false;
-                if(ran) {
+                if (ran) {
                     job.runs++;
                     job.lastStart = start;
                     job.lastDurationMillis = end - start;
-                } else if(error == null) {
+                } else if (error == null) {
                     job.skipped++;
                 }
-                if(error != null) {
+                if (error != null) {
                     job.failures++;
                     job.lastError = error;
                 }
-                if(job.kind == FIXED_DELAY && !stopped) {
+                if (job.kind == FIXED_DELAY && !stopped) {
                     job.next = end + job.period;
                 }
                 notifyAll();
@@ -416,7 +427,7 @@ public final class Scheduler {
         }
     }
 
-    private boolean claim(Job job, long localNow) throws IOException {
+    private boolean claim(Job job) throws IOException {
         prepareLockTable();
         // The DATABASE's clock, which every replica shares: with each replica's
         // own, one running ahead by more than the remaining lease would take a
@@ -425,14 +436,14 @@ public final class Scheduler {
         long until = now + job.lockAtMostFor;
         int updated = locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ?, locked_at = ?, "
                 + "locked_by = ? WHERE name = ? AND lock_until <= ?",
-                new Object[] {new Long(until), new Long(now), instance, job.lock, new Long(now)});
-        if(updated > 0) {
+                new Object[] {Long.valueOf(until), Long.valueOf(now), instance, job.lock, Long.valueOf(now)});
+        if (updated > 0) {
             return true;
         }
         try {
             locks.execute("INSERT INTO " + LOCK_TABLE + " (name, lock_until, locked_at, "
                     + "locked_by) VALUES (?, ?, ?, ?)",
-                    new Object[] {job.lock, new Long(until), new Long(now), instance});
+                    new Object[] {job.lock, Long.valueOf(until), Long.valueOf(now), instance});
             return true;
         } catch (IOException failed) {
             // Only a row that exists means another instance holds the claim.
@@ -446,7 +457,7 @@ public final class Scheduler {
             } catch (IOException err) {
                 throw failed;
             }
-            if(row != null) {
+            if (row != null) {
                 return false;
             }
             throw failed;
@@ -456,8 +467,8 @@ public final class Scheduler {
     private void release(Job job) {
         try {
             locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ? WHERE name = ? AND "
-                    + "locked_by = ?", new Object[] {new Long(databaseNow()),
-                    job.lock, instance});
+                    + "locked_by = ?", new Object[] {Long.valueOf(databaseNow()),
+                        job.lock, instance});
         } catch (IOException err) {
             // The claim expires by itself; the only cost is that the next run on
             // another instance waits for it.
@@ -465,13 +476,13 @@ public final class Scheduler {
         }
     }
 
-    /** Milliseconds since the epoch by the database server's clock. */
+    /// Milliseconds since the epoch by the database server's clock.
     long databaseNow() throws IOException {
         String name = locks.dialect().getName();
         String sql;
-        if("postgresql".equals(name)) {
+        if ("postgresql".equals(name)) {
             sql = "SELECT CAST(EXTRACT(EPOCH FROM clock_timestamp()) * 1000 AS BIGINT) AS db_now";
-        } else if("mysql".equals(name)) {
+        } else if ("mysql".equals(name)) {
             sql = "SELECT CAST(ROUND(UNIX_TIMESTAMP(NOW(3)) * 1000) AS SIGNED) AS db_now";
         } else {
             // SQLite runs in this process: its clock is this host's anyway.
@@ -479,14 +490,14 @@ public final class Scheduler {
         }
         Map row = locks.queryOne(sql, null);
         Object value = row == null ? null : row.get("db_now");
-        if(!(value instanceof Number)) {
+        if (!(value instanceof Number)) {
             throw new IOException("The database did not report its time: " + value);
         }
-        return ((Number)value).longValue();
+        return ((Number) value).longValue();
     }
 
     private synchronized void prepareLockTable() throws IOException {
-        if(lockTableReady) {
+        if (lockTableReady) {
             return;
         }
         Dialect d = locks.dialect();
@@ -498,23 +509,22 @@ public final class Scheduler {
         lockTableReady = true;
     }
 
-    /**
-     * Runs a job now, on its executor, whatever its schedule says. Answers
-     * false when no job has that name or its previous run is still going.
-     */
+    /// Runs a job now, on its executor, whatever its schedule says. Answers
+    /// false when no job has that name or its previous run is still going.
     public synchronized boolean trigger(String name) {
-        for(int iter = 0 ; iter < jobs.size() ; iter++) {
-            final Job job = (Job)jobs.get(iter);
-            if(job.name.equals(name)) {
+        for (Object element : jobs) {
+            final Job job = (Job) element;
+            if (job.name.equals(name)) {
                 // Refused once stopped: stop() promises no run starts after it,
                 // and a management or MCP request still in flight during the
                 // drain must not start one.
-                if(stopped || job.running || job.executor == null) {
+                if (stopped || job.running || job.executor == null) {
                     return false;
                 }
                 job.running = true;
                 try {
                     job.executor.execute(new Runnable() {
+                        @Override
                         public void run() {
                             runJob(job);
                         }
@@ -531,30 +541,30 @@ public final class Scheduler {
         return false;
     }
 
-    /** Every job and what has happened to it, for the management endpoint and MCP. */
+    /// Every job and what has happened to it, for the management endpoint and MCP.
     public synchronized List describe() {
         List out = new ArrayList();
-        for(int iter = 0 ; iter < jobs.size() ; iter++) {
-            Job job = (Job)jobs.get(iter);
+        for (Object element : jobs) {
+            Job job = (Job) element;
             Map m = new LinkedHashMap();
             m.put("name", job.name);
             m.put("schedule", job.describeSchedule());
             m.put("executor", job.executorName);
-            if(job.lock != null) {
+            if (job.lock != null) {
                 m.put("lock", job.lock);
             }
             m.put("running", Boolean.valueOf(job.running));
-            m.put("runs", new Long(job.runs));
-            m.put("failures", new Long(job.failures));
-            m.put("skipped", new Long(job.skipped));
-            if(job.next != Long.MAX_VALUE) {
-                m.put("nextRunEpochMillis", new Long(job.next));
+            m.put("runs", Long.valueOf(job.runs));
+            m.put("failures", Long.valueOf(job.failures));
+            m.put("skipped", Long.valueOf(job.skipped));
+            if (job.next != Long.MAX_VALUE) {
+                m.put("nextRunEpochMillis", Long.valueOf(job.next));
             }
-            if(job.lastStart != 0) {
-                m.put("lastRunEpochMillis", new Long(job.lastStart));
-                m.put("lastDurationMillis", new Long(job.lastDurationMillis));
+            if (job.lastStart != 0) {
+                m.put("lastRunEpochMillis", Long.valueOf(job.lastStart));
+                m.put("lastDurationMillis", Long.valueOf(job.lastDurationMillis));
             }
-            if(job.lastError != null) {
+            if (job.lastError != null) {
                 m.put("lastError", job.lastError);
             }
             out.add(m);
@@ -562,7 +572,7 @@ public final class Scheduler {
         return out;
     }
 
-    /** The registered jobs. */
+    /// The registered jobs.
     public synchronized List getJobs() {
         return new ArrayList(jobs);
     }

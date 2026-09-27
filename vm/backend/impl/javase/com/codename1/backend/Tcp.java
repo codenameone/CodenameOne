@@ -41,16 +41,14 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-/**
- * Java SE twin of the translated Tcp.
- *
- * The public surface is identical on purpose. Everything above this -- Http,
- * HttpServer, the Lambda runtime, the database and S3 clients -- is compiled from
- * ONE shared source tree against whichever of the two implementations is on the
- * path. Nothing above knows which target it is on, and there is no runtime lookup
- * to get wrong. Divergence is caught by the runtime self-test, which runs against
- * both.
- */
+/// Java SE twin of the translated Tcp.
+///
+/// The public surface is identical on purpose. Everything above this -- Http,
+/// HttpServer, the Lambda runtime, the database and S3 clients -- is compiled from
+/// ONE shared source tree against whichever of the two implementations is on the
+/// path. Nothing above knows which target it is on, and there is no runtime lookup
+/// to get wrong. Divergence is caught by the runtime self-test, which runs against
+/// both.
 public final class Tcp {
     private Socket socket;
     private InputStream in;
@@ -70,7 +68,7 @@ public final class Tcp {
         // by each caller, so a caller that upgrades cannot forget.
         int deadline = socket == null ? 0 : socket.getSoTimeout();
         this.socket = replacement;
-        if(deadline > 0) {
+        if (deadline > 0) {
             replacement.setSoTimeout(deadline);
         }
         this.in = replacement.getInputStream();
@@ -94,35 +92,27 @@ public final class Tcp {
             } catch (IOException ignored) {
                 // closing a socket that never connected
             }
-            throw new IOException("Connection to " + host + ":" + port + " failed");
+            throw new IOException("Connection to " + host + ":" + port + " failed", err);
         }
     }
 
-    /**
-     * Upgrades this connection to TLS. See the translated twin for why this is an
-     * upgrade rather than a flag on connect.
-     *
-     * HTTPS endpoint identification is asked for explicitly: an SSLSocket made
-     * this way verifies the certificate chain by default but NOT that the name on
-     * it is the host we asked for, which is most of the protection.
-     */
+    /// Upgrades this connection to TLS. See the translated twin for why this is an
+    /// upgrade rather than a flag on connect.
+    ///
+    /// HTTPS endpoint identification is asked for explicitly: an SSLSocket made
+    /// this way verifies the certificate chain by default but NOT that the name on
+    /// it is the host we asked for, which is most of the protection.
     public void startTls(String host) throws IOException {
         startTls(host, null);
     }
 
-    /**
-     * As {@link #startTls(String)}, verifying against the PEM bundle at `caFile`
-     * INSTEAD of the system trust store. See the translated twin for why.
-     */
-    /**
-     * How long an outbound handshake may take, in milliseconds.
-     *
-     * <p>CN1_TLS_HANDSHAKE_MS, default 15000, 0 or less for no bound. The
-     * packaged arm reads the same name in C, so a deployment tunes one knob.
-     */
+    /// How long an outbound handshake may take, in milliseconds.
+    ///
+    /// CN1_TLS_HANDSHAKE_MS, default 15000, 0 or less for no bound. The
+    /// packaged arm reads the same name in C, so a deployment tunes one knob.
     private static int handshakeBudgetMillis() {
         String raw = System.getenv("CN1_TLS_HANDSHAKE_MS");
-        if(raw != null && raw.length() > 0) {
+        if (raw != null && raw.length() > 0) {
             try {
                 return Integer.parseInt(raw.trim());
             } catch (NumberFormatException malformed) {
@@ -132,6 +122,8 @@ public final class Tcp {
         return 15000;
     }
 
+    /// As [#startTls(String)], verifying against the PEM bundle at `caFile`
+    /// INSTEAD of the system trust store. See the translated twin for why.
     public void startTls(String host, String caFile) throws IOException {
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
@@ -145,14 +137,21 @@ public final class Tcp {
         // The trust root is a file name that crosses to a native; see
         // Urls.requireNoNul for what a NUL in it loads instead.
         Urls.requireNoNul("An sslrootcert path", caFile);
-        if(secure) {
+        if (secure) {
             return;
         }
         SSLSocketFactory factory = caFile == null
-                ? (SSLSocketFactory)SSLSocketFactory.getDefault()
+                ? (SSLSocketFactory) SSLSocketFactory.getDefault()
                 : factoryTrusting(caFile);
-        SSLSocket upgraded = (SSLSocket)factory
-                .createSocket(socket, host, socket.getPort(), true);
+        // Checked rather than cast: an SSLSocketFactory that answered with a plain
+        // Socket would otherwise surface as a ClassCastException, not as the
+        // IOException every caller of startTls handles, and the socket would leak.
+        Socket created = factory.createSocket(socket, host, socket.getPort(), true); //NOPMD CloseResource - closed below unless it is TLS, and then it becomes this connection's socket
+        if (!(created instanceof SSLSocket)) {
+            created.close();
+            throw new IOException("The TLS socket factory did not produce a TLS socket");
+        }
+        SSLSocket upgraded = (SSLSocket) created; //NOPMD CloseResource - becomes this connection's socket in rebind()
         SSLParameters parameters = upgraded.getSSLParameters();
         parameters.setEndpointIdentificationAlgorithm("HTTPS");
         upgraded.setSSLParameters(parameters);
@@ -169,13 +168,13 @@ public final class Tcp {
         // poll(); saying so here is better than implying the two are identical.
         int handshakeMillis = handshakeBudgetMillis();
         int previousTimeout = upgraded.getSoTimeout();
-        if(handshakeMillis > 0) {
+        if (handshakeMillis > 0) {
             upgraded.setSoTimeout(handshakeMillis);
         }
         try {
             upgraded.startHandshake();
         } finally {
-            if(handshakeMillis > 0) {
+            if (handshakeMillis > 0) {
                 // Back to what it was, or an idle connection's first read after
                 // the handshake would inherit a deadline nobody asked for.
                 upgraded.setSoTimeout(previousTimeout);
@@ -185,17 +184,15 @@ public final class Tcp {
         secure = true;
     }
 
-    /** Whether this connection is encrypted. */
+    /// Whether this connection is encrypted.
     public boolean isSecure() {
         return secure;
     }
 
-    /**
-     * A factory that trusts exactly the certificates in one PEM bundle. The
-     * default trust store is deliberately NOT included: the caller named the
-     * roots it wants, and quietly adding more would defeat the point of naming
-     * them.
-     */
+    /// A factory that trusts exactly the certificates in one PEM bundle. The
+    /// default trust store is deliberately NOT included: the caller named the
+    /// roots it wants, and quietly adding more would defeat the point of naming
+    /// them.
     private static SSLSocketFactory factoryTrusting(String caFile) throws IOException {
         try {
             KeyStore trust = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -204,12 +201,12 @@ public final class Tcp {
             FileInputStream in = new FileInputStream(caFile);
             try {
                 Collection<? extends Certificate> loaded = certificates.generateCertificates(in);
-                if(loaded.isEmpty()) {
+                if (loaded.isEmpty()) {
                     throw new IOException("No certificates in " + caFile);
                 }
                 int index = 0;
                 Iterator<? extends Certificate> it = loaded.iterator();
-                while(it.hasNext()) {
+                while (it.hasNext()) {
                     trust.setCertificateEntry("ca" + (index++), it.next());
                 }
             } finally {
@@ -225,20 +222,18 @@ public final class Tcp {
             throw err;
         } catch (Exception err) {
             throw new IOException("Could not build a trust store from " + caFile
-                    + ": " + err.getMessage());
+                    + ": " + err.getMessage(), err);
         }
     }
 
-    /**
-     * A receive deadline for this connection, in milliseconds; 0 for none.
-     *
-     * <p>The packaged arm sets SO_RCVTIMEO and SO_SNDTIMEO; an SSLSocket here
-     * expresses only the receive half, through setSoTimeout, and that is said
-     * rather than implied. Without one, a peer that finishes connecting and then
-     * stops answering holds the calling thread indefinitely.
-     */
+    /// A receive deadline for this connection, in milliseconds; 0 for none.
+    ///
+    /// The packaged arm sets SO_RCVTIMEO and SO_SNDTIMEO; an SSLSocket here
+    /// expresses only the receive half, through setSoTimeout, and that is said
+    /// rather than implied. Without one, a peer that finishes connecting and then
+    /// stops answering holds the calling thread indefinitely.
     public void setReadTimeout(int millis) throws IOException {
-        if(millis < 0) {
+        if (millis < 0) {
             throw new IllegalArgumentException("read timeout must not be negative: "
                     + millis);
         }

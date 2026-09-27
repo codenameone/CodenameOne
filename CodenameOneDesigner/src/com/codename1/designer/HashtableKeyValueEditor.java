@@ -31,8 +31,6 @@ import javax.swing.DefaultComboBoxModel;
 
 /**
  * Used by the hashtable editor to edit a sepcific entry.
- *
- * @author Shai Almog
  */
 public class HashtableKeyValueEditor extends javax.swing.JPanel {
     private EditableResources res;

@@ -74,7 +74,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
 /// to avoid regressions when the default is changed.
 ///
-/// @author Chen Fishbein
 /// Fused so each Style is allocated as ONE heap block together with its
 /// `padding` and `margin` arrays instead of three. A Style is created five
 /// times per component -- getComponentStyle, getComponentSelectedStyle and

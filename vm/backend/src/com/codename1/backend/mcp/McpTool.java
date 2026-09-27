@@ -24,30 +24,28 @@ package com.codename1.backend.mcp;
 
 import java.util.Map;
 
-/**
- * One tool on the server's MCP endpoint.
- *
- * <p>An {@code @McpTool} method becomes one of these through a class the build
- * generates, whose schema is a constant and whose {@link #call} converts the
- * arguments and invokes the method directly. Write one by hand for a tool that is
- * not a bean method, and pass it to {@link McpServer#register}.
- */
+/// One tool on the server's MCP endpoint.
+///
+/// An `@McpTool` method becomes one of these through a class the build
+/// generates, whose schema is a constant and whose [#call] converts the
+/// arguments and invokes the method directly. Write one by hand for a tool that is
+/// not a bean method, and pass it to [McpServer#register].
 public interface McpTool {
-    /** The tool's name, unique on the server. */
+    /// The tool's name, unique on the server.
     String name();
 
-    /** What it does, for the agent choosing between tools. */
+    /// What it does, for the agent choosing between tools.
     String description();
 
-    /** The JSON Schema of its arguments: an object schema, as a map. */
+    /// The JSON Schema of its arguments: an object schema, as a map.
     Map inputSchema();
 
-    /**
-     * Runs the tool. The result is written with {@link com.codename1.backend.Json}
-     * as the call's text content.
-     *
-     * @throws IllegalArgumentException for arguments the tool cannot use, which
-     *         the agent is told as a tool error it can correct
-     */
+    /// Runs the tool. The result is written with [com.codename1.backend.Json]
+    /// as the call's text content.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: @throws IllegalArgumentException for arguments the tool cannot use, which
+    /// the agent is told as a tool error it can correct
     Object call(Map arguments) throws Exception;
 }

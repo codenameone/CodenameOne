@@ -95,8 +95,6 @@ import com.codename1.ui.layouts.FlowLayout;
 ///     }
 /// }
 /// ```
-///
-/// @author Shai Almog
 public final class InfiniteScrollAdapter {
     private final Component ip;
     private final InfiniteProgress progress;

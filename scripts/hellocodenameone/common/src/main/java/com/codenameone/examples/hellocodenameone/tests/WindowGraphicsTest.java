@@ -33,8 +33,6 @@ import com.codename1.ui.Graphics;
  * surface: the window has its own render target, its own dirty queue and its own clip
  * universe. Getting the clip clamp wrong here is what leaves stale pixels on a retained
  * surface, so the shapes deliberately reach the window's edges.</p>
- *
- * @author Shai Almog
  */
 public class WindowGraphicsTest extends WindowHostTest {
 

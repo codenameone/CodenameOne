@@ -28,8 +28,6 @@ import android.os.Bundle;
 /**
  * Sends callbacks for all Android lifecycle events that can be broadcast to 
  * native views e.g. map view
- *
- * @author Shai Almog
  */
 public interface LifecycleListener {
     public void onCreate(Bundle savedInstanceState);

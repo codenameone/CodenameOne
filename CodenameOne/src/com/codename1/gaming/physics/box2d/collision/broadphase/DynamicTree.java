@@ -37,8 +37,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 /// ray casts. Leafs are proxies with an AABB. In the tree we expand the proxy AABB by _fatAABBFactor
 /// so that the proxy AABB is bigger than the client object. This allows the client object to move by
 /// small amounts without triggering a tree update.
-///
-/// @author daniel
 public class DynamicTree implements BroadPhaseStrategy {
   public static final int MAX_STACK_SIZE = 64;
   public static final int NULL_NODE = -1;

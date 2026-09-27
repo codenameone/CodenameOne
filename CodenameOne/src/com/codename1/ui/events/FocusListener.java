@@ -27,8 +27,6 @@ import com.codename1.ui.Component;
 
 /// Observes focus change events for a given form and invokes the callbacks to
 /// enable us to assign functionality based on current focused component.
-///
-/// @author Chen Fishbein
 public interface FocusListener {
 
     /// Invoked when component gains focus

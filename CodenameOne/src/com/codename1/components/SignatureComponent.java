@@ -71,19 +71,14 @@ import com.codename1.ui.TopLevelContainer;
 /// hi.show();
 /// ```
 ///
-/// Screenshots
-///
-/// Video Demo
+/// ![The signature dialog, with Cancel, Reset and Save buttons](https://www.codenameone.com/developer-guide/img/components-signature2.png)
 ///
 /// Source available [here](https://github.com/codenameone/codenameone-demos/SignatureComponentDemo)
-///
-/// .
 ///
 /// Styles
 ///
 /// You can customize the styles of various aspects of the Signature component using the following Styles (UIIDs) in
 /// the theme:
-///
 ///
 /// - SignatureButton  - The style for the main signature component button.
 ///
@@ -94,9 +89,6 @@ import com.codename1.ui.TopLevelContainer;
 /// - SignaturePanelBox - The box and "X" in the SignaturePanel.  Uses only the `Style#getFgColor()` property.
 ///
 /// - SignaturePanelSignature - The signature that is drawn by the user.  Uses only the `Style#getFgColor()` property.
-///
-/// @author shannah
-///
 public class SignatureComponent extends Container implements ActionSource<ActionEvent> {
 
     private final SignaturePanel signaturePanel = new SignaturePanel();
@@ -487,8 +479,6 @@ public class SignatureComponent extends Container implements ActionSource<Action
 
     /// Inner class with the actual body of the dialog for drawing the signature.  This dialog
     /// is shown when the user clicks on the main button.
-    ///
-    /// @author shannah
     private class SignatureDialogBody extends Container {
         private final EventDispatcher eventDispatcher = new EventDispatcher();
         private Image value;

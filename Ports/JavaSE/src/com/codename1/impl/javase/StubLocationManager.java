@@ -42,10 +42,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 
-/**
- *
- * @author Chen
- */
 class StubLocationManager extends LocationManager {
 
     private Timer geofenceTimer;

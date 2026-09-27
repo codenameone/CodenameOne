@@ -33,7 +33,6 @@ import java.util.Date;
  * dates is not implemented in this class since the localization pattern is not
  * exposed.
  * 
- * @author Eric Coolman
  * @see <a href="http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html">http://docs.oracle.com/javase/6/docs/api/java/text/DateFormat.html</a>
  * @deprecated this class has many issues in iOS and other platforms, please use the L10NManager
  */

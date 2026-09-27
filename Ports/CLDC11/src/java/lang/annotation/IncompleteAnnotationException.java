@@ -26,8 +26,6 @@ package java.lang.annotation;
 import java.lang.annotation.Annotation;
 
 /// A mirror of java.lang.annotation.IncompleteAnnotationException.
-///
-/// @author Toby Reyelts
 public class IncompleteAnnotationException extends RuntimeException {
 
 	private final Class<? extends Annotation> annotationType_;

@@ -20,8 +20,6 @@
 package com.codename1.maps;
 
 /// This class declares a coordinate point on a map.
-///
-/// @author Roman Kamyk roman.kamyk@itiner.pl
 public class Coord {
 
     private static final double DELTA = 0.0000001;

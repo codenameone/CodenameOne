@@ -24,22 +24,18 @@ package com.codename1.backend.metrics;
 
 import java.util.List;
 
-/**
- * A value read when metrics are collected -- a queue's depth, a pool's size, a
- * {@code @ManagedAttribute}. Nothing is recorded in between, so a gauge costs
- * nothing until something asks.
- */
+/// A value read when metrics are collected -- a queue's depth, a pool's size, a
+/// `@ManagedAttribute`. Nothing is recorded in between, so a gauge costs
+/// nothing until something asks.
 public final class Gauge extends Instrument {
-    /** Where a gauge's value comes from. */
+    /// Where a gauge's value comes from.
     public interface Source {
         double read();
     }
 
-    /**
-     * Where a gauge with several labelled values comes from -- one per executor,
-     * say. Each point is a map with {@code attributes} and {@code value}; see
-     * {@link #point}.
-     */
+    /// Where a gauge with several labelled values comes from -- one per executor,
+    /// say. Each point is a map with `attributes` and `value`; see
+    /// [#point].
     public interface MultiSource {
         List read();
     }
@@ -59,16 +55,16 @@ public final class Gauge extends Instrument {
         this.multi = multi;
     }
 
-    /** One labelled value, for a {@link MultiSource}. */
+    /// One labelled value, for a [MultiSource].
     public static java.util.Map point(String key, Object label, double value) {
         java.util.Map attributes = new java.util.LinkedHashMap();
         attributes.put(key, label);
         return Instrument.point(attributes, value);
     }
 
-    /** The value now, or NaN when reading it failed. */
+    /// The value now, or NaN when reading it failed.
     public double read() {
-        if(source == null) {
+        if (source == null) {
             return Double.NaN;
         }
         try {
@@ -78,8 +74,9 @@ public final class Gauge extends Instrument {
         }
     }
 
+    @Override
     public List points() {
-        if(multi != null) {
+        if (multi != null) {
             try {
                 List points = multi.read();
                 return points == null ? new java.util.ArrayList() : points;

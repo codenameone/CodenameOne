@@ -25,8 +25,6 @@ package com.codename1.ui.geom;
 
 /// Utility class that holds a width and height that represents a dimension of
 /// a component or element
-///
-/// @author Nir Shabi
 public class Dimension2D {
 
     private double width;

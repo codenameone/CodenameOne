@@ -40,8 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * release in one window dropped the other's still-held selection, and a component in
  * one window ended up tested against the other's coordinates -- which are window
  * relative, so the two are not even the same origin.</p>
- *
- * @author Shai Almog
  */
 class WindowSelectionStateTest extends UITestBase {
 

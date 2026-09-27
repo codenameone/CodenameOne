@@ -104,8 +104,6 @@ import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 /// A prismatic joint. This joint provides one degree of freedom: translation along an axis fixed in
 /// bodyA. Relative rotation is prevented. You can use a joint limit to restrict the range of motion
 /// and a joint motor to drive the motion or to model joint friction.
-///
-/// @author Daniel
 public class PrismaticJoint extends Joint {
 
   // Solver shared

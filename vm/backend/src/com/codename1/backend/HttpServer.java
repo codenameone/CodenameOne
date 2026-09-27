@@ -30,48 +30,44 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * An HTTP/1.1 server built around a reactor and a bounded worker pool.
- *
- * The split is the whole design. A parked ParparVM thread costs about 243KB on
- * musl (see vm/benchmarks ThreadCost), so ten thousand connections cannot each
- * have one. Here an IDLE connection is a descriptor the reactor watches, and only
- * a connection with a request in flight occupies a worker. Workers are bounded, so
- * overload sheds as queueing rather than as memory exhaustion.
- *
- * Once a worker owns a connection its descriptor is switched to BLOCKING mode, so
- * request parsing is a straight read loop rather than a resumable state machine.
- * That spends a worker per in-flight request to avoid a large amount of
- * complexity, and in-flight requests are the thing there are few of.
- */
+/// An HTTP/1.1 server built around a reactor and a bounded worker pool.
+///
+/// The split is the whole design. A parked ParparVM thread costs about 243KB on
+/// musl (see vm/benchmarks ThreadCost), so ten thousand connections cannot each
+/// have one. Here an IDLE connection is a descriptor the reactor watches, and only
+/// a connection with a request in flight occupies a worker. Workers are bounded, so
+/// overload sheds as queueing rather than as memory exhaustion.
+///
+/// Once a worker owns a connection its descriptor is switched to BLOCKING mode, so
+/// request parsing is a straight read loop rather than a resumable state machine.
+/// That spends a worker per in-flight request to avoid a large amount of
+/// complexity, and in-flight requests are the thing there are few of.
 public final class HttpServer {
-    /**
-     * What a handler receives. Header names are matched case-insensitively.
-     *
-     * The headers are NOT copied out of the request. They stay as offsets into
-     * the buffer the kernel filled, and {@link #getHeader} compares against those
-     * bytes -- so a handler that reads two headers allocates nothing, where
-     * building a map of Strings cost about 2.6KB per request and made char[] the
-     * single largest allocation in the server. {@link #getHeaders} still returns
-     * a Map, built on first call, for callers that want one.
-     *
-     * A Request is valid for the duration of {@link Handler#handle} and NOT
-     * beyond it. Both the byte array it was parsed from and the slice table that
-     * indexes it are reused -- the array by the reading thread, the table by the
-     * connection -- so a Request held past the handler describes whatever arrived
-     * next, not what it was built from.
-     *
-     * This corrects a claim that used to stand here, that the slices "stay valid
-     * for as long as the Request is held". That was never true: the table is
-     * `conn.slices`, reused by the very next request on the same connection. The
-     * zero-copy read added a second way for it to be false, which is what prompted
-     * reading the sentence carefully enough to notice it had always been wrong.
-     *
-     * The synchronous handler signature already makes the call the natural
-     * lifetime, so this documents the contract rather than narrowing one -- but
-     * anything that needs to outlive the handler must copy what it needs, and
-     * {@link #getHeaders} or {@link #getHeader} give Strings that are safe to keep.
-     */
+    /// What a handler receives. Header names are matched case-insensitively.
+    ///
+    /// The headers are NOT copied out of the request. They stay as offsets into
+    /// the buffer the kernel filled, and [#getHeader] compares against those
+    /// bytes -- so a handler that reads two headers allocates nothing, where
+    /// building a map of Strings cost about 2.6KB per request and made char\[\] the
+    /// single largest allocation in the server. [#getHeaders] still returns
+    /// a Map, built on first call, for callers that want one.
+    ///
+    /// A Request is valid for the duration of [Handler#handle] and NOT
+    /// beyond it. Both the byte array it was parsed from and the slice table that
+    /// indexes it are reused -- the array by the reading thread, the table by the
+    /// connection -- so a Request held past the handler describes whatever arrived
+    /// next, not what it was built from.
+    ///
+    /// This corrects a claim that used to stand here, that the slices "stay valid
+    /// for as long as the Request is held". That was never true: the table is
+    /// `conn.slices`, reused by the very next request on the same connection. The
+    /// zero-copy read added a second way for it to be false, which is what prompted
+    /// reading the sentence carefully enough to notice it had always been wrong.
+    ///
+    /// The synchronous handler signature already makes the call the natural
+    /// lifetime, so this documents the contract rather than narrowing one -- but
+    /// anything that needs to outlive the handler must copy what it needs, and
+    /// [#getHeaders] or [#getHeader] give Strings that are safe to keep.
     public static final class Request {
         // Not final because one Request is REUSED for every request on a
         // connection, which is the same trade the buffer and the slice table
@@ -84,54 +80,50 @@ public final class HttpServer {
         private String target;
         private String version;
         private String body;
-        /** The connection this request arrived on; null for HTTP/2, see respond. */
+        /// The connection this request arrived on; null for HTTP/2, see respond.
         private Conn conn;
-        /** The bytes the header block was read from. */
+        /// The bytes the header block was read from.
         private byte[] raw;
-        /** nameStart, nameLength, valueStart, valueLength per header, in order. */
+        /// nameStart, nameLength, valueStart, valueLength per header, in order.
         private int[] slices;
         private int headerCount;
         private Map headers;
-        /**
-         * Where the request target sits inside {@link #raw}.
-         *
-         * Kept so a router can match on the bytes the parser already has. Matching
-         * on getTarget() means comparing Strings, and the generated router is the
-         * one caller that runs for every request on every route, so it is worth not
-         * asking it to.
-         */
+        /// Where the request target sits inside [#raw].
+        ///
+        /// Kept so a router can match on the bytes the parser already has. Matching
+        /// on getTarget() means comparing Strings, and the generated router is the
+        /// one caller that runs for every request on every route, so it is worth not
+        /// asking it to.
         private int targetStart;
         private int targetLength;
-        /** Computed on first use; -1 until then. Reset with the rest of the Request. */
+        /// Computed on first use; -1 until then. Reset with the rest of the Request.
         private int pathLength = -1;
-        /**
-         * The target with percent-encoded UNRESERVED octets resolved, or null when
-         * it carried none and the raw bytes are already canonical.
-         *
-         * <p>RFC 3986 calls %6D and "m" the same character, so /users/%6De and
-         * /users/me are one URI spelled two ways. Route selection compares bytes,
-         * so without this the literal route missed and a sibling pattern route
-         * caught it instead -- /users/me and /users/{id} are different handlers,
-         * and choosing between them by spelling is how a check on one of them gets
-         * walked around. An encoded SLASH is deliberately left alone: %2F is not a
-         * segment boundary, and resolving it would invent one.
-         *
-         * <p>Built only when such an escape is actually there, so an ordinary
-         * target stays on the zero-allocation path the comment above describes.
-         */
+        /// The target with percent-encoded UNRESERVED octets resolved, or null when
+        /// it carried none and the raw bytes are already canonical.
+        ///
+        /// RFC 3986 calls %6D and "m" the same character, so /users/%6De and
+        /// /users/me are one URI spelled two ways. Route selection compares bytes,
+        /// so without this the literal route missed and a sibling pattern route
+        /// caught it instead -- /users/me and /users/{id} are different handlers,
+        /// and choosing between them by spelling is how a check on one of them gets
+        /// walked around. An encoded SLASH is deliberately left alone: %2F is not a
+        /// segment boundary, and resolving it would invent one.
+        ///
+        /// Built only when such an escape is actually there, so an ordinary
+        /// target stays on the zero-allocation path the comment above describes.
         private byte[] canonicalTarget;
         private int canonicalLength;
         private boolean canonicalChecked;
-        /** The sessions of the server serving this request; set by Backend. */
+        /// The sessions of the server serving this request; set by Backend.
         Sessions sessions;
-        /** See {@link #endedSessions}. */
-        private java.util.List endedSessions;
-        /** The sessions this request counts as using; see Sessions.enter. */
-        java.util.List sessionsInUse;
-        /** This request's session once looked up; see {@link #getSession(boolean)}. */
+        /// See [#endedSessions].
+        private List endedSessions;
+        /// The sessions this request counts as using; see Sessions.enter.
+        List sessionsInUse;
+        /// This request's session once looked up; see [#getSession(boolean)].
         private HttpSession session;
         private boolean sessionResolved;
-        /** The request's {@code @RequestScope} beans, by the slot the build gave each. */
+        /// The request's `@RequestScope` beans, by the slot the build gave each.
         private Object[] scopedBeans;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
@@ -153,49 +145,45 @@ public final class HttpServer {
             this.pathLength = -1;
         }
 
-        /**
-         * True when the request PATH is exactly these bytes.
-         *
-         * The path, not the target: everything from `?` onwards is the query string
-         * and is not part of the route. A router that compared the whole target
-         * would match `/healthz` and miss `/healthz?probe=1`, which is the same
-         * request.
-         *
-         * For the generated router, which holds each route as a byte[] constant. No
-         * String is built and nothing is hashed: it is a length test and a compare
-         * against the buffer the request was parsed from. Falls back to comparing
-         * the target String when the slice is not available, which is the HTTP/2
-         * path -- there the target came from HPACK rather than from a byte range.
-         */
+        /// True when the request PATH is exactly these bytes.
+        ///
+        /// The path, not the target: everything from `?` onwards is the query string
+        /// and is not part of the route. A router that compared the whole target
+        /// would match `/healthz` and miss `/healthz?probe=1`, which is the same
+        /// request.
+        ///
+        /// For the generated router, which holds each route as a byte\[\] constant. No
+        /// String is built and nothing is hashed: it is a length test and a compare
+        /// against the buffer the request was parsed from. Falls back to comparing
+        /// the target String when the slice is not available, which is the HTTP/2
+        /// path -- there the target came from HPACK rather than from a byte range.
         public boolean pathIs(byte[] path) {
-            if(path == null) {
+            if (path == null) {
                 return false;
             }
             int length = pathByteLength();
-            if(path.length != length) {
+            if (path.length != length) {
                 return false;
             }
             return regionEquals(path, 0, length);
         }
 
-        /** As {@link #pathIs}, for a route that continues into a path variable. */
+        /// As [#pathIs], for a route that continues into a path variable.
         public boolean pathStartsWith(byte[] prefix) {
-            if(prefix == null || prefix.length > pathByteLength()) {
+            if (prefix == null || prefix.length > pathByteLength()) {
                 return false;
             }
             return regionEquals(prefix, 0, prefix.length);
         }
 
-        /**
-         * The path from `from` onwards, as text. Allocates, so a matched route only.
-         *
-         * Percent escapes are left alone. The router decodes the segments it binds,
-         * because decoding first would let an encoded `/` invent a segment boundary
-         * that the client never sent.
-         */
+        /// The path from `from` onwards, as text. Allocates, so a matched route only.
+        ///
+        /// Percent escapes are left alone. The router decodes the segments it binds,
+        /// because decoding first would let an encoded `/` invent a segment boundary
+        /// that the client never sent.
         public String pathFrom(int from) {
             int length = pathByteLength();
-            if(from >= length) {
+            if (from >= length) {
                 return "";
             }
             // The canonical bytes when there are any: the offsets a caller has are
@@ -203,24 +191,24 @@ public final class HttpServer {
             // compare against the same bytes. Reading raw here instead would hand
             // back a slice measured in one spelling and indexed in the other.
             canonicalize();
-            if(canonicalTarget != null) {
+            if (canonicalTarget != null) {
                 return asciiString(canonicalTarget, from, length - from);
             }
-            if(targetLength <= 0 || raw == null) {
+            if (targetLength <= 0 || raw == null) {
                 return target.substring(from, length);
             }
             return asciiString(raw, targetStart + from, length - from);
         }
 
-        /** The path's length in bytes -- the target up to `?` -- without building it. */
+        /// The path's length in bytes -- the target up to `?` -- without building it.
         public int pathByteLength() {
-            if(pathLength >= 0) {
+            if (pathLength >= 0) {
                 return pathLength;
             }
             int length = targetByteLength();
             int found = length;
-            for(int iter = 0 ; iter < length ; iter++) {
-                if(byteAt(iter) == '?') {
+            for (int iter = 0 ; iter < length ; iter++) {
+                if (byteAt(iter) == '?') {
                     found = iter;
                     break;
                 }
@@ -229,28 +217,26 @@ public final class HttpServer {
             return found;
         }
 
-        /**
-         * A query parameter's decoded value, or null when the request did not send
-         * it. An empty `?flag=` is present with an empty value, which is not the
-         * same as absent, and callers that offer a default depend on the difference.
-         */
+        /// A query parameter's decoded value, or null when the request did not send
+        /// it. An empty `?flag=` is present with an empty value, which is not the
+        /// same as absent, and callers that offer a default depend on the difference.
         public String queryParam(String name) {
             int length = targetByteLength();
             int pos = pathByteLength();
-            if(pos >= length || name == null) {
+            if (pos >= length || name == null) {
                 return null;
             }
             pos++; // the '?' itself
-            while(pos <= length) {
+            while (pos <= length) {
                 int end = pos;
-                while(end < length && byteAt(end) != '&') {
+                while (end < length && byteAt(end) != '&') {
                     end++;
                 }
                 int eq = pos;
-                while(eq < end && byteAt(eq) != '=') {
+                while (eq < end && byteAt(eq) != '=') {
                     eq++;
                 }
-                if(nameEquals(name, pos, eq)) {
+                if (nameEquals(name, pos, eq)) {
                     return percentDecode(eq < end ? eq + 1 : end, end);
                 }
                 pos = end + 1;
@@ -258,26 +244,24 @@ public final class HttpServer {
             return null;
         }
 
-        /**
-         * One byte of the request target, from whichever form this Request holds.
-         *
-         * <p>The String form is one char per OCTET -- the h2 natives build it with
-         * newStringFromAsciiLen, as the HTTP/1 parser reads its bytes -- so
-         * narrowing here recovers exactly what arrived. It is not a UTF-16 string
-         * being truncated: decoding those octets into characters anywhere upstream
-         * would make this return bytes the client never sent, which is what a
-         * UTF-8 decode of :path did.
-         */
+        /// One byte of the request target, from whichever form this Request holds.
+        ///
+        /// The String form is one char per OCTET -- the h2 natives build it with
+        /// newStringFromAsciiLen, as the HTTP/1 parser reads its bytes -- so
+        /// narrowing here recovers exactly what arrived. It is not a UTF-16 string
+        /// being truncated: decoding those octets into characters anywhere upstream
+        /// would make this return bytes the client never sent, which is what a
+        /// UTF-8 decode of :path did.
         private int byteAt(int index) {
             canonicalize();
-            if(canonicalTarget != null) {
+            if (canonicalTarget != null) {
                 return canonicalTarget[index] & 0xff;
             }
             return rawByteAt(index);
         }
 
         private int rawByteAt(int index) {
-            if(targetLength > 0 && raw != null) {
+            if (targetLength > 0 && raw != null) {
                 return raw[targetStart + index] & 0xff;
             }
             return target.charAt(index) & 0xff;
@@ -288,30 +272,28 @@ public final class HttpServer {
                                     : (target == null ? 0 : target.length());
         }
 
-        /** The target's length in bytes, after normalizing if it needed it. */
+        /// The target's length in bytes, after normalizing if it needed it.
         private int targetByteLength() {
             canonicalize();
             return canonicalTarget != null ? canonicalLength : rawTargetLength();
         }
 
-        /**
-         * Resolves percent-encoded unreserved octets, once, and only when there is
-         * at least one. See canonicalTarget.
-         */
+        /// Resolves percent-encoded unreserved octets, once, and only when there is
+        /// at least one. See canonicalTarget.
         private void canonicalize() {
-            if(canonicalChecked) {
+            if (canonicalChecked) {
                 return;
             }
             canonicalChecked = true;
             int length = rawTargetLength();
             boolean needed = false;
-            for(int iter = 0 ; iter + 2 < length ; iter++) {
-                if(rawByteAt(iter) != '%') {
+            for (int iter = 0 ; iter + 2 < length ; iter++) {
+                if (rawByteAt(iter) != '%') {
                     continue;
                 }
                 int hi = hexDigit(rawByteAt(iter + 1));
                 int lo = hexDigit(rawByteAt(iter + 2));
-                if(hi < 0 || lo < 0) {
+                if (hi < 0 || lo < 0) {
                     continue;
                 }
                 // A RETAINED ESCAPE STILL NEEDS ITS CASE SETTLED. %2F and %2f are
@@ -320,39 +302,39 @@ public final class HttpServer {
                 // declared with one spelling was missed by the other, and a
                 // request that changed nothing but the case of a hex digit fell
                 // past a protected route into whatever dynamic one followed it.
-                if(isUnreservedByte((hi << 4) | lo) || isLowerHex(rawByteAt(iter + 1))
+                if (isUnreservedByte((hi << 4) | lo) || isLowerHex(rawByteAt(iter + 1))
                         || isLowerHex(rawByteAt(iter + 2))) {
                     needed = true;
                     break;
                 }
             }
-            if(!needed) {
+            if (!needed) {
                 return;             // already canonical; nothing allocated
             }
             byte[] out = new byte[length];
             int count = 0;
             int pos = 0;
-            while(pos < length) {
+            while (pos < length) {
                 int c = rawByteAt(pos);
-                if(c == '%' && pos + 2 < length) {
+                if (c == '%' && pos + 2 < length) {
                     int hi = hexDigit(rawByteAt(pos + 1));
                     int lo = hexDigit(rawByteAt(pos + 2));
-                    if(hi >= 0 && lo >= 0) {
+                    if (hi >= 0 && lo >= 0) {
                         int decoded = (hi << 4) | lo;
-                        if(isUnreservedByte(decoded)) {
-                            out[count++] = (byte)decoded;
+                        if (isUnreservedByte(decoded)) {
+                            out[count++] = (byte) decoded;
                             pos += 3;
                             continue;
                         }
                         // Kept encoded, and kept in ONE spelling.
-                        out[count++] = (byte)'%';
-                        out[count++] = (byte)upperHex(rawByteAt(pos + 1));
-                        out[count++] = (byte)upperHex(rawByteAt(pos + 2));
+                        out[count++] = (byte) '%';
+                        out[count++] = (byte) upperHex(rawByteAt(pos + 1));
+                        out[count++] = (byte) upperHex(rawByteAt(pos + 2));
                         pos += 3;
                         continue;
                     }
                 }
-                out[count++] = (byte)c;
+                out[count++] = (byte) c;
                 pos++;
             }
             canonicalTarget = out;
@@ -367,7 +349,7 @@ public final class HttpServer {
             return isLowerHex(c) ? c - ('a' - 'A') : c;
         }
 
-        /** ALPHA / DIGIT / "-" / "." / "_" / "~", the RFC 3986 unreserved set. */
+        /// ALPHA / DIGIT / "-" / "." / "_" / "~", the RFC 3986 unreserved set.
         private static boolean isUnreservedByte(int c) {
             return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9')
@@ -375,19 +357,17 @@ public final class HttpServer {
         }
 
         private boolean regionEquals(byte[] expected, int from, int length) {
-            for(int iter = 0 ; iter < length ; iter++) {
-                if(byteAt(from + iter) != (expected[iter] & 0xff)) {
+            for (int iter = 0 ; iter < length ; iter++) {
+                if (byteAt(from + iter) != (expected[iter] & 0xff)) {
                     return false;
                 }
             }
             return true;
         }
 
-        /**
-         * Compares a parameter name against the raw bytes, decoding escapes in the
-         * request as it goes. Names are rarely encoded, but comparing an encoded
-         * name against a plain one would silently miss the parameter.
-         */
+        /// Compares a parameter name against the raw bytes, decoding escapes in the
+        /// request as it goes. Names are rarely encoded, but comparing an encoded
+        /// name against a plain one would silently miss the parameter.
         private boolean nameEquals(String name, int from, int to) {
             // A DECODED OCTET is compared below, so the thing it is compared
             // against has to be an octet too. For a non-ASCII name it is not:
@@ -399,8 +379,8 @@ public final class HttpServer {
             // of them, keep the character path: it is identical for them and
             // allocates nothing on a per-request code path.
             byte[] utf8 = null;
-            for(int iter = 0 ; iter < name.length() ; iter++) {
-                if(name.charAt(iter) > 0x7f) {
+            for (int iter = 0 ; iter < name.length() ; iter++) {
+                if (name.charAt(iter) > 0x7f) {
                     try {
                         utf8 = name.getBytes("UTF-8");
                     } catch (IOException err) {
@@ -412,22 +392,22 @@ public final class HttpServer {
             int wanted = utf8 == null ? name.length() : utf8.length;
             int index = 0;
             int pos = from;
-            while(pos < to) {
+            while (pos < to) {
                 int c = byteAt(pos);
                 int width = 1;
-                if(c == '%' && pos + 2 < to) {
+                if (c == '%' && pos + 2 < to) {
                     int hi = hexDigit(byteAt(pos + 1));
                     int lo = hexDigit(byteAt(pos + 2));
-                    if(hi >= 0 && lo >= 0) {
+                    if (hi >= 0 && lo >= 0) {
                         c = (hi << 4) | lo;
                         width = 3;
                     }
-                } else if(c == '+') {
+                } else if (c == '+') {
                     c = ' ';
                 }
                 int want = index >= wanted ? -1
                         : (utf8 == null ? (name.charAt(index) & 0xff) : (utf8[index] & 0xff));
-                if(want != c) {
+                if (want != c) {
                     return false;
                 }
                 index++;
@@ -436,74 +416,67 @@ public final class HttpServer {
             return index == wanted;
         }
 
-        /**
-         * Decodes one query value. The octets are gathered and decoded as a run,
-         * because a percent escape carries one byte of UTF-8 and a character built
-         * from a single byte at a time is mojibake for everything above ASCII.
-         */
+        /// Decodes one query value. The octets are gathered and decoded as a run,
+        /// because a percent escape carries one byte of UTF-8 and a character built
+        /// from a single byte at a time is mojibake for everything above ASCII.
         private String percentDecode(int from, int to) {
             byte[] out = new byte[to - from];
             int length = 0;
             int pos = from;
-            while(pos < to) {
+            while (pos < to) {
                 int c = byteAt(pos);
-                if(c == '%' && pos + 2 < to) {
+                if (c == '%' && pos + 2 < to) {
                     int hi = hexDigit(byteAt(pos + 1));
                     int lo = hexDigit(byteAt(pos + 2));
-                    if(hi >= 0 && lo >= 0) {
-                        out[length++] = (byte)((hi << 4) | lo);
+                    if (hi >= 0 && lo >= 0) {
+                        out[length++] = (byte) ((hi << 4) | lo);
                         pos += 3;
                         continue;
                     }
-                } else if(c == '+') {
+                } else if (c == '+') {
                     c = ' ';
                 }
-                out[length++] = (byte)c;
+                out[length++] = (byte) c;
                 pos++;
             }
-            try {
-                return new String(out, 0, length, "UTF-8");
-            } catch (java.io.UnsupportedEncodingException err) {
-                // UTF-8 is required of every VM this runs on; the checked exception
-                // is the API's, not a case that can happen.
-                return new String(out, 0, length);
-            }
+            // Malformed sequences decode to U+FFFD, as they always did; what goes
+            // is the fallback to the platform charset, which on the JVM arm was a
+            // second, different decoding of the same bytes.
+            return Utf8.decode(out, 0, length);
         }
 
         private static int hexDigit(int c) {
-            if(c >= '0' && c <= '9') {
+            if (c >= '0' && c <= '9') {
                 return c - '0';
             }
-            if(c >= 'a' && c <= 'f') {
+            if (c >= 'a' && c <= 'f') {
                 return c - 'a' + 10;
             }
-            if(c >= 'A' && c <= 'F') {
+            if (c >= 'A' && c <= 'F') {
                 return c - 'A' + 10;
             }
             return -1;
         }
 
-        /**
-         * A Response for this request WITHOUT allocating one.
-         *
-         * Returns the connection's single Response, re-pointed to these values. It
-         * is valid for the duration of {@link Handler#handle} and not beyond it --
-         * the same contract this Request already carries, and for the same reason:
-         * the next request on this connection reuses it.
-         *
-         * Why it exists: on a route that allocates nothing else, the Response was
-         * the last per-request allocation, and allocation is what drives both the
-         * collector's frequency and its footprint. Removing it measured a 15x
-         * better p99 and an 8x smaller resident set at the same throughput.
-         *
-         * {@code new Response(...)} still works and still allocates; a handler that
-         * needs its Response to outlive the call must use it.
-         */
+        /// A Response for this request WITHOUT allocating one.
+        ///
+        /// Returns the connection's single Response, re-pointed to these values. It
+        /// is valid for the duration of [Handler#handle] and not beyond it --
+        /// the same contract this Request already carries, and for the same reason:
+        /// the next request on this connection reuses it.
+        ///
+        /// Why it exists: on a route that allocates nothing else, the Response was
+        /// the last per-request allocation, and allocation is what drives both the
+        /// collector's frequency and its footprint. Removing it measured a 15x
+        /// better p99 and an 8x smaller resident set at the same throughput.
+        ///
+        /// `new Response(...)` still works and still allocates; a handler that
+        /// needs its Response to outlive the call must use it.
         public Response respond(int status, String contentType, byte[] body) {
-            if(conn == null) {
+            if (conn == null) {
                 return new Response(status, contentType, body);   // HTTP/2 path
             }
-            if(conn.pooledResponse == null) {
+            if (conn.pooledResponse == null) {
                 conn.pooledResponse = new Response(status, contentType, body);
             } else {
                 conn.pooledResponse.reset(status, contentType,
@@ -512,33 +485,31 @@ public final class HttpServer {
             return conn.pooledResponse;
         }
 
-        /**
-         * A JSON response on the connection's pooled Response, serialised straight
-         * from the value.
-         *
-         * The deferred-JSON path already avoided every copy on the body side --
-         * Json.write goes into the connection's reusable ByteSink, so nothing
-         * materialises a byte[] or a String -- but Response.jsonValue is a static
-         * that allocates a fresh Response per call, and that was the ONLY thing the
-         * route allocated. Profiled over 10.8M requests: 88.1 bytes each, all of it
-         * one HttpServer.Response, count 10789601 against 10789541 requests. The
-         * plaintext route had already been pooled and sat at 0.1 bytes per request.
-         *
-         * That is worth removing because of what allocation costs HERE rather than
-         * what it costs to allocate: the collector shares the server's cores, so a
-         * route that allocates pays for cycles in its tail. fasthttp on the same
-         * body allocates about 16 bytes per request and collects three times a
-         * second; this route was collecting thirteen to eighteen times a second.
-         *
-         * reset() clears deferredJson and hasDeferredJson, so a pooled Response
-         * reused for a plain body cannot carry a stale value into the next
-         * response -- which is the failure this would otherwise invite.
-         */
+        /// A JSON response on the connection's pooled Response, serialised straight
+        /// from the value.
+        ///
+        /// The deferred-JSON path already avoided every copy on the body side --
+        /// Json.write goes into the connection's reusable ByteSink, so nothing
+        /// materialises a byte\[\] or a String -- but Response.jsonValue is a static
+        /// that allocates a fresh Response per call, and that was the ONLY thing the
+        /// route allocated. Profiled over 10.8M requests: 88.1 bytes each, all of it
+        /// one HttpServer.Response, count 10789601 against 10789541 requests. The
+        /// plaintext route had already been pooled and sat at 0.1 bytes per request.
+        ///
+        /// That is worth removing because of what allocation costs HERE rather than
+        /// what it costs to allocate: the collector shares the server's cores, so a
+        /// route that allocates pays for cycles in its tail. fasthttp on the same
+        /// body allocates about 16 bytes per request and collects three times a
+        /// second; this route was collecting thirteen to eighteen times a second.
+        ///
+        /// reset() clears deferredJson and hasDeferredJson, so a pooled Response
+        /// reused for a plain body cannot carry a stale value into the next
+        /// response -- which is the failure this would otherwise invite.
         public Response respondJson(int status, Object value) {
-            if(conn == null) {
+            if (conn == null) {
                 return Response.jsonValue(status, value);   // HTTP/2 path, as respond() does
             }
-            if(conn.pooledResponse == null) {
+            if (conn.pooledResponse == null) {
                 conn.pooledResponse = new Response(status, JSON_CONTENT_TYPE,
                         EMPTY_BODY, -1, 0, 0, null);
             } else {
@@ -550,38 +521,32 @@ public final class HttpServer {
             return conn.pooledResponse;
         }
 
-        /**
-         * DIAGNOSTIC: the connection's Response exactly as the last request left
-         * it, or null the first time. Separates the allocation pooling saves from
-         * the field writes it adds -- see the bench demo's RESPONSE_MODE.
-         */
+        /// DIAGNOSTIC: the connection's Response exactly as the last request left
+        /// it, or null the first time. Separates the allocation pooling saves from
+        /// the field writes it adds -- see the bench demo's RESPONSE_MODE.
         public Response presetResponse() {
             return conn == null ? null : conn.pooledResponse;
         }
 
-        /**
-         * Re-points this Request at a freshly parsed request. Every field is
-         * assigned, with no "unchanged" case: a field left behind describes the
-         * PREVIOUS request on this connection, and headers is the one that would
-         * hurt -- it caches a Map built on demand by getHeaders, so carrying it
-         * over would answer one request's header lookups with another's. That is
-         * a wrong answer rather than a crash, which is why it is assigned here
-         * unconditionally instead of being cleared at some later point.
-         */
+        /// Re-points this Request at a freshly parsed request. Every field is
+        /// assigned, with no "unchanged" case: a field left behind describes the
+        /// PREVIOUS request on this connection, and headers is the one that would
+        /// hurt -- it caches a Map built on demand by getHeaders, so carrying it
+        /// over would answer one request's header lookups with another's. That is
+        /// a wrong answer rather than a crash, which is why it is assigned here
+        /// unconditionally instead of being cleared at some later point.
         void reset(Conn conn, String method, String target, String version, byte[] raw,
                    int[] slices, int headerCount, String body) {
             reset(conn, method, target, version, raw, slices, headerCount, body, 0, 0);
         }
 
-        /**
-         * Drops what this request pointed at, once it has been answered.
-         *
-         * This object is pooled per connection and re-pointed by reset() for the
-         * next request, so between the two it goes on referencing the LAST one:
-         * the buffer the headers were sliced from, and the decoded body, which for
-         * an upload is the whole of it. Every field cleared here is assigned again
-         * by reset() before anything reads it.
-         */
+        /// Drops what this request pointed at, once it has been answered.
+        ///
+        /// This object is pooled per connection and re-pointed by reset() for the
+        /// next request, so between the two it goes on referencing the LAST one:
+        /// the buffer the headers were sliced from, and the decoded body, which for
+        /// an upload is the whole of it. Every field cleared here is assigned again
+        /// by reset() before anything reads it.
         void releaseRetained() {
             this.raw = null;
             this.slices = null;
@@ -595,33 +560,31 @@ public final class HttpServer {
             this.sessionsInUse = null;
         }
 
-        /** The session of this request, creating one if it has none. */
+        /// The session of this request, creating one if it has none.
         public HttpSession getSession() {
             return getSession(true);
         }
 
-        /**
-         * The session this request belongs to: the one its cookie names, or, with
-         * {@code create} set and no valid cookie, a new one the response will
-         * send a cookie for. Null when there is none and {@code create} is false.
-         * See {@link Sessions} for the cookie and where sessions are kept.
-         */
+        /// The session this request belongs to: the one its cookie names, or, with
+        /// `create` set and no valid cookie, a new one the response will
+        /// send a cookie for. Null when there is none and `create` is false.
+        /// See [Sessions] for the cookie and where sessions are kept.
         public HttpSession getSession(boolean create) {
-            if(sessionResolved && session != null && !session.isValid()) {
+            if (sessionResolved && session != null && !session.isValid()) {
                 // Invalidated earlier in this request: it is not the session any
                 // more. Kept aside so the end of the request still deletes it and
                 // clears its cookie; a lookup now answers as if there were none,
                 // and create starts a new one.
-                if(endedSessions == null) {
-                    endedSessions = new java.util.ArrayList(1);
+                if (endedSessions == null) {
+                    endedSessions = new ArrayList(1);
                 }
                 endedSessions.add(session);
                 session = null;
             }
-            if(sessionResolved && (session != null || !create)) {
+            if (sessionResolved && (session != null || !create)) {
                 return session;
             }
-            if(sessions == null) {
+            if (sessions == null) {
                 // Sessions are stored, and their cookie sent, when a Backend
                 // finishes the request; a bare HttpServer has nothing that would,
                 // so a session here would silently never persist.
@@ -635,42 +598,38 @@ public final class HttpServer {
                         create);
             } catch (IOException err) {
                 throw new IllegalStateException("The session store failed: "
-                        + err.getMessage());
+                        + err.getMessage(), err);
             }
             sessionResolved = true;
-            if(session != null) {
+            if (session != null) {
                 owner.enter(this, session);
             }
             return session;
         }
 
-        /** The value of one cookie the client sent, or null. */
+        /// The value of one cookie the client sent, or null.
         public String getCookie(String name) {
             return Sessions.cookieValue(getHeader("cookie"), name);
         }
 
-        /** The session, if this request looked it up. */
+        /// The session, if this request looked it up.
         HttpSession resolvedSession() {
             return session;
         }
 
-        /**
-         * The sessions this request invalidated and then replaced, oldest first,
-         * or null. All of them: one request can end a session, start another and
-         * end that too, and each has to be deleted when it finishes.
-         */
-        java.util.List endedSessions() {
+        /// The sessions this request invalidated and then replaced, oldest first,
+        /// or null. All of them: one request can end a session, start another and
+        /// end that too, and each has to be deleted when it finishes.
+        List endedSessions() {
             return endedSessions;
         }
 
-        /**
-         * This request's {@code @RequestScope} beans, grown to hold at least
-         * {@code count}. Called by generated code.
-         */
+        /// This request's `@RequestScope` beans, grown to hold at least
+        /// `count`. Called by generated code.
         public Object[] scopedBeans(int count) {
-            if(scopedBeans == null || scopedBeans.length < count) {
+            if (scopedBeans == null || scopedBeans.length < count) {
                 Object[] grown = new Object[count];
-                if(scopedBeans != null) {
+                if (scopedBeans != null) {
                     System.arraycopy(scopedBeans, 0, grown, 0, scopedBeans.length);
                 }
                 scopedBeans = grown;
@@ -678,18 +637,16 @@ public final class HttpServer {
             return scopedBeans;
         }
 
-        /** The request's beans, handed over for destruction and forgotten. */
+        /// The request's beans, handed over for destruction and forgotten.
         Object[] takeScopedBeans() {
             Object[] out = scopedBeans;
             scopedBeans = null;
             return out;
         }
 
-        /**
-         * The body, once it has been read. The only field that is not known when
-         * the header block is parsed, and the only one readRequest assigns after
-         * it -- see the comment there for why the rest must not be reassigned.
-         */
+        /// The body, once it has been read. The only field that is not known when
+        /// the header block is parsed, and the only one readRequest assigns after
+        /// it -- see the comment there for why the rest must not be reassigned.
         void setBody(String value) {
             this.body = value;
         }
@@ -722,11 +679,9 @@ public final class HttpServer {
             this.sessionsInUse = null;
         }
 
-        /**
-         * For HTTP/2, whose headers arrive already decoded from the HPACK state --
-         * there is no request buffer to slice into, so the map IS the
-         * representation and every lookup below falls back to it.
-         */
+        /// For HTTP/2, whose headers arrive already decoded from the HPACK state --
+        /// there is no request buffer to slice into, so the map IS the
+        /// representation and every lookup below falls back to it.
         Request(String method, String target, String version, Map headers, String body) {
             // pathLength is NOT set here, and does not need to be: it carries a
             // field initializer (= -1) and javac copies those into every
@@ -744,7 +699,7 @@ public final class HttpServer {
             this.body = body;
         }
 
-        /** "HTTP/1.1" or "HTTP/1.0". The two differ on whether keep-alive is the default. */
+        /// "HTTP/1.1" or "HTTP/1.0". The two differ on whether keep-alive is the default.
         public String getVersion() {
             return version;
         }
@@ -753,27 +708,25 @@ public final class HttpServer {
             return method;
         }
 
-        /** Path plus query string, exactly as it arrived. */
+        /// Path plus query string, exactly as it arrived.
         public String getTarget() {
             return target;
         }
 
-        /**
-         * The headers as a Map, lower-cased names to values.
-         *
-         * Built on the first call and cached. Prefer {@link #getHeader}: this
-         * allocates a String per name and per value, which is the cost the slice
-         * representation exists to avoid.
-         */
+        /// The headers as a Map, lower-cased names to values.
+        ///
+        /// Built on the first call and cached. Prefer [#getHeader]: this
+        /// allocates a String per name and per value, which is the cost the slice
+        /// representation exists to avoid.
         public Map getHeaders() {
-            if(headers == null) {
+            if (headers == null) {
                 Map out = new LinkedHashMap();
-                for(int iter = 0 ; iter < headerCount ; iter++) {
+                for (int iter = 0 ; iter < headerCount ; iter++) {
                     int base = iter * 4;
                     String name = lowerCaseString(raw, slices[base], slices[base + 1]);
                     String value = asciiString(raw, slices[base + 2], slices[base + 3]);
                     Object existing = out.get(name);
-                    if(existing == null) {
+                    if (existing == null) {
                         out.put(name, value);
                     } else {
                         // Combined in arrival order, as the HTTP/2 path does. Replacing
@@ -790,20 +743,20 @@ public final class HttpServer {
             return headers;
         }
 
-        /** One header by name, matched case-insensitively. Allocates only the value. */
+        /// One header by name, matched case-insensitively. Allocates only the value.
         public String getHeader(String name) {
-            if(name == null) {
+            if (name == null) {
                 return null;
             }
-            if(raw == null) {
+            if (raw == null) {
                 Object v = headers.get(asciiLower(name));
                 return v == null ? null : String.valueOf(v);
             }
             int at = indexOfHeader(name);
-            if(at < 0) {
+            if (at < 0) {
                 return null;
             }
-            if(countHeader(name) == 1) {
+            if (countHeader(name) == 1) {
                 return asciiString(raw, slices[at + 2], slices[at + 3]);
             }
             // Repeated field. getHeaders() combines these and the HTTP/2 path does
@@ -817,12 +770,12 @@ public final class HttpServer {
             // everything else with "," as RFC 9110 5.3 defines for a list field.
             String separator = "cookie".equalsIgnoreCase(name) ? "; " : ", ";
             StringBuilder joined = new StringBuilder();
-            for(int iter = 0 ; iter < headerCount ; iter++) {
+            for (int iter = 0 ; iter < headerCount ; iter++) {
                 int base = iter * 4;
-                if(!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                if (!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
                     continue;
                 }
-                if(joined.length() > 0) {
+                if (joined.length() > 0) {
                     joined.append(separator);
                 }
                 joined.append(asciiString(raw, slices[base + 2], slices[base + 3]));
@@ -830,26 +783,24 @@ public final class HttpServer {
             return joined.toString();
         }
 
-        /**
-         * Lowercases an ASCII header name.
-         *
-         * NOT String.toLowerCase(), which is locale sensitive and has no overload
-         * here that takes a Locale: on a Turkish default the I of "COOKIE" folds to
-         * a dotless i and the lookup misses a header that is present. A field name
-         * is ASCII by specification, so it folds by hand. Six lines, copied rather
-         * than shared, as the other folds in this tree are.
-         */
+        /// Lowercases an ASCII header name.
+        ///
+        /// NOT String.toLowerCase(), which is locale sensitive and has no overload
+        /// here that takes a Locale: on a Turkish default the I of "COOKIE" folds to
+        /// a dotless i and the lookup misses a header that is present. A field name
+        /// is ASCII by specification, so it folds by hand. Six lines, copied rather
+        /// than shared, as the other folds in this tree are.
         private static String asciiLower(String name) {
             int length = name.length();
             StringBuilder out = new StringBuilder(length);
-            for(int iter = 0 ; iter < length ; iter++) {
+            for (int iter = 0 ; iter < length ; iter++) {
                 char c = name.charAt(iter);
-                out.append(c >= 'A' && c <= 'Z' ? (char)(c + 32) : c);
+                out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
             }
             return out.toString();
         }
 
-        /** The slice index of a header, or -1. No allocation on either path. */
+        /// The slice index of a header, or -1. No allocation on either path.
         int indexOfHeader(String name) {
             // Callers guard on raw != null; headerCount is 0 for the map form, so
             // this returns -1 there rather than reading a null slices array.
@@ -861,74 +812,71 @@ public final class HttpServer {
             // cn1InlStrCharAt (which re-checks the string's coder) plus a foldAscii
             // call, against a plain array read on the other side.
             byte[] needle = foldedBytes(name);
-            if(needle == null) {
+            if (needle == null) {
                 // Not ASCII-foldable, so the general path is the only correct one.
-                for(int iter = 0 ; iter < headerCount ; iter++) {
+                for (int iter = 0 ; iter < headerCount ; iter++) {
                     int base = iter * 4;
-                    if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                    if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
                         return base;
                     }
                 }
                 return -1;
             }
-            for(int iter = 0 ; iter < headerCount ; iter++) {
+            for (int iter = 0 ; iter < headerCount ; iter++) {
                 int base = iter * 4;
-                if(sliceEqualsFolded(raw, slices[base], slices[base + 1], needle)) {
+                if (sliceEqualsFolded(raw, slices[base], slices[base + 1], needle)) {
                     return base;
                 }
             }
             return -1;
         }
 
-        /**
-         * Whether a header's value contains a token, case-insensitively. Used for
-         * "connection: keep-alive" and friends without materialising the value.
-         */
-        /**
-         * Whether a comma-separated field lists this token.
-         *
-         * A WHOLE token, not a substring. "Connection: disclose" contains "close"
-         * and "not-keep-alive" contains "keep-alive", and a substring test read
-         * both as the option itself -- so an extension token nobody here has heard
-         * of decided whether the connection stays open, which is a framing
-         * decision made on an unrelated name. Every occurrence of the field is
-         * searched, because a repeated one is as legal as a repeated Cookie.
-         */
+        // Whether a header's value contains a token, case-insensitively. Used for
+        // "connection: keep-alive" and friends without materialising the value.
+
+        /// Whether a comma-separated field lists this token.
+        ///
+        /// A WHOLE token, not a substring. "Connection: disclose" contains "close"
+        /// and "not-keep-alive" contains "keep-alive", and a substring test read
+        /// both as the option itself -- so an extension token nobody here has heard
+        /// of decided whether the connection stays open, which is a framing
+        /// decision made on an unrelated name. Every occurrence of the field is
+        /// searched, because a repeated one is as legal as a repeated Cookie.
         boolean headerContains(String name, String token) {
-            if(raw == null) {
+            if (raw == null) {
                 Object v = headers == null ? null : headers.get(asciiLower(name));
                 return v != null && listHasToken(String.valueOf(v), token);
             }
-            for(int iter = 0 ; iter < headerCount ; iter++) {
+            for (int iter = 0 ; iter < headerCount ; iter++) {
                 int base = iter * 4;
-                if(!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                if (!sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
                     continue;
                 }
-                if(sliceHasToken(raw, slices[base + 2], slices[base + 3], token)) {
+                if (sliceHasToken(raw, slices[base + 2], slices[base + 3], token)) {
                     return true;
                 }
             }
             return false;
         }
 
-        /** The slice form: no String is built for the field or for its tokens. */
+        /// The slice form: no String is built for the field or for its tokens.
         private boolean sliceHasToken(byte[] data, int start, int length, String token) {
             int end = start + length;
             int at = start;
-            while(at < end) {
-                while(at < end && (data[at] == ' ' || data[at] == '\t' || data[at] == ',')) {
+            while (at < end) {
+                while (at < end && (data[at] == ' ' || data[at] == '\t' || data[at] == ',')) {
                     at++;
                 }
                 int tokenStart = at;
-                while(at < end && data[at] != ',') {
+                while (at < end && data[at] != ',') {
                     at++;
                 }
                 int tokenEnd = at;
-                while(tokenEnd > tokenStart
+                while (tokenEnd > tokenStart
                         && (data[tokenEnd - 1] == ' ' || data[tokenEnd - 1] == '\t')) {
                     tokenEnd--;
                 }
-                if(tokenEnd - tokenStart == token.length()
+                if (tokenEnd - tokenStart == token.length()
                         && sliceEqualsIgnoreCase(data, tokenStart, tokenEnd - tokenStart, token)) {
                     return true;
                 }
@@ -936,28 +884,28 @@ public final class HttpServer {
             return false;
         }
 
-        /** The String form, for a Request built from a map rather than a socket. */
+        /// The String form, for a Request built from a map rather than a socket.
         private boolean listHasToken(String value, String token) {
             int at = 0;
-            while(at <= value.length()) {
+            while (at <= value.length()) {
                 int comma = value.indexOf(',', at);
                 int end = comma < 0 ? value.length() : comma;
                 int start = at;
-                while(start < end && (value.charAt(start) == ' ' || value.charAt(start) == '\t')) {
+                while (start < end && (value.charAt(start) == ' ' || value.charAt(start) == '\t')) {
                     start++;
                 }
                 int trimmed = end;
-                while(trimmed > start
+                while (trimmed > start
                         && (value.charAt(trimmed - 1) == ' ' || value.charAt(trimmed - 1) == '\t')) {
                     trimmed--;
                 }
                 // regionMatches(true, ...) compares character by character and is
                 // locale independent, unlike folding both sides with toLowerCase().
-                if(trimmed - start == token.length()
+                if (trimmed - start == token.length()
                         && value.regionMatches(true, start, token, 0, token.length())) {
                     return true;
                 }
-                if(comma < 0) {
+                if (comma < 0) {
                     return false;
                 }
                 at = comma + 1;
@@ -965,12 +913,12 @@ public final class HttpServer {
             return false;
         }
 
-        /** How many headers arrived, so a duplicate can be detected. */
+        /// How many headers arrived, so a duplicate can be detected.
         int countHeader(String name) {
             int found = 0;
-            for(int iter = 0 ; iter < headerCount ; iter++) {
+            for (int iter = 0 ; iter < headerCount ; iter++) {
                 int base = iter * 4;
-                if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
+                if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], name)) {
                     found++;
                 }
             }
@@ -982,7 +930,7 @@ public final class HttpServer {
         }
     }
 
-    /** What a handler returns. */
+    /// What a handler returns.
     public static final class Response {
         // Not final because Request.respond hands back ONE Response per connection,
         // re-pointed per request. The same trade the Request beside it already
@@ -992,29 +940,21 @@ public final class HttpServer {
         int status;
         String contentType;
         byte[] body;
-        /** When >= 0 the body is this descriptor, and the server owns closing it. */
+        /// When >= 0 the body is this descriptor, and the server owns closing it.
         int fileFd;
         long fileOffset;
         long fileLength;
         Map extraHeaders;
-        /** Serialised into the connection buffer at write time; see jsonValue. */
+        /// Serialised into the connection buffer at write time; see jsonValue.
         Object deferredJson;
         boolean hasDeferredJson;
 
-        /**
-         * Re-points this Response. Every field is assigned with no "unchanged"
-         * case: a field left behind describes the PREVIOUS response on this
-         * connection, and deferredJson is the one that would hurt -- it makes the
-         * writer serialise an object the handler never returned.
-         */
-        /**
-         * Drops what this response pointed at, once it has been written.
-         *
-         * Pooled per connection like the Request, so between responses it goes on
-         * referencing the last one -- and deferredJson is a handler's object
-         * graph, which for a large result is the largest thing either side holds.
-         * reset() assigns every field below before anything reads it.
-         */
+        /// Drops what this response pointed at, once it has been written.
+        ///
+        /// Pooled per connection like the Request, so between responses it goes on
+        /// referencing the last one -- and deferredJson is a handler's object
+        /// graph, which for a large result is the largest thing either side holds.
+        /// reset() assigns every field below before anything reads it.
         void releaseRetained() {
             this.deferredJson = null;
             this.hasDeferredJson = false;
@@ -1022,6 +962,10 @@ public final class HttpServer {
             this.extraHeaders = null;
         }
 
+        /// Re-points this Response. Every field is assigned with no "unchanged"
+        /// case: a field left behind describes the PREVIOUS response on this
+        /// connection, and deferredJson is the one that would hurt -- it makes the
+        /// writer serialise an object the handler never returned.
         void reset(int status, String contentType, byte[] body, int fileFd,
                    long fileOffset, long fileLength, Map extraHeaders) {
             this.status = status;
@@ -1039,15 +983,13 @@ public final class HttpServer {
             this(status, contentType, body == null ? new byte[0] : body, -1, 0, 0, null);
         }
 
-        /**
-         * A body AND application headers, which nothing public could express.
-         *
-         * The constructor above always passed null for them, empty() takes headers
-         * but discards the body, and file() wants a descriptor -- so a handler
-         * returning JSON with a Set-Cookie, a CORS header or a cache directive had
-         * no supported way to say so, even though both protocol writers send extra
-         * headers. Server-owned names are still refused at write time.
-         */
+        /// A body AND application headers, which nothing public could express.
+        ///
+        /// The constructor above always passed null for them, empty() takes headers
+        /// but discards the body, and file() wants a descriptor -- so a handler
+        /// returning JSON with a Set-Cookie, a CORS header or a cache directive had
+        /// no supported way to say so, even though both protocol writers send extra
+        /// headers. Server-owned names are still refused at write time.
         public Response(int status, String contentType, byte[] body, Map extraHeaders) {
             this(status, contentType, body == null ? new byte[0] : body, -1, 0, 0,
                     extraHeaders);
@@ -1064,19 +1006,15 @@ public final class HttpServer {
             this.extraHeaders = extraHeaders;
         }
 
-        /**
-         * A response whose body is a file. The server sends it with sendfile where
-         * the platform has it, so the bytes never enter user space, and CLOSES the
-         * descriptor when it is done -- a handler that returned one must not.
-         */
-        /**
-         * This response with other extra headers, as a NEW object. For a header
-         * the server adds to one request's answer -- a session cookie -- because
-         * the Response a handler returns may be a constant shared by every
-         * request, and writing into it would hand one client's cookie to the next.
-         * Only one of the two is ever sent, so a file descriptor it carries still
-         * has exactly one owner.
-         */
+        /// A response whose body is a file. The server sends it with sendfile where
+        /// the platform has it, so the bytes never enter user space, and CLOSES the
+        /// descriptor when it is done -- a handler that returned one must not.
+        /// This response with other extra headers, as a NEW object. For a header
+        /// the server adds to one request's answer -- a session cookie -- because
+        /// the Response a handler returns may be a constant shared by every
+        /// request, and writing into it would hand one client's cookie to the next.
+        /// Only one of the two is ever sent, so a file descriptor it carries still
+        /// has exactly one owner.
         Response withHeaders(Map headers) {
             Response copy = new Response(status, contentType, body, fileFd, fileOffset,
                     fileLength, headers);
@@ -1098,17 +1036,15 @@ public final class HttpServer {
             return new Response(status, "application/json; charset=utf-8", bytes(body));
         }
 
-        /**
-         * A JSON response serialised straight into the connection's write buffer.
-         *
-         * Prefer this to json(status, Json.write(value)): that builds a
-         * StringBuilder, grows its char[], copies it into a String and encodes
-         * that to bytes, for a document about to go to a socket and be discarded.
-         * Deliberately a DIFFERENT NAME rather than an overload taking Object --
-         * an overload would bind a String-typed variable to this method and
-         * double-encode it, which is exactly the kind of thing that is found in
-         * production rather than in review.
-         */
+        /// A JSON response serialised straight into the connection's write buffer.
+        ///
+        /// Prefer this to json(status, Json.write(value)): that builds a
+        /// StringBuilder, grows its char\[\], copies it into a String and encodes
+        /// that to bytes, for a document about to go to a socket and be discarded.
+        /// Deliberately a DIFFERENT NAME rather than an overload taking Object --
+        /// an overload would bind a String-typed variable to this method and
+        /// double-encode it, which is exactly the kind of thing that is found in
+        /// production rather than in review.
         public static Response jsonValue(int status, Object value) {
             Response r = new Response(status, "application/json; charset=utf-8",
                     EMPTY_BODY, -1, 0, 0, null);
@@ -1117,7 +1053,7 @@ public final class HttpServer {
             return r;
         }
 
-        /** A response with headers but no body, for 304 and for HEAD. */
+        /// A response with headers but no body, for 304 and for HEAD.
         public static Response empty(int status, String contentType, Map extraHeaders) {
             return new Response(status, contentType, new byte[0], -1, 0, 0, extraHeaders);
         }
@@ -1139,57 +1075,52 @@ public final class HttpServer {
         Response handle(Request request) throws Exception;
     }
 
-    /**
-     * Chooses the websocket endpoint for an upgrade request, or null when this
-     * router does not serve that path.
-     *
-     * The same "null means not mine" the Handler chain uses, so a generated router
-     * can answer for the routes it knows and leave the rest alone.
-     */
+    /// Chooses the websocket endpoint for an upgrade request, or null when this
+    /// router does not serve that path.
+    ///
+    /// The same "null means not mine" the Handler chain uses, so a generated router
+    /// can answer for the routes it knows and leave the rest alone.
     public interface WebSocketHandler {
         WebSocket open(Request request) throws Exception;
     }
 
-    /**
-     * Where websocket routes come from.
-     *
-     * The server ASKS for them, once, while it is starting and before the listener
-     * accepts anything. It is not a setter, and that is the point: this server is
-     * event driven everywhere else -- a Handler is called, a `@RestController` is
-     * found by the build, `Backend.Handlers` is invoked with what the server
-     * opened -- and a mutable registry an application pokes at afterwards is a
-     * different model bolted onto the side of it.
-     *
-     * It also removes a race rather than documenting one. Registration that
-     * happened after `start` returned left a window in which the listener was
-     * already bound and a valid upgrade arriving in it fell through to the
-     * ordinary HTTP handler, because the route it wanted did not exist yet.
-     * A callback the server runs before it accepts cannot have that window.
-     */
+    /// Where websocket routes come from.
+    ///
+    /// The server ASKS for them, once, while it is starting and before the listener
+    /// accepts anything. It is not a setter, and that is the point: this server is
+    /// event driven everywhere else -- a Handler is called, a `@RestController` is
+    /// found by the build, `Backend.Handlers` is invoked with what the server
+    /// opened -- and a mutable registry an application pokes at afterwards is a
+    /// different model bolted onto the side of it.
+    ///
+    /// It also removes a race rather than documenting one. Registration that
+    /// happened after `start` returned left a window in which the listener was
+    /// already bound and a valid upgrade arriving in it fell through to the
+    /// ordinary HTTP handler, because the route it wanted did not exist yet.
+    /// A callback the server runs before it accepts cannot have that window.
     public interface WebSocketRoutes {
         void register(WebSocketRegistry registry) throws Exception;
     }
 
-    /** What a {@link WebSocketRoutes} callback puts its endpoints into. */
+    /// What a [WebSocketRoutes] callback puts its endpoints into.
     public interface WebSocketRegistry {
-        /**
-         * Serves `path` with `endpoint`.
-         *
-         * The path is matched against the request's CANONICAL path -- percent
-         * escapes decoded, query removed -- exactly as an HTTP route is, so a key
-         * that could never be selected is refused here rather than accepted and
-         * left unreachable.
-         */
+        /// Serves `path` with `endpoint`.
+        ///
+        /// The path is matched against the request's CANONICAL path -- percent
+        /// escapes decoded, query removed -- exactly as an HTTP route is, so a key
+        /// that could never be selected is refused here rather than accepted and
+        /// left unreachable.
         void route(String path, WebSocket endpoint);
 
-        /** Consulted for any upgrade {@link #route} did not claim. */
+        /// Consulted for any upgrade [#route] did not claim.
         void fallback(WebSocketHandler router);
     }
 
-    /** The registry handed to a WebSocketRoutes callback during start. */
+    /// The registry handed to a WebSocketRoutes callback during start.
     private final class Registry implements WebSocketRegistry {
+        @Override
         public void route(String path, WebSocket endpoint) {
-            if(path == null || endpoint == null) {
+            if (path == null || endpoint == null) {
                 throw new IllegalArgumentException(
                         "a websocket route needs both a path and an endpoint");
             }
@@ -1197,145 +1128,129 @@ public final class HttpServer {
             // canonical path without its query, so either of these is a key no
             // request could ever select -- and a server that starts happily with
             // an endpoint nothing can reach is worse than one that will not start.
-            if(path.indexOf('%') >= 0) {
+            if (path.indexOf('%') >= 0) {
                 throw new IllegalArgumentException("a websocket path is matched after "
                         + "percent-decoding, so register the decoded form, not: " + path);
             }
-            if(path.indexOf('?') >= 0) {
+            if (path.indexOf('?') >= 0) {
                 throw new IllegalArgumentException("a websocket path is matched without "
                         + "its query string, so register the path alone, not: " + path);
             }
             webSocketRoutes.put(path, endpoint);
         }
 
+        @Override
         public void fallback(WebSocketHandler router) {
             webSocketRouter = router;
         }
     }
 
-    /** How large a single websocket message may be before it is refused with 1009. */
+    /// How large a single websocket message may be before it is refused with 1009.
     long getMaxWebSocketMessageBytes() {
         return MAX_WS_MESSAGE_BYTES;
     }
 
-    /**
-     * How long stop() waits, after closing the sockets, for workers to unwind before
-     * it releases any session they might still have been inside.
-     */
+    /// How long stop() waits, after closing the sockets, for workers to unwind before
+    /// it releases any session they might still have been inside.
     private static final int SESSION_RELEASE_GRACE_MILLIS = 2000;
 
     private static final int MAX_HEADER_BYTES = 64 * 1024;
 
-    /**
-     * The largest websocket message this server will reassemble, before it answers
-     * 1009 and closes.
-     *
-     * A cap is not optional: a message is reassembled across as many frames as the
-     * peer likes, so without one a single client declares a length and the server
-     * grows a buffer to match. 8MB is generous for a control protocol and small
-     * enough that a few hundred connections cannot exhaust the machine between
-     * them.
-     */
+    /// The largest websocket message this server will reassemble, before it answers
+    /// 1009 and closes.
+    ///
+    /// A cap is not optional: a message is reassembled across as many frames as the
+    /// peer likes, so without one a single client declares a length and the server
+    /// grows a buffer to match. 8MB is generous for a control protocol and small
+    /// enough that a few hundred connections cannot exhaust the machine between
+    /// them.
     private static final long MAX_WS_MESSAGE_BYTES =
-            (long)envIntAtLeast("CN1_WS_MAX_MESSAGE_MB", 8, 1) * 1024L * 1024L;
+            (long) envIntAtLeast("CN1_WS_MAX_MESSAGE_MB", 8, 1) * 1024L * 1024L;
 
-    /**
-     * How long a websocket may be idle before it is shed, or 0 for never.
-     *
-     * Distinct from CN1_HTTP_TIMEOUT_MS, which is about a client that started a
-     * request and stopped. A websocket is idle by design, so this defaults to five
-     * minutes rather than fifteen seconds, and an application serving long-lived
-     * connections with no traffic sets it to 0.
-     */
+    /// How long a websocket may be idle before it is shed, or 0 for never.
+    ///
+    /// Distinct from CN1_HTTP_TIMEOUT_MS, which is about a client that started a
+    /// request and stopped. A websocket is idle by design, so this defaults to five
+    /// minutes rather than fifteen seconds, and an application serving long-lived
+    /// connections with no traffic sets it to 0.
     private static final int WS_IDLE_TIMEOUT_MILLIS =
             envInt("CN1_WS_IDLE_TIMEOUT_MS", 300000);
 
-    /**
-     * Websocket reassembly memory held across the whole process.
-     *
-     * MAX_WS_MESSAGE_BYTES bounds one message on one session, and a peer may open
-     * as many sessions as MAX_CONNECTIONS allows -- so the per-message cap
-     * multiplies. This is the ceiling on the product, the same shape as the HTTP
-     * upload accounting, and for the same reason: a budget checked after the
-     * allocation bounds nothing.
-     */
+    /// Websocket reassembly memory held across the whole process.
+    ///
+    /// MAX_WS_MESSAGE_BYTES bounds one message on one session, and a peer may open
+    /// as many sessions as MAX_CONNECTIONS allows -- so the per-message cap
+    /// multiplies. This is the ceiling on the product, the same shape as the HTTP
+    /// upload accounting, and for the same reason: a budget checked after the
+    /// allocation bounds nothing.
     private static final long MAX_WS_INFLIGHT_BYTES =
-            (long)envIntAtLeast("CN1_WS_MAX_INFLIGHT_MB", 64, 1) * 1024L * 1024L;
+            (long) envIntAtLeast("CN1_WS_MAX_INFLIGHT_MB", 64, 1) * 1024L * 1024L;
 
     private final java.util.concurrent.atomic.AtomicLong webSocketBytes =
             new java.util.concurrent.atomic.AtomicLong();
 
-    /**
-     * Charges `extra` bytes against the process-wide budget, or refuses.
-     *
-     * A compare-and-set loop rather than addAndGet-then-check: the latter can
-     * overshoot the ceiling by however many sessions raced, and with an 8MB
-     * per-message cap the overshoot is the thing being bounded.
-     */
+    /// Charges `extra` bytes against the process-wide budget, or refuses.
+    ///
+    /// A compare-and-set loop rather than addAndGet-then-check: the latter can
+    /// overshoot the ceiling by however many sessions raced, and with an 8MB
+    /// per-message cap the overshoot is the thing being bounded.
     boolean reserveWebSocketMemory(long extra) {
-        if(extra <= 0) {
+        if (extra <= 0) {
             return true;
         }
-        while(true) {
+        while (true) {
             long held = webSocketBytes.get();
             long wanted = held + extra;
-            if(wanted > MAX_WS_INFLIGHT_BYTES) {
+            if (wanted > MAX_WS_INFLIGHT_BYTES) {
                 return false;
             }
-            if(webSocketBytes.compareAndSet(held, wanted)) {
+            if (webSocketBytes.compareAndSet(held, wanted)) {
                 return true;
             }
         }
     }
 
     void releaseWebSocketMemory(long amount) {
-        if(amount > 0) {
+        if (amount > 0) {
             webSocketBytes.addAndGet(-amount);
         }
     }
 
-    private volatile WebSocketHandler webSocketRouter;
-    /**
-     * Cleared at the top of stop(), before the open sessions are snapshotted.
-     *
-     * An upgrade that completes after that snapshot is one the shutdown will
-     * never say goodbye to, so it is refused instead -- with a 503, which is what
-     * a client reaching a draining server should see.
-     */
-    private volatile boolean acceptingUpgrades = true;
+    private volatile WebSocketHandler webSocketRouter; //NOPMD AvoidUsingVolatile - set from the start thread, read by every worker
+    /// Cleared at the top of stop(), before the open sessions are snapshotted.
+    ///
+    /// An upgrade that completes after that snapshot is one the shutdown will
+    /// never say goodbye to, so it is refused instead -- with a 503, which is what
+    /// a client reaching a draining server should see.
+    private volatile boolean acceptingUpgrades = true; //NOPMD AvoidUsingVolatile - cleared by stop(), read by the workers upgrading
 
-    /**
-     * How much response body one HTTP/2 turn may hold before it drains.
-     *
-     * Not a limit on any response, which MAX_BODY_BYTES governs: a limit on how
-     * many of them may sit copied into native buffers at once while this loop
-     * keeps answering the next ready stream.
-     */
-    /**
-     * What a request body buffer starts at, and doubles from as bytes arrive. Not
-     * the declared Content-Length: see fillTo for why believing that number before
-     * the body exists is what lets a client allocate memory it never has to send.
-     */
+    // How much response body one HTTP/2 turn may hold before it drains.
+    //
+    // Not a limit on any response, which MAX_BODY_BYTES governs: a limit on how
+    // many of them may sit copied into native buffers at once while this loop
+    // keeps answering the next ready stream.
+
+    /// What a request body buffer starts at, and doubles from as bytes arrive. Not
+    /// the declared Content-Length: see fillTo for why believing that number before
+    /// the body exists is what lets a client allocate memory it never has to send.
     private static final int BODY_CHUNK_BYTES = 16 * 1024;
 
-    /**
-     * Request-body bytes held by uploads IN PROGRESS, across the process.
-     *
-     * Growing with the data removed the case where a client allocates 8MB by
-     * declaring it and sending nothing. It does not bound the case where the
-     * client really sends nearly all of it on many connections and pauses before
-     * the last byte: that memory is real, it is held until the rate allowance
-     * expires, and nothing counted it. The connection ceiling is in the
-     * thousands, so a modest number of near-complete uploads is the machine.
-     *
-     * Scoped to the read, which is what makes it safe to account at all: the
-     * charge is taken as the buffer grows and given back in a finally on every
-     * path out of fillTo. A reservation that outlived the call would have to be
-     * threaded through borrowed thread buffers, owned copies and every failure
-     * path, and ONE leaked reservation wedges the server for good -- a worse
-     * failure than the one it fixes. What this bounds is uploads in flight,
-     * which is the shape of the attack.
-     */
+    /// Request-body bytes held by uploads IN PROGRESS, across the process.
+    ///
+    /// Growing with the data removed the case where a client allocates 8MB by
+    /// declaring it and sending nothing. It does not bound the case where the
+    /// client really sends nearly all of it on many connections and pauses before
+    /// the last byte: that memory is real, it is held until the rate allowance
+    /// expires, and nothing counted it. The connection ceiling is in the
+    /// thousands, so a modest number of near-complete uploads is the machine.
+    ///
+    /// Scoped to the read, which is what makes it safe to account at all: the
+    /// charge is taken as the buffer grows and given back in a finally on every
+    /// path out of fillTo. A reservation that outlived the call would have to be
+    /// threaded through borrowed thread buffers, owned copies and every failure
+    /// path, and ONE leaked reservation wedges the server for good -- a worse
+    /// failure than the one it fixes. What this bounds is uploads in flight,
+    /// which is the shape of the attack.
     private static final java.util.concurrent.atomic.AtomicLong http1UploadBytes =
             new java.util.concurrent.atomic.AtomicLong();
 
@@ -1344,136 +1259,124 @@ public final class HttpServer {
 
     private static final long MAX_QUEUED_H2_BODY_BYTES = 4L * 1024 * 1024;
 
-    /**
-     * File-backed HTTP/2 responses that may be outstanding across the process.
-     * A separate limit from the byte one because it is a separate resource: such
-     * a response holds a DESCRIPTOR and no heap, so the byte figure never sees
-     * it, and a peer that keeps its flow-control window shut holds one per
-     * stream for as long as it likes. Descriptors run out process-wide, and when
-     * they do the server stops accepting sockets and opening files entirely --
-     * a failure with nothing to do with whoever caused it.
-     */
+    /// File-backed HTTP/2 responses that may be outstanding across the process.
+    /// A separate limit from the byte one because it is a separate resource: such
+    /// a response holds a DESCRIPTOR and no heap, so the byte figure never sees
+    /// it, and a peer that keeps its flow-control window shut holds one per
+    /// stream for as long as it likes. Descriptors run out process-wide, and when
+    /// they do the server stops accepting sockets and opening files entirely --
+    /// a failure with nothing to do with whoever caused it.
     private static final int MAX_OPEN_H2_FILES = envInt("CN1_HTTP_MAX_H2_FILES", 128);
 
-    /**
-     * Response-body heap that may be outstanding across the PROCESS. The limit
-     * beside it is per turn and per session, which bounds one connection -- and
-     * the connection ceiling is in the thousands, so a body per connection is
-     * still gigabytes. Memory runs out process-wide, so it is counted that way,
-     * exactly like the descriptors above.
-     */
+    /// Response-body heap that may be outstanding across the PROCESS. The limit
+    /// beside it is per turn and per session, which bounds one connection -- and
+    /// the connection ceiling is in the thousands, so a body per connection is
+    /// still gigabytes. Memory runs out process-wide, so it is counted that way,
+    /// exactly like the descriptors above.
     private static final long MAX_OPEN_H2_BODY_BYTES =
             envInt("CN1_HTTP_MAX_H2_BODY_MB", 64) * 1024L * 1024L;
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
     private static final int READY_CAPACITY = 256;
 
-    /**
-     * Bodies at or below this are sent together with the headers in one write.
-     * Sized so an ordinary JSON response fits and a page-sized payload does not;
-     * beyond it the copy costs more than the syscall it saves.
-     */
+    /// Bodies at or below this are sent together with the headers in one write.
+    /// Sized so an ordinary JSON response fits and a page-sized payload does not;
+    /// beyond it the copy costs more than the syscall it saves.
     static final int COMBINED_WRITE_LIMIT = 8192;
 
     static final byte[] EMPTY_BODY = new byte[0];
-    /** One instance, so the pooled JSON path does not intern a literal per call. */
+    /// One instance, so the pooled JSON path does not intern a literal per call.
     static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
-    /** What a Response with no content type is sent as, on either protocol. */
+    /// What a Response with no content type is sent as, on either protocol.
     static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
-    /** "Sat, 29 Aug 2026 07:11:02 GMT" -- RFC 9110 fixes the width. */
+    /// "Sat, 29 Aug 2026 07:11:02 GMT" -- RFC 9110 fixes the width.
     private static final int HTTP_DATE_LENGTH = 29;
 
-    /**
-     * How long a worker waits, still holding the connection, for the NEXT request
-     * before handing it back to the poller.
-     *
-     * This is the difference between a poller that is re-armed per request and one
-     * that is not. Handing the descriptor back costs an epoll_ctl pair, two
-     * blocking-mode flips and a cross-thread handoff -- measured against Go, whose
-     * netpoller registers a connection once: 2 epoll_ctl, 4 fcntl and 3.9 futex
-     * per request against its 0.00, 0.00 and 0.05, with the futex traffic alone
-     * 80% of our syscall time.
-     *
-     * A client that is going to send another request usually sends it within
-     * microseconds, so a few milliseconds captures nearly all of them. Set to 0 to
-     * hand back immediately, which is the behaviour this replaces.
-     *
-     * The timeout alone does NOT bound how long a worker keeps a connection: a
-     * client that keeps sending is readable every time, so the worker goes round
-     * again and holds it indefinitely. Under continuous load that made the pool
-     * the limit on concurrent clients -- exactly what the reactor exists to
-     * prevent -- and it was invisible in a throughput number, because the
-     * connections that DID hold a worker were served at full speed while the rest
-     * starved. A fresh connection got no response in five seconds while the
-     * benchmark reported 234k requests a second. What bounds it is
-     * {@link #pendingWork} below, plus the burst cap.
-     */
-    /**
-     * Which thread takes a ready descriptor from the poller.
-     *
-     *   0  A dedicated reactor thread calls the poller and DISPATCHES: it
-     *      deregisters the descriptor, allocates a task, queues it and wakes a
-     *      worker. That wake is a futex and a context switch, and the descriptor
-     *      has to be registered again afterwards, so an ordinary request costs
-     *      two epoll_ctl and a cross-thread handoff on top of its own read and
-     *      write.
-     *   1  The WORKERS call the poller themselves. A worker with nothing to do
-     *      waits on the same set and serves the first descriptor it is given, on
-     *      the thread that polled -- no queue, no wake, no task object. The
-     *      descriptor is armed {@link Reactor#ONESHOT} so the kernel hands it to
-     *      exactly one waiter, and re-arming afterwards is a single epoll_ctl.
-     *
-     * Mode 1 is what Go's scheduler does. `netpoll()` is called from
-     * `findRunnable()` on whatever thread has run out of work, and the result is
-     * `gp := list.pop(); injectglist(&list); return gp` -- it runs the first
-     * ready goroutine ON THE POLLING THREAD and only queues the remainder. A
-     * syscall census of the two servers under the same load put us at 6.9x Go's
-     * futex rate and 41x its epoll_ctl rate while the read and write counts
-     * matched to within 5%, which says the gap is coordination rather than work.
-     */
-    /**
-     *   2  ONE worker polls at a time. It serves the first ready descriptor on
-     *      its own thread and queues the remainder for the others, so a lone
-     *      event -- the common case -- costs no handoff at all, while a burst
-     *      pays one wake per SURPLUS descriptor rather than one per request.
-     *
-     * Mode 2 is what Go actually does, and mode 1 is what it looks like from a
-     * distance. The difference is a guard in `findRunnable` that mode 1 has no
-     * equivalent of: "we can safely skip it if there are no waiters or A THREAD
-     * IS BLOCKED IN NETPOLL ALREADY". Go never has two threads in the poller.
-     * Mode 1 puts every worker in `epoll_wait` on one set, so a single arriving
-     * event wakes all of them; ONESHOT still guarantees only one RECEIVES the
-     * descriptor, but the other wakeups happen anyway and cost more the more
-     * workers there are. Measured, that is exactly what mode 1 does: +40% on two
-     * workers, +24% on four, and -25% on eight.
-     */
-    /**
-     *   3  A VIRTUAL THREAD per connection. Host threads poll and resume; a
-     *      connection's virtual thread runs until it finishes or asks for bytes
-     *      that have not arrived, and parks inside the ordinary blocking read.
-     *      There is no handoff at all, and no thread per connection either.
-     *
-     * The numbers that motivate mode 3 rather than more tuning of 0 to 2: moving
-     * a request between OS threads measured 21181ns on the machine this was built
-     * on, switching a virtual thread measured 2.6ns, and the paired experiment
-     * over modes 0 to 2 showed the handoff is worth about a third of throughput
-     * at four workers while REMOVING it costs about a third at sixteen -- because
-     * a pool large enough to hide the handoff is a pool large enough to lose to
-     * the OS scheduler. A virtual thread is how a context per connection stops
-     * implying an OS thread per connection, which is the assumption that made
-     * those two facts irreconcilable.
-     */
-    /**
-     * 0 the reactor thread dispatches to a pool; 3 a virtual thread per connection.
-     *
-     * Modes 1 and 2 were two ways of letting the WORKERS poll, and the paired
-     * experiment killed both: removing the dispatch is worth about a third of
-     * throughput at four workers and costs about a third at sixteen, because a
-     * pool big enough to hide the handoff is a pool big enough to lose to the OS
-     * scheduler. Their numbers are in the benchmarks README; the code is gone
-     * rather than left to rot, since a mode nobody selects is a mode nobody
-     * tests.
-     */
+    // How long a worker waits, still holding the connection, for the NEXT request
+    // before handing it back to the poller.
+    //
+    // This is the difference between a poller that is re-armed per request and one
+    // that is not. Handing the descriptor back costs an epoll_ctl pair, two
+    // blocking-mode flips and a cross-thread handoff -- measured against Go, whose
+    // netpoller registers a connection once: 2 epoll_ctl, 4 fcntl and 3.9 futex
+    // per request against its 0.00, 0.00 and 0.05, with the futex traffic alone
+    // 80% of our syscall time.
+    //
+    // A client that is going to send another request usually sends it within
+    // microseconds, so a few milliseconds captures nearly all of them. Set to 0 to
+    // hand back immediately, which is the behaviour this replaces.
+    //
+    // The timeout alone does NOT bound how long a worker keeps a connection: a
+    // client that keeps sending is readable every time, so the worker goes round
+    // again and holds it indefinitely. Under continuous load that made the pool
+    // the limit on concurrent clients -- exactly what the reactor exists to
+    // prevent -- and it was invisible in a throughput number, because the
+    // connections that DID hold a worker were served at full speed while the rest
+    // starved. A fresh connection got no response in five seconds while the
+    // benchmark reported 234k requests a second. What bounds it is
+    // [#pendingWork] below, plus the burst cap.
+
+    // Which thread takes a ready descriptor from the poller.
+    //
+    // 0  A dedicated reactor thread calls the poller and DISPATCHES: it
+    // deregisters the descriptor, allocates a task, queues it and wakes a
+    // worker. That wake is a futex and a context switch, and the descriptor
+    // has to be registered again afterwards, so an ordinary request costs
+    // two epoll_ctl and a cross-thread handoff on top of its own read and
+    // write.
+    // 1  The WORKERS call the poller themselves. A worker with nothing to do
+    // waits on the same set and serves the first descriptor it is given, on
+    // the thread that polled -- no queue, no wake, no task object. The
+    // descriptor is armed [Reactor#ONESHOT] so the kernel hands it to
+    // exactly one waiter, and re-arming afterwards is a single epoll_ctl.
+    //
+    // Mode 1 is what Go's scheduler does. `netpoll()` is called from
+    // `findRunnable()` on whatever thread has run out of work, and the result is
+    // `gp := list.pop(); injectglist(&list); return gp` -- it runs the first
+    // ready goroutine ON THE POLLING THREAD and only queues the remainder. A
+    // syscall census of the two servers under the same load put us at 6.9x Go's
+    // futex rate and 41x its epoll_ctl rate while the read and write counts
+    // matched to within 5%, which says the gap is coordination rather than work.
+
+    // 2  ONE worker polls at a time. It serves the first ready descriptor on
+    // its own thread and queues the remainder for the others, so a lone
+    // event -- the common case -- costs no handoff at all, while a burst
+    // pays one wake per SURPLUS descriptor rather than one per request.
+    //
+    // Mode 2 is what Go actually does, and mode 1 is what it looks like from a
+    // distance. The difference is a guard in `findRunnable` that mode 1 has no
+    // equivalent of: "we can safely skip it if there are no waiters or A THREAD
+    // IS BLOCKED IN NETPOLL ALREADY". Go never has two threads in the poller.
+    // Mode 1 puts every worker in `epoll_wait` on one set, so a single arriving
+    // event wakes all of them; ONESHOT still guarantees only one RECEIVES the
+    // descriptor, but the other wakeups happen anyway and cost more the more
+    // workers there are. Measured, that is exactly what mode 1 does: +40% on two
+    // workers, +24% on four, and -25% on eight.
+
+    // 3  A VIRTUAL THREAD per connection. Host threads poll and resume; a
+    // connection's virtual thread runs until it finishes or asks for bytes
+    // that have not arrived, and parks inside the ordinary blocking read.
+    // There is no handoff at all, and no thread per connection either.
+    //
+    // The numbers that motivate mode 3 rather than more tuning of 0 to 2: moving
+    // a request between OS threads measured 21181ns on the machine this was built
+    // on, switching a virtual thread measured 2.6ns, and the paired experiment
+    // over modes 0 to 2 showed the handoff is worth about a third of throughput
+    // at four workers while REMOVING it costs about a third at sixteen -- because
+    // a pool large enough to hide the handoff is a pool large enough to lose to
+    // the OS scheduler. A virtual thread is how a context per connection stops
+    // implying an OS thread per connection, which is the assumption that made
+    // those two facts irreconcilable.
+
+    /// 0 the reactor thread dispatches to a pool; 3 a virtual thread per connection.
+    ///
+    /// Modes 1 and 2 were two ways of letting the WORKERS poll, and the paired
+    /// experiment killed both: removing the dispatch is worth about a third of
+    /// throughput at four workers and costs about a third at sixteen, because a
+    /// pool big enough to hide the handoff is a pool big enough to lose to the OS
+    /// scheduler. Their numbers are in the benchmarks README; the code is gone
+    /// rather than left to rot, since a mode nobody selects is a mode nobody
+    /// tests.
     /*
      * The DEFAULT is virtual threads wherever the build has them, and the pool
      * only where it does not.
@@ -1509,77 +1412,65 @@ public final class HttpServer {
             envInt("CN1_HTTP_POLL_MODE", VirtualThread.supported() ? 3 : 0);
     private static final boolean VIRTUAL_THREADS = POLL_MODE == 3;
 
-    /**
-     * C stack per connection. Java locals and the operand stack are NOT here --
-     * they live in the virtual thread's own VM state, mapped lazily -- so this
-     * buys call depth rather than data. 64KB holds a few hundred nested Java
-     * frames, well past what an HTTP handler needs, and is mapped lazily too.
-     */
+    /// C stack per connection. Java locals and the operand stack are NOT here --
+    /// they live in the virtual thread's own VM state, mapped lazily -- so this
+    /// buys call depth rather than data. 64KB holds a few hundred nested Java
+    /// frames, well past what an HTTP handler needs, and is mapped lazily too.
     private static final int VT_STACK_BYTES = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
 
-    /**
-     * How often a virtual-thread host sweeps its deadlines, however busy it is.
-     * The same 250ms the idle poll waits, so a quiet host behaves exactly as
-     * before and a busy one stops being exempt.
-     */
+    /// How often a virtual-thread host sweeps its deadlines, however busy it is.
+    /// The same 250ms the idle poll waits, so a quiet host behaves exactly as
+    /// before and a busy one stops being exempt.
     private static final long SWEEP_INTERVAL_MILLIS = 250;
 
     private static final int KEEPALIVE_LINGER_MILLIS =
             envInt("CN1_HTTP_KEEPALIVE_LINGER_MS", 5);
 
-    /**
-     * How long a worker waits for a request, and for the client to take the
-     * response. A connection that opens and says nothing would otherwise hold a
-     * worker forever, and the pool is bounded on purpose -- open as many silent
-     * connections as there are workers and the server stops answering anyone.
-     */
+    /// How long a worker waits for a request, and for the client to take the
+    /// response. A connection that opens and says nothing would otherwise hold a
+    /// worker forever, and the pool is bounded on purpose -- open as many silent
+    /// connections as there are workers and the server stops answering anyone.
     private static final int SOCKET_TIMEOUT_MILLIS =
             envIntAtLeast("CN1_HTTP_TIMEOUT_MS", 15000, 1);
 
-    /**
-     * The slowest upload this server will wait for, in bytes per second.
-     *
-     * 8 KB/s is well under any real link and still bounds a body: 8 MiB has about
-     * seventeen minutes to arrive, and a client sending a byte at a time does not
-     * get them. Set CN1_HTTP_MIN_BODY_RATE to change it.
-     */
+    /// The slowest upload this server will wait for, in bytes per second.
+    ///
+    /// 8 KB/s is well under any real link and still bounds a body: 8 MiB has about
+    /// seventeen minutes to arrive, and a client sending a byte at a time does not
+    /// get them. Set CN1_HTTP_MIN_BODY_RATE to change it.
     private static final int MIN_BODY_BYTES_PER_SECOND =
             envIntAtLeast("CN1_HTTP_MIN_BODY_RATE", 8192, 1);
 
-    /**
-     * Ceiling on open connections. Past it a connection is accepted and closed
-     * immediately rather than left in the backlog: refusing is a fast, legible
-     * answer, while a full backlog looks to a client like a server that hangs. Set
-     * to 0 for no ceiling.
-     *
-     * <p>THROUGH THE CLAMP, with zero as its floor. The admission check applies
-     * this only when it is positive, so a value below zero read as "no ceiling"
-     * -- and nobody types -1 at a connection limit meaning to remove the
-     * protection against descriptor and worker exhaustion. Zero says that, and
-     * says it on purpose; a negative is a typo, and takes the default with a line
-     * on stderr saying so.
-     */
+    /// Ceiling on open connections. Past it a connection is accepted and closed
+    /// immediately rather than left in the backlog: refusing is a fast, legible
+    /// answer, while a full backlog looks to a client like a server that hangs. Set
+    /// to 0 for no ceiling.
+    ///
+    /// THROUGH THE CLAMP, with zero as its floor. The admission check applies
+    /// this only when it is positive, so a value below zero read as "no ceiling"
+    /// -- and nobody types -1 at a connection limit meaning to remove the
+    /// protection against descriptor and worker exhaustion. Zero says that, and
+    /// says it on purpose; a negative is a typo, and takes the default with a line
+    /// on stderr saying so.
     private static final int MAX_CONNECTIONS =
             envIntAtLeast("CN1_HTTP_MAX_CONNECTIONS", 4096, 0);
 
-    /**
-     * A tunable that must be at least `minimum`, or the default is used instead.
-     *
-     * Some of these settings are DIVISORS or array sizes, and a zero reaches very
-     * different places on the two runtimes: Java SE throws ArithmeticException,
-     * which the reader catches as an ordinary read failure and drops the
-     * connection with no response, while ParparVM answers 0 for an integer
-     * division by zero -- so the packaged binary silently loses the rate part of
-     * its own deadline instead. Neither is what anyone typed 0 hoping for, and a
-     * setting that behaves differently in the dev loop than in production is the
-     * exact divergence this backend keeps being reviewed for.
-     *
-     * Package-visible so the runtime self-test can check the clamp itself on both
-     * arms; the values it guards are read once at class initialisation, which no
-     * test can reach.
-     */
+    /// A tunable that must be at least `minimum`, or the default is used instead.
+    ///
+    /// Some of these settings are DIVISORS or array sizes, and a zero reaches very
+    /// different places on the two runtimes: Java SE throws ArithmeticException,
+    /// which the reader catches as an ordinary read failure and drops the
+    /// connection with no response, while ParparVM answers 0 for an integer
+    /// division by zero -- so the packaged binary silently loses the rate part of
+    /// its own deadline instead. Neither is what anyone typed 0 hoping for, and a
+    /// setting that behaves differently in the dev loop than in production is the
+    /// exact divergence this backend keeps being reviewed for.
+    ///
+    /// Package-visible so the runtime self-test can check the clamp itself on both
+    /// arms; the values it guards are read once at class initialisation, which no
+    /// test can reach.
     static int atLeast(String name, int value, int minimum) {
-        if(value >= minimum) {
+        if (value >= minimum) {
             return value;
         }
         System.err.println(name + "=" + value + " is below the minimum of " + minimum
@@ -1594,7 +1485,7 @@ public final class HttpServer {
 
     private static int envInt(String name, int fallback) {
         String v = System.getenv(name);
-        if(v == null || v.length() == 0) {
+        if (v == null || v.length() == 0) {
             return fallback;
         }
         try {
@@ -1604,15 +1495,13 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Set CN1_HTTP_TRACE=1 to print what the reactor sees. A reactor that is not
-     * reporting readiness looks exactly like a handler that is not responding, and
-     * the only way to tell them apart from outside is to ask which one is silent.
-     */
+    /// Set CN1_HTTP_TRACE=1 to print what the reactor sees. A reactor that is not
+    /// reporting readiness looks exactly like a handler that is not responding, and
+    /// the only way to tell them apart from outside is to ask which one is silent.
     private static final boolean TRACE = "1".equals(System.getenv("CN1_HTTP_TRACE"));
 
     private static void trace(String message) {
-        if(TRACE) {
+        if (TRACE) {
             System.err.println("[http] " + message);
         }
     }
@@ -1622,93 +1511,80 @@ public final class HttpServer {
     private final ExecutorService workers;
     private final Handler handler;
     private final Tls tls;
-    /**
-     * fd to SSL session. Only written when a connection is established or closed,
-     * never per request. A TLS connection genuinely costs an object; the plain
-     * server allocates nothing per idle connection and this map is why that
-     * property does not carry over to TLS.
-     */
+    /// fd to SSL session. Only written when a connection is established or closed,
+    /// never per request. A TLS connection genuinely costs an object; the plain
+    /// server allocates nothing per idle connection and this map is why that
+    /// property does not carry over to TLS.
     private final Map sessions = java.util.Collections.synchronizedMap(new java.util.HashMap());
-    /** fd to HTTP/2 session, for connections where ALPN settled on h2. */
+    /// fd to HTTP/2 session, for connections where ALPN settled on h2.
     private final Map http2Sessions = java.util.Collections.synchronizedMap(new java.util.HashMap());
-    /**
-     * fd to WebSocketSession, for connections that upgraded.
-     *
-     * Deliberately the same shape as http2Sessions: a per-descriptor map that
-     * drop() clears while the descriptor is still open. A websocket is a
-     * connection that stopped being HTTP, and every rule that applies to an h2
-     * session applies to one of these.
-     */
+    /// fd to WebSocketSession, for connections that upgraded.
+    ///
+    /// Deliberately the same shape as http2Sessions: a per-descriptor map that
+    /// drop() clears while the descriptor is still open. A websocket is a
+    /// connection that stopped being HTTP, and every rule that applies to an h2
+    /// session applies to one of these.
     private final Map webSockets = java.util.Collections.synchronizedMap(new java.util.HashMap());
-    /** Path to WebSocket endpoint. Written at startup, read on every upgrade. */
+    /// Path to WebSocket endpoint. Written at startup, read on every upgrade.
     private final Map webSocketRoutes =
-            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap());
-    /**
-     * Held across the part of a websocket turn that touches shared state, and
-     * NEVER across a park -- the same rule http2Turns follows, and for the same
-     * reason: stop() must not free a session under a thread inside it, but it also
-     * must not wait on a counter an idle connection holds for ever.
-     */
+            java.util.Collections.synchronizedMap(new LinkedHashMap());
+    /// Held across the part of a websocket turn that touches shared state, and
+    /// NEVER across a park -- the same rule http2Turns follows, and for the same
+    /// reason: stop() must not free a session under a thread inside it, but it also
+    /// must not wait on a counter an idle connection holds for ever.
     private final java.util.concurrent.atomic.AtomicInteger webSocketTurns =
             new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.concurrent.atomic.AtomicLong webSocketIds =
             new java.util.concurrent.atomic.AtomicLong();
-    /**
-     * Every accepted descriptor that has not been dropped yet.
-     *
-     * The TLS and HTTP/2 maps only hold the connections that have one of those, so
-     * a plaintext connection appeared in neither and stop() had nothing to close it
-     * with. It would stay open past the drain deadline while the server reported
-     * itself fully stopped.
-     */
+    /// Every accepted descriptor that has not been dropped yet.
+    ///
+    /// The TLS and HTTP/2 maps only hold the connections that have one of those, so
+    /// a plaintext connection appeared in neither and stop() had nothing to close it
+    /// with. It would stay open past the drain deadline while the server reported
+    /// itself fully stopped.
     private final Map liveConnections = java.util.Collections.synchronizedMap(new java.util.HashMap());
 
-    /**
-     * When each PARKED pooled connection stops being worth keeping.
-     *
-     * The virtual-thread path has this on its hosts, keyed by descriptor and swept
-     * by the poller. The pooled reactor had nothing: it registered the descriptor
-     * and left, and SO_RCVTIMEO cannot expire a socket while no thread is inside
-     * recv, so an accepted connection that said nothing -- or a keep-alive one
-     * re-armed and then abandoned -- stayed in liveConnections for ever. Enough of
-     * them reach MAX_CONNECTIONS and every later client is refused, which is the
-     * cheapest denial of service there is. Every Java SE run and every TLS server
-     * takes this path.
-     *
-     * Only while PARKED: handOff removes the entry, because a connection a worker
-     * is serving is bounded by the request deadlines instead.
-     */
+    /// When each PARKED pooled connection stops being worth keeping.
+    ///
+    /// The virtual-thread path has this on its hosts, keyed by descriptor and swept
+    /// by the poller. The pooled reactor had nothing: it registered the descriptor
+    /// and left, and SO_RCVTIMEO cannot expire a socket while no thread is inside
+    /// recv, so an accepted connection that said nothing -- or a keep-alive one
+    /// re-armed and then abandoned -- stayed in liveConnections for ever. Enough of
+    /// them reach MAX_CONNECTIONS and every later client is refused, which is the
+    /// cheapest denial of service there is. Every Java SE run and every TLS server
+    /// takes this path.
+    ///
+    /// Only while PARKED: handOff removes the entry, because a connection a worker
+    /// is serving is bounded by the request deadlines instead.
     private final Map pooledDeadlines =
             java.util.Collections.synchronizedMap(new java.util.HashMap());
-    private volatile boolean running = true;
+    private volatile boolean running = true; //NOPMD AvoidUsingVolatile - cleared by stop(), read by the reactor and every worker
     private Thread loop;
-    /** Released only when stop() has finished draining. See awaitTermination. */
+    /// Released only when stop() has finished draining. See awaitTermination.
     private final Object stopped = new Object();
     private boolean fullyStopped;
     private final java.util.concurrent.atomic.AtomicInteger openConnections =
             new java.util.concurrent.atomic.AtomicInteger();
-    /**
-     * Requests actually being served, as opposed to connections being held.
-     *
-     * activeRequests counts a worker's whole stay on a connection, which the pool
-     * sizing below genuinely wants -- but in virtual-thread mode a worker owns a
-     * keep-alive connection for its lifetime and parks between requests, so that
-     * number stays positive while the client sits idle. Reported as saturation it is
-     * wrong, and stop() waiting on it meant one idle keep-alive client held shutdown
-     * for the entire drain window.
-     */
-    /**
-     * HTTP/2 turns inside nghttp2, which stop() has to wait for as well.
-     *
-     * Separate from inFlightRequests rather than folded into it: that one is what
-     * getMetrics reports as active requests, and a connection pumping control
-     * frames or flushing after its last stream is not a request in flight -- but
-     * it IS a reason not to free the session under it.
-     */
+    // Requests actually being served, as opposed to connections being held.
+    //
+    // activeRequests counts a worker's whole stay on a connection, which the pool
+    // sizing below genuinely wants -- but in virtual-thread mode a worker owns a
+    // keep-alive connection for its lifetime and parks between requests, so that
+    // number stays positive while the client sits idle. Reported as saturation it is
+    // wrong, and stop() waiting on it meant one idle keep-alive client held shutdown
+    // for the entire drain window.
+
+    /// HTTP/2 turns inside nghttp2, which stop() has to wait for as well.
+    ///
+    /// Separate from inFlightRequests rather than folded into it: that one is what
+    /// getMetrics reports as active requests, and a connection pumping control
+    /// frames or flushing after its last stream is not a request in flight -- but
+    /// it IS a reason not to free the session under it.
     private final java.util.concurrent.atomic.AtomicInteger http2Turns =
             new java.util.concurrent.atomic.AtomicInteger();
 
-    /** Whoever wins this owns the teardown; see stop(). */
+    /// Whoever wins this owns the teardown; see stop().
     private final java.util.concurrent.atomic.AtomicBoolean stopClaimed =
             new java.util.concurrent.atomic.AtomicBoolean(false);
 
@@ -1717,27 +1593,25 @@ public final class HttpServer {
 
     private final java.util.concurrent.atomic.AtomicInteger activeRequests =
             new java.util.concurrent.atomic.AtomicInteger();
-    /**
-     * Requests answered, striped one slot per host thread.
-     *
-     * A profile put AtomicLong.incrementAndGet among the hottest symbols in this
-     * server: requestsServed was one CONTENDED atomic per request, and with the
-     * host threads pinned to two cores every increment moved a cache line between
-     * them. Each slot here has a single writer -- the host thread that owns the
-     * connection -- so the increment is a plain add, and the health endpoint sums
-     * the stripes. Slots are 8 longs apart so two hosts never share a cache line,
-     * which is the whole point of striping and easy to leave out by accident.
-     *
-     * Kept alongside requestsServed rather than replacing it: the reactor mode has
-     * no hosts to stripe by, and still uses the atomic.
-     */
+    /// Requests answered, striped one slot per host thread.
+    ///
+    /// A profile put AtomicLong.incrementAndGet among the hottest symbols in this
+    /// server: requestsServed was one CONTENDED atomic per request, and with the
+    /// host threads pinned to two cores every increment moved a cache line between
+    /// them. Each slot here has a single writer -- the host thread that owns the
+    /// connection -- so the increment is a plain add, and the health endpoint sums
+    /// the stripes. Slots are 8 longs apart so two hosts never share a cache line,
+    /// which is the whole point of striping and easy to leave out by accident.
+    ///
+    /// Kept alongside requestsServed rather than replacing it: the reactor mode has
+    /// no hosts to stripe by, and still uses the atomic.
     private static final int SERVED_STRIPE_STRIDE = 8;
     private long[] servedStripes = new long[0];
 
     private long servedTotal() {
         long total = requestsServed.get();
         long[] st = servedStripes;
-        for(int i = 0 ; i < st.length ; i += SERVED_STRIPE_STRIDE) {
+        for (int i = 0 ; i < st.length ; i += SERVED_STRIPE_STRIDE) {
             total += st[i];
         }
         return total;
@@ -1752,37 +1626,33 @@ public final class HttpServer {
     private final long startedAt = System.currentTimeMillis();
 
 
-    /**
-     * How many requests one worker may serve on one connection before handing it
-     * back even when nothing else is waiting.
-     *
-     * A backstop under the pendingWork check rather than the main mechanism: it
-     * bounds the damage if that check is ever wrong. In virtual-thread mode the
-     * cap still applies but its ACTION is to step aside rather than to close --
-     * see where it is used.
-     */
+    /// How many requests one worker may serve on one connection before handing it
+    /// back even when nothing else is waiting.
+    ///
+    /// A backstop under the pendingWork check rather than the main mechanism: it
+    /// bounds the damage if that check is ever wrong. In virtual-thread mode the
+    /// cap still applies but its ACTION is to step aside rather than to close --
+    /// see where it is used.
     private static final int KEEPALIVE_BURST_LIMIT =
             envInt("CN1_HTTP_KEEPALIVE_BURST", 256);
 
-    /** How many requests may be in flight at once; the pool size. */
+    /// How many requests may be in flight at once; the pool size.
     private final int workerCount;
 
-    /**
-     * Whether THIS server runs on virtual threads, which is not the same question as
-     * whether the build supports them.
-     *
-     * A TLS server does not, however POLL_MODE is set. Tls.readImpl maps
-     * SSL_ERROR_WANT_READ to a hard error rather than parking, so a TLS descriptor
-     * has to stay blocking -- and a blocking descriptor on a virtual thread holds
-     * its host OS thread for the whole read. With one host per core, one idle TLS
-     * client per core occupies every host and unrelated connections stop being
-     * served. A thread pool has a worse ceiling and an honest one; virtual threads
-     * here have a better ceiling that a single slow client removes.
-     *
-     * So TLS falls back to the pool until the TLS layer can park. This is decided
-     * once, here, rather than tested at each use, because half a server in each mode
-     * is neither.
-     */
+    /// Whether THIS server runs on virtual threads, which is not the same question as
+    /// whether the build supports them.
+    ///
+    /// A TLS server does not, however POLL_MODE is set. Tls.readImpl maps
+    /// SSL_ERROR_WANT_READ to a hard error rather than parking, so a TLS descriptor
+    /// has to stay blocking -- and a blocking descriptor on a virtual thread holds
+    /// its host OS thread for the whole read. With one host per core, one idle TLS
+    /// client per core occupies every host and unrelated connections stop being
+    /// served. A thread pool has a worse ceiling and an honest one; virtual threads
+    /// here have a better ceiling that a single slow client removes.
+    ///
+    /// So TLS falls back to the pool until the TLS layer can park. This is decided
+    /// once, here, rather than tested at each use, because half a server in each mode
+    /// is neither.
     private final boolean virtualThreads;
 
     private HttpServer(ServerSocket listener, Reactor reactor, ExecutorService workers,
@@ -1803,51 +1673,45 @@ public final class HttpServer {
         this.virtualThreads = workers == null;
     }
 
-    /**
-     * Arming used for connection descriptors.
-     *
-     * Plain level-triggered READ, with no ONESHOT and so no re-arm, and affinity
-     * is what makes that safe. A descriptor lives in exactly ONE host's epoll
-     * set, and that host is not polling while it is inside advance() running the
-     * virtual thread, so no second thread can ever be handed a descriptor whose
-     * virtual thread is already running. ONESHOT was guarding against a hazard
-     * that only exists when several threads share a poller.
-     *
-     * What it cost to keep it was an epoll_ctl on every park, which is the exact
-     * syscall Go does not pay: it registers each descriptor once and never
-     * touches epoll again for the life of the connection. A profile of the
-     * plaintext benchmark put epoll_ctl at 4.65% of in-binary self time, so the
-     * re-arm is now gone and a descriptor stays armed for the whole connection.
-     *
-     * ONESHOT was doing one more thing than the hazard above, and dropping it
-     * without replacing that is a use-after-free. The kernel DISARMS on delivery,
-     * so a descriptor whose virtual thread returned RUNNABLE -- queued in the
-     * ring, neither running nor parked -- could not be reported again while it
-     * sat there. Left armed it can be, and advance() would resume a handle the
-     * ring is also about to resume. That invariant is now explicit: the RUNNABLE
-     * path disarms with a remove() and VtHost.armedByFd remembers it, which costs
-     * a syscall on the yield path instead of on every request.
-     */
+    /// Arming used for connection descriptors.
+    ///
+    /// Plain level-triggered READ, with no ONESHOT and so no re-arm, and affinity
+    /// is what makes that safe. A descriptor lives in exactly ONE host's epoll
+    /// set, and that host is not polling while it is inside advance() running the
+    /// virtual thread, so no second thread can ever be handed a descriptor whose
+    /// virtual thread is already running. ONESHOT was guarding against a hazard
+    /// that only exists when several threads share a poller.
+    ///
+    /// What it cost to keep it was an epoll_ctl on every park, which is the exact
+    /// syscall Go does not pay: it registers each descriptor once and never
+    /// touches epoll again for the life of the connection. A profile of the
+    /// plaintext benchmark put epoll_ctl at 4.65% of in-binary self time, so the
+    /// re-arm is now gone and a descriptor stays armed for the whole connection.
+    ///
+    /// ONESHOT was doing one more thing than the hazard above, and dropping it
+    /// without replacing that is a use-after-free. The kernel DISARMS on delivery,
+    /// so a descriptor whose virtual thread returned RUNNABLE -- queued in the
+    /// ring, neither running nor parked -- could not be reported again while it
+    /// sat there. Left armed it can be, and advance() would resume a handle the
+    /// ring is also about to resume. That invariant is now explicit: the RUNNABLE
+    /// path disarms with a remove() and VtHost.armedByFd remembers it, which costs
+    /// a syscall on the yield path instead of on every request.
     private static final int CONN_EVENTS = Reactor.READ;
 
-    /**
-     * Ready descriptors handed to the pool and not yet picked up.
-     *
-     * The keep-alive linger is bounded by this rather than by its timeout: a
-     * client that keeps sending is readable every time, so a worker would hold
-     * one connection for ever and the pool would become the limit on concurrent
-     * clients. A fresh connection got no response in five seconds while the
-     * benchmark reported 234k requests a second.
-     */
+    /// Ready descriptors handed to the pool and not yet picked up.
+    ///
+    /// The keep-alive linger is bounded by this rather than by its timeout: a
+    /// client that keeps sending is readable every time, so a worker would hold
+    /// one connection for ever and the pool would become the limit on concurrent
+    /// clients. A fresh connection got no response in five seconds while the
+    /// benchmark reported 234k requests a second.
     private final java.util.concurrent.atomic.AtomicInteger pendingWork =
             new java.util.concurrent.atomic.AtomicInteger(0);
 
-    /** Set only when a poller-per-worker mode is on; the threads that poll. */
+    /// Set only when a poller-per-worker mode is on; the threads that poll.
     private Thread[] pollers;
 
     private final java.util.concurrent.atomic.AtomicInteger vtAccepts =
-            new java.util.concurrent.atomic.AtomicInteger(0);
-    private final java.util.concurrent.atomic.AtomicInteger vtDispatched =
             new java.util.concurrent.atomic.AtomicInteger(0);
     private final java.util.concurrent.atomic.AtomicInteger vtCreateFailures =
             new java.util.concurrent.atomic.AtomicInteger(0);
@@ -1857,24 +1721,20 @@ public final class HttpServer {
         return start(host, port, backlog, workerCount, handler, null);
     }
 
-    /**
-     * - `tls`: terminate TLS here, or null to serve plaintext (correct behind a
-     *   load balancer that already terminated it)
-     */
+    /// - `tls`: terminate TLS here, or null to serve plaintext (correct behind a
+    /// load balancer that already terminated it)
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls) throws IOException {
         return start(host, port, backlog, workerCount, handler, tls, null);
     }
 
-    /**
-     * - `webSockets`: asked for its routes before the listener accepts anything
-     *
-     * The callback runs here rather than on the returned server because this
-     * method binds the listener and starts the poller threads before it returns:
-     * a client arriving in that window would find no websocket routes at all, and
-     * its upgrade would fall through to the ordinary handler and be answered as
-     * HTTP. There is no way to express that mistake through this signature.
-     */
+    /// - `webSockets`: asked for its routes before the listener accepts anything
+    ///
+    /// The callback runs here rather than on the returned server because this
+    /// method binds the listener and starts the poller threads before it returns:
+    /// a client arriving in that window would find no websocket routes at all, and
+    /// its upgrade would fall through to the ordinary handler and be answered as
+    /// HTTP. There is no way to express that mistake through this signature.
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls, WebSocketRoutes webSockets)
             throws IOException {
@@ -1886,7 +1746,7 @@ public final class HttpServer {
         // simply created no workers and handed back a server that accepts
         // connections and queues them forever, which is worse than either. One
         // check here and neither can happen.
-        if(workerCount < 1) {
+        if (workerCount < 1) {
             throw new IOException("workerCount must be at least 1, not " + workerCount);
         }
         ServerSocket listener = ServerSocket.bind(host, port, backlog);
@@ -1936,14 +1796,14 @@ public final class HttpServer {
         // can hold that slot; the next takes the pool, which is per instance and
         // has no such ambiguity. Claimed before the server is built so two
         // starting at once cannot both win it.
-        if(useVirtualThreads && !VT_SLOT_TAKEN.compareAndSet(false, true)) {
+        if (useVirtualThreads && !VT_SLOT_TAKEN.compareAndSet(false, true)) {
             System.out.println("another virtual-thread server is already running in "
                     + "this process, so this one runs on a thread pool: an accepted "
                     + "descriptor is all a virtual thread carries, and it cannot say "
                     + "which server to hand it to.");
             useVirtualThreads = false;
         }
-        if(VIRTUAL_THREADS && tls != null) {
+        if (VIRTUAL_THREADS && tls != null) {
             System.out.println("TLS is configured, so this server runs on a thread "
                     + "pool rather than virtual threads: the TLS layer cannot park a "
                     + "read yet, and a blocking read on a virtual thread holds its "
@@ -1955,16 +1815,18 @@ public final class HttpServer {
         // Before any thread that could accept a connection exists. A callback that
         // throws takes the whole start down rather than leaving a server running
         // with half its routes -- the same answer a Handlers factory gets.
-        if(webSockets != null) {
+        if (webSockets != null) {
             try {
                 webSockets.register(server.new Registry());
+            } catch (IOException err) {
+                abandonStart(listener, server);
+                throw err;
             } catch (Exception err) {
                 abandonStart(listener, server);
-                throw err instanceof IOException ? (IOException)err
-                        : new IOException("the websocket routes could not be registered: " + err);
+                throw new IOException("the websocket routes could not be registered: " + err, err);
             }
         }
-        if(useVirtualThreads) {
+        if (useVirtualThreads) {
             ACTIVE_SERVER = server;
             // A poller PER HOST, because affinity is enforced by the poller: a
             // descriptor registered in one host's set can only ever be reported
@@ -1986,10 +1848,10 @@ public final class HttpServer {
             // answered by the virtual threads instead.
             int hostCount = workerCount;
             int cores = ServerSocket.availableProcessors();
-            if(hostCount > cores) {
+            if (hostCount > cores) {
                 hostCount = cores;
             }
-            if(hostCount < 1) {
+            if (hostCount < 1) {
                 hostCount = 1;
             }
             server.vtHosts = new VtHost[hostCount];
@@ -2005,22 +1867,23 @@ public final class HttpServer {
             // server in the process fell back off virtual threads permanently --
             // from a failure that was transient.
             try {
-                for(int iter = 0 ; iter < hostCount ; iter++) {
+                for (int iter = 0 ; iter < hostCount ; iter++) {
                     server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
                     // So a background task handed to this host runs now rather
                     // than after the host's poll times out. Without one the task
                     // still runs, just up to a poll interval later.
                     int[] wake = Reactor.createWakePipe();
-                    if(wake != null) {
+                    if (wake != null) {
                         server.vtHosts[iter].wakeRead = wake[0];
                         server.vtHosts[iter].wakeWrite = wake[1];
                         server.vtHosts[iter].poller.add(wake[0], Reactor.READ);
                     }
                 }
                 server.pollers = new Thread[hostCount];
-                for(int iter = 0 ; iter < hostCount ; iter++) {
+                for (int iter = 0 ; iter < hostCount ; iter++) {
                     final int index = iter;
                     server.pollers[iter] = new Thread(new Runnable() {
+                        @Override
                         public void run() {
                             server.runVirtualThreadHost(index);
                         }
@@ -2039,6 +1902,7 @@ public final class HttpServer {
             }
         } else {
             server.loop = new Thread(new Runnable() {
+                @Override
                 public void run() {
                     server.pump();
                 }
@@ -2048,18 +1912,16 @@ public final class HttpServer {
         return server;
     }
 
-    /**
-     * Undoes a start that failed after the listener was bound.
-     *
-     * <p>The order matters and is the same as stop()'s: stop the loops, wait for
-     * them to leave their reactors, then close. A poller already started is
-     * inside its reactor, and closing that under it is the use-after-free stop()
-     * goes out of its way to avoid -- a failed start is not a reason to take the
-     * process down with it.
-     */
+    /// Undoes a start that failed after the listener was bound.
+    ///
+    /// The order matters and is the same as stop()'s: stop the loops, wait for
+    /// them to leave their reactors, then close. A poller already started is
+    /// inside its reactor, and closing that under it is the use-after-free stop()
+    /// goes out of its way to avoid -- a failed start is not a reason to take the
+    /// process down with it.
     private static void abandonStart(ServerSocket listener, HttpServer server) {
         server.running = false;
-        if(server.pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
+        if (server.pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
             server.closePollers();
         }
         listener.close();
@@ -2068,7 +1930,7 @@ public final class HttpServer {
         server.releaseVirtualThreadSlot();
     }
 
-    /** Whether this server speaks TLS, so a client of it must use https. */
+    /// Whether this server speaks TLS, so a client of it must use https.
     public boolean isSecure() {
         return tls != null;
     }
@@ -2077,60 +1939,56 @@ public final class HttpServer {
         return listener.getPort();
     }
 
-    /** Connections currently open. */
+    /// Connections currently open.
     public int getOpenConnections() {
         return openConnections.get();
     }
 
-    /** Requests being handled right now. This is what saturation looks like. */
+    /// Requests being handled right now. This is what saturation looks like.
     public int getActiveRequests() {
         return inFlightRequests.get();
     }
 
-    /**
-     * A snapshot for a health or metrics endpoint. "draining" is what a load
-     * balancer needs to see to take this instance out of rotation before it stops
-     * answering.
-     */
+    /// A snapshot for a health or metrics endpoint. "draining" is what a load
+    /// balancer needs to see to take this instance out of rotation before it stops
+    /// answering.
     public Map getMetrics() {
         Map out = new LinkedHashMap();
         out.put("status", running ? "ok" : "draining");
-        out.put("uptimeSeconds", new Long((System.currentTimeMillis() - startedAt) / 1000L));
-        out.put("openConnections", new Integer(openConnections.get()));
-        out.put("activeRequests", new Integer(inFlightRequests.get()));
-        out.put("webSocketConnections", new Integer(webSockets.size()));
-        out.put("requestsServed", new Long(servedTotal()));
-        out.put("connectionsAccepted", new Long(connectionsAccepted.get()));
-        out.put("connectionsRefused", new Long(connectionsRefused.get()));
+        out.put("uptimeSeconds", Long.valueOf((System.currentTimeMillis() - startedAt) / 1000L));
+        out.put("openConnections", Integer.valueOf(openConnections.get()));
+        out.put("activeRequests", Integer.valueOf(inFlightRequests.get()));
+        out.put("webSocketConnections", Integer.valueOf(webSockets.size()));
+        out.put("requestsServed", Long.valueOf(servedTotal()));
+        out.put("connectionsAccepted", Long.valueOf(connectionsAccepted.get()));
+        out.put("connectionsRefused", Long.valueOf(connectionsRefused.get()));
         out.put("tls", tls == null ? "off" : "on");
-        out.put("http2Connections", new Integer(http2Sessions.size()));
+        out.put("http2Connections", Integer.valueOf(http2Sessions.size()));
         // A descriptor handed to a Response and not yet closed. Reported
         // because nothing else can see one that escapes: the process limit is
         // enormous, so a leak surfaces hours later as a server that cannot
         // accept sockets, with nothing pointing at the cause.
-        out.put("openStaticFiles", new Integer(StaticFiles.openFileCount()));
+        out.put("openStaticFiles", Integer.valueOf(StaticFiles.openFileCount()));
         // Only when tracing is on, so a server that does not trace reports
         // exactly what it always has.
         Tracing.metrics(out);
         return out;
     }
 
-    /**
-     * Blocks until the server has fully stopped, draining included.
-     *
-     * A caller's main() must do this or something equivalent: the reactor and the
-     * workers run on threads ParparVM creates DETACHED, so when main returns the
-     * process exits and takes them with it -- silently, with status 0, which from
-     * outside looks exactly like a server that refuses connections.
-     *
-     * Waiting on the reactor THREAD is not enough, and that was a real bug: stop()
-     * clears the running flag, the loop returns on its next timeout, main wakes up
-     * and the process ends while a worker is still writing a response. This waits
-     * on the drain finishing instead.
-     */
+    /// Blocks until the server has fully stopped, draining included.
+    ///
+    /// A caller's main() must do this or something equivalent: the reactor and the
+    /// workers run on threads ParparVM creates DETACHED, so when main returns the
+    /// process exits and takes them with it -- silently, with status 0, which from
+    /// outside looks exactly like a server that refuses connections.
+    ///
+    /// Waiting on the reactor THREAD is not enough, and that was a real bug: stop()
+    /// clears the running flag, the loop returns on its next timeout, main wakes up
+    /// and the process ends while a worker is still writing a response. This waits
+    /// on the drain finishing instead.
     public void awaitTermination() {
-        synchronized(stopped) {
-            while(!fullyStopped) {
+        synchronized (stopped) {
+            while (!fullyStopped) {
                 try {
                     stopped.wait();
                 } catch (InterruptedException err) {
@@ -2150,7 +2008,7 @@ public final class HttpServer {
         // Bounded, because this must not become a way to hang a shutdown: after
         // the grace the caller gets control back whatever is still running.
         long limit = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
-        while(System.currentTimeMillis() < limit && workOutstanding()) {
+        while (System.currentTimeMillis() < limit && workOutstanding()) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -2160,14 +2018,12 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Stops accepting, lets in-flight requests finish, then closes what is left.
-     *
-     * The order matters. Closing the listener first means no new work arrives while
-     * the pool drains; draining before closing connections means a request already
-     * being served gets to produce its response instead of having the socket pulled
-     * out from under it, which is what a client sees as a truncated reply.
-     */
+    /// Stops accepting, lets in-flight requests finish, then closes what is left.
+    ///
+    /// The order matters. Closing the listener first means no new work arrives while
+    /// the pool drains; draining before closing connections means a request already
+    /// being served gets to produce its response instead of having the socket pulled
+    /// out from under it, which is what a client sees as a truncated reply.
     public void stop(int drainMillis) {
         // CLAIMED, so one teardown runs however many callers ask for it. Two
         // shutdown paths overlapping -- a signal handler and the application's own
@@ -2188,11 +2044,11 @@ public final class HttpServer {
         // wedge itself against a drain that is waiting for that same handler: the
         // bound is the whole teardown the winner is allowed, and after it this
         // returns whether or not the winner finished.
-        if(!stopClaimed.compareAndSet(false, true)) {
+        if (!stopClaimed.compareAndSet(false, true)) {
             long limit = System.currentTimeMillis() + drainMillis
                     + SESSION_RELEASE_GRACE_MILLIS + POLL_LOOP_JOIN_MILLIS;
-            synchronized(stopped) {
-                while(!fullyStopped && System.currentTimeMillis() < limit) {
+            synchronized (stopped) {
+                while (!fullyStopped && System.currentTimeMillis() < limit) {
                     try {
                         stopped.wait(50);
                     } catch (InterruptedException err) {
@@ -2210,7 +2066,7 @@ public final class HttpServer {
         // the sweep then closed the descriptor the reply was owed on, so the
         // caller of that endpoint got a dropped connection instead of an answer.
         Object servingFd = SERVING_FD.get();
-        int callerFd = servingFd == null ? -1 : ((Integer)servingFd).intValue();
+        int callerFd = servingFd == null ? -1 : ((Integer) servingFd).intValue();
         // Before the drain window, so a well-behaved peer has that window to
         // answer. A websocket never ends on its own -- waiting for one to finish
         // is waiting forever -- and simply closing the socket makes every client
@@ -2235,7 +2091,7 @@ public final class HttpServer {
         running = false;
         reactor.remove(listener.getFd());
         listener.close();
-        if(workers != null) {           // null in virtual-thread mode; see start()
+        if (workers != null) {           // null in virtual-thread mode; see start()
             workers.shutdown();
         }
         long deadline = System.currentTimeMillis() + drainMillis;
@@ -2257,7 +2113,7 @@ public final class HttpServer {
         // answer at the end of its own turn; until then such a response can still
         // be cut short by a stop(), and that is a smaller fault than a native data
         // race during shutdown.
-        while(System.currentTimeMillis() < deadline && workOutstandingBesidesCaller(callerFd)) {
+        while (System.currentTimeMillis() < deadline && workOutstandingBesidesCaller(callerFd)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -2277,17 +2133,17 @@ public final class HttpServer {
         // it takes its own connection down through drop(), which frees the session on
         // the thread that was using it.
         retireWebSocketsForShutdown();
-        java.util.Iterator live = new java.util.ArrayList(liveConnections.keySet()).iterator();
-        while(live.hasNext()) {
-            int fd = ((Integer)live.next()).intValue();
-            if(fd == callerFd) {
+        java.util.Iterator live = new ArrayList(liveConnections.keySet()).iterator();
+        while (live.hasNext()) {
+            int fd = ((Integer) live.next()).intValue();
+            if (fd == callerFd) {
                 // The one connection that must survive the sweep: this thread is
                 // inside its handler and has a response still to write. Closing it
                 // here is closing the answer to the request that asked for the
                 // shutdown.
                 continue;
             }
-            if(deferredCloses.containsKey(new Integer(fd))) {
+            if (deferredCloses.containsKey(Integer.valueOf(fd))) {
                 // A websocket writer is still inside this descriptor. Closing it
                 // frees a number that thread is about to use -- the whole reason
                 // retireWebSocketsForShutdown deferred it. sweepDeferredCloses
@@ -2300,7 +2156,7 @@ public final class HttpServer {
         // while one is still inside it is the thing being avoided, so the sweep below
         // waits for the count to reach zero rather than assuming it has.
         long freeBy = System.currentTimeMillis() + SESSION_RELEASE_GRACE_MILLIS;
-        while(System.currentTimeMillis() < freeBy && workOutstandingBesidesCaller(callerFd)) {
+        while (System.currentTimeMillis() < freeBy && workOutstandingBesidesCaller(callerFd)) {
             try {
                 Thread.sleep(20);
             } catch (InterruptedException err) {
@@ -2316,9 +2172,9 @@ public final class HttpServer {
         // sessions are left alone. That leaks one per live connection, which a
         // process about to exit does not care about and a use-after-free is not
         // a trade for.
-        if(workOutstanding()) {
+        if (workOutstanding()) {
             releaseVirtualThreadSlot();
-            synchronized(stopped) {
+            synchronized (stopped) {
                 fullyStopped = true;
                 stopped.notifyAll();
             }
@@ -2339,36 +2195,36 @@ public final class HttpServer {
         // keeps every one of them, which matters precisely because
         // releaseVirtualThreadSlot() exists so a server CAN be started again here.
         freeParkedVirtualThreads();
-        java.util.Iterator stranded = new java.util.ArrayList(liveConnections.keySet()).iterator();
-        while(stranded.hasNext()) {
-            drop(((Integer)stranded.next()).intValue());
+        java.util.Iterator stranded = new ArrayList(liveConnections.keySet()).iterator();
+        while (stranded.hasNext()) {
+            drop(((Integer) stranded.next()).intValue());
         }
         // Belt and braces: a session recorded for a descriptor that was already
         // dropped would otherwise never be freed.
-        synchronized(sessions) {
-            java.util.Iterator it = new java.util.ArrayList(sessions.keySet()).iterator();
-            while(it.hasNext()) {
+        synchronized (sessions) {
+            java.util.Iterator it = new ArrayList(sessions.keySet()).iterator();
+            while (it.hasNext()) {
                 Object key = it.next();
                 Object session = sessions.remove(key);
-                if(session != null) {
-                    Tls.closeSession(((Long)session).longValue());
+                if (session != null) {
+                    Tls.closeSession(((Long) session).longValue());
                 }
             }
         }
-        synchronized(http2Sessions) {
-            java.util.Iterator it = new java.util.ArrayList(http2Sessions.keySet()).iterator();
-            while(it.hasNext()) {
+        synchronized (http2Sessions) {
+            java.util.Iterator it = new ArrayList(http2Sessions.keySet()).iterator();
+            while (it.hasNext()) {
                 Object key = it.next();
                 Object h2 = http2Sessions.remove(key);
-                if(h2 != null) {
-                    ((Http2)h2).close();
+                if (h2 != null) {
+                    ((Http2) h2).close();
                 }
-                if(key instanceof Integer) {
-                    abandonHttp2Spans(((Integer)key).intValue());
+                if (key instanceof Integer) {
+                    abandonHttp2Spans(((Integer) key).intValue());
                 }
             }
         }
-        if(tls != null) {
+        if (tls != null) {
             tls.close();
         }
         // THE POLLERS, which nothing closed. Each Reactor owns an epoll or kqueue
@@ -2381,92 +2237,83 @@ public final class HttpServer {
         // it under one is the same use-after-free the session sweeps go out of
         // their way to avoid, and the same trade is taken there -- a process about
         // to exit can afford a descriptor, and cannot afford a crash.
-        if(pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
+        if (pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
             closePollers();
         }
         releaseVirtualThreadSlot();
-        synchronized(stopped) {
+        synchronized (stopped) {
             fullyStopped = true;
             stopped.notifyAll();
         }
     }
 
-    /**
-     * Whether any worker is queued, running, or inside a request or an h2 turn.
-     *
-     * <p>ALL FOUR counters, which is the point of having one predicate. The drain
-     * loops waited on inFlightRequests and http2Turns alone, and both of those are
-     * still zero while a task sits in the pool's queue or a worker is handshaking
-     * or parsing a request line -- so a stop() could decide nothing was running,
-     * free the TLS and HTTP/2 sessions, and let a task ExecutorService.shutdown()
-     * still permits run straight into them. pendingWork covers the queued window
-     * and activeRequests the worker's whole stay on a connection; both already
-     * existed and neither was consulted here.
-     *
-     * <p>The comment on the first drain loop records http2Turns being added to one
-     * loop and not the others, which is this same drift once already. One method
-     * is what stops it happening a third time.
-     */
-    /**
-     * The descriptor whose request this thread is currently serving, or null.
-     *
-     * <p>For stop(): a handler that calls it is itself the work being drained, so
-     * a shutdown from inside a request waited out the whole window for a request
-     * that could not finish until the shutdown returned, then closed the very
-     * descriptor the reply was owed on. The handler's caller got a dropped
-     * connection instead of an acknowledgement.
-     *
-     * <p>A ThreadLocal really is per VIRTUAL thread here, not per host: two
-     * connections interleaved on one host each read back their own value and
-     * neither saw the other's. Measured rather than assumed, because everything
-     * else in this file that is per host is per host precisely because the
-     * virtual threads share it.
-     */
+    // Whether any worker is queued, running, or inside a request or an h2 turn.
+    //
+    // ALL FOUR counters, which is the point of having one predicate. The drain
+    // loops waited on inFlightRequests and http2Turns alone, and both of those are
+    // still zero while a task sits in the pool's queue or a worker is handshaking
+    // or parsing a request line -- so a stop() could decide nothing was running,
+    // free the TLS and HTTP/2 sessions, and let a task ExecutorService.shutdown()
+    // still permits run straight into them. pendingWork covers the queued window
+    // and activeRequests the worker's whole stay on a connection; both already
+    // existed and neither was consulted here.
+    //
+    // The comment on the first drain loop records http2Turns being added to one
+    // loop and not the others, which is this same drift once already. One method
+    // is what stops it happening a third time.
+
+    /// The descriptor whose request this thread is currently serving, or null.
+    ///
+    /// For stop(): a handler that calls it is itself the work being drained, so
+    /// a shutdown from inside a request waited out the whole window for a request
+    /// that could not finish until the shutdown returned, then closed the very
+    /// descriptor the reply was owed on. The handler's caller got a dropped
+    /// connection instead of an acknowledgement.
+    ///
+    /// A ThreadLocal really is per VIRTUAL thread here, not per host: two
+    /// connections interleaved on one host each read back their own value and
+    /// neither saw the other's. Measured rather than assumed, because everything
+    /// else in this file that is per host is per host precisely because the
+    /// virtual threads share it.
     private static final ThreadLocal SERVING_FD = new ThreadLocal();
 
-    /** Whether the request this thread serves is an HTTP/2 turn; see stop(). */
+    /// Whether the request this thread serves is an HTTP/2 turn; see stop().
     private static final ThreadLocal SERVING_H2 = new ThreadLocal();
-    /**
-     * Set while a websocket callback is running, so stop() called from inside one
-     * can discount the turn that callback is itself holding.
-     */
+    /// Set while a websocket callback is running, so stop() called from inside one
+    /// can discount the turn that callback is itself holding.
     private static final ThreadLocal SERVING_WS = new ThreadLocal();
 
-    /**
-     * workOutstanding(), minus what the calling handler is itself holding.
-     *
-     * <p>A handler that calls stop() holds one in-flight request and one active
-     * connection, and neither can be released until stop() returns -- so the
-     * drain has to discount them or it waits for itself. Any OTHER work still
-     * counts, which is the part of the drain worth having.
-     */
-    /**
-     * The headers a refusal this server invented may carry: none of the handler's.
-     *
-     * <p>The 503s above replace a response the server could not send, and they
-     * were submitted with that response's own header list. A login handler's
-     * Set-Cookie therefore went out on a 503 that said the operation was
-     * unavailable -- the client is told the request failed and is authenticated
-     * anyway -- and a validator or cache directive went out describing a body
-     * that was never sent. What the server says on its own behalf is the status,
-     * and nothing the handler wrote belongs to it.
-     */
+    /// The headers a refusal this server invented may carry: none of the handler's.
+    ///
+    /// The 503s above replace a response the server could not send, and they
+    /// were submitted with that response's own header list. A login handler's
+    /// Set-Cookie therefore went out on a 503 that said the operation was
+    /// unavailable -- the client is told the request failed and is authenticated
+    /// anyway -- and a validator or cache directive went out describing a body
+    /// that was never sent. What the server says on its own behalf is the status,
+    /// and nothing the handler wrote belongs to it.
     private static List refusalHeaders() {
-        return new java.util.ArrayList();
+        return new ArrayList();
     }
 
+    /// workOutstanding(), minus what the calling handler is itself holding.
+    ///
+    /// A handler that calls stop() holds one in-flight request and one active
+    /// connection, and neither can be released until stop() returns -- so the
+    /// drain has to discount them or it waits for itself. Any OTHER work still
+    /// counts, which is the part of the drain worth having.
     private boolean workOutstandingBesidesCaller(int callerFd) {
         // THE WEBSOCKET DISCOUNT COMES FIRST, because SERVING_FD is only set
         // around ordinary HTTP handlers -- so a websocket callback calling stop()
         // has callerFd == -1 and used to take the early return below, which meant
         // the discount added for it could never run. A marker nothing reaches is
         // not a control.
-        if(Boolean.TRUE.equals(SERVING_WS.get())) {
+        if (Boolean.TRUE.equals(SERVING_WS.get())) {
             return inFlightRequests.get() > 0 || activeRequests.get() > 0
                     || http2Turns.get() > 0 || webSocketTurns.get() > 1
                     || pendingWork.get() > 0;
         }
-        if(callerFd < 0) {
+        if (callerFd < 0) {
             return workOutstanding();
         }
         // AND THE TURN, on HTTP/2. serveHttp2 holds a turn for as long as the
@@ -2490,27 +2337,27 @@ public final class HttpServer {
                 || pendingWork.get() > 0 || activeRequests.get() > 0;
     }
 
-    /** How long stop() waits for the poll loops before giving up on closing them. */
+    /// How long stop() waits for the poll loops before giving up on closing them.
     private static final int POLL_LOOP_JOIN_MILLIS = 2000;
 
-    /** Waits for every poll loop to end, and answers whether they all did. */
+    /// Waits for every poll loop to end, and answers whether they all did.
     private boolean pollLoopsEnded(long millis) {
         long deadline = System.currentTimeMillis() + millis;
         boolean all = true;
         Thread[] threads = pollers;
-        if(threads != null) {
-            for(int iter = 0 ; iter < threads.length ; iter++) {
+        if (threads != null) {
+            for (Thread thread : threads) {
                 // Every one of them, not just until the first that outstays its
                 // welcome: a poller still inside its reactor is exactly the one
                 // whose reactor must be left alone.
-                all = endedBy(threads[iter], deadline) && all;
+                all = endedBy(thread, deadline) && all;
             }
         }
         return endedBy(loop, deadline) && all;
     }
 
     private boolean endedBy(Thread thread, long deadline) {
-        if(thread == null) {
+        if (thread == null) {
             return true;
         }
         long left = deadline - System.currentTimeMillis();
@@ -2522,51 +2369,43 @@ public final class HttpServer {
         return !thread.isAlive();
     }
 
-    /** Closes every reactor exactly once. */
+    /// Closes every reactor exactly once.
     private void closePollers() {
         VtHost[] hosts = vtHosts;
-        if(hosts != null) {
-            for(int iter = 0 ; iter < hosts.length ; iter++) {
-                if(hosts[iter] != null) {
-                    releaseTaskInbox(hosts[iter]);
+        if (hosts != null) {
+            for (VtHost host : hosts) {
+                if (host != null) {
+                    releaseTaskInbox(host);
                 }
                 // Host 0 SHARES the main reactor (see start()), so closing every
                 // host's poller and then the reactor would close that one twice --
                 // a double free of one descriptor, not the release of two.
-                if(hosts[iter] != null && hosts[iter].poller != reactor) {
-                    hosts[iter].poller.close();
+                if (host != null && host.poller != reactor) { //NOPMD CompareObjectsWithEquals - the same reactor instance, see above
+                    host.poller.close();
                 }
             }
         }
         reactor.close();
     }
 
-    /**
-     * Hands the single virtual-thread slot back, so a server started later in this
-     * process can have it. Only the holder releases it: a second server that fell
-     * back to the pool must not free the running one's claim when it stops.
-     */
-    /**
-     * Frees every virtual thread still parked on a connection, at shutdown.
-     *
-     * Only safe because nothing is running by the time it is called: the poll loop
-     * has stopped, so no host can resume one of these handles, and a handle that is
-     * freed while its thread could still be resumed is a use-after-free -- the same
-     * hazard the RUNNABLE path guards with poller.remove().
-     */
+    /// Frees every virtual thread still parked on a connection, at shutdown.
+    ///
+    /// Only safe because nothing is running by the time it is called: the poll loop
+    /// has stopped, so no host can resume one of these handles, and a handle that is
+    /// freed while its thread could still be resumed is a use-after-free -- the same
+    /// hazard the RUNNABLE path guards with poller.remove().
     private void freeParkedVirtualThreads() {
         VtHost[] hosts = vtHosts;
-        if(hosts == null) {
+        if (hosts == null) {
             return;
         }
-        for(int h = 0 ; h < hosts.length ; h++) {
-            VtHost host = hosts[h];
-            if(host == null) {
+        for (VtHost host : hosts) {
+            if (host == null) {
                 continue;
             }
-            for(int fd = 0 ; fd < host.vtByFd.length ; fd++) {
+            for (int fd = 0 ; fd < host.vtByFd.length ; fd++) {
                 long handle = host.handleFor(fd);
-                if(handle != 0) {
+                if (handle != 0) {
                     host.setHandle(fd, 0);
                     host.setDeadline(fd, 0);
                     VirtualThread.free(handle);
@@ -2575,14 +2414,17 @@ public final class HttpServer {
         }
     }
 
+    /// Hands the single virtual-thread slot back, so a server started later in this
+    /// process can have it. Only the holder releases it: a second server that fell
+    /// back to the pool must not free the running one's claim when it stops.
     private void releaseVirtualThreadSlot() {
-        if(virtualThreads) {
+        if (virtualThreads) {
             ACTIVE_SERVER = null;
             VT_SLOT_TAKEN.set(false);
         }
     }
 
-    /** Stops with a default drain window. */
+    /// Stops with a default drain window.
     public void stop() {
         stop(10000);
     }
@@ -2591,24 +2433,24 @@ public final class HttpServer {
         trace("reactor thread started");
         int[] ready = new int[READY_CAPACITY];
         int listenFd = listener.getFd();
-        while(running) {
+        while (running) {
             int n;
             try {
                 // A timeout rather than an infinite wait, so stop() is noticed even
                 // when no connection ever arrives.
                 n = reactor.await(ready, 250);
             } catch (IOException err) {
-                if(running) {
+                if (running) {
                     System.err.println("reactor failed: " + err);
                 }
                 return;
             }
-            if(n > 0) {
+            if (n > 0) {
                 trace("ready=" + n);
             }
-            for(int iter = 0 ; iter < n ; iter++) {
+            for (int iter = 0 ; iter < n ; iter++) {
                 int fd = ready[iter];
-                if(fd == listenFd) {
+                if (fd == listenFd) {
                     acceptAll();
                 } else {
                     handOff(fd);
@@ -2618,150 +2460,136 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Closes parked pooled connections whose idle deadline has passed.
-     *
-     * On the reactor thread, which is the only one that parks them, and after the
-     * ready set has been dispatched so a descriptor that just became readable is
-     * never swept on the same turn. await() returns at least every 250ms, so this
-     * runs often enough without a timer of its own.
-     */
+    /// Closes parked pooled connections whose idle deadline has passed.
+    ///
+    /// On the reactor thread, which is the only one that parks them, and after the
+    /// ready set has been dispatched so a descriptor that just became readable is
+    /// never swept on the same turn. await() returns at least every 250ms, so this
+    /// runs often enough without a timer of its own.
     private void sweepIdlePooledConnections() {
         // A descriptor whose close was deferred for a writer that had not left
         // yet. Swept here because both modes already run one of these
         // periodically, and neither needs a thread of its own to do it.
         sweepDeferredCloses();
-        if(virtualThreads || pooledDeadlines.isEmpty()) {
+        if (virtualThreads || pooledDeadlines.isEmpty()) {
             return;
         }
         long now = System.currentTimeMillis();
         java.util.Iterator it =
-                new java.util.ArrayList(pooledDeadlines.entrySet()).iterator();
-        while(it.hasNext()) {
-            java.util.Map.Entry entry = (java.util.Map.Entry)it.next();
-            if(((Long)entry.getValue()).longValue() > now) {
+                new ArrayList(pooledDeadlines.entrySet()).iterator();
+        while (it.hasNext()) {
+            Map.Entry entry = (Map.Entry) it.next();
+            if (((Long) entry.getValue()).longValue() > now) {
                 continue;
             }
-            int fd = ((Integer)entry.getKey()).intValue();
+            int fd = ((Integer) entry.getKey()).intValue();
             pooledDeadlines.remove(entry.getKey());
             trace("idle deadline reached, dropping fd=" + fd);
             drop(fd);
         }
     }
 
-    /**
-     * The server a virtual thread belongs to.
-     *
-     * A virtual thread's body is a C function and cannot carry a Java receiver,
-     * so it arrives at serveVirtual with a descriptor and nothing else. One
-     * server per process is the shape every backend binary has.
-     */
-    private static volatile HttpServer ACTIVE_SERVER;
+    /// The server a virtual thread belongs to.
+    ///
+    /// A virtual thread's body is a C function and cannot carry a Java receiver,
+    /// so it arrives at serveVirtual with a descriptor and nothing else. One
+    /// server per process is the shape every backend binary has.
+    private static volatile HttpServer ACTIVE_SERVER; //NOPMD AvoidUsingVolatile - published once, read by every virtual thread
 
-    /** Guards ACTIVE_SERVER: exactly one server per process may use virtual threads. */
+    /// Guards ACTIVE_SERVER: exactly one server per process may use virtual threads.
     private static final java.util.concurrent.atomic.AtomicBoolean VT_SLOT_TAKEN =
             new java.util.concurrent.atomic.AtomicBoolean();
 
-    /** Background tasks waiting for a virtual thread, by the token its body asks with. */
+    /// Background tasks waiting for a virtual thread, by the token its body asks with.
     private static final Map VIRTUAL_TASKS = new java.util.HashMap();
     private static long nextVirtualTask;
-    /** Round-robin cursor over the hosts for new tasks. */
+    /// Round-robin cursor over the hosts for new tasks.
     private static int nextTaskHost;
 
-    /**
-     * Whether a background task handed to {@link #submitVirtualTask} would get a
-     * virtual thread: this build has them and a server is running on them.
-     */
+    /// Whether a background task handed to [#submitVirtualTask] would get a
+    /// virtual thread: this build has them and a server is running on them.
     static boolean acceptsVirtualTasks() {
         HttpServer server = ACTIVE_SERVER;
         return server != null && server.running && server.vtHosts != null;
     }
 
-    /**
-     * Runs {@code task} on a virtual thread of the running server's hosts.
-     * Answers false, having done nothing, when there is none to run it on; the
-     * caller then runs it on a platform thread.
-     *
-     * <p>The task is queued on a host and the host woken through its pipe; the
-     * host creates the virtual thread itself, because a virtual thread's VM state
-     * belongs to the host that runs it.
-     */
-    /** The tracer this server's requests report to, when it has one of its own. */
-    private volatile Tracer serverTracer;
+    /// Runs `task` on a virtual thread of the running server's hosts.
+    /// Answers false, having done nothing, when there is none to run it on; the
+    /// caller then runs it on a platform thread.
+    ///
+    /// The task is queued on a host and the host woken through its pipe; the
+    /// host creates the virtual thread itself, because a virtual thread's VM state
+    /// belongs to the host that runs it.
+    /// The tracer this server's requests report to, when it has one of its own.
+    private volatile Tracer serverTracer; //NOPMD AvoidUsingVolatile - set by setTracer after start, read by every worker
 
-    /**
-     * Traces this server's requests with {@code tracer} rather than whichever
-     * tracer is installed process-wide -- which, with two servers, is the one
-     * that started last. Called by the server's builder.
-     */
+    /// Traces this server's requests with `tracer` rather than whichever
+    /// tracer is installed process-wide -- which, with two servers, is the one
+    /// that started last. Called by the server's builder.
     void setTracer(Tracer tracer) {
         this.serverTracer = tracer;
     }
 
-    /** The server holding the virtual-thread slot, or null. */
+    /// The server holding the virtual-thread slot, or null.
     static HttpServer activeServer() {
         return ACTIVE_SERVER;
     }
 
-    /**
-     * Queues {@code task} on a host of {@code server}, which must be the server
-     * that owns the virtual-thread slot; false -- run it elsewhere -- when it is
-     * not, is stopping, or runs no virtual threads.
-     */
+    /// Queues `task` on a host of `server`, which must be the server
+    /// that owns the virtual-thread slot; false -- run it elsewhere -- when it is
+    /// not, is stopping, or runs no virtual threads.
     static boolean submitVirtualTask(Runnable task, HttpServer server) {
-        if(task == null || server == null || server != ACTIVE_SERVER || !server.running
+        if (task == null || server == null || server != ACTIVE_SERVER || !server.running
                 || server.vtHosts == null) {
             return false;
         }
         VtHost[] hosts = server.vtHosts;
         long token;
         VtHost host;
-        synchronized(VIRTUAL_TASKS) {
+        synchronized (VIRTUAL_TASKS) {
             token = ++nextVirtualTask;
-            VIRTUAL_TASKS.put(new Long(token), task);
+            VIRTUAL_TASKS.put(Long.valueOf(token), task);
             int index = nextTaskHost;
             nextTaskHost = index + 1 >= hosts.length ? 0 : index + 1;
             host = hosts[index];
         }
-        if(host == null) {
+        if (host == null) {
             takeVirtualTask(token);
             return false;
         }
-        synchronized(host.inbox) {
+        synchronized (host.inbox) {
             // Rechecked under the lock releaseTaskInbox takes: a shutdown that won
             // the race has already drained this inbox and closed its wake pipe,
             // and a token added after that would sit there with no host to run
             // it -- its executor's count stuck, its Future never done.
-            if(host.inboxClosed) {
+            if (host.inboxClosed) {
                 takeVirtualTask(token);
                 return false;
             }
-            host.inbox.add(new Long(token));
+            host.inbox.add(Long.valueOf(token));
         }
-        if(host.wakeWrite >= 0) {
+        if (host.wakeWrite >= 0) {
             Reactor.wake(host.wakeWrite);
         }
         return true;
     }
 
-    /**
-     * At shutdown: the tasks still queued on a host go to a platform thread
-     * rather than being lost with it, and its wake pipe is closed.
-     */
+    /// At shutdown: the tasks still queued on a host go to a platform thread
+    /// rather than being lost with it, and its wake pipe is closed.
     private static void releaseTaskInbox(VtHost host) {
         Long[] tokens;
-        synchronized(host.inbox) {
-            tokens = (Long[])host.inbox.toArray(new Long[host.inbox.size()]);
+        synchronized (host.inbox) {
+            tokens = (Long[]) host.inbox.toArray(new Long[host.inbox.size()]);
             host.inbox.clear();
             host.inboxClosed = true;
         }
-        for(int iter = 0 ; iter < tokens.length ; iter++) {
-            Runnable task = takeVirtualTask(tokens[iter].longValue());
-            if(task != null) {
+        for (Long element : tokens) {
+            Runnable task = takeVirtualTask(element.longValue());
+            if (task != null) {
                 TaskExecutor.fallBack(task);
             }
         }
-        if(host.wakeRead >= 0) {
+        if (host.wakeRead >= 0) {
             ServerSocket.closeFd(host.wakeRead);
             ServerSocket.closeFd(host.wakeWrite);
             host.wakeRead = -1;
@@ -2769,42 +2597,40 @@ public final class HttpServer {
         }
     }
 
-    /** The task a virtual thread's body runs, handed over once. */
+    /// The task a virtual thread's body runs, handed over once.
     static Runnable takeVirtualTask(long token) {
-        synchronized(VIRTUAL_TASKS) {
-            return (Runnable)VIRTUAL_TASKS.remove(new Long(token));
+        synchronized (VIRTUAL_TASKS) {
+            return (Runnable) VIRTUAL_TASKS.remove(Long.valueOf(token));
         }
     }
 
-    /**
-     * Gives the tasks queued on {@code me} their virtual threads and puts them on
-     * the run ring. A task that cannot have one -- no stack to be had -- goes to
-     * a platform thread instead: it is not the task's fault, and this host must
-     * not run it inline, where a long task would stall every connection it owns.
-     */
+    /// Gives the tasks queued on `me` their virtual threads and puts them on
+    /// the run ring. A task that cannot have one -- no stack to be had -- goes to
+    /// a platform thread instead: it is not the task's fault, and this host must
+    /// not run it inline, where a long task would stall every connection it owns.
     private void drainTaskInbox(VtHost me) {
         Long[] tokens;
-        synchronized(me.inbox) {
-            if(me.inbox.isEmpty()) {
+        synchronized (me.inbox) {
+            if (me.inbox.isEmpty()) {
                 return;
             }
-            tokens = (Long[])me.inbox.toArray(new Long[me.inbox.size()]);
+            tokens = (Long[]) me.inbox.toArray(new Long[me.inbox.size()]);
             me.inbox.clear();
         }
-        for(int iter = 0 ; iter < tokens.length ; iter++) {
-            long token = tokens[iter].longValue();
+        for (Long element : tokens) {
+            long token = element.longValue();
             Runnable queued;
-            synchronized(VIRTUAL_TASKS) {
-                queued = (Runnable)VIRTUAL_TASKS.get(new Long(token));
+            synchronized (VIRTUAL_TASKS) {
+                queued = (Runnable) VIRTUAL_TASKS.get(Long.valueOf(token));
             }
             long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
-            if(handle != 0 && queued != null) {
+            if (handle != 0 && queued != null) {
                 // Kept so a task abandoned at shutdown can still be told.
-                me.tasks.put(new Long(handle), queued);
+                me.tasks.put(Long.valueOf(handle), queued);
             }
-            if(handle == 0) {
+            if (handle == 0) {
                 Runnable task = takeVirtualTask(token);
-                if(task != null) {
+                if (task != null) {
                     TaskExecutor.fallBack(task);
                 }
                 continue;
@@ -2813,90 +2639,80 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Gives a task's virtual thread its turn. A task has no descriptor, so every
-     * answer but FINISHED puts it back on the ring: a yield -- which the VM
-     * reports as parked-on-I/O when nothing says otherwise -- would otherwise
-     * leave it waiting on a poller that will never report it.
-     */
+    /// Gives a task's virtual thread its turn. A task has no descriptor, so every
+    /// answer but FINISHED puts it back on the ring: a yield -- which the VM
+    /// reports as parked-on-I/O when nothing says otherwise -- would otherwise
+    /// leave it waiting on a poller that will never report it.
     private void advanceTask(VtHost me, long handle) {
         int state = VirtualThread.resume(handle);
-        if(state == VirtualThread.FINISHED) {
-            me.tasks.remove(new Long(handle));
+        if (state == VirtualThread.FINISHED) {
+            me.tasks.remove(Long.valueOf(handle));
             VirtualThread.free(handle);
             return;
         }
         me.ringAdd(handle);
     }
 
-    /**
-     * What a connection's virtual thread runs. Reached from native code only,
-     * which is also what keeps it from being dead-code eliminated.
-     *
-     * Deliberately just serve(): the existing connection handling, written in
-     * the blocking style, unchanged. That it now runs on a virtual thread is
-     * invisible to it, which is the property that makes virtual threads worth
-     * having rather than a rewrite into callbacks.
-     */
+    /// What a connection's virtual thread runs. Reached from native code only,
+    /// which is also what keeps it from being dead-code eliminated.
+    ///
+    /// Deliberately just serve(): the existing connection handling, written in
+    /// the blocking style, unchanged. That it now runs on a virtual thread is
+    /// invisible to it, which is the property that makes virtual threads worth
+    /// having rather than a rewrite into callbacks.
     static void serveVirtual(int fd) {
         HttpServer server = ACTIVE_SERVER;
-        if(server == null) {
+        if (server == null) {
             ServerSocket.closeFd(fd);
             return;
         }
         server.serve(fd);
     }
 
-    /**
-     * One host thread's private world: its poller, its connections, its virtual
-     * threads, its run queue.
-     *
-     * NOTHING here is shared, and that is the point. A virtual thread runs on
-     * the host that accepted its connection and on no other, for its whole life.
-     *
-     * WHY AFFINITY IS NOT A TUNING CHOICE. The VM keeps real state per OS
-     * THREAD: the BiBOP allocator's current page (`bibopCurrent`), the pacing
-     * claim (`cn1MyPacingClaim`), the mark buffer, `cn1TlsSelf`, and this
-     * backend's own zero-copy read buffer. A virtual thread that parks on one
-     * host and resumes on another continues against a different thread's copy of
-     * all of it. The first version had no affinity and crashed as soon as the
-     * collector's backpressure started parking virtual threads mid-allocation.
-     *
-     * Auditing each of those for migration-safety would be a list that grows
-     * every time somebody adds a __thread; pinning the virtual thread to its
-     * host makes every one of them correct by construction, including the ones
-     * nobody has written yet.
-     */
+    /// One host thread's private world: its poller, its connections, its virtual
+    /// threads, its run queue.
+    ///
+    /// NOTHING here is shared, and that is the point. A virtual thread runs on
+    /// the host that accepted its connection and on no other, for its whole life.
+    ///
+    /// WHY AFFINITY IS NOT A TUNING CHOICE. The VM keeps real state per OS
+    /// THREAD: the BiBOP allocator's current page (`bibopCurrent`), the pacing
+    /// claim (`cn1MyPacingClaim`), the mark buffer, `cn1TlsSelf`, and this
+    /// backend's own zero-copy read buffer. A virtual thread that parks on one
+    /// host and resumes on another continues against a different thread's copy of
+    /// all of it. The first version had no affinity and crashed as soon as the
+    /// collector's backpressure started parking virtual threads mid-allocation.
+    ///
+    /// Auditing each of those for migration-safety would be a list that grows
+    /// every time somebody adds a __thread; pinning the virtual thread to its
+    /// host makes every one of them correct by construction, including the ones
+    /// nobody has written yet.
     private static final class VtHost {
         final Reactor poller;
 
-        /**
-         * Virtual threads ready to run, as a preallocated ring of raw handles.
-         *
-         * NOT a LinkedList of boxed Longs, and this is the single most important
-         * line in the scheduler. That version allocated twice per yield -- the
-         * box and the list node -- ON THE HOST THREAD, and a host thread has no
-         * virtual thread to hand back when the collector's backpressure stops it:
-         * it just sleeps. Caught with a debugger, the accepting host was sitting
-         * in cn1PacingPark underneath LinkedList.addLast underneath advance(),
-         * which is this queue. Nothing was accepted after that, and the failure
-         * amplifies itself -- the more the collector is behind, the more the
-         * scheduler allocates trying to cope.
-         *
-         * A scheduler's hot path must not allocate, or it becomes a customer of
-         * the very backpressure it is supposed to be relieving.
-         */
+        /// Virtual threads ready to run, as a preallocated ring of raw handles.
+        ///
+        /// NOT a LinkedList of boxed Longs, and this is the single most important
+        /// line in the scheduler. That version allocated twice per yield -- the
+        /// box and the list node -- ON THE HOST THREAD, and a host thread has no
+        /// virtual thread to hand back when the collector's backpressure stops it:
+        /// it just sleeps. Caught with a debugger, the accepting host was sitting
+        /// in cn1PacingPark underneath LinkedList.addLast underneath advance(),
+        /// which is this queue. Nothing was accepted after that, and the failure
+        /// amplifies itself -- the more the collector is behind, the more the
+        /// scheduler allocates trying to cope.
+        ///
+        /// A scheduler's hot path must not allocate, or it becomes a customer of
+        /// the very backpressure it is supposed to be relieving.
         long[] ring = new long[256];
         int ringHead = 0;
         int ringCount = 0;
 
-        /**
-         * Tokens of background tasks other threads handed to this host. The one
-         * piece of a host that another thread writes, so it is locked; the host
-         * takes the whole list at once, at the top of its loop.
-         */
-        final java.util.ArrayList inbox = new java.util.ArrayList();
-        /** The wake pipe polled with the connections, or -1 where there is none. */
+        /// Tokens of background tasks other threads handed to this host. The one
+        /// piece of a host that another thread writes, so it is locked; the host
+        /// takes the whole list at once, at the top of its loop.
+        final ArrayList inbox = new ArrayList();
+        /// The wake pipe polled with the connections, or -1 where there is none.
         int wakeRead = -1;
         int wakeWrite = -1;
 
@@ -2904,31 +2720,29 @@ public final class HttpServer {
             return ringCount == 0;
         }
 
-        /** Set, under the inbox lock, once a stopping host has finished its tasks. */
+        /// Set, under the inbox lock, once a stopping host has finished its tasks.
         boolean tasksDrained;
 
-        /** Set, under the inbox lock, once shutdown has drained it for good. */
+        /// Set, under the inbox lock, once shutdown has drained it for good.
         boolean inboxClosed;
 
-        /**
-         * The task each background virtual thread on this host runs, by handle.
-         * Touched only by the host thread.
-         */
+        /// The task each background virtual thread on this host runs, by handle.
+        /// Touched only by the host thread.
         final java.util.HashMap tasks = new java.util.HashMap();
 
         boolean hasQueuedTasks() {
-            synchronized(inbox) {
+            synchronized (inbox) {
                 return !inbox.isEmpty();
             }
         }
 
         void ringAdd(long handle) {
-            if(ringCount == ring.length) {
+            if (ringCount == ring.length) {
                 // Growth allocates, which is why the ring starts big enough that
                 // it does not happen in steady state: it is bounded by how many
                 // virtual threads can be mid-yield at once on ONE host.
                 long[] grown = new long[ring.length * 2];
-                for(int iter = 0 ; iter < ringCount ; iter++) {
+                for (int iter = 0 ; iter < ringCount ; iter++) {
                     grown[iter] = ring[(ringHead + iter) % ring.length];
                 }
                 ring = grown;
@@ -2938,33 +2752,31 @@ public final class HttpServer {
             ringCount++;
         }
 
-        /**
-         * Head first, and NOT the FILO order fasthttp uses.
-         *
-         * fasthttp hands a new connection to its most recently released worker --
-         * "such a scheme keeps CPU caches hot" -- and the same idea looks like it
-         * should apply here. It does not, because it is not the same queue.
-         * fasthttp is choosing among IDLE, INTERCHANGEABLE workers, where nothing
-         * can starve: whichever it picks, every connection still has a worker.
-         * This queue holds PENDING RUNNABLE CONTEXTS, and the order decides
-         * whether a connection runs at all -- work keeps arriving at the tail, so
-         * taking from the tail lets the head sit.
-         *
-         * Measured rather than reasoned, tail-first against head-first, two reps
-         * at each of 64 and 256 connections:
-         *
-         *     64  conns   head-first 277152/176814 rps, 1.48/1.39 cores
-         *                 tail-first  92603/ 73980 rps, 0.56/0.55 cores
-         *     256 conns   head-first 274451/270569 rps, 1.52/1.51 cores
-         *                 tail-first 131821/120500 rps, 0.81/0.74 cores
-         *
-         * Tail-first costs two thirds of the throughput and half the machine,
-         * four readings out of four. Its p99 looks better only because it is
-         * serving a third of the traffic. Do not re-import this from fasthttp
-         * without re-reading which queue it applies to.
-         */
+        /// Head first, and NOT the FILO order fasthttp uses.
+        ///
+        /// fasthttp hands a new connection to its most recently released worker --
+        /// "such a scheme keeps CPU caches hot" -- and the same idea looks like it
+        /// should apply here. It does not, because it is not the same queue.
+        /// fasthttp is choosing among IDLE, INTERCHANGEABLE workers, where nothing
+        /// can starve: whichever it picks, every connection still has a worker.
+        /// This queue holds PENDING RUNNABLE CONTEXTS, and the order decides
+        /// whether a connection runs at all -- work keeps arriving at the tail, so
+        /// taking from the tail lets the head sit.
+        ///
+        /// Measured rather than reasoned, tail-first against head-first, two reps
+        /// at each of 64 and 256 connections:
+        ///
+        /// 64  conns   head-first 277152/176814 rps, 1.48/1.39 cores
+        /// tail-first  92603/ 73980 rps, 0.56/0.55 cores
+        /// 256 conns   head-first 274451/270569 rps, 1.52/1.51 cores
+        /// tail-first 131821/120500 rps, 0.81/0.74 cores
+        ///
+        /// Tail-first costs two thirds of the throughput and half the machine,
+        /// four readings out of four. Its p99 looks better only because it is
+        /// serving a third of the traffic. Do not re-import this from fasthttp
+        /// without re-reading which queue it applies to.
         long ringTake() {
-            if(ringCount == 0) {
+            if (ringCount == 0) {
                 return 0;
             }
             long handle = ring[ringHead];
@@ -2972,55 +2784,47 @@ public final class HttpServer {
             ringCount--;
             return handle;
         }
-        /** Descriptor to virtual-thread handle. Only this host touches it. */
+        /// Descriptor to virtual-thread handle. Only this host touches it.
         long[] vtByFd = new long[1024];
 
-        /**
-         * Descriptor to the connection being served on it, for the borrow check in
-         * advance().
-         *
-         * Host-private for the same reason vtByFd is, and written from the virtual
-         * thread that serves the descriptor -- which runs on THIS host thread, so
-         * the write and the read in advance() are the same thread and no
-         * publication is involved. A server-wide table indexed by fd could not say
-         * that: the accept loop grows it from another thread.
-         */
+        /// Descriptor to the connection being served on it, for the borrow check in
+        /// advance().
+        ///
+        /// Host-private for the same reason vtByFd is, and written from the virtual
+        /// thread that serves the descriptor -- which runs on THIS host thread, so
+        /// the write and the read in advance() are the same thread and no
+        /// publication is involved. A server-wide table indexed by fd could not say
+        /// that: the accept loop grows it from another thread.
         Conn[] connByFd = new Conn[1024];
 
-        /**
-         * Whether each descriptor is currently registered with this host's poller.
-         *
-         * Without ONESHOT the kernel no longer disarms on delivery, so this is the
-         * only record of it. Only the owning host reads or writes it, which is the
-         * same single-writer rule the tables beside it follow.
-         */
+        /// Whether each descriptor is currently registered with this host's poller.
+        ///
+        /// Without ONESHOT the kernel no longer disarms on delivery, so this is the
+        /// only record of it. Only the owning host reads or writes it, which is the
+        /// same single-writer rule the tables beside it follow.
         boolean[] armedByFd = new boolean[1024];
-        /**
-         * Which descriptors are websockets rather than HTTP connections.
-         *
-         * advance() arms SOCKET_TIMEOUT_MILLIS on every park, which is right for a
-         * half-sent request and fatal for a websocket: a connection idle for more
-         * than fifteen seconds was closed by sweepDeadlines while both peers still
-         * believed it was open. Measured against the browser screenshot suite,
-         * which delivered 31 of 181 images before the client's socket went away
-         * with no error on either side.
-         */
+        /// Which descriptors are websockets rather than HTTP connections.
+        ///
+        /// advance() arms SOCKET_TIMEOUT_MILLIS on every park, which is right for a
+        /// half-sent request and fatal for a websocket: a connection idle for more
+        /// than fifteen seconds was closed by sweepDeadlines while both peers still
+        /// believed it was open. Measured against the browser screenshot suite,
+        /// which delivered 31 of 181 images before the client's socket went away
+        /// with no error on either side.
         boolean[] webSocketByFd = new boolean[1024];
 
-        /**
-         * When each parked connection stops being worth waiting for, or 0.
-         *
-         * A parked virtual thread is resumed only when its descriptor becomes
-         * readable, so a client that connects, sends half a request and then goes
-         * quiet is never resumed and never shed: the connection lives for ever
-         * and holds a virtual thread and its stacks. That is slowloris, and
-         * BackendHttpIntegrationTest.shedsIdleConnections tests for it. The
-         * dispatching path inherits the behaviour from the socket deadline; this
-         * path has to enforce it, because nothing else will.
-         */
+        /// When each parked connection stops being worth waiting for, or 0.
+        ///
+        /// A parked virtual thread is resumed only when its descriptor becomes
+        /// readable, so a client that connects, sends half a request and then goes
+        /// quiet is never resumed and never shed: the connection lives for ever
+        /// and holds a virtual thread and its stacks. That is slowloris, and
+        /// BackendHttpIntegrationTest.shedsIdleConnections tests for it. The
+        /// dispatching path inherits the behaviour from the socket deadline; this
+        /// path has to enforce it, because nothing else will.
         long[] deadlineByFd = new long[1024];
 
-        /** When this host last swept, so a busy one still sheds stale work. */
+        /// When this host last swept, so a busy one still sheds stale work.
         long lastSweep;
 
         VtHost(Reactor poller) {
@@ -3031,23 +2835,21 @@ public final class HttpServer {
             return fd < vtByFd.length ? vtByFd[fd] : 0;
         }
 
-        /**
-         * Makes room for this descriptor in all three tables.
-         *
-         * Every writer calls it, not just setHandle. The tables start at 1024
-         * and a process serving the advertised connection ceiling opens numbers
-         * far past that, so a write that only bounds-CHECKED was a write that
-         * silently did nothing: an accepted connection above 1024 recorded no
-         * deadline, and a client that then sent nothing was never swept, because
-         * the growth happened in setHandle and setHandle only runs once the
-         * connection has spoken. Silence was the one case it had to cover.
-         */
+        /// Makes room for this descriptor in all three tables.
+        ///
+        /// Every writer calls it, not just setHandle. The tables start at 1024
+        /// and a process serving the advertised connection ceiling opens numbers
+        /// far past that, so a write that only bounds-CHECKED was a write that
+        /// silently did nothing: an accepted connection above 1024 recorded no
+        /// deadline, and a client that then sent nothing was never swept, because
+        /// the growth happened in setHandle and setHandle only runs once the
+        /// connection has spoken. Silence was the one case it had to cover.
         void ensureCapacity(int fd) {
-            if(fd < vtByFd.length) {
+            if (fd < vtByFd.length) {
                 return;
             }
             int size = vtByFd.length;
-            while(size <= fd) {
+            while (size <= fd) {
                 size = size * 2;
             }
             long[] grown = new long[size];
@@ -3068,7 +2870,7 @@ public final class HttpServer {
         }
 
         void setConn(int fd, Conn conn) {
-            if(fd < 0) {
+            if (fd < 0) {
                 return;
             }
             ensureCapacity(fd);
@@ -3079,36 +2881,32 @@ public final class HttpServer {
             return fd >= 0 && fd < connByFd.length ? connByFd[fd] : null;
         }
 
-        /**
-         * Drop the handle slot for a virtual thread that has just finished, but only
-         * if the slot still names it.
-         *
-         * A connection closes itself -- drop() runs inside the virtual thread, before
-         * it returns here -- so by the time this is reached the kernel may already
-         * have handed the descriptor NUMBER to a connection accepted since. Host 0
-         * accepts while every other host runs its own virtual threads, so that new
-         * connection can be arriving on this very host, in these very arrays. Clearing
-         * unconditionally then throws away the new connection's handle rather than the
-         * finished one's.
-         */
+        /// Drop the handle slot for a virtual thread that has just finished, but only
+        /// if the slot still names it.
+        ///
+        /// A connection closes itself -- drop() runs inside the virtual thread, before
+        /// it returns here -- so by the time this is reached the kernel may already
+        /// have handed the descriptor NUMBER to a connection accepted since. Host 0
+        /// accepts while every other host runs its own virtual threads, so that new
+        /// connection can be arriving on this very host, in these very arrays. Clearing
+        /// unconditionally then throws away the new connection's handle rather than the
+        /// finished one's.
         void releaseHandle(int fd, long handle) {
-            if(fd >= 0 && fd < vtByFd.length && vtByFd[fd] == handle) {
+            if (fd >= 0 && fd < vtByFd.length && vtByFd[fd] == handle) {
                 vtByFd[fd] = 0;
             }
         }
 
-        /**
-         * Forget everything this host knows about a descriptor, EXCEPT the handle.
-         *
-         * Called from drop() while the descriptor is still open, which is what makes
-         * it safe: the number cannot be reused until close(2), so these slots are
-         * certainly still this connection's. The handle is left because the virtual
-         * thread that owns it is usually the caller -- it is still running on that
-         * stack, and freeing it here would be a use-after-free. advance() releases it
-         * when the thread actually finishes.
-         */
+        /// Forget everything this host knows about a descriptor, EXCEPT the handle.
+        ///
+        /// Called from drop() while the descriptor is still open, which is what makes
+        /// it safe: the number cannot be reused until close(2), so these slots are
+        /// certainly still this connection's. The handle is left because the virtual
+        /// thread that owns it is usually the caller -- it is still running on that
+        /// stack, and freeing it here would be a use-after-free. advance() releases it
+        /// when the thread actually finishes.
         void forget(int fd) {
-            if(fd < 0 || fd >= deadlineByFd.length) {
+            if (fd < 0 || fd >= deadlineByFd.length) {
                 return;
             }
             deadlineByFd[fd] = 0;
@@ -3120,7 +2918,7 @@ public final class HttpServer {
         void setHandle(int fd, long handle) {
             ensureCapacity(fd);
             vtByFd[fd] = handle;
-            if(handle == 0) {
+            if (handle == 0) {
                 deadlineByFd[fd] = 0;
                 connByFd[fd] = null;
                 // The descriptor is being closed, and close() takes it out of the
@@ -3136,7 +2934,7 @@ public final class HttpServer {
         }
 
         void setDeadline(int fd, long at) {
-            if(fd < 0) {
+            if (fd < 0) {
                 return;
             }
             ensureCapacity(fd);
@@ -3144,7 +2942,7 @@ public final class HttpServer {
         }
 
         void setWebSocket(int fd, boolean value) {
-            if(fd >= 0) {
+            if (fd >= 0) {
                 ensureCapacity(fd);
                 webSocketByFd[fd] = value;
             }
@@ -3159,7 +2957,7 @@ public final class HttpServer {
         }
 
         void setArmed(int fd, boolean armed) {
-            if(fd >= 0) {
+            if (fd >= 0) {
                 ensureCapacity(fd);
                 armedByFd[fd] = armed;
             }
@@ -3168,24 +2966,22 @@ public final class HttpServer {
 
     private VtHost[] vtHosts;
 
-    /**
-     * Which host owns each descriptor, so a connection can be re-armed on the
-     * poller it actually lives in.
-     *
-     * Written only by the accept loop, which runs on host 0 alone, and read only
-     * by the owning host -- which cannot learn the descriptor exists until the
-     * registration syscall below has already happened, so the write is published
-     * before any reader can reach it.
-     */
+    /// Which host owns each descriptor, so a connection can be re-armed on the
+    /// poller it actually lives in.
+    ///
+    /// Written only by the accept loop, which runs on host 0 alone, and read only
+    /// by the owning host -- which cannot learn the descriptor exists until the
+    /// registration syscall below has already happened, so the write is published
+    /// before any reader can reach it.
     private int[] vtOwnerByFd = new int[1024];
 
-    /** Round-robin cursor for handing new connections out. Accept thread only. */
+    /// Round-robin cursor for handing new connections out. Accept thread only.
     private int nextVtHost;
 
     private void setVtOwner(int fd, int host) {
-        if(fd >= vtOwnerByFd.length) {
+        if (fd >= vtOwnerByFd.length) {
             int size = vtOwnerByFd.length;
-            while(size <= fd) {
+            while (size <= fd) {
                 size = size * 2;
             }
             int[] grown = new int[size];
@@ -3197,33 +2993,29 @@ public final class HttpServer {
 
     private VtHost ownerOf(int fd) {
         int index = fd < vtOwnerByFd.length ? vtOwnerByFd[fd] : 0;
-        if(index < 0 || index >= vtHosts.length) {
+        if (index < 0 || index >= vtHosts.length) {
             index = 0;
         }
         return vtHosts[index];
     }
-    /** Round robin over the hosts, used only by whoever is accepting. */
-    private int vtNextHost = 0;
 
-    /** Until when a stopping host keeps running its background tasks. */
-    private volatile long taskDrainDeadline;
+    /// Until when a stopping host keeps running its background tasks.
+    private volatile long taskDrainDeadline; //NOPMD AvoidUsingVolatile - set by stop(), read by every host thread
 
-    /**
-     * After the loop: the background tasks this host is running, run to the end
-     * or to the drain deadline. Only they are resumed -- no polling, no
-     * connections, which stop() is taking down -- and a host that exits with a
-     * yielded task still in its ring would leave that task's Future unfinished
-     * and its executor's active count stuck forever.
-     */
+    /// After the loop: the background tasks this host is running, run to the end
+    /// or to the drain deadline. Only they are resumed -- no polling, no
+    /// connections, which stop() is taking down -- and a host that exits with a
+    /// yielded task still in its ring would leave that task's Future unfinished
+    /// and its executor's active count stuck forever.
     private void drainTasksAfterStop(VtHost me) {
         try {
-            while(System.currentTimeMillis() < taskDrainDeadline) {
+            while (System.currentTimeMillis() < taskDrainDeadline) {
                 drainTaskInbox(me);
                 int budget = me.ringCount;
                 int tasks = 0;
-                while(budget-- > 0 && !me.ringEmpty()) {
+                while (budget-- > 0 && !me.ringEmpty()) {
                     long handle = me.ringTake();
-                    if(VirtualThread.descriptorOf(handle) < 0) {
+                    if (VirtualThread.descriptorOf(handle) < 0) {
                         advanceTask(me, handle);
                         tasks++;
                     } else {
@@ -3231,7 +3023,7 @@ public final class HttpServer {
                         me.ringAdd(handle);
                     }
                 }
-                if(tasks == 0 && !me.hasQueuedTasks()) {
+                if (tasks == 0 && !me.hasQueuedTasks()) {
                     return;
                 }
             }
@@ -3239,12 +3031,12 @@ public final class HttpServer {
             // Future never completes, so say so.
             int abandoned = 0;
             int left = me.ringCount;
-            while(left-- > 0 && !me.ringEmpty()) {
+            while (left-- > 0 && !me.ringEmpty()) {
                 long handle = me.ringTake();
-                if(VirtualThread.descriptorOf(handle) < 0) {
-                    Runnable task = (Runnable)me.tasks.remove(new Long(handle));
+                if (VirtualThread.descriptorOf(handle) < 0) {
+                    Runnable task = (Runnable) me.tasks.remove(Long.valueOf(handle));
                     VirtualThread.free(handle);
-                    if(task != null) {
+                    if (task != null) {
                         TaskExecutor.abandoned(task);
                     }
                     abandoned++;
@@ -3252,39 +3044,37 @@ public final class HttpServer {
                     me.ringAdd(handle);
                 }
             }
-            if(abandoned > 0) {
+            if (abandoned > 0) {
                 System.err.println(abandoned + " background task(s) on virtual threads did "
                         + "not finish within the shutdown window and were abandoned");
             }
         } finally {
-            synchronized(me.inbox) {
+            synchronized (me.inbox) {
                 me.tasksDrained = true;
             }
         }
     }
 
-    /**
-     * Waits, until the drain deadline, for every host to finish its tasks --
-     * except the host running a handler that called stop(): it cannot reach its
-     * drain until this returns, so waiting for it waited out the whole window,
-     * which the drain above already goes out of its way not to do.
-     */
+    /// Waits, until the drain deadline, for every host to finish its tasks --
+    /// except the host running a handler that called stop(): it cannot reach its
+    /// drain until this returns, so waiting for it waited out the whole window,
+    /// which the drain above already goes out of its way not to do.
     private void awaitTaskDrain(int callerFd) {
         VtHost[] hosts = vtHosts;
-        if(hosts == null) {
+        if (hosts == null) {
             return;
         }
         VtHost callersHost = callerFd >= 0 ? ownerOf(callerFd) : null;
-        while(System.currentTimeMillis() < taskDrainDeadline + 50) {
+        while (System.currentTimeMillis() < taskDrainDeadline + 50) {
             boolean all = true;
-            for(int iter = 0 ; iter < hosts.length ; iter++) {
-                if(hosts[iter] != null && hosts[iter] != callersHost) {
-                    synchronized(hosts[iter].inbox) {
-                        all &= hosts[iter].tasksDrained;
+            for (VtHost element : hosts) {
+                if (element != null && element != callersHost) { //NOPMD CompareObjectsWithEquals - hosts are compared by identity
+                    synchronized (element.inbox) {
+                        all &= element.tasksDrained;
                     }
                 }
             }
-            if(all) {
+            if (all) {
                 return;
             }
             try {
@@ -3296,15 +3086,13 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * One host thread: run whoever is ready, then poll for more.
-     *
-     * Everything it touches belongs to it. The run queue is a plain LinkedList
-     * because no other thread can reach it, and the descriptor table is a plain
-     * long[] for the same reason -- affinity is what buys that, and it is worth
-     * more than the lock it saves, because it is also what makes the VM's
-     * per-thread allocator state correct under a parked virtual thread.
-     */
+    /// One host thread: run whoever is ready, then poll for more.
+    ///
+    /// Everything it touches belongs to it. The run queue is a plain LinkedList
+    /// because no other thread can reach it, and the descriptor table is a plain
+    /// long[] for the same reason -- affinity is what buys that, and it is worth
+    /// more than the lock it saves, because it is also what makes the VM's
+    /// per-thread allocator state correct under a parked virtual thread.
     private void runVirtualThreadHost(int index) {
         VtHost me = vtHosts[index];
         try {
@@ -3320,7 +3108,7 @@ public final class HttpServer {
         int[] ready = new int[READY_CAPACITY];
         int listenFd = listener.getFd();
         boolean owner = (index == 0);       // only one host accepts
-        while(running) {
+        while (running) {
             drainTaskInbox(me);
             // Runnable virtual threads first: they wait for a turn, not for the
             // network, so polling before running them would delay them by the
@@ -3337,29 +3125,29 @@ public final class HttpServer {
                 // accumulate to the process ceiling. Busy is exactly when the
                 // sweep matters.
                 long now = System.currentTimeMillis();
-                if(n == 0 || now - me.lastSweep >= SWEEP_INTERVAL_MILLIS) {
+                if (n == 0 || now - me.lastSweep >= SWEEP_INTERVAL_MILLIS) {
                     me.lastSweep = now;
                     sweepDeadlines(me);
                 }
             } catch (IOException err) {
-                if(running) {
+                if (running) {
                     System.err.println("poller failed: " + err);
                 }
                 return;
             }
-            for(int iter = 0 ; iter < n ; iter++) {
+            for (int iter = 0 ; iter < n ; iter++) {
                 int fd = ready[iter];
-                if(fd == me.wakeRead && fd >= 0) {
+                if (fd == me.wakeRead && fd >= 0) {
                     // A task was queued; the top of the loop picks it up.
                     Reactor.drainWake(fd);
                     continue;
                 }
-                if(owner && fd == listenFd) {
+                if (owner && fd == listenFd) {
                     acceptAll();
                     try {
                         me.poller.modify(listenFd, CONN_EVENTS);
                     } catch (IOException err) {
-                        if(running) {
+                        if (running) {
                             System.err.println("could not re-arm the listener: " + err);
                         }
                         return;
@@ -3371,17 +3159,15 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Run the virtual threads that are ready. True if any were.
-     */
+    /// Run the virtual threads that are ready. True if any were.
     private boolean drainRunnable(VtHost me) {
         boolean any = false;
         int budget = me.ringCount;          // one pass, so a busy one cannot starve the poller
-        while(budget-- > 0 && !me.ringEmpty()) {
+        while (budget-- > 0 && !me.ringEmpty()) {
             long handle = me.ringTake();
             any = true;
             int fd = VirtualThread.descriptorOf(handle);
-            if(fd < 0) {
+            if (fd < 0) {
                 advanceTask(me, handle);
             } else {
                 advance(me, fd, handle);
@@ -3390,29 +3176,27 @@ public final class HttpServer {
         return any;
     }
 
-    /**
-     * Give a connection's virtual thread its turn, creating it on first sight,
-     * and do whatever its answer asks for.
-     *
-     * The three answers are the whole scheduler. FINISHED means the connection is
-     * over. PARKED_IO means it wants bytes, so the descriptor goes back to this
-     * host's poller. RUNNABLE means it gave up its turn but is ready now -- it is
-     * waiting on the collector, not on its socket -- and handing that one to the
-     * poller would wait for a client that is itself waiting for the response this
-     * virtual thread still owes it.
-     */
+    /// Give a connection's virtual thread its turn, creating it on first sight,
+    /// and do whatever its answer asks for.
+    ///
+    /// The three answers are the whole scheduler. FINISHED means the connection is
+    /// over. PARKED_IO means it wants bytes, so the descriptor goes back to this
+    /// host's poller. RUNNABLE means it gave up its turn but is ready now -- it is
+    /// waiting on the collector, not on its socket -- and handing that one to the
+    /// poller would wait for a client that is itself waiting for the response this
+    /// virtual thread still owes it.
     private void advance(VtHost me, int fd, long handle) {
-        if(fd < 0) {
+        if (fd < 0) {
             return;
         }
-        if(handle == 0) {
+        if (handle == 0) {
             handle = VirtualThread.create(fd, VT_STACK_BYTES);
-            if(handle == 0) {
+            if (handle == 0) {
                 // No stack. Serving it on this thread is not an option here: the
                 // keep-alive wait is indefinite because it expects to park, so
                 // this host would never poll again. Refuse instead, and say so
                 // once -- a server quietly dropping to zero is far worse.
-                if(vtCreateFailures.incrementAndGet() == 1) {
+                if (vtCreateFailures.incrementAndGet() == 1) {
                     System.err.println("virtual thread creation failed; "
                             + "refusing connections rather than pinning a host");
                 }
@@ -3423,7 +3207,7 @@ public final class HttpServer {
         }
         me.setDeadline(fd, 0);      // it is running, so it is not idle
         int state = VirtualThread.resume(handle);
-        if(state != VirtualThread.FINISHED) {
+        if (state != VirtualThread.FINISHED) {
             // IT STOPPED MID-REQUEST, and this is the only instant at which that
             // is knowable before another virtual thread runs on this host.
             //
@@ -3447,7 +3231,7 @@ public final class HttpServer {
             // so the steady state still allocates nothing per request.
             privatiseBorrowedBuffer(me.connOf(fd));
         }
-        if(state == VirtualThread.FINISHED) {
+        if (state == VirtualThread.FINISHED) {
             // Only the handle, and only if it is still ours. Everything else this
             // host held for the descriptor was cleared by drop() BEFORE the close,
             // which is the only moment at which the number is still guaranteed to
@@ -3460,7 +3244,7 @@ public final class HttpServer {
             VirtualThread.free(handle);
             return;
         }
-        if(state == VirtualThread.RUNNABLE) {
+        if (state == VirtualThread.RUNNABLE) {
             // Take it out of the poller for as long as it sits in the ring. It is
             // neither running nor parked, so a readable descriptor would otherwise
             // be reported and resumed here while the ring is about to resume it
@@ -3490,7 +3274,7 @@ public final class HttpServer {
             // parks for every later request without touching epoll again. Only a
             // descriptor the RUNNABLE path disarmed has to come back, and it comes
             // back as an ADD because remove() really deregistered it.
-            if(!me.isArmed(fd)) {
+            if (!me.isArmed(fd)) {
                 me.poller.add(fd, CONN_EVENTS);
                 me.setArmed(fd, true);
             }
@@ -3513,42 +3297,38 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Give a connection its own copy of the host's read buffer.
-     *
-     * A no-op unless it is actually borrowing, which is what makes it cheap
-     * enough to call at every park. The Request is re-pointed with it: its slices
-     * name positions in the ARRAY, so copying the connection's reference alone
-     * would leave the request reading the storage the copy was made to escape.
-     */
+    /// Give a connection its own copy of the host's read buffer.
+    ///
+    /// A no-op unless it is actually borrowing, which is what makes it cheap
+    /// enough to call at every park. The Request is re-pointed with it: its slices
+    /// name positions in the ARRAY, so copying the connection's reference alone
+    /// would leave the request reading the storage the copy was made to escape.
     private static void privatiseBorrowedBuffer(Conn conn) {
-        if(conn == null || !conn.borrowed) {
+        if (conn == null || !conn.borrowed) {
             return;
         }
         conn.detachPreservingOffsets();
     }
 
-    /**
-     * Close connections whose deadline passed while they were parked.
-     *
-     * Swept on the poll timeout rather than per event: a connection making
-     * progress is resumed by readability long before this runs, so the only
-     * descriptors it ever finds are the silent ones.
-     */
+    /// Close connections whose deadline passed while they were parked.
+    ///
+    /// Swept on the poll timeout rather than per event: a connection making
+    /// progress is resumed by readability long before this runs, so the only
+    /// descriptors it ever finds are the silent ones.
     private void sweepDeadlines(VtHost me) {
         // A descriptor whose close was deferred for a writer that had not left
         // yet. Swept here because both modes already run one of these
         // periodically, and neither needs a thread of its own to do it.
         sweepDeferredCloses();
         long now = System.currentTimeMillis();
-        for(int fd = 0 ; fd < me.deadlineByFd.length ; fd++) {
+        for (int fd = 0 ; fd < me.deadlineByFd.length ; fd++) {
             long at = me.deadlineByFd[fd];
-            if(at == 0 || at > now) {
+            if (at == 0 || at > now) {
                 continue;
             }
             long handle = me.handleFor(fd);
             me.setDeadline(fd, 0);
-            if(handle != 0) {
+            if (handle != 0) {
                 me.setHandle(fd, 0);
                 VirtualThread.free(handle);
             }
@@ -3556,43 +3336,40 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Arm a connection descriptor for its next request.
-     *
-     * The two modes need different calls and getting it wrong fails quietly in
-     * both directions, which is why this is one place. Under ONESHOT the kernel
-     * DISARMS a descriptor as it delivers it but leaves it registered, so coming
-     * back is EPOLL_CTL_MOD; an EPOLL_CTL_ADD would fail with EEXIST and the
-     * connection would hang for ever. The dispatching path removed the
-     * descriptor before handing it over, so there it has to be an ADD.
-     *
-     * @param fresh true for a descriptor the poller has never seen -- one just
-     *              accepted -- which is an ADD either way.
-     */
-    /**
-     * Hand a connection to a host and keep it there.
-     *
-     * Every accepted descriptor used to be registered with `reactor`, which IS
-     * host 0's poller, so every connection lived on host 0 and the other hosts
-     * polled empty sets for the life of the process. Virtual-thread mode was
-     * therefore single threaded: measured 0.75 of two pinned cores against the
-     * pool's 1.61 and Go's 1.49, while costing the LEAST cpu per request of the
-     * three (5.64 us against 9.78 and 6.87). It was not slower, it was narrower.
-     *
-     * Affinity is enforced by the poller -- a descriptor registered in one host's
-     * set is only ever reported to that host -- so choosing the set at accept
-     * time is what assigns the owner, and the virtual thread is then created by
-     * whichever host first sees it. The accept loop never touches another host's
-     * descriptor table, so that table stays single-writer.
-     */
+    // Arm a connection descriptor for its next request.
+    //
+    // The two modes need different calls and getting it wrong fails quietly in
+    // both directions, which is why this is one place. Under ONESHOT the kernel
+    // DISARMS a descriptor as it delivers it but leaves it registered, so coming
+    // back is EPOLL_CTL_MOD; an EPOLL_CTL_ADD would fail with EEXIST and the
+    // connection would hang for ever. The dispatching path removed the
+    // descriptor before handing it over, so there it has to be an ADD.
+    //
+    // @param fresh true for a descriptor the poller has never seen -- one just
+    // accepted -- which is an ADD either way.
+
+    /// Hand a connection to a host and keep it there.
+    ///
+    /// Every accepted descriptor used to be registered with `reactor`, which IS
+    /// host 0's poller, so every connection lived on host 0 and the other hosts
+    /// polled empty sets for the life of the process. Virtual-thread mode was
+    /// therefore single threaded: measured 0.75 of two pinned cores against the
+    /// pool's 1.61 and Go's 1.49, while costing the LEAST cpu per request of the
+    /// three (5.64 us against 9.78 and 6.87). It was not slower, it was narrower.
+    ///
+    /// Affinity is enforced by the poller -- a descriptor registered in one host's
+    /// set is only ever reported to that host -- so choosing the set at accept
+    /// time is what assigns the owner, and the virtual thread is then created by
+    /// whichever host first sees it. The accept loop never touches another host's
+    /// descriptor table, so that table stays single-writer.
     private void armConnection(int fd, boolean fresh) throws IOException {
-        if(!virtualThreads) {
-            pooledDeadlines.put(new Integer(fd),
-                    new Long(System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS));
+        if (!virtualThreads) {
+            pooledDeadlines.put(Integer.valueOf(fd),
+                    Long.valueOf(System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS));
             reactor.add(fd, CONN_EVENTS);
             return;
         }
-        if(fresh) {
+        if (fresh) {
             int host = nextVtHost;
             nextVtHost = host + 1 >= vtHosts.length ? 0 : host + 1;
             setVtOwner(fd, host);
@@ -3615,13 +3392,13 @@ public final class HttpServer {
     }
 
     private void acceptAll() {
-        while(running) {
+        while (running) {
             int fd = listener.accept();
-            if(fd < 0) {
+            if (fd < 0) {
                 return; // drained
             }
             trace("accepted fd=" + fd);
-            if(MAX_CONNECTIONS > 0 && openConnections.get() >= MAX_CONNECTIONS) {
+            if (MAX_CONNECTIONS > 0 && openConnections.get() >= MAX_CONNECTIONS) {
                 // Accept-and-close rather than stop accepting: leaving it in the
                 // backlog looks to the client like a server that hangs.
                 trace("at the connection ceiling, refusing fd=" + fd);
@@ -3648,7 +3425,7 @@ public final class HttpServer {
                 // Registered BEFORE the poller can report it. Arming first would let
                 // another host thread reach drop() for a descriptor this map has not
                 // heard of yet, and drop declines to close what it does not own.
-                liveConnections.put(new Integer(fd), Boolean.TRUE);
+                liveConnections.put(Integer.valueOf(fd), Boolean.TRUE);
                 openConnections.incrementAndGet();
                 armConnection(fd, true);
                 vtAccepts.incrementAndGet();
@@ -3660,71 +3437,20 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Takes the descriptor away from the reactor and gives it to a worker. It has
-     * to leave the poller BEFORE the worker starts reading: this is level
-     * triggered, so an fd left registered is reported ready again on the next turn
-     * and two workers end up on one connection.
-     */
-    /**
-     * How many ready descriptors one wake may carry.
-     *
-     * The dispatching path costs a task object and a WAKE per descriptor, and a
-     * wake is a futex -- a kernel operation whose cost is the same whichever
-     * language issues it. Measured against Go under the same load this server
-     * does 6.9x the futex traffic per request while doing the same number of
-     * reads and writes, so the coordination is the gap rather than the work.
-     *
-     * A poller turn that finds N ready descriptors does not need N wakes: one
-     * worker can be handed the batch and walk it. That divides the dominant cost
-     * by the batch size, and batches are BIGGEST under exactly the load where
-     * this server is furthest behind.
-     *
-     * 1 restores the old behaviour exactly, which is what makes the comparison
-     * an A/B rather than a rewrite.
-     */
-    private static final int HANDOFF_BATCH = envInt("CN1_HTTP_HANDOFF_BATCH", 1);
-
-    /**
-     * Give a whole batch of ready descriptors to ONE worker, in one wake.
-     *
-     * Every descriptor still leaves the poller before any of them is read, for
-     * the same reason the single handoff does it: level-triggered, an fd left
-     * registered is reported ready again on the next turn and a second worker
-     * lands on a connection this batch already owns.
-     */
-    private void handOffBatch(final int[] fds, final int count) {
-        for(int iter = 0 ; iter < count ; iter++) {
-            reactor.remove(fds[iter]);
-            pooledDeadlines.remove(new Integer(fds[iter]));
-        }
-        pendingWork.addAndGet(count);
-        try {
-            workers.execute(new Runnable() {
-                public void run() {
-                    for(int iter = 0 ; iter < count ; iter++) {
-                        pendingWork.decrementAndGet();
-                        serve(fds[iter]);
-                    }
-                }
-            });
-        } catch (RuntimeException err) {
-            for(int iter = 0 ; iter < count ; iter++) {
-                pendingWork.decrementAndGet();
-                drop(fds[iter]);
-            }
-        }
-    }
-
+    /// Takes the descriptor away from the reactor and gives it to a worker. It has
+    /// to leave the poller BEFORE the worker starts reading: this is level
+    /// triggered, so an fd left registered is reported ready again on the next turn
+    /// and two workers end up on one connection.
     private void handOff(final int fd) {
         // It is about to be served, so the idle deadline no longer applies; the
         // request deadlines take over from here.
-        pooledDeadlines.remove(new Integer(fd));
+        pooledDeadlines.remove(Integer.valueOf(fd));
         trace("handOff fd=" + fd);
         reactor.remove(fd);
         pendingWork.incrementAndGet();
         try {
             workers.execute(new Runnable() {
+                @Override
                 public void run() {
                     pendingWork.decrementAndGet();
                     serve(fd);
@@ -3738,24 +3464,22 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * The only place a served connection is closed, so the count stays honest.
-     *
-     * Idempotent, and it has to be: the stop() deadline closes what is still open
-     * while a worker may be using that same connection, and that worker calls here
-     * again on its next failed read. Closing twice decrements the count a second
-     * time and hands close() a descriptor number the OS may already have reused for
-     * something else, so the second call would shut down unrelated I/O. Winning the
-     * removal is what decides which call owns the teardown.
-     */
+    /// The only place a served connection is closed, so the count stays honest.
+    ///
+    /// Idempotent, and it has to be: the stop() deadline closes what is still open
+    /// while a worker may be using that same connection, and that worker calls here
+    /// again on its next failed read. Closing twice decrements the count a second
+    /// time and hands close() a descriptor number the OS may already have reused for
+    /// something else, so the second call would shut down unrelated I/O. Winning the
+    /// removal is what decides which call owns the teardown.
     private void drop(int fd) {
-        if(liveConnections.remove(new Integer(fd)) == null) {
+        if (liveConnections.remove(Integer.valueOf(fd)) == null) {
             return;
         }
         // Before anything else: a descriptor number is reused as soon as it is
         // closed, so an entry left behind here would time out the NEXT connection
         // to be handed that number.
-        pooledDeadlines.remove(new Integer(fd));
+        pooledDeadlines.remove(Integer.valueOf(fd));
         // The same rule for the virtual-thread tables, which had no equivalent and
         // were cleared AFTER the close instead, from advance(). The descriptor is
         // still open on this line, so ownerOf() still names this connection's host
@@ -3766,28 +3490,28 @@ public final class HttpServer {
         // still means this connection on this line and may not on the next. A
         // session that still has a writer inside it defers the close rather than
         // freeing a number that thread is about to write into.
-        Object socket = webSockets.remove(new Integer(fd));
-        if(socket != null && !((WebSocketSession)socket).retire()) {
-            deferredCloses.put(new Integer(fd), socket);
+        Object socket = webSockets.remove(Integer.valueOf(fd));
+        if (socket != null && !((WebSocketSession) socket).retire()) {
+            deferredCloses.put(Integer.valueOf(fd), socket);
             // The TLS session goes with it, or this early return skips the
             // Tls.closeSession below and the sweep -- which only closes the
             // descriptor -- leaks one native SSL session per slow-writer
             // disconnect. Worse, if the number is reused the map entry is
             // overwritten and the handle can no longer be reached at all.
-            Object deferredTls = sessions.remove(new Integer(fd));
-            if(deferredTls != null) {
-                deferredTlsSessions.put(new Integer(fd), deferredTls);
+            Object deferredTls = sessions.remove(Integer.valueOf(fd));
+            if (deferredTls != null) {
+                deferredTlsSessions.put(Integer.valueOf(fd), deferredTls);
             }
             return;
         }
-        Object h2 = http2Sessions.remove(new Integer(fd));
-        if(h2 != null) {
-            ((Http2)h2).close();
+        Object h2 = http2Sessions.remove(Integer.valueOf(fd));
+        if (h2 != null) {
+            ((Http2) h2).close();
         }
         abandonHttp2Spans(fd);
-        Object session = sessions.remove(new Integer(fd));
-        if(session != null) {
-            Tls.closeSession(((Long)session).longValue());
+        Object session = sessions.remove(Integer.valueOf(fd));
+        if (session != null) {
+            Tls.closeSession(((Long) session).longValue());
         }
         ServerSocket.closeFd(fd);
         openConnections.decrementAndGet();
@@ -3797,17 +3521,15 @@ public final class HttpServer {
     // WebSocket
     // ------------------------------------------------------------------------
 
-    /**
-     * Whether this request is asking to become a websocket.
-     *
-     * Ordered cheapest first, so an ordinary request pays one field read. The two
-     * header tests use headerContains, which walks the slice form without building
-     * a String and searches EVERY occurrence of the field -- both of which matter:
-     * `Connection: keep-alive, Upgrade` is what a browser sends, and a substring
-     * test would find `upgrade` inside an unrelated token.
-     */
+    /// Whether this request is asking to become a websocket.
+    ///
+    /// Ordered cheapest first, so an ordinary request pays one field read. The two
+    /// header tests use headerContains, which walks the slice form without building
+    /// a String and searches EVERY occurrence of the field -- both of which matter:
+    /// `Connection: keep-alive, Upgrade` is what a browser sends, and a substring
+    /// test would find `upgrade` inside an unrelated token.
     private boolean isUpgradeRequest(Request request) {
-        if(webSocketRouter == null && webSocketRoutes.isEmpty()) {
+        if (webSocketRouter == null && webSocketRoutes.isEmpty()) {
             return false;
         }
         return "GET".equals(request.getMethod())
@@ -3815,30 +3537,28 @@ public final class HttpServer {
                 && request.headerContains("connection", "upgrade");
     }
 
-    /** The endpoint for a path: an exact route first, then the router. */
+    /// The endpoint for a path: an exact route first, then the router.
     private WebSocket routeWebSocket(Request request, String path) throws Exception {
         Object exact = webSocketRoutes.get(path);
-        if(exact != null) {
+        if (exact != null) {
             // Names the handshake span as the generated HTTP routers name theirs,
             // or every endpoint's handshake is one operation called "GET". The
             // registered path is literal (refused with a '%' or a '?') and matched
             // exactly, so it IS the route template. A fallback router names its
             // own, as any hand-written router does.
             Tracing.route(path);
-            return (WebSocket)exact;
+            return (WebSocket) exact;
         }
         WebSocketHandler router = webSocketRouter;
         return router == null ? null : router.open(request);
     }
 
-    /**
-     * Validates the handshake, writes the 101 and runs the session.
-     *
-     * Answers true when the connection has been taken over -- whether the session
-     * succeeded or not, it is no longer HTTP and the caller must return. False
-     * means the request was refused with a status and the connection is still an
-     * ordinary HTTP one.
-     */
+    /// Validates the handshake, writes the 101 and runs the session.
+    ///
+    /// Answers true when the connection has been taken over -- whether the session
+    /// succeeded or not, it is no longer HTTP and the caller must return. False
+    /// means the request was refused with a status and the connection is still an
+    /// ordinary HTTP one.
     private boolean tryUpgrade(Conn conn, int fd, long session, Request request, Span span) {
         // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
         // Taking the raw target substring instead meant `/ch%61t` missed the
@@ -3851,31 +3571,31 @@ public final class HttpServer {
         String target = request.getTarget();
         String query = null;
         int question = target == null ? -1 : target.indexOf('?');
-        if(question >= 0) {
+        if (question >= 0) {
             query = target.substring(question + 1);
         }
 
         // RFC 6455 4.2.1. Each refusal answers a specific status: a dropped
         // connection is indistinguishable from a dead server, which is the same
         // reason ProtocolException carries one on the request path.
-        if(!acceptingUpgrades) {
+        if (!acceptingUpgrades) {
             // Draining. Taking this one would add a session the goodbye pass has
             // already been past, and it would be shut down without a Close.
             writeStatusOnly(conn, 503, "the server is shutting down");
             return false;
         }
-        if(!"HTTP/1.1".equals(request.getVersion())) {
+        if (!"HTTP/1.1".equals(request.getVersion())) {
             writeStatusOnly(conn, 400, "a websocket upgrade requires HTTP/1.1");
             return false;
         }
         String version = request.getHeader("sec-websocket-version");
-        if(!WebSocketHandshake.VERSION.equals(version)) {
+        if (!WebSocketHandshake.VERSION.equals(version)) {
             // 426 naming the version this server speaks, which is what lets a
             // client that opened with an older draft retry rather than guess.
             writeUpgradeRequired(conn);
             return false;
         }
-        if(request.countHeader("sec-websocket-key") != 1) {
+        if (request.countHeader("sec-websocket-key") != 1) {
             // getHeader joins repeats with ", ", so two keys would decode as one
             // long blob and yield a well-formed accept for a handshake the peer
             // believes failed.
@@ -3883,7 +3603,7 @@ public final class HttpServer {
             return false;
         }
         String key = request.getHeader("sec-websocket-key");
-        if(!WebSocketHandshake.keyIsWellFormed(key)) {
+        if (!WebSocketHandshake.keyIsWellFormed(key)) {
             writeStatusOnly(conn, 400, "Sec-WebSocket-Key must be sixteen base64 bytes");
             return false;
         }
@@ -3891,7 +3611,7 @@ public final class HttpServer {
         // whatever readRequest did not take off the socket would be read as the
         // first websocket frames.
         String contentLength = request.getHeader("content-length");
-        if((contentLength != null && !"0".equals(contentLength.trim()))
+        if ((contentLength != null && !"0".equals(contentLength.trim()))
                 || request.getHeader("transfer-encoding") != null) {
             writeStatusOnly(conn, 400, "a websocket handshake carries no body");
             return false;
@@ -3905,7 +3625,7 @@ public final class HttpServer {
             writeStatusOnly(conn, 500, "internal error");
             return false;
         }
-        if(endpoint == null) {
+        if (endpoint == null) {
             writeStatusOnly(conn, 404, "not found");
             return false;
         }
@@ -3939,7 +3659,7 @@ public final class HttpServer {
         conn.releaseBorrowed();
         int pendingLength = conn.available();
         byte[] pending = new byte[pendingLength];
-        if(pendingLength > 0) {
+        if (pendingLength > 0) {
             System.arraycopy(conn.buffer, conn.pos, pending, 0, pendingLength);
         }
         conn.liveRequest = null;
@@ -3962,7 +3682,7 @@ public final class HttpServer {
         WebSocketSession socket = new WebSocketSession(this, fd, session, endpoint, path, query,
                 handshakeHeaders, subprotocol, webSocketIds.incrementAndGet(),
                 pending, pendingLength);
-        webSockets.put(new Integer(fd), socket);
+        webSockets.put(Integer.valueOf(fd), socket);
         armWebSocketDeadline(fd);
         applyWebSocketReadTimeout(fd);
 
@@ -3989,34 +3709,31 @@ public final class HttpServer {
         return true;
     }
 
-    /**
-     * Replaces the request deadline with the websocket one.
-     *
-     * sweepDeadlines closes anything whose deadline has passed and treats 0 as
-     * "none", and the pooled path keeps the same answer in pooledDeadlines. Both
-     * are armed for a client that began a request and stopped -- which is exactly
-     * what a websocket, idle by design, looks like. Fifteen seconds would shed
-     * every one of them.
-     */
-    /** When a parked websocket should be given up on. 0 means never. */
+    // Replaces the request deadline with the websocket one.
+    //
+    // sweepDeadlines closes anything whose deadline has passed and treats 0 as
+    // "none", and the pooled path keeps the same answer in pooledDeadlines. Both
+    // are armed for a client that began a request and stopped -- which is exactly
+    // what a websocket, idle by design, looks like. Fifteen seconds would shed
+    // every one of them.
+
+    /// When a parked websocket should be given up on. 0 means never.
     private static long webSocketDeadline() {
         return WS_IDLE_TIMEOUT_MILLIS <= 0 ? 0
                 : System.currentTimeMillis() + WS_IDLE_TIMEOUT_MILLIS;
     }
 
-    /**
-     * Gives the DESCRIPTOR the websocket's read timeout.
-     *
-     * The reactor bookkeeping above is only half of it, and on the pooled arm it
-     * is the half that does not matter: the worker keeps the descriptor blocking
-     * inside runWebSocket, so `pooledDeadlines` is never consulted while
-     * socket.fill() waits -- what actually times the read out is SO_RCVTIMEO,
-     * installed at accept as CN1_HTTP_TIMEOUT_MS. Left alone, a healthy idle
-     * websocket on Java SE or behind TLS was closed after fifteen seconds, and
-     * CN1_WS_IDLE_TIMEOUT_MS=0 did not disable it because it never reached the
-     * socket. Measured with a two-second HTTP timeout and a five-second idle: the
-     * connection was gone both with the default and with 0.
-     */
+    /// Gives the DESCRIPTOR the websocket's read timeout.
+    ///
+    /// The reactor bookkeeping above is only half of it, and on the pooled arm it
+    /// is the half that does not matter: the worker keeps the descriptor blocking
+    /// inside runWebSocket, so `pooledDeadlines` is never consulted while
+    /// socket.fill() waits -- what actually times the read out is SO_RCVTIMEO,
+    /// installed at accept as CN1_HTTP_TIMEOUT_MS. Left alone, a healthy idle
+    /// websocket on Java SE or behind TLS was closed after fifteen seconds, and
+    /// CN1_WS_IDLE_TIMEOUT_MS=0 did not disable it because it never reached the
+    /// socket. Measured with a two-second HTTP timeout and a five-second idle: the
+    /// connection was gone both with the default and with 0.
     private void applyWebSocketReadTimeout(int fd) {
         try {
             // THE RECEIVE DEADLINE ONLY. setTimeout sets both directions, and
@@ -4037,9 +3754,9 @@ public final class HttpServer {
     private void armWebSocketDeadline(int fd) {
         long at = webSocketDeadline();
         VtHost[] hosts = vtHosts;
-        if(hosts != null) {
+        if (hosts != null) {
             VtHost owner = ownerOf(fd);
-            if(owner != null) {
+            if (owner != null) {
                 // The flag as well as the deadline: advance() re-arms on every
                 // park and needs to know this descriptor is not an HTTP request
                 // that stalled.
@@ -4048,42 +3765,39 @@ public final class HttpServer {
             }
             return;
         }
-        if(at == 0) {
-            pooledDeadlines.remove(new Integer(fd));
+        if (at == 0) {
+            pooledDeadlines.remove(Integer.valueOf(fd));
         } else {
-            pooledDeadlines.put(new Integer(fd), new Long(at));
+            pooledDeadlines.put(Integer.valueOf(fd), Long.valueOf(at));
         }
     }
 
-    /**
-     * Runs a websocket until it finishes.
-     *
-     * Blocking, which is the right shape on a virtual thread: the park inside the
-     * read is the same one an idle keep-alive connection already does, and a
-     * parked virtual thread costs a stack rather than a host thread. On a pool
-     * worker it does cost the worker for the life of the connection -- the JavaSE
-     * arm is always pooled, and so is any TLS server -- which is why a pooled
-     * deployment serving many websockets needs its worker count sized for them.
-     */
-    /**
-     * Warns, once, when websockets are using up the worker pool.
-     *
-     * In pool mode a websocket holds its worker for the whole life of the
-     * connection, so `workerCount` is the ceiling on how many can be open at
-     * once -- and the failure past that ceiling is silent and misleading: the
-     * process is healthy, the listener is bound, `kill -0` says it is alive, and
-     * new connections are simply refused because no worker ever comes back to
-     * accept them.
-     *
-     * Measured with the Autobahn suite against an eight-worker server: the run
-     * reached case 9.4.4 and every case after it failed to connect. Diagnosing
-     * that from the outside took a bisect. One line of warning is cheaper.
-     */
+    // Runs a websocket until it finishes.
+    //
+    // Blocking, which is the right shape on a virtual thread: the park inside the
+    // read is the same one an idle keep-alive connection already does, and a
+    // parked virtual thread costs a stack rather than a host thread. On a pool
+    // worker it does cost the worker for the life of the connection -- the JavaSE
+    // arm is always pooled, and so is any TLS server -- which is why a pooled
+    // deployment serving many websockets needs its worker count sized for them.
+
+    /// Warns, once, when websockets are using up the worker pool.
+    ///
+    /// In pool mode a websocket holds its worker for the whole life of the
+    /// connection, so `workerCount` is the ceiling on how many can be open at
+    /// once -- and the failure past that ceiling is silent and misleading: the
+    /// process is healthy, the listener is bound, `kill -0` says it is alive, and
+    /// new connections are simply refused because no worker ever comes back to
+    /// accept them.
+    ///
+    /// Measured with the Autobahn suite against an eight-worker server: the run
+    /// reached case 9.4.4 and every case after it failed to connect. Diagnosing
+    /// that from the outside took a bisect. One line of warning is cheaper.
     private void warnIfWebSocketsAreEatingThePool() {
-        if(virtualThreads || webSocketPoolWarningIssued) {
+        if (virtualThreads || webSocketPoolWarningIssued) {
             return;
         }
-        if(webSockets.size() * 2 < workerCount) {
+        if (webSockets.size() * 2 < workerCount) {
             return;
         }
         webSocketPoolWarningIssued = true;
@@ -4095,7 +3809,7 @@ public final class HttpServer {
                 + "CN1_WS_IDLE_TIMEOUT_MS so abandoned connections are shed sooner.");
     }
 
-    private volatile boolean webSocketPoolWarningIssued;
+    private volatile boolean webSocketPoolWarningIssued; //NOPMD AvoidUsingVolatile - set and read by the pool workers
 
     private void runWebSocket(int fd, WebSocketSession socket) {
         warnIfWebSocketsAreEatingThePool();
@@ -4106,7 +3820,7 @@ public final class HttpServer {
         // balanced. A turn that is actually running is counted by webSocketTurns.
         activeRequests.decrementAndGet();
         try {
-            while(!socket.isFinished()) {
+            while (!socket.isFinished()) {
                 webSocketTurns.incrementAndGet();
                 SERVING_WS.set(Boolean.TRUE);
                 try {
@@ -4122,7 +3836,7 @@ public final class HttpServer {
                     SERVING_WS.set(null);
                     webSocketTurns.decrementAndGet();
                 }
-                if(socket.isFinished()) {
+                if (socket.isFinished()) {
                     break;
                 }
                 boolean more;
@@ -4137,7 +3851,7 @@ public final class HttpServer {
                     reportWebSocketError(socket, err);
                     break;
                 }
-                if(!more) {
+                if (!more) {
                     break;
                 }
                 armWebSocketDeadline(fd);      // re-armed from the last activity
@@ -4148,7 +3862,7 @@ public final class HttpServer {
         }
     }
 
-    /** Tells the endpoint the connection is over, exactly once, then drops it. */
+    /// Tells the endpoint the connection is over, exactly once, then drops it.
     private void finishWebSocket(int fd, WebSocketSession socket) {
         try {
             socket.getEndpoint().onClose(socket, socket.getCloseCode(), socket.getCloseReason());
@@ -4167,27 +3881,25 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Sends 1001 to every open websocket, so a shutdown reads as one -- without
-     * letting a stalled peer hold the shutdown.
-     *
-     * Each of these writes can block: a sender whose peer stopped reading is
-     * inside the socket's send timeout, and a Close frame queued behind it waits
-     * for the same lock. Done in a loop on this thread, several such sessions cost
-     * their write timeouts SERIALLY, before `running` is even cleared and long
-     * before retire() gets to shutdown(2) them -- so a deployment could hang for
-     * minutes on peers that were already gone, none of it inside drainMillis.
-     *
-     * So the goodbyes go out on their own threads and this waits a bounded moment
-     * for them. A peer that does not take its Close in that window gets the
-     * descriptor-first teardown instead, which is what it would have got anyway.
-     */
+    /// Sends 1001 to every open websocket, so a shutdown reads as one -- without
+    /// letting a stalled peer hold the shutdown.
+    ///
+    /// Each of these writes can block: a sender whose peer stopped reading is
+    /// inside the socket's send timeout, and a Close frame queued behind it waits
+    /// for the same lock. Done in a loop on this thread, several such sessions cost
+    /// their write timeouts SERIALLY, before `running` is even cleared and long
+    /// before retire() gets to shutdown(2) them -- so a deployment could hang for
+    /// minutes on peers that were already gone, none of it inside drainMillis.
+    ///
+    /// So the goodbyes go out on their own threads and this waits a bounded moment
+    /// for them. A peer that does not take its Close in that window gets the
+    /// descriptor-first teardown instead, which is what it would have got anyway.
     private void closeWebSocketsForShutdown(long budgetMillis) {
-        java.util.List open;
-        synchronized(webSockets) {
-            open = new java.util.ArrayList(webSockets.values());
+        List open;
+        synchronized (webSockets) {
+            open = new ArrayList(webSockets.values());
         }
-        if(open.isEmpty()) {
+        if (open.isEmpty()) {
             return;
         }
         // A BOUNDED FLEET, not one thread per session. Each goodbye can block --
@@ -4202,7 +3914,7 @@ public final class HttpServer {
         // and the wait below is bounded whatever they get through. Whoever is not
         // reached gets the descriptor-first teardown, which is what they would
         // have got anyway.
-        final java.util.List sessions = open;
+        final List sessions = open;
         final java.util.concurrent.atomic.AtomicInteger cursor =
                 new java.util.concurrent.atomic.AtomicInteger();
         final java.util.concurrent.atomic.AtomicInteger running =
@@ -4210,26 +3922,8 @@ public final class HttpServer {
         int fleet = open.size() < SHUTDOWN_GOODBYE_THREADS
                 ? open.size() : SHUTDOWN_GOODBYE_THREADS;
         running.set(fleet);
-        for(int iter = 0 ; iter < fleet ; iter++) {
-            Thread goodbye = new Thread(new Runnable() {
-                public void run() {
-                    try {
-                        while(true) {
-                            int next = cursor.getAndIncrement();
-                            if(next >= sessions.size()) {
-                                return;
-                            }
-                            try {
-                                ((WebSocketSession)sessions.get(next)).closeForShutdown();
-                            } catch (RuntimeException ignored) {
-                                // One peer's failure is not the others' problem.
-                            }
-                        }
-                    } finally {
-                        running.decrementAndGet();
-                    }
-                }
-            });
+        for (int iter = 0 ; iter < fleet ; iter++) {
+            Thread goodbye = new Thread(new Goodbyes(sessions, cursor, running));
             goodbye.setDaemon(true);
             try {
                 goodbye.start();
@@ -4241,7 +3935,7 @@ public final class HttpServer {
             }
         }
         long deadline = System.currentTimeMillis() + budgetMillis;
-        while(running.get() > 0 && System.currentTimeMillis() < deadline) {
+        while (running.get() > 0 && System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException err) {
@@ -4251,31 +3945,62 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * How many threads say goodbye at shutdown.
-     *
-     * Small on purpose: they exist only so one stalled peer cannot hold the
-     * others, and each is a real OS thread on the translated runtime.
-     */
+    /// One of the goodbye threads: takes the next session off the shared cursor
+    /// until the list runs out. Static, so it holds the three things it walks and
+    /// not the server.
+    private static final class Goodbyes implements Runnable {
+        private final List sessions;
+        private final java.util.concurrent.atomic.AtomicInteger cursor;
+        private final java.util.concurrent.atomic.AtomicInteger running;
+
+        Goodbyes(List sessions, java.util.concurrent.atomic.AtomicInteger cursor,
+                java.util.concurrent.atomic.AtomicInteger running) {
+            this.sessions = sessions;
+            this.cursor = cursor;
+            this.running = running;
+        }
+
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    int next = cursor.getAndIncrement();
+                    if (next >= sessions.size()) {
+                        return;
+                    }
+                    try {
+                        ((WebSocketSession) sessions.get(next)).closeForShutdown();
+                    } catch (RuntimeException ignored) {
+                        // One peer's failure is not the others' problem.
+                    }
+                }
+            } finally {
+                running.decrementAndGet();
+            }
+        }
+    }
+
+    /// How many threads say goodbye at shutdown.
+    ///
+    /// Small on purpose: they exist only so one stalled peer cannot hold the
+    /// others, and each is a real OS thread on the translated runtime.
     private static final int SHUTDOWN_GOODBYE_THREADS =
             envIntAtLeast("CN1_WS_SHUTDOWN_THREADS", 8, 1);
 
-    /**
-     * Marks every remaining session unusable before stop()'s raw descriptor sweep.
-     *
-     * That sweep closes descriptors directly, bypassing drop() on purpose -- so
-     * without this a thread broadcasting during shutdown would write into a number
-     * that is about to belong to something else.
-     */
+    /// Marks every remaining session unusable before stop()'s raw descriptor sweep.
+    ///
+    /// That sweep closes descriptors directly, bypassing drop() on purpose -- so
+    /// without this a thread broadcasting during shutdown would write into a number
+    /// that is about to belong to something else.
     private void retireWebSocketsForShutdown() {
-        java.util.List open;
-        synchronized(webSockets) {
-            open = new java.util.ArrayList(webSockets.values());
+        List open;
+        synchronized (webSockets) {
+            open = new ArrayList(webSockets.values());
             webSockets.clear();
         }
-        for(int iter = 0 ; iter < open.size() ; iter++) {
-            WebSocketSession session = (WebSocketSession)open.get(iter);
-            if(!session.retire()) {
+        for (Object item : open) {
+            WebSocketSession session = (WebSocketSession) item;
+            if (!session.retire()) {
                 // A WRITER IS STILL INSIDE IT, and the sweep after this closes
                 // descriptors directly. Discarding the answer here means freeing a
                 // number that thread is about to write into -- and an external
@@ -4284,82 +4009,78 @@ public final class HttpServer {
                 // while the old write is still in flight. That is the
                 // cross-connection corruption drop()'s deferred close exists to
                 // prevent, so it gets the same treatment here.
-                Integer key = new Integer(session.getFd());
+                Integer key = Integer.valueOf(session.getFd());
                 deferredCloses.put(key, session);
                 Object tls = sessions.remove(key);
-                if(tls != null) {
+                if (tls != null) {
                     deferredTlsSessions.put(key, tls);
                 }
             }
         }
     }
 
-    /** Closes the descriptor behind a session, called from the session itself. */
+    /// Closes the descriptor behind a session, called from the session itself.
     void dropWebSocket(int fd) {
         drop(fd);
     }
 
-    /**
-     * Descriptors whose close is waiting for a writer to leave.
-     *
-     * Closing a descriptor while another thread is inside a write to it frees a
-     * number that thread is about to use, and the kernel hands numbers out again
-     * immediately -- so the write lands in whatever connection was accepted next.
-     * Deferring leaks one descriptor for as long as that writer takes; closing
-     * anyway corrupts an unrelated connection. The leak is the better trade, and
-     * it is bounded because the session has already been shut down in both
-     * directions, so the writer fails rather than blocking.
-     */
+    /// Descriptors whose close is waiting for a writer to leave.
+    ///
+    /// Closing a descriptor while another thread is inside a write to it frees a
+    /// number that thread is about to use, and the kernel hands numbers out again
+    /// immediately -- so the write lands in whatever connection was accepted next.
+    /// Deferring leaks one descriptor for as long as that writer takes; closing
+    /// anyway corrupts an unrelated connection. The leak is the better trade, and
+    /// it is bounded because the session has already been shut down in both
+    /// directions, so the writer fails rather than blocking.
     private final Map deferredCloses =
             java.util.Collections.synchronizedMap(new java.util.HashMap());
-    /** The TLS session belonging to a descriptor whose close is deferred. */
+    /// The TLS session belonging to a descriptor whose close is deferred.
     private final Map deferredTlsSessions =
             java.util.Collections.synchronizedMap(new java.util.HashMap());
 
-    /** Closes whatever finally has no writer left inside it. */
+    /// Closes whatever finally has no writer left inside it.
     private void sweepDeferredCloses() {
-        if(deferredCloses.isEmpty()) {
+        if (deferredCloses.isEmpty()) {
             return;
         }
-        java.util.List done = new java.util.ArrayList();
-        synchronized(deferredCloses) {
+        List done = new ArrayList();
+        synchronized (deferredCloses) {
             java.util.Iterator entries = deferredCloses.entrySet().iterator();
-            while(entries.hasNext()) {
-                Map.Entry entry = (Map.Entry)entries.next();
+            while (entries.hasNext()) {
+                Map.Entry entry = (Map.Entry) entries.next();
                 // Non-blocking: this runs on the reactor thread, which is also
                 // the accepting thread. See WebSocketSession.isQuiescent.
-                if(((WebSocketSession)entry.getValue()).isQuiescent()) {
+                if (((WebSocketSession) entry.getValue()).isQuiescent()) {
                     done.add(entry.getKey());
                     entries.remove();
                 }
             }
         }
-        for(int iter = 0 ; iter < done.size() ; iter++) {
-            Integer key = (Integer)done.get(iter);
+        for (Object item : done) {
+            Integer key = (Integer) item;
             int fd = key.intValue();
             Object tls = deferredTlsSessions.remove(key);
-            if(tls != null) {
-                Tls.closeSession(((Long)tls).longValue());
+            if (tls != null) {
+                Tls.closeSession(((Long) tls).longValue());
             }
             ServerSocket.closeFd(fd);
             openConnections.decrementAndGet();
         }
     }
 
-    /**
-     * The 101.
-     *
-     * Not written through writeHeadAndBody, for four separate reasons, any one of
-     * which alone would be a silent bug: that writer always emits Content-Type and
-     * Content-Length; it emits Connection from the keep-alive flag rather than the
-     * literal `Upgrade` a 101 needs; isServerOwnedHeader refuses `connection` and
-     * `upgrade` from extraHeaders so there is no way to express them through it;
-     * and reason(101) answers "OK", which would put `HTTP/1.1 101 OK` on the wire.
-     *
-     * One write, for the same reason the response path combines its own: on a
-     * fresh connection two writes are two segments, and the client waits a round
-     * trip before it can send anything.
-     */
+    /// The 101.
+    ///
+    /// Not written through writeHeadAndBody, for four separate reasons, any one of
+    /// which alone would be a silent bug: that writer always emits Content-Type and
+    /// Content-Length; it emits Connection from the keep-alive flag rather than the
+    /// literal `Upgrade` a 101 needs; isServerOwnedHeader refuses `connection` and
+    /// `upgrade` from extraHeaders so there is no way to express them through it;
+    /// and reason(101) answers "OK", which would put `HTTP/1.1 101 OK` on the wire.
+    ///
+    /// One write, for the same reason the response path combines its own: on a
+    /// fresh connection two writes are two segments, and the client waits a round
+    /// trip before it can send anything.
     private void writeHandshakeResponse(Conn conn, String accept, String subprotocol)
             throws IOException {
         conn.reset();
@@ -4369,7 +4090,7 @@ public final class HttpServer {
         conn.put("Sec-WebSocket-Accept: ");
         conn.put(accept);
         conn.put("\r\n");
-        if(subprotocol != null) {
+        if (subprotocol != null) {
             // Chosen from the endpoint's own list and checked to be a token, so it
             // cannot carry a CR or an LF. This response does not pass through the
             // response-splitting guard every other response here has, and that
@@ -4382,7 +4103,7 @@ public final class HttpServer {
         writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
     }
 
-    /** 426, naming the version this server speaks. RFC 6455 4.2.2 requires it. */
+    /// 426, naming the version this server speaks. RFC 6455 4.2.2 requires it.
     private void writeUpgradeRequired(Conn conn) {
         try {
             conn.reset();
@@ -4397,27 +4118,25 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Clear the per-descriptor state the owning virtual-thread host holds, if this
-     * server is running that way at all.
-     *
-     * Deliberately called with the descriptor still open. ownerOf() reads the owner
-     * table, and that table is only rewritten when a descriptor is ACCEPTED -- so
-     * asking after the close could name the host of a different connection that had
-     * been handed the same number, and clear its state instead of ours.
-     */
+    /// Clear the per-descriptor state the owning virtual-thread host holds, if this
+    /// server is running that way at all.
+    ///
+    /// Deliberately called with the descriptor still open. ownerOf() reads the owner
+    /// table, and that table is only rewritten when a descriptor is ACCEPTED -- so
+    /// asking after the close could name the host of a different connection that had
+    /// been handed the same number, and clear its state instead of ours.
     private void forgetVtState(int fd) {
         VtHost[] hosts = vtHosts;
-        if(hosts == null) {
+        if (hosts == null) {
             return;     // pool mode: pooledDeadlines above is the whole of it
         }
         ownerOf(fd).forget(fd);
     }
 
-    /** 0 when this connection is plaintext. */
+    /// 0 when this connection is plaintext.
     private long sessionOf(int fd) {
-        Object session = sessions.get(new Integer(fd));
-        return session == null ? 0 : ((Long)session).longValue();
+        Object session = sessions.get(Integer.valueOf(fd));
+        return session == null ? 0 : ((Long) session).longValue();
     }
 
     static int readFrom(int fd, long session, byte[] buffer, int offset, int length)
@@ -4428,7 +4147,7 @@ public final class HttpServer {
 
     static void writeTo(int fd, long session, byte[] buffer, int offset, int length)
             throws IOException {
-        if(session == 0) {
+        if (session == 0) {
             ServerSocket.write(fd, buffer, offset, length);
         } else {
             Tls.write(session, buffer, offset, length);
@@ -4445,7 +4164,7 @@ public final class HttpServer {
         }
     }
 
-    /** A malformed request that deserves a specific status before the close. */
+    /// A malformed request that deserves a specific status before the close.
     private static final class ProtocolException extends IOException {
         final int status;
 
@@ -4455,37 +4174,31 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * A connection plus whatever has been read from it and not yet consumed.
-     *
-     * The leftover is the point. A client may send a second request before reading
-     * the reply to the first, and both arrive in one read; a parser that keeps only
-     * the request it wanted silently drops the rest. That is not an exotic case --
-     * it is what pipelining is, and what a proxy does when it coalesces.
-     */
-    private final class Conn {
-        /**
-         * The status of the last refusal or handshake written on this connection,
-         * -1 when none was. A websocket handshake's span reads it: tryUpgrade
-         * answers through several writers, and each records what it sent.
-         */
+    /// A connection plus whatever has been read from it and not yet consumed.
+    ///
+    /// The leftover is the point. A client may send a second request before reading
+    /// the reply to the first, and both arrive in one read; a parser that keeps only
+    /// the request it wanted silently drops the rest. That is not an exotic case --
+    /// it is what pipelining is, and what a proxy does when it coalesces.
+    private static final class Conn {
+        /// The status of the last refusal or handshake written on this connection,
+        /// -1 when none was. A websocket handshake's span reads it: tryUpgrade
+        /// answers through several writers, and each records what it sent.
         int writtenStatus = -1;
         final int fd;
         final long session;
         byte[] buffer = new byte[0];
         int pos;
-        /** True while `buffer` is the thread's shared buffer rather than ours. */
+        /// True while `buffer` is the thread's shared buffer rather than ours.
         boolean borrowed;
-        /**
-         * True once this request's header slices name positions in `buffer`.
-         *
-         * "Is anything still pointing at this buffer" is the question fill() has to
-         * answer before it lets go of a borrow, and "is there anything left to
-         * read" is NOT the same question -- see the comment there.
-         */
+        /// True once this request's header slices name positions in `buffer`.
+        ///
+        /// "Is anything still pointing at this buffer" is the question fill() has to
+        /// answer before it lets go of a borrow, and "is there anything left to
+        /// read" is NOT the same question -- see the comment there.
         boolean parsedFromBuffer;
 
-        /** Memoised request targets for this connection. See internTarget. */
+        /// Memoised request targets for this connection. See internTarget.
         private final String[] targetCache = new String[TARGET_CACHE_SLOTS];
 
         String internTarget(byte[] data, int start, int length) {
@@ -4502,25 +4215,25 @@ public final class HttpServer {
             // Capped rather than cleared when idle: clearing would throw the
             // memoisation away on every keep-alive request, which is the case it
             // was measured to help.
-            if(targetCache.length == 0 || length > MAX_CACHED_TARGET_BYTES) {
+            if (targetCache.length == 0 || length > MAX_CACHED_TARGET_BYTES) {
                 // Cache disabled (CN1_HTTP_TARGET_CACHE=0), for A/B measurement.
                 // Guarded because the slot arithmetic below is a modulo, and a zero
                 // size would divide by it rather than politely doing nothing.
                 return asciiString(data, start, length);
             }
             int hash = 0;
-            for(int iter = 0 ; iter < length ; iter++) {
+            for (int iter = 0 ; iter < length ; iter++) {
                 hash = hash * 31 + data[start + iter];
             }
             int slot = (hash & 0x7fffffff) % TARGET_CACHE_SLOTS;
             String cached = targetCache[slot];
-            if(cached != null && cached.length() == length) {
+            if (cached != null && cached.length() == length) {
                 int iter = 0;
-                while(iter < length
-                        && cached.charAt(iter) == (char)(data[start + iter] & 0xff)) {
+                while (iter < length
+                        && cached.charAt(iter) == (char) (data[start + iter] & 0xff)) {
                     iter++;
                 }
-                if(iter == length) {
+                if (iter == length) {
                     return cached;
                 }
             }
@@ -4531,95 +4244,83 @@ public final class HttpServer {
             targetCache[slot] = fresh;
             return fresh;
         }
-        /**
-         * Set when a read returned end-of-stream. The linger above has to tell a
-         * client that WENT AWAY from one that has merely gone quiet: the first
-         * must be closed, and handing the second to the poller is the whole point.
-         */
-        boolean closedByPeer;
 
-        /**
-         * Where a response is assembled, reused for the life of the connection.
-         *
-         * The head used to be built with a StringBuilder, turned into a String and
-         * then encoded to bytes, and the body copied in after that -- four
-         * allocations per response, and the StringBuilder reallocating its char[]
-         * as it grew. An allocation census put char[] at 47% of ALL allocation in
-         * this server, and this path was most of it. Bytes go in directly now:
-         * the header field names are ASCII constants, and a status or a length is
-         * digits.
-         */
+        /// Where a response is assembled, reused for the life of the connection.
+        ///
+        /// The head used to be built with a StringBuilder, turned into a String and
+        /// then encoded to bytes, and the body copied in after that -- four
+        /// allocations per response, and the StringBuilder reallocating its char\[\]
+        /// as it grew. An allocation census put char\[\] at 47% of ALL allocation in
+        /// this server, and this path was most of it. Bytes go in directly now:
+        /// the header field names are ASCII constants, and a status or a length is
+        /// digits.
         byte[] out = new byte[1024];
         int outLength;
-        /**
-         * Reused header slices: nameStart, nameLength, valueStart, valueLength.
-         *
-         * Handed to a Request BY REFERENCE, not copied -- and that is only safe
-         * because `buffer` is a fresh, exactly-sized array per fill, so each
-         * Request's `raw` is privately owned and immutable once parsed. The two are
-         * a pair: the slices name absolute offsets into that particular array.
-         *
-         * Anything that makes the buffer REUSABLE breaks the pair. Measured, with a
-         * capacity-plus-limit buffer in place of the per-fill array: a Request came
-         * back holding `raw.length=45` while its own slices named offsets 212 and
-         * 232, i.e. raw from one request and the slice table from a larger later
-         * one -- the shared table had been re-parsed under a Request still using it.
-         * The result was an ArrayIndexOutOfBoundsException in getHeader, thrown
-         * outside any try block, which killed the connection with no response
-         * written (~1 suite run in 2).
-         *
-         * TWO WRONG ANSWERS, so that a third attempt does not re-buy them. It is
-         * NOT two workers on one connection: a probe that reports a second thread
-         * entering serve() for a descriptor already inside it fired ZERO times on
-         * the build that fails (the same probe on the passing build proves nothing,
-         * which is how it was nearly mis-read). And it is not the slice table
-         * overflowing: slices.length was 64 against a headerCount of 3.
-         *
-         * THE ACTUAL CAUSE, and it is a property of the VM rather than of this
-         * class: a zero-copy buffer's LENGTH IS NOT STABLE. readIntoThreadBufferImpl
-         * hands back the same array object every call and mutates it in place --
-         * `a->length = (int)n` -- because a ParparVM array's length is a field in a
-         * struct the runtime owns. So the array reports ~100 bytes while its headers
-         * are parsed (slices at 39, 59, 69) and reports 40 after the same thread's
-         * next read, with the already-parsed slices left naming positions past the
-         * end. That is the 40-against-69 reading, and nothing moved: the length did.
-         *
-         * `available()` is written as `buffer.length - pos` for exactly this reason.
-         * It re-reads the length every time and therefore self-corrects. Caching it
-         * in a `limit` field -- which is what a reusable buffer needs -- is what
-         * breaks, and it breaks silently, as a truncated response rather than a
-         * wrong one.
-         *
-         * So a reusable buffer has to stop borrowing first: take a private array
-         * (whose length really is immutable) before anything caches a length or
-         * parses slices out of it. Sizing that copy is itself subject to the same
-         * trap, since buffer.length must be read before the next read mutates it.
-         *
-         * THAT WAS BUILT, AND IT IS NOT WORTH IT. With the length handled correctly
-         * the reusable buffer is correct -- 4 default plus 2 virtual-thread suite
-         * runs clean, against a naive version that failed within two -- and it buys
-         * NOTHING. Measured in virtual-thread mode, same 12s window and load:
-         *
-         *   cycles per window   reuse 40, 40, 38     no reuse 41, 42, 41
-         *   requests            2.69M, 2.63M, 2.56M  3.08M, 3.01M, 2.70M
-         *
-         * The collection RATE does not move, so this array is not a meaningful part
-         * of the ~340 bytes a request allocates, and the throughput came out lower
-         * in all three reps (arms were not interleaved, so treat that half loosely).
-         * The per-request read buffer is simply not where the allocation is: look
-         * for the bytes before removing an allocation on the assumption it matters.
-         *
-         * So removing the per-request byte[] is not just a capacity field: a Request
-         * has to own a consistent (raw, slices, headerCount) triple, re-based
-         * together or not at all.
-         */
+        /// Reused header slices: nameStart, nameLength, valueStart, valueLength.
+        ///
+        /// Handed to a Request BY REFERENCE, not copied -- and that is only safe
+        /// because `buffer` is a fresh, exactly-sized array per fill, so each
+        /// Request's `raw` is privately owned and immutable once parsed. The two are
+        /// a pair: the slices name absolute offsets into that particular array.
+        ///
+        /// Anything that makes the buffer REUSABLE breaks the pair. Measured, with a
+        /// capacity-plus-limit buffer in place of the per-fill array: a Request came
+        /// back holding `raw.length=45` while its own slices named offsets 212 and
+        /// 232, i.e. raw from one request and the slice table from a larger later
+        /// one -- the shared table had been re-parsed under a Request still using it.
+        /// The result was an ArrayIndexOutOfBoundsException in getHeader, thrown
+        /// outside any try block, which killed the connection with no response
+        /// written (~1 suite run in 2).
+        ///
+        /// TWO WRONG ANSWERS, so that a third attempt does not re-buy them. It is
+        /// NOT two workers on one connection: a probe that reports a second thread
+        /// entering serve() for a descriptor already inside it fired ZERO times on
+        /// the build that fails (the same probe on the passing build proves nothing,
+        /// which is how it was nearly mis-read). And it is not the slice table
+        /// overflowing: slices.length was 64 against a headerCount of 3.
+        ///
+        /// THE ACTUAL CAUSE, and it is a property of the VM rather than of this
+        /// class: a zero-copy buffer's LENGTH IS NOT STABLE. readIntoThreadBufferImpl
+        /// hands back the same array object every call and mutates it in place --
+        /// `a->length = (int)n` -- because a ParparVM array's length is a field in a
+        /// struct the runtime owns. So the array reports ~100 bytes while its headers
+        /// are parsed (slices at 39, 59, 69) and reports 40 after the same thread's
+        /// next read, with the already-parsed slices left naming positions past the
+        /// end. That is the 40-against-69 reading, and nothing moved: the length did.
+        ///
+        /// `available()` is written as `buffer.length - pos` for exactly this reason.
+        /// It re-reads the length every time and therefore self-corrects. Caching it
+        /// in a `limit` field -- which is what a reusable buffer needs -- is what
+        /// breaks, and it breaks silently, as a truncated response rather than a
+        /// wrong one.
+        ///
+        /// So a reusable buffer has to stop borrowing first: take a private array
+        /// (whose length really is immutable) before anything caches a length or
+        /// parses slices out of it. Sizing that copy is itself subject to the same
+        /// trap, since buffer.length must be read before the next read mutates it.
+        ///
+        /// THAT WAS BUILT, AND IT IS NOT WORTH IT. With the length handled correctly
+        /// the reusable buffer is correct -- 4 default plus 2 virtual-thread suite
+        /// runs clean, against a naive version that failed within two -- and it buys
+        /// NOTHING. Measured in virtual-thread mode, same 12s window and load:
+        ///
+        /// cycles per window   reuse 40, 40, 38     no reuse 41, 42, 41
+        /// requests            2.69M, 2.63M, 2.56M  3.08M, 3.01M, 2.70M
+        ///
+        /// The collection RATE does not move, so this array is not a meaningful part
+        /// of the ~340 bytes a request allocates, and the throughput came out lower
+        /// in all three reps (arms were not interleaved, so treat that half loosely).
+        /// The per-request read buffer is simply not where the allocation is: look
+        /// for the bytes before removing an allocation on the assumption it matters.
+        ///
+        /// So removing the per-request byte\[\] is not just a capacity field: a Request
+        /// has to own a consistent (raw, slices, headerCount) triple, re-based
+        /// together or not at all.
         int[] slices = new int[64];
-        /**
-         * Where a deferred JSON body is serialised, so its length is known before
-         * the head that must declare it is written. Reused like everything else
-         * here; the copy into the head buffer afterwards is a memcpy of a body
-         * small enough to share a packet with its headers.
-         */
+        /// Where a deferred JSON body is serialised, so its length is known before
+        /// the head that must declare it is written. Reused like everything else
+        /// here; the copy into the head buffer afterwards is a memcpy of a body
+        /// small enough to share a packet with its headers.
         // Not final: an oversized one is REPLACED rather than carried, see
         // releaseIdleMemory. reset() only rewinds the length, which is the right
         // thing per request and the wrong thing across an idle wait.
@@ -4630,11 +4331,11 @@ public final class HttpServer {
         }
 
         void ensure(int extra) {
-            if(outLength + extra <= out.length) {
+            if (outLength + extra <= out.length) {
                 return;
             }
             int size = out.length * 2;
-            while(size < outLength + extra) {
+            while (size < outLength + extra) {
                 size *= 2;
             }
             byte[] grown = new byte[size];
@@ -4642,42 +4343,42 @@ public final class HttpServer {
             out = grown;
         }
 
-        /** ASCII only. Every caller passes a header name or a constant. */
+        /// ASCII only. Every caller passes a header name or a constant.
         void put(String ascii) {
             int n = ascii.length();
             ensure(n);
-            for(int iter = 0 ; iter < n ; iter++) {
-                out[outLength++] = (byte)ascii.charAt(iter);
+            for (int iter = 0 ; iter < n ; iter++) {
+                out[outLength++] = (byte) ascii.charAt(iter);
             }
         }
 
-        /**
-         * The content type, encoded once per connection rather than per response.
-         *
-         * put(String) walks charAt by charAt, and a handler hands back the same
-         * String instance every time -- a literal, or a constant on Response --
-         * so after the first response the bytes are already there. Identity, not
-         * equals: a handler that builds a fresh String per response simply keeps
-         * missing and pays what it paid before, and the cache is filled ONCE so
-         * that case cannot allocate per request either.
-         */
+        /// The content type, encoded once per connection rather than per response.
+        ///
+        /// put(String) walks charAt by charAt, and a handler hands back the same
+        /// String instance every time -- a literal, or a constant on Response --
+        /// so after the first response the bytes are already there. Identity, not
+        /// equals: a handler that builds a fresh String per response simply keeps
+        /// missing and pays what it paid before, and the cache is filled ONCE so
+        /// that case cannot allocate per request either.
         private String ctKey;
         private byte[] ctBytes;
 
         void putContentType(String ct) {
-            if(ct == ctKey) {
+            if (ct == ctKey) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
                 System.arraycopy(ctBytes, 0, out, ensureAt(ctBytes.length), ctBytes.length);
                 outLength += ctBytes.length;
                 return;
             }
+            // put() has already dereferenced ct: the caller passes it through
+            // safeContentType, which never answers null.
             put(ct);
-            if(ctKey == null && ct != null) {
+            if (ctKey == null) {
                 ctKey = ct;
                 ctBytes = asciiBytes(ct);
             }
         }
 
-        /** Reserves {@code n} bytes and answers the offset they start at. */
+        /// Reserves `n` bytes and answers the offset they start at.
         private int ensureAt(int n) {
             ensure(n);
             return outLength;
@@ -4691,20 +4392,18 @@ public final class HttpServer {
 
         void put(int b) {
             ensure(1);
-            out[outLength++] = (byte)b;
+            out[outLength++] = (byte) b;
         }
 
-        /**
-         * A non-negative number as ASCII digits, written in place.
-         * Integer.toString would allocate a String and its char[] -- per response,
-         * twice (the status and the content length).
-         */
+        /// A non-negative number as ASCII digits, written in place.
+        /// Integer.toString would allocate a String and its char\[\] -- per response,
+        /// twice (the status and the content length).
         void putNumber(long value) {
-            if(value < 0) {
+            if (value < 0) {
                 put("-");
                 value = -value;
             }
-            if(value == 0) {
+            if (value == 0) {
                 put('0');
                 return;
             }
@@ -4720,18 +4419,18 @@ public final class HttpServer {
             // evidence, but there was no sign of a gain in any of them.
             long v = value;
             int digits = 0;
-            while(v > 0) {
+            while (v > 0) {
                 digits++;
                 v /= 10;
             }
             ensure(digits);
             outLength += digits;
             int at = outLength;
-            while(value > 0) {
-                out[--at] = (byte)('0' + (int)(value % 10));
+            while (value > 0) {
+                out[--at] = (byte) ('0' + (int) (value % 10));
                 value /= 10;
             }
-            if(at != start) {
+            if (at != start) {
                 // Unreachable unless the digit count and the loop disagree; the
                 // buffer would be left with a hole rather than a short write.
                 throw new IllegalStateException("digit count mismatch");
@@ -4747,39 +4446,27 @@ public final class HttpServer {
             return buffer.length - pos;
         }
 
-        /**
-         * The one Response handed to Request.respond on this connection. Null until
-         * a handler asks for it, so a handler that never does pays nothing.
-         */
+        /// The one Response handed to Request.respond on this connection. Null until
+        /// a handler asks for it, so a handler that never does pays nothing.
         Response pooledResponse;
 
-        /**
-         * Requests answered on this connection since the last fold into the
-         * server's striped counter. Plain: one virtual thread owns a connection
-         * for its whole life, so this field has a single writer.
-         */
-        long servedPending;
 
-        /** Index into servedStripes for the host that owns this connection, or -1. */
+        /// Index into servedStripes for the host that owns this connection, or -1.
         int stripe = -1;
 
-        /**
-         * The one Request served on this connection, re-pointed per request rather
-         * than reallocated. Response and Request were the whole of what /plaintext
-         * still allocated once the borrowed-buffer copy went: 88 and 80 bytes, one
-         * of each, every request.
-         */
+        /// The one Request served on this connection, re-pointed per request rather
+        /// than reallocated. Response and Request were the whole of what /plaintext
+        /// still allocated once the borrowed-buffer copy went: 88 and 80 bytes, one
+        /// of each, every request.
         Request pooledRequest;
 
-        /**
-         * The request currently parsed out of this connection's buffer, pooled or
-         * not, so detachPreservingOffsets can re-point it.
-         */
+        /// The request currently parsed out of this connection's buffer, pooled or
+        /// not, so detachPreservingOffsets can re-point it.
         Request liveRequest;
 
-        /** Reads more. False at end of stream. */
+        /// Reads more. False at end of stream.
         boolean fill(byte[] scratch) throws IOException {
-            if(borrowed && available() == 0 && !parsedFromBuffer) {
+            if (borrowed && available() == 0 && !parsedFromBuffer) {
                 // Nothing is left unread AND nothing has been parsed out of this
                 // buffer, so this is the START of a new request on a kept-alive
                 // connection and there is nothing to preserve: the previous request
@@ -4812,7 +4499,7 @@ public final class HttpServer {
                 buffer = EMPTY_BODY;
                 pos = 0;
                 borrowed = false;
-            } else if(borrowed) {
+            } else if (borrowed) {
                 // A second read WITHIN one request is about to overwrite the
                 // thread buffer, and a Request parsed out of it holds SLICES into
                 // exactly that memory. Copy first, preserving absolute offsets so
@@ -4826,7 +4513,7 @@ public final class HttpServer {
                 // as easily have served one request's bytes inside another's.
                 detachPreservingOffsets();
             }
-            if(ZERO_COPY_READ && available() == 0 && session == 0) {
+            if (ZERO_COPY_READ && available() == 0 && session == 0) {
                 // The common case by far: nothing left over, so the bytes are read
                 // into this thread's reusable buffer and parsed where they land --
                 // no array allocated, nothing copied. The request is parsed out of
@@ -4842,11 +4529,10 @@ public final class HttpServer {
                 // Plaintext only (session == 0): a TLS read decrypts through its
                 // own path and does not hand back a buffer we own.
                 byte[] direct = ServerSocket.readIntoThreadBuffer(fd, scratch.length);
-                if(direct == null) {
-                    closedByPeer = true;
+                if (direct == null) {
                     return false;
                 }
-                if(direct.length == 0) {
+                if (direct.length == 0) {
                     // Nothing ready on a non-blocking descriptor, which means two
                     // different things and only one of them is trouble.
                     //
@@ -4869,13 +4555,12 @@ public final class HttpServer {
                     // already maintained for fill()'s benefit. Note a SPLIT header
                     // block needs nothing here: after the first partial read
                     // available() is non-zero, so it never takes this branch.
-                    if(!parsedFromBuffer) {
-                        closedByPeer = true;
+                    if (!parsedFromBuffer) {
                         return false;
                     }
                     return fillCopying(scratch);
                 }
-                if(ZERO_COPY_MODE == 2) {
+                if (ZERO_COPY_MODE == 2) {
                     // Diagnostic bisection only -- see ZERO_COPY_MODE. Same read as
                     // mode 1, same heap array as mode 0, so whichever of the two the
                     // throughput follows is the one that costs.
@@ -4894,18 +4579,15 @@ public final class HttpServer {
             return fillCopying(scratch);
         }
 
-        /**
-         * The copying read: into this connection's own scratch, then into a buffer
-         * sized for what is kept plus what arrived.
-         *
-         * Split out of fill() so the zero-copy path can defer to it when the
-         * descriptor has nothing ready. readFrom parks on EAGAIN for a virtual
-         * thread, which is the behaviour the shared-buffer read cannot safely have.
-         */
+        /// The copying read: into this connection's own scratch, then into a buffer
+        /// sized for what is kept plus what arrived.
+        ///
+        /// Split out of fill() so the zero-copy path can defer to it when the
+        /// descriptor has nothing ready. readFrom parks on EAGAIN for a virtual
+        /// thread, which is the behaviour the shared-buffer read cannot safely have.
         private boolean fillCopying(byte[] scratch) throws IOException {
             int n = readFrom(fd, session, scratch, 0, scratch.length);
-            if(n <= 0) {
-                closedByPeer = true;
+            if (n <= 0) {
                 return false;
             }
             int keep = available();
@@ -4918,43 +4600,41 @@ public final class HttpServer {
             return true;
         }
 
-        /**
-         * Reads until `needed` bytes are buffered, into ONE array sized for them.
-         *
-         * fill() grows by exactly what it just read, so a body arriving in
-         * scratch-sized pieces reallocated and recopied everything once per read:
-         * an 8MB upload over an 8KB buffer is about a thousand resizes and some 4GB
-         * of copying before the handler is even called, which a few concurrent
-         * uploads turn into the whole machine.
-         *
-         * When the total is known -- and for Content-Length it is -- the destination
-         * can be grown toward it in doublings, which is one copy of what was already
-         * buffered and an amortised one of the body.
-         *
-         * It is NOT allocated at `needed` up front, which is what this did first.
-         * Content-Length is a client's CLAIM, and believing it before a byte of the
-         * body has arrived means an unauthenticated client can make the server
-         * allocate 8MB by sending a header and then nothing at all: this loop holds
-         * that memory until the rate allowance below expires, and the connection
-         * ceiling is in the thousands, so a few dozen such requests are gigabytes.
-         * Growing as the bytes ARRIVE makes the memory track what was actually sent,
-         * which is the only figure a client cannot lie about. The doubling is what
-         * keeps that affordable -- growing by each read's size instead was the
-         * original defect here, about a thousand resizes and 4GB of copying for one
-         * 8MB upload.
-         *
-         * The invariant the rest of this class depends on is kept, because every
-         * growth is capped at `needed`: the last one allocates exactly that, so the
-         * array handed over is exactly `needed` long with every byte valid, and
-         * `buffer.length` still means "bytes readable". See the class comment for
-         * why a `limit` field is not the answer here.
-         */
+        /// Reads until `needed` bytes are buffered, into ONE array sized for them.
+        ///
+        /// fill() grows by exactly what it just read, so a body arriving in
+        /// scratch-sized pieces reallocated and recopied everything once per read:
+        /// an 8MB upload over an 8KB buffer is about a thousand resizes and some 4GB
+        /// of copying before the handler is even called, which a few concurrent
+        /// uploads turn into the whole machine.
+        ///
+        /// When the total is known -- and for Content-Length it is -- the destination
+        /// can be grown toward it in doublings, which is one copy of what was already
+        /// buffered and an amortised one of the body.
+        ///
+        /// It is NOT allocated at `needed` up front, which is what this did first.
+        /// Content-Length is a client's CLAIM, and believing it before a byte of the
+        /// body has arrived means an unauthenticated client can make the server
+        /// allocate 8MB by sending a header and then nothing at all: this loop holds
+        /// that memory until the rate allowance below expires, and the connection
+        /// ceiling is in the thousands, so a few dozen such requests are gigabytes.
+        /// Growing as the bytes ARRIVE makes the memory track what was actually sent,
+        /// which is the only figure a client cannot lie about. The doubling is what
+        /// keeps that affordable -- growing by each read's size instead was the
+        /// original defect here, about a thousand resizes and 4GB of copying for one
+        /// 8MB upload.
+        ///
+        /// The invariant the rest of this class depends on is kept, because every
+        /// growth is capped at `needed`: the last one allocates exactly that, so the
+        /// array handed over is exactly `needed` long with every byte valid, and
+        /// `buffer.length` still means "bytes readable". See the class comment for
+        /// why a `limit` field is not the answer here.
         boolean fillTo(int needed) throws IOException {
             int keep = available();
-            if(keep >= needed) {
+            if (keep >= needed) {
                 return true;
             }
-            if(borrowed) {
+            if (borrowed) {
                 // BEFORE the compaction below, and before this parks waiting for
                 // the body.
                 //
@@ -4977,66 +4657,65 @@ public final class HttpServer {
             }
             long charged = 0;
             try {
-            // RESERVED before allocated, not after. The charge is what bounds
-            // concurrent uploads, and a budget checked after the allocation
-            // bounds nothing: every thread that reaches a growth boundary at the
-            // same moment takes its memory first and finds out it was over the
-            // limit second, so the peak is the number of threads times their
-            // step, whatever the limit says. Reserving first makes the refusal
-            // happen while the memory is still hypothetical. `charged` is
-            // incremented in the same breath, so the finally below rolls the
-            // reservation back even if the allocation itself fails.
-            int first = Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES));
-            charged += first;
-            if(http1UploadBytes.addAndGet(first) > MAX_HTTP1_UPLOAD_BYTES) {
-                throw new ProtocolException(503, "too many uploads in flight");
-            }
-            byte[] grown = new byte[first];
-            System.arraycopy(buffer, pos, grown, 0, keep);
-            int at = keep;
-            // A RATE, not a deadline. The head gets a flat bound because it is small;
-            // a body cannot, since 8 MiB over a slow mobile link is a real client and
-            // any fixed wall-clock limit refuses it. But SO_RCVTIMEO restarts on
-            // every successful read, so without something here a client declaring a
-            // large Content-Length and sending one byte inside each window holds its
-            // worker for as long as it likes -- and in pool mode, which is what TLS
-            // uses, enough of those are the whole server. The allowance is what this
-            // many bytes take at the floor rate, plus one socket timeout of slack, so
-            // a slow upload that keeps making progress finishes and a dribble does not.
-            long started = System.currentTimeMillis();
-            long allowed = SOCKET_TIMEOUT_MILLIS
-                    + (long)(needed - keep) * 1000L / MIN_BODY_BYTES_PER_SECOND;
-            while(at < needed) {
-                if(System.currentTimeMillis() - started > allowed) {
-                    throw new ProtocolException(408, "the request body did not arrive in time");
+                // RESERVED before allocated, not after. The charge is what bounds
+                // concurrent uploads, and a budget checked after the allocation
+                // bounds nothing: every thread that reaches a growth boundary at the
+                // same moment takes its memory first and finds out it was over the
+                // limit second, so the peak is the number of threads times their
+                // step, whatever the limit says. Reserving first makes the refusal
+                // happen while the memory is still hypothetical. `charged` is
+                // incremented in the same breath, so the finally below rolls the
+                // reservation back even if the allocation itself fails.
+                int first = Math.max(keep, Math.min(needed, BODY_CHUNK_BYTES));
+                charged += first;
+                if (http1UploadBytes.addAndGet(first) > MAX_HTTP1_UPLOAD_BYTES) {
+                    throw new ProtocolException(503, "too many uploads in flight");
                 }
-                if(at == grown.length) {
-                    // Doubling, capped at what was declared -- so the final growth
-                    // lands exactly on `needed` and the invariant above holds.
-                    int next = (int)Math.min((long)needed, (long)grown.length * 2);
-                    // Reserved before allocated, for the reason above.
-                    long delta$ = (long)next - grown.length;
-                    charged += delta$;
-                    if(http1UploadBytes.addAndGet(delta$) > MAX_HTTP1_UPLOAD_BYTES) {
-                        throw new ProtocolException(503, "too many uploads in flight");
+                byte[] grown = new byte[first];
+                System.arraycopy(buffer, pos, grown, 0, keep);
+                int at = keep;
+                // A RATE, not a deadline. The head gets a flat bound because it is small;
+                // a body cannot, since 8 MiB over a slow mobile link is a real client and
+                // any fixed wall-clock limit refuses it. But SO_RCVTIMEO restarts on
+                // every successful read, so without something here a client declaring a
+                // large Content-Length and sending one byte inside each window holds its
+                // worker for as long as it likes -- and in pool mode, which is what TLS
+                // uses, enough of those are the whole server. The allowance is what this
+                // many bytes take at the floor rate, plus one socket timeout of slack, so
+                // a slow upload that keeps making progress finishes and a dribble does not.
+                long started = System.currentTimeMillis();
+                long allowed = SOCKET_TIMEOUT_MILLIS
+                        + (long) (needed - keep) * 1000L / MIN_BODY_BYTES_PER_SECOND;
+                while (at < needed) {
+                    if (System.currentTimeMillis() - started > allowed) {
+                        throw new ProtocolException(408, "the request body did not arrive in time");
                     }
-                    byte[] bigger = new byte[next];
-                    System.arraycopy(grown, 0, bigger, 0, at);
-                    grown = bigger;
+                    if (at == grown.length) {
+                        // Doubling, capped at what was declared -- so the final growth
+                        // lands exactly on `needed` and the invariant above holds.
+                        int next = (int) Math.min((long) needed, (long) grown.length * 2);
+                        // Reserved before allocated, for the reason above.
+                        long growth = (long) next - grown.length;
+                        charged += growth;
+                        if (http1UploadBytes.addAndGet(growth) > MAX_HTTP1_UPLOAD_BYTES) {
+                            throw new ProtocolException(503, "too many uploads in flight");
+                        }
+                        byte[] bigger = new byte[next];
+                        System.arraycopy(grown, 0, bigger, 0, at);
+                        grown = bigger;
+                    }
+                    // Exactly the shortfall, so a pipelined request behind this body stays
+                    // in the socket for the next parse rather than being read into it.
+                    int n = readFrom(fd, session, grown, at, grown.length - at);
+                    if (n <= 0) {
+                        return false;
+                    }
+                    at += n;
                 }
-                // Exactly the shortfall, so a pipelined request behind this body stays
-                // in the socket for the next parse rather than being read into it.
-                int n = readFrom(fd, session, grown, at, grown.length - at);
-                if(n <= 0) {
-                    closedByPeer = true;
-                    return false;
-                }
-                at += n;
-            }
-            buffer = grown;
-            pos = 0;
-            borrowed = false;
-            return true;
+                buffer = grown;
+                pos = 0;
+                borrowed = false;
+                return true;
             } finally {
                 // Every path out: the body arrived, the peer went away, the
                 // deadline passed, or the process was full. The charge covers
@@ -5047,27 +4726,24 @@ public final class HttpServer {
             }
         }
 
-        /**
-         * Give up the shared thread buffer before this connection can be taken by a
-         * different worker.
-         *
-         * The buffer belongs to the THREAD, not the connection. Anything still
-         * unread has to be copied somewhere this connection owns before the
-         * descriptor goes back to the reactor: the next worker runs on another
-         * thread whose buffer is different memory, and the thread that read these
-         * bytes overwrites them on its next request.
-         *
-         * The copy happens only when bytes are actually left over -- the pipelining
-         * case. The ordinary request-per-read path copies nothing.
-         */
-        /**
-         * Take a private copy of the whole borrowed buffer, keeping every index the
-         * same, so anything already parsed out of it (a Request's header slices)
-         * keeps pointing at the right bytes.
-         *
-         * Compacting here instead would be a subtle disaster: it moves the content
-         * to offset zero while the slices still name the old positions.
-         */
+        // Give up the shared thread buffer before this connection can be taken by a
+        // different worker.
+        //
+        // The buffer belongs to the THREAD, not the connection. Anything still
+        // unread has to be copied somewhere this connection owns before the
+        // descriptor goes back to the reactor: the next worker runs on another
+        // thread whose buffer is different memory, and the thread that read these
+        // bytes overwrites them on its next request.
+        //
+        // The copy happens only when bytes are actually left over -- the pipelining
+        // case. The ordinary request-per-read path copies nothing.
+
+        /// Take a private copy of the whole borrowed buffer, keeping every index the
+        /// same, so anything already parsed out of it (a Request's header slices)
+        /// keeps pointing at the right bytes.
+        ///
+        /// Compacting here instead would be a subtle disaster: it moves the content
+        /// to offset zero while the slices still name the old positions.
         void detachPreservingOffsets() {
             byte[] borrowedBuffer = buffer;
             byte[] owned = new byte[buffer.length];
@@ -5079,45 +4755,43 @@ public final class HttpServer {
             // storage -- the copy is made precisely because something else is
             // about to write there. Offsets are unchanged, so re-pointing is the
             // whole of it.
-            if(liveRequest != null && liveRequest.raw == borrowedBuffer) {
+            if (liveRequest != null && liveRequest.raw == borrowedBuffer) {
                 liveRequest.raw = owned;
             }
         }
 
-        /**
-         * Lets go of an oversized buffer this connection OWNS, and of the request
-         * that pointed into it, before it waits for the next one.
-         *
-         * releaseBorrowed below deals with the THREAD's buffer. This is the other
-         * half, and the one an upload reaches: a body bigger than what is already
-         * buffered grows a private array to fit, and the connection then keeps it.
-         *
-         * CN1_HTTP_MAX_UPLOAD_MB bounds what is IN FLIGHT, and the charge is
-         * dropped when the read completes -- correct, because by then it is this
-         * connection's memory rather than an upload still arriving, but it does
-         * mean the bound stops describing it. A kept-alive connection holds the
-         * whole body while it waits, and under virtual threads it waits for as long
-         * as the client cares to take, so connections that have each uploaded once
-         * and gone quiet hold far more than the in-flight bound ever allowed and
-         * nothing counts it.
-         *
-         * Holding the CHARGE across the wait instead would let idle connections
-         * refuse other people's uploads, which trades a memory problem for a
-         * liveness one. The memory is not needed: the response has been written,
-         * so nothing points into the buffer any more -- the same fact that lets
-         * parsedFromBuffer be cleared at the wait -- and fill() borrows the
-         * thread's buffer for the next request. This is the state a connection
-         * starts in.
-         *
-         * Nothing is dropped while bytes are still unread: a pipelined request
-         * sitting in this buffer is the next request, not residue.
-         */
+        /// Lets go of an oversized buffer this connection OWNS, and of the request
+        /// that pointed into it, before it waits for the next one.
+        ///
+        /// releaseBorrowed below deals with the THREAD's buffer. This is the other
+        /// half, and the one an upload reaches: a body bigger than what is already
+        /// buffered grows a private array to fit, and the connection then keeps it.
+        ///
+        /// CN1_HTTP_MAX_UPLOAD_MB bounds what is IN FLIGHT, and the charge is
+        /// dropped when the read completes -- correct, because by then it is this
+        /// connection's memory rather than an upload still arriving, but it does
+        /// mean the bound stops describing it. A kept-alive connection holds the
+        /// whole body while it waits, and under virtual threads it waits for as long
+        /// as the client cares to take, so connections that have each uploaded once
+        /// and gone quiet hold far more than the in-flight bound ever allowed and
+        /// nothing counts it.
+        ///
+        /// Holding the CHARGE across the wait instead would let idle connections
+        /// refuse other people's uploads, which trades a memory problem for a
+        /// liveness one. The memory is not needed: the response has been written,
+        /// so nothing points into the buffer any more -- the same fact that lets
+        /// parsedFromBuffer be cleared at the wait -- and fill() borrows the
+        /// thread's buffer for the next request. This is the state a connection
+        /// starts in.
+        ///
+        /// Nothing is dropped while bytes are still unread: a pipelined request
+        /// sitting in this buffer is the next request, not residue.
         void releaseIdleMemory() {
-            if(!borrowed && buffer.length > 0 && available() == 0) {
+            if (!borrowed && buffer.length > 0 && available() == 0) {
                 buffer = EMPTY_BODY;
                 pos = 0;
             }
-            if(pooledRequest != null) {
+            if (pooledRequest != null) {
                 pooledRequest.releaseRetained();
             }
             // The RESPONSE side keeps peaks of its own. Both of these grow to fit
@@ -5127,24 +4801,24 @@ public final class HttpServer {
             // in the head buffer it was copied to. Anything up to the combine
             // limit is the working size and is kept; past that it belonged to one
             // response that has already gone out.
-            if(out.length > MAX_IDLE_BUFFER_BYTES) {
+            if (out.length > MAX_IDLE_BUFFER_BYTES) {
                 out = new byte[1024];
                 outLength = 0;
             }
-            if(bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
+            if (bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
                 bodySink = new ByteSink(512);
             }
-            if(pooledResponse != null) {
+            if (pooledResponse != null) {
                 pooledResponse.releaseRetained();
             }
         }
 
         void releaseBorrowed() {
-            if(!borrowed) {
+            if (!borrowed) {
                 return;
             }
             int keep = available();
-            if(keep > 0) {
+            if (keep > 0) {
                 byte[] owned = new byte[keep];
                 System.arraycopy(buffer, pos, owned, 0, keep);
                 buffer = owned;
@@ -5160,21 +4834,19 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Serves one connection, releasing it even if the failure is an ERROR.
-     *
-     * Every catch below is `catch (Exception)`, and an Error is not one: a
-     * StackOverflowError out of a recursive parser, or an AssertionError from a
-     * handler, walks past all of them and leaves serveOne without reaching any
-     * drop(). By then the descriptor has been removed from its poller and is
-     * still in liveConnections, so nothing will ever close it -- one stranded
-     * socket per occurrence, and the process runs out of them. The Error itself
-     * is rethrown: this releases the connection, it does not pretend the failure
-     * did not happen.
-     *
-     * A wrapper rather than a try around the body, because the body has many
-     * returns and the point is that EVERY one of them is covered.
-     */
+    /// Serves one connection, releasing it even if the failure is an ERROR.
+    ///
+    /// Every catch below is `catch (Exception)`, and an Error is not one: a
+    /// StackOverflowError out of a recursive parser, or an AssertionError from a
+    /// handler, walks past all of them and leaves serveOne without reaching any
+    /// drop(). By then the descriptor has been removed from its poller and is
+    /// still in liveConnections, so nothing will ever close it -- one stranded
+    /// socket per occurrence, and the process runs out of them. The Error itself
+    /// is rethrown: this releases the connection, it does not pretend the failure
+    /// did not happen.
+    ///
+    /// A wrapper rather than a try around the body, because the body has many
+    /// returns and the point is that EVERY one of them is covered.
     private void serveOne(int fd) {
         try {
             serveOneRelease(fd);
@@ -5201,10 +4873,10 @@ public final class HttpServer {
             // non-blocking descriptor would break TLS reads outright. Giving the TLS
             // layer a park path is the real fix and is not this change.
             boolean parking = virtualThreads;
-            if(!parking) {
+            if (!parking) {
                 ServerSocket.setBlocking(fd, true);
             }
-            if(tls != null && sessionOf(fd) == 0) {
+            if (tls != null && sessionOf(fd) == 0) {
                 // The handshake runs here, on the worker, because the descriptor is
                 // blocking here and a handshake is several round trips. On the
                 // reactor thread it would stall every other connection.
@@ -5213,21 +4885,26 @@ public final class HttpServer {
                 // waits for. The head's deadline cannot cover this, because it is
                 // only armed once the handshake has produced a session.
                 long fresh = tls.accept(fd, SOCKET_TIMEOUT_MILLIS);
-                if(fresh == 0) {
+                if (fresh == 0) {
                     // Not a TLS client, or no common cipher. Ordinary traffic.
                     drop(fd);
                     return;
                 }
-                sessions.put(new Integer(fd), new Long(fresh));
+                sessions.put(Integer.valueOf(fd), Long.valueOf(fresh));
             }
             session = sessionOf(fd);
-            if(tls != null && Http2.ALPN.equals(Tls.negotiatedProtocol(session))) {
+            if (tls != null && Http2.ALPN.equals(Tls.negotiatedProtocol(session))) {
                 // ALPN settled on h2, so this connection is framed, not textual,
                 // for its whole life. There is no downgrade from here.
                 serveHttp2(fd, session, null, 0);
                 return;
             }
-        } catch (Exception err) {
+        } catch (IOException err) {
+            drop(fd);
+            return;
+        } catch (RuntimeException err) {
+            // Not only the I/O failing: a handshake that throws is a connection
+            // this server cannot serve, and it must still give the descriptor back.
             drop(fd);
             return;
         }
@@ -5235,16 +4912,16 @@ public final class HttpServer {
         Conn conn = new Conn(fd, session);
         // Which stripe this connection's requests count into. Resolved once here
         // rather than per request: the owner cannot change for a live descriptor.
-        if(virtualThreads && fd >= 0 && fd < vtOwnerByFd.length && servedStripes.length > 0) {
+        if (virtualThreads && fd >= 0 && fd < vtOwnerByFd.length && servedStripes.length > 0) {
             int host = vtOwnerByFd[fd];
-            if(host >= 0 && host * SERVED_STRIPE_STRIDE < servedStripes.length) {
+            if (host >= 0 && host * SERVED_STRIPE_STRIDE < servedStripes.length) {
                 conn.stripe = host * SERVED_STRIPE_STRIDE;
             }
         }
         // Registered with the host that resumes this virtual thread, so advance()
         // can privatise the read buffer if this connection stops mid-request. Same
         // thread as the reader, since the virtual thread runs on its own host.
-        if(virtualThreads) {
+        if (virtualThreads) {
             ownerOf(fd).setConn(fd, conn);
         }
         byte[] scratch = new byte[8192];
@@ -5255,7 +4932,7 @@ public final class HttpServer {
         // line. This is how gRPC talks over cleartext and how a load balancer that
         // terminated TLS talks to an origin, and it is the only way to reach h2
         // without ALPN.
-        if(http2Sessions.containsKey(new Integer(fd))) {
+        if (http2Sessions.containsKey(Integer.valueOf(fd))) {
             serveHttp2(fd, session, null, 0);
             return;
         }
@@ -5266,30 +4943,36 @@ public final class HttpServer {
         // built with offerHttp2=false spoke h2 to whoever asked in the one way the
         // operator had turned off. RFC 9113 puts prior knowledge on the cleartext
         // side for exactly this reason.
-        if(session == 0) {
+        if (session == 0) {
             try {
-                while(conn.available() < HTTP2_PREFACE.length) {
-                    if(!conn.fill(scratch)) {
+                while (conn.available() < HTTP2_PREFACE.length) {
+                    if (!conn.fill(scratch)) {
                         drop(fd);
                         return;
                     }
-                    if(!startsWithPrefacePrefix(conn)) {
+                    if (!startsWithPrefacePrefix(conn)) {
                         break; // definitely not h2; parse it as HTTP/1.1
                     }
                 }
-                if(conn.available() >= HTTP2_PREFACE.length && matchesPreface(conn)) {
+                if (conn.available() >= HTTP2_PREFACE.length && matchesPreface(conn)) {
                     byte[] rest = new byte[conn.available()];
                     System.arraycopy(conn.buffer, conn.pos, rest, 0, rest.length);
                     serveHttp2(fd, session, rest, rest.length);
                     return;
                 }
-            } catch (Exception err) {
+            } catch (IOException err) {
+                drop(fd);
+                return;
+            } catch (RuntimeException err) {
+                // Named on its own rather than folded into a catch of Exception:
+                // anything unchecked from the preface sniff drops this connection
+                // exactly as a failed read does, and nothing else is swallowed.
                 drop(fd);
                 return;
             }
         }
 
-        while(true) {
+        while (true) {
             Request request;
             try {
                 request = readRequest(conn, scratch);
@@ -5308,7 +4991,7 @@ public final class HttpServer {
                 drop(fd);
                 return;
             }
-            if(request == null) {
+            if (request == null) {
                 drop(fd); // the peer closed
                 return;
             }
@@ -5317,7 +5000,7 @@ public final class HttpServer {
             // BEFORE the handler, or the generated router answers 404 for a path
             // it was never told carried a websocket. After wantsKeepAlive, so
             // nothing in the ordinary flow above moves.
-            if(isUpgradeRequest(request)) {
+            if (isUpgradeRequest(request)) {
                 // The handshake is a request like any other and gets a span like
                 // any other. Started before tryUpgrade, so the websocket router,
                 // getSubprotocols and onOpen run inside it; tryUpgrade ends it once
@@ -5333,7 +5016,7 @@ public final class HttpServer {
                     Tracing.endServer(handshake, -1, err);
                     throw err;
                 }
-                if(upgraded) {
+                if (upgraded) {
                     return;             // this connection is no longer HTTP
                 }
                 Tracing.endServer(handshake, conn.writtenStatus, null);
@@ -5351,7 +5034,7 @@ public final class HttpServer {
             // From here to the end of the write is the request being in flight. Not
             // the whole of serveOne: that is the CONNECTION, which outlives this.
             inFlightRequests.incrementAndGet();
-            SERVING_FD.set(new Integer(fd));
+            SERVING_FD.set(Integer.valueOf(fd));
             // Null unless a tracer is installed. Started HERE, before the handler,
             // and read from the request now: the Request is reused by the next
             // one on this connection. Ended after the write, in the finally below,
@@ -5363,7 +5046,7 @@ public final class HttpServer {
             try {
                 try {
                     response = handler.handle(request);
-                    if(response == null) {
+                    if (response == null) {
                         response = Response.text(404, "not found");
                     }
                 } catch (Exception err) {
@@ -5376,7 +5059,7 @@ public final class HttpServer {
                 try {
                     writeResponse(conn, fd, session, response, keepAlive, headOnly);
                     sentStatus = status;
-                    if(conn.stripe >= 0) {
+                    if (conn.stripe >= 0) {
                         servedStripes[conn.stripe]++;      // single writer: this host
                     } else {
                         requestsServed.incrementAndGet();  // reactor mode, no stripes
@@ -5389,15 +5072,15 @@ public final class HttpServer {
             } finally {
                 inFlightRequests.decrementAndGet();
                 SERVING_FD.set(null);
-                if(span != null) {
+                if (span != null) {
                     Tracing.endServer(span, sentStatus, handlerError);
                 }
             }
-            if(!keepAlive) {
+            if (!keepAlive) {
                 drop(fd);
                 return;
             }
-            if(conn.available() > 0) {
+            if (conn.available() > 0) {
                 continue; // a pipelined request is already in the buffer
             }
             // The burst cap is a fairness backstop for a POOL: it stops one worker
@@ -5409,8 +5092,9 @@ public final class HttpServer {
             // client sees as a mid-stream close: 446833 write errors against
             // 164307 requests at four connections, and it made every earlier
             // virtual-thread measurement an underestimate.
-            if(++served >= KEEPALIVE_BURST_LIMIT) {
-                if(virtualThreads) {
+            served++;
+            if (served >= KEEPALIVE_BURST_LIMIT) {
+                if (virtualThreads) {
                     // Step aside rather than close. A virtual thread under a load
                     // generator never runs out of bytes, so it never parks on its
                     // own and would hold this host thread for as long as the
@@ -5431,7 +5115,7 @@ public final class HttpServer {
             // the host thread immediately, so holding the connection costs no one
             // anything and handing it back would only add a poller round trip per
             // request.
-            if(!virtualThreads && pendingWork.get() > 0
+            if (!virtualThreads && pendingWork.get() > 0
                     && workerCount - activeRequests.get() <= pendingWork.get()) {
                 // Hand back only when something is actually waiting AND there are
                 // not enough idle workers for it -- the case where holding this
@@ -5475,7 +5159,7 @@ public final class HttpServer {
             // virtual thread costing a stack and nothing else, which is exactly
             // the resource an idle keep-alive connection should cost.
             int linger = virtualThreads ? -1 : KEEPALIVE_LINGER_MILLIS;
-            if(virtualThreads || linger > 0) {
+            if (virtualThreads || linger > 0) {
                 boolean more;
                 // BEFORE THE WAIT, not after it. Under virtual threads this parks
                 // until the client sends something, which may be never, and an
@@ -5487,7 +5171,7 @@ public final class HttpServer {
                     // is waiting for still gets the full one when it arrives.
                     // Setting and restoring SO_RCVTIMEO around each wait did work,
                     // and cost four setsockopt per request -- 15% of syscall time.
-                    if(!ServerSocket.awaitReadable(fd, linger)) {
+                    if (!ServerSocket.awaitReadable(fd, linger)) {
                         break;                  // quiet client; the poller can have it
                     }
                     // The request this buffer was parsed from has been ANSWERED,
@@ -5517,14 +5201,14 @@ public final class HttpServer {
                     drop(fd);
                     return;
                 }
-                if(more) {
+                if (more) {
                     continue;
                 }
                 // Readable but nothing came: the peer closed.
                 drop(fd);
                 return;
             }
-            break;
+            break; //NOPMD AvoidBranchingStatementAsLastInLoop - every path that serves another request continues explicitly above
         }
         // Before the descriptor can be taken by another worker: the read buffer
         // belongs to THIS thread and the next request on it will overwrite these
@@ -5537,7 +5221,7 @@ public final class HttpServer {
         try {
             // Back to the poller for the next request on this connection. Both
             // epoll_ctl and kevent are safe to call from this thread.
-            if(virtualThreads) {
+            if (virtualThreads) {
                 // Reached only when the connection itself is finished: a virtual
                 // thread does not come back here to wait, it parks where it waits.
                 // Re-arming now would hand the poller a descriptor nobody owns.
@@ -5551,15 +5235,13 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * One turn of an HTTP/2 connection: read what is available, answer every
-     * request that completed, flush, and hand the descriptor back to the reactor.
-     *
-     * Deliberately the same shape as the HTTP/1.1 path rather than a worker that
-     * owns the connection for its lifetime. h2 connections are long-lived by
-     * design, so pinning a worker to each would mean the pool size is the limit on
-     * concurrent clients -- the exact thing the reactor exists to avoid.
-     */
+    /// One turn of an HTTP/2 connection: read what is available, answer every
+    /// request that completed, flush, and hand the descriptor back to the reactor.
+    ///
+    /// Deliberately the same shape as the HTTP/1.1 path rather than a worker that
+    /// owns the connection for its lifetime. h2 connections are long-lived by
+    /// design, so pinning a worker to each would mean the pool size is the limit on
+    /// concurrent clients -- the exact thing the reactor exists to avoid.
     private void serveHttp2(int fd, long session, byte[] pending, int pendingLength) {
         Http2 h2;
         // Held for the WHOLE turn, not just while a handler runs. The per-stream
@@ -5570,8 +5252,8 @@ public final class HttpServer {
         // that only pumped control frames, was never counted by anything.
         http2Turns.incrementAndGet();
         try {
-            Object existing = http2Sessions.get(new Integer(fd));
-            if(existing == null) {
+            Object existing = http2Sessions.get(Integer.valueOf(fd));
+            if (existing == null) {
                 // Told to the native side once, where the reservation happens.
                 // Idempotent, so doing it per session rather than finding a
                 // startup hook costs an atomic store on a path that is already
@@ -5579,20 +5261,20 @@ public final class HttpServer {
                 Http2.setMaxBodyBytes(MAX_OPEN_H2_BODY_BYTES);
                 Http2.setMaxFileBodies(MAX_OPEN_H2_FILES);
                 h2 = Http2.create();
-                http2Sessions.put(new Integer(fd), h2);
+                http2Sessions.put(Integer.valueOf(fd), h2);
                 // The SETTINGS preface has to reach the client before anything else.
                 flushHttp2(fd, session, h2);
             } else {
-                h2 = (Http2)existing;
+                h2 = (Http2) existing;
             }
 
-            if(pending != null && pendingLength > 0) {
+            if (pending != null && pendingLength > 0) {
                 // Bytes already read while deciding this was h2, preface included.
                 h2.receive(pending, 0, pendingLength);
             } else {
                 byte[] scratch = new byte[16384];
                 int n = readFrom(fd, session, scratch, 0, scratch.length);
-                if(n <= 0) {
+                if (n <= 0) {
                     drop(fd);
                     return;
                 }
@@ -5608,7 +5290,7 @@ public final class HttpServer {
             // paying a syscall per response.
             long queuedBodyBytes = 0;
             Http2.Stream stream;
-            while((stream = h2.nextRequest()) != null) {
+            while ((stream = h2.nextRequest()) != null) {
                 // :authority is what Host is in HTTP/1.1, so the handler sees a
                 // request shaped exactly like an HTTP/1.1 one. Which means it has
                 // to be held to the same rules: a handler reading getHeader("host")
@@ -5619,10 +5301,10 @@ public final class HttpServer {
                 Map headers = new LinkedHashMap(stream.getHeaders());
                 Object carriedHost = headers.get("host");
                 String authority = stream.getAuthority();
-                if(authority != null) {
-                    if(carriedHost != null
+                if (authority != null) {
+                    if (carriedHost != null
                             && !String.valueOf(carriedHost).equalsIgnoreCase(authority)) {
-                        if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                        if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                                 asciiBytes("the authority and the Host header disagree"))) {
                             h2.respond(stream.getId(), 400, "text/plain",
                                        new ArrayList(), null);
@@ -5639,16 +5321,16 @@ public final class HttpServer {
                 // at all, so anything routing or authorising on the host saw a null
                 // over h2 and a 400 over h1 for the same request. RFC 9113 calls
                 // that stream malformed.
-                if(effectiveHost == null) {
-                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                if (effectiveHost == null) {
+                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the request carries neither :authority nor Host"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
                     continue;
                 }
-                if(!isAuthority(String.valueOf(effectiveHost))) {
-                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                if (!isAuthority(String.valueOf(effectiveHost))) {
+                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the authority is not a valid authority"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
@@ -5656,13 +5338,13 @@ public final class HttpServer {
                     continue;
                 }
                 byte[] h2RequestBody = stream.getBody();
-                if(h2RequestBody != null && h2RequestBody.length > 0
+                if (h2RequestBody != null && h2RequestBody.length > 0
                         && !Utf8.isValid(h2RequestBody, 0, h2RequestBody.length)) {
                     // Decided here rather than in getBodyAsString, because this is
                     // where a status code can be produced: the decoder has no way
                     // to answer 400, and returning null there would have made a
                     // malformed body indistinguishable from an absent one.
-                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the request body is not valid UTF-8"))) {
                         // The explanation is itself a body, and under a full
                         // process budget respond() takes nothing and says so. This
@@ -5675,7 +5357,7 @@ public final class HttpServer {
                     requestsServed.incrementAndGet();
                     continue;
                 }
-                if(!targetDecodesToUtf8(stream.getPath())) {
+                if (!targetDecodesToUtf8(stream.getPath())) {
                     // The same rule the HTTP/1 request line takes, because the
                     // handler cannot tell which protocol carried it. Fixing this in
                     // the parser alone left "?name=%C3%28" refused over HTTP/1 and
@@ -5683,7 +5365,7 @@ public final class HttpServer {
                     // of defect this whole file keeps closing. The control-byte
                     // rule rides in the same call on both, which is why this says
                     // what the HTTP/1 side says.
-                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the request target holds a control character "
                                     + "or is not valid UTF-8"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
@@ -5691,19 +5373,19 @@ public final class HttpServer {
                     requestsServed.incrementAndGet();
                     continue;
                 }
-                if(targetHasFragment(stream.getPath())) {
+                if (targetHasFragment(stream.getPath())) {
                     // The same rule the HTTP/1 request line takes, beside it for
                     // the same reason the UTF-8 one is: the handler cannot tell
                     // which protocol carried the request, so a target refused on
                     // one and served on the other is one server with two answers.
-                    if(!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
+                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
                             asciiBytes("the request target carries a fragment"))) {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
                     continue;
                 }
-                if(!isKnownMethod(stream.getMethod())) {
+                if (!isKnownMethod(stream.getMethod())) {
                     // 501 before the handler, for the same reason the HTTP/1
                     // request line answers 501: the path may well exist, the verb
                     // is what is unknown. Without this the two protocols
@@ -5712,7 +5394,7 @@ public final class HttpServer {
                     // code over h2, where a generated router turns it into a 404
                     // and a hand-written handler may treat anything that is not a
                     // GET as a write.
-                    if(!h2.respond(stream.getId(), 501, "text/plain", new ArrayList(),
+                    if (!h2.respond(stream.getId(), 501, "text/plain", new ArrayList(),
                             asciiBytes("unsupported method"))) {
                         h2.respond(stream.getId(), 501, "text/plain", new ArrayList(), null);
                     }
@@ -5723,7 +5405,7 @@ public final class HttpServer {
                         "HTTP/2", headers, stream.getBodyAsString());
                 Response response;
                 inFlightRequests.incrementAndGet();
-                SERVING_FD.set(new Integer(fd));
+                SERVING_FD.set(Integer.valueOf(fd));
                 SERVING_H2.set(Boolean.TRUE);
                 // The HTTP/1 path's span, for the same reasons. It stops being this
                 // thread's current span in the finally that closes this stream's
@@ -5744,7 +5426,7 @@ public final class HttpServer {
                 boolean spanRegistered = false;
                 try {
                     response = handler.handle(request);
-                    if(response == null) {
+                    if (response == null) {
                         response = Response.text(404, "not found");
                     }
                 } catch (Exception err) {
@@ -5753,204 +5435,204 @@ public final class HttpServer {
                     response = Response.text(500, "internal error");
                 }
                 try {
-                boolean headOnly = "HEAD".equals(stream.getMethod());
-                List extra = new java.util.ArrayList();
-                // RFC 9110 6.6.1: an origin server with a clock MUST send Date, and
-                // the HTTP/1 writer does. This path sent only the content type and
-                // whatever the handler added -- and a handler cannot make up for it,
-                // because "date" is refused as server-owned. Caches were left without
-                // the timestamp they compute freshness and age from.
-                // ONE entry, and a complete line: Http2.headerLines() treats every
-                // element as "name: value" and the native parser drops anything
-                // without a colon. Added as two elements this produced two lines it
-                // ignored, so the header was still absent and nothing failed -- no
-                // test asserted it, which is why the first attempt looked right.
-                extra.add("date: " + currentHttpDate());
-                if(response.extraHeaders != null) {
-                    java.util.Iterator it = response.extraHeaders.keySet().iterator();
-                    while(it.hasNext()) {
-                        Object key = it.next();
-                        // A List is several fields of one name -- Set-Cookie is the
-                        // header that needs it, since a cookie cannot share a line.
-                        Object raw = response.extraHeaders.get(key);
-                        List several = raw instanceof List ? (List)raw : null;
-                        int count = several == null ? 1 : several.size();
-                        for(int each = 0 ; each < count ; each++) {
-                            Object value = several == null ? raw : several.get(each);
-                            if(key != null && value != null) {
-                                String name = String.valueOf(key);
-                                String text = String.valueOf(value);
-                                // The native side splits this block on '\n', so a newline
-                                // here is another field exactly as it is over HTTP/1.1.
-                                if(isServerOwnedHeader(name)) {
-                                    System.err.println("dropped a response header the "
-                                            + "server owns: " + sanitizeForLog(name));
-                                } else if(isHeaderName(name) && isHeaderSafe(text)) {
-                                    extra.add(name + ": " + text);
-                                } else {
-                                    System.err.println("dropped a response header whose name "
-                                            + "is not a token or whose value carries a control "
-                                            + "character: " + sanitizeForLog(name));
+                    boolean headOnly = "HEAD".equals(stream.getMethod());
+                    List extra = new ArrayList();
+                    // RFC 9110 6.6.1: an origin server with a clock MUST send Date, and
+                    // the HTTP/1 writer does. This path sent only the content type and
+                    // whatever the handler added -- and a handler cannot make up for it,
+                    // because "date" is refused as server-owned. Caches were left without
+                    // the timestamp they compute freshness and age from.
+                    // ONE entry, and a complete line: Http2.headerLines() treats every
+                    // element as "name: value" and the native parser drops anything
+                    // without a colon. Added as two elements this produced two lines it
+                    // ignored, so the header was still absent and nothing failed -- no
+                    // test asserted it, which is why the first attempt looked right.
+                    extra.add("date: " + currentHttpDate());
+                    if (response.extraHeaders != null) {
+                        java.util.Iterator it = response.extraHeaders.keySet().iterator();
+                        while (it.hasNext()) {
+                            Object key = it.next();
+                            // A List is several fields of one name -- Set-Cookie is the
+                            // header that needs it, since a cookie cannot share a line.
+                            Object raw = response.extraHeaders.get(key);
+                            List several = raw instanceof List ? (List) raw : null;
+                            int count = several == null ? 1 : several.size();
+                            for (int each = 0 ; each < count ; each++) {
+                                Object value = several == null ? raw : several.get(each);
+                                if (key != null && value != null) {
+                                    String name = String.valueOf(key);
+                                    String text = String.valueOf(value);
+                                    // The native side splits this block on '\n', so a newline
+                                    // here is another field exactly as it is over HTTP/1.1.
+                                    if (isServerOwnedHeader(name)) {
+                                        System.err.println("dropped a response header the "
+                                                + "server owns: " + sanitizeForLog(name));
+                                    } else if (isHeaderName(name) && isHeaderSafe(text)) {
+                                        extra.add(name + ": " + text);
+                                    } else {
+                                        System.err.println("dropped a response header whose name "
+                                                + "is not a token or whose value carries a control "
+                                                + "character: " + sanitizeForLog(name));
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                String contentType = safeContentType(response.contentType);
-                // The same rule as HTTP/1: a 204, 304 or 1xx carries no body, so
-                // a DATA frame must not follow the headers here either.
-                boolean noBody = headOnly || statusForbidsBody(response.status);
-                if(response.fileFd >= 0 && !noBody
-                        && Http2.pendingBodyFiles() >= MAX_OPEN_H2_FILES) {
-                    // BEFORE submitting, not after. The turn check below stops
-                    // this session, but every other session wakes on a control
-                    // frame and submits one more first, so the cap was really
-                    // "the cap plus one per connection" -- and a peer holding its
-                    // window shut can keep waking them. Descriptors are a process
-                    // resource and running out stops the server accepting sockets
-                    // at all, which is a failure for every client rather than the
-                    // one that caused it.
-                    //
-                    // Answered rather than deferred: the handler has ALREADY
-                    // opened the descriptor, so holding the response holds the
-                    // very thing being rationed. Closing it and saying so is the
-                    // honest answer, and 503 is what it is.
-                    StaticFiles.closeFile(response.fileFd);
-                    // Even this small explanation is a body, and a body is what
-                    // the ceiling refuses. If there is no room for it, the status
-                    // alone still has to reach the client -- dropping the whole
-                    // response would leave the stream hanging.
-                    if(!h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(),
-                            asciiBytes("too many files in flight"))) {
-                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
-                    }
-                    fallbackStatus = 503;
-                } else if(response.fileFd >= 0 && !noBody) {
-                    // Streamed frame by frame out of the descriptor. Reading the file
-                    // in first cost its whole size in the heap plus the same again in
-                    // the native copy, so a large enough public file turned one request
-                    // into an OutOfMemoryError -- which the catch above does not catch,
-                    // because it is an Error. The descriptor belongs to the session
-                    // from here, so nothing on this side closes it.
-                    if(h2.respondFile(stream.getId(), response.status, contentType,
-                            extra, response.fileFd, response.fileOffset, response.fileLength)) {
-                        // The session owns it from here and frees it natively.
-                        StaticFiles.handOverFile(response.fileFd);
-                    } else {
-                        // Refused by the descriptor ceiling, which means the
-                        // session took NOTHING -- the fd is still ours to close.
-                        // The Java-side check above is now an early-out rather
-                        // than the enforcement; this is the enforcement, and it
-                        // happens in the same step that takes the descriptor.
+                    String contentType = safeContentType(response.contentType);
+                    // The same rule as HTTP/1: a 204, 304 or 1xx carries no body, so
+                    // a DATA frame must not follow the headers here either.
+                    boolean noBody = headOnly || statusForbidsBody(response.status);
+                    if (response.fileFd >= 0 && !noBody
+                            && Http2.pendingBodyFiles() >= MAX_OPEN_H2_FILES) {
+                        // BEFORE submitting, not after. The turn check below stops
+                        // this session, but every other session wakes on a control
+                        // frame and submits one more first, so the cap was really
+                        // "the cap plus one per connection" -- and a peer holding its
+                        // window shut can keep waking them. Descriptors are a process
+                        // resource and running out stops the server accepting sockets
+                        // at all, which is a failure for every client rather than the
+                        // one that caused it.
+                        //
+                        // Answered rather than deferred: the handler has ALREADY
+                        // opened the descriptor, so holding the response holds the
+                        // very thing being rationed. Closing it and saying so is the
+                        // honest answer, and 503 is what it is.
                         StaticFiles.closeFile(response.fileFd);
-                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
-                        fallbackStatus = 503;
-                    }
-                } else {
-                    // A HEAD describes the representation it is not sending, and
-                    // that is the whole point of asking: over HTTP/1 this server
-                    // reports the real length, so over HTTP/2 it has to as well,
-                    // or the same static file answers a size on one protocol and
-                    // nothing on the other from one handler. Only for a HEAD --
-                    // a bodiless STATUS has no representation to describe, which
-                    // is the distinction the HTTP/1 writer already makes.
-                    // ... and only where the status permits a length at all. A
-                    // HEAD of a 204 must not carry one, which statusForbidsLength
-                    // already knows and the HTTP/1 writer already honours -- so
-                    // adding it here unconditionally made the SAME response valid
-                    // over one protocol and invalid over the other, which is the
-                    // exact divergence this fix existed to remove.
-                    // The descriptor is NOT closed here, and a review that says
-                    // it leaks is reading one branch short: responseBodyFor()
-                    // below closes it in a finally, which is the entire reason it
-                    // is called on a path that wants no body. Closing it here as
-                    // well was measured at exactly one extra close per request --
-                    // openStaticFiles ran to -10 over ten HEADs -- and a double
-                    // close is worse than the leak it was meant to fix, because
-                    // the number is reusable the instant the first close returns
-                    // and the second one then lands on whatever took it.
-                    if(headOnly && !statusForbidsLength(response.status)) {
-                        long described;
-                        if(response.fileFd >= 0) {
-                            described = response.fileLength;
-                        } else if(response.hasDeferredJson) {
-                            // respondJson leaves the value UNSERIALISED so the
-                            // HTTP/1 writer can render it straight into the
-                            // connection's buffer, which means response.body is
-                            // empty and measuring it reports zero for a
-                            // representation that is not. Rendering it is the only
-                            // way to know the length, and describing the
-                            // representation is the entire purpose of a HEAD.
-                            described = responseBodyFor(response, false).length;
-                        } else {
-                            described = response.body == null ? 0 : response.body.length;
+                        // Even this small explanation is a body, and a body is what
+                        // the ceiling refuses. If there is no room for it, the status
+                        // alone still has to reach the client -- dropping the whole
+                        // response would leave the stream hanging.
+                        if (!h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(),
+                                asciiBytes("too many files in flight"))) {
+                            h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                         }
-                        extra.add("content-length: " + described);
-                    }
-                    byte[] h2Body = responseBodyFor(response, noBody);
-                    int bodyBytes = h2Body == null ? 0 : h2Body.length;
-                    // The RESERVATION is the check. Testing the counter here and
-                    // allocating inside respond() is two steps with a gap: two
-                    // sessions being processed at once both read the total below
-                    // the ceiling and then both allocate, so the real peak was the
-                    // limit plus a body for every concurrent responder. respond()
-                    // reserves and allocates in the same step natively, and
-                    // answers false having taken nothing when the body would
-                    // cross the ceiling.
-                    if(!h2.respond(stream.getId(), response.status, contentType, extra,
-                            h2Body)) {
-                        // Bodiless, because the reason for refusing is that there
-                        // is no room for bodies. An explanatory body here is the
-                        // one allocation that must not be attempted.
-                        h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                         fallbackStatus = 503;
+                    } else if (response.fileFd >= 0 && !noBody) {
+                        // Streamed frame by frame out of the descriptor. Reading the file
+                        // in first cost its whole size in the heap plus the same again in
+                        // the native copy, so a large enough public file turned one request
+                        // into an OutOfMemoryError -- which the catch above does not catch,
+                        // because it is an Error. The descriptor belongs to the session
+                        // from here, so nothing on this side closes it.
+                        if (h2.respondFile(stream.getId(), response.status, contentType,
+                                extra, response.fileFd, response.fileOffset, response.fileLength)) {
+                            // The session owns it from here and frees it natively.
+                            StaticFiles.handOverFile(response.fileFd);
+                        } else {
+                            // Refused by the descriptor ceiling, which means the
+                            // session took NOTHING -- the fd is still ours to close.
+                            // The Java-side check above is now an early-out rather
+                            // than the enforcement; this is the enforcement, and it
+                            // happens in the same step that takes the descriptor.
+                            StaticFiles.closeFile(response.fileFd);
+                            h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                            fallbackStatus = 503;
+                        }
                     } else {
-                        queuedBodyBytes += bodyBytes;
+                        // A HEAD describes the representation it is not sending, and
+                        // that is the whole point of asking: over HTTP/1 this server
+                        // reports the real length, so over HTTP/2 it has to as well,
+                        // or the same static file answers a size on one protocol and
+                        // nothing on the other from one handler. Only for a HEAD --
+                        // a bodiless STATUS has no representation to describe, which
+                        // is the distinction the HTTP/1 writer already makes.
+                        // ... and only where the status permits a length at all. A
+                        // HEAD of a 204 must not carry one, which statusForbidsLength
+                        // already knows and the HTTP/1 writer already honours -- so
+                        // adding it here unconditionally made the SAME response valid
+                        // over one protocol and invalid over the other, which is the
+                        // exact divergence this fix existed to remove.
+                        // The descriptor is NOT closed here, and a review that says
+                        // it leaks is reading one branch short: responseBodyFor()
+                        // below closes it in a finally, which is the entire reason it
+                        // is called on a path that wants no body. Closing it here as
+                        // well was measured at exactly one extra close per request --
+                        // openStaticFiles ran to -10 over ten HEADs -- and a double
+                        // close is worse than the leak it was meant to fix, because
+                        // the number is reusable the instant the first close returns
+                        // and the second one then lands on whatever took it.
+                        if (headOnly && !statusForbidsLength(response.status)) {
+                            long described;
+                            if (response.fileFd >= 0) {
+                                described = response.fileLength;
+                            } else if (response.hasDeferredJson) {
+                                // respondJson leaves the value UNSERIALISED so the
+                                // HTTP/1 writer can render it straight into the
+                                // connection's buffer, which means response.body is
+                                // empty and measuring it reports zero for a
+                                // representation that is not. Rendering it is the only
+                                // way to know the length, and describing the
+                                // representation is the entire purpose of a HEAD.
+                                described = responseBodyFor(response, false).length;
+                            } else {
+                                described = response.body == null ? 0 : response.body.length;
+                            }
+                            extra.add("content-length: " + described);
+                        }
+                        byte[] h2Body = responseBodyFor(response, noBody);
+                        int bodyBytes = h2Body == null ? 0 : h2Body.length;
+                        // The RESERVATION is the check. Testing the counter here and
+                        // allocating inside respond() is two steps with a gap: two
+                        // sessions being processed at once both read the total below
+                        // the ceiling and then both allocate, so the real peak was the
+                        // limit plus a body for every concurrent responder. respond()
+                        // reserves and allocates in the same step natively, and
+                        // answers false having taken nothing when the body would
+                        // cross the ceiling.
+                        if (!h2.respond(stream.getId(), response.status, contentType, extra,
+                                h2Body)) {
+                            // Bodiless, because the reason for refusing is that there
+                            // is no room for bodies. An explanatory body here is the
+                            // one allocation that must not be attempted.
+                            h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
+                            fallbackStatus = 503;
+                        } else {
+                            queuedBodyBytes += bodyBytes;
+                        }
                     }
-                }
-                // What the peer received: the 503 that replaced a refused response
-                // is what the client saw, and the span must say so -- recording the
-                // handler's 200 hid exactly the overload a trace is read to find.
-                submittedStatus = fallbackStatus > 0 ? fallbackStatus : response.status;
-                requestsServed.incrementAndGet();
-                if(span != null) {
-                    // Registered NOW, before the flush just below can run: that
-                    // flush may close this very stream, and settling consumes its
-                    // one close notification. Registered after it -- in the finally
-                    // -- the span missed that notification and stayed open until
-                    // the whole connection went.
-                    Tracing.leave(span);
-                    tracedStreams(fd).put(new Integer(stream.getId()),
-                            new Object[] {span, new Integer(submittedStatus), handlerError});
-                    spanRegistered = true;
-                }
-                if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
-                        || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
-                        || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
-                    flushHttp2(fd, session, h2);
-                    settleHttp2Spans(fd, h2);
-                    // What the flush could NOT write, not zero. nghttp2 pulls
-                    // from a submitted body only as the peer's flow-control
-                    // window allows, so a client that simply stops sending
-                    // WINDOW_UPDATE makes every flush a no-op while the bodies
-                    // stay retained. Zeroing a turn-local counter against that
-                    // bounds nothing: the advertised stream concurrency times a
-                    // large endpoint is hundreds of megabytes of native buffers
-                    // held for a client that is reading none of it.
-                    queuedBodyBytes = h2.pendingBodyBytes();
-                    if(queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
+                    // What the peer received: the 503 that replaced a refused response
+                    // is what the client saw, and the span must say so -- recording the
+                    // handler's 200 hid exactly the overload a trace is read to find.
+                    submittedStatus = fallbackStatus > 0 ? fallbackStatus : response.status;
+                    requestsServed.incrementAndGet();
+                    if (span != null) {
+                        // Registered NOW, before the flush just below can run: that
+                        // flush may close this very stream, and settling consumes its
+                        // one close notification. Registered after it -- in the finally
+                        // -- the span missed that notification and stayed open until
+                        // the whole connection went.
+                        Tracing.leave(span);
+                        tracedStreams(fd).put(Integer.valueOf(stream.getId()),
+                                new Object[] {span, Integer.valueOf(submittedStatus), handlerError});
+                        spanRegistered = true;
+                    }
+                    if (queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
                             || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
                             || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
-                        // Still over after a real attempt to write, so the peer
-                        // is not draining. Leave the rest of the ready requests
-                        // where they are -- their inbound bodies are already
-                        // capped by the session limit -- and end the turn. The
-                        // WINDOW_UPDATE that unblocks this connection wakes it
-                        // again, and a peer that sends nothing at all is closed
-                        // by the idle deadline rather than held forever.
-                        break;
+                        flushHttp2(fd, session, h2);
+                        settleHttp2Spans(fd, h2);
+                        // What the flush could NOT write, not zero. nghttp2 pulls
+                        // from a submitted body only as the peer's flow-control
+                        // window allows, so a client that simply stops sending
+                        // WINDOW_UPDATE makes every flush a no-op while the bodies
+                        // stay retained. Zeroing a turn-local counter against that
+                        // bounds nothing: the advertised stream concurrency times a
+                        // large endpoint is hundreds of megabytes of native buffers
+                        // held for a client that is reading none of it.
+                        queuedBodyBytes = h2.pendingBodyBytes();
+                        if (queuedBodyBytes > MAX_QUEUED_H2_BODY_BYTES
+                                || Http2.pendingBodyFiles() > MAX_OPEN_H2_FILES
+                                || Http2.pendingBodyBytesAll() > MAX_OPEN_H2_BODY_BYTES) {
+                            // Still over after a real attempt to write, so the peer
+                            // is not draining. Leave the rest of the ready requests
+                            // where they are -- their inbound bodies are already
+                            // capped by the session limit -- and end the turn. The
+                            // WINDOW_UPDATE that unblocks this connection wakes it
+                            // again, and a peer that sends nothing at all is closed
+                            // by the idle deadline rather than held forever.
+                            break;
+                        }
                     }
-                }
                 } finally {
                     // Held until the response has been SUBMITTED, not merely produced.
                     // Releasing it after the handler let stop() see no work in flight
@@ -5960,18 +5642,18 @@ public final class HttpServer {
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
-                    if(span != null && !spanRegistered) {
+                    if (span != null && !spanRegistered) {
                         // Submitting threw before the span was registered above. Not
                         // current any more, so the next stream's span is not its
                         // child.
                         Tracing.leave(span);
-                        if(submittedStatus < 0) {
+                        if (submittedStatus < 0) {
                             // Nothing was submitted, so no stream close will ever
                             // report on it: it failed here.
                             Tracing.endServer(span, -1, handlerError);
                         } else {
-                            tracedStreams(fd).put(new Integer(stream.getId()),
-                                    new Object[] {span, new Integer(submittedStatus),
+                            tracedStreams(fd).put(Integer.valueOf(stream.getId()),
+                                    new Object[] {span, Integer.valueOf(submittedStatus),
                                             handlerError});
                         }
                     }
@@ -5979,13 +5661,17 @@ public final class HttpServer {
             }
             flushHttp2(fd, session, h2);
             settleHttp2Spans(fd, h2);
-            if(!h2.isAlive()) {
+            if (!h2.isAlive()) {
                 drop(fd);
                 return;
             }
             ServerSocket.setBlocking(fd, false);
             armConnection(fd, false);
-        } catch (Exception err) {
+        } catch (IOException err) {
+            trace("fd=" + fd + " http/2 failed: " + err);
+            drop(fd);
+        } catch (RuntimeException err) {
+            // Every failure ends the session the same way, not only an I/O one.
             trace("fd=" + fd + " http/2 failed: " + err);
             drop(fd);
         } finally {
@@ -5993,23 +5679,21 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Server spans of HTTP/2 responses submitted but not yet fully sent, per
-     * connection and then per stream id: each an Object[] {span, submitted status,
-     * handler error}. A response is sent in full only when its stream CLOSES --
-     * nghttp2 pulls a body only as the peer's flow-control window allows, so a
-     * large one finishes turns after it was submitted -- and a stream the peer
-     * resets never is. Ending the span at submission, or at the first flush,
-     * reported a success for a response the peer never got. The HTTP/1 path keeps
-     * its span open through the write for the same reason.
-     */
+    /// Server spans of HTTP/2 responses submitted but not yet fully sent, per
+    /// connection and then per stream id: each an Object\[\] {span, submitted status,
+    /// handler error}. A response is sent in full only when its stream CLOSES --
+    /// nghttp2 pulls a body only as the peer's flow-control window allows, so a
+    /// large one finishes turns after it was submitted -- and a stream the peer
+    /// resets never is. Ending the span at submission, or at the first flush,
+    /// reported a success for a response the peer never got. The HTTP/1 path keeps
+    /// its span open through the write for the same reason.
     private final Map http2Spans = java.util.Collections.synchronizedMap(new java.util.HashMap());
 
     private Map tracedStreams(int fd) {
-        Integer key = new Integer(fd);
-        synchronized(http2Spans) {
-            Map streams = (Map)http2Spans.get(key);
-            if(streams == null) {
+        Integer key = Integer.valueOf(fd);
+        synchronized (http2Spans) {
+            Map streams = (Map) http2Spans.get(key);
+            if (streams == null) {
                 streams = java.util.Collections.synchronizedMap(new java.util.HashMap());
                 http2Spans.put(key, streams);
             }
@@ -6017,56 +5701,54 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Ends the spans of the streams that closed, after a flush put their final
-     * frames on the socket: with the status sent when the stream closed cleanly,
-     * as the failed write HTTP/1 reports (-1) when it was reset.
-     */
+    /// Ends the spans of the streams that closed, after a flush put their final
+    /// frames on the socket: with the status sent when the stream closed cleanly,
+    /// as the failed write HTTP/1 reports (-1) when it was reset.
     private void settleHttp2Spans(int fd, Http2 h2) {
         int[] closed = h2.closedStreams();
-        if(closed == null) {
+        if (closed == null) {
             return;
         }
-        Map streams = (Map)http2Spans.get(new Integer(fd));
-        if(streams == null) {
+        Map streams = (Map) http2Spans.get(Integer.valueOf(fd));
+        if (streams == null) {
             return;
         }
-        for(int iter = 0 ; iter + 1 < closed.length ; iter += 2) {
-            Object entry = streams.remove(new Integer(closed[iter]));
-            if(entry instanceof Object[]) {
-                endHttp2Span((Object[])entry, closed[iter + 1] == 0);
+        for (int iter = 0 ; iter + 1 < closed.length ; iter += 2) {
+            Object entry = streams.remove(Integer.valueOf(closed[iter]));
+            if (entry instanceof Object[]) {
+                endHttp2Span((Object[]) entry, closed[iter + 1] == 0);
             }
         }
     }
 
-    /** Every span still open on a connection that is going away: none was sent in full. */
+    /// Every span still open on a connection that is going away: none was sent in full.
     private void abandonHttp2Spans(int fd) {
-        Object streams = http2Spans.remove(new Integer(fd));
-        if(!(streams instanceof Map)) {
+        Object streams = http2Spans.remove(Integer.valueOf(fd));
+        if (!(streams instanceof Map)) {
             return;
         }
-        synchronized(streams) {
-            java.util.Iterator it = ((Map)streams).values().iterator();
-            while(it.hasNext()) {
+        synchronized (streams) {
+            java.util.Iterator it = ((Map) streams).values().iterator();
+            while (it.hasNext()) {
                 Object entry = it.next();
-                if(entry instanceof Object[]) {
-                    endHttp2Span((Object[])entry, false);
+                if (entry instanceof Object[]) {
+                    endHttp2Span((Object[]) entry, false);
                 }
             }
-            ((Map)streams).clear();
+            ((Map) streams).clear();
         }
     }
 
     private static void endHttp2Span(Object[] entry, boolean sent) {
-        if(!(entry[0] instanceof Span)) {
+        if (!(entry[0] instanceof Span)) {
             return;
         }
-        int status = sent && entry[1] instanceof Integer ? ((Integer)entry[1]).intValue() : -1;
-        Tracing.endServer((Span)entry[0], status,
-                entry[2] instanceof Exception ? (Exception)entry[2] : null);
+        int status = sent && entry[1] instanceof Integer ? ((Integer) entry[1]).intValue() : -1;
+        Tracing.endServer((Span) entry[0], status,
+                entry[2] instanceof Exception ? (Exception) entry[2] : null);
     }
 
-    /** The HTTP/2 connection preface, sent by a client that opens with h2. */
+    /// The HTTP/2 connection preface, sent by a client that opens with h2.
     private static final byte[] HTTP2_PREFACE = prefaceBytes();
 
     private static byte[] prefaceBytes() {
@@ -6077,15 +5759,13 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * True while what has arrived is still consistent with the preface. Lets the
-     * read loop stop early on an ordinary request rather than waiting for 24 bytes
-     * that will never match -- "GET / HTTP/1.1" diverges at the second character.
-     */
+    /// True while what has arrived is still consistent with the preface. Lets the
+    /// read loop stop early on an ordinary request rather than waiting for 24 bytes
+    /// that will never match -- "GET / HTTP/1.1" diverges at the second character.
     private static boolean startsWithPrefacePrefix(Conn conn) {
         int have = Math.min(conn.available(), HTTP2_PREFACE.length);
-        for(int iter = 0 ; iter < have ; iter++) {
-            if(conn.buffer[conn.pos + iter] != HTTP2_PREFACE[iter]) {
+        for (int iter = 0 ; iter < have ; iter++) {
+            if (conn.buffer[conn.pos + iter] != HTTP2_PREFACE[iter]) {
                 return false;
             }
         }
@@ -6093,8 +5773,8 @@ public final class HttpServer {
     }
 
     private static boolean matchesPreface(Conn conn) {
-        for(int iter = 0 ; iter < HTTP2_PREFACE.length ; iter++) {
-            if(conn.buffer[conn.pos + iter] != HTTP2_PREFACE[iter]) {
+        for (int iter = 0 ; iter < HTTP2_PREFACE.length ; iter++) {
+            if (conn.buffer[conn.pos + iter] != HTTP2_PREFACE[iter]) {
                 return false;
             }
         }
@@ -6103,27 +5783,19 @@ public final class HttpServer {
 
     private void flushHttp2(int fd, long session, Http2 h2) throws IOException {
         byte[] out = h2.drain();
-        while(out != null && out.length > 0) {
+        while (out != null && out.length > 0) {
             writeTo(fd, session, out, 0, out.length);
             out = h2.drain();
         }
     }
 
-    /**
-     * The response body as bytes. A file-backed response cannot use sendfile on an
-     * HTTP/2 connection -- the bytes have to become DATA frames, which means they
-     * have to be produced here -- so it is read in, and the descriptor is released
-     * either way.
-     */
-    /**
-     * Whether this status ends the response at the header section.
-     *
-     * RFC 9110: a 1xx, 204 or 304 response carries no body, and a client stops
-     * reading at the blank line. Writing one anyway does not merely waste bytes
-     * -- on a keep-alive connection the client reads those bytes as the start of
-     * the NEXT response, and everything after that on the connection is
-     * misframed. Only HEAD used to be treated this way.
-     */
+    /// Whether this status ends the response at the header section.
+    ///
+    /// RFC 9110: a 1xx, 204 or 304 response carries no body, and a client stops
+    /// reading at the blank line. Writing one anyway does not merely waste bytes
+    /// -- on a keep-alive connection the client reads those bytes as the start of
+    /// the NEXT response, and everything after that on the connection is
+    /// misframed. Only HEAD used to be treated this way.
     static boolean statusForbidsBody(int status) {
         // 205 belongs here with 204: RFC 9110 15.3.6 says a Reset Content
         // response cannot contain content and is terminated by the first empty
@@ -6133,30 +5805,32 @@ public final class HttpServer {
                 || (status >= 100 && status < 200);
     }
 
-    /**
-     * Whether this status must not carry Content-Length at all.
-     *
-     * RFC 9110 6.4.1 makes that a MUST NOT for 1xx and 204.
-     *
-     * 304 is here too, which is a correction. The rule for one is not that it
-     * carries no length but that any length it carries must describe the
-     * SELECTED REPRESENTATION -- what a 200 for the same request would have
-     * sent. Nothing here knows that: a 304 is built by StaticFiles as
-     * Response.empty, so the only figure available is zero, and sending
-     * "Content-Length: 0" tells the cache the file it just validated is empty.
-     * The header is optional on a 304, so omitting it is both correct and the
-     * only honest answer available.
-     */
+    /// Whether this status must not carry Content-Length at all.
+    ///
+    /// RFC 9110 6.4.1 makes that a MUST NOT for 1xx and 204.
+    ///
+    /// 304 is here too, which is a correction. The rule for one is not that it
+    /// carries no length but that any length it carries must describe the
+    /// SELECTED REPRESENTATION -- what a 200 for the same request would have
+    /// sent. Nothing here knows that: a 304 is built by StaticFiles as
+    /// Response.empty, so the only figure available is zero, and sending
+    /// "Content-Length: 0" tells the cache the file it just validated is empty.
+    /// The header is optional on a 304, so omitting it is both correct and the
+    /// only honest answer available.
     static boolean statusForbidsLength(int status) {
         return status == 204 || status == 304 || (status >= 100 && status < 200);
     }
 
+    /// The response body as bytes. A file-backed response cannot use sendfile on an
+    /// HTTP/2 connection -- the bytes have to become DATA frames, which means they
+    /// have to be produced here -- so it is read in, and the descriptor is released
+    /// either way.
     private byte[] responseBodyFor(Response response, boolean headOnly) throws IOException {
-        if(response.fileFd < 0) {
-            if(headOnly) {
+        if (response.fileFd < 0) {
+            if (headOnly) {
                 return new byte[0];
             }
-            if(response.hasDeferredJson) {
+            if (response.hasDeferredJson) {
                 // respondJson and jsonValue leave the value unserialised so the HTTP/1.1
                 // writer can render it straight into the connection's reusable buffer.
                 // There is no such buffer here -- the bytes have to become DATA frames --
@@ -6168,7 +5842,7 @@ public final class HttpServer {
             return response.body;
         }
         try {
-            if(headOnly) {
+            if (headOnly) {
                 return new byte[0];
             }
             // Reached only when the caller has no streaming path to offer. The HTTP/2
@@ -6180,43 +5854,39 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * True for the fields whose values this server decides.
-     *
-     * A handler that sets Content-Length or Transfer-Encoding through extraHeaders
-     * gets it serialised AFTER the server's own, so the response carries two
-     * answers to "where does the body end". A client and a proxy may pick
-     * different ones, which desynchronises everything after it on that connection
-     * -- request smuggling, and cache poisoning when the map came from the request.
-     * Connection is the same: the server decides keep-alive from the request and
-     * the framing follows from that.
-     *
-     * Dropped rather than merged. There is no sensible merge of two lengths, and a
-     * handler wanting a different body should return a different body.
-     */
+    /// True for the fields whose values this server decides.
+    ///
+    /// A handler that sets Content-Length or Transfer-Encoding through extraHeaders
+    /// gets it serialised AFTER the server's own, so the response carries two
+    /// answers to "where does the body end". A client and a proxy may pick
+    /// different ones, which desynchronises everything after it on that connection
+    /// -- request smuggling, and cache poisoning when the map came from the request.
+    /// Connection is the same: the server decides keep-alive from the request and
+    /// the framing follows from that.
+    ///
+    /// Dropped rather than merged. There is no sensible merge of two lengths, and a
+    /// handler wanting a different body should return a different body.
     private static boolean isServerOwnedHeader(String name) {
-        return name.equalsIgnoreCase("content-length")
-                || name.equalsIgnoreCase("transfer-encoding")
-                || name.equalsIgnoreCase("connection")
-                || name.equalsIgnoreCase("content-type")
-                || name.equalsIgnoreCase("date");
+        return "content-length".equalsIgnoreCase(name)
+                || "transfer-encoding".equalsIgnoreCase(name)
+                || "connection".equalsIgnoreCase(name)
+                || "content-type".equalsIgnoreCase(name)
+                || "date".equalsIgnoreCase(name);
     }
 
-    /**
-     * The content type to serialise: the handler's, or the default.
-     *
-     * Validated with the same rule as every other header value. Response.respond and
-     * the public Response constructor both take this from the handler, so it can
-     * carry request-derived text just as extraHeaders can -- guarding one and not
-     * the other left the same response-splitting hole open through a different
-     * argument. A rejected type falls back rather than being dropped, because a
-     * response without Content-Type is its own problem.
-     */
+    /// The content type to serialise: the handler's, or the default.
+    ///
+    /// Validated with the same rule as every other header value. Response.respond and
+    /// the public Response constructor both take this from the handler, so it can
+    /// carry request-derived text just as extraHeaders can -- guarding one and not
+    /// the other left the same response-splitting hole open through a different
+    /// argument. A rejected type falls back rather than being dropped, because a
+    /// response without Content-Type is its own problem.
     private static String safeContentType(String contentType) {
-        if(contentType == null) {
+        if (contentType == null) {
             return DEFAULT_CONTENT_TYPE;
         }
-        if(isHeaderSafe(contentType)) {
+        if (isHeaderSafe(contentType)) {
             return contentType;
         }
         System.err.println("replaced a content type containing a control character: "
@@ -6224,117 +5894,109 @@ public final class HttpServer {
         return DEFAULT_CONTENT_TYPE;
     }
 
-    /**
-     * True when this text can go into a response head as it stands.
-     *
-     * CR and LF end a field; NUL truncates it in every C call underneath. None of
-     * the three can appear in a header name or value, and a header carrying one is
-     * either a bug or an injection attempt -- neither is worth serialising.
-     */
-    /**
-     * True when this is a field NAME as HTTP defines one: a non-empty run of
-     * tchar (RFC 9110 5.6.2). isHeaderSafe is the right rule for a value and
-     * the wrong one for a name -- a space, tab or colon passes it and still
-     * produces a field line no peer reads the way the handler meant. A leading
-     * space is worse than merely malformed: over HTTP/1 that is obsolete line
-     * folding, so the name and value are appended to the PREVIOUS header
-     * instead of forming their own. Over HTTP/2 nghttp2 rejects the name, and
-     * that can cost the whole response rather than the one header.
-     */
+    // True when this text can go into a response head as it stands.
+    //
+    // CR and LF end a field; NUL truncates it in every C call underneath. None of
+    // the three can appear in a header name or value, and a header carrying one is
+    // either a bug or an injection attempt -- neither is worth serialising.
+
+    /// True when this is a field NAME as HTTP defines one: a non-empty run of
+    /// tchar (RFC 9110 5.6.2). isHeaderSafe is the right rule for a value and
+    /// the wrong one for a name -- a space, tab or colon passes it and still
+    /// produces a field line no peer reads the way the handler meant. A leading
+    /// space is worse than merely malformed: over HTTP/1 that is obsolete line
+    /// folding, so the name and value are appended to the PREVIOUS header
+    /// instead of forming their own. Over HTTP/2 nghttp2 rejects the name, and
+    /// that can cost the whole response rather than the one header.
     private static boolean isHeaderName(String name) {
-        if(name.length() == 0) {
+        if (name.length() == 0) {
             return false;
         }
-        for(int iter = 0 ; iter < name.length() ; iter++) {
+        for (int iter = 0 ; iter < name.length() ; iter++) {
             char c = name.charAt(iter);
             boolean tchar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9')
                     || c == '!' || c == '#' || c == '$' || c == '%' || c == '&'
                     || c == '\'' || c == '*' || c == '+' || c == '-' || c == '.'
                     || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
-            if(!tchar) {
+            if (!tchar) {
                 return false;
             }
         }
         return true;
     }
 
-    /**
-     * Whether this value may be written as a field value.
-     *
-     * RFC 9110's field-value carries HTAB, SP, VCHAR (0x21-0x7E) and obs-text
-     * (0x80-0xFF). Every other C0 character, and DEL, is a delimiter to somebody:
-     * over HTTP/1 they produce a malformed field, and an HTTP/2 submission
-     * carrying one can be rejected outright and take the whole response with it.
-     *
-     * THE TEST IS ON THE BYTE THAT WILL BE EMITTED, not on the char, and that is
-     * the part worth reading twice. Both writers narrow with a plain cast --
-     * Buffer.put does out[n] = (byte)charAt(i), and asciiBytes the same -- so
-     * '\u010A' is not '\n' to a char comparison and is byte 0x0A on the wire.
-     * The old rule tested \r, \n and NUL as CHARS and so passed it. A handler
-     * reflecting a query parameter into a header -- exactly the shape this guard
-     * exists for -- therefore turned ?v=%C4%8A into a real newline in the header
-     * block, which is response splitting and a cache-poisoning primitive: the
-     * defect the comment beside the caller says is being prevented. Anything
-     * above 0xFF cannot be spelled in one byte at all and is refused for the same
-     * reason rather than being narrowed into whatever it happens to alias.
-     */
+    /// Whether this value may be written as a field value.
+    ///
+    /// RFC 9110's field-value carries HTAB, SP, VCHAR (0x21-0x7E) and obs-text
+    /// (0x80-0xFF). Every other C0 character, and DEL, is a delimiter to somebody:
+    /// over HTTP/1 they produce a malformed field, and an HTTP/2 submission
+    /// carrying one can be rejected outright and take the whole response with it.
+    ///
+    /// THE TEST IS ON THE BYTE THAT WILL BE EMITTED, not on the char, and that is
+    /// the part worth reading twice. Both writers narrow with a plain cast --
+    /// Buffer.put does out\[n\] = (byte)charAt(i), and asciiBytes the same -- so
+    /// '\u010A' is not '\n' to a char comparison and is byte 0x0A on the wire.
+    /// The old rule tested \r, \n and NUL as CHARS and so passed it. A handler
+    /// reflecting a query parameter into a header -- exactly the shape this guard
+    /// exists for -- therefore turned ?v=%C4%8A into a real newline in the header
+    /// block, which is response splitting and a cache-poisoning primitive: the
+    /// defect the comment beside the caller says is being prevented. Anything
+    /// above 0xFF cannot be spelled in one byte at all and is refused for the same
+    /// reason rather than being narrowed into whatever it happens to alias.
     private static boolean isHeaderSafe(String value) {
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(c == '\t') {
+            if (c == '\t') {
                 continue;
             }
-            if(c < 0x20 || c == 0x7f || c > 0xff) {
+            if (c < 0x20 || c == 0x7f || c > 0xff) {
                 return false;
             }
         }
         return true;
     }
 
-    /**
-     * The same question for an h2 :path, which arrives already decoded into a
-     * String rather than as a slice of the read buffer.
-     *
-     * <p>Re-encoding to UTF-8 first is what makes the two agree: a literal
-     * non-ASCII character in the path is text that came from valid bytes and
-     * re-encodes to valid bytes, while the percent escapes -- the only part that
-     * can be malformed -- decode and are checked exactly as they are on the
-     * HTTP/1 side.
-     */
-    /**
-     * Whether a request target carries a raw '#'.
-     *
-     * A FRAGMENT IS NOT PART OF A REQUEST TARGET. RFC 9110 7.1 says a client must
-     * not send one, and nothing downstream agrees on what to do when it arrives:
-     * this server's path ends at '?' alone, so "/users/123#x" bound a path
-     * variable of "123#x", while an intermediary that strips the fragment
-     * forwards "/users/123" and gets a different answer out of the same server.
-     * That difference is the whole reason the targets are canonicalized at all.
-     *
-     * <p>Refused rather than trimmed. Trimming would make this server the one
-     * that quietly decided the client meant something else, which is the same
-     * mistake in the other direction.
-     *
-     * <p>The escape is untouched: %23 is an ordinary character in a path segment
-     * and decodes long after the routing is done.
-     */
+    // The same question for an h2 :path, which arrives already decoded into a
+    // String rather than as a slice of the read buffer.
+    //
+    // Re-encoding to UTF-8 first is what makes the two agree: a literal
+    // non-ASCII character in the path is text that came from valid bytes and
+    // re-encodes to valid bytes, while the percent escapes -- the only part that
+    // can be malformed -- decode and are checked exactly as they are on the
+    // HTTP/1 side.
+
+    /// Whether a request target carries a raw '#'.
+    ///
+    /// A FRAGMENT IS NOT PART OF A REQUEST TARGET. RFC 9110 7.1 says a client must
+    /// not send one, and nothing downstream agrees on what to do when it arrives:
+    /// this server's path ends at '?' alone, so "/users/123#x" bound a path
+    /// variable of "123#x", while an intermediary that strips the fragment
+    /// forwards "/users/123" and gets a different answer out of the same server.
+    /// That difference is the whole reason the targets are canonicalized at all.
+    ///
+    /// Refused rather than trimmed. Trimming would make this server the one
+    /// that quietly decided the client meant something else, which is the same
+    /// mistake in the other direction.
+    ///
+    /// The escape is untouched: %23 is an ordinary character in a path segment
+    /// and decodes long after the routing is done.
     private static boolean targetHasFragment(byte[] raw, int from, int to) {
-        for(int iter = from ; iter < to ; iter++) {
-            if(raw[iter] == '#') {
+        for (int iter = from ; iter < to ; iter++) {
+            if (raw[iter] == '#') {
                 return true;
             }
         }
         return false;
     }
 
-    /** The same question for an h2 :path, which arrives as a String. */
+    /// The same question for an h2 :path, which arrives as a String.
     private static boolean targetHasFragment(String target) {
         return target != null && target.indexOf('#') >= 0;
     }
 
     private static boolean targetDecodesToUtf8(String target) {
-        if(target == null) {
+        if (target == null) {
             return true;
         }
         // NO "%" FAST PATH HERE. The byte version's was corrected to test for pure
@@ -6349,38 +6011,36 @@ public final class HttpServer {
         // it back apart the same way -- so getBytes("UTF-8") would have re-encoded
         // each of those chars and validated something the server never received.
         byte[] raw = new byte[target.length()];
-        for(int iter = 0 ; iter < raw.length ; iter++) {
+        for (int iter = 0 ; iter < raw.length ; iter++) {
             char c = target.charAt(iter);
-            if(c > 0xff) {
+            if (c > 0xff) {
                 // Not a byte any wire could have delivered under that
                 // representation, so it cannot be a target this server parsed.
                 return false;
             }
-            raw[iter] = (byte)c;
+            raw[iter] = (byte) c;
         }
         return targetDecodesToUtf8(raw, 0, raw.length);
     }
 
-    /**
-     * Whether the request target's percent escapes decode to valid UTF-8.
-     *
-     * <p>Decodes exactly as Request.percentDecode does, so the two cannot disagree
-     * about what the handler will see. '+' is not folded to a space here because
-     * both are ASCII and neither changes whether the run is valid UTF-8.
-     *
-     * <p>A target with no '%' in it cannot decode to anything but itself, so the
-     * scan for one is the whole cost on the overwhelming majority of requests and
-     * nothing is allocated for them.
-     */
+    /// Whether the request target's percent escapes decode to valid UTF-8.
+    ///
+    /// Decodes exactly as Request.percentDecode does, so the two cannot disagree
+    /// about what the handler will see. '+' is not folded to a space here because
+    /// both are ASCII and neither changes whether the run is valid UTF-8.
+    ///
+    /// A target with no '%' in it cannot decode to anything but itself, so the
+    /// scan for one is the whole cost on the overwhelming majority of requests and
+    /// nothing is allocated for them.
     private static boolean targetDecodesToUtf8(byte[] raw, int from, int to) {
         boolean inspect = false;
-        for(int iter = from ; iter < to ; iter++) {
+        for (int iter = from ; iter < to ; iter++) {
             int c = raw[iter] & 0xff;
             // A RAW CONTROL BYTE IS NOT A TARGET. RFC 9110 excludes CTL from a
             // URI, so anything below 0x20 or DEL arrives only from a client that
             // means something by it -- and this runs after the request line was
             // split on spaces, so CR and LF cannot reach here anyway.
-            if(c < 0x20 || c == 0x7f) {
+            if (c < 0x20 || c == 0x7f) {
                 return false;
             }
             // The fast path is PURE ASCII, not merely unescaped. The version this
@@ -6391,19 +6051,19 @@ public final class HttpServer {
             // sitting on the wire with no escape anywhere, and it decoded to
             // U+FFFD exactly as "%C3%28" did, aliasing the same legitimate
             // spelling this check exists to keep distinct.
-            if(c == '%' || c >= 0x80) {
+            if (c == '%' || c >= 0x80) {
                 inspect = true;
             }
         }
-        if(!inspect) {
+        if (!inspect) {
             return true;
         }
         byte[] out = new byte[to - from];
         int length = 0;
         int pos = from;
-        while(pos < to) {
+        while (pos < to) {
             int c = raw[pos] & 0xff;
-            if(c == '%') {
+            if (c == '%') {
                 // EVERY '%' INTRODUCES TWO HEX DIGITS, or the target is malformed.
                 // RFC 3986 leaves no other reading, and this used to fall through
                 // and copy the '%' as a literal byte -- which is valid UTF-8, so
@@ -6413,182 +6073,177 @@ public final class HttpServer {
                 // rejected or served depending on which kind of handler sat behind
                 // it, and an intermediary that normalises escapes could disagree
                 // with all three.
-                if(pos + 2 >= to) {
+                if (pos + 2 >= to) {
                     return false;
                 }
                 int hi = Request.hexDigit(raw[pos + 1] & 0xff);
                 int lo = Request.hexDigit(raw[pos + 2] & 0xff);
-                if(hi < 0 || lo < 0) {
+                if (hi < 0 || lo < 0) {
                     return false;
                 }
-                out[length++] = (byte)((hi << 4) | lo);
+                out[length++] = (byte) ((hi << 4) | lo);
                 pos += 3;
                 continue;
             }
-            out[length++] = (byte)c;
+            out[length++] = (byte) c;
             pos++;
         }
         return Utf8.isValid(out, 0, length);
     }
 
-    /**
-     * Whether {@code [from, to)} is an RFC 3986 IPv6address.
-     *
-     * <p>Eight groups of one to four hex digits, at most one "::" standing for a
-     * run of zero groups, and an optional dotted-quad tail that counts as the
-     * last two. IPvFuture ("v1.xyz") is refused: nothing sends it, and accepting
-     * a form this server cannot route is how the whitelist got here.
-     *
-     * <p>An RFC 6874 zone id is refused too, for the same reason -- "%25eth0"
-     * after the address is not something a Host field carries to an origin
-     * server, and the escape-shaped syntax made it the one place a percent could
-     * appear inside brackets.
-     */
+    /// Whether `[from, to)` is an RFC 3986 IPv6address.
+    ///
+    /// Eight groups of one to four hex digits, at most one "::" standing for a
+    /// run of zero groups, and an optional dotted-quad tail that counts as the
+    /// last two. IPvFuture ("v1.xyz") is refused: nothing sends it, and accepting
+    /// a form this server cannot route is how the whitelist got here.
+    ///
+    /// An RFC 6874 zone id is refused too, for the same reason -- "%25eth0"
+    /// after the address is not something a Host field carries to an origin
+    /// server, and the escape-shaped syntax made it the one place a percent could
+    /// appear inside brackets.
     private static boolean isIpv6Literal(String value, int from, int to) {
-        if(to <= from) {
+        if (to <= from) {
             return false;
         }
         int pos = from;
         int groups = 0;
         boolean compressed = false;
-        if(value.charAt(pos) == ':') {
+        if (value.charAt(pos) == ':') {
             // A leading colon is only legal as the first half of "::".
-            if(pos + 1 >= to || value.charAt(pos + 1) != ':') {
+            if (pos + 1 >= to || value.charAt(pos + 1) != ':') {
                 return false;
             }
             compressed = true;
             pos += 2;
-            if(pos == to) {
+            if (pos == to) {
                 return true;                       // "::" alone is the any address
             }
         }
-        while(pos < to) {
+        while (pos < to) {
             int start = pos;
             int digits = 0;
-            while(pos < to && digits < 4 && Hex.digit(value.charAt(pos)) >= 0) {
+            while (pos < to && digits < 4 && Hex.digit(value.charAt(pos)) >= 0) {
                 pos++;
                 digits++;
             }
-            if(pos < to && value.charAt(pos) == '.') {
+            if (pos < to && value.charAt(pos) == '.') {
                 // A dotted-quad tail ends the address and fills two groups.
-                if(!isIpv4Literal(value, start, to)) {
+                if (!isIpv4Literal(value, start, to)) {
                     return false;
                 }
                 groups += 2;
-                pos = to;
                 break;
             }
-            if(digits == 0) {
+            if (digits == 0) {
                 return false;
             }
             groups++;
-            if(pos == to) {
+            if (pos == to) {
                 break;
             }
-            if(value.charAt(pos) != ':') {
+            if (value.charAt(pos) != ':') {
                 return false;                      // a fifth hex digit, or junk
             }
             pos++;
-            if(pos < to && value.charAt(pos) == ':') {
-                if(compressed) {
+            if (pos < to && value.charAt(pos) == ':') {
+                if (compressed) {
                     return false;                  // only one "::" may appear
                 }
                 compressed = true;
                 pos++;
-                if(pos == to) {
+                if (pos == to) {
                     break;                         // a trailing "::" is legal
                 }
-            } else if(pos == to) {
+            } else if (pos == to) {
                 return false;                      // a trailing single colon is not
             }
         }
         return compressed ? groups < 8 : groups == 8;
     }
 
-    /** Whether {@code [from, to)} is a dotted quad, each part 0-255 and unpadded. */
+    /// Whether `[from, to)` is a dotted quad, each part 0-255 and unpadded.
     private static boolean isIpv4Literal(String value, int from, int to) {
         int parts = 0;
         int pos = from;
-        while(pos < to) {
+        while (pos < to) {
             int start = pos;
             int n = 0;
-            while(pos < to && value.charAt(pos) >= '0' && value.charAt(pos) <= '9') {
+            while (pos < to && value.charAt(pos) >= '0' && value.charAt(pos) <= '9') {
                 n = n * 10 + (value.charAt(pos) - '0');
                 pos++;
             }
             int digits = pos - start;
             // "01" is not a dec-octet: RFC 3986 spells the leading-zero forms out
             // and none of them has one, which is also what stops an octal reading.
-            if(digits < 1 || digits > 3 || n > 255
+            if (digits < 1 || digits > 3 || n > 255
                     || (digits > 1 && value.charAt(start) == '0')) {
                 return false;
             }
             parts++;
-            if(pos == to) {
+            if (pos == to) {
                 break;
             }
-            if(value.charAt(pos) != '.') {
+            if (value.charAt(pos) != '.') {
                 return false;
             }
             pos++;
-            if(pos == to) {
+            if (pos == to) {
                 return false;                      // a trailing dot
             }
         }
         return parts == 4;
     }
 
-    /** Whether {@code at} is a '%' followed by two hex digits. */
+    /// Whether `at` is a '%' followed by two hex digits.
     private static boolean isPercentTriplet(String value, int at) {
         return at + 2 < value.length()
                 && Hex.digit(value.charAt(at + 1)) >= 0
                 && Hex.digit(value.charAt(at + 2)) >= 0;
     }
 
-    /**
-     * Whether this is a legal HTTP authority: a host, bracketed if it is an IPv6
-     * literal, optionally followed by ":" and a port.
-     *
-     * <p>Userinfo is the part that matters. RFC 9110 excludes it from an HTTP
-     * authority, and "Host: user@internal" is how one request is made to mean one
-     * thing to a parser that takes the whole string and another to a parser that
-     * reads only what follows the '@'.
-     */
+    /// Whether this is a legal HTTP authority: a host, bracketed if it is an IPv6
+    /// literal, optionally followed by ":" and a port.
+    ///
+    /// Userinfo is the part that matters. RFC 9110 excludes it from an HTTP
+    /// authority, and "Host: user@internal" is how one request is made to mean one
+    /// thing to a parser that takes the whole string and another to a parser that
+    /// reads only what follows the '@'.
     private static boolean isAuthority(String value) {
-        if(value.length() == 0) {
+        if (value.length() == 0) {
             return false;
         }
         int hostEnd;
-        if(value.charAt(0) == '[') {
+        if (value.charAt(0) == '[') {
             int close = value.indexOf(']');
-            if(close < 2) {
+            if (close < 2) {
                 return false;
             }
             // PARSED, not character-whitelisted. Accepting any run of hex digits,
             // colons and dots took "[.]" and "[1:]" for IPv6 literals -- neither
             // is one, and a frontend that parses them rejects the request this
             // server then routed on.
-            if(!isIpv6Literal(value, 1, close)) {
+            if (!isIpv6Literal(value, 1, close)) {
                 return false;
             }
             hostEnd = close + 1;
         } else {
             hostEnd = value.indexOf(':');
-            if(hostEnd < 0) {
+            if (hostEnd < 0) {
                 hostEnd = value.length();
             }
-            if(hostEnd == 0) {
+            if (hostEnd == 0) {
                 return false;
             }
-            for(int iter = 0 ; iter < hostEnd ; iter++) {
+            for (int iter = 0 ; iter < hostEnd ; iter++) {
                 char c = value.charAt(iter);
-                if(c == '%') {
+                if (c == '%') {
                     // pct-encoded is "%" HEXDIG HEXDIG, and accepting a bare '%'
                     // as an ordinary character meant "bad%zz.example" passed here
                     // -- an authority a conforming frontend rejects or normalises,
                     // which is the same proxy-versus-origin disagreement this
                     // validator exists to close, reintroduced one level down.
-                    if(!isPercentTriplet(value, iter)) {
+                    if (!isPercentTriplet(value, iter)) {
                         return false;
                     }
                     iter += 2;
@@ -6612,25 +6267,25 @@ public final class HttpServer {
                         || c == '!' || c == '$' || c == '&' || c == '\''
                         || c == '(' || c == ')' || c == '*' || c == '+'
                         || c == ';' || c == '=';
-                if(!ok) {
+                if (!ok) {
                     return false;
                 }
             }
         }
-        if(hostEnd == value.length()) {
+        if (hostEnd == value.length()) {
             return true;
         }
-        if(value.charAt(hostEnd) != ':') {
+        if (value.charAt(hostEnd) != ':') {
             return false;
         }
         int digits = value.length() - hostEnd - 1;
-        if(digits < 1 || digits > 5) {
+        if (digits < 1 || digits > 5) {
             return false;
         }
         int port = 0;
-        for(int iter = hostEnd + 1 ; iter < value.length() ; iter++) {
+        for (int iter = hostEnd + 1 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
-            if(c < '0' || c > '9') {
+            if (c < '0' || c > '9') {
                 return false;
             }
             port = port * 10 + (c - '0');
@@ -6638,73 +6293,67 @@ public final class HttpServer {
         return port >= 1 && port <= 65535;
     }
 
-    /**
-     * Whether this is one of the methods this server routes. Anything else is
-     * 501, not a 404 -- the path may well exist, the verb is what is unknown.
-     *
-     * Derived from KNOWN_METHODS rather than spelling the seven out again. The
-     * version this replaced did spell them out, and had no callers at all, so a
-     * method added to KNOWN_METHODS would have been routed by the HTTP/1 parser
-     * and refused here with nothing to notice the disagreement.
-     */
+    /// Whether this is one of the methods this server routes. Anything else is
+    /// 501, not a 404 -- the path may well exist, the verb is what is unknown.
+    ///
+    /// Derived from KNOWN_METHODS rather than spelling the seven out again. The
+    /// version this replaced did spell them out, and had no callers at all, so a
+    /// method added to KNOWN_METHODS would have been routed by the HTTP/1 parser
+    /// and refused here with nothing to notice the disagreement.
     private static boolean isKnownMethod(String method) {
-        for(int iter = 0 ; iter < KNOWN_METHODS.length ; iter++) {
-            if(KNOWN_METHODS[iter].equals(method)) {
+        for (String known : KNOWN_METHODS) {
+            if (known.equals(method)) {
                 return true;
             }
         }
         return false;
     }
 
-    /** The same token rule as isHeaderName, over a slice of the read buffer. */
+    /// The same token rule as isHeaderName, over a slice of the read buffer.
     private static boolean isRequestHeaderName(byte[] raw, int from, int to) {
-        if(to <= from) {
+        if (to <= from) {
             return false;
         }
-        for(int iter = from ; iter < to ; iter++) {
+        for (int iter = from ; iter < to ; iter++) {
             int c = raw[iter] & 0xff;
             boolean tchar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9')
                     || c == '!' || c == '#' || c == '$' || c == '%' || c == '&'
                     || c == '\'' || c == '*' || c == '+' || c == '-' || c == '.'
                     || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
-            if(!tchar) {
+            if (!tchar) {
                 return false;
             }
         }
         return true;
     }
 
-    /**
-     * Whether this slice holds a byte no field value may carry. HTAB is allowed
-     * because RFC 9110 permits it inside a value; everything else below 0x20, and
-     * DEL, is a delimiter to somebody.
-     */
+    /// Whether this slice holds a byte no field value may carry. HTAB is allowed
+    /// because RFC 9110 permits it inside a value; everything else below 0x20, and
+    /// DEL, is a delimiter to somebody.
     private static boolean hasControlByte(byte[] raw, int from, int to) {
-        for(int iter = from ; iter < to ; iter++) {
+        for (int iter = from ; iter < to ; iter++) {
             int c = raw[iter] & 0xff;
-            if((c < 0x20 && c != '\t') || c == 0x7f) {
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
                 return true;
             }
         }
         return false;
     }
 
-    /** The same characters would break the log line they are reported on. */
+    /// The same characters would break the log line they are reported on.
     private static String sanitizeForLog(String value) {
         StringBuilder out = new StringBuilder(value.length());
-        for(int iter = 0 ; iter < value.length() ; iter++) {
+        for (int iter = 0 ; iter < value.length() ; iter++) {
             char c = value.charAt(iter);
             out.append(c == '\r' || c == '\n' || c < 0x20 ? '?' : c);
         }
         return out.toString();
     }
 
-    /**
-     * HTTP/1.1 keeps the connection alive unless asked not to; HTTP/1.0 closes
-     * unless asked to keep it. Treating a 1.0 client as keep-alive leaves it
-     * waiting for a close that never comes.
-     */
+    /// HTTP/1.1 keeps the connection alive unless asked not to; HTTP/1.0 closes
+    /// unless asked to keep it. Treating a 1.0 client as keep-alive leaves it
+    /// waiting for a close that never comes.
     private static boolean wantsKeepAlive(Request request) {
         // headerContains rather than getHeader, and this is the hot path.
         //
@@ -6720,7 +6369,7 @@ public final class HttpServer {
         // Same answers as before on both branches: headerContains is false when
         // the header is absent, so 1.0 still needs an explicit keep-alive and 1.1
         // still defaults to keeping the connection.
-        if("HTTP/1.0".equals(request.getVersion())) {
+        if ("HTTP/1.0".equals(request.getVersion())) {
             return request.headerContains("connection", "keep-alive");
         }
         return !request.headerContains("connection", "close");
@@ -6752,31 +6401,27 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * The methods this server routes. Anything else is 501, not a 404.
-     *
-     * Held as constants so a parsed method can BE one of them rather than a fresh
-     * String per request.
-     */
+    /// The methods this server routes. Anything else is 501, not a 404.
+    ///
+    /// Held as constants so a parsed method can BE one of them rather than a fresh
+    /// String per request.
     private static final String[] KNOWN_METHODS = {
         "GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"
     };
 
-    /**
-     * The same constants as bytes, because comparing against the String walks it a
-     * character at a time and String.charAt is a call.
-     *
-     * Every one of these is matched against raw buffer bytes on the request path,
-     * and the comparison was reaching into a String for each character: a profile
-     * of the plaintext benchmark put String.charInternal at 4.92% of in-binary self
-     * time, third behind syscall dispatch and serveOne itself. A request line costs
-     * about eleven of those calls -- eight for the version and three for the method
-     * -- before a single header is looked at. Held as bytes the same comparison is
-     * a byte load, and the constants are built once at class initialisation.
-     *
-     * The IGNORE-CASE constants are stored already folded, so only the data side is
-     * folded at comparison time rather than both sides on every character.
-     */
+    /// The same constants as bytes, because comparing against the String walks it a
+    /// character at a time and String.charAt is a call.
+    ///
+    /// Every one of these is matched against raw buffer bytes on the request path,
+    /// and the comparison was reaching into a String for each character: a profile
+    /// of the plaintext benchmark put String.charInternal at 4.92% of in-binary self
+    /// time, third behind syscall dispatch and serveOne itself. A request line costs
+    /// about eleven of those calls -- eight for the version and three for the method
+    /// -- before a single header is looked at. Held as bytes the same comparison is
+    /// a byte load, and the constants are built once at class initialisation.
+    ///
+    /// The IGNORE-CASE constants are stored already folded, so only the data side is
+    /// folded at comparison time rather than both sides on every character.
     private static final byte[] HTTP_1_1_BYTES = asciiConstant("HTTP/1.1");
     private static final byte[] HTTP_1_0_BYTES = asciiConstant("HTTP/1.0");
     private static final byte[] CONTENT_LENGTH_BYTES = asciiConstant("content-length");
@@ -6786,52 +6431,50 @@ public final class HttpServer {
 
     private static byte[] asciiConstant(String ascii) {
         byte[] out = new byte[ascii.length()];
-        for(int iter = 0 ; iter < ascii.length() ; iter++) {
-            out[iter] = (byte)ascii.charAt(iter);
+        for (int iter = 0 ; iter < ascii.length() ; iter++) {
+            out[iter] = (byte) ascii.charAt(iter);
         }
         return out;
     }
 
     private static byte[][] asciiConstants(String[] values) {
         byte[][] out = new byte[values.length][];
-        for(int iter = 0 ; iter < values.length ; iter++) {
+        for (int iter = 0 ; iter < values.length ; iter++) {
             out[iter] = asciiConstant(values[iter]);
         }
         return out;
     }
 
-    /**
-     * A DECLARED path -- a mount prefix, a route pattern -- in the form a request
-     * for it arrives as.
-     *
-     * A target is canonicalised before anything compares it, so /assets%7E and
-     * /assets~ are one resource by then. Whatever the declaring side wrote has to
-     * speak the same form or it matches NEITHER spelling: not the encoded
-     * request, which no longer looks like that when it is compared, and not the
-     * decoded one, which never did. A mount configured that way is simply
-     * unreachable, with nothing at startup or request time to say so.
-     *
-     * Shares Request's rule rather than restating it, because two implementations
-     * of "which octets are unreserved" that drift apart is the same defect in a
-     * slower form.
-     */
+    /// A DECLARED path -- a mount prefix, a route pattern -- in the form a request
+    /// for it arrives as.
+    ///
+    /// A target is canonicalised before anything compares it, so /assets%7E and
+    /// /assets~ are one resource by then. Whatever the declaring side wrote has to
+    /// speak the same form or it matches NEITHER spelling: not the encoded
+    /// request, which no longer looks like that when it is compared, and not the
+    /// decoded one, which never did. A mount configured that way is simply
+    /// unreachable, with nothing at startup or request time to say so.
+    ///
+    /// Shares Request's rule rather than restating it, because two implementations
+    /// of "which octets are unreserved" that drift apart is the same defect in a
+    /// slower form.
     private static final char[] HEX = {'0', '1', '2', '3', '4', '5', '6', '7',
             '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
     static String canonicalDeclaredPath(String value) {
-        if(value == null || value.indexOf('%') < 0) {
+        if (value == null || value.indexOf('%') < 0) {
             return value;
         }
         StringBuilder out = new StringBuilder(value.length());
         int at = 0;
-        while(at < value.length()) {
+        while (at < value.length()) {
             char c = value.charAt(at);
-            if(c == '%' && at + 2 < value.length()) {
+            if (c == '%' && at + 2 < value.length()) {
                 int hi = Request.hexDigit(value.charAt(at + 1));
                 int lo = Request.hexDigit(value.charAt(at + 2));
-                if(hi >= 0 && lo >= 0) {
-                    if(Request.isUnreservedByte((hi << 4) | lo)) {
-                        out.append((char)((hi << 4) | lo));
+                if (hi >= 0 && lo >= 0) {
+                    if (Request.isUnreservedByte((hi << 4) | lo)) {
+                        out.append((char) ((hi << 4) | lo));
                     } else {
                         // The same one spelling the request side settles on.
                         out.append('%').append(HEX[hi]).append(HEX[lo]);
@@ -6846,10 +6489,8 @@ public final class HttpServer {
         return out.toString();
     }
 
-    /**
-     * Reads one request. Null when the peer closed; ProtocolException when what
-     * arrived is not a request this server will act on.
-     */
+    /// Reads one request. Null when the peer closed; ProtocolException when what
+    /// arrived is not a request this server will act on.
     private Request readRequest(Conn conn, byte[] scratch) throws IOException {
         // Cleared before the header block is read and raised once it has been
         // parsed, so fill() can tell "start of a request" from "midway through
@@ -6869,17 +6510,17 @@ public final class HttpServer {
         // large upload over a slow link, which is a real client rather than an
         // attack.
         long headDeadline = 0;
-        while(headerEnd < 0) {
-            if(conn.available() > MAX_HEADER_BYTES) {
+        while (headerEnd < 0) {
+            if (conn.available() > MAX_HEADER_BYTES) {
                 throw new ProtocolException(431, "request head too large");
             }
-            if(conn.available() > 0 && headDeadline == 0) {
+            if (conn.available() > 0 && headDeadline == 0) {
                 headDeadline = System.currentTimeMillis() + SOCKET_TIMEOUT_MILLIS;
             }
-            if(headDeadline != 0 && System.currentTimeMillis() > headDeadline) {
+            if (headDeadline != 0 && System.currentTimeMillis() > headDeadline) {
                 throw new ProtocolException(408, "the request head did not arrive in time");
             }
-            if(!conn.fill(scratch)) {
+            if (!conn.fill(scratch)) {
                 return null;
             }
             headerEnd = indexOfHeaderEnd(conn.buffer, conn.pos);
@@ -6899,34 +6540,34 @@ public final class HttpServer {
         conn.pos = headerEnd + 4;
 
         int lineEnd = indexOfCrLfWithin(raw, blockStart, blockEnd);
-        if(lineEnd < 0) {
+        if (lineEnd < 0) {
             lineEnd = blockEnd;         // a single request line with no headers
         }
-        if(lineEnd == blockStart) {
+        if (lineEnd == blockStart) {
             throw new ProtocolException(400, "empty request");
         }
 
-        int firstSpace = indexOfByte(raw, blockStart, lineEnd, (byte)' ');
+        int firstSpace = indexOfByte(raw, blockStart, lineEnd, (byte) ' ');
         int secondSpace = firstSpace < 0 ? -1
-                : indexOfByte(raw, firstSpace + 1, lineEnd, (byte)' ');
-        if(firstSpace < 0 || secondSpace < 0
-                || indexOfByte(raw, secondSpace + 1, lineEnd, (byte)' ') >= 0) {
+                : indexOfByte(raw, firstSpace + 1, lineEnd, (byte) ' ');
+        if (firstSpace < 0 || secondSpace < 0
+                || indexOfByte(raw, secondSpace + 1, lineEnd, (byte) ' ') >= 0) {
             throw new ProtocolException(400, "malformed request line");
         }
 
         String version;
         int versionStart = secondSpace + 1;
         int versionLength = lineEnd - versionStart;
-        if(sliceEquals(raw, versionStart, versionLength, HTTP_1_1_BYTES)) {
+        if (sliceEquals(raw, versionStart, versionLength, HTTP_1_1_BYTES)) {
             version = "HTTP/1.1";
-        } else if(sliceEquals(raw, versionStart, versionLength, HTTP_1_0_BYTES)) {
+        } else if (sliceEquals(raw, versionStart, versionLength, HTTP_1_0_BYTES)) {
             version = "HTTP/1.0";
         } else {
             throw new ProtocolException(505, "unsupported HTTP version");
         }
 
         String method = knownMethod(raw, blockStart, firstSpace - blockStart);
-        if(method == null) {
+        if (method == null) {
             // 501, not 404: the path may well exist, the verb is what is unknown.
             throw new ProtocolException(501, "unsupported method");
         }
@@ -6961,11 +6602,11 @@ public final class HttpServer {
         // was missing, so this says where it is. The message names both for the
         // same reason: a client that sent a TAB was being told its target was not
         // valid UTF-8, which is true of neither the byte nor the complaint.
-        if(!targetDecodesToUtf8(raw, targetStart, targetStart + targetLength)) {
+        if (!targetDecodesToUtf8(raw, targetStart, targetStart + targetLength)) {
             throw new ProtocolException(400,
                     "the request target holds a control character or is not valid UTF-8");
         }
-        if(targetHasFragment(raw, targetStart, targetStart + targetLength)) {
+        if (targetHasFragment(raw, targetStart, targetStart + targetLength)) {
             throw new ProtocolException(400, "the request target carries a fragment");
         }
         // The origin-form target when it had to be built rather than pointed at.
@@ -6978,27 +6619,27 @@ public final class HttpServer {
         String absoluteAuthority = null;
         // Absolute-form ("GET http://host/path"), which a request through a proxy
         // uses and RFC 9112 requires a server to accept.
-        if(sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "http://")
+        if (sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "http://")
                 || sliceStartsWithIgnoreCase(raw, targetStart, targetLength, "https://")) {
-            int schemeEnd = indexOfByte(raw, targetStart, targetStart + targetLength, (byte)':');
+            int schemeEnd = indexOfByte(raw, targetStart, targetStart + targetLength, (byte) ':');
             int authority = schemeEnd + 3;      // past "://"
             int end = targetStart + targetLength;
-            int slash = indexOfByte(raw, authority, end, (byte)'/');
-            int question = indexOfByte(raw, authority, end, (byte)'?');
+            int slash = indexOfByte(raw, authority, end, (byte) '/');
+            int question = indexOfByte(raw, authority, end, (byte) '?');
             // Whichever comes first ends the authority. Looking only for '/' drops the
             // query of "http://host?a=b" on the floor, and reads a '/' INSIDE a query
             // value as the start of the path.
             int authorityEnd = end;
-            if(slash >= 0 && (question < 0 || slash < question)) {
+            if (slash >= 0 && (question < 0 || slash < question)) {
                 authorityEnd = slash;
-            } else if(question >= 0) {
+            } else if (question >= 0) {
                 authorityEnd = question;
             }
             absoluteAuthority = asciiString(raw, authority, authorityEnd - authority);
-            if(slash >= 0 && (question < 0 || slash < question)) {
+            if (slash >= 0 && (question < 0 || slash < question)) {
                 targetLength = end - slash;
                 targetStart = slash;
-            } else if(question >= 0) {
+            } else if (question >= 0) {
                 // No path but a query. The origin-form is "/" followed by that query,
                 // which is not a range of this buffer, so it has to be built.
                 synthesized = "/" + asciiString(raw, question, end - question);
@@ -7008,10 +6649,10 @@ public final class HttpServer {
             }
         }
         String target;
-        if(targetStart < 0) {
+        if (targetStart < 0) {
             target = synthesized == null ? "/" : synthesized;
         } else {
-            if(targetLength == 0
+            if (targetLength == 0
                     || (raw[targetStart] != '/'
                         && !(targetLength == 1 && raw[targetStart] == '*'
                              && "OPTIONS".equals(method)))) {
@@ -7033,23 +6674,23 @@ public final class HttpServer {
         int[] slices = conn.slices;
         int headerCount = 0;
         int at = lineEnd + 2;
-        while(at < blockEnd) {
+        while (at < blockEnd) {
             int end = indexOfCrLfWithin(raw, at, blockEnd);
-            if(end < 0) {
+            if (end < 0) {
                 end = blockEnd;
             }
-            if(end == at) {
+            if (end == at) {
                 at = end + 2;
                 continue;
             }
             int first = raw[at] & 0xff;
-            if(first == ' ' || first == '\t') {
+            if (first == ' ' || first == '\t') {
                 // Obsolete line folding. Two parsers disagreeing about where a
                 // header ends is how a request is smuggled; RFC 9112 says reject.
                 throw new ProtocolException(400, "obsolete line folding");
             }
-            int colon = indexOfByte(raw, at, end, (byte)':');
-            if(colon <= at) {
+            int colon = indexOfByte(raw, at, end, (byte) ':');
+            if (colon <= at) {
                 throw new ProtocolException(400, "malformed header");
             }
             int nameStart = at;
@@ -7061,18 +6702,18 @@ public final class HttpServer {
             // Two parsers disagreeing about which headers a request carries is how a
             // request is smuggled, which is why the obsolete line folding above is
             // refused rather than joined up.
-            if(nameEnd > nameStart && isSpace(raw[nameEnd - 1])) {
+            if (nameEnd > nameStart && isSpace(raw[nameEnd - 1])) {
                 throw new ProtocolException(400, "whitespace before header colon");
             }
             int valueStart = colon + 1;
             int valueEnd = end;
-            while(valueStart < valueEnd && isSpace(raw[valueStart])) {
+            while (valueStart < valueEnd && isSpace(raw[valueStart])) {
                 valueStart++;
             }
-            while(valueEnd > valueStart && isSpace(raw[valueEnd - 1])) {
+            while (valueEnd > valueStart && isSpace(raw[valueEnd - 1])) {
                 valueEnd--;
             }
-            if(headerCount * 4 + 4 > slices.length) {
+            if (headerCount * 4 + 4 > slices.length) {
                 int[] grown = new int[slices.length * 2];
                 System.arraycopy(slices, 0, grown, 0, slices.length);
                 slices = grown;
@@ -7088,10 +6729,10 @@ public final class HttpServer {
             // request on it is whatever the attacker put after the body. The
             // response side already refuses exactly this shape (isHeaderName); a
             // request is the direction that matters more.
-            if(!isRequestHeaderName(raw, nameStart, nameEnd)) {
+            if (!isRequestHeaderName(raw, nameStart, nameEnd)) {
                 throw new ProtocolException(400, "malformed header name");
             }
-            if(hasControlByte(raw, valueStart, valueEnd)) {
+            if (hasControlByte(raw, valueStart, valueEnd)) {
                 throw new ProtocolException(400, "control character in a header value");
             }
             int base = headerCount * 4;
@@ -7104,8 +6745,8 @@ public final class HttpServer {
         }
 
         Request request;
-        if(POOL_REQUEST) {
-            if(conn.pooledRequest == null) {
+        if (POOL_REQUEST) {
+            if (conn.pooledRequest == null) {
                 conn.pooledRequest = new Request(method, target, version, raw, slices,
                                                  headerCount, null, sliceStart, sliceLength);
             } else {
@@ -7127,20 +6768,24 @@ public final class HttpServer {
         int contentLengthAt = -1;
         boolean chunked = false;
         String transferEncoding = null;
+        // Only allocated for a SECOND Transfer-Encoding field. Joining with + in
+        // the loop was quadratic in how many a client chose to send, and the one
+        // field every real request carries should not pay for that case.
+        StringBuilder joinedEncodings = null;
         int hostCount = 0;
         String hostValue = null;
-        for(int iter = 0 ; iter < headerCount ; iter++) {
+        for (int iter = 0 ; iter < headerCount ; iter++) {
             int base = iter * 4;
-            if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
+            if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], CONTENT_LENGTH_BYTES)) {
                 // Two different lengths means two readings of where this request
                 // ends. Refuse rather than pick one.
-                if(contentLengthAt >= 0
+                if (contentLengthAt >= 0
                         && !slicesEqual(raw, slices[contentLengthAt + 2], slices[contentLengthAt + 3],
                                         slices[base + 2], slices[base + 3])) {
                     throw new ProtocolException(400, "conflicting Content-Length");
                 }
                 contentLengthAt = base;
-            } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1],
+            } else if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1],
                                             TRANSFER_ENCODING_BYTES)) {
                 // Every instance, in order, joined with commas. RFC 9110 5.3 makes
                 // repeated fields mean the same as one field holding the joined
@@ -7149,16 +6794,25 @@ public final class HttpServer {
                 // "chunked" followed by anything else fell back to Content-Length
                 // here while a proxy in front still framed it as chunked.
                 String value = asciiString(raw, slices[base + 2], slices[base + 3]);
-                transferEncoding = transferEncoding == null ? value
-                        : transferEncoding + "," + value;
-            } else if(sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], HOST_BYTES)) {
+                if (transferEncoding == null) {
+                    transferEncoding = value;
+                } else {
+                    if (joinedEncodings == null) {
+                        joinedEncodings = new StringBuilder(transferEncoding);
+                    }
+                    joinedEncodings.append(',').append(value);
+                }
+            } else if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], HOST_BYTES)) {
                 hostCount++;
-                if(hostValue == null) {
+                if (hostValue == null) {
                     hostValue = asciiString(raw, slices[base + 2], slices[base + 3]);
                 }
             }
         }
-        if(transferEncoding != null) {
+        if (joinedEncodings != null) {
+            transferEncoding = joinedEncodings.toString();
+        }
+        if (transferEncoding != null) {
             // RFC 9112 6.1: chunked MUST be the final coding, and a server that
             // cannot decode the rest MUST NOT guess at the framing. An unsupported
             // coding, chunked twice, or chunked in the middle all mean this server
@@ -7168,14 +6822,14 @@ public final class HttpServer {
         // RFC 9112: an HTTP/1.1 request MUST carry Host, and a server MUST reject
         // one that does not. Routing on a name the client never sent is how a
         // request reaches the wrong virtual host.
-        if("HTTP/1.1".equals(version) && hostCount == 0) {
+        if ("HTTP/1.1".equals(version) && hostCount == 0) {
             throw new ProtocolException(400, "missing Host header");
         }
         // Refused rather than silently preferred one of the two. The authority is
         // what this server must act on, but a handler reading getHeader("host")
         // would still see the other, and a request that carries two different
         // answers to "which host did you mean" has no honest interpretation.
-        if(absoluteAuthority != null && hostValue != null
+        if (absoluteAuthority != null && hostValue != null
                 && !absoluteAuthority.equalsIgnoreCase(hostValue)) {
             throw new ProtocolException(400,
                     "the request target's authority and the Host header disagree");
@@ -7184,7 +6838,7 @@ public final class HttpServer {
         // request APIs disagree -- getHeader returns the first, getHeaders keeps the
         // last -- so a handler and whatever authorized it can read different
         // authorities out of the same request.
-        if(hostCount > 1) {
+        if (hostCount > 1) {
             throw new ProtocolException(400, "duplicate Host header");
         }
         // And the authority has to BE one. Everything above settles which answer
@@ -7201,10 +6855,10 @@ public final class HttpServer {
         // the equality test above to carry the verdict across: that test runs only
         // when BOTH are present, and an HTTP/1.0 absolute-form request has no Host
         // to compare against.
-        if(hostValue != null && !isAuthority(hostValue)) {
+        if (hostValue != null && !isAuthority(hostValue)) {
             throw new ProtocolException(400, "the Host header is not a valid authority");
         }
-        if(absoluteAuthority != null && !isAuthority(absoluteAuthority)) {
+        if (absoluteAuthority != null && !isAuthority(absoluteAuthority)) {
             throw new ProtocolException(400,
                     "the request target's authority is not a valid authority");
         }
@@ -7213,7 +6867,7 @@ public final class HttpServer {
         int declaredLength = contentLengthAt < 0 ? -1
                 : sliceToInt(raw, slices[contentLengthAt + 2], slices[contentLengthAt + 3]);
 
-        if(chunked && contentLength != null) {
+        if (chunked && contentLength != null) {
             // Both framings in one request is precisely how a request is smuggled
             // past a proxy that believes one and a server that believes the other.
             throw new ProtocolException(400, "both Content-Length and Transfer-Encoding");
@@ -7230,20 +6884,20 @@ public final class HttpServer {
         // The body read below relies on these having run; they used to sit there
         // instead, which is why a request with no Expect behaved correctly and
         // one that politely asked first did not.
-        if(contentLength != null) {
+        if (contentLength != null) {
             // sliceToInt returns -1 for anything that is not a plain non-negative
             // decimal, which covers the malformed and the negative cases the two
             // separate checks here used to make after parsing.
-            if(declaredLength < 0) {
+            if (declaredLength < 0) {
                 throw new ProtocolException(400, "malformed Content-Length");
             }
-            if(declaredLength > MAX_BODY_BYTES) {
+            if (declaredLength > MAX_BODY_BYTES) {
                 throw new ProtocolException(413, "request body too large");
             }
         }
 
         String expectation = request.getHeader("Expect");
-        if(expectation != null) {
+        if (expectation != null) {
             // EVERY token, not just whether the one we know is among them. An
             // earlier version asked headerContains for 100-continue and answered
             // it, so "Expect: 100-continue, custom-extension" got its interim
@@ -7259,7 +6913,7 @@ public final class HttpServer {
             // receive deadline -- the client for a reply it was invited to expect,
             // the server for a body that is not coming. 417 is what RFC 9110
             // provides, and it costs one round trip instead of a timeout.
-            if(!onlyExpects100Continue(expectation)) {
+            if (!onlyExpects100Continue(expectation)) {
                 throw new ProtocolException(417, "unsupported expectation");
             }
             // The client is entitled to this before sending the body. A server
@@ -7269,22 +6923,22 @@ public final class HttpServer {
         }
 
         String body = null;
-        if(chunked) {
+        if (chunked) {
             byte[] decoded = readChunked(conn, scratch);
-            if(decoded == null) {
+            if (decoded == null) {
                 return null;
             }
-            if(decoded.length > 0 && !Utf8.isValid(decoded, 0, decoded.length)) {
+            if (decoded.length > 0 && !Utf8.isValid(decoded, 0, decoded.length)) {
                 throw new ProtocolException(400, "the request body is not valid UTF-8");
             }
             body = decoded.length == 0 ? null : new String(decoded, "UTF-8");
-        } else if(contentLength != null) {
+        } else if (contentLength != null) {
             // Already refused above if it was malformed or too large, which has to
             // happen before an Expect is answered rather than here.
-            if(!conn.fillTo(declaredLength)) {
+            if (!conn.fillTo(declaredLength)) {
                 return null;
             }
-            if(declaredLength > 0) {
+            if (declaredLength > 0) {
                 // Checked before it is decoded. new String replaces a malformed
                 // sequence with U+FFFD rather than failing, so without this the
                 // handler is handed text the client never sent -- and whatever
@@ -7293,7 +6947,7 @@ public final class HttpServer {
                 // that one is left alone deliberately, because refusing a query
                 // parameter is a different policy from refusing a body, and no
                 // report has been made against it.
-                if(!Utf8.isValid(conn.buffer, conn.pos, declaredLength)) {
+                if (!Utf8.isValid(conn.buffer, conn.pos, declaredLength)) {
                     throw new ProtocolException(400, "the request body is not valid UTF-8");
                 }
                 body = new String(conn.buffer, conn.pos, declaredLength, "UTF-8");
@@ -7305,7 +6959,7 @@ public final class HttpServer {
         // to a handler -- so neither one mutates anything a handler can see, and
         // "immutable to its handler" is preserved either way. The slices and the
         // array are shared, not copied.
-        if(body == null) {
+        if (body == null) {
             return request;
         }
         // THE BODY ONLY. This used to re-point the whole request -- every field
@@ -7326,12 +6980,10 @@ public final class HttpServer {
         return request;
     }
 
-    /**
-     * Decodes a chunked body: a size in hex, CRLF, that many bytes, CRLF, until a
-     * zero-length chunk. The trailer section after it is consumed and discarded --
-     * ignoring trailers is allowed, but leaving them in the stream would
-     * desynchronise the next request on a keep-alive connection.
-     */
+    /// Decodes a chunked body: a size in hex, CRLF, that many bytes, CRLF, until a
+    /// zero-length chunk. The trailer section after it is consumed and discarded --
+    /// ignoring trailers is allowed, but leaving them in the stream would
+    /// desynchronise the next request on a keep-alive connection.
     private byte[] readChunked(Conn conn, byte[] scratch) throws IOException {
         // Charged against the SAME process-wide budget the fixed-length path uses.
         // Bounding only that path left this one open: a chunked body is capped per
@@ -7347,168 +6999,168 @@ public final class HttpServer {
         // necessary in the first place.
         long[] charged = { 0 };
         try {
-        // A ByteSink rather than a ByteArrayOutputStream, because the reservation
-        // below has to follow the ALLOCATION and a stream does not say how big its
-        // array is. Both double when they grow, so charging the logical body left
-        // roughly half of a grown buffer uncounted: a client crossing a growth
-        // boundary and then pausing held about 8MB against a 4MB charge, and enough
-        // connections doing it hold close to twice CN1_HTTP_MAX_UPLOAD_MB while the
-        // guard believes it is inside the limit. bytes().length is the capacity, so
-        // it can be charged for what it really is.
-        ByteSink body = new ByteSink(1024);
-        // The same floor rate the fixed-length path got, over the WHOLE chunked
-        // read: the size lines, the data and the trailers. Each of the three fill
-        // loops below restarts the socket timeout on every successful read, so a
-        // client sending a one-byte chunk just inside each window could hold a
-        // worker for years before the 8 MiB cap ever came into view -- and in pool
-        // mode, which is what TLS uses, enough of those are the server. Bounding
-        // only the fixed-length path left this one open.
-        long started = System.currentTimeMillis();
-        while(true) {
-            int lineEnd = indexOfCrLf(conn.buffer, conn.pos);
-            while(lineEnd < 0) {
-                // A chunk-size line with no CRLF would otherwise be read for ever:
-                // fill() reallocates and copies what is already buffered, and none
-                // of it counts toward MAX_BODY_BYTES because no body byte has been
-                // framed yet. Metadata gets the same ceiling the header block has.
-                if(conn.available() > MAX_HEADER_BYTES) {
-                    throw new ProtocolException(400, "chunk size line too long");
-                }
-                requireChunkedProgress(started, body.length() + conn.available());
-                reserveUploadUpTo(charged, body.length() + conn.available());
-                if(!conn.fill(scratch)) {
-                    return null;
-                }
-                lineEnd = indexOfCrLf(conn.buffer, conn.pos);
-            }
-            // NO CONTROL BYTE ANYWHERE ON THE LINE, checked before any of it is
-            // discarded. The extension after ';' is thrown away unread, so a bare
-            // LF inside one was swallowed with it -- this parser scans on to the
-            // next CRLF, while an intermediary that ends a chunk line at LF stops
-            // there and reads the rest as chunk data or as the next request. That
-            // is the same disagreement the trailer loop below refuses, and the
-            // comment under this one already claims this line refuses it too.
-            if(hasControlByte(conn.buffer, conn.pos, lineEnd)) {
-                throw new ProtocolException(400, "control character in a chunk size line");
-            }
-            String sizeLine = new String(conn.buffer, conn.pos, lineEnd - conn.pos, "UTF-8");
-            // A chunk-size may carry extensions after a ';'; the size is before it.
-            int semi = sizeLine.indexOf(';');
-            if(semi >= 0) {
-                sizeLine = sizeLine.substring(0, semi);
-            }
-            // 1*HEXDIG, on the raw text. Integer.parseInt(_, 16) took a sign and
-            // any Unicode digit, so "+1" and U+0661 both framed a one-byte chunk
-            // and "-0" framed the TERMINATING one -- while the intermediary in
-            // front rejects all three. A server that frames a message differently
-            // from the proxy ahead of it is the whole of request smuggling, and
-            // this parser refuses bare LF and obsolete folding for exactly that
-            // reason. No trim either: HTTP does not allow space around the size.
-            int size = Hex.parse(sizeLine, 0, sizeLine.length());
-            if(size < 0) {
-                throw new ProtocolException(400, "malformed chunk size");
-            }
-            conn.pos = lineEnd + 2;
-            if(size == 0) {
-                // Trailers, terminated by a bare CRLF. Bounded in total, not per
-                // line: an endless run of short well-formed trailers costs exactly
-                // as much memory as one endless line.
-                int trailerBytes = 0;
-                while(true) {
-                    int trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
-                    while(trailerEnd < 0) {
-                        if(conn.available() > MAX_HEADER_BYTES) {
-                            throw new ProtocolException(400, "chunk trailer too long");
-                        }
-                        requireChunkedProgress(started, body.length() + conn.available());
-                        reserveUploadUpTo(charged, body.length() + conn.available());
-                        if(!conn.fill(scratch)) {
-                            // EOF before the blank line that ends the trailers: the
-                            // chunked framing never finished, so this is a truncated
-                            // message, not a complete one. Returning the body here
-                            // ran the handler on it -- and for a mutating request
-                            // that means committing half a message. The fixed-length
-                            // and chunk-data paths both return null; so does this.
-                            return null;
-                        }
-                        trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
+            // A ByteSink rather than a ByteArrayOutputStream, because the reservation
+            // below has to follow the ALLOCATION and a stream does not say how big its
+            // array is. Both double when they grow, so charging the logical body left
+            // roughly half of a grown buffer uncounted: a client crossing a growth
+            // boundary and then pausing held about 8MB against a 4MB charge, and enough
+            // connections doing it hold close to twice CN1_HTTP_MAX_UPLOAD_MB while the
+            // guard believes it is inside the limit. bytes().length is the capacity, so
+            // it can be charged for what it really is.
+            ByteSink body = new ByteSink(1024);
+            // The same floor rate the fixed-length path got, over the WHOLE chunked
+            // read: the size lines, the data and the trailers. Each of the three fill
+            // loops below restarts the socket timeout on every successful read, so a
+            // client sending a one-byte chunk just inside each window could hold a
+            // worker for years before the 8 MiB cap ever came into view -- and in pool
+            // mode, which is what TLS uses, enough of those are the server. Bounding
+            // only the fixed-length path left this one open.
+            long started = System.currentTimeMillis();
+            while (true) {
+                int lineEnd = indexOfCrLf(conn.buffer, conn.pos);
+                while (lineEnd < 0) {
+                    // A chunk-size line with no CRLF would otherwise be read for ever:
+                    // fill() reallocates and copies what is already buffered, and none
+                    // of it counts toward MAX_BODY_BYTES because no body byte has been
+                    // framed yet. Metadata gets the same ceiling the header block has.
+                    if (conn.available() > MAX_HEADER_BYTES) {
+                        throw new ProtocolException(400, "chunk size line too long");
                     }
-                    trailerBytes += (trailerEnd - conn.pos) + 2;
-                    if(trailerBytes > MAX_HEADER_BYTES) {
-                        throw new ProtocolException(400, "chunk trailers too large");
+                    requireChunkedProgress(started, body.length() + conn.available());
+                    reserveUploadUpTo(charged, body.length() + conn.available());
+                    if (!conn.fill(scratch)) {
+                        return null;
                     }
-                    boolean blank = trailerEnd == conn.pos;
-                    if(!blank) {
-                        // THE SAME CHECKS THE HEADER BLOCK GETS, and for the same
-                        // reason. This loop finds the end of a trailer by scanning
-                        // for CRLF, so a bare LF inside one was just a byte to it:
-                        // a zero chunk followed by "X: v\n\nGET /next ..." ended
-                        // the trailer section at an intermediary that treats LF as
-                        // a delimiter, while this consumed the whole thing --
-                        // including the next request -- as opaque trailer text. The
-                        // two then disagree about where the next request starts on
-                        // a reused connection, which is the whole of smuggling. The
-                        // header block above refuses exactly this shape; a trailer
-                        // is a header field and gets the same treatment.
-                        int colon = -1;
-                        for(int scan = conn.pos ; scan < trailerEnd ; scan++) {
-                            if(conn.buffer[scan] == ':') {
-                                colon = scan;
-                                break;
+                    lineEnd = indexOfCrLf(conn.buffer, conn.pos);
+                }
+                // NO CONTROL BYTE ANYWHERE ON THE LINE, checked before any of it is
+                // discarded. The extension after ';' is thrown away unread, so a bare
+                // LF inside one was swallowed with it -- this parser scans on to the
+                // next CRLF, while an intermediary that ends a chunk line at LF stops
+                // there and reads the rest as chunk data or as the next request. That
+                // is the same disagreement the trailer loop below refuses, and the
+                // comment under this one already claims this line refuses it too.
+                if (hasControlByte(conn.buffer, conn.pos, lineEnd)) {
+                    throw new ProtocolException(400, "control character in a chunk size line");
+                }
+                String sizeLine = new String(conn.buffer, conn.pos, lineEnd - conn.pos, "UTF-8");
+                // A chunk-size may carry extensions after a ';'; the size is before it.
+                int semi = sizeLine.indexOf(';');
+                if (semi >= 0) {
+                    sizeLine = sizeLine.substring(0, semi);
+                }
+                // 1*HEXDIG, on the raw text. Integer.parseInt(_, 16) took a sign and
+                // any Unicode digit, so "+1" and U+0661 both framed a one-byte chunk
+                // and "-0" framed the TERMINATING one -- while the intermediary in
+                // front rejects all three. A server that frames a message differently
+                // from the proxy ahead of it is the whole of request smuggling, and
+                // this parser refuses bare LF and obsolete folding for exactly that
+                // reason. No trim either: HTTP does not allow space around the size.
+                int size = Hex.parse(sizeLine, 0, sizeLine.length());
+                if (size < 0) {
+                    throw new ProtocolException(400, "malformed chunk size");
+                }
+                conn.pos = lineEnd + 2;
+                if (size == 0) {
+                    // Trailers, terminated by a bare CRLF. Bounded in total, not per
+                    // line: an endless run of short well-formed trailers costs exactly
+                    // as much memory as one endless line.
+                    int trailerBytes = 0;
+                    while (true) {
+                        int trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
+                        while (trailerEnd < 0) {
+                            if (conn.available() > MAX_HEADER_BYTES) {
+                                throw new ProtocolException(400, "chunk trailer too long");
+                            }
+                            requireChunkedProgress(started, body.length() + conn.available());
+                            reserveUploadUpTo(charged, body.length() + conn.available());
+                            if (!conn.fill(scratch)) {
+                                // EOF before the blank line that ends the trailers: the
+                                // chunked framing never finished, so this is a truncated
+                                // message, not a complete one. Returning the body here
+                                // ran the handler on it -- and for a mutating request
+                                // that means committing half a message. The fixed-length
+                                // and chunk-data paths both return null; so does this.
+                                return null;
+                            }
+                            trailerEnd = indexOfCrLf(conn.buffer, conn.pos);
+                        }
+                        trailerBytes += (trailerEnd - conn.pos) + 2;
+                        if (trailerBytes > MAX_HEADER_BYTES) {
+                            throw new ProtocolException(400, "chunk trailers too large");
+                        }
+                        boolean blank = trailerEnd == conn.pos;
+                        if (!blank) {
+                            // THE SAME CHECKS THE HEADER BLOCK GETS, and for the same
+                            // reason. This loop finds the end of a trailer by scanning
+                            // for CRLF, so a bare LF inside one was just a byte to it:
+                            // a zero chunk followed by "X: v\n\nGET /next ..." ended
+                            // the trailer section at an intermediary that treats LF as
+                            // a delimiter, while this consumed the whole thing --
+                            // including the next request -- as opaque trailer text. The
+                            // two then disagree about where the next request starts on
+                            // a reused connection, which is the whole of smuggling. The
+                            // header block above refuses exactly this shape; a trailer
+                            // is a header field and gets the same treatment.
+                            int colon = -1;
+                            for (int scan = conn.pos ; scan < trailerEnd ; scan++) {
+                                if (conn.buffer[scan] == ':') {
+                                    colon = scan;
+                                    break;
+                                }
+                            }
+                            // No colon covers obsolete folding too: a continuation line
+                            // begins with space and carries none.
+                            if (colon < 0 || !isRequestHeaderName(conn.buffer, conn.pos, colon)) {
+                                throw new ProtocolException(400, "malformed trailer name");
+                            }
+                            int valueStart = colon + 1;
+                            while (valueStart < trailerEnd && (conn.buffer[valueStart] == ' '
+                                    || conn.buffer[valueStart] == '\t')) {
+                                valueStart++;
+                            }
+                            if (hasControlByte(conn.buffer, valueStart, trailerEnd)) {
+                                throw new ProtocolException(400,
+                                        "control character in a trailer value");
                             }
                         }
-                        // No colon covers obsolete folding too: a continuation line
-                        // begins with space and carries none.
-                        if(colon < 0 || !isRequestHeaderName(conn.buffer, conn.pos, colon)) {
-                            throw new ProtocolException(400, "malformed trailer name");
-                        }
-                        int valueStart = colon + 1;
-                        while(valueStart < trailerEnd && (conn.buffer[valueStart] == ' '
-                                || conn.buffer[valueStart] == '\t')) {
-                            valueStart++;
-                        }
-                        if(hasControlByte(conn.buffer, valueStart, trailerEnd)) {
-                            throw new ProtocolException(400,
-                                    "control character in a trailer value");
+                        conn.pos = trailerEnd + 2;
+                        if (blank) {
+                            return usedBytes(body);
                         }
                     }
-                    conn.pos = trailerEnd + 2;
-                    if(blank) {
-                        return usedBytes(body);
+                }
+                // Subtraction, not addition: body.length() + size overflows to a negative
+                // for a chunk size near Integer.MAX_VALUE and sails past the cap, after
+                // which the loop below grows the buffer toward the declared multi-gigabyte
+                // chunk. Four bytes and a "7ffffffd" header was enough for an
+                // unauthenticated client to take the process out. Both sides here are
+                // non-negative, so there is nothing left to overflow.
+                if (size > MAX_BODY_BYTES - body.length()) {
+                    throw new ProtocolException(413, "chunked body too large");
+                }
+                // The chunk and its trailing CRLF must both be present before it is taken.
+                while (conn.available() < size + 2) {
+                    requireChunkedProgress(started, body.length() + conn.available());
+                    reserveUploadUpTo(charged, body.length() + conn.available());
+                    if (!conn.fill(scratch)) {
+                        return null;
                     }
                 }
-            }
-            // Subtraction, not addition: body.length() + size overflows to a negative
-            // for a chunk size near Integer.MAX_VALUE and sails past the cap, after
-            // which the loop below grows the buffer toward the declared multi-gigabyte
-            // chunk. Four bytes and a "7ffffffd" header was enough for an
-            // unauthenticated client to take the process out. Both sides here are
-            // non-negative, so there is nothing left to overflow.
-            if(size > MAX_BODY_BYTES - body.length()) {
-                throw new ProtocolException(413, "chunked body too large");
-            }
-            // The chunk and its trailing CRLF must both be present before it is taken.
-            while(conn.available() < size + 2) {
-                requireChunkedProgress(started, body.length() + conn.available());
-                reserveUploadUpTo(charged, body.length() + conn.available());
-                if(!conn.fill(scratch)) {
-                    return null;
+                // Reserved for the copy BEFORE it is made, like every other growth
+                // point: a budget checked afterwards has already spent what it meant
+                // to withhold.
+                // Reserved against the capacity this write will leave behind, not the
+                // bytes it adds: ensure() doubles, and the doubling is the memory.
+                body.ensure(size);
+                reserveUploadUpTo(charged, body.bytes().length + conn.available());
+                body.put(conn.buffer, conn.pos, size);
+                conn.pos += size;
+                if (conn.buffer[conn.pos] != '\r' || conn.buffer[conn.pos + 1] != '\n') {
+                    throw new ProtocolException(400, "malformed chunk terminator");
                 }
+                conn.pos += 2;
             }
-            // Reserved for the copy BEFORE it is made, like every other growth
-            // point: a budget checked afterwards has already spent what it meant
-            // to withhold.
-            // Reserved against the capacity this write will leave behind, not the
-            // bytes it adds: ensure() doubles, and the doubling is the memory.
-            body.ensure(size);
-            reserveUploadUpTo(charged, body.bytes().length + conn.available());
-            body.put(conn.buffer, conn.pos, size);
-            conn.pos += size;
-            if(conn.buffer[conn.pos] != '\r' || conn.buffer[conn.pos + 1] != '\n') {
-                throw new ProtocolException(400, "malformed chunk terminator");
-            }
-            conn.pos += 2;
-        }
         } finally {
             // Every path out, exactly like the fixed-length reader: the body
             // arrived, the peer went away, the deadline passed or the process was
@@ -7518,50 +7170,45 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Tops a reservation up to what the caller is now holding.
-     *
-     * The running total is in the array so that the charge is recorded BEFORE the
-     * ceiling is tested: if this throws, the caller's finally still releases what
-     * was just taken. Recording it afterwards leaks the last reservation of every
-     * refused upload, which is the slowest possible way to run a server out of
-     * budget.
-     */
-    /**
-     * The filled prefix of a sink, copied out.
-     *
-     * ByteSink.bytes() is the whole backing array -- capacity, not content -- so
-     * handing it to a caller that reads buffer.length would hand it the padding
-     * too.
-     */
+    // Tops a reservation up to what the caller is now holding.
+    //
+    // The running total is in the array so that the charge is recorded BEFORE the
+    // ceiling is tested: if this throws, the caller's finally still releases what
+    // was just taken. Recording it afterwards leaks the last reservation of every
+    // refused upload, which is the slowest possible way to run a server out of
+    // budget.
+
+    /// The filled prefix of a sink, copied out.
+    ///
+    /// ByteSink.bytes() is the whole backing array -- capacity, not content -- so
+    /// handing it to a caller that reads buffer.length would hand it the padding
+    /// too.
     private static byte[] usedBytes(ByteSink sink) {
         byte[] out = new byte[sink.length()];
         System.arraycopy(sink.bytes(), 0, out, 0, out.length);
         return out;
     }
 
-    /**
-     * Whether an Expect field asks for nothing but 100-continue.
-     *
-     * <p>It is a comma-separated list, and one member this server cannot satisfy
-     * makes the whole field unsatisfiable -- there is no partial answer to give.
-     * Compared without case folding a token by hand: equalsIgnoreCase is
-     * locale-independent, which toLowerCase is not.
-     */
+    /// Whether an Expect field asks for nothing but 100-continue.
+    ///
+    /// It is a comma-separated list, and one member this server cannot satisfy
+    /// makes the whole field unsatisfiable -- there is no partial answer to give.
+    /// Compared without case folding a token by hand: equalsIgnoreCase is
+    /// locale-independent, which toLowerCase is not.
     private static boolean onlyExpects100Continue(String value) {
         int at = 0;
         boolean any = false;
-        while(at <= value.length()) {
+        while (at <= value.length()) {
             int comma = value.indexOf(',', at);
             int end = comma < 0 ? value.length() : comma;
             String token = value.substring(at, end).trim();
-            if(token.length() > 0) {
+            if (token.length() > 0) {
                 any = true;
-                if(!"100-continue".equalsIgnoreCase(token)) {
+                if (!"100-continue".equalsIgnoreCase(token)) {
                     return false;
                 }
             }
-            if(comma < 0) {
+            if (comma < 0) {
                 break;
             }
             at = comma + 1;
@@ -7571,65 +7218,59 @@ public final class HttpServer {
 
     private static void reserveUploadUpTo(long[] charged, long needed)
             throws ProtocolException {
-        if(needed <= charged[0]) {
+        if (needed <= charged[0]) {
             return;
         }
         long delta = needed - charged[0];
         charged[0] = needed;
-        if(http1UploadBytes.addAndGet(delta) > MAX_HTTP1_UPLOAD_BYTES) {
+        if (http1UploadBytes.addAndGet(delta) > MAX_HTTP1_UPLOAD_BYTES) {
             throw new ProtocolException(503, "too many uploads in flight");
         }
     }
 
-    /**
-     * Refuses a chunked body that is not arriving at the floor rate.
-     *
-     * The total is not declared, so the allowance is computed from what has
-     * ARRIVED: at any moment the elapsed time may be one socket timeout plus what
-     * those bytes take at MIN_BODY_BYTES_PER_SECOND. A slow but progressing upload
-     * keeps earning time; one that has stopped delivering does not.
-     *
-     * "Arrived" includes what is BUFFERED for the chunk in progress, not just the
-     * chunks already complete. Counting only completed chunks meant one legal
-     * large chunk earned no time at all while it streamed: a 1 MiB chunk at four
-     * times the floor rate was cut off with a 408 after about fifteen seconds,
-     * because the total stayed zero until the whole of it had landed.
-     */
+    /// Refuses a chunked body that is not arriving at the floor rate.
+    ///
+    /// The total is not declared, so the allowance is computed from what has
+    /// ARRIVED: at any moment the elapsed time may be one socket timeout plus what
+    /// those bytes take at MIN_BODY_BYTES_PER_SECOND. A slow but progressing upload
+    /// keeps earning time; one that has stopped delivering does not.
+    ///
+    /// "Arrived" includes what is BUFFERED for the chunk in progress, not just the
+    /// chunks already complete. Counting only completed chunks meant one legal
+    /// large chunk earned no time at all while it streamed: a 1 MiB chunk at four
+    /// times the floor rate was cut off with a 408 after about fifteen seconds,
+    /// because the total stayed zero until the whole of it had landed.
     private static void requireChunkedProgress(long started, int received)
             throws ProtocolException {
         long allowed = SOCKET_TIMEOUT_MILLIS
-                + (long)received * 1000L / MIN_BODY_BYTES_PER_SECOND;
-        if(System.currentTimeMillis() - started > allowed) {
+                + (long) received * 1000L / MIN_BODY_BYTES_PER_SECOND;
+        if (System.currentTimeMillis() - started > allowed) {
             throw new ProtocolException(408, "the chunked body did not arrive in time");
         }
     }
 
     private static int indexOfCrLf(byte[] data, int from) {
-        for(int iter = from ; iter + 1 < data.length ; iter++) {
-            if(data[iter] == '\r' && data[iter + 1] == '\n') {
+        for (int iter = from ; iter + 1 < data.length ; iter++) {
+            if (data[iter] == '\r' && data[iter + 1] == '\n') {
                 return iter;
             }
         }
         return -1;
     }
 
-    /**
-     * The Date header value, formatted at most once a second.
-     *
-     * The header has one-second resolution, so formatting it per response is work
-     * whose result is identical for every request in the same second -- and at
-     * these rates that is thousands of them. Two threads racing here both compute
-     * the same string for the same second, so the only cost of the race is a
-     * duplicated format, never a wrong value.
-     */
-    private static volatile long dateStampSecond = -1;
-    private static volatile String dateStampValue;
-    /**
-     * The same stamp as bytes, so writing it costs a copy rather than a
-     * per-character conversion. An HTTP date is fixed width and ASCII, which is
-     * what makes the length a constant.
-     */
-    private static volatile byte[] dateStampBytes = new byte[HTTP_DATE_LENGTH];
+    /// The Date header value, formatted at most once a second.
+    ///
+    /// The header has one-second resolution, so formatting it per response is work
+    /// whose result is identical for every request in the same second -- and at
+    /// these rates that is thousands of them. Two threads racing here both compute
+    /// the same string for the same second, so the only cost of the race is a
+    /// duplicated format, never a wrong value.
+    private static volatile long dateStampSecond = -1; //NOPMD AvoidUsingVolatile - one-second cache shared by every worker, see above
+    private static volatile String dateStampValue; //NOPMD AvoidUsingVolatile - one-second cache shared by every worker, see above
+    /// The same stamp as bytes, so writing it costs a copy rather than a
+    /// per-character conversion. An HTTP date is fixed width and ASCII, which is
+    /// what makes the length a constant.
+    private static volatile byte[] dateStampBytes = new byte[HTTP_DATE_LENGTH]; //NOPMD AvoidUsingVolatile - replaced whole, never mutated, see above
 
     static String currentHttpDate() {
         refreshHttpDate();
@@ -7644,17 +7285,17 @@ public final class HttpServer {
     private static void refreshHttpDate() {
         long millis = System.currentTimeMillis();
         long second = millis / 1000L;
-        if(second != dateStampSecond) {
+        if (second != dateStampSecond) {
             String formatted = Http1Date.format(second * 1000L);
             byte[] bytes = new byte[HTTP_DATE_LENGTH];
             // Fixed width by construction; a formatter that ever returned another
             // length would otherwise write a short or truncated date silently.
-            if(formatted.length() != HTTP_DATE_LENGTH) {
+            if (formatted.length() != HTTP_DATE_LENGTH) {
                 throw new IllegalStateException("HTTP date is not "
                         + HTTP_DATE_LENGTH + " characters: " + formatted);
             }
-            for(int iter = 0 ; iter < HTTP_DATE_LENGTH ; iter++) {
-                bytes[iter] = (byte)formatted.charAt(iter);
+            for (int iter = 0 ; iter < HTTP_DATE_LENGTH ; iter++) {
+                bytes[iter] = (byte) formatted.charAt(iter);
             }
             dateStampValue = formatted;
             dateStampBytes = bytes;
@@ -7662,31 +7303,29 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Writes the response, and closes a file-backed one's descriptor however it
-     * goes.
-     *
-     * <p>THE SERVER OWNS THE DESCRIPTOR once a handler hands it over, and on this
-     * path nothing else closes it: the caller traces the failure, drops the
-     * socket and returns without looking at the response. So the close cannot sit
-     * beside the send, which is where it was. A client that resets the connection
-     * before the response head is written makes the HEAD write throw -- before
-     * the file branch is ever reached -- and the descriptor stayed open, counted
-     * against OPEN_FILES for the life of the process. Aborted static requests are
-     * free to send, so a client could repeat that until the process ran out of
-     * descriptors.
-     *
-     * <p>At this scope rather than around the writes, because the head write is
-     * not the only thing above the file branch that can throw: serialising a
-     * deferred JSON body and the two early returns that write a small body in one
-     * syscall are all in front of it.
-     */
+    /// Writes the response, and closes a file-backed one's descriptor however it
+    /// goes.
+    ///
+    /// THE SERVER OWNS THE DESCRIPTOR once a handler hands it over, and on this
+    /// path nothing else closes it: the caller traces the failure, drops the
+    /// socket and returns without looking at the response. So the close cannot sit
+    /// beside the send, which is where it was. A client that resets the connection
+    /// before the response head is written makes the HEAD write throw -- before
+    /// the file branch is ever reached -- and the descriptor stayed open, counted
+    /// against OPEN_FILES for the life of the process. Aborted static requests are
+    /// free to send, so a client could repeat that until the process ran out of
+    /// descriptors.
+    ///
+    /// At this scope rather than around the writes, because the head write is
+    /// not the only thing above the file branch that can throw: serialising a
+    /// deferred JSON body and the two early returns that write a small body in one
+    /// syscall are all in front of it.
     private void writeResponse(Conn conn, int fd, long session, Response response,
             boolean keepAlive, boolean headOnly) throws IOException {
         try {
             writeHeadAndBody(conn, fd, session, response, keepAlive, headOnly);
         } finally {
-            if(response.fileFd >= 0) {
+            if (response.fileFd >= 0) {
                 StaticFiles.closeFile(response.fileFd);
             }
         }
@@ -7700,7 +7339,7 @@ public final class HttpServer {
         // the head is not built yet.
         byte[] deferred = null;
         int deferredLength = 0;
-        if(response.hasDeferredJson) {
+        if (response.hasDeferredJson) {
             conn.bodySink.reset();
             Json.write(response.deferredJson, conn.bodySink);
             deferred = conn.bodySink.bytes();
@@ -7717,7 +7356,7 @@ public final class HttpServer {
         // representation to describe -- it tells the client to clear its form --
         // so it advertises zero. Reporting the suppressed body's length there
         // would leave a keep-alive client waiting for bytes that never come.
-        if(noBody && !headOnly) {
+        if (noBody && !headOnly) {
             bodyLength = 0;
         }
 
@@ -7734,8 +7373,8 @@ public final class HttpServer {
         // of user CPU per request against fasthttp's 0.74us, with system time at
         // parity -- the gap was all in our own code, and this is the largest
         // identifiable piece of it.
-        if(FAST_HEADERS) {
-            if(response.status == 200) {
+        if (FAST_HEADERS) {
+            if (response.status == 200) {
                 conn.put(H_STATUS_200, 0, H_STATUS_200.length);   // overwhelmingly the common case
             } else {
                 conn.put(H_VERSION, 0, H_VERSION.length);
@@ -7755,11 +7394,11 @@ public final class HttpServer {
             // Always an explicit length: without it a keep-alive client waits for
             // a close that is not coming. The exception is a status the spec says
             // must not carry one, where the absent header IS the framing.
-            if(!noLength) {
+            if (!noLength) {
                 conn.put(H_CLEN, 0, H_CLEN.length);
                 conn.putNumber(bodyLength);
             }
-            if(keepAlive) {
+            if (keepAlive) {
                 conn.put(H_KEEPALIVE, 0, H_KEEPALIVE.length);
             } else {
                 conn.put(H_CLOSE, 0, H_CLOSE.length);
@@ -7779,23 +7418,23 @@ public final class HttpServer {
             conn.put(safeContentType(response.contentType));
             conn.put("\r\nDate: ");
             conn.put(currentHttpDateBytes(), 0, HTTP_DATE_LENGTH);
-            if(!noLength) {
+            if (!noLength) {
                 conn.put("\r\nContent-Length: ");
                 conn.putNumber(bodyLength);
             }
             conn.put(keepAlive ? "\r\nConnection: keep-alive" : "\r\nConnection: close");
         }
-        if(response.extraHeaders != null) {
+        if (response.extraHeaders != null) {
             java.util.Iterator it = response.extraHeaders.keySet().iterator();
-            while(it.hasNext()) {
+            while (it.hasNext()) {
                 Object key = it.next();
                 // A List is several fields of one name; see the HTTP/2 writer.
                 Object raw = response.extraHeaders.get(key);
-                List several = raw instanceof List ? (List)raw : null;
+                List several = raw instanceof List ? (List) raw : null;
                 int count = several == null ? 1 : several.size();
-                for(int each = 0 ; each < count ; each++) {
+                for (int each = 0 ; each < count ; each++) {
                     Object value = several == null ? raw : several.get(each);
-                    if(key != null && value != null) {
+                    if (key != null && value != null) {
                         String name = String.valueOf(key);
                         String text = String.valueOf(value);
                         // A CR or LF here ENDS the field and starts another, so a value
@@ -7805,10 +7444,10 @@ public final class HttpServer {
                         // response splitting, and it is a cache-poisoning primitive.
                         // Dropped rather than escaped: there is no correct escaping, and a
                         // header the handler could not have meant is not worth sending.
-                        if(isServerOwnedHeader(name)) {
+                        if (isServerOwnedHeader(name)) {
                             System.err.println("dropped a response header the server owns: "
                                     + sanitizeForLog(name));
-                        } else if(isHeaderName(name) && isHeaderSafe(text)) {
+                        } else if (isHeaderName(name) && isHeaderSafe(text)) {
                             conn.put("\r\n");
                             conn.put(name);
                             conn.put(": ");
@@ -7822,7 +7461,7 @@ public final class HttpServer {
                 }
             }
         }
-        if(FAST_HEADERS) {
+        if (FAST_HEADERS) {
             conn.put(H_END, 0, H_END.length);
         } else {
             conn.put("\r\n\r\n");
@@ -7835,7 +7474,7 @@ public final class HttpServer {
         // our remaining syscall count per request. Above the threshold the copy
         // would cost more than the syscall it saves, and a file body never enters
         // user space at all -- both keep the two-write path.
-        if(deferred != null) {
+        if (deferred != null) {
             // THE SAME LIMIT THE ORDINARY BODY GETS. This path used to copy any
             // deferred body into the head buffer, however large: a big JSON result
             // was then held twice, once in bodySink where it was serialised and
@@ -7843,18 +7482,18 @@ public final class HttpServer {
             // for the life of the connection. Above the limit the copy costs more
             // than the syscall it saves anyway, which is why the branch below
             // stops there.
-            if(!noBody && deferredLength > 0 && deferredLength <= COMBINED_WRITE_LIMIT) {
+            if (!noBody && deferredLength > 0 && deferredLength <= COMBINED_WRITE_LIMIT) {
                 conn.put(deferred, 0, deferredLength);
                 writeTo(fd, session, conn.out, 0, conn.outLength);
                 return;
             }
             writeTo(fd, session, conn.out, 0, conn.outLength);
-            if(!noBody && deferredLength > 0) {
+            if (!noBody && deferredLength > 0) {
                 writeTo(fd, session, deferred, 0, deferredLength);
             }
             return;
         }
-        if(response.fileFd < 0 && !noBody
+        if (response.fileFd < 0 && !noBody
                 && response.body.length > 0
                 && response.body.length <= COMBINED_WRITE_LIMIT) {
             conn.put(response.body, 0, response.body.length);
@@ -7863,28 +7502,26 @@ public final class HttpServer {
         }
         writeTo(fd, session, conn.out, 0, conn.outLength);
 
-        if(response.fileFd >= 0) {
+        if (response.fileFd >= 0) {
             // Closed by writeResponse, whatever happens here -- including a send
             // that fails halfway, and including the writes above that never reach
             // this branch at all.
-            if(!noBody) {
+            if (!noBody) {
                 StaticFiles.sendBody(fd, session, response.fileFd, response.fileOffset, response.fileLength);
             }
             return;
         }
-        if(!noBody && response.body.length > 0) {
+        if (!noBody && response.body.length > 0) {
             writeTo(fd, session, response.body, 0, response.body.length);
         }
     }
 
-    /** Pre-encoded: this goes out on the body path of every expecting client. */
+    /// Pre-encoded: this goes out on the body path of every expecting client.
     private static final byte[] CONTINUE_100 = asciiBytes("HTTP/1.1 100 Continue\r\n\r\n");
 
-    /**
-     * The response head's fixed bytes, encoded once at class init instead of
-     * character by character per response. CN1_HTTP_FAST_HEADERS=0 restores the
-     * per-character path, which is what the measurement compares against.
-     */
+    /// The response head's fixed bytes, encoded once at class init instead of
+    /// character by character per response. CN1_HTTP_FAST_HEADERS=0 restores the
+    /// per-character path, which is what the measurement compares against.
     private static final boolean FAST_HEADERS = envInt("CN1_HTTP_FAST_HEADERS", 1) != 0;
     private static final byte[] H_STATUS_200 = asciiBytes("HTTP/1.1 200 OK");
     private static final byte[] H_VERSION    = asciiBytes("HTTP/1.1 ");
@@ -7897,44 +7534,42 @@ public final class HttpServer {
 
     private static byte[] asciiBytes(String value) {
         byte[] out = new byte[value.length()];
-        for(int iter = 0 ; iter < out.length ; iter++) {
-            out[iter] = (byte)value.charAt(iter);
+        for (int iter = 0 ; iter < out.length ; iter++) {
+            out[iter] = (byte) value.charAt(iter);
         }
         return out;
     }
 
-    /**
-     * True when the joined Transfer-Encoding list ends in `chunked` and carries
-     * nothing this server cannot decode.
-     *
-     * Throws rather than returning false for a list it will not act on: silently
-     * ignoring a coding leaves the body to be read as the next request on the
-     * connection, which is the smuggling case this exists to close.
-     */
+    /// True when the joined Transfer-Encoding list ends in `chunked` and carries
+    /// nothing this server cannot decode.
+    ///
+    /// Throws rather than returning false for a list it will not act on: silently
+    /// ignoring a coding leaves the body to be read as the next request on the
+    /// connection, which is the smuggling case this exists to close.
     private static boolean requireChunkedIsFinalCoding(String value)
             throws ProtocolException {
         String[] codings = splitOn(value, ',');
         int seen = 0;
-        for(int iter = 0 ; iter < codings.length ; iter++) {
+        for (int iter = 0 ; iter < codings.length ; iter++) {
             String coding = codings[iter].trim();
             // A transfer coding may carry parameters after a semicolon; the coding
             // itself is what decides the framing.
             int semi = coding.indexOf(';');
-            if(semi >= 0) {
+            if (semi >= 0) {
                 coding = coding.substring(0, semi).trim();
             }
-            if(coding.length() == 0) {
+            if (coding.length() == 0) {
                 continue;
             }
-            if(!"chunked".equalsIgnoreCase(coding)) {
+            if (!"chunked".equalsIgnoreCase(coding)) {
                 throw new ProtocolException(501, "unsupported transfer coding");
             }
-            if(iter != codings.length - 1) {
+            if (iter != codings.length - 1) {
                 throw new ProtocolException(400, "chunked is not the final transfer coding");
             }
             seen++;
         }
-        if(seen == 0) {
+        if (seen == 0) {
             throw new ProtocolException(400, "empty Transfer-Encoding");
         }
         return true;
@@ -7945,8 +7580,8 @@ public final class HttpServer {
     }
 
     static int indexOfByte(byte[] data, int from, int to, byte wanted) {
-        for(int iter = from ; iter < to ; iter++) {
-            if(data[iter] == wanted) {
+        for (int iter = from ; iter < to ; iter++) {
+            if (data[iter] == wanted) {
                 return iter;
             }
         }
@@ -7954,8 +7589,8 @@ public final class HttpServer {
     }
 
     static int indexOfCrLfWithin(byte[] data, int from, int to) {
-        for(int iter = from ; iter + 1 < to ; iter++) {
-            if(data[iter] == '\r' && data[iter + 1] == '\n') {
+        for (int iter = from ; iter + 1 < to ; iter++) {
+            if (data[iter] == '\r' && data[iter + 1] == '\n') {
                 return iter;
             }
         }
@@ -7968,11 +7603,11 @@ public final class HttpServer {
     }
 
     static boolean slicesEqual(byte[] data, int aStart, int aLength, int bStart, int bLength) {
-        if(aLength != bLength) {
+        if (aLength != bLength) {
             return false;
         }
-        for(int iter = 0 ; iter < aLength ; iter++) {
-            if(data[aStart + iter] != data[bStart + iter]) {
+        for (int iter = 0 ; iter < aLength ; iter++) {
+            if (data[aStart + iter] != data[bStart + iter]) {
                 return false;
             }
         }
@@ -7991,47 +7626,42 @@ public final class HttpServer {
         return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
     }
 
-    /**
-     * The case-folded bytes of an ASCII string, or null if it is not ASCII.
-     *
-     * Cached per String IDENTITY, because the callers pass literals: "connection"
-     * at a given call site is the same object every time, so the fold happens once
-     * for the life of the process rather than once per header per request. A miss
-     * simply folds again -- the cache is a hint, never a correctness dependency,
-     * which is what lets it stay lock-free.
-     */
-    /**
-     * Case-folded header names, packed END TO END in ONE byte[].
-     *
-     * Flat on purpose. An array of arrays scatters every entry across the heap and
-     * costs a pointer chase per lookup; this holds all of them contiguously, so a
-     * comparison walks memory the prefetcher already has. It is also one object for
-     * the collector to mark instead of seventeen.
-     *
-     * Keyed by String IDENTITY, because the callers pass literals -- "connection" at
-     * a given call site is the same object every time, so the fold happens once for
-     * the life of the process rather than once per header per request. A miss simply
-     * folds again: the cache is a hint, never a correctness dependency, which is
-     * what lets it stay lock-free.
-     */
+    // The case-folded bytes of an ASCII string, or null if it is not ASCII.
+    //
+    // Cached per String IDENTITY, because the callers pass literals: "connection"
+    // at a given call site is the same object every time, so the fold happens once
+    // for the life of the process rather than once per header per request. A miss
+    // simply folds again -- the cache is a hint, never a correctness dependency,
+    // which is what lets it stay lock-free.
+
+    /// Case-folded header names, packed END TO END in ONE byte\[\].
+    ///
+    /// Flat on purpose. An array of arrays scatters every entry across the heap and
+    /// costs a pointer chase per lookup; this holds all of them contiguously, so a
+    /// comparison walks memory the prefetcher already has. It is also one object for
+    /// the collector to mark instead of seventeen.
+    ///
+    /// Keyed by String IDENTITY, because the callers pass literals -- "connection" at
+    /// a given call site is the same object every time, so the fold happens once for
+    /// the life of the process rather than once per header per request. A miss simply
+    /// folds again: the cache is a hint, never a correctness dependency, which is
+    /// what lets it stay lock-free.
     private static final int FOLD_CACHE_SLOTS = 16;
 
-    /**
-     * One cached fold. Both fields are final, which is the whole point.
-     *
-     * The cache used to be three parallel static arrays and a rotating index, and
-     * a lookup returned the SLOT it had matched. The caller then compared against
-     * that slot while walking the request's headers -- a window in which another
-     * worker could retire the slot and write a different name into its bytes. Two
-     * names of equal length are then indistinguishable, so getHeader answered
-     * with the wrong field, or reported a header that was sent as absent, and
-     * nothing threw. Clearing the key first does not help a reader that already
-     * holds the index.
-     *
-     * Handing back an immutable entry closes that by construction: what the
-     * caller compares against cannot be rewritten, because nothing ever writes to
-     * a published entry.
-     */
+    /// One cached fold. Both fields are final, which is the whole point.
+    ///
+    /// The cache used to be three parallel static arrays and a rotating index, and
+    /// a lookup returned the SLOT it had matched. The caller then compared against
+    /// that slot while walking the request's headers -- a window in which another
+    /// worker could retire the slot and write a different name into its bytes. Two
+    /// names of equal length are then indistinguishable, so getHeader answered
+    /// with the wrong field, or reported a header that was sent as absent, and
+    /// nothing threw. Clearing the key first does not help a reader that already
+    /// holds the index.
+    ///
+    /// Handing back an immutable entry closes that by construction: what the
+    /// caller compares against cannot be rewritten, because nothing ever writes to
+    /// a published entry.
     private static final class Folded {
         final String key;
         final byte[] bytes;
@@ -8042,40 +7672,36 @@ public final class HttpServer {
         }
     }
 
-    /**
-     * Published by replacement, never by mutation, so a reader either sees an
-     * entry complete or does not see it at all. Two threads that fold the same
-     * name at once may lose one of the two writes; that costs a later refold and
-     * nothing else, which is what keeps this lock free.
-     */
-    private static volatile Folded[] foldCache = new Folded[0];
+    /// Published by replacement, never by mutation, so a reader either sees an
+    /// entry complete or does not see it at all. Two threads that fold the same
+    /// name at once may lose one of the two writes; that costs a later refold and
+    /// nothing else, which is what keeps this lock free.
+    private static volatile Folded[] foldCache = new Folded[0]; //NOPMD AvoidUsingVolatile - replaced whole, never mutated, see above
 
-    /**
-     * The folded bytes of `ascii`, or null when it cannot be cached -- not ASCII,
-     * or the cache is full. Null means the caller takes the general path, which
-     * is only slower.
-     */
+    /// The folded bytes of `ascii`, or null when it cannot be cached -- not ASCII,
+    /// or the cache is full. Null means the caller takes the general path, which
+    /// is only slower.
     static byte[] foldedBytes(String ascii) {
         Folded[] snapshot = foldCache;
-        for(int iter = 0 ; iter < snapshot.length ; iter++) {
+        for (Folded entry : snapshot) {
             // Identity, not equals: a given call site hands over the same constant
             // every time, so this is a pointer compare and the fold happens once
             // for the life of the process.
-            if(snapshot[iter].key == ascii) {
-                return snapshot[iter].bytes;
+            if (entry.key == ascii) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
+                return entry.bytes;
             }
         }
-        if(snapshot.length >= FOLD_CACHE_SLOTS) {
+        if (snapshot.length >= FOLD_CACHE_SLOTS) {
             return null;
         }
         int length = ascii.length();
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(ascii.charAt(iter) > 127) {
+        for (int iter = 0 ; iter < length ; iter++) {
+            if (ascii.charAt(iter) > 127) {
                 return null;
             }
         }
         byte[] bytes = new byte[length];
-        for(int iter = 0 ; iter < length ; iter++) {
+        for (int iter = 0 ; iter < length ; iter++) {
             bytes[iter] = (byte) foldAscii(ascii.charAt(iter));
         }
         Folded[] grown = new Folded[snapshot.length + 1];
@@ -8085,29 +7711,27 @@ public final class HttpServer {
         return bytes;
     }
 
-    /** Case-insensitive compare of a slice against already-folded needle bytes. */
+    /// Case-insensitive compare of a slice against already-folded needle bytes.
     static boolean sliceEqualsFolded(byte[] data, int start, int length, byte[] needle) {
-        if(length != needle.length) {
+        if (length != needle.length) {
             return false;
         }
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(foldAscii(data[start + iter] & 0xff) != needle[iter]) {
+        for (int iter = 0 ; iter < length ; iter++) {
+            if (foldAscii(data[start + iter] & 0xff) != needle[iter]) {
                 return false;
             }
         }
         return true;
     }
 
-    /**
-     * Folded compare against a constant that is ALREADY folded, so only the bytes
-     * that arrived off the socket have to be folded here.
-     */
+    /// Folded compare against a constant that is ALREADY folded, so only the bytes
+    /// that arrived off the socket have to be folded here.
     static boolean sliceEqualsIgnoreCase(byte[] data, int start, int length, byte[] asciiLower) {
-        if(length != asciiLower.length) {
+        if (length != asciiLower.length) {
             return false;
         }
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(foldAscii(data[start + iter] & 0xff) != (asciiLower[iter] & 0xff)) {
+        for (int iter = 0 ; iter < length ; iter++) {
+            if (foldAscii(data[start + iter] & 0xff) != (asciiLower[iter] & 0xff)) {
                 return false;
             }
         }
@@ -8115,11 +7739,11 @@ public final class HttpServer {
     }
 
     static boolean sliceEqualsIgnoreCase(byte[] data, int start, int length, String ascii) {
-        if(length != ascii.length()) {
+        if (length != ascii.length()) {
             return false;
         }
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(foldAscii(data[start + iter] & 0xff) != foldAscii(ascii.charAt(iter))) {
+        for (int iter = 0 ; iter < length ; iter++) {
+            if (foldAscii(data[start + iter] & 0xff) != foldAscii(ascii.charAt(iter))) {
                 return false;
             }
         }
@@ -8128,71 +7752,67 @@ public final class HttpServer {
 
     static boolean sliceContainsIgnoreCase(byte[] data, int start, int length, String ascii) {
         int needle = ascii.length();
-        if(needle == 0 || needle > length) {
+        if (needle == 0 || needle > length) {
             return needle == 0;
         }
         int last = start + length - needle;
-        for(int at = start ; at <= last ; at++) {
+        for (int at = start ; at <= last ; at++) {
             int iter = 0;
-            while(iter < needle
+            while (iter < needle
                     && foldAscii(data[at + iter] & 0xff) == foldAscii(ascii.charAt(iter))) {
                 iter++;
             }
-            if(iter == needle) {
+            if (iter == needle) {
                 return true;
             }
         }
         return false;
     }
 
-    /**
-     * A non-negative decimal from a slice, or -1 when it is not one.
-     *
-     * Integer.parseInt would need a String first, which is the allocation this
-     * whole representation exists to avoid -- and it is on the path of every
-     * request that carries a body.
-     */
+    /// A non-negative decimal from a slice, or -1 when it is not one.
+    ///
+    /// Integer.parseInt would need a String first, which is the allocation this
+    /// whole representation exists to avoid -- and it is on the path of every
+    /// request that carries a body.
     static int sliceToInt(byte[] data, int start, int length) {
-        if(length <= 0 || length > 10) {
+        if (length <= 0 || length > 10) {
             return -1;
         }
         long value = 0;
-        for(int iter = 0 ; iter < length ; iter++) {
+        for (int iter = 0 ; iter < length ; iter++) {
             int c = data[start + iter] & 0xff;
-            if(c < '0' || c > '9') {
+            if (c < '0' || c > '9') {
                 return -1;
             }
             value = value * 10 + (c - '0');
-            if(value > Integer.MAX_VALUE) {
+            if (value > Integer.MAX_VALUE) {
                 return -1;
             }
         }
-        return (int)value;
+        return (int) value;
     }
 
-    /**
-     * The request target as a String, memoised PER CONNECTION.
-     *
-     * A connection asks for the same handful of targets over and over, so this is a
-     * hit almost every time and the steady state allocates nothing. A miss does
-     * exactly what the code did before and is only slower, never wrong.
-     *
-     * Worth doing because the target was the last per-request String on the
-     * plaintext path, and it cost three objects rather than one: asciiString builds
-     * a char[] and String's public constructor copies it into a second.
-     *
-     * PER CONNECTION rather than one shared static table, and that is a
-     * correctness requirement rather than a preference. `java.lang.String.value` is
-     * NOT final in this runtime (only offset and count are), so a String published
-     * through an unsynchronised static array can be observed by another worker with
-     * a null value -- on arm64 that is a real reordering, not a theoretical one. A
-     * Conn reaches its next worker through the executor, which gives the
-     * happens-before edge this needs for free.
-     *
-     * Bounded, because targets are attacker controlled: a query string or path
-     * parameter makes every request unique. Past the cap it stops inserting and
-     * every miss allocates as before -- a performance cliff, never a memory one.
-     */
+    /// The request target as a String, memoised PER CONNECTION.
+    ///
+    /// A connection asks for the same handful of targets over and over, so this is a
+    /// hit almost every time and the steady state allocates nothing. A miss does
+    /// exactly what the code did before and is only slower, never wrong.
+    ///
+    /// Worth doing because the target was the last per-request String on the
+    /// plaintext path, and it cost three objects rather than one: asciiString builds
+    /// a char\[\] and String's public constructor copies it into a second.
+    ///
+    /// PER CONNECTION rather than one shared static table, and that is a
+    /// correctness requirement rather than a preference. `java.lang.String.value` is
+    /// NOT final in this runtime (only offset and count are), so a String published
+    /// through an unsynchronised static array can be observed by another worker with
+    /// a null value -- on arm64 that is a real reordering, not a theoretical one. A
+    /// Conn reaches its next worker through the executor, which gives the
+    /// happens-before edge this needs for free.
+    ///
+    /// Bounded, because targets are attacker controlled: a query string or path
+    /// parameter makes every request unique. Past the cap it stops inserting and
+    /// every miss allocates as before -- a performance cliff, never a memory one.
     // DEFAULT OFF. Measured against the same binary at 16 connections, the cache
     // is worth +24% when the zero-copy read is on (159,291 vs 128,111) and -6%
     // when it is off (172,681 vs 183,406). Since the zero-copy read is itself off
@@ -8200,238 +7820,211 @@ public final class HttpServer {
     // Kept behind a switch rather than deleted because the allocation it removes is
     // real -- 2 char[] and a String per request -- and a cheaper lookup might yet
     // win; what is NOT supported is turning it on without re-measuring.
-    /**
-     * On by default. Sixty-four slots per connection, one reference each.
-     *
-     * With this at 0 internTarget takes its disabled path and calls asciiString
-     * for EVERY request, which allocates a char[], a String and the String's own
-     * storage. A per-class allocation profile of /plaintext at 64 connections put
-     * char[] + String + byte[] at 57% of all bytes allocated -- 424MB, 123MB and
-     * 302MB against a 1.49GB total -- and the request target is the only thing
-     * left materialising on that path once the keep-alive check stopped doing it.
-     *
-     * A benchmark client sends a handful of distinct targets, and a real service
-     * has a bounded route set, so the slot array is small and the hit rate is
-     * high. 64 references per connection is 512 bytes, against the ~180 bytes per
-     * REQUEST the miss path was costing.
-     *
-     * MEASURED: paired A/B, arms alternated inside each rep, six readings at 64
-     * and 256 connections -- +7% to +13% throughput, 6 of 6 in favour, p99 better
-     * in 5 of 6, and allocation 639 -> 411 bytes per request with String
-     * allocations falling from 2,575,425 to 542. The backend suite passed twice.
-     *
-     * NOT MEASURED: a workload whose targets are all DISTINCT, which is what
-     * query strings produce and what an attacker can force. Five attempts to
-     * measure it failed for harness reasons rather than server ones -- 404s reply
-     * Connection: close so varied targets tore down the connection, and driving
-     * wrk from Lua produced 1.5M write errors against 20k requests. The arm is
-     * still worth building if this ever looks suspect.
-     *
-     * What the MISS path costs, from the code rather than a measurement: a hash
-     * over the target, a length compare that fails immediately, then exactly the
-     * asciiString the disabled path performs, plus a reference store. So a miss
-     * adds one pass over a short byte range and allocates nothing extra -- it
-     * cannot allocate MORE than the cache being off, because it stores the very
-     * String that path would have created. That bounds the worst case to a small
-     * constant, which is why this ships on rather than off.
-     *
-     * CN1_HTTP_TARGET_CACHE=0 restores the old behaviour for A/B.
-     */
+    /// On by default. Sixty-four slots per connection, one reference each.
+    ///
+    /// With this at 0 internTarget takes its disabled path and calls asciiString
+    /// for EVERY request, which allocates a char\[\], a String and the String's own
+    /// storage. A per-class allocation profile of /plaintext at 64 connections put
+    /// char\[\] + String + byte\[\] at 57% of all bytes allocated -- 424MB, 123MB and
+    /// 302MB against a 1.49GB total -- and the request target is the only thing
+    /// left materialising on that path once the keep-alive check stopped doing it.
+    ///
+    /// A benchmark client sends a handful of distinct targets, and a real service
+    /// has a bounded route set, so the slot array is small and the hit rate is
+    /// high. 64 references per connection is 512 bytes, against the ~180 bytes per
+    /// REQUEST the miss path was costing.
+    ///
+    /// MEASURED: paired A/B, arms alternated inside each rep, six readings at 64
+    /// and 256 connections -- +7% to +13% throughput, 6 of 6 in favour, p99 better
+    /// in 5 of 6, and allocation 639 -> 411 bytes per request with String
+    /// allocations falling from 2,575,425 to 542. The backend suite passed twice.
+    ///
+    /// NOT MEASURED: a workload whose targets are all DISTINCT, which is what
+    /// query strings produce and what an attacker can force. Five attempts to
+    /// measure it failed for harness reasons rather than server ones -- 404s reply
+    /// Connection: close so varied targets tore down the connection, and driving
+    /// wrk from Lua produced 1.5M write errors against 20k requests. The arm is
+    /// still worth building if this ever looks suspect.
+    ///
+    /// What the MISS path costs, from the code rather than a measurement: a hash
+    /// over the target, a length compare that fails immediately, then exactly the
+    /// asciiString the disabled path performs, plus a reference store. So a miss
+    /// adds one pass over a short byte range and allocates nothing extra -- it
+    /// cannot allocate MORE than the cache being off, because it stores the very
+    /// String that path would have created. That bounds the worst case to a small
+    /// constant, which is why this ships on rather than off.
+    ///
+    /// CN1_HTTP_TARGET_CACHE=0 restores the old behaviour for A/B.
     private static final int TARGET_CACHE_SLOTS =
             envIntAtLeast("CN1_HTTP_TARGET_CACHE", 64, 0);
 
-    /**
-     * The longest target worth memoising, and worth HOLDING.
-     *
-     * A route repeated on one connection is short; a target near MAX_HEADER_BYTES
-     * is not a route, it is a query string, and caching sixty-four of those would
-     * let a client that never sends a body hold megabytes per connection for as
-     * long as it keeps the connection open. 512 leaves ample room for a real path
-     * with parameters and none for that.
-     */
+    /// The longest target worth memoising, and worth HOLDING.
+    ///
+    /// A route repeated on one connection is short; a target near MAX_HEADER_BYTES
+    /// is not a route, it is a query string, and caching sixty-four of those would
+    /// let a client that never sends a body hold megabytes per connection for as
+    /// long as it keeps the connection open. 512 leaves ample room for a real path
+    /// with parameters and none for that.
     private static final int MAX_CACHED_TARGET_BYTES = 512;
 
-    /**
-     * The largest per-connection buffer worth carrying across an idle wait.
-     *
-     * The head buffer and the body sink both grow to fit and never shrink, which
-     * is what makes them cheap per request. Across a wait that may last as long as
-     * the client likes, a buffer sized by one big response is just retention, so
-     * anything past this is dropped and rebuilt. Comfortably above
-     * COMBINED_WRITE_LIMIT, so the steady-state buffers survive.
-     */
+    /// The largest per-connection buffer worth carrying across an idle wait.
+    ///
+    /// The head buffer and the body sink both grow to fit and never shrink, which
+    /// is what makes them cheap per request. Across a wait that may last as long as
+    /// the client likes, a buffer sized by one big response is just retention, so
+    /// anything past this is dropped and rebuilt. Comfortably above
+    /// COMBINED_WRITE_LIMIT, so the steady-state buffers survive.
     static final int MAX_IDLE_BUFFER_BYTES = 16 * 1024;
 
-    /**
-     * Read straight into the thread's reusable buffer instead of a fresh array.
-     * A switch because it is the kind of change that has to be A/B measurable
-     * against the allocation it removes -- an optimisation that costs more than it
-     * saves looks exactly like one that works until somebody measures the thing it
-     * was supposed to improve.
-     */
-    /**
-     * Read straight into the thread's reusable buffer instead of a fresh array.
-     *
-     * ON by default. It removes 95% of the per-request byte[] allocations
-     * (1.04 to 0.054 per request).
-     *
-     * MODES, because the throughput answer turned out to depend on the route and
-     * two earlier readings here were both wrong:
-     *
-     *   0  read with recv() into the worker's reusable scratch, then copy into a
-     *      fresh byte[] sized to the read. Allocates once per request.
-     *   1  read straight into this thread's foreign (off-heap) buffer and parse
-     *      where the bytes land. Allocates nothing.
-     *   2  DIAGNOSTIC. Identical native to mode 1, identical Java to mode 0: read
-     *      into the foreign buffer and immediately copy it into a heap array. It
-     *      exists to split mode 1's two differences from mode 0 -- the syscall and
-     *      the off-heap object living in a Java field -- because measuring only 0
-     *      against 1 cannot say which of them moved the number.
-     *
-     * Paired measurement on an idle Linux box, same binary, 3 reps, median req/s:
-     *
-     *   /plaintext   mode 0 = 262961   mode 1 = 233800   mode 1 is 11% SLOWER
-     *   /json        mode 0 = 167851   mode 1 = 176876   mode 1 is  5% FASTER
-     *
-     * That split is the whole reason the modes are here. Earlier comments in this
-     * spot claimed first a flat 30% loss and then no cost at all; the first was
-     * measured against a machine running a compile, the second was an A/B too
-     * noisy to resolve an 11% effect and should have been reported as a failed
-     * measurement rather than a result.
-     *
-     * WHAT THE BISECTION FOUND. Mode 2 lands on mode 0 on BOTH routes -- 250962
-     * against 249524 on /plaintext, 159168 against 158972 on /json -- so the
-     * native read costs nothing and is not what moved either number. Since mode 2
-     * differs from mode 1 only in copying the bytes into a heap array, the whole
-     * effect, in both directions, is the cost of keeping a FOREIGN off-heap array
-     * in a Java field:
-     *
-     *   /json        mode 1 gains 5.3% over mode 2 -- the route is allocation
-     *                bound, so not allocating a per-request array is worth more
-     *                than the collector's extra work.
-     *   /plaintext   mode 1 loses 4.2% to mode 2 -- little GC pressure here, so
-     *                the saved allocation buys little while the off-heap cost is
-     *                paid on every traversal: `Conn.buffer` points outside the
-     *                heap, so the fast range check in the mark path fails and the
-     *                object has to be resolved as an immortal root instead.
-     *
-     * The default is therefore a judgement about the workload rather than a fact
-     * about the code, which is why the switch is left in place.
-     */
+    // Read straight into the thread's reusable buffer instead of a fresh array.
+    // A switch because it is the kind of change that has to be A/B measurable
+    // against the allocation it removes -- an optimisation that costs more than it
+    // saves looks exactly like one that works until somebody measures the thing it
+    // was supposed to improve.
+
+    /// Read straight into the thread's reusable buffer instead of a fresh array.
+    ///
+    /// ON by default. It removes 95% of the per-request byte\[\] allocations
+    /// (1.04 to 0.054 per request).
+    ///
+    /// MODES, because the throughput answer turned out to depend on the route and
+    /// two earlier readings here were both wrong:
+    ///
+    /// 0  read with recv() into the worker's reusable scratch, then copy into a
+    /// fresh byte\[\] sized to the read. Allocates once per request.
+    /// 1  read straight into this thread's foreign (off-heap) buffer and parse
+    /// where the bytes land. Allocates nothing.
+    /// 2  DIAGNOSTIC. Identical native to mode 1, identical Java to mode 0: read
+    /// into the foreign buffer and immediately copy it into a heap array. It
+    /// exists to split mode 1's two differences from mode 0 -- the syscall and
+    /// the off-heap object living in a Java field -- because measuring only 0
+    /// against 1 cannot say which of them moved the number.
+    ///
+    /// Paired measurement on an idle Linux box, same binary, 3 reps, median req/s:
+    ///
+    /// /plaintext   mode 0 = 262961   mode 1 = 233800   mode 1 is 11% SLOWER
+    /// /json        mode 0 = 167851   mode 1 = 176876   mode 1 is  5% FASTER
+    ///
+    /// That split is the whole reason the modes are here. Earlier comments in this
+    /// spot claimed first a flat 30% loss and then no cost at all; the first was
+    /// measured against a machine running a compile, the second was an A/B too
+    /// noisy to resolve an 11% effect and should have been reported as a failed
+    /// measurement rather than a result.
+    ///
+    /// WHAT THE BISECTION FOUND. Mode 2 lands on mode 0 on BOTH routes -- 250962
+    /// against 249524 on /plaintext, 159168 against 158972 on /json -- so the
+    /// native read costs nothing and is not what moved either number. Since mode 2
+    /// differs from mode 1 only in copying the bytes into a heap array, the whole
+    /// effect, in both directions, is the cost of keeping a FOREIGN off-heap array
+    /// in a Java field:
+    ///
+    /// /json        mode 1 gains 5.3% over mode 2 -- the route is allocation
+    /// bound, so not allocating a per-request array is worth more
+    /// than the collector's extra work.
+    /// /plaintext   mode 1 loses 4.2% to mode 2 -- little GC pressure here, so
+    /// the saved allocation buys little while the off-heap cost is
+    /// paid on every traversal: `Conn.buffer` points outside the
+    /// heap, so the fast range check in the mark path fails and the
+    /// object has to be resolved as an immortal root instead.
+    ///
+    /// The default is therefore a judgement about the workload rather than a fact
+    /// about the code, which is why the switch is left in place.
     private static final int ZERO_COPY_MODE = envInt("CN1_HTTP_ZERO_COPY", 1);
-    /**
-     * On under virtual threads too, since the reason it was not is gone.
-     *
-     * WHAT THIS USED TO SAY, AND WHY IT WAS WRONG. It read that combining the two
-     * was unsafe because the zero-copy read hands back a HOST thread's buffer and
-     * a virtual thread could resume elsewhere, and it cited an attempt that
-     * "passed the virtual-thread suite 21/21 and then produced a TRUNCATED
-     * RESPONSE on the dispatching path: authGuardsMutatingRoutes read a reply it
-     * could not parse, once".
-     *
-     * That truncation was not the buffer refactor. It was the missing
-     * parsedFromBuffer guard in fill() -- see the comment there, which records
-     * the same two symptoms (transactionRollsBack timing out at 15.05s with
-     * status -1, authGuardsMutatingRoutes reading an empty body, about 2 runs in
-     * 6) and says in as many words that it "never appeared under virtual threads
-     * because ZERO_COPY_READ is off there". Turning zero-copy on under virtual
-     * threads is exactly what first exposed that bug; the refactor was blamed,
-     * reverted, and the real defect found and fixed afterwards without anyone
-     * going back to correct the verdict.
-     *
-     * The sharing hazard is handled by that same guard rather than by keeping the
-     * paths apart. Several virtual threads do multiplex onto one host thread, but
-     * fill() either releases the borrow when nothing has been parsed out of it or
-     * calls detachPreservingOffsets before any second read, so a virtual thread
-     * that parks mid-request already owns a private copy and no other thread's
-     * read can overwrite live slices.
-     *
-     * What it costs to leave off: a per-request byte[] copy on every request. The
-     * census measured 223 bytes per request when this path was copying and none
-     * when it was not, against 662 bytes per request total on /plaintext.
-     *
-     * CN1_HTTP_ZERO_COPY=0 still disables it entirely.
-     */
+    /// On under virtual threads too, since the reason it was not is gone.
+    ///
+    /// WHAT THIS USED TO SAY, AND WHY IT WAS WRONG. It read that combining the two
+    /// was unsafe because the zero-copy read hands back a HOST thread's buffer and
+    /// a virtual thread could resume elsewhere, and it cited an attempt that
+    /// "passed the virtual-thread suite 21/21 and then produced a TRUNCATED
+    /// RESPONSE on the dispatching path: authGuardsMutatingRoutes read a reply it
+    /// could not parse, once".
+    ///
+    /// That truncation was not the buffer refactor. It was the missing
+    /// parsedFromBuffer guard in fill() -- see the comment there, which records
+    /// the same two symptoms (transactionRollsBack timing out at 15.05s with
+    /// status -1, authGuardsMutatingRoutes reading an empty body, about 2 runs in
+    /// 6) and says in as many words that it "never appeared under virtual threads
+    /// because ZERO_COPY_READ is off there". Turning zero-copy on under virtual
+    /// threads is exactly what first exposed that bug; the refactor was blamed,
+    /// reverted, and the real defect found and fixed afterwards without anyone
+    /// going back to correct the verdict.
+    ///
+    /// The sharing hazard is handled by that same guard rather than by keeping the
+    /// paths apart. Several virtual threads do multiplex onto one host thread, but
+    /// fill() either releases the borrow when nothing has been parsed out of it or
+    /// calls detachPreservingOffsets before any second read, so a virtual thread
+    /// that parks mid-request already owns a private copy and no other thread's
+    /// read can overwrite live slices.
+    ///
+    /// What it costs to leave off: a per-request byte\[\] copy on every request. The
+    /// census measured 223 bytes per request when this path was copying and none
+    /// when it was not, against 662 bytes per request total on /plaintext.
+    ///
+    /// CN1_HTTP_ZERO_COPY=0 still disables it entirely.
     private static final boolean ZERO_COPY_READ = ZERO_COPY_MODE != 0;
 
-    /**
-     * Reuse one Request per connection instead of allocating one per request.
-     *
-     * Request and Response were the whole of what /plaintext still allocated once
-     * the borrowed-buffer copy went -- 80 and 88 bytes, one of each, every
-     * request -- so this is half of what was left. The allocation half is exact
-     * and was measured directly: Request disappears from the profile and the
-     * route falls from 168.2 to 88.2 bytes per request. Throughput, thirteen
-     * interleaved pairs in one binary with the arm order rotating, is a median
-     * +13.6% and ahead in 12 of 13, p99 better in 10.
-     *
-     * A profiled build shows only +2.3% for the same change, and that is not a
-     * contradiction: the profiler taxes every allocation, so the server is slower,
-     * allocates less per second, and the collector it is being spared matters
-     * less. The non-profiled figure is the one that describes a real deployment.
-     *
-     * CN1_HTTP_POOL_REQUEST=0 restores the allocating path -- kept for the same
-     * reason ZERO_COPY_MODE keeps its switch, so the comparison stays runnable
-     * rather than having to be rebuilt.
-     */
+    /// Reuse one Request per connection instead of allocating one per request.
+    ///
+    /// Request and Response were the whole of what /plaintext still allocated once
+    /// the borrowed-buffer copy went -- 80 and 88 bytes, one of each, every
+    /// request -- so this is half of what was left. The allocation half is exact
+    /// and was measured directly: Request disappears from the profile and the
+    /// route falls from 168.2 to 88.2 bytes per request. Throughput, thirteen
+    /// interleaved pairs in one binary with the arm order rotating, is a median
+    /// +13.6% and ahead in 12 of 13, p99 better in 10.
+    ///
+    /// A profiled build shows only +2.3% for the same change, and that is not a
+    /// contradiction: the profiler taxes every allocation, so the server is slower,
+    /// allocates less per second, and the collector it is being spared matters
+    /// less. The non-profiled figure is the one that describes a real deployment.
+    ///
+    /// CN1_HTTP_POOL_REQUEST=0 restores the allocating path -- kept for the same
+    /// reason ZERO_COPY_MODE keeps its switch, so the comparison stays runnable
+    /// rather than having to be rebuilt.
     private static final boolean POOL_REQUEST = envInt("CN1_HTTP_POOL_REQUEST", 1) != 0;
 
     static String asciiString(byte[] data, int start, int length) {
         char[] chars = new char[length];
-        for(int iter = 0 ; iter < length ; iter++) {
-            chars[iter] = (char)(data[start + iter] & 0xff);
+        for (int iter = 0 ; iter < length ; iter++) {
+            chars[iter] = (char) (data[start + iter] & 0xff);
         }
         return new String(chars);
     }
 
     static String lowerCaseString(byte[] data, int start, int length) {
         char[] chars = new char[length];
-        for(int iter = 0 ; iter < length ; iter++) {
-            chars[iter] = (char)foldAscii(data[start + iter] & 0xff);
+        for (int iter = 0 ; iter < length ; iter++) {
+            chars[iter] = (char) foldAscii(data[start + iter] & 0xff);
         }
         return new String(chars);
     }
 
-    /**
-     * The interned constant for a known method, or null.
-     *
-     * Returning a constant rather than a fresh String means the common methods
-     * cost nothing, and it makes the identity comparisons elsewhere in this file
-     * safe as well as the equals ones.
-     */
+    /// The interned constant for a known method, or null.
+    ///
+    /// Returning a constant rather than a fresh String means the common methods
+    /// cost nothing, and it makes the identity comparisons elsewhere in this file
+    /// safe as well as the equals ones.
     static String knownMethod(byte[] data, int start, int length) {
         // The folded compare that used to guard this one was redundant: an EXACT
         // match implies a folded match, so it could only ever agree with the test
         // below it, at the cost of a second walk of the same bytes -- with a
         // foldAscii call per character on both sides -- for every request.
-        for(int iter = 0 ; iter < KNOWN_METHOD_BYTES.length ; iter++) {
-            if(sliceEquals(data, start, length, KNOWN_METHOD_BYTES[iter])) {
+        for (int iter = 0 ; iter < KNOWN_METHOD_BYTES.length ; iter++) {
+            if (sliceEquals(data, start, length, KNOWN_METHOD_BYTES[iter])) {
                 return KNOWN_METHODS[iter];
             }
         }
         return null;
     }
 
-    /** Exact, not folded: HTTP methods are case SENSITIVE. */
-    /** Exact compare against a constant already held as bytes. */
+    /// Exact compare against a constant already held as bytes. Exact, not
+    /// folded: HTTP methods are case SENSITIVE.
     private static boolean sliceEquals(byte[] data, int start, int length, byte[] ascii) {
-        if(length != ascii.length) {
+        if (length != ascii.length) {
             return false;
         }
-        for(int iter = 0 ; iter < length ; iter++) {
-            if(data[start + iter] != ascii[iter]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean sliceEquals(byte[] data, int start, int length, String ascii) {
-        if(length != ascii.length()) {
-            return false;
-        }
-        for(int iter = 0 ; iter < length ; iter++) {
-            if((data[start + iter] & 0xff) != ascii.charAt(iter)) {
+        for (int iter = 0 ; iter < length ; iter++) {
+            if (data[start + iter] != ascii[iter]) {
                 return false;
             }
         }
@@ -8439,7 +8032,7 @@ public final class HttpServer {
     }
 
     private static String reason(int status) {
-        switch(status) {
+        switch (status) {
             case 200: return "OK";
             case 201: return "Created";
             case 204: return "No Content";
@@ -8457,8 +8050,8 @@ public final class HttpServer {
     }
 
     private static int indexOfHeaderEnd(byte[] data, int from) {
-        for(int iter = from ; iter + 3 < data.length ; iter++) {
-            if(data[iter] == '\r' && data[iter + 1] == '\n'
+        for (int iter = from ; iter + 3 < data.length ; iter++) {
+            if (data[iter] == '\r' && data[iter + 1] == '\n'
                     && data[iter + 2] == '\r' && data[iter + 3] == '\n') {
                 return iter;
             }
@@ -8466,33 +8059,12 @@ public final class HttpServer {
         return -1;
     }
 
-    private static String[] splitLines(String value) {
-        List parts = new ArrayList();
-        int pos = 0;
-        while(true) {
-            int next = value.indexOf("\r\n", pos);
-            if(next < 0) {
-                if(pos < value.length()) {
-                    parts.add(value.substring(pos));
-                }
-                break;
-            }
-            parts.add(value.substring(pos, next));
-            pos = next + 2;
-        }
-        String[] out = new String[parts.size()];
-        for(int iter = 0 ; iter < out.length ; iter++) {
-            out[iter] = (String)parts.get(iter);
-        }
-        return out;
-    }
-
     private static String[] splitOn(String value, char sep) {
         List parts = new ArrayList();
         int pos = 0;
-        while(true) {
+        while (true) {
             int next = value.indexOf(sep, pos);
-            if(next < 0) {
+            if (next < 0) {
                 parts.add(value.substring(pos));
                 break;
             }
@@ -8500,8 +8072,8 @@ public final class HttpServer {
             pos = next + 1;
         }
         String[] out = new String[parts.size()];
-        for(int iter = 0 ; iter < out.length ; iter++) {
-            out[iter] = (String)parts.get(iter);
+        for (int iter = 0 ; iter < out.length ; iter++) {
+            out[iter] = (String) parts.get(iter);
         }
         return out;
     }

@@ -27,7 +27,8 @@ import java.util.List;
 /// Pre-flight gate that inspects messages before they're sent to the
 /// model. Implementations may call a moderation API, run a local
 /// profanity match, or anything else. Returning a non-null reason
-/// blocks the chat call and propagates an [LlmInvalidRequestException].
+/// blocks the chat call and propagates an [LlmException] whose
+/// [LlmException#getType()] is `INVALID_REQUEST`.
 public interface SafetyFilter {
     /// Returns `null` to allow the call, or a human-readable reason
     /// string to block it.

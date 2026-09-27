@@ -63,8 +63,6 @@ import java.util.Map;
 /// <p>The default {@link SizeMode#SHRINK} makes the component as tall as its wrapped content at the
 /// width it is given (ideal inside a scrollable {@code Form}); {@link SizeMode#SCROLL} keeps the
 /// component at the size its parent assigns and scrolls its content vertically.</p>
-///
-/// @author Codename One
 public class RichTextComponent extends Component {
 
     /// Controls how the component sizes itself relative to its content.

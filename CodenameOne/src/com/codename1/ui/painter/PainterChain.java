@@ -32,8 +32,6 @@ import java.util.Vector;
 
 /// A painter chain allows us to chain together several painters to provide a
 /// "layer" effect where each painter only draws one element.
-///
-/// @author Shai Almog
 public class PainterChain implements Painter {
 
     private Painter[] chain;

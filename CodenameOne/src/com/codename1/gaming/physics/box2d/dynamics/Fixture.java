@@ -41,8 +41,6 @@ import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactEdge;
 /// collision filters, etc. Fixtures are created via Body::CreateFixture.
 ///
 /// @warning you cannot reuse fixtures.
-///
-/// @author daniel
 public class Fixture {
 
   public float m_density;
@@ -91,8 +89,7 @@ public class Fixture {
 
   /// Is this fixture a sensor (non-solid)?
   ///
-  /// @return the true if the shape is a sensor.
-  /// @return
+  /// @return true if the shape is a sensor.
   public boolean isSensor() {
     return m_isSensor;
   }
@@ -160,7 +157,6 @@ public class Fixture {
   /// Get the parent body of this fixture. This is NULL if the fixture is not attached.
   ///
   /// @return the parent body.
-  /// @return
   public Body getBody() {
     return m_body;
   }
@@ -168,7 +164,6 @@ public class Fixture {
   /// Get the next fixture in the parent body's fixture list.
   ///
   /// @return the next shape.
-  /// @return
   public Fixture getNext() {
     return m_next;
   }
@@ -209,8 +204,8 @@ public class Fixture {
   ///
   /// @param output the ray-cast results.
   /// @param input the ray-cast input parameters.
-  /// @param output
-  /// @param input
+  /// @param childIndex the child shape index
+  /// @return true if the ray hits the shape
   public boolean raycast(RayCastOutput output, RayCastInput input, int childIndex) {
     return m_shape.raycast(output, input, m_body.m_xf, childIndex);
   }
@@ -218,7 +213,7 @@ public class Fixture {
   /// Get the mass data for this fixture. The mass data is based on the density and the shape. The
   /// rotational inertia is about the shape's origin.
   ///
-  /// @return
+  /// @param massData receives the mass data
   public void getMassData(MassData massData) {
     m_shape.computeMass(massData, m_density);
   }
@@ -365,9 +360,9 @@ public class Fixture {
 
   /// Internal method
   ///
-  /// @param broadPhase
-  /// @param xf1
-  /// @param xf2
+  /// @param broadPhase the broad phase the proxies live in
+  /// @param transform1 the transform at the start of the step
+  /// @param transform2 the transform at the end of the step
   protected void synchronize(BroadPhase broadPhase, final Transform transform1,
       final Transform transform2) {
     if (m_proxyCount == 0) {

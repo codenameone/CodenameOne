@@ -23,8 +23,6 @@
 package com.codename1.ui.validation;
 
 /// Forces the value to be a number potentially within specific bounds
-///
-/// @author Shai Almog
 public class NumericConstraint implements Constraint {
     private final boolean dec;
     private final double minimum;

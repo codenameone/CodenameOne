@@ -79,11 +79,6 @@ import org.w3c.dom.NodeList;
 import org.xeustechnologies.jtar.TarEntry;
 import org.xeustechnologies.jtar.TarOutputStream;
 
-/**
- *
- * @author Shai Almog
- * @author Steve Hannah
- */
 public class AndroidGradleBuilder extends Executor {
 
     private static final String GRADLE_8_VERSION = "8.13";

@@ -28,18 +28,16 @@ import java.io.UnsupportedEncodingException;
 
 import com.codename1.backend.Tcp;
 
-/**
- * Buffered framing over a {@link Tcp} connection, shared by the PostgreSQL and
- * MySQL clients.
- *
- * Both protocols are length-prefixed binary, and both are read a packet at a
- * time, so an unbuffered read per field would be one system call per integer. The
- * read buffer here is what makes a row decode a memory operation.
- *
- * The two protocols disagree about byte order -- PostgreSQL is big endian and
- * MySQL little endian -- so both are provided rather than picking one and having
- * a client remember to swap.
- */
+/// Buffered framing over a [Tcp] connection, shared by the PostgreSQL and
+/// MySQL clients.
+///
+/// Both protocols are length-prefixed binary, and both are read a packet at a
+/// time, so an unbuffered read per field would be one system call per integer. The
+/// read buffer here is what makes a row decode a memory operation.
+///
+/// The two protocols disagree about byte order -- PostgreSQL is big endian and
+/// MySQL little endian -- so both are provided rather than picking one and having
+/// a client remember to swap.
 final class Wire {
     private final Tcp connection;
     private final byte[] buffer = new byte[16384];
@@ -57,15 +55,15 @@ final class Wire {
 
     // ---------------- reading ----------------
 
-    /** One byte, or -1 at end of stream. */
+    /// One byte, or -1 at end of stream.
     int read() throws IOException {
-        if(position >= limit && !fill()) {
+        if (position >= limit && !fill()) {
             return -1;
         }
         return buffer[position++] & 0xff;
     }
 
-    /** Exactly `length` bytes, or an IOException: a short packet is a protocol error. */
+    /// Exactly `length` bytes, or an IOException: a short packet is a protocol error.
     byte[] readFully(int length) throws IOException {
         byte[] target = new byte[length];
         readFully(target, 0, length);
@@ -74,8 +72,8 @@ final class Wire {
 
     void readFully(byte[] target, int offset, int length) throws IOException {
         int at = 0;
-        while(at < length) {
-            if(position >= limit && !fill()) {
+        while (at < length) {
+            if (position >= limit && !fill()) {
                 throw new IOException("The connection closed after " + at + " of "
                         + length + " bytes");
             }
@@ -87,11 +85,11 @@ final class Wire {
         }
     }
 
-    /** Discards `length` bytes without allocating for them. */
+    /// Discards `length` bytes without allocating for them.
     void skip(int length) throws IOException {
         int remaining = length;
-        while(remaining > 0) {
-            if(position >= limit && !fill()) {
+        while (remaining > 0) {
+            if (position >= limit && !fill()) {
                 throw new IOException("The connection closed while skipping");
             }
             int available = limit - position;
@@ -115,7 +113,7 @@ final class Wire {
         position = 0;
         limit = 0;
         int n = connection.read(buffer, 0, buffer.length);
-        if(n <= 0) {
+        if (n <= 0) {
             return false;
         }
         limit = n;
@@ -129,7 +127,7 @@ final class Wire {
     }
 
     void writeBytes(byte[] data) {
-        if(data != null) {
+        if (data != null) {
             out.write(data, 0, data.length);
         }
     }
@@ -163,18 +161,18 @@ final class Wire {
     }
 
     void writeLongLE(long value) {
-        for(int iter = 0 ; iter < 8 ; iter++) {
-            out.write((int)((value >> (iter * 8)) & 0xff));
+        for (int iter = 0 ; iter < 8 ; iter++) {
+            out.write((int) ((value >> (iter * 8)) & 0xff));
         }
     }
 
-    /** A NUL-terminated string, which is how both protocols carry names. */
+    /// A NUL-terminated string, which is how both protocols carry names.
     void writeCString(String value) {
         writeBytes(utf8(value));
         out.write(0);
     }
 
-    /** How many bytes are staged but not yet sent. */
+    /// How many bytes are staged but not yet sent.
     int pending() {
         return out.size();
     }
@@ -185,22 +183,22 @@ final class Wire {
         return data;
     }
 
-    /** Sends everything staged and clears the buffer. */
+    /// Sends everything staged and clears the buffer.
     void flush() throws IOException {
         byte[] data = take();
-        if(data.length > 0) {
+        if (data.length > 0) {
             connection.write(data, 0, data.length);
         }
     }
 
     static byte[] utf8(String value) {
-        if(value == null) {
+        if (value == null) {
             return new byte[0];
         }
         try {
             return value.getBytes("UTF-8");
         } catch (UnsupportedEncodingException err) {
-            throw new IllegalStateException("UTF-8 is missing");
+            throw new IllegalStateException("UTF-8 is missing", err);
         }
     }
 
@@ -208,7 +206,7 @@ final class Wire {
         try {
             return new String(data, offset, length, "UTF-8");
         } catch (UnsupportedEncodingException err) {
-            throw new IllegalStateException("UTF-8 is missing");
+            throw new IllegalStateException("UTF-8 is missing", err);
         }
     }
 

@@ -55,7 +55,6 @@ import org.cef.handler.CefLoadHandlerAdapter;
 
 /**
  * JPanel subclass that is designed to house a CEF instance.
- * @author shannah
  */
 public abstract class BrowserPanel extends CN1JPanel {
     

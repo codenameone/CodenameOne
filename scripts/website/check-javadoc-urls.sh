@@ -19,10 +19,12 @@ PUBLIC_DIR="${1:?usage: check-javadoc-urls.sh <public-dir> [port]}"
 PORT="${2:-8788}"
 WRANGLER_VERSION="${WRANGLER_VERSION:-4.129.0}"
 
-if [ ! -d "${PUBLIC_DIR}/javadoc" ]; then
-  echo "check-javadoc-urls: ${PUBLIC_DIR}/javadoc does not exist; was the API generated?" >&2
-  exit 1
-fi
+for reference in javadoc backend/javadoc; do
+  if [ ! -d "${PUBLIC_DIR}/${reference}" ]; then
+    echo "check-javadoc-urls: ${PUBLIC_DIR}/${reference} does not exist; was the API generated?" >&2
+    exit 1
+  fi
+done
 
 npx --yes "wrangler@${WRANGLER_VERSION}" pages dev "${PUBLIC_DIR}" \
   --port "${PORT}" --log-level error >/tmp/check-javadoc-urls.log 2>&1 &
@@ -50,6 +52,13 @@ URLS=(
   "/javadoc/com/codename1/ui/List.html"
   "/javadoc/com/codename1/ui/list/ListModel.html"
   "/javadoc/java/lang/String.html"
+  # The backend reference, in both spellings, and a class it shares with the
+  # client: the same /*.html handling applies one directory deeper.
+  "/backend/javadoc/"
+  "/backend/javadoc/com/codename1/backend/HttpServer.html"
+  "/backend/javadoc/com/codename1/backend/HttpServer/"
+  "/backend/javadoc/com/codename1/backend/package-summary/"
+  "/backend/javadoc/com/codename1/orm/session/Session/"
 )
 
 failures=0

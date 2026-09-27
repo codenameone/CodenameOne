@@ -37,8 +37,6 @@ package com.codename1.processing;
 ///  Get all PO numbers of orders that contain a lineitem with a price over 35
 ///
 ///  //order/lineitem[price>35]/../order/@ponum`
-///
-/// @author Eric Coolman
 class TextEvaluator extends AbstractEvaluator {
     static final String FUNC_TEXT = "text()";
 

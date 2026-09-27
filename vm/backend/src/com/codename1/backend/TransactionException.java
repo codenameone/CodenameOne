@@ -22,14 +22,12 @@
  */
 package com.codename1.backend;
 
-/**
- * A transaction could not begin, commit or roll back the way a
- * {@code @Transactional} method asked.
- *
- * <p>Unchecked, as Spring's is: a woven method keeps the signature its author
- * wrote, and that signature cannot be made to declare a failure the author never
- * saw. The subclasses name the cases a caller might want to tell apart.
- */
+/// A transaction could not begin, commit or roll back the way a
+/// `@Transactional` method asked.
+///
+/// Unchecked, as Spring's is: a woven method keeps the signature its author
+/// wrote, and that signature cannot be made to declare a failure the author never
+/// saw. The subclasses name the cases a caller might want to tell apart.
 public class TransactionException extends RuntimeException {
     public TransactionException(String message) {
         super(message);
@@ -39,27 +37,25 @@ public class TransactionException extends RuntimeException {
         super(message, cause);
     }
 
-    /**
-     * A transaction was rolled back although its own method returned normally,
-     * because a method that joined it failed and marked it rollback-only.
-     *
-     * <p>Thrown rather than returning quietly, because the outer method's caller
-     * would otherwise believe its work was committed.
-     */
+    /// A transaction was rolled back although its own method returned normally,
+    /// because a method that joined it failed and marked it rollback-only.
+    ///
+    /// Thrown rather than returning quietly, because the outer method's caller
+    /// would otherwise believe its work was committed.
     public static class UnexpectedRollback extends TransactionException {
         public UnexpectedRollback(String message) {
             super(message);
         }
     }
 
-    /** A MANDATORY method was called with no transaction, or a NEVER one inside one. */
+    /// A MANDATORY method was called with no transaction, or a NEVER one inside one.
     public static class IllegalState extends TransactionException {
         public IllegalState(String message) {
             super(message);
         }
     }
 
-    /** The transaction ran past its {@code timeout} and was rolled back. */
+    /// The transaction ran past its `timeout` and was rolled back.
     public static class TimedOut extends TransactionException {
         public TimedOut(String message) {
             super(message);

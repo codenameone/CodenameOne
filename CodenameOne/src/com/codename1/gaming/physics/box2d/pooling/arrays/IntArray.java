@@ -27,7 +27,6 @@ package com.codename1.gaming.physics.box2d.pooling.arrays;
 import java.util.HashMap;
 
 /// Not thread safe int[] pooling
-/// @author Daniel Murphy
 public class IntArray {
 	
 	private final HashMap<Integer, int[]> map = new HashMap<Integer, int[]>();

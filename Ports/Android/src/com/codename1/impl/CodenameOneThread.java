@@ -36,8 +36,6 @@ import java.util.Hashtable;
 
 /**
  * Thread class implementing the crash protection functionality
- *
- * @author Shai Almog
  */
 public class CodenameOneThread extends Thread {
     private int[] stack =  new int[500];

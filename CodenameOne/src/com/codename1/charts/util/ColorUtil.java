@@ -23,7 +23,6 @@
 
 package com.codename1.charts.util;
 
-/// @author shannah
 public abstract class ColorUtil {
     public static final int LTGRAY = IColor.LightGray.argb;
     public static final int BLUE = IColor.Blue.argb;

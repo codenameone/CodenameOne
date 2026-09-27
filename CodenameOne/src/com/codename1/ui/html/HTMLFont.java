@@ -35,8 +35,6 @@ import java.util.Vector;
 /// In addition this class keeps track of "counterpart" fonts for this font in a space of 4 attributes: BOLD, ITALIC, BIG and SMALL.
 ///
 /// For example a bold font is the BOLD counterpart of a plain one. A font with size 16 is the BIG counterpart of a font the size of 12 - provided that all other attributes are the same (i.e. an arial.16 font is not the BIG counterpart of a courier.12 etc.)
-///
-/// @author Ofir Leitner
 class HTMLFont {
 
     static final int BOLD = 0;

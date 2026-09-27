@@ -30,8 +30,6 @@ import com.codename1.gaming.physics.box2d.common.Transform;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
 /// This is used to compute the current state of a contact manifold.
-///
-/// @author daniel
 public class WorldManifold {
   /// World vector pointing from A to B
   public final Vec2 normal;

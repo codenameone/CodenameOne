@@ -24,7 +24,6 @@
 /// Created at 12:52:04 AM Jan 20, 2011
 package com.codename1.gaming.physics.box2d.pooling.normal;
 
-/// @author Daniel Murphy
 public abstract class OrderedStack<E> {
 
   private final Object[] pool;

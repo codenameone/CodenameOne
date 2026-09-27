@@ -39,10 +39,6 @@ import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.browser.Window;
 import com.codename1.html5.js.core.JSString;
 
-/**
- *
- * @author shannah
- */
 public class HTML5LocationManager extends LocationManager {
     Location lastKnownLocation;
     int listenerId;

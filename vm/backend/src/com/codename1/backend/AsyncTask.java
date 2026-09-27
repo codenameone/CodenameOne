@@ -27,20 +27,18 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/**
- * One call of an {@code @Async} method, and the {@link Future} its caller holds.
- *
- * <p>The build generates a subclass per {@code @Async} method whose fields are the
- * call's arguments and whose {@link #call} invokes the method's original body.
- * The rewritten method constructs one, hands it to its executor and returns it,
- * so the caller's {@code Future} is this object. A method whose body itself
- * returns a Future -- {@link AsyncResult#of} -- completes this one with that
- * Future's value.
- *
- * <p>The caller's span, if it was being traced, is the parent of the span the
- * call runs in, so the background work shows up under the request that started
- * it.
- */
+/// One call of an `@Async` method, and the [Future] its caller holds.
+///
+/// The build generates a subclass per `@Async` method whose fields are the
+/// call's arguments and whose [#call] invokes the method's original body.
+/// The rewritten method constructs one, hands it to its executor and returns it,
+/// so the caller's `Future` is this object. A method whose body itself
+/// returns a Future -- [AsyncResult#of] -- completes this one with that
+/// Future's value.
+///
+/// The caller's span, if it was being traced, is the parent of the span the
+/// call runs in, so the background work shows up under the request that started
+/// it.
 public abstract class AsyncTask implements Runnable, Future {
     private final String name;
     private final boolean returnsVoid;
@@ -51,23 +49,25 @@ public abstract class AsyncTask implements Runnable, Future {
     private Object value;
     private Throwable failure;
 
-    /**
-     * @param name what the span is called: the class and the method
-     * @param returnsVoid whether the method returns nothing, so a failure has
-     *        nobody to be delivered to and is reported instead
-     */
+    /// #### Parameters
+    ///
+    /// - `name`: what the span is called: the class and the method
+    ///
+    /// - `returnsVoid`: @param returnsVoid whether the method returns nothing, so a failure has
+    /// nobody to be delivered to and is reported instead
     protected AsyncTask(String name, boolean returnsVoid) {
         this.name = name;
         this.returnsVoid = returnsVoid;
         this.parent = Tracing.captureParent();
     }
 
-    /** Runs the method's body. Generated. */
+    /// Runs the method's body. Generated.
     protected abstract Object call() throws Exception;
 
+    @Override
     public final void run() {
-        synchronized(this) {
-            if(cancelled || started) {
+        synchronized (this) {
+            if (cancelled || started) {
                 return;
             }
             started = true;
@@ -76,45 +76,44 @@ public abstract class AsyncTask implements Runnable, Future {
         Throwable error = null;
         try {
             result = Tracing.inBackground(name, parent, new Tracing.Work() {
+                @Override
                 public Object run(Span span) throws Exception {
                     return call();
                 }
             });
-            if(result instanceof Future) {
-                result = ((Future)result).get();
+            if (result instanceof Future) {
+                result = ((Future) result).get();
             }
         } catch (ExecutionException err) {
             error = err.getCause() != null ? err.getCause() : err;
         } catch (Throwable err) {
             error = err;
         }
-        synchronized(this) {
+        synchronized (this) {
             value = result;
             failure = error;
             done = true;
             notifyAll();
         }
-        if(error != null && returnsVoid) {
+        if (error != null && returnsVoid) {
             // Nobody holds a Future for a void method, so the failure goes to the
             // executor running this, which reports and counts it -- the only
             // place it is ever seen.
-            if(error instanceof RuntimeException) {
-                throw (RuntimeException)error;
+            if (error instanceof RuntimeException) {
+                throw (RuntimeException) error;
             }
-            if(error instanceof Error) {
-                throw (Error)error;
+            if (error instanceof Error) {
+                throw (Error) error;
             }
             throw new RuntimeException(name + " failed: " + error, error);
         }
     }
 
-    /**
-     * Ends a call whose virtual thread the server freed at shutdown before it
-     * finished: nothing will ever complete it otherwise, and a caller blocked
-     * in get() would wait for ever.
-     */
+    /// Ends a call whose virtual thread the server freed at shutdown before it
+    /// finished: nothing will ever complete it otherwise, and a caller blocked
+    /// in get() would wait for ever.
     synchronized void abandon(String reason) {
-        if(done) {
+        if (done) {
             return;
         }
         failure = new IllegalStateException(name + ": " + reason);
@@ -122,9 +121,10 @@ public abstract class AsyncTask implements Runnable, Future {
         notifyAll();
     }
 
-    /** Cancels the call if it has not started. A running call is never interrupted. */
+    /// Cancels the call if it has not started. A running call is never interrupted.
+    @Override
     public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-        if(started || done) {
+        if (started || done) {
             return false;
         }
         cancelled = true;
@@ -133,40 +133,44 @@ public abstract class AsyncTask implements Runnable, Future {
         return true;
     }
 
+    @Override
     public synchronized boolean isCancelled() {
         return cancelled;
     }
 
+    @Override
     public synchronized boolean isDone() {
         return done;
     }
 
+    @Override
     public Object get() throws InterruptedException, ExecutionException {
-        if(VirtualThread.isVirtual()) {
+        if (VirtualThread.isVirtual()) {
             awaitCooperatively(Long.MAX_VALUE);
             return completed();
         }
-        synchronized(this) {
-            while(!done) {
+        synchronized (this) {
+            while (!done) {
                 wait();
             }
             return result();
         }
     }
 
+    @Override
     public Object get(long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
         long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
-        if(VirtualThread.isVirtual()) {
-            if(!awaitCooperatively(deadline)) {
+        if (VirtualThread.isVirtual()) {
+            if (!awaitCooperatively(deadline)) {
                 throw new TimeoutException(name + " did not finish in time");
             }
             return completed();
         }
-        synchronized(this) {
-            while(!done) {
+        synchronized (this) {
+            while (!done) {
                 long left = deadline - System.currentTimeMillis();
-                if(left <= 0) {
+                if (left <= 0) {
                     throw new TimeoutException(name + " did not finish in time");
                 }
                 wait(left);
@@ -175,22 +179,22 @@ public abstract class AsyncTask implements Runnable, Future {
         }
     }
 
-    /**
-     * Waits on a virtual thread without blocking its host.
-     *
-     * A virtual thread that called wait() would block the OS thread under it,
-     * and every other virtual thread that host runs with it -- including,
-     * quite possibly, the virtual thread running the very task being waited
-     * for. With every host stuck that way the server stops: measured, 32
-     * concurrent requests each waiting on an @Async(thread = VIRTUAL) task
-     * wedged a native server within seconds. Yielding instead gives the host
-     * back after each check, OUTSIDE the monitor, so the task can finish.
-     *
-     * @return false when the deadline passed first
-     */
+    /// Waits on a virtual thread without blocking its host.
+    ///
+    /// A virtual thread that called wait() would block the OS thread under it,
+    /// and every other virtual thread that host runs with it -- including,
+    /// quite possibly, the virtual thread running the very task being waited
+    /// for. With every host stuck that way the server stops: measured, 32
+    /// concurrent requests each waiting on an @Async(thread = VIRTUAL) task
+    /// wedged a native server within seconds. Yielding instead gives the host
+    /// back after each check, OUTSIDE the monitor, so the task can finish.
+    ///
+    /// #### Returns
+    ///
+    /// false when the deadline passed first
     private boolean awaitCooperatively(long deadline) {
-        while(!isDone()) {
-            if(System.currentTimeMillis() >= deadline) {
+        while (!isDone()) {
+            if (System.currentTimeMillis() >= deadline) {
                 return false;
             }
             VirtualThread.yieldNow();
@@ -203,15 +207,16 @@ public abstract class AsyncTask implements Runnable, Future {
     }
 
     private Object result() throws ExecutionException {
-        if(cancelled) {
+        if (cancelled) {
             throw new java.util.concurrent.CancellationException(name + " was cancelled");
         }
-        if(failure != null) {
+        if (failure != null) {
             throw new ExecutionException(failure);
         }
         return value;
     }
 
+    @Override
     public String toString() {
         return name;
     }

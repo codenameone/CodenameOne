@@ -44,10 +44,6 @@ import javax.swing.JOptionPane;
 import javax.swing.ProgressMonitor;
 import javax.swing.SwingUtilities;
 
-/**
- *
- * @author Shai Almog
- */
 public class LivePreview extends javax.swing.JDialog {
     private static String previewKey;
     private static ResourceEditorView view;

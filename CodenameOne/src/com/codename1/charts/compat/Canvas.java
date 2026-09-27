@@ -42,8 +42,6 @@ import com.codename1.ui.geom.Shape;
 /// layer.
 ///
 /// **DO NOT USE DIRECTLY**
-///
-/// @author shannah
 public class Canvas {
 
     public com.codename1.ui.Graphics g;

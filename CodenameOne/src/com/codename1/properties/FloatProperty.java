@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the float specific version of numeric property
-///
-/// @author Shai Almog
 public class FloatProperty<K> extends NumericProperty<Float, K> {
 
     /// Creates a float property with the given name.

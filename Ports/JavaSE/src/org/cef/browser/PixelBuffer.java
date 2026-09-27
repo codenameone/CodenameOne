@@ -26,7 +26,6 @@ import java.awt.image.BufferedImage;
 
 /**
  * An abstraction of a pixel buffer that the CEF browser can paint to. 
- * @author shannah
  */
 public interface PixelBuffer {
 

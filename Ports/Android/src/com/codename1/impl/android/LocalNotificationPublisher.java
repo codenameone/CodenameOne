@@ -44,10 +44,6 @@ import java.io.InputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- *
- * @author Chen
- */
 public class LocalNotificationPublisher extends BroadcastReceiver {
 
     public static String NOTIFICATION = "notification";

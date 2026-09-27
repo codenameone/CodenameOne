@@ -51,8 +51,6 @@ import com.codename1.ui.plaf.Style;
 ///         add(fillButton);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class ScaleImageButton extends Button {
 
     /// Default constructor

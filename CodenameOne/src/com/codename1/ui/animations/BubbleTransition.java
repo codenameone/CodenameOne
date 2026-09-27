@@ -84,8 +84,6 @@ import com.codename1.ui.plaf.Style;
 ///
 /// hi.show();
 /// ```
-///
-/// @author Chen
 public class BubbleTransition extends Transition {
 
     private Component originSrc;

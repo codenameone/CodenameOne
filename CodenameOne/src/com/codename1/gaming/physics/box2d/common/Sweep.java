@@ -70,7 +70,7 @@ public class Sweep {
   /// Get the interpolated transform at a specific time.
   ///
   /// @param xf the result is placed here - must not be null
-  /// @param t the normalized time in [0,1].
+  /// @param beta the normalized time in `[0,1]`.
   public final void getTransform(final Transform xf, final float beta) {
     assert (xf != null);
     // if (xf == null)

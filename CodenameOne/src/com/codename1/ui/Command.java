@@ -32,8 +32,6 @@ import java.util.HashMap;
 
 /// The Command class provides a useful extension to the ActionListener
 /// interface in cases where the same functionality may be accessed by several controls.
-///
-/// @author Nir Shabi
 public class Command implements ActionListener<ActionEvent> {
     private boolean disposesDialog = true;
     private Image icon;

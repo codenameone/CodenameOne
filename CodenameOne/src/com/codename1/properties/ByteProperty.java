@@ -24,8 +24,6 @@
 package com.codename1.properties;
 
 /// This is the byte specific version of numeric property
-///
-/// @author Shai Almog
 public class ByteProperty<K> extends NumericProperty<Byte, K> {
 
     /// Creates a byte property with the given name.

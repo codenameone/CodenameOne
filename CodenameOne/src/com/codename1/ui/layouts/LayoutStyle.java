@@ -37,8 +37,6 @@ import com.codename1.ui.Display;
 /// This class is primarily useful for JREs prior to 1.6.  In 1.6 API for this
 /// was added to Swing.  When run on a JRE of 1.6 or greater this will call into
 /// the appropriate methods in Swing.
-///
-/// @version $Revision: 1.10 $
 public class LayoutStyle {
     /// Possible argument to getPreferredGap.  Used to indicate the two components
     /// are grouped together.

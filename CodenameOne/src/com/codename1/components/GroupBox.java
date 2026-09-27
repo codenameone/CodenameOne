@@ -130,7 +130,7 @@ public class GroupBox extends Container {
         return content;
     }
 
-    /// @inheritDoc
+    /// {@inheritDoc}
     ///
     /// Routed into the content pane, so an ordinary add means "add to the group" rather than
     /// "add beside the caption". `Container#add(Component)` is final and delegates here, so
@@ -145,7 +145,7 @@ public class GroupBox extends Container {
         content.addComponent(cmp);
     }
 
-    /// @inheritDoc
+    /// {@inheritDoc}
     ///
     /// The constraint belongs to the CONTENT layout, not to the BorderLayout that positions
     /// the caption. That layout is an implementation detail, and a caller passing
@@ -160,7 +160,7 @@ public class GroupBox extends Container {
         content.addComponent(constraints, cmp);
     }
 
-    /// @inheritDoc
+    /// {@inheritDoc}
     @Override
     public void removeComponent(com.codename1.ui.Component cmp) {
         if (cmp == title || cmp == content) { //NOPMD CompareObjectsWithEquals
@@ -170,7 +170,7 @@ public class GroupBox extends Container {
         content.removeComponent(cmp);
     }
 
-    /// @inheritDoc
+    /// {@inheritDoc}
     @Override
     public void removeAll() {
         content.removeAll();

@@ -34,27 +34,21 @@ import com.codename1.backend.metrics.Instrument;
 import com.codename1.backend.metrics.MetricReader;
 import com.codename1.backend.metrics.Metrics;
 
-/**
- * Exports {@link Metrics} over OTLP/HTTP, every
- * {@code cn1.otel.metrics.intervalMillis} (OTEL_METRIC_EXPORT_INTERVAL, one minute
- * by default), with cumulative temporality.
- *
- * <p>Configured like the tracer, with the metrics-specific settings taking
- * precedence the way the OpenTelemetry specification says:
- *
- * <table>
- *   <tr><th>key</th><th>environment</th><th>default</th></tr>
- *   <tr><td>cn1.otel.metrics.endpoint</td><td>OTEL_EXPORTER_OTLP_METRICS_ENDPOINT</td>
- *       <td>cn1.otel.endpoint + /v1/metrics</td></tr>
- *   <tr><td>cn1.otel.metrics.headers</td><td>OTEL_EXPORTER_OTLP_METRICS_HEADERS</td>
- *       <td>cn1.otel.headers</td></tr>
- *   <tr><td>cn1.otel.metrics.protocol</td><td>OTEL_EXPORTER_OTLP_METRICS_PROTOCOL</td>
- *       <td>cn1.otel.protocol</td></tr>
- *   <tr><td>cn1.otel.metrics.enabled</td><td></td><td>true</td></tr>
- * </table>
- *
- * <p>{@code OTEL_SDK_DISABLED=true} turns it off with the tracer.
- */
+/// Exports [Metrics] over OTLP/HTTP, every
+/// `cn1.otel.metrics.intervalMillis` (OTEL_METRIC_EXPORT_INTERVAL, one minute
+/// by default), with cumulative temporality.
+///
+/// Configured like the tracer, with the metrics-specific settings taking
+/// precedence the way the OpenTelemetry specification says:
+///
+/// | Key | Environment | Default |
+/// |---|---|---|
+/// | `cn1.otel.metrics.endpoint` | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | `cn1.otel.endpoint` + `/v1/metrics` |
+/// | `cn1.otel.metrics.headers` | `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | `cn1.otel.headers` |
+/// | `cn1.otel.metrics.protocol` | `OTEL_EXPORTER_OTLP_METRICS_PROTOCOL` | `cn1.otel.protocol` |
+/// | `cn1.otel.metrics.enabled` | | `true` |
+///
+/// `OTEL_SDK_DISABLED=true` turns it off with the tracer.
 public final class OtlpMetricExporter implements MetricReader {
     public static final String ENABLED = "cn1.otel.metrics.enabled";
     public static final String ENDPOINT = "cn1.otel.metrics.endpoint";
@@ -64,20 +58,18 @@ public final class OtlpMetricExporter implements MetricReader {
 
     private final String defaultServiceName;
     private String endpoint;
-    private List headers;
+    private List headers = new ArrayList();
     private boolean protobuf;
     private int intervalMillis;
     private Map resource;
     private Thread thread;
     private final Object lock = new Object();
-    /**
-     * The lifecycle of one open(): a builder started again reuses this reader,
-     * and a fresh Run is what keeps the new thread from inheriting the stopped
-     * one's flags -- and an old thread still finishing its last export from
-     * being revived by the new ones.
-     */
+    /// The lifecycle of one open(): a builder started again reuses this reader,
+    /// and a fresh Run is what keeps the new thread from inheriting the stopped
+    /// one's flags -- and an old thread still finishing its last export from
+    /// being revived by the new ones.
     private Run run;
-    /** Exporters open in this process; see open(). */
+    /// Exporters open in this process; see open().
     private static final List OPEN = new ArrayList();
     private long exports;
     private long failures;
@@ -87,28 +79,29 @@ public final class OtlpMetricExporter implements MetricReader {
         this.defaultServiceName = defaultServiceName;
     }
 
+    @Override
     public boolean open(Config config) throws IOException {
-        if(config.getBoolean(OtlpTracer.DISABLED, false) || !config.getBoolean(ENABLED, true)) {
+        if (config.getBoolean(OtlpTracer.DISABLED, false) || !config.getBoolean(ENABLED, true)) {
             return false;
         }
         String protocol = config.get(PROTOCOL, config.get(OtlpTracer.PROTOCOL,
                 "http/protobuf")).trim();
-        if("http/protobuf".equals(protocol)) {
+        if ("http/protobuf".equals(protocol)) {
             protobuf = true;
-        } else if("http/json".equals(protocol)) {
+        } else if ("http/json".equals(protocol)) {
             protobuf = false;
         } else {
             throw new IOException(PROTOCOL + " is '" + protocol + "'; this server exports "
                     + "OTLP over HTTP, so use http/protobuf or http/json");
         }
         String target = config.get(ENDPOINT);
-        if(target == null || target.trim().length() == 0) {
+        if (target == null || target.trim().length() == 0) {
             target = OtlpTracer.appendSignalPath(
                     config.get(OtlpTracer.ENDPOINT, "http://localhost:4318").trim(),
                     "/v1/metrics");
         }
         endpoint = target.trim();
-        if(!OtlpTracer.hasHttpAuthority(endpoint)) {
+        if (!OtlpTracer.hasHttpAuthority(endpoint)) {
             throw new IOException("The metrics endpoint must be an http or https URL naming "
                     + "a host and is '" + BatchExporter.redact(endpoint) + "'");
         }
@@ -117,15 +110,15 @@ public final class OtlpMetricExporter implements MetricReader {
         OtlpTracer.parseHeaders(own != null ? own : config.get(OtlpTracer.HEADERS), headers);
         intervalMillis = OtlpTracer.positive(config, INTERVAL, 60000);
         resource = OtlpTracer.resource(config, defaultServiceName);
-        synchronized(OPEN) {
+        synchronized (OPEN) {
             // The instruments are the process's -- every server's requests, jobs
             // and gauges in one set -- so two exporters with different resources
             // would each send the SAME numbers under their own service name, or
             // to their own collector, and both would be wrong. One process, one
             // metrics identity; the same one twice is fine.
-            for(int iter = 0 ; iter < OPEN.size() ; iter++) {
-                OtlpMetricExporter other = (OtlpMetricExporter)OPEN.get(iter);
-                if(other != this && (!other.resource.equals(resource)
+            for (Object element : OPEN) {
+                OtlpMetricExporter other = (OtlpMetricExporter) element;
+                if (other != this && (!other.resource.equals(resource) //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
                         || !other.endpoint.equals(endpoint))) {
                     throw new IOException("Another server in this process already exports "
                             + "metrics as a different service or to a different collector. "
@@ -134,15 +127,16 @@ public final class OtlpMetricExporter implements MetricReader {
                             + "service and endpoint, or set " + ENABLED + "=false on one.");
                 }
             }
-            if(!OPEN.contains(this)) {
+            if (!OPEN.contains(this)) {
                 OPEN.add(this);
             }
         }
         final Run mine = new Run();
-        synchronized(lock) {
+        synchronized (lock) {
             run = mine;
         }
         thread = new Thread(new Runnable() {
+            @Override
             public void run() {
                 loop(mine);
             }
@@ -153,12 +147,12 @@ public final class OtlpMetricExporter implements MetricReader {
     }
 
     private void loop(Run mine) {
-        while(true) {
-            synchronized(lock) {
+        while (true) {
+            synchronized (lock) {
                 long deadline = System.currentTimeMillis() + intervalMillis;
-                while(!mine.stopping) {
+                while (!mine.stopping) {
                     long left = deadline - System.currentTimeMillis();
-                    if(left <= 0) {
+                    if (left <= 0) {
                         break;
                     }
                     try {
@@ -167,8 +161,8 @@ public final class OtlpMetricExporter implements MetricReader {
                         return;
                     }
                 }
-                if(mine.stopping) {
-                    if(!mine.finalExport) {
+                if (mine.stopping) {
+                    if (!mine.finalExport) {
                         return;
                     }
                     break;
@@ -182,7 +176,7 @@ public final class OtlpMetricExporter implements MetricReader {
         export();
     }
 
-    /** Sends one export now. Answers whether the collector accepted it. */
+    /// Sends one export now. Answers whether the collector accepted it.
     public boolean export() {
         try {
             Map request = request(resource, Metrics.instruments(), System.currentTimeMillis());
@@ -194,9 +188,9 @@ public final class OtlpMetricExporter implements MetricReader {
             lines.addAll(headers);
             Web.Result result = Web.request("POST", endpoint, lines, body);
             int status = result.getStatus();
-            synchronized(lock) {
+            synchronized (lock) {
                 exports++;
-                if(status < 200 || status >= 300) {
+                if (status < 200 || status >= 300) {
                     failures++;
                     lastError = "the collector answered " + status;
                     return false;
@@ -204,11 +198,11 @@ public final class OtlpMetricExporter implements MetricReader {
             }
             return true;
         } catch (Exception err) {
-            synchronized(lock) {
+            synchronized (lock) {
                 failures++;
                 lastError = BatchExporter.bounded("could not export metrics: "
                         + err.getMessage());
-                if(failures == 1 || failures % 100 == 0) {
+                if (failures == 1 || failures % 100 == 0) {
                     System.err.println(lastError);
                 }
             }
@@ -216,13 +210,14 @@ public final class OtlpMetricExporter implements MetricReader {
         }
     }
 
+    @Override
     public void shutdown(int timeoutMillis) {
-        synchronized(OPEN) {
+        synchronized (OPEN) {
             OPEN.remove(this);
         }
         Thread exporter;
-        synchronized(lock) {
-            if(run == null || run.stopping) {
+        synchronized (lock) {
+            if (run == null || run.stopping) {
                 return;
             }
             run.stopping = true;
@@ -233,7 +228,7 @@ public final class OtlpMetricExporter implements MetricReader {
             exporter = thread;
             lock.notifyAll();
         }
-        if(exporter != null && timeoutMillis > 0) {
+        if (exporter != null && timeoutMillis > 0) {
             try {
                 exporter.join(timeoutMillis);
             } catch (InterruptedException err) {
@@ -242,71 +237,71 @@ public final class OtlpMetricExporter implements MetricReader {
         }
     }
 
-    /** Whether one open()'s thread should stop, and whether it exports once more first. */
+    /// Whether one open()'s thread should stop, and whether it exports once more first.
     private static final class Run {
         boolean stopping;
         boolean finalExport;
     }
 
-    /** Exports attempted, failures, and the last error, for the management view. */
+    /// Exports attempted, failures, and the last error, for the management view.
     public Map status() {
         Map out = new LinkedHashMap();
-        synchronized(lock) {
+        synchronized (lock) {
             out.put("endpoint", BatchExporter.redact(endpoint));
-            out.put("exports", new Long(exports));
-            out.put("failures", new Long(failures));
-            if(lastError != null) {
+            out.put("exports", Long.valueOf(exports));
+            out.put("failures", Long.valueOf(failures));
+            if (lastError != null) {
                 out.put("lastError", lastError);
             }
         }
         return out;
     }
 
-    /** The ExportMetricsServiceRequest tree for these instruments, at {@code now}. */
+    /// The ExportMetricsServiceRequest tree for these instruments, at `now`.
     static Map request(Map resource, List instruments, long nowMillis) {
         String start = nanos(Metrics.startTimeMillis());
         String time = nanos(nowMillis);
         List metrics = new ArrayList(instruments.size());
-        for(int iter = 0 ; iter < instruments.size() ; iter++) {
-            Instrument instrument = (Instrument)instruments.get(iter);
+        for (Object item : instruments) {
+            Instrument instrument = (Instrument) item;
             Map metric = new LinkedHashMap();
             metric.put("name", instrument.getName());
-            if(instrument.getDescription().length() > 0) {
+            if (instrument.getDescription().length() > 0) {
                 metric.put("description", instrument.getDescription());
             }
-            if(instrument.getUnit().length() > 0) {
+            if (instrument.getUnit().length() > 0) {
                 metric.put("unit", instrument.getUnit());
             }
             List points = instrument.points();
             List dataPoints = new ArrayList(points.size());
-            for(int p = 0 ; p < points.size() ; p++) {
-                Map point = (Map)points.get(p);
+            for (Object entry : points) {
+                Map point = (Map) entry;
                 Map dp = new LinkedHashMap();
-                dp.put("attributes", OtlpTracer.keyValues((Map)point.get("attributes")));
-                if(instrument.getKind() != Instrument.GAUGE) {
+                dp.put("attributes", OtlpTracer.keyValues((Map) point.get("attributes")));
+                if (instrument.getKind() != Instrument.GAUGE) {
                     dp.put("startTimeUnixNano", start);
                 }
                 dp.put("timeUnixNano", time);
-                if(instrument.getKind() == Instrument.HISTOGRAM) {
+                if (instrument.getKind() == Instrument.HISTOGRAM) {
                     dp.put("count", String.valueOf(point.get("count")));
                     dp.put("sum", point.get("sum"));
-                    List buckets = (List)point.get("buckets");
+                    List buckets = (List) point.get("buckets");
                     List counts = new ArrayList(buckets.size());
-                    for(int b = 0 ; b < buckets.size() ; b++) {
-                        counts.add(String.valueOf(buckets.get(b)));
+                    for (Object element : buckets) {
+                        counts.add(String.valueOf(element));
                     }
                     dp.put("bucketCounts", counts);
                     dp.put("explicitBounds", point.get("bounds"));
-                    if(point.get("min") != null) {
+                    if (point.get("min") != null) {
                         dp.put("min", point.get("min"));
                         dp.put("max", point.get("max"));
                     }
                 } else {
                     Object value = point.get("value");
-                    if(value instanceof Double && ((Double)value).isNaN()) {
+                    if (value instanceof Double && ((Double) value).isNaN()) {
                         continue;
                     }
-                    if(value instanceof Long) {
+                    if (value instanceof Long) {
                         // as_int, exactly: through asDouble a counter past 2^53
                         // would be rounded. A string, as OTLP JSON writes int64.
                         dp.put("asInt", String.valueOf(value));
@@ -318,16 +313,16 @@ public final class OtlpMetricExporter implements MetricReader {
             }
             Map data = new LinkedHashMap();
             data.put("dataPoints", dataPoints);
-            switch(instrument.getKind()) {
+            switch (instrument.getKind()) {
                 case Instrument.GAUGE:
                     metric.put("gauge", data);
                     break;
                 case Instrument.HISTOGRAM:
-                    data.put("aggregationTemporality", new Integer(2));
+                    data.put("aggregationTemporality", Integer.valueOf(2));
                     metric.put("histogram", data);
                     break;
                 default:
-                    data.put("aggregationTemporality", new Integer(2));
+                    data.put("aggregationTemporality", Integer.valueOf(2));
                     data.put("isMonotonic", Boolean.valueOf(
                             instrument.getKind() == Instrument.COUNTER));
                     metric.put("sum", data);

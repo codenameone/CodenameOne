@@ -27,35 +27,33 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * State kept for one client across requests, found again through a cookie.
- *
- * <pre>
- *   &#64;PostMapping("/login")
- *   public void login(HttpServer.Request request, &#64;RequestBody Map body) {
- *       ...
- *       HttpSession session = request.getSession(true);
- *       session.changeSessionId();          // never keep a pre-login id
- *       session.setAttribute("user", userId);
- *   }
- * </pre>
- *
- * <p>A session is created only when something asks for one with
- * {@code getSession(true)}, so a server that never does sets no cookie and keeps
- * nothing. The cookie is {@code HttpOnly}, {@code SameSite=Lax} and, on a TLS
- * server, {@code Secure}; its name, lifetime and store are configured under
- * {@code cn1.session.*}. See {@link Sessions}.
- *
- * <p>Attributes live in the {@link SessionStore}. The in-memory store keeps any
- * object; the database store keeps what {@link Json} can write -- strings,
- * numbers, booleans, and maps and lists of those -- because it has to read them
- * back in another process.
- *
- * <p>A {@code @SessionScope} bean is never written to a store: the server that
- * built it keeps it in memory for as long as the session lives, and runs its
- * destroy methods when the session is invalidated, expires or the server stops.
- * Another instance behind a load balancer builds its own.
- */
+/// State kept for one client across requests, found again through a cookie.
+///
+/// ```java
+/// @PostMapping("/login")
+///   public void login(HttpServer.Request request, @RequestBody Map body) {
+///       ...
+///       HttpSession session = request.getSession(true);
+///       session.changeSessionId();          // never keep a pre-login id
+///       session.setAttribute("user", userId);
+///   }
+/// ```
+///
+/// A session is created only when something asks for one with
+/// `getSession(true)`, so a server that never does sets no cookie and keeps
+/// nothing. The cookie is `HttpOnly`, `SameSite=Lax` and, on a TLS
+/// server, `Secure`; its name, lifetime and store are configured under
+/// `cn1.session.*`. See [Sessions].
+///
+/// Attributes live in the [SessionStore]. The in-memory store keeps any
+/// object; the database store keeps what [Json] can write -- strings,
+/// numbers, booleans, and maps and lists of those -- because it has to read them
+/// back in another process.
+///
+/// A `@SessionScope` bean is never written to a store: the server that
+/// built it keeps it in memory for as long as the session lives, and runs its
+/// destroy methods when the session is invalidated, expires or the server stops.
+/// Another instance behind a load balancer builds its own.
 public final class HttpSession {
     private String id;
     private final long created;
@@ -66,15 +64,13 @@ public final class HttpSession {
     private boolean fresh;
     private boolean dirty;
     private String previousId;
-    /**
-     * The attribute names this request set or removed, so a store that loads a
-     * copy per request can apply just these onto what another request saved in
-     * the meantime, instead of replacing it with this copy's stale whole map.
-     */
+    /// The attribute names this request set or removed, so a store that loads a
+    /// copy per request can apply just these onto what another request saved in
+    /// the meantime, instead of replacing it with this copy's stale whole map.
     private final java.util.Set changed = new java.util.HashSet();
     private boolean maxInactiveChanged;
     private Object[] beans;
-    /** The last-access time the store holds, which lags the live one. */
+    /// The last-access time the store holds, which lags the live one.
     long storedAccessed;
 
     HttpSession(String id, long created, long lastAccessed, int maxInactiveSeconds) {
@@ -85,12 +81,12 @@ public final class HttpSession {
         this.maxInactiveSeconds = maxInactiveSeconds;
     }
 
-    /** The id the cookie carries. Secret: never log it. */
+    /// The id the cookie carries. Secret: never log it.
     public synchronized String getId() {
         return id;
     }
 
-    /** Whether this session was created by the current request. */
+    /// Whether this session was created by the current request.
     public synchronized boolean isNew() {
         return fresh;
     }
@@ -103,7 +99,7 @@ public final class HttpSession {
         return lastAccessed;
     }
 
-    /** Seconds of inactivity after which the session is discarded. */
+    /// Seconds of inactivity after which the session is discarded.
     public synchronized int getMaxInactiveInterval() {
         return maxInactiveSeconds;
     }
@@ -121,7 +117,7 @@ public final class HttpSession {
 
     public synchronized void setAttribute(String name, Object value) {
         checkValid();
-        if(value == null) {
+        if (value == null) {
             attributes.remove(name);
         } else {
             attributes.put(name, value);
@@ -132,18 +128,18 @@ public final class HttpSession {
 
     public synchronized void removeAttribute(String name) {
         checkValid();
-        if(attributes.remove(name) != null) {
+        if (attributes.remove(name) != null) {
             changed.add(name);
             dirty = true;
         }
     }
 
-    /** The attribute names, as a copy. */
+    /// The attribute names, as a copy.
     public synchronized List getAttributeNames() {
         return new ArrayList(attributes.keySet());
     }
 
-    /** Ends the session: its attributes are dropped and the client's cookie cleared. */
+    /// Ends the session: its attributes are dropped and the client's cookie cleared.
     public synchronized void invalidate() {
         checkValid();
         invalid = true;
@@ -157,18 +153,18 @@ public final class HttpSession {
         return !invalid;
     }
 
-    /**
-     * Gives the session a new id, keeping its attributes, and sends the client the
-     * new cookie. Call it when a user signs in: an id a client held before
-     * authenticating is one an attacker may have planted.
-     *
-     * @return the new id
-     */
+    /// Gives the session a new id, keeping its attributes, and sends the client the
+    /// new cookie. Call it when a user signs in: an id a client held before
+    /// authenticating is one an attacker may have planted.
+    ///
+    /// #### Returns
+    ///
+    /// the new id
     public String changeSessionId() {
         String next = Sessions.newId();
-        synchronized(this) {
+        synchronized (this) {
             checkValid();
-            if(previousId == null) {
+            if (previousId == null) {
                 previousId = id;
             }
             id = next;
@@ -178,7 +174,7 @@ public final class HttpSession {
     }
 
     private void checkValid() {
-        if(invalid) {
+        if (invalid) {
             throw new IllegalStateException("This session has been invalidated");
         }
     }
@@ -189,8 +185,13 @@ public final class HttpSession {
         lastAccessed = now;
     }
 
-    /** Extra time before expiry, for a store whose stored last use lags. */
-    long expiryGraceMillis;
+    /// Extra time before expiry, for a store whose stored last use lags.
+    private long expiryGraceMillis;
+
+    /// Allows `millis` past the timeout before expiry; see Sessions.Jdbc.
+    synchronized void setExpiryGrace(long millis) {
+        expiryGraceMillis = millis;
+    }
 
     synchronized boolean isExpired(long now) {
         return maxInactiveSeconds > 0
@@ -214,7 +215,7 @@ public final class HttpSession {
         maxInactiveChanged = false;
     }
 
-    /** The names this request set or removed, as a copy. */
+    /// The names this request set or removed, as a copy.
     synchronized java.util.Set changedNames() {
         return new java.util.HashSet(changed);
     }
@@ -223,61 +224,55 @@ public final class HttpSession {
         return maxInactiveChanged;
     }
 
-    /** The id the client held before {@link #changeSessionId}, or null. */
+    /// The id the client held before [#changeSessionId], or null.
     synchronized String previousId() {
         return previousId;
     }
 
-    /** A copy of the attributes, for a store to write. */
+    /// A copy of the attributes, for a store to write.
     synchronized Map attributesCopy() {
         return new LinkedHashMap(attributes);
     }
 
     synchronized void loadAttributes(Map values) {
         attributes.clear();
-        if(values != null) {
+        if (values != null) {
             attributes.putAll(values);
         }
     }
 
-    /**
-     * The server whose sessions this belongs to, which keeps the session-scoped
-     * beans; null for a session made outside one.
-     */
+    /// The server whose sessions this belongs to, which keeps the session-scoped
+    /// beans; null for a session made outside one.
     Sessions owner;
 
-    /** The beans held on this object itself, when it has no owner; taken once. */
+    /// The beans held on this object itself, when it has no owner; taken once.
     synchronized Object[] takeLocalBeans() {
         Object[] out = beans;
         beans = null;
         return out;
     }
 
-    /**
-     * What generated code locks while it builds one of this session's beans: an
-     * object every loaded copy of the session shares.
-     */
+    /// What generated code locks while it builds one of this session's beans: an
+    /// object every loaded copy of the session shares.
     public Object beanLock() {
         Sessions o = owner;
         return o == null ? this : o.beanLock(this);
     }
 
-    /**
-     * The {@code @SessionScope} beans of this session, by the slot the build gave
-     * each. Called by generated code.
-     */
+    /// The `@SessionScope` beans of this session, by the slot the build gave
+    /// each. Called by generated code.
     public Object[] scopedBeans(int count) {
         Sessions o = owner;
-        if(o != null) {
+        if (o != null) {
             return o.sharedBeans(this, count);
         }
         return localBeans(count);
     }
 
     private synchronized Object[] localBeans(int count) {
-        if(beans == null || beans.length < count) {
+        if (beans == null || beans.length < count) {
             Object[] grown = new Object[count];
-            if(beans != null) {
+            if (beans != null) {
                 System.arraycopy(beans, 0, grown, 0, beans.length);
             }
             beans = grown;

@@ -25,11 +25,9 @@ package com.codename1.backend;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * The packaged runtime's half of {@link DevConsole}: it cannot redirect the
- * process's console, so it captures nothing and says so. The development tools
- * are for {@code cn1:backend}, which runs on the Java SE arm.
- */
+/// The packaged runtime's half of [DevConsole]: it cannot redirect the
+/// process's console, so it captures nothing and says so. The development tools
+/// are for `cn1:backend`, which runs on the Java SE arm.
 public final class DevConsole {
     private DevConsole() {
     }

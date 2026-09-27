@@ -32,8 +32,6 @@ import static org.apache.maven.model.jdom.util.JDomUtils.detectIndentation;
 
 /**
  * JDOM implementation of POMs {@code modules} element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public class JDomModules extends ArrayList<String> implements JDomBacked {
 

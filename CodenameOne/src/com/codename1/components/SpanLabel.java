@@ -62,8 +62,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// hi.add(d).add(l).add(r).add(c);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class SpanLabel extends Container implements IconHolder, TextHolder {
     private final Label icon;
     private final Container iconWrapper;

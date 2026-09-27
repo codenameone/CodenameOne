@@ -30,8 +30,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 /// Parent class representing an animation object within the AnimationManager queue.
-///
-/// @author Shai Almog
 public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;

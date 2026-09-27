@@ -27,10 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class ByteCodeField {
     private final String clsName;
     private boolean staticField;

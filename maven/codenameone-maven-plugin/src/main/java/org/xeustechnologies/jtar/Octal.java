@@ -17,10 +17,6 @@
 
 package org.xeustechnologies.jtar;
 
-/**
- * @author Kamran Zafar
- * 
- */
 public class Octal {
 
     /**

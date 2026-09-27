@@ -31,8 +31,6 @@ import java.io.IOException;
 
 /**
  * Editor for SVG images allowing such images to be embedded into the resource file
- *
- * @author Shai Almog
  */
 public class ImageSVGEditor extends ImageRGBEditor {
     public ImageSVGEditor(EditableResources res, String name, ResourceEditorView view) {

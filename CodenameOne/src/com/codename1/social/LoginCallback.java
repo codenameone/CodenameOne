@@ -26,8 +26,6 @@ package com.codename1.social;
 /// This class is used to indicate whether login was successful or not, it is
 /// an abstract class rather than an interface in order to allow additional features
 /// in the future.
-///
-/// @author Shai Almog
 public abstract class LoginCallback {
     /// Indicates that logging in to the social network has been successful
     public void loginSuccessful() {

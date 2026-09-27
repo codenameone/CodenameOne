@@ -18,9 +18,6 @@
 package com.codename1.util.regex;
 
 /// This is a class that contains utility helper methods for this package.
-///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @version $Id: REUtil.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public abstract class REUtil {
     /// complex:
     private static final String complexPrefix = "complex:";

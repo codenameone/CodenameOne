@@ -48,8 +48,6 @@ import java.util.Vector;
 /// The GlassTutorial uses the "GlassTutorial" UIID to paint itself it then paints
 /// the hint components in their proper places.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// interaction dialog is a superior way for displaying these types of tutorials

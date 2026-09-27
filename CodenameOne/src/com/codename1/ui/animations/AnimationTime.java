@@ -31,8 +31,6 @@ package com.codename1.ui.animations;
 ///
 /// All methods are static and the class holds only primitive state to keep the
 /// hot path cheap - `now()` is invoked from every animation tick.
-///
-/// @author Shai Almog
 public final class AnimationTime {
     private static long overrideTime;
     private static boolean overridden;

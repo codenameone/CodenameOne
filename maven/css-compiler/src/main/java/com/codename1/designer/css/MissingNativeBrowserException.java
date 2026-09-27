@@ -22,10 +22,6 @@
  */
 package com.codename1.designer.css;
 
-/**
- *
- * @author shannah
- */
 public class MissingNativeBrowserException extends RuntimeException {
     
 }

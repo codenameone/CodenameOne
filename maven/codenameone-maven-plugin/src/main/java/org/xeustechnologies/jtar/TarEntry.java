@@ -20,10 +20,6 @@ package org.xeustechnologies.jtar;
 import java.io.File;
 import java.util.Date;
 
-/**
- * @author Kamran Zafar
- * 
- */
 public class TarEntry {
     protected File file;
     protected TarHeader header;

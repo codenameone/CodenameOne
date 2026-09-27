@@ -30,10 +30,6 @@ import com.codename1.html5.js.JSFunctor;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.core.JSBoolean;
 
-/**
- *
- * @author shannah
- */
 public class JQuery {
     
     @JSFunctor

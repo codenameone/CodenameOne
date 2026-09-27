@@ -66,8 +66,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// Collapsed:
 ///
 /// Expanded:
-///
-/// @author Steve Hannah
 public class SplitPane extends Container {
 
     /// Constant used for orientation.

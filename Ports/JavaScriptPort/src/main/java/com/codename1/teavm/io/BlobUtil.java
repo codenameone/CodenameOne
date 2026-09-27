@@ -48,10 +48,6 @@ import com.codename1.html5.js.dom.HTMLCanvasElement;
 import com.codename1.html5.js.typedarrays.ArrayBuffer;
 import com.codename1.html5.js.typedarrays.Uint8Array;
 
-/**
- *
- * @author shannah
- */
 public class BlobUtil {
 
     public static Blob toType(Blob blob, String mimeType) {

@@ -150,7 +150,8 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
     protected void onSetup(GraphicsDevice device) {
     }
 
-    /// {@inheritDoc} Forwards GPU setup to `#onSetup(com.codename1.gpu.GraphicsDevice)`.
+    /// Called by the renderer once the GPU device is ready. Forwards to
+    /// [#onSetup(com.codename1.gpu.GraphicsDevice)], which is the method to override.
     @Override
     public void setup(GraphicsDevice device) {
         onSetup(device);
@@ -300,7 +301,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         input.pointer(lx, ly, down, pressed, released);
     }
 
-    /// {@inheritDoc} Drives game logic each frame -- invoked by the `SpriteRenderer`
+    /// Drives game logic each frame -- invoked by the `SpriteRenderer`
     /// before the scene is drawn.
     @Override
     public void frame(double deltaSeconds) {

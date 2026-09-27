@@ -54,8 +54,6 @@ import java.util.Date;
 ///     add("parseLong").add("" + l10n.parseLong("4444444"));
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class L10NManager {
     private String language;
     private String locale;

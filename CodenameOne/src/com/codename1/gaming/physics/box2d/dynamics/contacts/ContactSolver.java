@@ -38,7 +38,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Fixture;
 import com.codename1.gaming.physics.box2d.dynamics.TimeStep;
 import com.codename1.gaming.physics.box2d.dynamics.contacts.ContactVelocityConstraint.VelocityConstraintPoint;
 
-/// @author Daniel
 public class ContactSolver {
 
   public static final boolean DEBUG_SOLVER = false;

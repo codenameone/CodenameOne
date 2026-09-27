@@ -59,8 +59,6 @@ import java.util.List;
 /// });
 /// form.add(BorderLayout.CENTER, editor);
 /// ```
-///
-/// @author Shai Almog
 public class CodeEditor extends AbstractEditorComponent {
     private static final Hashtable<String, SyntaxHighlighter> syntaxHighlighters =
             new Hashtable<String, SyntaxHighlighter>();

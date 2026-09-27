@@ -26,22 +26,28 @@ import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.certificatewizard.project.AndroidKeystoreGenerator;
 import com.codename1.ui.Display;
 import java.awt.Desktop;
+import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.KeyboardFocusManager;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.Taskbar;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /**
  * Generated desktop wrapper for a Codename One app. Generated at build time by
@@ -66,13 +72,6 @@ public class CertificateWizardStub implements Runnable, WindowListener {
     public static final String BUILD_KEY = "";
     public static final String PACKAGE_NAME = "";
     public static final String BUILT_BY_USER = "";
-    private static final boolean isWindows;
-    static {
-        isWindows = File.separatorChar == '\\';
-    }
-
-    private static final String[] fontFaces = null;
-
     private static JFrame frm;
     private CertificateWizard mainApp;
 
@@ -97,15 +96,8 @@ public class CertificateWizardStub implements Runnable, WindowListener {
         JavaSEPort.setDesktopTitleBarMode(APP_DESKTOP_TITLEBAR);
         JavaSEPort.setDesktopInteractiveScrollbars(APP_DESKTOP_INTERACTIVE_SCROLLBARS);
 
-        if(fontFaces != null) {
-            JavaSEPort.setFontFaces(fontFaces[0], fontFaces[1], fontFaces[2]);
-        } else {
-            if(isWindows) {
-                JavaSEPort.setFontFaces("ArialUnicodeMS", "SansSerif", "Monospaced");
-            } else {
-                JavaSEPort.setFontFaces("Arial", "SansSerif", "Monospaced");
-            }
-        }
+        // No setFontFaces: the desktop native theme picks the platform's own face (Segoe UI
+        // Variable, SF, Cantarell), and pinning Arial here overrode it.
 
         frm = new JFrame(APP_TITLE);
         Toolkit tk = Toolkit.getDefaultToolkit();
@@ -191,9 +183,130 @@ public class CertificateWizardStub implements Runnable, WindowListener {
                     SwingUtilities.invokeLater(this);
                 } else {
                     frameShow(frm);
+                    scheduleScreenshotIfRequested();
                 }
             }
         });
+    }
+
+    /// `-Dcertificatewizard.screenshot=<png>` paints the window into that file once the UI has
+    /// settled and exits: the same hook the Settings app has, for the Windows tooling job and
+    /// for reviewing the native themes (`-Dcodename1.arg.desktop.themeMode=fluent|aqua|adwaita`)
+    /// without a signing account (`-Dcertificatewizard.mock=true`).
+    private static void scheduleScreenshotIfRequested() {
+        String screenshot = System.getProperty("certificatewizard.screenshot");
+        if (screenshot == null || screenshot.length() == 0) {
+            return;
+        }
+        int delay = Integer.getInteger("certificatewizard.screenshot.delay", 1500);
+        Timer timer = new Timer(delay, e -> {
+            try {
+                captureOffscreen(new File(screenshot));
+                captureOnScreen(screenshot);
+                captureOwnedWindows(screenshot);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            if (!"false".equals(System.getProperty("certificatewizard.screenshot.exit"))) {
+                Display.getInstance().exitApplication();
+            }
+        });
+        timer.setRepeats(false);
+        timer.start();
+    }
+
+    private static void captureOffscreen(File target) throws Exception {
+        // The canvas renders at DEVICE resolution and blits 1:1, so an image sized in Swing's
+        // logical points catches only the top left corner of a Retina window.
+        double scale = displayScale();
+        BufferedImage image = new BufferedImage(
+                Math.max(1, (int) Math.round(frm.getContentPane().getWidth() * scale)),
+                Math.max(1, (int) Math.round(frm.getContentPane().getHeight() * scale)),
+                BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        graphics.scale(scale, scale);
+        frm.getContentPane().paint(graphics);
+        graphics.dispose();
+        ImageIO.write(image, "png", target);
+    }
+
+    /// The composited desktop pixels of the window, beside the offscreen paint as
+    /// `<name>.onscreen.png`. The two can disagree: `contentPane.paint()` drives a fresh Swing
+    /// paint pass, so it can look healthy while the window the user is actually looking at is
+    /// stale or unpainted -- the shape of issue #5443 -- which is why the Windows tooling job
+    /// gates on this image and not the other. Best effort: a Robot grab can be denied, and it
+    /// never fails the capture. `-Dcertificatewizard.screenshot.onscreen=false` turns it off.
+    private static void captureOnScreen(String screenshot) {
+        if (!Boolean.parseBoolean(System.getProperty("certificatewizard.screenshot.onscreen", "true"))) {
+            return;
+        }
+        try {
+            // A window that is not showing yet, or that another application covers, would write
+            // whatever is at those screen coordinates into a file named after this one: someone
+            // else's pixels, reading as a broken wizard. Better to write nothing.
+            if (!frm.isShowing()) {
+                System.err.println("On-screen capture skipped: window is not showing");
+                return;
+            }
+            if (!frm.isActive()) {
+                System.err.println("On-screen capture skipped: window is not the active window");
+                return;
+            }
+            Rectangle bounds = frm.getBounds();
+            if (bounds.width <= 0 || bounds.height <= 0) {
+                return;
+            }
+            BufferedImage image = new Robot().createScreenCapture(bounds);
+            ImageIO.write(image, "png", new File(onScreenPath(screenshot)));
+        } catch (Throwable ex) {
+            System.err.println("On-screen capture unavailable: " + ex);
+        }
+    }
+
+    static String onScreenPath(String screenshot) {
+        int dot = screenshot.lastIndexOf('.');
+        int separator = Math.max(screenshot.lastIndexOf('/'), screenshot.lastIndexOf('\\'));
+        if (dot > separator) {
+            return screenshot.substring(0, dot) + ".onscreen" + screenshot.substring(dot);
+        }
+        return screenshot + ".onscreen.png";
+    }
+
+    /// On the desktop an InteractionDialog opens as a window of its own, which a paint of the
+    /// frame's content pane never reaches. Each one showing is written beside the screenshot as
+    /// `<name>.window<N>.png`.
+    private static void captureOwnedWindows(String screenshot) throws Exception {
+        double scale = displayScale();
+        java.awt.Window[] owned = frm.getOwnedWindows();
+        int n = 0;
+        for (java.awt.Window w : owned) {
+            if (!w.isShowing() || w.getWidth() <= 0 || w.getHeight() <= 0) {
+                continue;
+            }
+            BufferedImage image = new BufferedImage((int) Math.round(w.getWidth() * scale),
+                    (int) Math.round(w.getHeight() * scale), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = image.createGraphics();
+            graphics.scale(scale, scale);
+            w.paint(graphics);
+            graphics.dispose();
+            String base = screenshot.endsWith(".png") ? screenshot.substring(0, screenshot.length() - 4) : screenshot;
+            ImageIO.write(image, "png", new File(base + ".window" + (n++) + ".png"));
+        }
+    }
+
+    private static double displayScale() {
+        try {
+            java.awt.GraphicsConfiguration config = frm.getGraphicsConfiguration();
+            if (config != null) {
+                double scale = config.getDefaultTransform().getScaleX();
+                if (scale > 0) {
+                    return scale;
+                }
+            }
+        } catch (Throwable ex) {
+            System.err.println("Display scale unavailable: " + ex);
+        }
+        return 1;
     }
 
     private void framePrepare(JFrame frm) {

@@ -35,7 +35,7 @@ import com.codename1.util.AsyncResource;
 /// redirect URL once the OS hands it back. Replaces the embedded WebView
 /// approach used by the legacy [com.codename1.io.Oauth2] class.
 ///
-/// You normally do not call this directly -- [OidcClient.authorize] does it
+/// You normally do not call this directly -- [OidcClient#authorize()] does it
 /// for you. Use the public methods on this class when wiring up a custom
 /// OAuth 2.0 flow that does not fit the OIDC client (e.g. device flow).
 ///

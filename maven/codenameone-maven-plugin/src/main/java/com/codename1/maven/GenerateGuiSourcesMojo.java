@@ -54,7 +54,6 @@ import static com.codename1.maven.PathUtil.path;
 
 /**
  * Goal to generate java sources from the guibuilder files.
- * @author shannah
  */
 @Mojo(name="generate-gui-sources", defaultPhase = LifecyclePhase.INITIALIZE)
 public class GenerateGuiSourcesMojo extends AbstractCN1Mojo {

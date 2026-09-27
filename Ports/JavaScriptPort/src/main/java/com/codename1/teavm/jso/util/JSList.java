@@ -32,10 +32,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.core.JSArray;
 
-/**
- *
- * @author shannah
- */
 public class JSList<T> implements List<T> {
     private JSArray arr;
     

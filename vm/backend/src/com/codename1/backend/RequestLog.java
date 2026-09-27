@@ -27,21 +27,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The last requests the server answered, kept for the development MCP tools:
- * what came in, what went out, how long it took and what was thrown.
- *
- * <p>Off unless the development tools turn it on. Off, recording is a static
- * read per request and nothing else.
- */
+/// The last requests the server answered, kept for the development MCP tools:
+/// what came in, what went out, how long it took and what was thrown.
+///
+/// Off unless the development tools turn it on. Off, recording is a static
+/// read per request and nothing else.
 public final class RequestLog {
-    /**
-     * Per server, never per process: with two servers in one process, the one
-     * running the development tools must not show the other's request targets
-     * and exceptions. Volatile: the development tools switch it on after the
-     * workers are running, and a plain write need never become visible to them.
-     */
-    volatile boolean enabled;
+    /// Per server, never per process: with two servers in one process, the one
+    /// running the development tools must not show the other's request targets
+    /// and exceptions. Volatile: the development tools switch it on after the
+    /// workers are running, and a plain write need never become visible to them.
+    volatile boolean enabled; //NOPMD AvoidUsingVolatile - switched on while the workers run
     private Map[] ring = new Map[0];
     private int next;
     private int size;
@@ -49,7 +45,7 @@ public final class RequestLog {
     RequestLog() {
     }
 
-    /** Starts keeping the last {@code capacity} requests. */
+    /// Starts keeping the last `capacity` requests.
     public synchronized void enable(int capacity) {
         ring = new Map[capacity < 1 ? 1 : capacity];
         next = 0;
@@ -59,54 +55,54 @@ public final class RequestLog {
 
     void record(HttpServer.Request request, int status, long startedMillis,
                 Throwable error) {
-        if(!enabled) {
+        if (!enabled) {
             return;
         }
         Map entry = new LinkedHashMap();
-        entry.put("time", new Long(startedMillis));
+        entry.put("time", Long.valueOf(startedMillis));
         entry.put("method", request.getMethod());
         entry.put("target", request.getTarget());
-        entry.put("status", new Integer(status));
-        entry.put("millis", new Long(System.currentTimeMillis() - startedMillis));
-        if(error != null) {
+        entry.put("status", Integer.valueOf(status));
+        entry.put("millis", Long.valueOf(System.currentTimeMillis() - startedMillis));
+        if (error != null) {
             entry.put("error", String.valueOf(error));
             StringBuilder where = new StringBuilder();
             Throwable cause = error;
             int depth = 0;
-            while(cause != null && depth < 4) {
-                if(depth > 0) {
+            while (cause != null && depth < 4) {
+                if (depth > 0) {
                     where.append(" <- caused by ").append(cause);
                 }
                 cause = cause.getCause();
                 depth++;
             }
-            if(where.length() > 0) {
+            if (where.length() > 0) {
                 entry.put("causes", where.toString());
             }
         }
-        synchronized(this) {
+        synchronized (this) {
             ring[next] = entry;
             next = (next + 1) % ring.length;
-            if(size < ring.length) {
+            if (size < ring.length) {
                 size++;
             }
         }
     }
 
-    /** The newest {@code limit} requests, newest first; only failures when asked. */
+    /// The newest `limit` requests, newest first; only failures when asked.
     public synchronized List recent(int limit, boolean failuresOnly) {
         List out = new ArrayList();
-        for(int iter = 0 ; iter < size && out.size() < limit ; iter++) {
+        for (int iter = 0 ; iter < size && out.size() < limit ; iter++) {
             int at = (next - 1 - iter + ring.length) % ring.length;
             Map entry = ring[at];
-            if(entry == null) {
+            if (entry == null) {
                 continue;
             }
-            if(failuresOnly) {
+            if (failuresOnly) {
                 Object status = entry.get("status");
                 boolean failed = entry.get("error") != null
-                        || (status instanceof Integer && ((Integer)status).intValue() >= 500);
-                if(!failed) {
+                        || (status instanceof Integer && ((Integer) status).intValue() >= 500);
+                if (!failed) {
                     continue;
                 }
             }

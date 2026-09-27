@@ -25,8 +25,6 @@ package com.codename1.ui.validation;
 import com.codename1.util.regex.RE;
 
 /// Creates a validation constraint based on a regular expression
-///
-/// @author Shai Almog
 public class RegexConstraint implements Constraint {
     private static final String validEmailRegex = "^([a-zA-Z0-9.!#$%&'*+/=?^`{|}~]|-|_)+@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$";
     private static final String validURLRegex = "^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]";

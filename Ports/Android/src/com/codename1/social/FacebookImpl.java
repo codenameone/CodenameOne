@@ -42,8 +42,6 @@ import java.util.StringTokenizer;
 
 /**
  * Class implementing the facebook API
- *
- * @author Shai Almog
  */
 public class FacebookImpl extends FacebookConnect {
 

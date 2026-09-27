@@ -24,30 +24,26 @@ package com.codename1.backend;
 
 import java.io.IOException;
 
-/**
- * Where {@link HttpSession}s are kept between requests.
- *
- * <p>Two are provided, chosen by {@code cn1.session.store}: {@code memory} (the
- * default) and {@code jdbc}, which keeps them in the server's database so any
- * instance behind a load balancer can serve any client. Implement this for
- * another -- a cache server -- and pass it to {@link Sessions#setStore}.
- */
+/// Where [HttpSession]s are kept between requests.
+///
+/// Two are provided, chosen by `cn1.session.store`: `memory` (the
+/// default) and `jdbc`, which keeps them in the server's database so any
+/// instance behind a load balancer can serve any client. Implement this for
+/// another -- a cache server -- and pass it to [Sessions#setStore].
 public interface SessionStore {
-    /** The session with this id, or null when there is none or it expired. */
+    /// The session with this id, or null when there is none or it expired.
     HttpSession load(String id) throws IOException;
 
-    /**
-     * Records a session after a request that created or changed it. When its id
-     * changed, {@code previousId} names the entry to drop; otherwise it is null.
-     */
+    /// Records a session after a request that created or changed it. When its id
+    /// changed, `previousId` names the entry to drop; otherwise it is null.
     void save(HttpSession session, String previousId) throws IOException;
 
-    /** Forgets a session. */
+    /// Forgets a session.
     void delete(String id) throws IOException;
 
-    /** Drops every session that has expired by {@code now}; answers how many. */
+    /// Drops every session that has expired by `now`; answers how many.
     int purgeExpired(long now) throws IOException;
 
-    /** How many sessions are kept, or -1 when that is expensive to know. */
+    /// How many sessions are kept, or -1 when that is expensive to know.
     int size();
 }

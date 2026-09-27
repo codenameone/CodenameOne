@@ -222,7 +222,6 @@ import java.util.ArrayList;
 ///
 /// *ISSUES:*
 ///
-///
 /// - com.weusours.util.re is not currently compatible with all
 /// standard POSIX regcomp flags
 ///
@@ -248,9 +247,6 @@ import java.util.ArrayList;
 /// and actually Perl doesn't go to this extent either!  Until someone
 /// actually complains about this, I'm not sure it's worth "fixing".
 /// If it ever is fixed, test #137 in RETest.txt should be updated.
-///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @author [Tobias Schafer](mailto:ts@sch-fer.de)
 ///
 /// #### See also
 ///

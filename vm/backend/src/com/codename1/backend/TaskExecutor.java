@@ -24,20 +24,18 @@ package com.codename1.backend;
 
 import java.util.LinkedList;
 
-/**
- * A named place background work runs: a pool of platform threads, or virtual
- * threads on the server's hosts.
- *
- * <p>Configured as {@code cn1.task.executor.<name>.threads} and
- * {@code cn1.task.executor.<name>.kind} ({@code platform} or {@code virtual}),
- * and obtained through {@link Tasks#executor}. The threads of a pool start on the
- * first task, so an executor the configuration names and nothing uses costs a
- * map entry.
- *
- * <p>A virtual executor hands each task to a virtual thread of its own; on a
- * runtime or a server that has none -- the Java SE arm, a TLS server, Windows --
- * it runs the task on its pool instead, which is why it has a size too.
- */
+/// A named place background work runs: a pool of platform threads, or virtual
+/// threads on the server's hosts.
+///
+/// Configured as `cn1.task.executor..threads` and
+/// `cn1.task.executor..kind` (`platform` or `virtual`),
+/// and obtained through [Tasks#executor]. The threads of a pool start on the
+/// first task, so an executor the configuration names and nothing uses costs a
+/// map entry.
+///
+/// A virtual executor hands each task to a virtual thread of its own; on a
+/// runtime or a server that has none -- the Java SE arm, a TLS server, Windows --
+/// it runs the task on its pool instead, which is why it has a size too.
 public final class TaskExecutor {
     private final String name;
     private final boolean virtual;
@@ -48,11 +46,11 @@ public final class TaskExecutor {
     private long completed;
     private long failed;
     private boolean shutdown;
-    /** Tasks dropped unstarted because the shutdown deadline passed. */
+    /// Tasks dropped unstarted because the shutdown deadline passed.
     private long dropped;
-    /** Whether shutdown ran out of time; nothing may start after that. */
+    /// Whether shutdown ran out of time; nothing may start after that.
     private boolean timedOut;
-    /** The server these executors belong to, which the task threads carry. */
+    /// The server these executors belong to, which the task threads carry.
     private final Tasks.Registry registry;
 
     TaskExecutor(String name, boolean virtual, int size, Tasks.Registry registry) {
@@ -66,7 +64,7 @@ public final class TaskExecutor {
         return name;
     }
 
-    /** Whether this executor asks for virtual threads. */
+    /// Whether this executor asks for virtual threads.
     public boolean isVirtual() {
         return virtual;
     }
@@ -75,12 +73,12 @@ public final class TaskExecutor {
         return size;
     }
 
-    /** Tasks waiting for a thread. */
+    /// Tasks waiting for a thread.
     public synchronized int getQueueDepth() {
         return queue.size();
     }
 
-    /** Tasks running now. */
+    /// Tasks running now.
     public synchronized int getActiveCount() {
         return active;
     }
@@ -89,58 +87,59 @@ public final class TaskExecutor {
         return completed;
     }
 
-    /** Tasks that ended with an exception nobody received. */
+    /// Tasks that ended with an exception nobody received.
     public synchronized long getFailedCount() {
         return failed;
     }
 
-    /**
-     * Runs {@code task} on this executor.
-     *
-     * @throws IllegalStateException once the server has stopped it
-     */
+    /// Runs `task` on this executor.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: once the server has stopped it
     public void execute(Runnable task) {
-        if(task == null) {
+        if (task == null) {
             return;
         }
-        if(virtual) {
+        if (virtual) {
             // Refused and counted BEFORE the hand-off, exactly like a pool task:
             // a submission after shutdown must fail rather than run on a server
             // that is stopping, and a task already handed to a host must hold
             // shutdown()'s drain open from the moment it is accepted -- counting
             // it only once it starts let shutdown() return while it still sat in
             // a host's inbox.
-            synchronized(this) {
-                if(shutdown) {
+            synchronized (this) {
+                if (shutdown) {
                     throw new IllegalStateException("Executor " + name + " has been shut down");
                 }
                 active++;
             }
             HttpServer host = registry == null ? HttpServer.activeServer()
                     : registry.virtualHost();
-            if(HttpServer.submitVirtualTask(new Counted(this, task), host)) {
+            if (HttpServer.submitVirtualTask(new Counted(this, task), host)) {
                 return;
             }
-            synchronized(this) {
+            synchronized (this) {
                 active--;
             }
         }
-        synchronized(this) {
-            if(shutdown) {
+        synchronized (this) {
+            if (shutdown) {
                 throw new IllegalStateException("Executor " + name + " has been shut down");
             }
             queue.addLast(task);
-            if(workers == null) {
+            if (workers == null) {
                 startWorkers();
             }
-            notify();
+            notifyAll();
         }
     }
 
     private void startWorkers() {
         workers = new Thread[size];
-        for(int iter = 0 ; iter < size ; iter++) {
+        for (int iter = 0 ; iter < size ; iter++) {
             Thread t = new Thread(new Runnable() {
+                @Override
                 public void run() {
                     work();
                 }
@@ -152,21 +151,21 @@ public final class TaskExecutor {
     }
 
     private void work() {
-        while(true) {
+        while (true) {
             Runnable task;
-            synchronized(this) {
-                while(queue.isEmpty() && !shutdown) {
+            synchronized (this) {
+                while (queue.isEmpty() && !shutdown) {
                     try {
                         wait();
                     } catch (InterruptedException err) {
                         return;
                     }
                 }
-                if(queue.isEmpty()) {
+                if (queue.isEmpty()) {
                     notifyAll();
                     return;
                 }
-                task = (Runnable)queue.removeFirst();
+                task = (Runnable) queue.removeFirst();
                 active++;
             }
             runCounted(task);
@@ -185,13 +184,13 @@ public final class TaskExecutor {
             System.err.println("Task " + task + " on executor " + name + " failed: " + err);
         } finally {
             Tasks.leave(previous);
-            synchronized(this) {
+            synchronized (this) {
                 active--;
                 completed++;
-                if(!ok) {
+                if (!ok) {
                     failed++;
                 }
-                if(shutdown && active == 0 && queue.isEmpty()) {
+                if (shutdown && active == 0 && queue.isEmpty()) {
                     notifyAll();
                 }
             }
@@ -202,22 +201,20 @@ public final class TaskExecutor {
         failed++;
     }
 
-    /** Whether {@link #shutdown(long)} has been called; it then refuses tasks. */
+    /// Whether [#shutdown(long)] has been called; it then refuses tasks.
     public synchronized boolean isShutdown() {
         return shutdown;
     }
 
-    /**
-     * Stops taking tasks and waits up to {@code waitMillis} for the queued and
-     * running ones to finish.
-     */
+    /// Stops taking tasks and waits up to `waitMillis` for the queued and
+    /// running ones to finish.
     public synchronized void shutdown(long waitMillis) {
         shutdown = true;
         notifyAll();
         long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
-        while((active > 0 || !queue.isEmpty()) && waitMillis > 0) {
+        while ((active > 0 || !queue.isEmpty()) && waitMillis > 0) {
             long left = deadline - System.currentTimeMillis();
-            if(left <= 0) {
+            if (left <= 0) {
                 break;
             }
             try {
@@ -226,7 +223,7 @@ public final class TaskExecutor {
                 break;
             }
         }
-        if(queue.isEmpty() && active == 0) {
+        if (queue.isEmpty() && active == 0) {
             return;
         }
         // Out of time. The server destroys its beans and closes its database
@@ -240,17 +237,16 @@ public final class TaskExecutor {
         dropped += waiting;
         // A dropped @Async call still has a Future someone may be waiting on;
         // it fails rather than never finishing.
-        for(int iter = 0 ; iter < queue.size() ; iter++) {
-            Object queued = queue.get(iter);
-            if(queued instanceof AsyncTask) {
-                ((AsyncTask)queued).abandon("dropped when the server stopped before it "
+        for (Object queued : queue) {
+            if (queued instanceof AsyncTask) {
+                ((AsyncTask) queued).abandon("dropped when the server stopped before it "
                         + "could start");
             }
         }
         queue.clear();
-        if(workers != null) {
-            for(int iter = 0 ; iter < workers.length ; iter++) {
-                workers[iter].interrupt();
+        if (workers != null) {
+            for (Thread element : workers) {
+                element.interrupt();
             }
         }
         System.err.println("Executor " + name + " did not finish within the shutdown "
@@ -258,67 +254,64 @@ public final class TaskExecutor {
                 + " still running");
     }
 
-    /** Tasks the shutdown deadline dropped before they could start. */
+    /// Tasks the shutdown deadline dropped before they could start.
     public synchronized long getDroppedCount() {
         return dropped;
     }
 
-    /**
-     * Runs a task a host accepted for a virtual thread and then could not give
-     * one -- no stack, or the server stopping -- on this executor's own platform
-     * workers instead. It was accepted before any shutdown and is already counted
-     * active, so it is queued even now, and shutdown() waits for it.
-     */
+    /// Runs a task a host accepted for a virtual thread and then could not give
+    /// one -- no stack, or the server stopping -- on this executor's own platform
+    /// workers instead. It was accepted before any shutdown and is already counted
+    /// active, so it is queued even now, and shutdown() waits for it.
     static void fallBack(Runnable task) {
-        if(task instanceof Counted) {
-            Counted c = (Counted)task;
+        if (task instanceof Counted) {
+            Counted c = (Counted) task;
             c.owner.requeue(c.task);
             return;
         }
         Tasks.platform(task);
     }
 
-    /**
-     * A task whose virtual thread was freed at shutdown before it finished. Its
-     * own finally never runs, so what it would have done happens here: the
-     * executor stops counting it active -- or shutdown() waits for it until the
-     * deadline -- and its Future, if it has one, fails instead of never ending.
-     */
+    /// A task whose virtual thread was freed at shutdown before it finished. Its
+    /// own finally never runs, so what it would have done happens here: the
+    /// executor stops counting it active -- or shutdown() waits for it until the
+    /// deadline -- and its Future, if it has one, fails instead of never ending.
     static void abandoned(Runnable task) {
         Runnable inner = task;
-        if(task instanceof Counted) {
-            Counted c = (Counted)task;
+        if (task instanceof Counted) {
+            Counted c = (Counted) task;
             inner = c.task;
-            synchronized(c.owner) {
+            synchronized (c.owner) {
                 c.owner.active--;
                 c.owner.completed++;
                 c.owner.failed++;
                 c.owner.notifyAll();
             }
         }
-        if(inner instanceof AsyncTask) {
-            ((AsyncTask)inner).abandon("abandoned when the server stopped before it finished");
+        if (inner instanceof AsyncTask) {
+            ((AsyncTask) inner).abandon("abandoned when the server stopped before it finished");
         }
     }
 
     private synchronized void requeue(Runnable task) {
         active--;
-        if(timedOut) {
+        if (timedOut) {
             dropped++;
-            if(task instanceof AsyncTask) {
-                ((AsyncTask)task).abandon("dropped when the server stopped before it could "
+            if (task instanceof AsyncTask) {
+                ((AsyncTask) task).abandon("dropped when the server stopped before it could "
                         + "start");
             }
             notifyAll();
             return;
         }
         queue.addLast(task);
-        if(workers == null) {
+        if (workers == null) {
             startWorkers();
-        } else if(shutdown) {
+        } else if (shutdown) {
             // The pool's threads may already have drained and ended; one more
             // runs this and ends in turn, and shutdown() is still waiting on it.
             Thread t = new Thread(new Runnable() {
+                @Override
                 public void run() {
                     work();
                 }
@@ -326,17 +319,16 @@ public final class TaskExecutor {
             t.setDaemon(true);
             t.start();
         }
-        notify();
+        notifyAll();
     }
 
+    @Override
     public String toString() {
         return name + (virtual ? " (virtual)" : " (" + size + " threads)");
     }
 
-    /**
-     * A task on a virtual thread, counted like one on the pool. execute() has
-     * already counted it active; runCounted's finally is the matching decrement.
-     */
+    /// A task on a virtual thread, counted like one on the pool. execute() has
+    /// already counted it active; runCounted's finally is the matching decrement.
     private static final class Counted implements Runnable {
         private final TaskExecutor owner;
         private final Runnable task;
@@ -346,6 +338,7 @@ public final class TaskExecutor {
             this.task = task;
         }
 
+        @Override
         public void run() {
             owner.runCounted(task);
         }

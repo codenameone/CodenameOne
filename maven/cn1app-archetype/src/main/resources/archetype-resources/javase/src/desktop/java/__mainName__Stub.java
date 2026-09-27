@@ -43,8 +43,6 @@ import javax.swing.SwingUtilities;
 /**
  * A wrapper class around a Codename One app, allows building desktop Java
  * applications.
- *
- * @author Shai Almog
  */
 public class ${mainName}Stub implements Runnable, WindowListener {
     private static final String APP_TITLE = "Hi World";

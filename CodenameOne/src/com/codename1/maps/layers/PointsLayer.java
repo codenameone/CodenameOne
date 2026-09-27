@@ -35,8 +35,6 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /// This is a Points Layer
-///
-/// @author Roman Kamyk
 public class PointsLayer extends AbstractLayer implements ActionSource {
 
     private final Vector points = new Vector();

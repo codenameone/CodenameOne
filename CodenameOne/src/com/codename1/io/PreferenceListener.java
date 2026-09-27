@@ -24,8 +24,6 @@ package com.codename1.io;
 
 /// Respond to changes to the Preferences
 ///
-/// @author Miguel Mu\u00f1oz
-///
 /// #### See also
 ///
 /// - Preferences

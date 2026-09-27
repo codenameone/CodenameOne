@@ -35,8 +35,6 @@ import java.util.*;
 /**
  * This is a copy of the com.codename1.io.JSONParser for use in the BuildDaemon project
  * so that we don't need to add the CodenameOne.jar as a dependency on the OfflineBuilder.
- *
- * @author Shai Almog
  */
 public class JSONParser implements JSONParseCallback {
     

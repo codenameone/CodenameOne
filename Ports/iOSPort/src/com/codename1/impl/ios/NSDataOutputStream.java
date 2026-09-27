@@ -31,8 +31,6 @@ import java.io.OutputStream;
 
 /**
  * Implements the output stream interface on top of NSData
- *
- * @author Shai Almog
  */
 public class NSDataOutputStream extends OutputStream {
     private String file;

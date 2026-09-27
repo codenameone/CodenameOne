@@ -28,23 +28,21 @@ import com.codename1.orm.session.LockMode;
 import com.codename1.orm.session.Query;
 import com.codename1.orm.session.Session;
 
-/**
- * The {@link Session} the build injects: the managed session of whatever
- * transaction the calling thread is in.
- *
- * <p>One object is injected into a singleton and used by every request, so it
- * cannot BE a session -- a session is a persistence context, one per unit of
- * work, and not thread-safe. Each call is forwarded to the session of the
- * calling thread's {@code @Transactional} method instead, which is opened on the
- * transaction's connection when first used, flushed before the transaction
- * commits and closed when it ends. That is the same contract as a Spring-managed
- * {@code EntityManager}.
- *
- * <p>Outside a transaction there is no unit of work to belong to, and every call
- * refuses with a message saying so. The transaction's boundaries belong to the
- * annotation, so beginning, committing, rolling back and closing through this
- * object are refused too.
- */
+/// The [Session] the build injects: the managed session of whatever
+/// transaction the calling thread is in.
+///
+/// One object is injected into a singleton and used by every request, so it
+/// cannot BE a session -- a session is a persistence context, one per unit of
+/// work, and not thread-safe. Each call is forwarded to the session of the
+/// calling thread's `@Transactional` method instead, which is opened on the
+/// transaction's connection when first used, flushed before the transaction
+/// commits and closed when it ends. That is the same contract as a Spring-managed
+/// `EntityManager`.
+///
+/// Outside a transaction there is no unit of work to belong to, and every call
+/// refuses with a message saying so. The transaction's boundaries belong to the
+/// annotation, so beginning, committing, rolling back and closing through this
+/// object are refused too.
 public final class TransactionSession implements Session {
     private final EntityManager entities;
 
@@ -62,106 +60,132 @@ public final class TransactionSession implements Session {
                 + "Transactions.setRollbackOnly().");
     }
 
+    @Override
     public <T> JpqlQuery<T> createQuery(String statement, Class<T> resultType) {
         return current().createQuery(statement, resultType);
     }
 
+    @Override
     public JpqlQuery<Object> createQuery(String statement) {
         return current().createQuery(statement);
     }
 
+    @Override
     public void beginTransaction() {
         throw boundary("Beginning a transaction");
     }
 
+    @Override
     public void commitTransaction() {
         throw boundary("Committing");
     }
 
+    @Override
     public void rollbackTransaction() {
         throw boundary("Rolling back");
     }
 
+    @Override
     public boolean isTransactionActive() {
         return Transactions.isActive();
     }
 
+    @Override
     public boolean isRollbackOnly() {
         return Transactions.isRollbackOnly();
     }
 
+    @Override
     public boolean contains(Object entity) {
         return Transactions.isActive() && current().contains(entity);
     }
 
+    @Override
     public void detach(Object entity) {
         current().detach(entity);
     }
 
+    @Override
     public void clear() {
         current().clear();
     }
 
+    @Override
     public void close() {
         throw boundary("Closing the session");
     }
 
+    @Override
     public <T> T find(Class<T> type, Object id) {
         return current().find(type, id);
     }
 
+    @Override
     public <T> T find(Class<T> type, Object id, LockMode mode) {
         return current().find(type, id, mode);
     }
 
+    @Override
     public void lock(Object entity, LockMode mode) {
         current().lock(entity, mode);
     }
 
+    @Override
     public <T> void persist(T entity) {
         current().persist(entity);
     }
 
+    @Override
     public <T> T merge(T entity) {
         return current().merge(entity);
     }
 
+    @Override
     public void remove(Object entity) {
         current().remove(entity);
     }
 
+    @Override
     public void refresh(Object entity) {
         current().refresh(entity);
     }
 
+    @Override
     public void flush() {
         current().flush();
     }
 
+    @Override
     public <T> boolean increment(Class<T> type, Object id, String field, long amount) {
         return current().increment(type, id, field, amount);
     }
 
+    @Override
     public <T> Query<T> query(Class<T> type) {
         return current().query(type);
     }
 
+    @Override
     public void createTables() {
         current().createTables();
     }
 
+    @Override
     public void validateSchema() {
         current().validateSchema();
     }
 
+    @Override
     public long count(Object entity, String field) {
         return current().count(entity, field);
     }
 
+    @Override
     public boolean isLoaded(Object entity, String field) {
         return current().isLoaded(entity, field);
     }
 
+    @Override
     public void initialize(Object entity, String field) {
         current().initialize(entity, field);
     }

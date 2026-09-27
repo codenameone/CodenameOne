@@ -31,8 +31,6 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 
 /// A painter that draws the background of a component based on its style
-///
-/// @author Shai Almog
 public class BackgroundPainter implements Painter {
     private final Component parent;
 

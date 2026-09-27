@@ -24,14 +24,12 @@ package com.codename1.backend;
 
 import java.util.Map;
 
-/**
- * A {@code @ManagedResource} bean as the build describes it: its attributes and
- * operations by index, read and invoked through direct calls the build
- * generated. The JMX model -- named attributes you can watch, operations you can
- * call -- with nothing looked up reflectively.
- */
+/// A `@ManagedResource` bean as the build describes it: its attributes and
+/// operations by index, read and invoked through direct calls the build
+/// generated. The JMX model -- named attributes you can watch, operations you can
+/// call -- with nothing looked up reflectively.
 public interface ManagedBean {
-    /** The name its metrics are prefixed with. */
+    /// The name its metrics are prefixed with.
     String getObjectName();
 
     String getDescription();
@@ -40,19 +38,17 @@ public interface ManagedBean {
 
     String[] attributeDescriptions();
 
-    /** The attribute's current value. */
+    /// The attribute's current value.
     Object readAttribute(int index) throws Exception;
 
     String[] operationNames();
 
     String[] operationDescriptions();
 
-    /** Each operation's parameter names, in order. */
+    /// Each operation's parameter names, in order.
     String[][] operationParameters();
 
-    /**
-     * Calls an operation. Arguments arrive by parameter name, as strings,
-     * numbers or booleans, and are converted by the generated code.
-     */
+    /// Calls an operation. Arguments arrive by parameter name, as strings,
+    /// numbers or booleans, and are converted by the generated code.
     Object invoke(int index, Map arguments) throws Exception;
 }

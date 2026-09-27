@@ -38,10 +38,6 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Border;
 
-/**
- *
- * @author shannah
- */
 public class ContextMenu extends Container implements ActionListener {
     private HeavyButtonImpl copy = new HeavyButtonImpl("Copy");
     private Button selectAll = new Button("Select All");

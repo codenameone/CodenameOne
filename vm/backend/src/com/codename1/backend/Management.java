@@ -30,26 +30,24 @@ import java.util.Map;
 
 import com.codename1.backend.metrics.Metrics;
 
-/**
- * The server's management endpoints: health for the load balancer, metrics for
- * a scraper, and the jobs and managed beans for an operator.
- *
- * <pre>
- *   GET  /manage/health          public; 503 while draining
- *   GET  /manage/metrics         every metric, as JSON
- *   GET  /manage/prometheus      every metric, in the Prometheus text format
- *   GET  /manage/jobs            the scheduled jobs and their last runs
- *   GET  /manage/managed         the managed beans, with their attributes' values
- *   POST /manage/managed/{bean}/{operation}   calls an operation; body: arguments
- * </pre>
- *
- * <p>Off by default outside a development profile; {@code cn1.management.enabled}
- * turns it on or off explicitly, and {@code cn1.management.path} moves it.
- * Everything but health needs {@code Authorization: Bearer <cn1.management.token>}.
- * Without a token, a development profile serves the read-only views to anyone
- * who can reach the port -- a laptop -- and no profile serves an operation,
- * since an operation changes the running server.
- */
+/// The server's management endpoints: health for the load balancer, metrics for
+/// a scraper, and the jobs and managed beans for an operator.
+///
+/// ```java
+///   GET  /manage/health          public; 503 while draining
+///   GET  /manage/metrics         every metric, as JSON
+///   GET  /manage/prometheus      every metric, in the Prometheus text format
+///   GET  /manage/jobs            the scheduled jobs and their last runs
+///   GET  /manage/managed         the managed beans, with their attributes' values
+///   POST /manage/managed/{bean}/{operation}   calls an operation; body: arguments
+/// ```
+///
+/// Off by default outside a development profile; `cn1.management.enabled`
+/// turns it on or off explicitly, and `cn1.management.path` moves it.
+/// Everything but health needs `Authorization: Bearer `.
+/// Without a token, a development profile serves the read-only views to anyone
+/// who can reach the port -- a laptop -- and no profile serves an operation,
+/// since an operation changes the running server.
 public final class Management implements HttpServer.Handler {
     public static final String ENABLED = "cn1.management.enabled";
     public static final String PATH = "cn1.management.path";
@@ -58,11 +56,9 @@ public final class Management implements HttpServer.Handler {
     private final String path;
     private final byte[] token;
     private final boolean development;
-    /**
-     * Volatile: attached after the listener's workers are running, and a plain
-     * write need never reach them -- health would read STARTING for good.
-     */
-    private volatile Backend backend;
+    /// Volatile: attached after the listener's workers are running, and a plain
+    /// write need never reach them -- health would read STARTING for good.
+    private volatile Backend backend; //NOPMD AvoidUsingVolatile - attached after the workers start
 
     private Management(String path, String token, boolean development) {
         this.path = path;
@@ -70,61 +66,59 @@ public final class Management implements HttpServer.Handler {
         this.development = development;
     }
 
-    /**
-     * The endpoints this configuration asks for, or null when they are off.
-     *
-     * @throws IOException when they are on outside development with no token,
-     *         which would publish the server's internals to anyone
-     */
+    /// The endpoints this configuration asks for, or null when they are off.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: @throws IOException when they are on outside development with no token,
+    /// which would publish the server's internals to anyone
     public static Management fromConfig(Config config) throws IOException {
         boolean development = config.isDevelopmentProfile();
-        if(!config.getBoolean(ENABLED, development)) {
+        if (!config.getBoolean(ENABLED, development)) {
             return null;
         }
         String token = config.get(TOKEN);
-        if(!development && (token == null || token.length() == 0)) {
+        if (!development && (token == null || token.length() == 0)) {
             throw new IOException(ENABLED + " is on outside a development profile and "
                     + TOKEN + " is not set. The metrics and managed beans would be readable "
                     + "by anyone who can reach the port; set a token, or leave the "
                     + "endpoints off.");
         }
         String path = config.get(PATH, "/manage");
-        while(path.endsWith("/")) {
+        while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
-        if(!path.startsWith("/")) {
+        if (!path.startsWith("/")) {
             throw new IOException(PATH + " must start with /");
         }
         return new Management(path, token, development);
     }
 
-    /** Set once the server is running. */
+    /// Set once the server is running.
     void attach(Backend running) {
         this.backend = running;
     }
 
-    /** The managed beans of the server this endpoint belongs to. */
+    /// The managed beans of the server this endpoint belongs to.
     private List beans() {
         return backend == null ? new ArrayList() : backend.getManagedBeans();
     }
 
-    /**
-     * Each of {@code all} -- a server's managed beans, from
-     * {@link Backend#getManagedBeans} -- with its attributes' current values and
-     * its operations.
-     */
+    /// Each of `all` -- a server's managed beans, from
+    /// [Backend#getManagedBeans] -- with its attributes' current values and
+    /// its operations.
     public static List describeBeans(List all) {
         List out = new ArrayList();
-        for(int iter = 0 ; iter < all.size() ; iter++) {
-            ManagedBean bean = (ManagedBean)all.get(iter);
+        for (Object element : all) {
+            ManagedBean bean = (ManagedBean) element;
             Map m = new LinkedHashMap();
             m.put("objectName", bean.getObjectName());
-            if(bean.getDescription().length() > 0) {
+            if (bean.getDescription().length() > 0) {
                 m.put("description", bean.getDescription());
             }
             Map attributes = new LinkedHashMap();
             String[] names = bean.attributeNames();
-            for(int a = 0 ; a < names.length ; a++) {
+            for (int a = 0 ; a < names.length ; a++) {
                 Object value;
                 try {
                     value = bean.readAttribute(a);
@@ -138,14 +132,14 @@ public final class Management implements HttpServer.Handler {
             String[] ops = bean.operationNames();
             String[] descriptions = bean.operationDescriptions();
             String[][] params = bean.operationParameters();
-            for(int o = 0 ; o < ops.length ; o++) {
+            for (int o = 0 ; o < ops.length ; o++) {
                 Map op = new LinkedHashMap();
                 op.put("name", ops[o]);
-                if(descriptions[o].length() > 0) {
+                if (descriptions[o].length() > 0) {
                     op.put("description", descriptions[o]);
                 }
                 List p = new ArrayList();
-                for(int q = 0 ; q < params[o].length ; q++) {
+                for (int q = 0 ; q < params[o].length ; q++) {
                     p.add(params[o][q]);
                 }
                 op.put("parameters", p);
@@ -157,15 +151,15 @@ public final class Management implements HttpServer.Handler {
         return out;
     }
 
-    /**
-     * Calls an operation of a managed bean by name.
-     *
-     * @throws IllegalArgumentException when there is no such bean or operation
-     */
+    /// Calls an operation of a managed bean by name.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when there is no such bean or operation
     private static ManagedBean find(List all, String objectName) {
-        for(int iter = 0 ; iter < all.size() ; iter++) {
-            ManagedBean bean = (ManagedBean)all.get(iter);
-            if(bean.getObjectName().equals(objectName)) {
+        for (Object element : all) {
+            ManagedBean bean = (ManagedBean) element;
+            if (bean.getObjectName().equals(objectName)) {
                 return bean;
             }
         }
@@ -174,8 +168,8 @@ public final class Management implements HttpServer.Handler {
 
     private static int operationIndex(ManagedBean bean, String operation) {
         String[] ops = bean.operationNames();
-        for(int o = 0 ; o < ops.length ; o++) {
-            if(ops[o].equals(operation)) {
+        for (int o = 0 ; o < ops.length ; o++) {
+            if (ops[o].equals(operation)) {
                 return o;
             }
         }
@@ -184,14 +178,14 @@ public final class Management implements HttpServer.Handler {
 
     public static Object invoke(List all, String objectName, String operation,
                                 Map arguments) throws Exception {
-        for(int iter = 0 ; iter < all.size() ; iter++) {
-            ManagedBean bean = (ManagedBean)all.get(iter);
-            if(!bean.getObjectName().equals(objectName)) {
+        for (Object element : all) {
+            ManagedBean bean = (ManagedBean) element;
+            if (!bean.getObjectName().equals(objectName)) {
                 continue;
             }
             String[] ops = bean.operationNames();
-            for(int o = 0 ; o < ops.length ; o++) {
-                if(ops[o].equals(operation)) {
+            for (int o = 0 ; o < ops.length ; o++) {
+                if (ops[o].equals(operation)) {
                     return bean.invoke(o, arguments == null ? new LinkedHashMap() : arguments);
                 }
             }
@@ -200,51 +194,52 @@ public final class Management implements HttpServer.Handler {
         throw new IllegalArgumentException("No managed bean " + objectName);
     }
 
+    @Override
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
         String target = request.getTarget();
-        if(target == null || !target.startsWith(path)) {
+        if (target == null || !target.startsWith(path)) {
             return null;
         }
         int query = target.indexOf('?');
         String rest = (query < 0 ? target : target.substring(0, query)).substring(path.length());
-        if(rest.length() > 0 && rest.charAt(0) != '/') {
+        if (rest.length() > 0 && rest.charAt(0) != '/') {
             return null;
         }
         String method = request.getMethod();
-        if("/health".equals(rest) && ("GET".equals(method) || "HEAD".equals(method))) {
+        if ("/health".equals(rest) && ("GET".equals(method) || "HEAD".equals(method))) {
             return health(request);
         }
-        if(rest.length() == 0) {
+        if (rest.length() == 0) {
             return null;
         }
         boolean operation = "POST".equals(method) && rest.startsWith("/managed/");
-        if(!authorized(request, operation)) {
+        if (!authorized(request, operation)) {
             return request.respondJson(token == null ? 403 : 401, error(token == null
                     ? "Set " + TOKEN + " to use this endpoint"
                     : "A bearer token is required"));
         }
-        if("GET".equals(method) || "HEAD".equals(method)) {
-            if("/metrics".equals(rest)) {
+        if ("GET".equals(method) || "HEAD".equals(method)) {
+            if ("/metrics".equals(rest)) {
                 return request.respondJson(200, Metrics.snapshot());
             }
-            if("/prometheus".equals(rest)) {
+            if ("/prometheus".equals(rest)) {
                 return request.respond(200, "text/plain; version=0.0.4; charset=utf-8",
                         utf8(Metrics.prometheus()));
             }
-            if("/jobs".equals(rest)) {
+            if ("/jobs".equals(rest)) {
                 Scheduler scheduler = backend == null || backend.getApplication() == null
                         ? null : backend.getApplication().getScheduler();
                 return request.respondJson(200, scheduler == null ? new ArrayList()
                         : scheduler.describe());
             }
-            if("/managed".equals(rest)) {
+            if ("/managed".equals(rest)) {
                 return request.respondJson(200, describeBeans(beans()));
             }
             return null;
         }
-        if(operation) {
+        if (operation) {
             String[] parts = split(rest.substring("/managed/".length()));
-            if(parts == null) {
+            if (parts == null) {
                 return request.respondJson(404, error("Expected /managed/{bean}/{operation}"));
             }
             // Bean and operation names are Java identifiers, so there is nothing
@@ -254,16 +249,16 @@ public final class Management implements HttpServer.Handler {
             // fix, a 400, not an endpoint that does not exist.
             ManagedBean bean = find(beans(), parts[0]);
             int op = bean == null ? -1 : operationIndex(bean, parts[1]);
-            if(bean == null) {
+            if (bean == null) {
                 return request.respondJson(404, error("No managed bean " + parts[0]));
             }
-            if(op < 0) {
+            if (op < 0) {
                 return request.respondJson(404, error(parts[0] + " has no operation "
                         + parts[1]));
             }
             Map arguments = new LinkedHashMap();
             String body = request.getBody();
-            if(body != null && body.trim().length() > 0) {
+            if (body != null && body.trim().length() > 0) {
                 try {
                     arguments = Json.parseObject(body);
                 } catch (Exception err) {
@@ -285,7 +280,7 @@ public final class Management implements HttpServer.Handler {
     private HttpServer.Response health(HttpServer.Request request) {
         Map out = new LinkedHashMap();
         boolean up = true;
-        if(backend != null) {
+        if (backend != null) {
             Map server = backend.getServer().getMetrics();
             boolean serving = "ok".equals(server.get("status"));
             // STARTING until the application's start-up hook has returned: the
@@ -294,10 +289,10 @@ public final class Management implements HttpServer.Handler {
             up = serving && backend.isReady();
             out.put("status", !serving ? "DRAINING" : up ? "UP" : "STARTING");
             out.put("uptimeSeconds", server.get("uptimeSeconds"));
-            if(backend.getDataSource() != null) {
+            if (backend.getDataSource() != null) {
                 Map db = new LinkedHashMap();
-                db.put("open", new Integer(backend.getDataSource().getOpenCount()));
-                db.put("idle", new Integer(backend.getDataSource().getIdleCount()));
+                db.put("open", Integer.valueOf(backend.getDataSource().getOpenCount()));
+                db.put("idle", Integer.valueOf(backend.getDataSource().getIdleCount()));
                 out.put("database", db);
             }
         } else {
@@ -309,11 +304,11 @@ public final class Management implements HttpServer.Handler {
     }
 
     private boolean authorized(HttpServer.Request request, boolean operation) {
-        if(token == null) {
+        if (token == null) {
             return development && !operation;
         }
         String header = request.getHeader("authorization");
-        if(header == null || !header.regionMatches(true, 0, "Bearer ", 0, 7)) {
+        if (header == null || !header.regionMatches(true, 0, "Bearer ", 0, 7)) {
             return false;
         }
         return Crypto.equalsConstantTime(token, utf8(header.substring(7).trim()));
@@ -321,7 +316,7 @@ public final class Management implements HttpServer.Handler {
 
     private static String[] split(String rest) {
         int slash = rest.indexOf('/');
-        if(slash <= 0 || slash == rest.length() - 1 || rest.indexOf('/', slash + 1) >= 0) {
+        if (slash <= 0 || slash == rest.length() - 1 || rest.indexOf('/', slash + 1) >= 0) {
             return null;
         }
         return new String[] {rest.substring(0, slash), rest.substring(slash + 1)};
@@ -337,7 +332,7 @@ public final class Management implements HttpServer.Handler {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException err) {
-            throw new IllegalStateException("UTF-8 is required");
+            throw new IllegalStateException("UTF-8 is required", err);
         }
     }
 }

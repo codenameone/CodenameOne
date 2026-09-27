@@ -30,10 +30,6 @@ import java.util.prefs.Preferences;
 
 import javax.swing.*;
 
-/**
- *
- * @author Chen
- */
 public class LocationSimulation extends JFrame {
 
     private final JcefMapBridge mapBridge = new JcefMapBridge();

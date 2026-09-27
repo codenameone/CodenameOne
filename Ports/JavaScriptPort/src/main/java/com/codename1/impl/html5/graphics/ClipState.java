@@ -23,10 +23,6 @@
 
 package com.codename1.impl.html5.graphics;
 
-/**
- *
- * @author shannah
- */
 public class ClipState {
     private boolean set;
     public boolean isSet() {

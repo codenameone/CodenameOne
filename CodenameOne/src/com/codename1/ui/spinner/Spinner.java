@@ -45,8 +45,6 @@ import java.util.Date;
 /// A spinner allows us to select a numeric, date or time value using the arrow keys
 /// in a similar way to a list or a combo box.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

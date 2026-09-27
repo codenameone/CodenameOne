@@ -55,8 +55,6 @@ import java.util.List;
  * factor, and opening a real operating system window inside that simulation is
  * incoherent. The predicate mirrors the one {@code isFullScreenSupported} already
  * uses.</p>
- *
- * @author Shai Almog
  */
 public class JavaSEWindowManager extends WindowManager {
 

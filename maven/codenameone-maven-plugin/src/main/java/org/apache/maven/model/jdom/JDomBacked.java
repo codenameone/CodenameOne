@@ -20,8 +20,6 @@ import org.jdom2.Element;
 
 /**
  * Denotes model classes that are backed by a JDOM element.
- *
- * @author Marc Rohlfs, CoreMedia AG
  */
 public interface JDomBacked {
 

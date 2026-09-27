@@ -20,9 +20,6 @@ package com.codename1.util.regex;
 /// A class that holds compiled regular expressions.  You should not need to
 /// work directly with this class.
 ///
-/// @author [Jonathan Locke](mailto:jonl@muppetlabs.com)
-/// @version $Id: REProgram.java 518156 2007-03-14 14:31:26Z vgritsenko $
-///
 /// #### See also
 ///
 /// - RE

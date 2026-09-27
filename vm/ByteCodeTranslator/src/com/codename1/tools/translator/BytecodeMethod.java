@@ -61,10 +61,6 @@ import java.util.TreeSet;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class BytecodeMethod implements SignatureSet {
     private static MethodDependencyGraph dependencyGraph;
 

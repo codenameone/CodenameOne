@@ -155,8 +155,6 @@ import com.codename1.gaming.physics.box2d.dynamics.joints.Joint;
  */
 
 /// This is an internal class.
-///
-/// @author Daniel Murphy
 public class Island {
 
   public ContactListener m_listener;

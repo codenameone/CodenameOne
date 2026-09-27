@@ -42,9 +42,6 @@ import static com.codename1.ui.CN.isEdt;
 /// as a handle for the object to be passed around irrespective of whether the
 /// object has finished loading.  Conceptually this is very similar to Futures and
 /// Promises.
-///
-/// @author shannah
-///
 public class AsyncResource<V> extends Observable {
     private final Object lock = new Object();
     private V value;

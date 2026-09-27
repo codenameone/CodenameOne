@@ -27,65 +27,61 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Where background work runs: the named {@link TaskExecutor}s, and two
- * shorthands for running something once.
- *
- * <pre>
- *   Tasks.platform(new Runnable() { public void run() { rebuildIndex(); } });
- *   Tasks.virtual(new Runnable() { public void run() { pingWebhooks(); } });
- * </pre>
- *
- * <h2>Whose executors</h2>
- *
- * <p>Every server has its own executors, sized from its own configuration and
- * stopped with it: two servers in one process -- or one stopped and started
- * again -- must not share a pool, or stopping one would shut down the executor
- * the other's scheduler and {@code @Async} methods still submit to. The calls
- * here are static because generated code makes them, so they find the server by
- * the calling thread: a request thread, a task thread and a scheduled job all
- * carry the server they work for, and so does the thread that builds and starts
- * the beans. A thread that carries none -- one the program started itself --
- * gets the most recently started server that is still running.
- *
- * <h2>Which thread</h2>
- *
- * <p>A virtual thread is the cheaper one, and the right one for work that waits
- * on sockets. It is the wrong one for work that talks to a database: on this
- * runtime a database read blocks the HOST thread under the virtual thread, and
- * every other virtual thread on that host with it. See
- * {@code com.codename1.backend.annotations.ThreadKind}.
- */
+/// Where background work runs: the named [TaskExecutor]s, and two
+/// shorthands for running something once.
+///
+/// ```java
+///   Tasks.platform(new Runnable() { public void run() { rebuildIndex(); } });
+///   Tasks.virtual(new Runnable() { public void run() { pingWebhooks(); } });
+/// ```
+///
+/// ## Whose executors
+///
+/// Every server has its own executors, sized from its own configuration and
+/// stopped with it: two servers in one process -- or one stopped and started
+/// again -- must not share a pool, or stopping one would shut down the executor
+/// the other's scheduler and `@Async` methods still submit to. The calls
+/// here are static because generated code makes them, so they find the server by
+/// the calling thread: a request thread, a task thread and a scheduled job all
+/// carry the server they work for, and so does the thread that builds and starts
+/// the beans. A thread that carries none -- one the program started itself --
+/// gets the most recently started server that is still running.
+///
+/// ## Which thread
+///
+/// A virtual thread is the cheaper one, and the right one for work that waits
+/// on sockets. It is the wrong one for work that talks to a database: on this
+/// runtime a database read blocks the HOST thread under the virtual thread, and
+/// every other virtual thread on that host with it. See
+/// `com.codename1.backend.annotations.ThreadKind`.
 public final class Tasks {
     public static final int AUTO = 0;
     public static final int VIRTUAL = 1;
     public static final int PLATFORM = 2;
 
-    /** The executor {@code @Async} methods use when they name none. */
+    /// The executor `@Async` methods use when they name none.
     public static final String DEFAULT = "default";
-    /** The executor scheduled jobs use when they name none. */
+    /// The executor scheduled jobs use when they name none.
     public static final String SCHEDULING = "scheduling";
 
-    /** The registry of the server the calling thread works for, when it carries one. */
+    /// The registry of the server the calling thread works for, when it carries one.
     private static final ThreadLocal CURRENT = new ThreadLocal();
-    /** Every registry not yet shut down, oldest first. */
+    /// Every registry not yet shut down, oldest first.
     private static final List LIVE = new ArrayList();
 
     private Tasks() {
     }
 
-    /** One server's executors. */
+    /// One server's executors.
     static final class Registry {
         private final Map executors = new LinkedHashMap();
         private final Config config;
         private boolean reportedAuto;
         private boolean shutdown;
-        /**
-         * The server whose hosts this registry's virtual tasks run on, once it is
-         * listening; null before that. Only meaningful when {@link #ownedByServer}.
-         */
+        /// The server whose hosts this registry's virtual tasks run on, once it is
+        /// listening; null before that. Only meaningful when [#ownedByServer].
         HttpServer server;
-        /** Whether a server opened this registry, as opposed to a bare process. */
+        /// Whether a server opened this registry, as opposed to a bare process.
         final boolean ownedByServer;
 
         Registry(Config config, boolean ownedByServer) {
@@ -93,36 +89,32 @@ public final class Tasks {
             this.ownedByServer = ownedByServer;
         }
 
-        /**
-         * The server a virtual task of this registry may go to: its own, never
-         * another backend's -- whose stop would then wait on, or abandon, a task
-         * this one still wants. Null means "run it on a platform thread".
-         */
+        /// The server a virtual task of this registry may go to: its own, never
+        /// another backend's -- whose stop would then wait on, or abandon, a task
+        /// this one still wants. Null means "run it on a platform thread".
         synchronized HttpServer virtualHost() {
             return ownedByServer ? server : HttpServer.activeServer();
         }
     }
 
-    /** A new registry for a server that is starting, which threads without one then use. */
+    /// A new registry for a server that is starting, which threads without one then use.
     static Registry open(Config config) {
         Registry r = new Registry(config, true);
-        synchronized(Tasks.class) {
+        synchronized (Tasks.class) {
             LIVE.add(r);
         }
         return r;
     }
 
-    /**
-     * Makes {@code registry} the calling thread's until {@link #leave}; answers
-     * what to restore.
-     */
+    /// Makes `registry` the calling thread's until [#leave]; answers
+    /// what to restore.
     static Object enter(Registry registry) {
         Object previous = CURRENT.get();
         CURRENT.set(registry);
         return previous;
     }
 
-    /** The calling thread's registry as it is, for restoring later; may be null. */
+    /// The calling thread's registry as it is, for restoring later; may be null.
     static Object peek() {
         return CURRENT.get();
     }
@@ -131,30 +123,30 @@ public final class Tasks {
         CURRENT.set(previous);
     }
 
-    /** The calling thread's registry, the newest live one, or a new one of defaults. */
+    /// The calling thread's registry, the newest live one, or a new one of defaults.
     private static Registry current() {
-        Registry r = (Registry)CURRENT.get();
-        if(r != null) {
+        Registry r = (Registry) CURRENT.get();
+        if (r != null) {
             return r;
         }
-        synchronized(Tasks.class) {
-            if(LIVE.isEmpty()) {
+        synchronized (Tasks.class) {
+            if (LIVE.isEmpty()) {
                 // No server is running -- a test calling an @Async method
                 // directly: executors take their defaults.
                 LIVE.add(new Registry(null, false));
             }
-            return (Registry)LIVE.get(LIVE.size() - 1);
+            return (Registry) LIVE.get(LIVE.size() - 1);
         }
     }
 
-    /**
-     * The executor called {@code name} of the calling thread's server, created
-     * on first use.
-     *
-     * @param kind {@link #AUTO}, {@link #VIRTUAL} or {@link #PLATFORM}: what the
-     *        code asked for, which {@code cn1.task.executor.<name>.kind}
-     *        overrides
-     */
+    /// The executor called `name` of the calling thread's server, created
+    /// on first use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: @param kind [#AUTO], [#VIRTUAL] or [#PLATFORM]: what the
+    /// code asked for, which `cn1.task.executor..kind`
+    /// overrides
     public static TaskExecutor executor(String name, int kind) {
         return executor(current(), name, kind);
     }
@@ -165,35 +157,35 @@ public final class Tasks {
         // unmarked method created first -- they would otherwise share "default".
         String key = name == null || name.length() == 0
                 ? (kind == VIRTUAL ? DEFAULT + "-virtual" : DEFAULT) : name;
-        synchronized(registry) {
-            TaskExecutor existing = (TaskExecutor)registry.executors.get(key);
-            if(existing != null) {
+        synchronized (registry) {
+            TaskExecutor existing = (TaskExecutor) registry.executors.get(key);
+            if (existing != null) {
                 return existing;
             }
-            if(registry.shutdown) {
+            if (registry.shutdown) {
                 throw new IllegalStateException("The server these tasks belong to has "
                         + "stopped; executor " + key + " cannot be created");
             }
             String prefix = "cn1.task.executor." + key + ".";
             int threads = SCHEDULING.equals(key) ? 2 : 8;
             String configured = null;
-            if(registry.config != null) {
+            if (registry.config != null) {
                 try {
                     threads = registry.config.getInt(prefix + "threads", threads);
                     configured = registry.config.get(prefix + "kind");
                 } catch (java.io.IOException err) {
                     throw new IllegalStateException("Executor " + key
-                            + " cannot be configured: " + err.getMessage());
+                            + " cannot be configured: " + err.getMessage(), err);
                 }
             }
             boolean virtual;
-            if("virtual".equalsIgnoreCase(configured)) {
+            if ("virtual".equalsIgnoreCase(configured)) {
                 virtual = true;
-            } else if("platform".equalsIgnoreCase(configured)) {
+            } else if ("platform".equalsIgnoreCase(configured)) {
                 virtual = false;
-            } else if(kind == AUTO) {
+            } else if (kind == AUTO) {
                 virtual = HttpServer.acceptsVirtualTasks();
-                if(!registry.reportedAuto) {
+                if (!registry.reportedAuto) {
                     registry.reportedAuto = true;
                     System.out.println("cn1: background tasks marked AUTO run on "
                             + (virtual ? "virtual" : "platform") + " threads");
@@ -207,25 +199,23 @@ public final class Tasks {
         }
     }
 
-    /** Runs {@code task} once on a virtual thread, or a platform one where there are none. */
+    /// Runs `task` once on a virtual thread, or a platform one where there are none.
     public static void virtual(Runnable task) {
         executor(null, VIRTUAL).execute(task);
     }
 
-    /** Runs {@code task} once on the default pool of platform threads. */
+    /// Runs `task` once on the default pool of platform threads.
     public static void platform(Runnable task) {
         executor(null, PLATFORM).execute(task);
     }
 
-    /**
-     * The body of a background task's virtual thread: the native entry point
-     * calls this with the token the task was queued under. Nothing in Java calls
-     * it, which is why the native source names it -- that keeps it alive through
-     * dead-code elimination.
-     */
+    /// The body of a background task's virtual thread: the native entry point
+    /// calls this with the token the task was queued under. Nothing in Java calls
+    /// it, which is why the native source names it -- that keeps it alive through
+    /// dead-code elimination.
     static void runVirtual(long token) {
         Runnable task = HttpServer.takeVirtualTask(token);
-        if(task == null) {
+        if (task == null) {
             return;
         }
         try {
@@ -236,48 +226,44 @@ public final class Tasks {
         }
     }
 
-    /** The executors of every running server, for a listing. */
+    /// The executors of every running server, for a listing.
     public static List executors() {
         List registries;
-        synchronized(Tasks.class) {
+        synchronized (Tasks.class) {
             registries = new ArrayList(LIVE);
         }
         List out = new ArrayList();
-        for(int iter = 0 ; iter < registries.size() ; iter++) {
-            Registry r = (Registry)registries.get(iter);
-            synchronized(r) {
+        for (Object element : registries) {
+            Registry r = (Registry) element;
+            synchronized (r) {
                 out.addAll(r.executors.values());
             }
         }
         return out;
     }
 
-    /**
-     * Stops the executors of the calling thread's server, waiting up to
-     * {@code waitMillis} in total for what is running.
-     */
+    /// Stops the executors of the calling thread's server, waiting up to
+    /// `waitMillis` in total for what is running.
     public static void shutdown(long waitMillis) {
         shutdown(current(), waitMillis);
     }
 
-    /**
-     * Stops {@code registry}'s executors, waiting up to {@code waitMillis} in
-     * total, and retires it: nothing new is accepted, and threads that fell
-     * back to it move on to another running server's.
-     */
+    /// Stops `registry`'s executors, waiting up to `waitMillis` in
+    /// total, and retires it: nothing new is accepted, and threads that fell
+    /// back to it move on to another running server's.
     static void shutdown(Registry registry, long waitMillis) {
         List all;
-        synchronized(Tasks.class) {
+        synchronized (Tasks.class) {
             LIVE.remove(registry);
         }
-        synchronized(registry) {
+        synchronized (registry) {
             registry.shutdown = true;
             all = new ArrayList(registry.executors.values());
         }
         long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
-        for(int iter = 0 ; iter < all.size() ; iter++) {
+        for (Object element : all) {
             long left = deadline - System.currentTimeMillis();
-            ((TaskExecutor)all.get(iter)).shutdown(left > 0 ? left : 0);
+            ((TaskExecutor) element).shutdown(left > 0 ? left : 0);
         }
     }
 }

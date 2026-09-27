@@ -40,8 +40,6 @@ import java.util.Hashtable;
 
 /// `XMLWriter` writes an XML `com.codename1.xml.Element` into an XML string/file
 /// this allowing us to serialize previously parsed and modified XML.
-///
-/// @author Paul Harrison Williams
 public class XMLWriter {
 
     private static final String[][] escapes = {

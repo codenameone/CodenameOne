@@ -34,8 +34,6 @@ import javax.swing.JOptionPane;
 
 /**
  * Generic dialog shown before adding a new resource to the resource editor
- *
- * @author  Shai Almog
  */
 public class AddResourceDialog extends javax.swing.JPanel {
     public static final int IMAGE = 0;

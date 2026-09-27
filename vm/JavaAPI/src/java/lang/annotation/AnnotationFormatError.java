@@ -25,8 +25,6 @@ package java.lang.annotation;
 
 /**
  * A mirror of java.lang.annotation.AnnotationFormatError.
- * 
- * @author Toby Reyelts
  */
 public class AnnotationFormatError extends Error {
 

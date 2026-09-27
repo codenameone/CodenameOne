@@ -37,8 +37,6 @@ import java.util.Vector;
 
 /// ResourceThreadQueue is a thread queue used to create and manage threads that download images and CSS files that were referred from HTML pages
 /// Was called ImageThreadQueue but name was changed since it now handles CSS as well
-///
-/// @author Ofir Leitner
 class ResourceThreadQueue {
 
     /// The default number of maximum threads used for image download
@@ -345,8 +343,6 @@ class ResourceThreadQueue {
     // Inner classes:
 
     /// An ResourceThread downloads an Image as requested
-    ///
-    /// @author Ofir Leitner
     static class ResourceThread implements Runnable, IOCallback {
 
         Component imgLabel;

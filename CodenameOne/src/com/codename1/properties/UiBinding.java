@@ -65,8 +65,6 @@ import java.util.Set;
 /// 3. `com.codename1.properties.UiBinding.Binding` - the commit mode.
 ///
 /// 4. `com.codename1.ui.Component)` - the `bind` helper methods allow us to bind a component easily without exposure to these complexities.
-///
-/// @author Shai Almog
 public class UiBinding {
     private boolean autoCommit = true;
 

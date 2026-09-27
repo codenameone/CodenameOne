@@ -31,8 +31,6 @@ import com.codename1.ui.geom.Dimension;
 /// Abstract class that can be used to arrange components in a container using
 /// a predefined algorithm. This class may be implemented externally and is similar
 /// in spirit to the AWT/Swing layout managers.
-///
-/// @author Chen Fishbein
 public abstract class Layout {
 
     /// Utility method

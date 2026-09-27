@@ -63,10 +63,6 @@ import com.codename1.html5.js.browser.Window;
 import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.typedarrays.Float32Array;
 
-/**
- *
- * @author shannah
- */
 public class HTML5MediaRecorder extends AbstractMedia {
     
     private CN1AudioRecorder peer;

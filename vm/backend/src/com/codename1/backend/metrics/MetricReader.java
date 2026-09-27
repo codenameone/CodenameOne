@@ -26,19 +26,15 @@ import java.io.IOException;
 
 import com.codename1.backend.Config;
 
-/**
- * Something that reads {@link Metrics} periodically and sends them somewhere --
- * the OTLP exporter. Installed by the generated entry point of a build that
- * enables OpenTelemetry, and referenced nowhere else, so a build that does not
- * leaves the exporter out of the binary.
- */
+/// Something that reads [Metrics] periodically and sends them somewhere --
+/// the OTLP exporter. Installed by the generated entry point of a build that
+/// enables OpenTelemetry, and referenced nowhere else, so a build that does not
+/// leaves the exporter out of the binary.
 public interface MetricReader {
-    /**
-     * Reads the configuration and starts. Answers false when the deployment has
-     * metrics turned off, in which case nothing is started.
-     */
+    /// Reads the configuration and starts. Answers false when the deployment has
+    /// metrics turned off, in which case nothing is started.
     boolean open(Config config) throws IOException;
 
-    /** Sends what is left and stops, waiting up to {@code timeoutMillis}. */
+    /// Sends what is left and stops, waiting up to `timeoutMillis`.
     void shutdown(int timeoutMillis);
 }

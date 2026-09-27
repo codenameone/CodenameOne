@@ -34,9 +34,7 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
 /// Class used for computing the time of impact. This class should not be constructed usually, just
-/// retrieve from the {@link SingletonPool#getTOI()}.
-///
-/// @author daniel
+/// retrieve from [IWorldPool#getTimeOfImpact()][com.codename1.gaming.physics.box2d.pooling.IWorldPool#getTimeOfImpact()].
 public class TimeOfImpact {
   public static final int MAX_ITERATIONS = 1000;
 
@@ -47,8 +45,6 @@ public class TimeOfImpact {
   public static int toiMaxRootIters = 0;
 
   /// Input parameters for TOI
-  ///
-  /// @author Daniel Murphy
   public static class TOIInput {
     public final DistanceProxy proxyA = new DistanceProxy();
     public final DistanceProxy proxyB = new DistanceProxy();
@@ -63,8 +59,6 @@ public class TimeOfImpact {
   }
 
   /// Output parameters for TimeOfImpact
-  ///
-  /// @author daniel
   public static class TOIOutput {
     public TOIOutputState state;
     public float t;
