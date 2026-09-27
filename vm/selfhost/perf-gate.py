@@ -87,6 +87,25 @@ PLATFORM_NAMES = {'linux-x64': 'Linux x64', 'linux-arm64': 'Linux arm64',
                   'windows-arm64': 'Windows arm64'}
 
 
+def cpu_model():
+    """The runner's processor, recorded with every result. Hosted runners of one label do
+    not all have the same CPU, and a ratio can move with the model: without this a jump on
+    one platform cannot be told apart from a change in the code."""
+    try:
+        if sys.platform == 'darwin':
+            return subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string'],
+                                           text=True).strip()
+        if sys.platform.startswith('linux'):
+            for line in Path('/proc/cpuinfo').read_text(errors='replace').splitlines():
+                if line.lower().startswith(('model name', 'hardware')):
+                    return line.split(':', 1)[1].strip()
+        if os.name == 'nt':
+            return os.environ.get('PROCESSOR_IDENTIFIER', '') or platform.processor()
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    return platform.processor() or 'unknown'
+
+
 def platform_key():
     system = {'Linux': 'linux', 'Darwin': 'macos', 'Windows': 'windows'}.get(
         platform.system(), platform.system().lower())
@@ -370,6 +389,8 @@ def render_markdown(report):
     name = PLATFORM_NAMES.get(report['platform'], report['platform'])
     tol = report['tolerance']
     lines = ['### ParparVM vs HotSpot (JDK 25): %s' % name, '']
+    if report.get('cpu'):
+        lines += ['Runner CPU: %s' % report['cpu'], '']
     if report.get('error'):
         lines += ['**The performance gate could not complete:** `%s`' % report['error'], '']
     regressions = []
@@ -471,7 +492,8 @@ def main(argv):
 
     exe = '.exe' if platform.system() == 'Windows' else ''
     report = {'platform': args.platform, 'rounds': args.rounds, 'results': {}, 'labels': {},
-              'available_cores': available_cores(), 'skipped_cores': [], 'regression': False}
+              'available_cores': available_cores(), 'skipped_cores': [], 'regression': False,
+              'cpu': cpu_model()}
     out = Path(args.out) if args.out else None
     markdown = Path(args.markdown) if args.markdown else None
 

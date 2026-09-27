@@ -824,6 +824,7 @@ struct CN1GcTraceContext {
     struct gcMarkLocalBuffer* localBuffer;
     int precise, trusted, gracePass, graceTraceFresh;
     JAVA_BOOLEAN maturing;
+    int traceIncomplete;
 };
 static __thread struct CN1GcTraceContext cn1GcTrace;
 #define cn1GcInGracePass (cn1GcTrace.gracePass)
@@ -973,8 +974,14 @@ static int cn1GcAgingSlack(void) {
 // cn1GcGenDecide.
 static JAVA_BOOLEAN cn1GcMinor = JAVA_FALSE;
 // Set by gcMarkObject when a conservative-resolve failure skipped a child; consumed by
-// whatever ran the mark function. GC thread only: single-core mode has one marker.
-static int cn1GcTraceIncomplete = 0;
+// whatever ran the mark function. PER MARKER THREAD, in the trace context: every marker
+// clears it before every mark function it runs, parallel workers included. As a plain
+// global that was one shared store per traced object from every marker, and whatever
+// else the linker put on its cache line was evicted from every marker in turn -- with
+// cn1GcMinor there, which gcMarkObject reads for every object, objectAllocation on
+// Linux ran 40% slower. Deleting 32 bytes of unrelated counters elsewhere in this file
+// was enough to move the two onto one line, so the cost was an accident of layout.
+#define cn1GcTraceIncomplete (cn1GcTrace.traceIncomplete)
 void cn1GcRememberSlow(JAVA_OBJECT t);
 #define CN1_GC_CHECK2_END() ((void)0)
 #define CN1_GC_TRACE_DONE(o) do { CN1_GC_CHECK2_END(); if(__builtin_expect(cn1GcTraceIncomplete, 0)) { \
@@ -15101,9 +15108,11 @@ static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
 // the overflow-rescan loop to detect a fixed point: if a rescan+drain pass marks
 // nothing new, the reachable set is fully closed under "marked" and we're done --
 // otherwise we'd spin forever re-pushing the same marked-and-already-scanned
-// objects when the marked set is larger than the worklist. Only touched on the
-// serial path (gcMarkLocalBuf == 0); the parallel workers never run the rescan, and
-// writing it from many workers would be a benign-value-but-still-reported data race.
+// objects when the marked set is larger than the worklist. Only the serial path
+// (gcMarkLocalBuf == 0) READS it -- the parallel workers never run the rescan -- but
+// gcMarkObject sets it on every path, so it is stored only when it is still false:
+// a store per newly marked object from every parallel marker keeps its cache line
+// bouncing between them for a value that never changes after the first one.
 static JAVA_BOOLEAN gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
 
 #ifdef CN1_BIBOP_VALIDATE
@@ -15748,7 +15757,9 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
 #endif
     CN1_OBJ_MARK_STORE(obj, markVal, __ATOMIC_RELAXED);
     CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, markSnapshot);
-    gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
+    if(!gcMarkFoundUnmarkedChildInPass) {
+        gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
+    }
     gcMarkNewObjectCount++;   // SATB fixpoint detection (mark-thread only)
 #ifdef CN1_BIBOP_VALIDATE
     // Belt diagnostic: name what the main drain systematically MISSED. When set, every
