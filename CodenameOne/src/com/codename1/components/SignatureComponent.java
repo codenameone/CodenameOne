@@ -71,13 +71,9 @@ import com.codename1.ui.TopLevelContainer;
 /// hi.show();
 /// ```
 ///
-/// Screenshots
-///
-/// Video Demo
+/// ![The signature dialog, with Cancel, Reset and Save buttons](https://www.codenameone.com/developer-guide/img/components-signature2.png)
 ///
 /// Source available [here](https://github.com/codenameone/codenameone-demos/SignatureComponentDemo)
-///
-/// .
 ///
 /// Styles
 ///

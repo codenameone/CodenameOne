@@ -46,8 +46,6 @@ import java.util.ArrayList;
 ///   TimeSpinnerHoursLabelUsed for the "hours" label to the right of the *hours* spinner.  Used only in duration mode.
 ///   TimeSpinnerMinutesLabelUsed for the "minutes" label to the right of the *minutes* spinner.  Used only in duration mode.
 ///
-/// Screenshots
-///
 /// #### Deprecated
 ///
 /// use Picker instead

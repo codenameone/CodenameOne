@@ -364,9 +364,12 @@ The backend is held to the client's gates:
   `package-info.java` per package; no since markers.
 - SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
   forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
-  using the core's own `pmd.xml` and `checkstyle.xml`. PMD and Checkstyle cover
-  `impl/parparvm` too, although Maven compiles only `impl/javase`.
+  using the core's own `pmd.xml` and `checkstyle.xml`.
 - Error Prone's `BanClassForName`, because ParparVM translates the backend too.
+- `maven/backend` compiles only the `impl/javase` twins, so the production
+  `impl/parparvm` tree gets its own analysis-only module, `maven/backend-parparvm`
+  (profile `-DbackendAnalysis`, never published), which compiles it against the
+  JDK for PMD and Error Prone. Checkstyle reads sources and covers it directly.
 - `build_javadocs.sh` runs BOTH references with `-Xdoclint:all,-missing -Werror`
   and no `|| true`: an unresolved `[Reference]`, a stray `@Word` at the start of a
   comment line, a `@param` naming no parameter, or a duplicated tag fails the

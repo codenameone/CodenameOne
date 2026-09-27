@@ -467,6 +467,8 @@ jobs:
       # The backend runtime is named explicitly rather than left to -am: the plugin
       # reaches it only through a test-scoped dependency, and its verify is where
       # its SpotBugs, PMD and Checkstyle run -- the same gates the core has.
+      # backend-parparvm (activated by -DbackendAnalysis) compiles the production
+      # impl/parparvm tree that maven/backend never compiles, so PMD can see it.
       - name: Run SpotBugs for ports, Maven plugin and backend runtime
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
@@ -476,7 +478,8 @@ jobs:
           mvn -B -DskipTests=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
-            -pl android,ios,codenameone-maven-plugin,backend -am verify
+            -DbackendAnalysis \
+            -pl android,ios,codenameone-maven-plugin,backend,backend-parparvm -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -674,7 +677,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -711,6 +714,9 @@ jobs:
           fi
           if [ -f maven/backend/target/pmd.xml ]; then
             cp maven/backend/target/pmd.xml quality-artifacts/static-analysis/pmd-backend.xml
+          fi
+          if [ -f maven/backend-parparvm/target/pmd.xml ]; then
+            cp maven/backend-parparvm/target/pmd.xml quality-artifacts/static-analysis/pmd-backend-parparvm.xml
           fi
           if [ -f maven/backend/target/checkstyle-result.xml ]; then
             cp maven/backend/target/checkstyle-result.xml quality-artifacts/static-analysis/checkstyle-backend.xml
@@ -810,7 +816,7 @@ jobs:
       - name: Generate quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
@@ -818,7 +824,7 @@ jobs:
           # PMD and Checkstyle run on the core and on the backend runtime, and each
           # must produce its report: without one, the forbidden-rule gate below it
           # has nothing to read and passes.
-          QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend
+          QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend:backend-parparvm
           QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}

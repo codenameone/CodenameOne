@@ -284,14 +284,14 @@
                     <rulesets>
                         <ruleset>${project.basedir}/../core-unittests/pmd.xml</ruleset>
                     </rulesets>
-                    <!-- Both implementations, although only the Java SE one is
-                         compiled here: the ParparVM one is the production
-                         runtime and is exactly as much this module's code. -->
-                    <compileSourceRoots>
-                        <compileSourceRoot>${backend.dir}/src</compileSourceRoot>
-                        <compileSourceRoot>${backend.dir}/impl/javase</compileSourceRoot>
-                        <compileSourceRoot>${backend.dir}/impl/parparvm</compileSourceRoot>
-                    </compileSourceRoots>
+                    <!-- The production impl/parparvm tree is analysed by
+                         maven/backend-parparvm, which compiles it. It cannot be
+                         added here: PMD reads the project's compile source roots,
+                         a read-only parameter, and making impl/parparvm one would
+                         compile both twins of every per-target class at once. -->
+                    <excludeRoots>
+                        <excludeRoot>${backend.shared.dir}</excludeRoot>
+                    </excludeRoots>
                 </configuration>
                 <executions>
                     <execution>

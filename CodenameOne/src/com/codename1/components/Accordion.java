@@ -67,7 +67,7 @@ import com.codename1.ui.util.EventDispatcher;
 /// f.show();
 /// ```
 ///
-/// Screenshots
+/// ![An accordion with one section expanded](https://www.codenameone.com/developer-guide/img/components-accordion.png)
 public class Accordion extends Container {
 
     private final EventDispatcher listeners = new EventDispatcher();

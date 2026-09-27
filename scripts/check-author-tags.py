@@ -51,7 +51,8 @@ DOC_LINE_TAG = re.compile(r'^\s*(?:/\*\*|\*)?\s*@(author|version)\b')
 
 def findings(path):
     try:
-        text = open(path, 'rb').read().decode('latin-1')
+        with open(path, 'rb') as source:
+            text = source.read().decode('latin-1')
     except OSError as err:
         return [(0, f'unreadable: {err}')]
     out = []
