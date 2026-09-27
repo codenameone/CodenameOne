@@ -63,13 +63,18 @@ public final class Gauge extends Instrument {
     }
 
     /// The value now, or NaN when reading it failed.
+    ///
+    /// Application code runs here, on the exporter's thread and on the
+    /// management endpoint's, so ANY throwable is contained -- an AssertionError
+    /// or LinkageError escaping used to end the exporter's only thread, and every
+    /// later export with it.
     public double read() {
         if (source == null) {
             return Double.NaN;
         }
         try {
             return source.read();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             return Double.NaN;
         }
     }
@@ -80,7 +85,8 @@ public final class Gauge extends Instrument {
             try {
                 List points = multi.read();
                 return points == null ? new java.util.ArrayList() : points;
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
+                // Contained like read(): the callback is the application's.
                 return new java.util.ArrayList();
             }
         }

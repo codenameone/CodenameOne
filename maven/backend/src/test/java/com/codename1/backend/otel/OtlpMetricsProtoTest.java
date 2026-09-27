@@ -93,6 +93,22 @@ class OtlpMetricsProtoTest {
     }
 
     @Test
+    @DisplayName("a gauge whose callback throws an Error costs its value, not the export")
+    void aGaugeErrorIsContained() throws Exception {
+        com.codename1.backend.metrics.Gauge broken = Metrics.gauge("test.proto.broken", "", "",
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        throw new AssertionError("application bug");
+                    }
+                });
+        assertTrue(Double.isNaN(broken.read()));
+        Map request = OtlpMetricExporter.request(new LinkedHashMap(),
+                Collections.singletonList(broken), System.currentTimeMillis());
+        OtlpSchema.metricsProtobuf(request);
+        assertTrue(Metrics.prometheus().length() > 0);
+    }
+
+    @Test
     @DisplayName("a counter past 2^53 is exported exactly, through as_int")
     void countersAreIntegral() throws Exception {
         com.codename1.backend.metrics.Counter big = Metrics.counter("test.proto.big", "", "");

@@ -120,6 +120,9 @@ public final class HttpServer {
         private List endedSessions;
         /// The sessions this request counts as using; see Sessions.enter.
         List sessionsInUse;
+        /// The id each of those sessions had when this request found it, so its
+        /// end can tell a rotation of its own from one another request made.
+        Map sessionIdsFound;
         /// This request's session once looked up; see [#getSession(boolean)].
         private HttpSession session;
         private boolean sessionResolved;

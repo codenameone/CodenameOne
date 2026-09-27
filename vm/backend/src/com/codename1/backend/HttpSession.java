@@ -229,6 +229,13 @@ public final class HttpSession {
         return maxInactiveChanged;
     }
 
+    /// Takes the session back to `previous`, the id another request's
+    /// rotation already announced; see Sessions.finish.
+    synchronized void undoRotation(String previous) {
+        id = previous;
+        previousId = null;
+    }
+
     synchronized void markRotationLost() {
         rotationLost = true;
     }

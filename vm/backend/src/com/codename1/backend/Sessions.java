@@ -297,12 +297,35 @@ public final class Sessions {
     /// needs. Called by the server after the handler returns.
     HttpServer.Response finish(HttpSession session, HttpServer.Response response)
             throws IOException {
+        return finish(null, session, response);
+    }
+
+    /// [#finish(HttpSession,HttpServer.Response)] for the request that used the
+    /// session, which is what tells its own rotation from another request's.
+    HttpServer.Response finish(HttpServer.Request request, HttpSession session,
+                               HttpServer.Response response) throws IOException {
         if (session == null) {
             return response;
         }
         SessionStore s = getStore();
         String cookie = null;
         String previous = session.previousId();
+        String found = request == null || request.sessionIdsFound == null ? null
+                : (String) request.sessionIdsFound.get(session);
+        if (previous != null && found != null && !found.equals(previous)
+                && !session.isNew()) {
+            // The id this rotation replaced is not the one this request found the
+            // session under: another request of the client rotated the SAME object
+            // -- the memory store shares one per session -- and has already sent
+            // that id in its Set-Cookie. Moving on from it would delete the id the
+            // other response hands the client, and if that response arrived last
+            // the client would be signed out. So this rotation is undone: the
+            // session keeps the id already announced, and this request sends none.
+            // The database store's copies never get here; its conditional move
+            // settles the same race.
+            session.undoRotation(previous);
+            previous = null;
+        }
         if (response == null && session.isValid() && (session.isNew() || previous != null)) {
             // No response of the handler's to carry a cookie -- it returned
             // nothing, or threw, and the server answers 404 or 500 itself. A new
@@ -423,6 +446,10 @@ public final class Sessions {
             return;
         }
         request.sessionsInUse.add(session);
+        if (request.sessionIdsFound == null) {
+            request.sessionIdsFound = new HashMap();
+        }
+        request.sessionIdsFound.put(session, session.getId());
         int[] count = (int[]) inUse.get(session);
         if (count == null) {
             count = new int[1];

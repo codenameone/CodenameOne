@@ -58,4 +58,35 @@ class DevToolsTest {
         assertTrue(StdioBridge.post(url, null, "{\"jsonrpc\":\"2.0\",\"method\":\"note\","
                 + "\"params\":{\"id\":1}}") == null, "a notification got an answer");
     }
+
+    @Test
+    @DisplayName("a backend that accepts and never answers is reported, not waited on forever")
+    void aStalledBackendTimesOut() throws Exception {
+        java.net.ServerSocket silent = new java.net.ServerSocket(0);
+        final java.util.List held = new java.util.ArrayList();
+        Thread acceptor = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    held.add(silent.accept());           // accepted, never answered
+                } catch (java.io.IOException closed) {
+                    // the test is over
+                }
+            }
+        });
+        acceptor.setDaemon(true);
+        acceptor.start();
+        try {
+            java.net.URL url = new java.net.URL("http://127.0.0.1:" + silent.getLocalPort()
+                    + "/mcp");
+            long start = System.currentTimeMillis();
+            String answer = StdioBridge.post(url, null,
+                    "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":3}", 300);
+            assertTrue(System.currentTimeMillis() - start < 10000, "the wait was not bounded");
+            assertTrue(answer != null && answer.contains("\"id\":3")
+                    && answer.contains("unreachable"), String.valueOf(answer));
+        } finally {
+            silent.close();
+        }
+        assertTrue(StdioBridge.readTimeoutMillis() > 0);
+    }
 }

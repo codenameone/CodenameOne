@@ -1464,6 +1464,106 @@ class ApplicationRuntimeTest {
         assertEquals(2.5, com.codename1.backend.mcp.McpArgs.doubleValue(args, "ok", true), 0.0);
     }
 
+    @Test
+    @DisplayName("two requests rotating one memory session: the later rotation is undone, not announced")
+    void aSecondRotationOfASharedSessionIsUndone() throws Exception {
+        Sessions sessions = new Sessions();
+        long now = System.currentTimeMillis();
+        HttpSession shared = new HttpSession("start", now, now, 1800);
+        shared.owner = sessions;
+        shared.markNew();
+        sessions.getStore().save(shared, null);
+        shared.clean();
+        HttpServer.Request a = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        HttpServer.Request b = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(a, shared);                  // both found it under "start"
+        sessions.enter(b, shared);
+        String first = shared.changeSessionId();
+        HttpServer.Response ra = sessions.finish(a, shared, HttpServer.Response.text(200, "a"));
+        String second = shared.changeSessionId();   // the memory store shares the object
+        HttpServer.Response rb = sessions.finish(b, shared, HttpServer.Response.text(200, "b"));
+        assertTrue(String.valueOf(ra.extraHeaders).contains(first));
+        assertTrue(rb.extraHeaders == null || !String.valueOf(rb.extraHeaders).contains(second),
+                "the second rotation announced an id: " + rb.extraHeaders);
+        assertTrue(sessions.getStore().load(first) == shared,
+                "the id the first response carries was removed");
+        assertNull(sessions.getStore().load(second));
+        assertEquals(first, shared.getId());
+        // One request rotating twice is still its own rotation.
+        HttpServer.Request c = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(c, shared);
+        shared.changeSessionId();
+        String last = shared.changeSessionId();
+        HttpServer.Response rc = sessions.finish(c, shared, HttpServer.Response.text(200, "c"));
+        assertTrue(String.valueOf(rc.extraHeaders).contains(last));
+        assertNull(sessions.getStore().load(first), "a request's own rotation left the old id");
+    }
+
+    @Test
+    @DisplayName("one session the store cannot end does not stop the request's others ending")
+    void everyEndedSessionIsFinishedWhenOneFails() throws Exception {
+        final List deleted = new ArrayList();
+        final String[] ids = new String[2];
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication())
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        for(int i = 0 ; i < 2 ; i++) {
+                            HttpSession s = request.getSession(true);
+                            ids[i] = s.getId();
+                            s.setAttribute("n", "x");
+                            s.invalidate();
+                        }
+                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                    }
+                }).start();
+        final SessionStore memory = backend.getSessions().getStore();
+        backend.getSessions().setStore(new SessionStore() {
+            public HttpSession load(String id) throws IOException {
+                return memory.load(id);
+            }
+
+            public void save(HttpSession session, String previousId) throws IOException {
+                memory.save(session, previousId);
+            }
+
+            public void delete(String id) throws IOException {
+                if(id.equals(ids[0])) {
+                    throw new IOException("the store refused");
+                }
+                deleted.add(id);
+                memory.delete(id);
+            }
+
+            public int purgeExpired(long now) throws IOException {
+                return memory.purgeExpired(now);
+            }
+
+            public int size() {
+                return memory.size();
+            }
+        });
+        try {
+            HttpURLConnection c = open(port, "/");
+            int status = c.getResponseCode();
+            assertEquals(500, status, "the store's failure should fail the request");
+            assertTrue(ids[0] != null && ids[1] != null && !ids[0].equals(ids[1]),
+                    ids[0] + " / " + ids[1]);
+            assertTrue(deleted.contains(ids[1]),
+                    "the second ended session was skipped after the first failed: " + deleted
+                    + " ids " + ids[0] + " / " + ids[1]);
+        } finally {
+            backend.stop();
+        }
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static final class QuietTracer implements Tracer {
         public boolean open(Config config) {

@@ -578,16 +578,22 @@ public final class Backend {
 
         /// What a request that threw still owes: its request beans
         /// destroyed, and the sessions it ended or changed stored.
-        private void failed(HttpServer.Request request,
-                            boolean sessionFinished, long startedMillis,
-                            Throwable err) {
+        ///
+        /// Per session: `attempted` holds the ones the normal path already
+        /// tried, the one whose store call threw among them, and each of the
+        /// others is still finished here -- one failing save must not leave the
+        /// rest undeleted, or their beans undestroyed.
+        private void failed(HttpServer.Request request, List attempted,
+                            long startedMillis, Throwable err) {
             endRequestBeans(request);
             List ended = request.endedSessions();
-            for (int e = 0 ; ended != null && !sessionFinished
-                    && e < ended.size() ; e++) {
+            for (int e = 0 ; ended != null && e < ended.size() ; e++) {
+                HttpSession ending = (HttpSession) ended.get(e);
+                if (attempted.contains(ending)) {
+                    continue;
+                }
                 try {
-                    sessions.finish((HttpSession) ended.get(e),
-                            null);
+                    sessions.finish(request, ending, null);
                 } catch (Exception storeErr) {
                     System.err.println("Could not end the "
                             + "session of a failed request: "
@@ -595,14 +601,14 @@ public final class Backend {
                 }
             }
             HttpSession session = request.resolvedSession();
-            if (session != null && !sessionFinished) {
+            if (session != null && !attempted.contains(session)) {
                 // The handler threw, but what it did to
                 // the session stands, as in a servlet
                 // container -- and a session-scoped bean
                 // it built must be kept or destroyed, not
                 // dropped with the request unreleased.
                 try {
-                    sessions.finish(session, null);
+                    sessions.finish(request, session, null);
                 } catch (Exception storeErr) {
                     System.err.println("Could not store the "
                             + "session of a failed request: "
@@ -646,7 +652,7 @@ public final class Backend {
             int status = 500;
             try {
                 HttpServer.Response response = null;
-                boolean sessionFinished = false;
+                List attempted = new ArrayList(2);
                 try {
                     for (HttpServer.Handler element : chain) {
                         response = element.handle(request);
@@ -666,26 +672,27 @@ public final class Backend {
                     // handler's own status.
                     List ended = request.endedSessions();
                     HttpSession session = request.resolvedSession();
-                    if (ended != null || session != null) {
-                        sessionFinished = true;
-                    }
                     // First, so their clearing cookies come
-                    // before the new session's.
+                    // before the new session's. Each is noted
+                    // BEFORE its store call, so a failure
+                    // finishes the others and not it again.
                     for (int e = 0 ; ended != null && e < ended.size() ; e++) {
-                        response = sessions.finish(
-                                (HttpSession) ended.get(e), response);
+                        HttpSession ending = (HttpSession) ended.get(e);
+                        attempted.add(ending);
+                        response = sessions.finish(request, ending, response);
                     }
                     if (session != null) {
-                        response = sessions.finish(session, response);
+                        attempted.add(session);
+                        response = sessions.finish(request, session, response);
                     }
                 } catch (Exception err) {
-                    failed(request, sessionFinished, startedMillis, err);
+                    failed(request, attempted, startedMillis, err);
                     throw err;
                 } catch (Error err) {
                     // The same clean-up: an invalidated session
                     // must still be deleted, or the client's old
                     // cookie keeps its signed-in state.
-                    failed(request, sessionFinished, startedMillis, err);
+                    failed(request, attempted, startedMillis, err);
                     throw err;
                 }
                 // Null is a 404 from here, which is what a

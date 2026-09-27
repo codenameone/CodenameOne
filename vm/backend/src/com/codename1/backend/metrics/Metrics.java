@@ -237,7 +237,7 @@ public final class Metrics {
                                 sum += v;
                                 any = true;
                             }
-                        } catch (RuntimeException err) {
+                        } catch (Throwable err) {
                             // One source failing leaves the others' values.
                         }
                     }

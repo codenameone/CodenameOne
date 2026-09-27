@@ -197,11 +197,14 @@ public final class OtlpMetricExporter implements MetricReader {
                 }
             }
             return true;
-        } catch (Exception err) {
+        } catch (Throwable err) {
+            // Throwable, not Exception: this runs on the exporter's only thread,
+            // and an Error out of an instrument or the encoder must cost one export,
+            // not every export after it.
             synchronized (lock) {
                 failures++;
                 lastError = BatchExporter.bounded("could not export metrics: "
-                        + err.getMessage());
+                        + err);
                 if (failures == 1 || failures % 100 == 0) {
                     System.err.println(lastError);
                 }

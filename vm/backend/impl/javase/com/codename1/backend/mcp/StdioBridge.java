@@ -42,6 +42,28 @@ import java.nio.charset.StandardCharsets;
 /// A host that speaks HTTP -- Claude Code among them -- needs none of this and
 /// should be pointed at the URL directly.
 public final class StdioBridge {
+    /// How long to wait for the backend to accept the connection.
+    static final int CONNECT_TIMEOUT_MILLIS = 5000;
+
+    /// How long to wait for an answer, in milliseconds: `CN1_MCP_TIMEOUT_MS`,
+    /// two minutes by default. Messages are forwarded one at a time, so without
+    /// a bound a backend that accepted a request and then stalled would hold
+    /// every later message too, and the host would wait forever instead of
+    /// being told the backend is unreachable.
+    static int readTimeoutMillis() {
+        String configured = System.getenv("CN1_MCP_TIMEOUT_MS");
+        int fallback = 120000;
+        if (configured == null) {
+            return fallback;
+        }
+        try {
+            int value = Integer.parseInt(configured.trim());
+            return value > 0 ? value : fallback;
+        } catch (NumberFormatException notANumber) {
+            return fallback;
+        }
+    }
+
     private StdioBridge() {
     }
 
@@ -72,8 +94,17 @@ public final class StdioBridge {
 
     /// Forwards one line; package-private for the test of the unreachable path.
     static String post(URL url, String token, String body) {
+        return post(url, token, body, readTimeoutMillis());
+    }
+
+    /// [#post(URL,String,String)] with an explicit bound on the answer's wait.
+    static String post(URL url, String token, String body, int readTimeout) {
         try {
             HttpURLConnection c = (HttpURLConnection) url.openConnection();
+            // A timeout is an IOException, so it reaches unreachable() below and
+            // the host gets an error under its request's id.
+            c.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+            c.setReadTimeout(readTimeout);
             c.setRequestMethod("POST");
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type", "application/json");
