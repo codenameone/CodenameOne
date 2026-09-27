@@ -1461,9 +1461,8 @@ public class Parser extends ClassVisitor {
             // On the raw bytecode, before any fusion pass below rewrites instructions:
             // see ByteCodeClass.isEagerInitEligible.
             ByteCodeClass.computeInitReferences(classes);
-            ByteCodeClass.computeInstantiated(classes, nativeSources);
-            // Cones memoised before the scan above included classes nothing creates.
-            cn1InvalidateDevirtMemo();
+            // Until computeInstantiated runs below, every class counts as instantiated.
+            ByteCodeClass.resetInstantiated();
             ByteCodeClass.computePureClinits(classes);
             // Also on the raw bytecode, where every field access is still a plain
             // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
@@ -1554,6 +1553,18 @@ public class Parser extends ClassVisitor {
             // mean "no information", not "the previous application's answer".
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 JavascriptReachability.resetExportedFacts();
+            }
+            // The C targets keep the conservative culler's answer for what is EMITTED, but
+            // the dispatch switches take RTA's instantiated set to decide which receivers
+            // get a direct arm: see ByteCodeClass.computeInstantiated. After the method
+            // cull, so the analysis starts from what survived it.
+            // -Dcn1.dispatchRta=false skips it, leaving every class a candidate for an arm.
+            if (BytecodeMethod.optimizerOn
+                    && ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                    && !"false".equalsIgnoreCase(Util.getProperty("cn1.dispatchRta", "true"))) {
+                ByteCodeClass.computeInstantiated(classes, nativeSources);
+                // Cones memoised earlier counted every class as instantiated.
+                cn1InvalidateDevirtMemo();
             }
             if (BytecodeMethod.optimizerOn
                     && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
