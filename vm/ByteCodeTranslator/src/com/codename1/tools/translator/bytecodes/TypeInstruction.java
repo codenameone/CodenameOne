@@ -482,7 +482,7 @@ public class TypeInstruction extends Instruction {
                         break;
                     }
                     if(Parser.isLeafClass(actualType)) {
-                        b.append("BC_INSTANCEOF_LEAF(class__");
+                        b.append("BC_INSTANCEOF_LEAF(cn1_class_id_");
                         b.append(actualType);
                         b.append(");\n");
                         break;

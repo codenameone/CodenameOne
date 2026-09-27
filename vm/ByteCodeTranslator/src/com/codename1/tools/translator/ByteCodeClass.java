@@ -1325,7 +1325,8 @@ public class ByteCodeClass {
                     }
 
                     // Static object fields may interact with heap bookkeeping, so they keep thread context.
-                    b.append("void set_static_");
+                    // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
+                    b.append("CN1_SETTER_INLINE void set_static_");
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName().replace('$', '_'));
@@ -1459,7 +1460,8 @@ public class ByteCodeClass {
             }
 
             // Instance field setters don't use thread context directly.
-            b.append("void set_field_");
+            // CN1_SETTER_INLINE: see its definition in cn1_globals.h.
+            b.append("CN1_SETTER_INLINE void set_field_");
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());

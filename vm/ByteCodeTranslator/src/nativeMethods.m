@@ -1864,6 +1864,22 @@ JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_T
 #define CN1_SB_PTR(s) ((JAVA_ARRAY_BYTE*)cn1StrChars((JAVA_OBJECT)(s)))
 #define CN1_SB_LEN(s) (((struct obj__java_lang_String*)(s))->java_lang_String_count)
 
+// The combined length, or OutOfMemoryError when it does not fit a Java int -- what the JDK
+// throws for a concatenation that long. Summed in 64 bits: an int sum wraps negative, and
+// while cn1FusedLatin1Begin refuses a negative length, cn1ConcatFallback would then have
+// handed the same wrapped value to allocArray.
+static int cn1ConcatLength(CODENAME_ONE_THREAD_STATE, const int* lens, int n) {
+    int64_t total = 0;
+    for(int i = 0 ; i < n ; i++) {
+        total += lens[i];
+    }
+    if(total > INT_MAX) {
+        CN1_THROW_OOM();
+        return 0;
+    }
+    return (int)total;
+}
+
 static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE* const* parts, const int* lens, int n, int total) {
     enteringNativeAllocations();
     JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
@@ -1882,7 +1898,7 @@ static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE*
 JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b) {
     JAVA_ARRAY_BYTE* p[2] = { CN1_SB_PTR(a), CN1_SB_PTR(b) };
     int l[2] = { CN1_SB_LEN(a), CN1_SB_LEN(b) };
-    int total = l[0] + l[1];
+    int total = cn1ConcatLength(threadStateData, l, 2);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1897,7 +1913,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c) {
     JAVA_ARRAY_BYTE* p[3] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c) };
     int l[3] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c) };
-    int total = l[0] + l[1] + l[2];
+    int total = cn1ConcatLength(threadStateData, l, 3);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1912,7 +1928,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat3___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d) {
     JAVA_ARRAY_BYTE* p[4] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d) };
     int l[4] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d) };
-    int total = l[0] + l[1] + l[2] + l[3];
+    int total = cn1ConcatLength(threadStateData, l, 4);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
@@ -1927,7 +1943,7 @@ JAVA_OBJECT java_lang_String_cn1FusedConcat4___java_lang_String_java_lang_String
 JAVA_OBJECT java_lang_String_cn1FusedConcat5___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b, JAVA_OBJECT c, JAVA_OBJECT d, JAVA_OBJECT e) {
     JAVA_ARRAY_BYTE* p[5] = { CN1_SB_PTR(a), CN1_SB_PTR(b), CN1_SB_PTR(c), CN1_SB_PTR(d), CN1_SB_PTR(e) };
     int l[5] = { CN1_SB_LEN(a), CN1_SB_LEN(b), CN1_SB_LEN(c), CN1_SB_LEN(d), CN1_SB_LEN(e) };
-    int total = l[0] + l[1] + l[2] + l[3] + l[4];
+    int total = cn1ConcatLength(threadStateData, l, 5);
     JAVA_ARRAY_BYTE* dst;
     JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
     if(so != JAVA_NULL) {
