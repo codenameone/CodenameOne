@@ -15733,6 +15733,16 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
 }
 
 
+// First stamp of a class: publish its descriptor under its header index. The full fence
+// orders the entry before any later store -- in particular before the store that makes
+// the object reachable from another thread -- so a reader that loaded the object's class
+// index finds the descriptor (its load of the entry depends on the index it read). Racing
+// first stamps of one class write the same pointer, which is harmless.
+void cn1ClazzRegister(uint16_t index, struct clazz* c) {
+    cn1ClazzById[index] = c;
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
+
 #if CN1_TAGGED_ACTIVE
 // Object-shaped proxies indexed by tag code; see cn1ClassOf in cn1_globals.h. They let a
 // tagged immediate resolve to its boxed class without dereferencing the tagged pointer.

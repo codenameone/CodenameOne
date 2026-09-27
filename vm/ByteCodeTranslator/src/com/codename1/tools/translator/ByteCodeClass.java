@@ -3071,11 +3071,21 @@ public class ByteCodeClass {
     /// in its own table code). One that always throws makes the class unusable in every
     /// run; running it eagerly moves that failure from the first use to startup.
     public boolean isEagerInitEligible() {
-        if (isEliminated() || !initReferenced) {
+        if (!EAGER_INIT || isEliminated() || !initReferenced) {
             return false;
         }
         return !hasClinit() || pureClinit;
     }
+
+    /// OFF UNLESS ASKED FOR (-Dcn1.eagerInit=true). Eager initialization removes a guard
+    /// from static entries and interface thunks, and measured neutral when it was added
+    /// (selfhost 1.001, the ten workloads within 0.5-5.5%). What it costs is code: each
+    /// listed initializer is called from startup, so no listed class can be dead-stripped,
+    /// and the translator must list every class some kept method could initialize --
+    /// Calendar.getInstance, which nothing calls, still lists GregorianCalendar. Together
+    /// with the class table's static entries it kept Bench at 504KB of code against
+    /// master's 324KB; with both gone it is 357KB, and the ten workloads stay within noise.
+    static final boolean EAGER_INIT = "true".equalsIgnoreCase(Util.getProperty("cn1.eagerInit", "false"));
 
     /// Whether surviving Java code can trigger this class's initialization at all.
     private boolean initReferenced;

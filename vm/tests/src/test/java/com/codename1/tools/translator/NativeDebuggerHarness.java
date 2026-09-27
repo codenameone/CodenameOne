@@ -126,10 +126,17 @@ final class NativeDebuggerHarness {
           // own header index, so an object can carry one whatever classId it claims.
           + "struct clazz cn1TestClazz[3] = { [0] = { .cn1HeaderIndex = 7 },\n"
           + "    [1] = { .cn1HeaderIndex = 8 }, [2] = { .cn1HeaderIndex = 9 } };\n"
-          + "struct clazz* const cn1ClazzById[] = { 0, &class__java_lang_Integer, &class__java_lang_Long,\n"
+          + "struct clazz* cn1ClazzById[] = { 0, &class__java_lang_Integer, &class__java_lang_Long,\n"
           + "    &class__java_lang_Double, &class__java_lang_Float, &class__java_lang_Character,\n"
           + "    &class__java_lang_Short, &cn1TestClazz[0], &cn1TestClazz[1], &cn1TestClazz[2] };\n"
           + "const int cn1ClazzByIdCount = 10;\n"
+          // CN1_OBJ_SET_CLASS fills an empty entry on first stamp (cn1ObjSetClass); the
+          // runtime's cn1ClazzRegister lives in cn1_globals.m, which this harness does not
+          // link, so it gets the same two lines here.
+          + "void cn1ClazzRegister(uint16_t index, struct clazz* c) {\n"
+          + "    cn1ClazzById[index] = c;\n"
+          + "    __atomic_thread_fence(__ATOMIC_SEQ_CST);\n"
+          + "}\n"
           // The collector's mark entry point. Records whether a nominated
           // reference was reached, rather than buffering every mark -- the
           // table can hold thousands, so a fixed buffer would answer "was it
