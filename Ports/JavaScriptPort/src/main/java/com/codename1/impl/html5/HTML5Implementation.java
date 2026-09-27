@@ -298,6 +298,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         /** Drags that arrived before the press itself was dispatched, in order. */
         List<Runnable> moves;
         /**
+         * Set the moment a release handler for this press starts. A move whose handler resumes
+         * after that -- it yielded on a host call while the finger lifted -- is dropped rather
+         * than dispatched after the release.
+         */
+        boolean releasing;
+        /**
          * Where this press's touch last was. The release reads it from here rather than from
          * pointerState, whose arrays the NEXT tap's touchstart overwrites -- a release parked
          * until after that would otherwise fire at the second tap's position.
@@ -325,6 +331,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private PressSlot pressForRelease() {
         synchronized (pointerEventOrderLock) {
+            if (lastPress != null) {
+                lastPress.releasing = true;
+            }
+            return lastPress;
+        }
+    }
+
+    /** The press a move belongs to, read at the move handler's entry; see pressForRelease. */
+    private PressSlot pressForMove() {
+        synchronized (pointerEventOrderLock) {
             return lastPress;
         }
     }
@@ -337,6 +353,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void dispatchMove(PressSlot slot, Runnable move) {
         boolean now;
         synchronized (pointerEventOrderLock) {
+            if (slot != null && slot.releasing) {
+                // Its release has begun; a drag now would arrive after the pointer went up.
+                return;
+            }
             if (slot != null && !slot.done) {
                 if (slot.moves == null) {
                     slot.moves = new ArrayList<Runnable>();
@@ -2384,6 +2404,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void handleEvent(Event evt) {
                 final PressSlot press = pressForRelease();
+                // Read and cleared before any JSO yield, like the press side: a quick second tap's
+                // touchstart can run while this handler is suspended, and a touchDown still set
+                // then made it treat the new tap as a second finger and drop it.
+                final boolean touchWasDown = pointerState.isTouchDown();
+                pointerState.setTouchDown(false);
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2394,14 +2419,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 debugLog("In TouchEnd");
                 // Guard against mouse event conflicts
                 // Prevent from firing if touch was not down already.
-                if (JavaScriptInputCoordinator.shouldIgnoreTouchRelease(pointerState.isMouseDown(), pointerState.isTouchDown())) {
+                if (JavaScriptInputCoordinator.shouldIgnoreTouchRelease(pointerState.isMouseDown(), touchWasDown)) {
                     debugLog("[touchEnd] mouseIsDown");
-                    if (pointerState.isMouseDown()) {
-                        pointerState.setTouchDown(false);
-                    }
                     return;
                 }
-                pointerState.setTouchDown(false);
                 //if (evt.getTarget() == textField || evt.getTarget() == textArea) {
                 //    // We don't want to respond to touch events on teh native input
                 //    // fields because it can result in some infinite looping behaviour.
@@ -2467,7 +2488,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 // The press this move belongs to, taken before any JSO yield: touchDown is set at
                 // touchstart's ENTRY, so a move can arrive while that press is still on its way.
-                final PressSlot press = pressForRelease();
+                final PressSlot press = pressForMove();
                 debugLog("in TouchMove");
                 TouchEvent me = (TouchEvent)evt;
                 JSArray<MouseEvent> touches = me.getTargetTouches();
@@ -2527,7 +2548,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
-                final PressSlot press = pressForRelease();
+                final PressSlot press = pressForMove();
                 debugLog("In mouseMove");
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
