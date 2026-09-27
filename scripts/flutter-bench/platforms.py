@@ -248,7 +248,7 @@ class Adapter(object):
                     except (ValueError, IndexError):
                         pass
                 print("    %s +%.0fms %s" % (side, (time.time() - started) * 1000.0,
-                                          txt[-300:]), flush=True)
+                                          txt[:1500]), flush=True)
             if lower is None and lower_marker and lower_marker.search(line):
                 lower = (time.time() - started) * 1000.0
             if upper is None and marker.search(line):
