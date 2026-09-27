@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import java.util.ArrayList;
@@ -190,5 +213,49 @@ final class JavascriptNameUtil {
         List<String> arguments = new ArrayList<String>();
         BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), arguments);
         return arguments;
+    }
+
+    /**
+     * The class or interface that declares the static field {@code owner.fieldName}, found
+     * by searching up from {@code owner}; {@code owner} itself when it cannot be resolved.
+     * Lives here rather than in JavascriptMethodGenerator because RTA (JavascriptReachability)
+     * needs it on every target, and the self-hosted translator stubs the generator out.
+     */
+    static String resolveStaticFieldOwner(String owner, String fieldName, java.util.Map<String, ByteCodeClass> idx) {
+        if (owner == null) {
+            return null;
+        }
+        String start = sanitizeClassName(owner);
+        if (idx == null || fieldName == null) {
+            return start;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Deque<String> stack = new java.util.ArrayDeque<String>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (current == null || !seen.add(current)) {
+                continue;
+            }
+            ByteCodeClass cls = idx.get(current);
+            if (cls == null) {
+                continue;
+            }
+            for (ByteCodeField f : cls.getFields()) {
+                if (f.isStaticField() && fieldName.equals(f.getFieldName())) {
+                    return current;
+                }
+            }
+            if (cls.getBaseInterfaces() != null) {
+                for (String iface : cls.getBaseInterfaces()) {
+                    stack.push(sanitizeClassName(iface));
+                }
+            }
+            String base = cls.getBaseClass();
+            if (base != null) {
+                stack.push(sanitizeClassName(base));
+            }
+        }
+        return start;
     }
 }

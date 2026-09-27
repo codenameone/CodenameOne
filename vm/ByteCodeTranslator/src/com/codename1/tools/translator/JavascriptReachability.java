@@ -150,7 +150,8 @@ final class JavascriptReachability {
         rta.index(classes);
         rta.seedRoots(classes, nativeSources);
         rta.propagate();
-        return rta.instantiated;
+        rta.explainWhy();
+        return rta.allocated;
     }
 
     static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
@@ -538,12 +539,12 @@ final class JavascriptReachability {
                 // touched; seed it when we see the class.
             }
             if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Used) {
-                markClassInstantiated(cls.getClsName());
+                markAllocated(cls.getClsName());
             }
         }
         // Runtime roots that the translator always keeps alive.
         for (String root : RUNTIME_ROOT_CLASSES) {
-            markClassInstantiated(root);
+            markAllocated(root);
         }
         // Thread.start() is a native stub that goes through ``jvm.spawn``
         // on the JS runtime side. The runtime drives ``Thread.run()`` as
@@ -687,7 +688,7 @@ final class JavascriptReachability {
      * (Thread.run, etc.) that bytecode analysis cannot see.
      */
     private void seedRuntimeDispatched(String owner, String methodName, String desc) {
-        markClassInstantiated(owner);
+        markAllocated(owner);
         VirtualCall call = new VirtualCall(owner, methodName, desc, false);
         recordPending(call);
         dispatchVirtualFromInstantiated(call);
@@ -697,7 +698,66 @@ final class JavascriptReachability {
         if (method == null || method.isEliminated() || !live.add(method)) {
             return;
         }
+        if (whyTarget != null) {
+            enqueuedBy.put(method, visiting);
+        }
         worklist.add(method);
+    }
+
+    /**
+     * ALLOCATED, AS OPPOSED TO INSTANTIATED. {@link #instantiated} also takes every class a
+     * static call, a static field access or any visited method merely touches -- which the
+     * JavaScript culler needs, since touching a class runs its initializer, but which is
+     * not the same as an object of that class existing. In {@link #analysisOnly} mode
+     * virtual calls resolve only against classes an allocation site actually creates: a
+     * NEW, a NativeLookup registration, a class natives use, a runtime root. That is the
+     * set the C targets' dispatch switches ask for, and resolving against the wider set
+     * made every class with a reachable static method a receiver, with all its overrides
+     * and whatever THEY allocate.
+     */
+    private final Set<String> allocated = new HashSet<String>();
+
+    private boolean isReceiver(String cls) {
+        return analysisOnly ? allocated.contains(cls) : instantiated.contains(cls);
+    }
+
+    private void markAllocated(String clsName) {
+        markClassInstantiated(clsName);
+        if (analysisOnly && clsName != null && allocated.add(clsName)) {
+            if (whyTarget != null && !allocatedBy.containsKey(clsName)) {
+                allocatedBy.put(clsName, visiting);
+            }
+            Set<String> ancestorChain = new HashSet<String>();
+            collectTransitiveAncestors(clsName, ancestorChain);
+            for (String ancestor : ancestorChain) {
+                resolvePendingFor(ancestor, clsName);
+            }
+        }
+    }
+
+    // -Dcn1.dispatchRta.why=<mangled class>: print how the analysis came to allocate it.
+    private final String whyTarget = Util.getProperty("cn1.dispatchRta.why", null);
+    private BytecodeMethod visiting;
+    private final Map<BytecodeMethod, BytecodeMethod> enqueuedBy =
+            new IdentityHashMap<BytecodeMethod, BytecodeMethod>();
+    private final Map<String, BytecodeMethod> allocatedBy = new HashMap<String, BytecodeMethod>();
+
+    private void explainWhy() {
+        if (whyTarget == null) {
+            return;
+        }
+        if (!allocated.contains(whyTarget)) {
+            System.out.println("dispatchRta.why: " + whyTarget + " is not allocated");
+            return;
+        }
+        System.out.println("dispatchRta.why: " + whyTarget + " allocated by:");
+        BytecodeMethod m = allocatedBy.get(whyTarget);
+        Set<BytecodeMethod> seen = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
+        while (m != null && seen.add(m)) {
+            System.out.println("  " + m.getClsName() + "." + m.getMethodName() + m.getSignature());
+            m = enqueuedBy.get(m);
+        }
+        System.out.println("  (root)");
     }
 
     private void markClassInstantiated(String clsName) {
@@ -718,7 +778,8 @@ final class JavascriptReachability {
             }
         }
         // Walk the supertype chain so instance method dispatch can
-        // land on any of them. Instantiating Foo implicitly touches
+        // land on any of them. (In analysisOnly mode dispatch lands only on ALLOCATED
+        // classes -- see markAllocated -- so this walk only initializes.) Instantiating Foo implicitly touches
         // Foo's base classes too (they don't get their own "new", but
         // Foo's ctor calls super() etc.).
         String base = cls.getBaseClass();
@@ -749,6 +810,9 @@ final class JavascriptReachability {
         // interfaces) on every instantiation re-resolves every pending
         // receiver type that the new class transitively satisfies, so
         // late-arriving subtypes pick up the existing pending calls.
+        if (analysisOnly) {
+            return;
+        }
         Set<String> ancestorChain = new HashSet<String>();
         collectTransitiveAncestors(clsName, ancestorChain);
         for (String ancestor : ancestorChain) {
@@ -809,6 +873,7 @@ final class JavascriptReachability {
     }
 
     private void visitMethod(BytecodeMethod method) {
+        visiting = method;
         String clsName = method.getClsName();
         markClassInstantiated(clsName);
         List<Instruction> instructions = method.getInstructions();
@@ -822,7 +887,7 @@ final class JavascriptReachability {
                 if (op == Opcodes.NEW) {
                     String type = ((TypeInstruction) instr).getTypeName();
                     if (type != null) {
-                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(type));
+                        markAllocated(JavascriptNameUtil.sanitizeClassName(type));
                     }
                 }
                 // ANEWARRAY doesn't create instances of the component type
@@ -849,7 +914,7 @@ final class JavascriptReachability {
                     // has existed and other things may depend on that.
                     String rawOwner = JavascriptNameUtil.sanitizeClassName(f.getOwner());
                     markClassInstantiated(rawOwner);
-                    String declaringOwner = JavascriptMethodGenerator.resolveStaticFieldOwner(
+                    String declaringOwner = JavascriptNameUtil.resolveStaticFieldOwner(
                             f.getOwner(), f.getFieldName(), byName);
                     if (declaringOwner != null && !declaringOwner.equals(rawOwner)) {
                         markClassInstantiated(declaringOwner);
@@ -894,7 +959,7 @@ final class JavascriptReachability {
                 if (cst instanceof Type) {
                     Type t = (Type) cst;
                     if (t.getSort() == Type.OBJECT) {
-                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(t.getInternalName()));
+                        markAllocated(JavascriptNameUtil.sanitizeClassName(t.getInternalName()));
                         needed--;
                     }
                 }
@@ -950,13 +1015,13 @@ final class JavascriptReachability {
         // If the static receiver type is itself instantiated, dispatch
         // to it first (covers the trivial case where no subtype has
         // been seen yet but the receiver's own method is reachable).
-        if (instantiated.contains(call.receiver)) {
+        if (isReceiver(call.receiver)) {
             enqueueResolved(call.receiver, call.methodName, call.desc, false);
         }
         Set<String> subtypes = subclassesOf.get(call.receiver);
         if (subtypes != null) {
             for (String sub : subtypes) {
-                if (instantiated.contains(sub)) {
+                if (isReceiver(sub)) {
                     enqueueResolved(sub, call.methodName, call.desc, false);
                 }
                 // Transitively walk further subtypes too.
@@ -971,7 +1036,7 @@ final class JavascriptReachability {
             return;
         }
         for (String sub : further) {
-            if (instantiated.contains(sub)) {
+            if (isReceiver(sub)) {
                 enqueueResolved(sub, call.methodName, call.desc, false);
             }
             dispatchVirtualSubtree(sub, call);
