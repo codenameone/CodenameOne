@@ -21,6 +21,8 @@
  * need additional information or have any questions.
  */
 #import <objc/runtime.h>
+#include <sys/stat.h>
+#include <limits.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
 
@@ -3200,10 +3202,16 @@ int getResourceSize(const char* name, int nameLen, const char* type, int typeLen
     if(path == nil) {
         return -1;
     }
-    NSData* iData = [NSData dataWithContentsOfFile:path];
-    int size = [iData length];
-    //CN1Log(@"getResourceSize %i finished", size);
-    return size;
+    // The size from the file system, not by reading the file. This used to load
+    // the whole resource into an NSData just to take its length, and it runs in
+    // front of every getResourceAsStream -- so each bundled resource was read in
+    // full twice, and the gallery's images, theme and fonts paid for it inside
+    // the first frame of a launch.
+    struct stat st;
+    if (stat([path fileSystemRepresentation], &st) != 0) {
+        return -1;
+    }
+    return st.st_size > INT_MAX ? INT_MAX : (int)st.st_size;
 }
 
 
