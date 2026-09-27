@@ -111,6 +111,59 @@ void CN1MacRefreshScaleValue(void) {
     }
 }
 
+/// The content size the main window will open at, in points, published once on
+/// the main thread before the application's main runs. 0 until then.
+///
+/// The window is created at the default 1024x685, but AppKit fits a window to the
+/// screen's visible frame when it is shown -- and on a small display, the menu bar
+/// and the Dock leave less than that. The GitHub macOS runner opens it at 1024x642.
+/// The size query answered 685 until the window existed and screenSizeChanged then
+/// said 642, so every launch there built and laid the tree out twice and settled
+/// 14MB heavier. Fitting the size up front, and building the window at it, makes
+/// the first answer the final one.
+static int cn1MacExpectedContentWidth = 0;
+static int cn1MacExpectedContentHeight = 0;
+
+static NSWindowStyleMask cn1MacMainWindowStyle(void) {
+    return NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+            | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+}
+
+/// Main thread only; see cn1MacExpectedContentWidth.
+void CN1MacPublishExpectedContentSize(void) {
+    if (![NSThread isMainThread]) {
+        return;
+    }
+    CGFloat w = CN1_MAC_DEFAULT_WIDTH;
+    CGFloat h = CN1_MAC_DEFAULT_HEIGHT;
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count > 0) {
+        NSRect visible = [[screens objectAtIndex:0] visibleFrame];
+        NSRect content = NSMakeRect(0, 0, w, h);
+        NSRect frame = [NSWindow frameRectForContentRect:content styleMask:cn1MacMainWindowStyle()];
+        CGFloat chromeW = frame.size.width - content.size.width;
+        CGFloat chromeH = frame.size.height - content.size.height;
+        if (visible.size.width - chromeW < w) {
+            w = floor(visible.size.width - chromeW);
+        }
+        if (visible.size.height - chromeH < h) {
+            h = floor(visible.size.height - chromeH);
+        }
+    }
+    __atomic_store_n(&cn1MacExpectedContentWidth, (int)w, __ATOMIC_RELEASE);
+    __atomic_store_n(&cn1MacExpectedContentHeight, (int)h, __ATOMIC_RELEASE);
+}
+
+static CGFloat cn1MacContentWidthPoints(void) {
+    int w = __atomic_load_n(&cn1MacExpectedContentWidth, __ATOMIC_ACQUIRE);
+    return w > 0 ? w : CN1_MAC_DEFAULT_WIDTH;
+}
+
+static CGFloat cn1MacContentHeightPoints(void) {
+    int h = __atomic_load_n(&cn1MacExpectedContentHeight, __ATOMIC_ACQUIRE);
+    return h > 0 ? h : CN1_MAC_DEFAULT_HEIGHT;
+}
+
 @implementation CN1MacHost {
     NSWindow *_window;
     METALView *_renderingView;
@@ -171,11 +224,8 @@ void CN1MacRefreshScaleValue(void) {
     }
 
     cn1StartupPhase("buildWindow.enter");
-    NSRect frame = NSMakeRect(0, 0, CN1_MAC_DEFAULT_WIDTH, CN1_MAC_DEFAULT_HEIGHT);
-    NSWindowStyleMask style = NSWindowStyleMaskTitled
-            | NSWindowStyleMaskClosable
-            | NSWindowStyleMaskMiniaturizable
-            | NSWindowStyleMaskResizable;
+    NSRect frame = NSMakeRect(0, 0, cn1MacContentWidthPoints(), cn1MacContentHeightPoints());
+    NSWindowStyleMask style = cn1MacMainWindowStyle();
     // CN1MacWindow, not NSWindow: a modal dialog usually blocks THIS window, and
     // blocking it has to include refusing key focus. See CN1AppKitWindows.h.
     _window = [[CN1MacWindow alloc] initWithContentRect:frame
@@ -295,7 +345,7 @@ static CGFloat cn1MacDefaultScale(void) {
 - (int)displayWidth {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)(CN1_MAC_DEFAULT_WIDTH * cn1MacDefaultScale());
+        return (int)(cn1MacContentWidthPoints() * cn1MacDefaultScale());
     }
     // Device pixels, not points: Codename One lays out in pixels and a Retina
     // display has two of them per point.
@@ -305,7 +355,7 @@ static CGFloat cn1MacDefaultScale(void) {
 - (int)displayHeight {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)(CN1_MAC_DEFAULT_HEIGHT * cn1MacDefaultScale());
+        return (int)(cn1MacContentHeightPoints() * cn1MacDefaultScale());
     }
     return (int)(v.bounds.size.height * CN1AppKitBackingScale(v));
 }

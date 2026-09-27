@@ -986,6 +986,10 @@ void CN1MacInstallAppDelegate(void) {
     // thread skip a dispatch_sync onto a main queue that is still busy.
     extern void CN1MacPublishPrimaryScale(void);
     CN1MacPublishPrimaryScale();
+    // And the size the window will really open at, for the same reason: the first
+    // layout happens before the window exists. See CN1MacHost.m.
+    extern void CN1MacPublishExpectedContentSize(void);
+    CN1MacPublishExpectedContentSize();
     // Build the window HERE, once, on this thread.
     //
     // It has to exist before the event dispatch thread first asks anything about
