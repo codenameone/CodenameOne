@@ -262,9 +262,13 @@ public final class McpServer implements HttpServer.Handler {
         }
         String method = (String) methodValue;
         Map params = m.get("params") instanceof Map ? (Map) m.get("params") : new LinkedHashMap();
-        if (notification) {
-            return null;
-        }
+        // A notification is still an invocation -- an id-less tools/call runs its
+        // tool -- and only the answer, result or error, is withheld.
+        Object answer = invoke(method, params, id);
+        return notification ? null : answer;
+    }
+
+    private Object invoke(String method, Map params, Object id) {
         try {
             if ("initialize".equals(method)) {
                 return result(id, initialize(params));

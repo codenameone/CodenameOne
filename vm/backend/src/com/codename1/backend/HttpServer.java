@@ -561,6 +561,7 @@ public final class HttpServer {
             this.sessions = null;
             this.endedSessions = null;
             this.sessionsInUse = null;
+            this.sessionIdsFound = null;
         }
 
         /// The session of this request, creating one if it has none.
@@ -680,6 +681,7 @@ public final class HttpServer {
             this.sessions = null;
             this.endedSessions = null;
             this.sessionsInUse = null;
+            this.sessionIdsFound = null;
         }
 
         /// For HTTP/2, whose headers arrive already decoded from the HPACK state --

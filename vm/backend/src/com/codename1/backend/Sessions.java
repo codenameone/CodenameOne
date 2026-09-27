@@ -465,6 +465,9 @@ public final class Sessions {
             return;
         }
         request.sessionsInUse = null;
+        // With the list: a pooled request would otherwise hold every session a
+        // keep-alive connection ever used, and its attributes with it.
+        request.sessionIdsFound = null;
         long now = System.currentTimeMillis();
         for (Object element : used) {
             HttpSession session = (HttpSession) element;

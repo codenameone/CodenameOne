@@ -1564,6 +1564,32 @@ class ApplicationRuntimeTest {
         }
     }
 
+    @Test
+    @DisplayName("a request's end forgets the ids of the sessions it found, so a pooled one holds none")
+    void leavingForgetsFoundSessionIds() {
+        Sessions sessions = new Sessions();
+        long now = System.currentTimeMillis();
+        HttpSession s = new HttpSession("pooled", now, now, 1800);
+        HttpServer.Request request = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(request, s);
+        assertNotNull(request.sessionIdsFound);
+        sessions.leave(request);
+        assertNull(request.sessionIdsFound, "a finished request still holds its sessions");
+    }
+
+    @Test
+    @DisplayName("an executor kind that is neither platform nor virtual stops the start")
+    void unknownExecutorKindsAreRefused() {
+        Properties settings = new Properties();
+        settings.setProperty("cn1.task.executor.reports.kind", "platfrom");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> Tasks.open(Config.of(settings, "test")));
+        assertTrue(e.getMessage().contains("cn1.task.executor.reports.kind"), e.getMessage());
+        assertEquals("platform", Tasks.checkedKind("k", " platform "));
+        assertNull(Tasks.checkedKind("k", "  "));
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static final class QuietTracer implements Tracer {
         public boolean open(Config config) {

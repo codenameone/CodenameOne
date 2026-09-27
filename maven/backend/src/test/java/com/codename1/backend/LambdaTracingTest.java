@@ -235,6 +235,35 @@ class LambdaTracingTest {
     }
 
     @Test
+    @DisplayName("work that fails with an Error is recorded on its span, not exported as a success")
+    void errorsAreRecordedOnSpans() throws Exception {
+        Recorder recorder = new Recorder();
+        Tracing.install(recorder);
+        try {
+            Tracing.inSpan("work", new Tracing.Work() {
+                public Object run(Span s) {
+                    throw new AssertionError("broken invariant");
+                }
+            });
+        } catch (AssertionError expected) {
+            // rethrown, as it must be
+        }
+        RecordedSpan span = (RecordedSpan)recorder.spans.get(0);
+        assertTrue(span.ended);
+        assertEquals(1, span.errors.size(), "the Error was not recorded on the span");
+        try {
+            Tracing.inBackground("job", null, null, new Tracing.Work() {
+                public Object run(Span s) {
+                    throw new LinkageError("missing class");
+                }
+            });
+        } catch (LinkageError expected) {
+            // rethrown
+        }
+        assertEquals(1, ((RecordedSpan)recorder.spans.get(1)).errors.size());
+    }
+
+    @Test
     @DisplayName("a span whose decoration throws is still ended")
     void abandonedSpansAreEnded() throws Exception {
         Recorder recorder = new Recorder();

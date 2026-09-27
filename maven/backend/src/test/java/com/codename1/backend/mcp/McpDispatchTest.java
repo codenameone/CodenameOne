@@ -51,4 +51,44 @@ class McpDispatchTest {
         ping.remove("id");
         assertNull(server.dispatch(ping), "a notification was answered");
     }
+
+    @Test
+    @DisplayName("a notification runs its method; only the answer is withheld")
+    void aNotificationStillRuns() throws Exception {
+        final int[] calls = {0};
+        McpTool tool = new McpTool() {
+            public String name() {
+                return "touch";
+            }
+
+            public String description() {
+                return "counts calls";
+            }
+
+            public Map inputSchema() {
+                Map schema = new LinkedHashMap();
+                schema.put("type", "object");
+                return schema;
+            }
+
+            public Object call(Map arguments) {
+                calls[0]++;
+                return "ok";
+            }
+        };
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null,
+                java.util.Collections.singletonList(tool));
+        Map call = new LinkedHashMap();
+        call.put("jsonrpc", "2.0");
+        call.put("method", "tools/call");
+        Map params = new LinkedHashMap();
+        params.put("name", "touch");
+        params.put("arguments", new LinkedHashMap());
+        call.put("params", params);
+        assertNull(server.dispatch(call), "a notification was answered");
+        org.junit.jupiter.api.Assertions.assertEquals(1, calls[0],
+                "an id-less tools/call never ran its tool");
+    }
 }

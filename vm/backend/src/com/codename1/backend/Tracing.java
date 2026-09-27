@@ -264,6 +264,11 @@ public final class Tracing {
         } catch (Exception err) {
             guardedException(span, err);
             throw err;
+        } catch (Error err) {
+            // Recorded too: the span ends in the finally either way, and an
+            // AssertionError that failed the work must not export as a success.
+            guardedException(span, err);
+            throw err;
         } finally {
             finish(span);
         }
@@ -340,6 +345,11 @@ public final class Tracing {
         try {
             return work.run(span);
         } catch (Exception err) {
+            guardedException(span, err);
+            throw err;
+        } catch (Error err) {
+            // Recorded too: the span ends in the finally either way, and an
+            // AssertionError that failed the work must not export as a success.
             guardedException(span, err);
             throw err;
         } finally {

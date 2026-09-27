@@ -99,6 +99,23 @@ public final class Tasks {
 
     /// A new registry for a server that is starting, which threads without one then use.
     static Registry open(Config config) {
+        if (config != null) {
+            // Every executor kind the files set is checked NOW, at start-up: an
+            // executor is created on first use, and a typo found then is a start
+            // that looked fine and a job running on the thread it was meant to
+            // leave. One set only in the environment is checked on creation.
+            for (Object name : config.keys()) {
+                String key = (String) name;
+                if (key.startsWith("cn1.task.executor.") && key.endsWith(".kind")) {
+                    try {
+                        checkedKind(key, config.get(key));
+                    } catch (java.io.IOException err) {
+                        throw new IllegalStateException(key + " cannot be read: "
+                                + err.getMessage(), err);
+                    }
+                }
+            }
+        }
         Registry r = new Registry(config, true);
         synchronized (Tasks.class) {
             LIVE.add(r);
@@ -178,6 +195,7 @@ public final class Tasks {
                             + " cannot be configured: " + err.getMessage(), err);
                 }
             }
+            configured = checkedKind(prefix + "kind", configured);
             boolean virtual;
             if ("virtual".equalsIgnoreCase(configured)) {
                 virtual = true;
@@ -197,6 +215,22 @@ public final class Tasks {
             registry.executors.put(key, created);
             return created;
         }
+    }
+
+    /// A configured executor kind, trimmed; null when unset or empty. Refused,
+    /// not ignored, when it is neither platform nor virtual: the setting exists to
+    /// OVERRIDE the code -- typically to move database work off virtual hosts --
+    /// and a typo falling back to the annotation's kind would leave it there.
+    static String checkedKind(String key, String value) {
+        String kind = value == null ? null : value.trim();
+        if (kind == null || kind.length() == 0) {
+            return null;
+        }
+        if (!"virtual".equalsIgnoreCase(kind) && !"platform".equalsIgnoreCase(kind)) {
+            throw new IllegalStateException(key + " is \"" + kind + "\"; it must be "
+                    + "platform or virtual");
+        }
+        return kind;
     }
 
     /// Runs `task` once on a virtual thread, or a platform one where there are none.
