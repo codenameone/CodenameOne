@@ -830,13 +830,18 @@ public final class Backend {
             // this start-up commits, and put back if it does not.
             Tracing.Swap claim = tracing ? Tracing.swap(tracer) : null;
             Backend started;
+            // A flag and a finally, not a catch of Exception: an Error -- a bean's
+            // static initializer failing, a class missing -- must undo the start
+            // as surely as an exception does, and none of these clean-ups rethrow
+            // anything but what they caught.
+            boolean ok = false;
             try {
                 started = startTraced(tracing);
-            } catch (Exception err) {
-                if(tracing) {
+                ok = true;
+            } finally {
+                if(!ok && tracing) {
                     Tracing.rollBack(claim);
                 }
-                throw err;
             }
             if(tracing) {
                 // Owned: this server's tracer runs until this server stops it,
@@ -857,45 +862,54 @@ public final class Backend {
 
         private Backend startTracedOnce(boolean tracing) throws Exception {
             DataSource pool = openDataSource();
+            boolean ok = false;
             try {
-                return startWith(pool, tracing);
-            } catch (Exception err) {
-                // EVERY failure after the pool is open, not just the bind. A
-                // controller constructor that rejects its configuration, a
-                // static root that is not a directory, a CREATE TABLE the
-                // server refuses: each of those used to leave the connections
-                // open, and a supervisor that retries turns that into a pool of
-                // dead sessions the database still counts.
-                //
-                // Only a pool this builder OPENED. One handed in belongs to the
-                // caller and is theirs to close.
-                // Ownership is whether THIS BUILDER opened it, which is not the
-                // same as whether anything was configured: .dataSource(url)
-                // makes the builder open one, and reading dataSourceGiven here
-                // left exactly that case leaking on a failed start.
-                Application built = createdApplication;
-                createdApplication = null;
-                Tasks.Registry tasks = startingTasks;
-                startingTasks = null;
-                if(tasks != null) {
-                    // Whatever @PostConstruct submitted stops before the beans it
-                    // uses are destroyed, as in stop().
-                    Tasks.shutdown(tasks, 0);
+                Backend started = startWith(pool, tracing);
+                ok = true;
+                return started;
+            } finally {
+                if(!ok) {
+                    abandonStart(pool);
                 }
-                if(built != null) {
-                    // Before the pool closes, as Backend.stop() orders it, so a
-                    // bean can still flush to the database on its way out.
-                    try {
-                        built.stopped();
-                    } catch (RuntimeException destroyErr) {
-                        System.err.println("Destroying the application's beans failed: "
-                                + destroyErr);
-                    }
+            }
+        }
+
+        /** Undoes a start that failed after the pool opened, however it failed. */
+        private void abandonStart(DataSource pool) {
+            // EVERY failure after the pool is open, not just the bind. A
+            // controller constructor that rejects its configuration, a
+            // static root that is not a directory, a CREATE TABLE the
+            // server refuses: each of those used to leave the connections
+            // open, and a supervisor that retries turns that into a pool of
+            // dead sessions the database still counts.
+            //
+            // Only a pool this builder OPENED. One handed in belongs to the
+            // caller and is theirs to close.
+            // Ownership is whether THIS BUILDER opened it, which is not the
+            // same as whether anything was configured: .dataSource(url)
+            // makes the builder open one, and reading dataSourceGiven here
+            // left exactly that case leaking on a failed start.
+            Application built = createdApplication;
+            createdApplication = null;
+            Tasks.Registry tasks = startingTasks;
+            startingTasks = null;
+            if(tasks != null) {
+                // Whatever @PostConstruct submitted stops before the beans it
+                // uses are destroyed, as in stop().
+                Tasks.shutdown(tasks, 0);
+            }
+            if(built != null) {
+                // Before the pool closes, as Backend.stop() orders it, so a
+                // bean can still flush to the database on its way out.
+                try {
+                    built.stopped();
+                } catch (Throwable destroyErr) {
+                    System.err.println("Destroying the application's beans failed: "
+                            + destroyErr);
                 }
-                if(pool != null && dataSource == null) {
-                    pool.close();
-                }
-                throw err;
+            }
+            if(pool != null && dataSource == null) {
+                pool.close();
             }
         }
 
@@ -1073,6 +1087,7 @@ public final class Backend {
             // exporter has opened below; until then, and on a server that turned
             // metrics off, its requests stay out of the process's histograms.
             final boolean[] instrumented = new boolean[1];
+            boolean bound = false;
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
             try {
@@ -1129,25 +1144,28 @@ public final class Backend {
                                         // client receives, and the request log
                                         // must say so rather than record the
                                         // handler's own status.
-                                        HttpSession ended = request.endedSession();
+                                        List ended = request.endedSessions();
                                         HttpSession session = request.resolvedSession();
                                         if(ended != null || session != null) {
                                             sessionFinished = true;
                                         }
-                                        if(ended != null) {
-                                            // First, so its clearing cookie comes
-                                            // before the new session's.
-                                            response = sessions.finish(ended, response);
+                                        // First, so their clearing cookies come
+                                        // before the new session's.
+                                        for(int e = 0 ; ended != null && e < ended.size() ; e++) {
+                                            response = sessions.finish(
+                                                    (HttpSession)ended.get(e), response);
                                         }
                                         if(session != null) {
                                             response = sessions.finish(session, response);
                                         }
                                     } catch (Exception err) {
                                         endRequestBeans(request);
-                                        HttpSession ended = request.endedSession();
-                                        if(ended != null && !sessionFinished) {
+                                        List ended = request.endedSessions();
+                                        for(int e = 0 ; ended != null && !sessionFinished
+                                                && e < ended.size() ; e++) {
                                             try {
-                                                sessions.finish(ended, null);
+                                                sessions.finish((HttpSession)ended.get(e),
+                                                        null);
                                             } catch (Exception storeErr) {
                                                 System.err.println("Could not end the "
                                                         + "session of a failed request: "
@@ -1218,11 +1236,11 @@ public final class Backend {
                                 }
                             }
                         });
-            } catch (Exception err) {
-                if(ownsContext) {
+                bound = true;
+            } finally {
+                if(!bound && ownsContext) {
                     context.close();
                 }
-                throw err;
             }
             // From now on this server's virtual tasks run on its own hosts, and
             // its requests are traced by its own tracer.
@@ -1243,6 +1261,7 @@ public final class Backend {
             // port and answers with a torn-down application. The exporter
             // refusing its configuration, an application metric that collides
             // with a built-in one, a managed gauge whose Prometheus name clashes.
+            boolean owned = false;
             try {
                 if(metricReader != null) {
                     measuring |= metricReader.open(config);
@@ -1256,13 +1275,15 @@ public final class Backend {
                         metricReader != null && measuring ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
                         environment == null ? new ArrayList() : environment.gauges);
-            } catch (Exception err) {
-                server.stop(0);
-                com.codename1.backend.metrics.Metrics.disableServer(server, pool);
-                if(metricReader != null) {
-                    metricReader.shutdown(0);
+                owned = true;
+            } finally {
+                if(!owned) {
+                    server.stop(0);
+                    com.codename1.backend.metrics.Metrics.disableServer(server, pool);
+                    if(metricReader != null) {
+                        metricReader.shutdown(0);
+                    }
                 }
-                throw err;
             }
             backend.measured = measuring;
             // Backend.stop() tears the beans down from here on.
@@ -1282,13 +1303,16 @@ public final class Backend {
                 }
             }
             if(application != null) {
+                boolean running = false;
                 try {
                     application.started(backend);
-                } catch (Exception err) {
-                    // A job or exporter that cannot start is a server that is not
-                    // what its build says it is; stop the one that is listening.
-                    backend.stop();
-                    throw err;
+                    running = true;
+                } finally {
+                    if(!running) {
+                        // A job or exporter that cannot start is a server that is
+                        // not what its build says it is; stop the one listening.
+                        backend.stop();
+                    }
                 }
             }
             backend.markReady();

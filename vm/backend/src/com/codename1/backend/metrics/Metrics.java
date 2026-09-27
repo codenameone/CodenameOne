@@ -228,7 +228,9 @@ public final class Metrics {
         if(sources == null) {
             final List all = new ArrayList();
             sources = all;
-            SHARED.put(name, all);
+            // Registered FIRST: a gauge refused here -- another kind under the
+            // name, a Prometheus clash -- must leave no entry behind, or a retry
+            // would find it and skip registering the gauge at all.
             replaceGauge(new Gauge(name, description, unit, new Gauge.Source() {
                 public double read() {
                     Object[] each;
@@ -251,6 +253,7 @@ public final class Metrics {
                     return any ? sum : Double.NaN;
                 }
             }));
+            SHARED.put(name, all);
         }
         sources.add(source);
     }

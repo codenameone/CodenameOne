@@ -238,6 +238,83 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a counter refuses to wrap past the 64-bit range")
+    void counterOverflow() {
+        Counter c = Metrics.counter("test.overflow", "", "");
+        c.add(Long.MAX_VALUE - c.get());
+        assertThrows(IllegalStateException.class, () -> c.add(1));
+        assertEquals(Long.MAX_VALUE, c.get());
+    }
+
+    @Test
+    @DisplayName("a float argument out of the float range is refused, not made infinite")
+    void floatArgumentRange() {
+        Map args = new LinkedHashMap();
+        args.put("f", new Double(1e100));
+        args.put("ok", new Double(1.5));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.floatValue(args, "f", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.floatObject(args, "f", true));
+        assertEquals(1.5f, com.codename1.backend.mcp.McpArgs.floatValue(args, "ok", true));
+    }
+
+    @Test
+    @DisplayName("a session cookie name that is not an HTTP token is refused")
+    void cookieNameValidated() throws Exception {
+        String[] bad = {"", "my session", "a;b", "x\u0001"};
+        for(int iter = 0 ; iter < bad.length ; iter++) {
+            Properties p = new Properties();
+            p.setProperty("cn1.session.cookie", bad[iter]);
+            final Config c = Config.of(p, "test");
+            assertThrows(IOException.class, () -> Sessions.configure(c, false, null, null),
+                    "accepted cookie name [" + bad[iter] + "]");
+        }
+    }
+
+    @Test
+    @DisplayName("a refused shared gauge leaves nothing behind for a retry to skip past")
+    void refusedSharedGaugeLeavesNoEntry() {
+        Metrics.gauge("test.shared.x", "", "", new com.codename1.backend.metrics.Gauge.Source() {
+            public double read() {
+                return 1;
+            }
+        });
+        final com.codename1.backend.metrics.Gauge.Source src =
+                new com.codename1.backend.metrics.Gauge.Source() {
+            public double read() {
+                return 2;
+            }
+        };
+        assertThrows(IllegalArgumentException.class,
+                () -> Metrics.addSource("test_shared_x", "", "", src));
+        assertThrows(IllegalArgumentException.class,
+                () -> Metrics.addSource("test_shared_x", "", "", src),
+                "a retry found the failed entry and registered no gauge");
+    }
+
+    @Test
+    @DisplayName("an Error while the application is built still undoes the start")
+    void errorDuringCreateCleansUp() throws Exception {
+        final boolean[] destroyed = new boolean[1];
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        assertThrows(NoClassDefFoundError.class, () -> Backend.builder(
+                Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        throw new NoClassDefFoundError("com/example/Missing");
+                    }
+
+                    public void stopped() {
+                        destroyed[0] = true;
+                    }
+                }).start());
+        assertTrue(destroyed[0], "the beans of a start that failed with an Error were kept");
+    }
+
+    @Test
     @DisplayName("an abandoned @Async call fails its Future instead of never finishing")
     void abandonedAsyncFails() throws Exception {
         AsyncTask task = new AsyncTask("test.abandoned", false) {
@@ -679,6 +756,17 @@ class ApplicationRuntimeTest {
                             request.getSession(true).invalidate();
                             return request.respond(200, "text/plain", "out".getBytes("UTF-8"));
                         }
+                        if(t.startsWith("/twice")) {
+                            // Ends two sessions in one request: both must go.
+                            request.getSession(true).invalidate();
+                            request.getSession(true).invalidate();
+                            return request.respond(200, "text/plain", "gone".getBytes("UTF-8"));
+                        }
+                        if(t.startsWith("/nothing")) {
+                            // A new session and no response to send its cookie on.
+                            request.getSession(true).setAttribute("k", "v");
+                            return null;
+                        }
                         if(t.startsWith("/switch")) {
                             // Ends the session and starts another in one request.
                             request.getSession(true).invalidate();
@@ -737,6 +825,18 @@ class ApplicationRuntimeTest {
             HttpURLConnection oldOne = open(port, "/me");
             oldOne.setRequestProperty("Cookie", pair2);
             assertEquals("nobody", read(oldOne));
+            HttpURLConnection twice = open(port, "/twice");
+            twice.setRequestProperty("Cookie", replaced);
+            assertEquals("gone", read(twice));
+            HttpURLConnection afterTwice = open(port, "/me");
+            afterTwice.setRequestProperty("Cookie", replaced);
+            assertEquals("nobody", read(afterTwice),
+                    "the first of two sessions ended in one request survived");
+            int kept = backend.getSessions().getStore().size();
+            HttpURLConnection nothing = open(port, "/nothing");
+            assertEquals(404, nothing.getResponseCode());
+            assertEquals(kept, backend.getSessions().getStore().size(),
+                    "a session whose cookie could never be sent was stored");
         } finally {
             backend.stop();
         }

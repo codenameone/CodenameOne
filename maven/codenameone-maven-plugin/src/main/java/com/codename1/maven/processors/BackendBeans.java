@@ -1217,6 +1217,16 @@ final class BackendBeans {
                 ctx.error(cls, "@McpTool method " + where + " must be an instance method.");
                 continue;
             }
+            if (m.getAnnotation(ASYNC) != null
+                    || (cls.getClassAnnotation(ASYNC) != null && m.isPublic())) {
+                // The adapter would call the stub and receive the queued task at
+                // once, and the agent would get neither the value nor the failure.
+                ctx.error(cls, "@McpTool method " + where + " is also @Async. A tool call "
+                        + "answers with what the method returns, so it must run to the "
+                        + "end; drop @Async, or have the tool start the work and return an "
+                        + "id to ask about it by.");
+                continue;
+            }
             String name = t.getStringOrDefault("name", "").trim();
             Tool tool = new Tool(m, name.length() > 0 ? name : m.getName(),
                     t.getStringOrDefault("description", ""));
@@ -1243,7 +1253,19 @@ final class BackendBeans {
                     ok = false;
                     continue;
                 }
-                tool.paramNames.add(p.getString("value"));
+                String paramName = p.getString("value");
+                if (paramName == null || paramName.trim().length() == 0
+                        || tool.paramNames.contains(paramName)) {
+                    // One JSON property per name: a second with the same name
+                    // would overwrite the first in the schema and be read for both.
+                    ctx.error(cls, "Parameter " + (i + 1) + " of @McpTool " + where + " is "
+                            + (paramName == null || paramName.trim().length() == 0
+                            ? "named nothing" : "named \"" + paramName + "\" like another")
+                            + "; each argument needs a name of its own.");
+                    ok = false;
+                    continue;
+                }
+                tool.paramNames.add(paramName);
                 tool.paramDescriptions.add(p.getStringOrDefault("description", ""));
                 tool.paramRequired.add(Boolean.valueOf(p.getBoolOrDefault("required", true)));
             }
@@ -1337,7 +1359,15 @@ final class BackendBeans {
                         ok = false;
                     }
                     AnnotationValues named = parameterAnnotations(m, i).get(MCP_PARAM);
-                    names.add(named != null ? named.getString("value") : "arg" + i);
+                    String paramName = named != null ? named.getString("value") : "arg" + i;
+                    if (paramName == null || paramName.trim().length() == 0
+                            || names.contains(paramName)) {
+                        ctx.error(cls, "Parameter " + (i + 1) + " of @ManagedOperation "
+                                + where + " needs a name of its own: arguments are passed "
+                                + "by name.");
+                        ok = false;
+                    }
+                    names.add(paramName);
                 }
                 for (MethodInfo other : managed.operations) {
                     if (other.getName().equals(m.getName())) {

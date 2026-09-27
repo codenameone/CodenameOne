@@ -109,7 +109,9 @@ browser closes; how long the session lasts is the server's decision.
 | Key | What it sets
 
 | `cn1.session.cookie`
-| The cookie's name, `CN1SESSION` by default.
+| The cookie's name, `CN1SESSION` by default. It has to be a valid cookie name --
+  letters, digits and the punctuation HTTP allows in a token, such as `-`, `_` and
+  `.` -- and anything else stops the server at start-up.
 
 | `cn1.session.timeout`
 | Seconds a session may go unused before it expires, 1800 by default. Zero means

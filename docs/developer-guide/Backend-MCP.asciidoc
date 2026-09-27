@@ -31,10 +31,14 @@ server serves itself has to be listed too.
 
 A tool is an instance method of a bean. Its name is the method's name unless
 `@McpTool(name = ...)` gives one, and a name is letters, digits, `_`, `-` and `.`
-only. Each parameter carries `@McpParam` with the argument's name, an optional
-`description` that goes into the schema, and `required`, true by default. A
+only. Each parameter carries `@McpParam` with the argument's name, which has to
+be unique within the tool, an optional `description` that goes into the schema,
+and `required`, true by default. A tool can't also be `@Async`: the agent gets
+what the method returns, so the method has to run to the end. A
 parameter may be a `String`, a number, a boolean, an enum, a `Map` or a `List`;
-the build writes the matching JSON Schema type, and refuses any other type.
+the build writes the matching JSON Schema type, and refuses any other type. A
+number that doesn't fit the parameter -- too large for an `int`, or for a
+`float` -- is refused rather than narrowed.
 
 When an agent calls the tool, the arguments are converted to the parameter types
 and the method is called directly, with no reflection. A value that doesn't fit --

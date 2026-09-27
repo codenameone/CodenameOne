@@ -1084,6 +1084,37 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void asyncToolsAndDuplicateParametersAreBuildErrors() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Tools", PKG + "@Component public class Tools {\n"
+                + "    @McpTool(description = \"a\") @Async\n"
+                + "    public Future slow() { return AsyncResult.of(\"x\"); }\n"
+                + "    @McpTool(description = \"b\")\n"
+                + "    public String pair(@McpParam(\"id\") String a, @McpParam(\"id\") String b) {\n"
+                + "        return a + b;\n"
+                + "    }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("is also @Async"));
+        assertTrue(errors, errors.contains("named \"id\" like another"));
+    }
+
+    @Test
+    public void anEscapedWebSocketPathIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Chat", PKG + "@WebSocketMapping(\"/ch%61t\")\n"
+                + "public class Chat implements WebSocket {\n"
+                + "    public void onOpen(WebSocketSession s) { }\n"
+                + "    public void onText(WebSocketSession s, String m) { }\n"
+                + "    public void onBinary(WebSocketSession s, byte[] m, int o, int l) { }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
+                .contains("must not contain a percent escape"));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

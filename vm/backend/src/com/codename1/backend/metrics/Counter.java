@@ -40,7 +40,7 @@ public final class Counter extends Instrument {
 
     /** Adds one. */
     public void increment() {
-        total.incrementAndGet();
+        add(1);
     }
 
     /**
@@ -53,7 +53,20 @@ public final class Counter extends Instrument {
             throw new IllegalArgumentException("Counter " + getName()
                     + " only goes up; use an up-down counter");
         }
-        total.addAndGet(amount);
+        // Refused rather than wrapped: addAndGet past Long.MAX_VALUE turns a
+        // total that only ever rises into a large negative one, which both
+        // exports then report as the counter's value.
+        while(true) {
+            long current = total.get();
+            long next = current + amount;
+            if(((current ^ next) & (amount ^ next)) < 0) {
+                throw new IllegalStateException("Counter " + getName()
+                        + " would overflow a 64-bit total");
+            }
+            if(total.compareAndSet(current, next)) {
+                return;
+            }
+        }
     }
 
     public long get() {

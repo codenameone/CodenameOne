@@ -466,7 +466,7 @@ final class BackendSources {
             case Type.SHORT: return helper + "shortValue(" + args + ")";
             case Type.INT: return helper + "intValue(" + args + ")";
             case Type.LONG: return helper + "longValue(" + args + ")";
-            case Type.FLOAT: return "(float) " + helper + "doubleValue(" + args + ")";
+            case Type.FLOAT: return helper + "floatValue(" + args + ")";
             case Type.DOUBLE: return helper + "doubleValue(" + args + ")";
             default:
                 break;

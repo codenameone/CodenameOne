@@ -187,7 +187,20 @@ public final class McpArgs {
 
     public static Float floatObject(Map args, String name, boolean required) {
         return raw(args, name, required) == null ? null
-                : new Float((float)doubleValue(args, name, required));
+                : new Float(floatValue(args, name, required));
+    }
+
+    /**
+     * A float argument, refused when it has no float value: a finite number
+     * such as 1e100 would otherwise narrow to infinity, and the method would
+     * run with a number nobody sent.
+     */
+    public static float floatValue(Map args, String name, boolean required) {
+        double d = doubleValue(args, name, required);
+        if(Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE) {
+            throw new IllegalArgumentException("\"" + name + "\" is out of range");
+        }
+        return (float)d;
     }
 
     public static Boolean booleanObject(Map args, String name, boolean required) {

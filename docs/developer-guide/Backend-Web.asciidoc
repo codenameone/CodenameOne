@@ -213,7 +213,9 @@ share per-connection state, which is an object. What it keeps from `@GetMapping`
 what a reader cares about -- the path is relative to a class-level
 `@RequestMapping`, a constructor taking a `DataSource` or an `EntityManager` is
 injected the same way, and two endpoints claiming one path is a build error rather
-than something registration order decides.
+than something registration order decides. Write the path's characters out: an
+escaped character such as `%61` in the mapping is a build error too, since an
+upgrade is matched against the decoded path, which an escaped mapping never equals.
 
 ==== A server that writes its own main
 

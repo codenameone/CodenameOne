@@ -93,6 +93,14 @@ public final class Sessions {
                                      Backend.Application application) throws IOException {
         Sessions out = new Sessions(application);
         out.cookieName = config.get("cn1.session.cookie", "CN1SESSION");
+        if(!isToken(out.cookieName)) {
+            // Emitted verbatim in Set-Cookie: an empty name, a space, a ';' or a
+            // control character makes a header the browser ignores or the writer
+            // drops, and every request then starts another session nobody can
+            // come back to.
+            throw new IOException("cn1.session.cookie is \"" + out.cookieName + "\"; a cookie "
+                    + "name is one or more letters, digits and !#$%&'*+-.^_`|~");
+        }
         out.timeoutSeconds = config.getInt("cn1.session.timeout", 1800);
         if(out.timeoutSeconds < 0) {
             // Zero is the documented "never"; a negative one is a typo that
@@ -154,6 +162,22 @@ public final class Sessions {
             standalone = new Sessions();
         }
         return standalone;
+    }
+
+    /** Whether {@code name} is an RFC 6265 cookie-name: an HTTP token. */
+    static boolean isToken(String name) {
+        if(name == null || name.length() == 0) {
+            return false;
+        }
+        for(int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+            if(!ok) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Replaces the store, for one of the application's own. */
@@ -273,6 +297,24 @@ public final class Sessions {
         SessionStore s = getStore();
         String cookie = null;
         String previous = session.previousId();
+        if(response == null && session.isValid() && (session.isNew() || previous != null)) {
+            // No response of the handler's to carry a cookie -- it returned
+            // nothing, or threw, and the server answers 404 or 500 itself. A new
+            // id stored now would be one the client never learns: kept until it
+            // expired, with its beans. So a new session is dropped, and a
+            // rotation is not made: the client keeps the id it has.
+            if(session.isNew()) {
+                destroy(take(session.getId()));
+            } else {
+                synchronized(this) {
+                    Held moved = (Held)beans.remove(session.getId());
+                    if(moved != null) {
+                        beans.put(previous, moved);
+                    }
+                }
+            }
+            return null;
+        }
         if(!session.isValid()) {
             s.delete(session.getId());
             // The beans end with the session, not with whatever next finds it gone.

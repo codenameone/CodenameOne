@@ -124,8 +124,8 @@ public final class HttpServer {
         private boolean canonicalChecked;
         /** The sessions of the server serving this request; set by Backend. */
         Sessions sessions;
-        /** See {@link #endedSession}. */
-        private HttpSession endedSession;
+        /** See {@link #endedSessions}. */
+        private java.util.List endedSessions;
         /** This request's session once looked up; see {@link #getSession(boolean)}. */
         private HttpSession session;
         private boolean sessionResolved;
@@ -589,7 +589,7 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
-            this.endedSession = null;
+            this.endedSessions = null;
         }
 
         /** The session of this request, creating one if it has none. */
@@ -609,7 +609,10 @@ public final class HttpServer {
                 // more. Kept aside so the end of the request still deletes it and
                 // clears its cookie; a lookup now answers as if there were none,
                 // and create starts a new one.
-                endedSession = session;
+                if(endedSessions == null) {
+                    endedSessions = new java.util.ArrayList(1);
+                }
+                endedSessions.add(session);
                 session = null;
             }
             if(sessionResolved && (session != null || !create)) {
@@ -638,9 +641,13 @@ public final class HttpServer {
             return session;
         }
 
-        /** A session this request invalidated and then replaced, or null. */
-        HttpSession endedSession() {
-            return endedSession;
+        /**
+         * The sessions this request invalidated and then replaced, oldest first,
+         * or null. All of them: one request can end a session, start another and
+         * end that too, and each has to be deleted when it finishes.
+         */
+        java.util.List endedSessions() {
+            return endedSessions;
         }
 
         /**
@@ -698,7 +705,7 @@ public final class HttpServer {
             this.sessionResolved = false;
             this.scopedBeans = null;
             this.sessions = null;
-            this.endedSession = null;
+            this.endedSessions = null;
         }
 
         /**

@@ -1102,6 +1102,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                             + cls.getBinaryName() + " -> \"" + full + "\"");
                     return;
                 }
+                if (full.indexOf('%') >= 0) {
+                    // The upgrade looks up the CANONICAL path -- unreserved escapes
+                    // decoded, the rest upper-cased -- so a mapping spelled with
+                    // an escape is a key nothing matches, and one that evades the
+                    // duplicate check against its decoded twin. Write the path out.
+                    ctx.error(cls, "@WebSocketMapping path must not contain a percent "
+                            + "escape; write the characters themselves: "
+                            + cls.getBinaryName() + " -> \"" + full + "\"");
+                    return;
+                }
                 if (full.indexOf('?') >= 0) {
                     // tryUpgrade strips the query before it looks a path up, so a
                     // mapping with one in it goes into the route map under a key
