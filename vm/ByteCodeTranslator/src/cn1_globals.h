@@ -425,7 +425,9 @@ extern const int cn1ClazzByIdCount;
 extern void cn1ClazzRegister(uint16_t index, struct clazz* c);
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c);
-#define CN1_OBJ_CLASS(o)            (cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId])
+// Every slot is read atomically (relaxed, which is an ordinary load on every target) because
+// cn1ClazzRegister writes slots while other threads read the table; see there.
+#define CN1_OBJ_CLASS(o)            (__atomic_load_n(&cn1ClazzById[((const struct JavaObjectPrototype*)(o))->__cn1ClassId], __ATOMIC_RELAXED))
 #define CN1_OBJ_SET_CLASS(o, c)     cn1ObjSetClass((struct JavaObjectPrototype*)(o), (c))
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c) {
     if(c == 0) {
@@ -439,7 +441,7 @@ static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const stru
 // hold an object whose class index resolves to nothing.
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c) {
     uint16_t index = cn1ClazzIndexOf(c);
-    if(__builtin_expect(index != 0 && cn1ClazzById[index] == 0, 0)) {
+    if(__builtin_expect(index != 0 && __atomic_load_n(&cn1ClazzById[index], __ATOMIC_RELAXED) == 0, 0)) {
         cn1ClazzRegister(index, (struct clazz*)c);
     }
     o->__cn1ClassId = index;

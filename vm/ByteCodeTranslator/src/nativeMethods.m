@@ -5499,7 +5499,12 @@ JAVA_CHAR java_lang_String_cn1InlineCharAt___int_R_char(CODENAME_ONE_THREAD_STAT
 
 JAVA_OBJECT java_lang_String_cn1SubstringFused___int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT off, JAVA_INT n) {
     struct obj__java_lang_String* me = (struct obj__java_lang_String*)__cn1ThisObject;
-    if(n < 0) {
+    // A length that cannot fit a fused block is refused BEFORE any size arithmetic: n is
+    // bounded only by the parent's length, and n * esz in int wraps for a UTF-16
+    // substring past INT_MAX / 2, which the allocator would then accept as a small size
+    // and the memcpy below overrun. Past the largest BiBOP object the fused path could
+    // never be taken anyway, so this changes which path runs, never the result.
+    if(n < 0 || n > CN1_BIBOP_MAX_OBJECT) {
         return JAVA_NULL;
     }
     // NOT "value == NULL means no source": a NULL store is now the INLINE marker,
@@ -5576,6 +5581,15 @@ JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_T
         return fallback;
     }
 
+    // Same guard as cn1SubstringFused: CN1_FUSED_ARR_BYTES narrows to int, so a builder
+    // past INT_MAX / 2 characters wraps to a negative total -- which CN1_BIBOP_CIDX files
+    // under the SMALLEST size class. Too large for a fused block in any case, so it takes
+    // the ordinary copy.
+    if(count > CN1_BIBOP_MAX_OBJECT) {
+        JAVA_OBJECT r = cn1BuilderStringCopy(threadStateData, __cn1ThisObject, latin1);
+        finishedNativeAllocations();
+        return r;
+    }
     int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
     int total = off + CN1_FUSED_ARR_BYTES(count, sizeof(JAVA_ARRAY_CHAR));
     // Inline no-zero bump path (init-before-publish, same discipline as the
