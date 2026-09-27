@@ -357,10 +357,25 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '8'
-          cache: 'maven'
       - name: Save JDK 8 path
         shell: pwsh
         run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # The Maven repository, restored from the NEAREST earlier run rather than an
+      # exact match. setup-java's cache: 'maven' keys on the hash of every pom.xml
+      # and restores nothing on a miss, so any change to a pom started this job
+      # from an empty repository -- and Central rate-limits Windows runners hard:
+      # one such run got 429 Too Many Requests on junit-bom through all five
+      # attempts of the retry loop below, over ten minutes, before building
+      # anything. A near match already holds almost every artifact, so the few new
+      # ones are all that has to come from Central.
+      - name: Maven repository cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-screenshot-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-screenshot-
 
       # Install the locally-built artifacts the hellocodenameone Maven build needs:
       # codename1-core + the Windows port (translator inputs), the codenameone
