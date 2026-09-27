@@ -264,6 +264,24 @@ void CN1MacRefreshScaleValue(void) {
     cn1StartupPhase("buildWindow.exit");
 }
 
+/// The scale to answer with before the window exists.
+///
+/// The default size is in POINTS -- it is the content rectangle the window is
+/// built with -- and Codename One lays out in device pixels. Answering it
+/// unscaled told a Retina launch its screen was 1024x685 until the window
+/// arrived and screenSizeChanged said 2048x1370, so the first layout of every
+/// launch was done at half size and then thrown away: the whole tree was built,
+/// laid out and rebuilt inside the first frame. The primary screen's scale is
+/// already published before the application's main runs (see
+/// CN1MacPublishPrimaryScale), so the answer can be in pixels without touching
+/// AppKit off the main thread. 0 from the reader means "not safe to guess" -- a
+/// mixed-scale desktop -- and then this stays at 1, as it always did.
+static CGFloat cn1MacDefaultScale(void) {
+    extern int cn1MacPublishedScaleTimes100(void);
+    int s100 = cn1MacPublishedScaleTimes100();
+    return s100 > 0 ? s100 / 100.0 : 1.0;
+}
+
 /// Answering a size query must not WAIT for the window either.
 ///
 /// The window is built early, on the main thread, from
@@ -277,7 +295,7 @@ void CN1MacRefreshScaleValue(void) {
 - (int)displayWidth {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)CN1_MAC_DEFAULT_WIDTH;
+        return (int)(CN1_MAC_DEFAULT_WIDTH * cn1MacDefaultScale());
     }
     // Device pixels, not points: Codename One lays out in pixels and a Retina
     // display has two of them per point.
@@ -287,7 +305,7 @@ void CN1MacRefreshScaleValue(void) {
 - (int)displayHeight {
     NSView *v = _renderingView;
     if (v == nil) {
-        return (int)CN1_MAC_DEFAULT_HEIGHT;
+        return (int)(CN1_MAC_DEFAULT_HEIGHT * cn1MacDefaultScale());
     }
     return (int)(v.bounds.size.height * CN1AppKitBackingScale(v));
 }
