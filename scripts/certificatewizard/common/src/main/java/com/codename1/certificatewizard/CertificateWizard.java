@@ -71,7 +71,7 @@ import com.codename1.annotations.buildhints.*;
 
 @Android(themeMode = ThemeMode.MODERN)
 @Build(nativeTheme = ThemeMode.MODERN)
-@DesktopBuild(height = 820, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, themeMode = "native", titleBar = DesktopTitleBar.NATIVE, width = 1260)
 @Ios(themeMode = ThemeMode.MODERN)
 public class CertificateWizard extends Lifecycle {
     public enum Section { OVERVIEW, CREDENTIAL, CERTIFICATES, BUNDLES, DEVICES, PROFILES, APNS, MAC, ANDROID, WINDOWS, MAINTENANCE }
@@ -138,7 +138,23 @@ public class CertificateWizard extends Lifecycle {
         installEdtErrorHandler();
         initTableState();
         Toolbar.setGlobalToolbar(true);
+        // On the desktop CN.isDarkMode() is the OS appearance, read once at launch, so the
+        // wizard follows the platform until the user picks a side with the toggle.
+        // certificatewizard.darkMode forces either one, which is how CI renders both.
         darkMode = Preferences.get(PREF_DARK_MODE, Boolean.TRUE.equals(CN.isDarkMode()));
+        String forcedDark = System.getProperty("certificatewizard.darkMode");
+        if ("true".equals(forcedDark) || "false".equals(forcedDark)) {
+            darkMode = "true".equals(forcedDark);
+        }
+        String forcedSection = System.getProperty("certificatewizard.section");
+        if (forcedSection != null) {
+            for (Section candidate : Section.values()) {
+                if (candidate.name().equalsIgnoreCase(forcedSection.replace('-', '_'))) {
+                    section = candidate;
+                    break;
+                }
+            }
+        }
         fontDeltaPx = Preferences.get(PREF_FONT_DELTA, 0);
         CN.setDarkMode(Boolean.valueOf(darkMode));
         applyThemeForCurrentScheme();
@@ -193,8 +209,8 @@ public class CertificateWizard extends Lifecycle {
                 super.pinchReleased(x, y);
             }
         };
-        form.setUIID(uiid("CWForm"));
-        form.getToolbar().setUIID(uiid("CWChrome"));
+        form.setUIID("CWForm");
+        form.getToolbar().setUIID("CWChrome");
         form.getTextSelection().setEnabled(true);
         installMenuCommands();
         buildShell();
@@ -202,27 +218,18 @@ public class CertificateWizard extends Lifecycle {
         reload();
     }
 
-    /// Refreshes the theme once the dark flag is known, and on the desktop restores the scrollbar
-    /// the generated stub already asks for.
+    /// Refreshes the theme once the dark flag is known.
     ///
-    /// The stub calls JavaSEPort.setDesktopInteractiveScrollbars(true), and the port injects
-    /// @interactiveScrollBool into the NATIVE theme. This app's theme is a CSS theme that does not
-    /// layer the native one, so installing it replaced the whole property table and took that
-    /// constant with it -- the look and feel then fell back to the thin mobile overlay bar you
-    /// cannot grab, on a desktop tool whose lists are long enough to need one.
+    /// The look and feel bakes the check box glyphs from the CheckBox style at refresh time, and
+    /// which of CheckBox / $DarkCheckBox that resolves to is read from the dark flag right then.
+    /// Refreshing before CN.setDarkMode coloured the boxes for the scheme the platform reported
+    /// rather than the one the stored preference selects.
     ///
-    /// The refresh has to come after CN.setDarkMode: the look and feel bakes the check box glyphs
-    /// from the CheckBox style at refresh time, and which of CheckBox / $DarkCheckBox that resolves
-    /// to is read from the dark flag right then. Refreshing earlier coloured the boxes for the
-    /// scheme the platform reported rather than the one the stored preference selects.
+    /// The desktop scrollbar needs nothing here any more. This theme layers the native one
+    /// (includeNativeBool), so the @interactiveScrollBool the port injects into it stays in the
+    /// property table instead of being replaced along with it.
     private void applyThemeForCurrentScheme() {
-        if (!CN.isDesktop()) {
-            UIManager.getInstance().refreshTheme();
-            return;
-        }
-        java.util.Hashtable<String, String> props = new java.util.Hashtable<String, String>();
-        props.put("@interactiveScrollBool", "true");
-        UIManager.getInstance().addThemeProps(props);
+        UIManager.getInstance().refreshTheme();
     }
 
     private void seedCredentialState() {
@@ -326,13 +333,13 @@ public class CertificateWizard extends Lifecycle {
 
     private void buildShell() {
         form.removeAll();
-        form.setUIID(uiid("CWForm"));
-        form.getToolbar().setUIID(uiid("CWChrome"));
+        form.setUIID("CWForm");
+        form.getToolbar().setUIID("CWChrome");
         form.add(BorderLayout.NORTH, topBar());
         form.add(BorderLayout.WEST, sidebar());
         page = new Container(BoxLayout.y());
         page.setScrollableY(true);
-        page.setUIID(uiid("CWPage"));
+        page.setUIID("CWPage");
         form.add(BorderLayout.CENTER, page);
         renderPage();
         applyFontScale(form);
@@ -341,29 +348,29 @@ public class CertificateWizard extends Lifecycle {
 
     private Container topBar() {
         Container bar = new Container(new BorderLayout());
-        bar.setUIID(uiid("CWChrome"));
+        bar.setUIID("CWChrome");
         Container left = new Container(new FlowLayout(Component.LEFT));
         Label logo = new Label("Codename One");
-        logo.setUIID(uiid("CWLogo"));
+        logo.setUIID("CWLogo");
         logo.setTextSelectionEnabled(true);
         Label title = new Label("Signing");
-        title.setUIID(uiid("CWTitle"));
+        title.setUIID("CWTitle");
         title.setTextSelectionEnabled(true);
         left.add(logo).add(title);
         Container right = new Container(new FlowLayout(Component.RIGHT));
-        right.setUIID(uiid("CWToolbarActions"));
+        right.setUIID("CWToolbarActions");
         Button status = new Button(state.credential.configured() ? "ASC API Key configured" : "ASC API Key missing");
-        status.setUIID(uiid(state.credential.configured() ? "CWStatus" : "CWStatusOff"));
+        status.setUIID(state.credential.configured() ? "CWStatus" : "CWStatusOff");
         status.setName("pill.credential");
         status.addActionListener(e -> go(Section.CREDENTIAL));
         Label email = new Label(userEmail);
-        email.setUIID(uiid("CWEmail"));
+        email.setUIID("CWEmail");
         email.setTextSelectionEnabled(true);
         Button refresh = iconButton(FontImage.MATERIAL_REFRESH, "Refresh", "btn.refresh");
         refresh.addActionListener(e -> reload());
         Button dark = iconButton(darkMode ? FontImage.MATERIAL_WB_SUNNY : FontImage.MATERIAL_BRIGHTNESS_3,
                 darkMode ? "Switch to light mode" : "Switch to dark mode", "toggle.darkMode");
-        dark.setUIID(uiid("CWDarkToggle"));
+        dark.setUIID("CWDarkToggle");
         dark.addActionListener(e -> setDarkMode(!darkMode));
         right.add(status);
         if (state.credential.configured()) {
@@ -380,7 +387,7 @@ public class CertificateWizard extends Lifecycle {
 
     private Container sidebar() {
         Container side = new Container(BoxLayout.y());
-        side.setUIID(uiid("CWSidebar"));
+        side.setUIID("CWSidebar");
         label(side, "WORKSPACE", "CWNavLabel");
         nav(side, Section.OVERVIEW, FontImage.MATERIAL_DASHBOARD, "Overview", null);
         nav(side, Section.CREDENTIAL, FontImage.MATERIAL_VPN_KEY, "ASC API Key", null);
@@ -403,7 +410,7 @@ public class CertificateWizard extends Lifecycle {
     private void nav(Container side, Section target, char icon, String text, Integer count) {
         Button b = new Button(count == null ? text : text + "  " + count);
         b.setName("nav." + target.name().toLowerCase());
-        b.setUIID(uiid(section == target ? "CWNavSelected" : "CWNav"));
+        b.setUIID(section == target ? "CWNavSelected" : "CWNav");
         FontImage.setMaterialIcon(b, icon, 3.2f);
         b.addActionListener(e -> go(target));
         side.add(b);
@@ -430,11 +437,11 @@ public class CertificateWizard extends Lifecycle {
         pageHead("Overview", "Manage signing assets for Apple, Android and desktop builds from the current project.");
         if (!state.credential.configured()) {
             Container b = new Container(new BorderLayout());
-            b.setUIID(uiid("CWBanner"));
+            b.setUIID("CWBanner");
             Container text = new Container(BoxLayout.y());
             label(text, "Connect your App Store Connect API key to begin", "CWCardTitle");
             Label copy = new Label("Certificates, bundle IDs, devices and profiles all talk to Apple through this key.");
-            copy.setUIID(uiid("CWCardMeta"));
+            copy.setUIID("CWCardMeta");
             copy.setTextSelectionEnabled(true);
             text.add(copy);
             b.add(BorderLayout.CENTER, text);
@@ -745,7 +752,7 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private float baseFontMm(String uiid) {
-        String id = stripDark(uiid);
+        String id = uiid == null ? "" : uiid;
         if ("CWMetricNumber".equals(id)) {
             return 5.2f;
         }
@@ -793,7 +800,7 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private boolean isBoldUiid(String uiid) {
-        String id = stripDark(uiid);
+        String id = uiid == null ? "" : uiid;
         return id.indexOf("Title") > -1 || id.indexOf("Logo") > -1 || id.indexOf("Status") > -1
                 || id.indexOf("Selected") > -1 || id.indexOf("Primary") > -1 || id.indexOf("Accent") > -1
                 || id.indexOf("Outline") > -1 || id.indexOf("Danger") > -1 || id.indexOf("Pill") > -1
@@ -802,19 +809,12 @@ public class CertificateWizard extends Lifecycle {
                 || "CWDarkToggle".equals(id);
     }
 
-    private String stripDark(String uiid) {
-        if (uiid != null && uiid.startsWith("DarkCW")) {
-            return uiid.substring(4);
-        }
-        return uiid == null ? "" : uiid;
-    }
-
     private void prepareP8TextArea(TextArea p8, int rows) {
         p8.setRows(rows);
         p8.setGrowByContent(false);
         p8.setTextSelectionEnabled(true);
-        p8.getHintLabel().setUIID(uiid("CWFieldHint"));
-        p8.setUIID(uiid("CWField"));
+        p8.getHintLabel().setUIID("CWFieldHint");
+        p8.setUIID("CWField");
     }
 
     private void certificatesPage() {
@@ -1098,7 +1098,7 @@ public class CertificateWizard extends Lifecycle {
         Button dl = primary("Download .p12", "modal.p12.submit");
         dl.addActionListener(e -> {
             d.dispose();
-            service.downloadP12(c.id(), pass.getText(), safeFileName(c.displayName()) + ".p12",
+            service.downloadP12(c.id(), pass.getText(), p12FileName(c),
                     x -> afterCertificateDownload(x, c, pass.getText()));
         });
         addDialogActions(d, dl);
@@ -1127,13 +1127,13 @@ public class CertificateWizard extends Lifecycle {
             name.setText(initialName);
         }
         CheckBox push = new CheckBox("Enable Push Notifications");
-        push.setUIID(uiid("CWFieldLabel"));
+        push.setUIID("CWFieldLabel");
         // Starts on what the project asks for. This dialog is the deliberate way to turn
         // the capability on, so it follows ios.includePush rather than deciding for
         // itself the way automatic setup used to.
         push.setSelected(projectWantsPush(platform));
         CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
-        appGroups.setUIID(uiid("CWFieldLabel"));
+        appGroups.setUIID("CWFieldLabel");
         appGroups.setName("modal.bundle.appGroups");
         d.add(id).add(name).add(push).add(appGroups);
         Button save = primary("Register", "modal.bundle.submit");
@@ -1225,7 +1225,7 @@ public class CertificateWizard extends Lifecycle {
         final InteractionDialog d = modalFrame("New provisioning profile");
         final Container content = new Container(BoxLayout.y());
         content.setScrollableY(true);
-        content.setUIID(uiid("CWDialogContent"));
+        content.setUIID("CWDialogContent");
         d.add(BorderLayout.CENTER, content);
 
         // The dialog opens with App Store selected, and now says so in the model as well as on
@@ -1253,7 +1253,7 @@ public class CertificateWizard extends Lifecycle {
         name.setName("field.profileName");
         name.setText(defaultProfileName(profileType[0]));
         final Label requirement = new Label("");
-        requirement.setUIID(uiid("CWFieldLabel"));
+        requirement.setUIID("CWFieldLabel");
         requirement.setName("modal.profile.requirement");
         requirement.setTextSelectionEnabled(true);
 
@@ -1487,7 +1487,7 @@ public class CertificateWizard extends Lifecycle {
                 for (SigningState.Device device : devices) {
                     CheckBox cb = new CheckBox(device.name() + "   " + device.udid());
                     cb.setName("pick.device." + device.id());
-                    cb.setUIID(uiid("CWFieldLabel"));
+                    cb.setUIID("CWFieldLabel");
                     cb.setSelected(devs.contains(device.id()));
                     deviceBoxes.add(cb);
                     cb.addActionListener(e -> {
@@ -2832,7 +2832,7 @@ public class CertificateWizard extends Lifecycle {
         final boolean mac = isMacCertificate(cert.certificateType()) || isMacProfile(profile.profileType());
         final boolean debug = isDevelopmentCertificate(cert.certificateType()) || isDevelopmentProfile(profile.profileType());
         final String password = generatedP12Password(cert);
-        final String p12Name = safeFileName(cert.displayName()) + ".p12";
+        final String p12Name = p12FileName(cert);
         final String profileName = safeFileName(profile.name()) + (mac ? ".provisionprofile" : ".mobileprovision");
         service.downloadP12(cert.id(), password, p12Name, p12 -> {
             if (!p12.ok) {
@@ -3024,7 +3024,7 @@ public class CertificateWizard extends Lifecycle {
         }
         messageHost.removeAll();
         if (pageMessage != null && pageMessage.length() > 0) {
-            String id = uiid(pageMessageWarn ? "CWBannerWarn" : "CWBanner");
+            String id = pageMessageWarn ? "CWBannerWarn" : "CWBanner";
             // A SpanLabel rather than a Label: these messages are whole
             // sentences telling the developer what to go and fix, and a Label
             // would clip them to the width of the banner.
@@ -3052,7 +3052,7 @@ public class CertificateWizard extends Lifecycle {
 
     private void banner(String text, boolean warn) {
         Label l = new Label(text);
-        l.setUIID(uiid(warn ? "CWBannerWarn" : "CWBanner"));
+        l.setUIID(warn ? "CWBannerWarn" : "CWBanner");
         l.setTextSelectionEnabled(true);
         page.add(l);
     }
@@ -3147,15 +3147,15 @@ public class CertificateWizard extends Lifecycle {
 
     private Container card() {
         Container c = new Container(BoxLayout.y());
-        c.setUIID(uiid("CWCard"));
+        c.setUIID("CWCard");
         return c;
     }
 
     private InteractionDialog modal(String title) {
         InteractionDialog d = new InteractionDialog(title);
         d.setLayout(BoxLayout.y());
-        d.setUIID(uiid("CWModal"));
-        d.getTitleComponent().setUIID(uiid("CWModalTitle"));
+        d.setUIID("CWModal");
+        d.getTitleComponent().setUIID("CWModalTitle");
         d.setScrollableY(true);
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setAnimateShow(true);
@@ -3166,8 +3166,8 @@ public class CertificateWizard extends Lifecycle {
     private InteractionDialog modalFrame(String title) {
         InteractionDialog d = new InteractionDialog(title);
         d.setLayout(new BorderLayout());
-        d.setUIID(uiid("CWModal"));
-        d.getTitleComponent().setUIID(uiid("CWModalTitle"));
+        d.setUIID("CWModal");
+        d.getTitleComponent().setUIID("CWModalTitle");
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setAnimateShow(true);
         d.setRepositionAnimation(false);
@@ -3182,13 +3182,13 @@ public class CertificateWizard extends Lifecycle {
 
     private void addDialogActions(InteractionDialog d, Button first, Button second) {
         Container actions = actionRow(Component.RIGHT, first, second);
-        actions.setUIID(uiid("CWDialogActions"));
+        actions.setUIID("CWDialogActions");
         d.add(actions);
     }
 
     private void addDialogActions(InteractionDialog d, Button first, Button second, Button third) {
         Container actions = actionRow(Component.RIGHT, first, second, third);
-        actions.setUIID(uiid("CWDialogActions"));
+        actions.setUIID("CWDialogActions");
         d.add(actions);
     }
 
@@ -3203,13 +3203,13 @@ public class CertificateWizard extends Lifecycle {
         Button cancel = outline("Cancel", "modal.cancel");
         cancel.addActionListener(e -> d.dispose());
         Container actions = actionRow(Component.RIGHT, cancel, primaryAction);
-        actions.setUIID(uiid("CWDialogActions"));
+        actions.setUIID("CWDialogActions");
         if (note == null) {
             d.add(BorderLayout.SOUTH, actions);
             return;
         }
         Container footer = new Container(new BorderLayout());
-        footer.setUIID(uiid("CWDialogActions"));
+        footer.setUIID("CWDialogActions");
         footer.add(BorderLayout.CENTER, note);
         footer.add(BorderLayout.EAST, actions);
         d.add(BorderLayout.SOUTH, footer);
@@ -3221,8 +3221,14 @@ public class CertificateWizard extends Lifecycle {
         int w = current == null || current.getWidth() <= 0 ? display.getDisplayWidth() : current.getWidth();
         int h = current == null || current.getHeight() <= 0 ? display.getDisplayHeight() : current.getHeight();
         int min = display.convertToPixels(4);
-        int preferredW = Math.min(w - min * 2, Math.max(display.convertToPixels(68), w / 3));
         applyFontScale(d);
+        // Never narrower than the widest row of buttons. A button grid gives every cell the width
+        // of its widest label, and the desktop themes' buttons carry insets of their own, so at a
+        // fixed width the certificate-type segments came out as "iOS Distribut". Only the button
+        // rows count: a SpanLabel reports its unwrapped width, which would stretch the dialog.
+        int rowsW = widestButtonRow(d) + d.getStyle().getHorizontalPadding()
+                + d.getContentPane().getStyle().getHorizontalPadding() + display.convertToPixels(2);
+        int preferredW = Math.min(w - min * 2, Math.max(Math.max(display.convertToPixels(68), w / 3), rowsW));
         int naturalH = d.getPreferredH();
         int preferredH = Math.min(h - min * 2, Math.max(display.convertToPixels(28),
                 naturalH <= 0 ? display.convertToPixels(44) : naturalH + display.convertToPixels(3)));
@@ -3235,14 +3241,30 @@ public class CertificateWizard extends Lifecycle {
         d.show(top, bottom, left, right);
     }
 
+    private static int widestButtonRow(Container c) {
+        int widest = 0;
+        for (int i = 0; i < c.getComponentCount(); i++) {
+            Component child = c.getComponentAt(i);
+            if ("CWActionGrid".equals(child.getUIID())) {
+                widest = Math.max(widest, child.getPreferredW() + child.getStyle().getHorizontalMargins());
+            } else if (child instanceof Container) {
+                widest = Math.max(widest, widestButtonRow((Container) child));
+            }
+        }
+        return widest;
+    }
+
     private void showLargeModal(InteractionDialog d) {
         Display display = Display.getInstance();
         Form current = display.getCurrent();
         int w = current == null || current.getWidth() <= 0 ? display.getDisplayWidth() : current.getWidth();
         int h = current == null || current.getHeight() <= 0 ? display.getDisplayHeight() : current.getHeight();
         int min = display.convertToPixels(4);
-        int preferredW = Math.min(w - min * 2, Math.max(display.convertToPixels(86), w * 2 / 5));
         applyFontScale(d);
+        // As in showModal, plus the scrollbar a large modal keeps beside its content.
+        int rowsW = widestButtonRow(d) + d.getStyle().getHorizontalPadding()
+                + d.getContentPane().getStyle().getHorizontalPadding() + display.convertToPixels(6);
+        int preferredW = Math.min(w - min * 2, Math.max(Math.max(display.convertToPixels(86), w * 2 / 5), rowsW));
         int preferredH = Math.min(h - min * 2, Math.max(display.convertToPixels(64), h * 3 / 4));
         d.setPreferredW(preferredW);
         d.setPreferredH(preferredH);
@@ -3255,12 +3277,12 @@ public class CertificateWizard extends Lifecycle {
 
     private void metric(Container parent, String number, String label, Runnable action) {
         Container box = new Container(BoxLayout.y());
-        box.setUIID(uiid("CWMetric"));
+        box.setUIID("CWMetric");
         Label n = new Label(number);
-        n.setUIID(uiid("CWMetricNumber"));
+        n.setUIID("CWMetricNumber");
         n.setTextSelectionEnabled(true);
         Label l = new Label(label);
-        l.setUIID(uiid("CWMetricLabel"));
+        l.setUIID("CWMetricLabel");
         l.setTextSelectionEnabled(true);
         box.add(n).add(l);
         box.addPointerReleasedListener(e -> action.run());
@@ -3269,9 +3291,9 @@ public class CertificateWizard extends Lifecycle {
 
     private Container actionRow(int align, Button... buttons) {
         Container outer = new Container(new FlowLayout(align));
-        outer.setUIID(uiid("CWActionRow"));
+        outer.setUIID("CWActionRow");
         Container grid = new Container(new GridLayout(1, buttons.length));
-        grid.setUIID(uiid("CWActionGrid"));
+        grid.setUIID("CWActionGrid");
         for (Button b : buttons) {
             grid.add(b);
         }
@@ -3281,18 +3303,18 @@ public class CertificateWizard extends Lifecycle {
 
     private Container filterRow(Section tableSection, Container body) {
         Container outer = new Container(new BorderLayout());
-        outer.setUIID(uiid("CWFilterRow"));
+        outer.setUIID("CWFilterRow");
         Container fieldWrap = new Container(new BorderLayout());
-        fieldWrap.setUIID(uiid("CWFilterWrap"));
+        fieldWrap.setUIID("CWFilterWrap");
         TextField filter = new TextField(tableFilter(tableSection));
         filter.setHint("Filter");
         filter.setName("filter." + tableSection.name().toLowerCase());
-        filter.getHintLabel().setUIID(uiid("CWFieldHint"));
+        filter.getHintLabel().setUIID("CWFieldHint");
         filter.setTextSelectionEnabled(true);
-        filter.setUIID(uiid("CWFilterField"));
+        filter.setUIID("CWFilterField");
         Button clear = new Button("");
         clear.setName("filter.clear." + tableSection.name().toLowerCase());
-        clear.setUIID(uiid("CWFilterClear"));
+        clear.setUIID("CWFilterClear");
         clear.setTooltip("Clear filter");
         FontImage.setMaterialIcon(clear, FontImage.MATERIAL_CLOSE, 2.4f);
         clear.setHidden(tableFilter(tableSection).length() == 0);
@@ -3319,7 +3341,7 @@ public class CertificateWizard extends Lifecycle {
     private Container tableBody(Section tableSection) {
         Container body = new Container(BoxLayout.y());
         body.setName("table." + tableSection.name().toLowerCase());
-        body.setUIID(uiid("CWTableBody"));
+        body.setUIID("CWTableBody");
         return body;
     }
 
@@ -3454,13 +3476,13 @@ public class CertificateWizard extends Lifecycle {
 
     private Container tableRow() {
         Container r = new Container(new GridLayout(1, 5));
-        r.setUIID(uiid("CWRow"));
+        r.setUIID("CWRow");
         return r;
     }
 
     private Container tableCell(Component cmp) {
         Container out = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
-        out.setUIID(uiid("CWTableCell"));
+        out.setUIID("CWTableCell");
         out.add(cmp);
         return out;
     }
@@ -3483,7 +3505,7 @@ public class CertificateWizard extends Lifecycle {
 
     private Label blankCell() {
         Label l = new Label("");
-        l.setUIID(uiid("CWCellSub"));
+        l.setUIID("CWCellSub");
         l.setTextSelectionEnabled(true);
         return l;
     }
@@ -3498,7 +3520,7 @@ public class CertificateWizard extends Lifecycle {
 
     private Button header(Section tableSection, int column, String text) {
         Button b = new Button(headerText(tableSection, column, text));
-        b.setUIID(uiid("CWTableHeader"));
+        b.setUIID("CWTableHeader");
         b.setName("sort." + tableSection.name().toLowerCase() + "." + column);
         b.setAlignment(Component.LEFT);
         b.getAllStyles().setAlignment(Component.LEFT);
@@ -3539,10 +3561,10 @@ public class CertificateWizard extends Lifecycle {
     private Container cell(String main, String sub) {
         Container c = new Container(BoxLayout.y());
         Label m = new Label(main == null ? "" : main);
-        m.setUIID(uiid("CWCellMain"));
+        m.setUIID("CWCellMain");
         m.setTextSelectionEnabled(true);
         Label s = new Label(sub == null ? "" : sub);
-        s.setUIID(uiid("CWCellSub"));
+        s.setUIID("CWCellSub");
         s.setTextSelectionEnabled(true);
         c.add(m).add(s);
         return c;
@@ -3550,7 +3572,7 @@ public class CertificateWizard extends Lifecycle {
 
     private Label pill(String text, String uiid) {
         Label l = new Label(text == null ? "" : text);
-        l.setUIID(uiid(uiid));
+        l.setUIID(uiid);
         l.setAlignment(Component.CENTER);
         l.setVerticalAlignment(Component.CENTER);
         l.setTextSelectionEnabled(true);
@@ -3560,9 +3582,9 @@ public class CertificateWizard extends Lifecycle {
     private TextField field(String label, String hint) {
         TextField f = new TextField();
         f.setHint(hint);
-        f.getHintLabel().setUIID(uiid("CWFieldHint"));
+        f.getHintLabel().setUIID("CWFieldHint");
         f.setTextSelectionEnabled(true);
-        f.setUIID(uiid("CWField"));
+        f.setUIID("CWField");
         return f;
     }
 
@@ -3589,7 +3611,7 @@ public class CertificateWizard extends Lifecycle {
         String head = title == null || title.trim().isEmpty() ? "(unnamed)" : title.trim();
         String text = desc == null || desc.trim().isEmpty() ? head : head + "   " + desc.trim();
         Button b = new Button(text);
-        b.setUIID(uiid(selected ? "CWChoiceSelected" : "CWChoice"));
+        b.setUIID(selected ? "CWChoiceSelected" : "CWChoice");
         b.setAlignment(Component.LEFT);
         b.getAllStyles().setAlignment(Component.LEFT);
         applyChoiceIcon(b, selected);
@@ -3688,14 +3710,14 @@ public class CertificateWizard extends Lifecycle {
     /// here shares its padding and margin, so the new look needs a repaint rather than a
     /// relayout.
     private void setScaledUIID(Component c, String id) {
-        c.setUIID(uiid(id));
+        c.setUIID(id);
         applyFontScale(c);
         c.repaint();
     }
 
     private Button iconButton(char icon, String tooltip, String name) {
         Button b = new Button("");
-        b.setUIID(uiid("CWToolbarButton"));
+        b.setUIID("CWToolbarButton");
         b.setName(name);
         b.setTooltip(tooltip);
         b.setAlignment(Component.CENTER);
@@ -3706,7 +3728,7 @@ public class CertificateWizard extends Lifecycle {
 
     private Button button(String text, String name, String uiid) {
         Button b = new Button(text);
-        b.setUIID(uiid(uiid));
+        b.setUIID(uiid);
         b.setName(name);
         b.setAlignment(Component.CENTER);
         b.getAllStyles().setAlignment(Component.CENTER);
@@ -3715,14 +3737,14 @@ public class CertificateWizard extends Lifecycle {
 
     private void label(Container c, String text, String uiid) {
         Label l = new Label(text);
-        l.setUIID(uiid(uiid));
+        l.setUIID(uiid);
         l.setTextSelectionEnabled(true);
         c.add(l);
     }
 
     private void row(Container c, String k, String v, String name) {
         Label l = new Label(k + ": " + (v == null ? "" : v));
-        l.setUIID(uiid("CWCardMeta"));
+        l.setUIID("CWCardMeta");
         l.setTextSelectionEnabled(true);
         l.setName(name);
         c.add(l);
@@ -3730,9 +3752,9 @@ public class CertificateWizard extends Lifecycle {
 
     private void macAssetRow(Container c, String title, String detail, String buttonName, Runnable action) {
         Container r = new Container(new BorderLayout());
-        r.setUIID(uiid("CWCardRow"));
+        r.setUIID("CWCardRow");
         Label l = new Label(title + ": " + (detail == null ? "" : detail));
-        l.setUIID(uiid("CWCardMeta"));
+        l.setUIID("CWCardMeta");
         l.setTextSelectionEnabled(true);
         r.add(BorderLayout.CENTER, l);
         Button install = outline("Install", buttonName);
@@ -3776,10 +3798,6 @@ public class CertificateWizard extends Lifecycle {
 
     private String dnPart(String value) {
         return firstNonEmpty(value, "Unknown").replace(',', ' ').trim();
-    }
-
-    private String uiid(String id) {
-        return darkMode ? "Dark" + id : id;
     }
 
     private static final class ProjectDefaults {
@@ -4060,7 +4078,21 @@ public class CertificateWizard extends Lifecycle {
         return "cn1-" + System.currentTimeMillis() + "-" + id;
     }
 
-    private String safeFileName(String s) {
+    /// The file a certificate's .p12 is written to: its name AND its identity.
+    ///
+    /// Named by the display name alone, two certificates shared one file whenever their names
+    /// matched -- and a blank name falls back to one fixed name, which every unnamed certificate
+    /// matches. Installing a development and a distribution pair then wrote both into the same
+    /// .p12, each with its own freshly generated password, so the debug and release slots named
+    /// one file under two passwords and whichever was written first could no longer be opened:
+    /// "Mac verify error: invalid password?" at build time (issues #5834, #5793).
+    static String p12FileName(SigningState.Certificate cert) {
+        String identity = cert.appleCertId() != null && !cert.appleCertId().trim().isEmpty()
+                ? cert.appleCertId().trim() : String.valueOf(cert.id());
+        return safeFileName(cert.displayName()) + "-" + safeFileName(identity) + ".p12";
+    }
+
+    private static String safeFileName(String s) {
         if (s == null || s.trim().isEmpty()) {
             return "ios-signing-asset";
         }
@@ -4072,7 +4104,7 @@ public class CertificateWizard extends Lifecycle {
         return out.toString();
     }
 
-    private boolean isSafeFileChar(char c) {
+    private static boolean isSafeFileChar(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
                 || c == '-' || c == '_';
     }
