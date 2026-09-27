@@ -28,6 +28,7 @@ import com.codename1.orm.session.LazyInitializationException;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class EntityState {
     SessionImpl session;
     final Object entity;

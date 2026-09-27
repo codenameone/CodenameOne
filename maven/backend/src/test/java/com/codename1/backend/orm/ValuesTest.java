@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.orm;
 
+import com.codename1.impl.orm.Values;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

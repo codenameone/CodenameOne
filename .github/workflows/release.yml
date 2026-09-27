@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Was 240 to cover five 30-minute Maven Central propagation polls. Those are gone
     # with Central, and what remains is the core reactor plus four editors against a
     # repository that either accepts an upload or does not. Still bounded explicitly

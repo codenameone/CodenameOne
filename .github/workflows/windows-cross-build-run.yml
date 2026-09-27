@@ -59,7 +59,7 @@ concurrency:
 jobs:
   cross-build:
     name: cross-build suite exe (Linux, x64 + WebView2)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Check out repository
@@ -323,7 +323,7 @@ jobs:
       !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'push' ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       # write, because this job publishes the normalized report to the
       # port-status-data branch itself (see the publish step below).

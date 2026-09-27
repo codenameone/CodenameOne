@@ -26,6 +26,7 @@ package com.codename1.impl.orm;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class Index {
     public final String name;
     public final boolean unique;

@@ -64,13 +64,15 @@
               Optional desktop media binaries. BrowserComponent receives JCEF
               Maven transitively from codenameone-javase and downloads the native
               runtime for the current platform on first use. This aggregator is
-              retained for the bundled ffmpeg media implementation.
+              retained for the bundled ffmpeg media implementation. Runtime scope:
+              see the javase module, and never make it compile scope.
             -->
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>cn1-binaries-javase</artifactId>
                 <version>${cn1.version}</version>
                 <type>pom</type>
+                <scope>runtime</scope>
             </dependency>
 
             <dependency>

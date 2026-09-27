@@ -31,5 +31,6 @@ import java.lang.annotation.Target;
 /// fields, caches, or fields shared only with the JSON / XML projection.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface DbTransient {
 }

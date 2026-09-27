@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Database index over mapped field names, declared on an entity.
 @Retention(RetentionPolicy.CLASS)
 @Target({})
+@com.codename1.impl.SharedWithBackend
 public @interface Index {
     /// Names the database index.
     /// @return index name; empty by default to request a derived name

@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Overrides the legacy Id.autoIncrement strategy for this identifier.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface GeneratedValue {
     /// Chooses identifier generation, overriding Id.autoIncrement.
     /// Generated composite identifiers are not supported.

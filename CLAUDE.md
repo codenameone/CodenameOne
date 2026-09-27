@@ -314,6 +314,29 @@ scripts/check-cast-semantics.sh
 scripts/check-cast-semantics.sh --write-baseline   # after fixing a method
 ```
 
+### Never copy a core class into `vm/backend`
+
+The backend runtime (`vm/backend`, published by `maven/backend`) needs some core
+classes verbatim -- the ORM (`impl/orm`, `orm/session`), the entity annotations. They
+live **only** in `CodenameOne/src`, marked `@com.codename1.impl.SharedWithBackend` on
+a line of their own above the type declaration, and every backend build compiles them
+from there:
+
+- `vm/backend/shared-sources.sh` lists them for the shell builds (`build.sh`,
+  `run-javase.sh`, `ws-conformance.sh`, `scripts/lib/cn1ss.sh`,
+  `scripts/check-native-signatures.sh`).
+- `maven/backend/pom.xml` copies them into `target/generated-sources/backend-shared`
+  with the same line match, for the compiled jar and the `parparvm-sources` jar.
+
+Both **fail the build** if any `vm/backend` source has the same package and class name
+as a core source. Behaviour that really differs on the server gets its own class name
+behind an interface the shared code declares -- `BackendSqlAccess` implementing the
+shared `SqlAccess` is the pattern -- never a second copy. A marked class may only depend
+on the JDK subset the backend compiles against and on other marked classes, and
+`package-info.java` cannot be marked (javac would emit a `package-info.class`).
+A class marked outside the current packages also needs its path added to
+`parparvm-tests.yml`'s `paths`, which cannot read the marker.
+
 ### Never case-fold a protocol token with `toLowerCase()`
 
 `String.toLowerCase()` and `toUpperCase()` are **locale sensitive**, and Codename

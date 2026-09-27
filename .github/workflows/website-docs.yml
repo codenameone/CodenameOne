@@ -91,7 +91,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A ceiling, because there was not one: this job hung in apt and ran for six
     # hours before GitHub's own limit stopped it.
     timeout-minutes: 90

@@ -39,7 +39,7 @@ jobs:
       github.event.workflow_run.conclusion != 'skipped' &&
       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'schedule') &&
       github.event.workflow_run.head_branch == 'master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:

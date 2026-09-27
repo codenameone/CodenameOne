@@ -42,6 +42,8 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <backend.dir>${project.basedir}/../../vm/backend</backend.dir>
+        <core.src.dir>${project.basedir}/../../CodenameOne/src</core.src.dir>
+        <backend.shared.dir>${project.build.directory}/generated-sources/backend-shared</backend.shared.dir>
     </properties>
 
     <dependencies>
@@ -138,6 +140,7 @@
                         <configuration>
                             <sources>
                                 <source>${backend.dir}/impl/javase</source>
+                                <source>${backend.shared.dir}</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -147,6 +150,63 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <!--
+                             The classes the app and the server share (the ORM,
+                             the entity annotations) have ONE copy, in
+                             CodenameOne/src, marked with
+                             @com.codename1.impl.SharedWithBackend on a line of its
+                             own. They are copied out of the core here rather than
+                             kept under vm/backend, which is what they used to be:
+                             sixty hand-synchronised duplicates.
+
+                             vm/backend/shared-sources.sh is the same selection for
+                             the shell builds; the line match below and its grep
+                             must agree. Both refuse a backend source that shadows
+                             a core one, so a copy cannot creep back in.
+                        -->
+                        <id>copy-shared-core-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <fail message="A source under vm/backend has the same package and class name as one in CodenameOne/src. Delete the backend copy and mark the core class @com.codename1.impl.SharedWithBackend, or give server-only behaviour a different class name. vm/backend/shared-sources.sh names the file.">
+                                    <condition>
+                                        <resourcecount when="greater" count="0">
+                                            <union>
+                                                <fileset dir="${backend.dir}/src" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                                <fileset dir="${backend.dir}/impl/javase" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                                <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                            </union>
+                                        </resourcecount>
+                                    </condition>
+                                </fail>
+                                <!-- Cleared first, so a class whose marker was
+                                     removed does not linger from an earlier run. -->
+                                <delete dir="${backend.shared.dir}"/>
+                                <copy todir="${backend.shared.dir}">
+                                    <fileset dir="${core.src.dir}" includes="**/*.java">
+                                        <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
+                                    </fileset>
+                                </copy>
+                                <fail message="No core source is marked @com.codename1.impl.SharedWithBackend; the backend cannot compile without the shared ORM classes.">
+                                    <condition>
+                                        <resourcecount when="equal" count="0">
+                                            <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
+                                        </resourcecount>
+                                    </condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>parparvm-sources-jar</id>
                         <phase>package</phase>
@@ -163,6 +223,7 @@
                                 <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
                                     <fileset dir="${backend.dir}/src" includes="**/*.java"/>
                                     <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java"/>
+                                    <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
                                     <zipfileset dir="${backend.dir}/native" includes="*.c"
                                                 prefix="cn1-native"/>
                                 </jar>

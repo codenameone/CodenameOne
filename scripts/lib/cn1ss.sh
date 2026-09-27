@@ -155,7 +155,8 @@ cn1ss_java_run() {
 # Two implementations, selected by CN1SS_WS_SERVER:
 #
 #   javase   (default) the Codename One backend server -- vm/backend/src plus
-#            impl/javase plus demo/cn1ss -- on this leg's JDK. Same Java the
+#            impl/javase plus demo/cn1ss plus the core classes it shares
+#            (vm/backend/shared-sources.sh) -- on this leg's JDK. Same Java the
 #            translated binary runs; no C toolchain, nothing new to install.
 #   native   the translated binary from vm/backend/build.sh. This is the arm that
 #            actually ships, and exactly one CI leg runs it.
@@ -198,9 +199,17 @@ cn1ss_backend_setup() {
     return 1
   fi
 
+  # The shared core classes are part of the compile AND of the digest: they live
+  # in CodenameOne/src, so a digest over vm/backend alone would reuse a stale
+  # cache after an ORM change.
+  local shared
+  if ! shared="$("$root/vm/backend/shared-sources.sh")"; then
+    cn1ss_log "cn1ss_backend_setup: could not list the shared core sources"
+    return 1
+  fi
   sources="$(mktemp)"
-  find "$root/vm/backend/src" "$root/vm/backend/impl/javase" "$root/vm/backend/demo/cn1ss" \
-    -name '*.java' -print | sort > "$sources"
+  { find "$root/vm/backend/src" "$root/vm/backend/impl/javase" "$root/vm/backend/demo/cn1ss" \
+      -name '*.java' -print; printf '%s\n' "$shared"; } | sort > "$sources"
   # CONTENT, not mtime: a branch switch can leave sources older than a stamp.
   digest="$(xargs shasum < "$sources" 2>/dev/null | shasum | awk '{print $1}')"
   local tmp_root="${TMPDIR:-/tmp}"
@@ -252,12 +261,14 @@ cn1ss_backend_build_native() {
   # build.sh at all. The one leg meant to exercise the translated server would be
   # testing a stale translator against new sources, which is exactly the
   # regression it exists to catch.
-  digest="$(find "$root/vm/backend/src" "$root/vm/backend/impl/parparvm" \
+  # And the core classes build.sh compiles from CodenameOne/src, for the same
+  # reason.
+  digest="$({ find "$root/vm/backend/src" "$root/vm/backend/impl/parparvm" \
       "$root/vm/backend/native" "$root/vm/backend/demo/cn1ss" \
-      "$root/vm/backend/build.sh" \
+      "$root/vm/backend/build.sh" "$root/vm/backend/shared-sources.sh" \
       "$root/vm/ByteCodeTranslator/src" "$root/vm/JavaAPI/src" \
-      -type f -print0 2>/dev/null \
-      | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')"
+      -type f -print 2>/dev/null; "$root/vm/backend/shared-sources.sh" 2>/dev/null; } \
+      | tr '\n' '\0' | xargs -0 shasum 2>/dev/null | shasum | awk '{print $1}')"
   local tmp_root="${TMPDIR:-/tmp}"
   tmp_root="${tmp_root%/}"
   out="${CN1SS_NATIVE_CACHE_DIR:-$tmp_root/cn1ss-native-cache}/$digest/cn1ss-screenshot-server"

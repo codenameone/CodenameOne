@@ -75,7 +75,7 @@ concurrency:
 jobs:
   core-tests:
     name: Core receipt-sync unit tests (JavaSE)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
     timeout-minutes: 20
     defaults:
@@ -235,7 +235,7 @@ jobs:
 
   native-android:
     name: Android billing-bridge purchase (emulator)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}

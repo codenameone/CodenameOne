@@ -22,7 +22,7 @@ on:
 
 jobs:
   android-native-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Set up JDK 17
@@ -32,6 +32,11 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        # The action's default list includes the legacy `tools` package, which
+        # cmdline-tools 16.0 (runner image ubuntu24/20260920) no longer offers,
+        # so `sdkmanager tools` exits 1. The next step installs what we need.
+        with:
+          packages: platform-tools
       - name: Install Android platform & ML Kit deps
         # sdkmanager + `yes |` would SIGPIPE under `set -o pipefail`, so feed
         # licence approvals via printf instead.

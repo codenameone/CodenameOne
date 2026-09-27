@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Persists the positions of elements in an owning List.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface OrderColumn {
     /// Stores positions for an owning List in its join table.
     /// Cannot be combined with OrderBy or used on an inverse association.

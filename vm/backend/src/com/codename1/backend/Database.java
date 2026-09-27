@@ -516,7 +516,7 @@ public final class Database {
         // Refusing it here threw after the insert had committed. Values is the one
         // place that parses such text exactly -- it is a leaf converter with no
         // reference back to this class, so using it here adds no cycle.
-        Long parsed = com.codename1.backend.orm.Values.asLongObject(value);
+        Long parsed = com.codename1.impl.orm.Values.asLongObject(value);
         if(parsed != null) {
             return parsed.longValue();
         }

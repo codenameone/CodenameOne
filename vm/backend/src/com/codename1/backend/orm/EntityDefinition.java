@@ -60,7 +60,7 @@ public abstract class EntityDefinition {
 
     /**
      * Writes the value of column {@code index} into {@code entity}, converting
-     * whatever the engine sent into the field's type. See {@link Values}.
+     * whatever the engine sent into the field's type. See {@link com.codename1.impl.orm.Values}.
      *
      * <p>Declared to throw because the conversion can fail and the failure is
      * worth reporting: a column holding text where the field is a number means

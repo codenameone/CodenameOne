@@ -18,7 +18,7 @@ jobs:
   update-device-db:
     # Only run on the canonical repo's master, never on forks or feature branches.
     if: github.repository == 'codenameone/CodenameOne' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Cold runs (empty cache) can take 30–60 min to walk the curated brands;
     # warm runs are typically a few minutes.
     timeout-minutes: 75

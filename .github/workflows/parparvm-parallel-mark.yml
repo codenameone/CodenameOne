@@ -111,7 +111,7 @@ jobs:
           # x64 as well, so a failure can be attributed to the architecture rather
           # than to the pool itself.
           - arch: x64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             markers: 4
             cflags: '-DCN1_GC_MARK_THREADS=4'
     steps:

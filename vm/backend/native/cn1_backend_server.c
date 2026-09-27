@@ -365,18 +365,57 @@ JAVA_OBJECT com_codename1_backend_ServerSocket_readIntoThreadBufferImpl___int_in
     if(a == 0 || fd < 0) {
         return JAVA_NULL;
     }
-    // YIELD around the blocking read, exactly as readImpl does. Without it the
-    // thread stays marked active while it sits in the kernel, so the collector has
-    // to wait for every worker that is parked on a socket before it can stop the
-    // world. Omitting it cost HALF the throughput -- 147k against 288k req/s -- and
-    // it is a liveness bug before it is a performance one: a quiet connection
-    // would hold the collector for as long as the client stayed silent.
-    CN1_YIELD_THREAD;
-    do {
-        n = read(fd, cn1BackendReadStorage, (size_t)capacity);
-    } while(n < 0 && errno == EINTR);
-    readErrno = errno;
-    CN1_RESUME_THREAD;
+    if(cn1VirtualThreadCurrent() != 0) {
+        // ON A VIRTUAL THREAD THE READ MUST NOT BE BRACKETED, because the bracket
+        // can hand the host to another virtual thread while the bytes are sitting
+        // in the shared storage.
+        //
+        // CN1_RESUME_THREAD waits out a collection that has this thread blocked,
+        // and on a virtual thread it waits by YIELDING -- to the other virtual
+        // threads multiplexed onto this host. Any of them may call this function,
+        // and its read lands in the same __thread storage. So: this read
+        // completes, a collection is in progress, the resume yields, another
+        // connection's read overwrites the storage, and this one resumes, stamps
+        // its own length on the array and returns ANOTHER CONNECTION'S REQUEST
+        // as its own. That request is then answered twice -- once to its own
+        // client and once, with whatever it carried, to this one -- and this
+        // connection's real request is never answered at all. advance() cannot
+        // catch it: it privatises a buffer the connection is borrowing, and this
+        // one has not taken the borrow yet. Measured with a stress client: about
+        // one request in 300k under virtual threads, zero with the zero-copy read
+        // switched off; CI saw it as a pipelined request answered 400 "duplicate
+        // Host header", the bytes of some other client's head.
+        //
+        // Leaving the thread active is what the bracket exists to avoid, and it
+        // is fine here because this read cannot wait: descriptors are
+        // non-blocking in virtual-thread mode, and MSG_DONTWAIT makes that true
+        // of this call whatever the descriptor's flags say, so a collection
+        // waits for one syscall that returns at once -- the same as any other
+        // short native call. Nothing between the read and the return can yield.
+        do {
+#ifdef MSG_DONTWAIT
+            n = recv(fd, cn1BackendReadStorage, (size_t)capacity, MSG_DONTWAIT);
+#else
+            n = read(fd, cn1BackendReadStorage, (size_t)capacity);
+#endif
+        } while(n < 0 && errno == EINTR);
+        readErrno = errno;
+    } else {
+        // YIELD around the blocking read, exactly as readImpl does. Without it the
+        // thread stays marked active while it sits in the kernel, so the collector
+        // has to wait for every worker that is parked on a socket before it can
+        // stop the world. Omitting it cost HALF the throughput -- 147k against
+        // 288k req/s -- and it is a liveness bug before it is a performance one: a
+        // quiet connection would hold the collector for as long as the client
+        // stayed silent. Safe off a virtual thread: the resume below then waits
+        // with usleep, so nothing else runs on this OS thread to touch the storage.
+        CN1_YIELD_THREAD;
+        do {
+            n = read(fd, cn1BackendReadStorage, (size_t)capacity);
+        } while(n < 0 && errno == EINTR);
+        readErrno = errno;
+        CN1_RESUME_THREAD;
+    }
     if(n < 0 && (readErrno == EAGAIN || readErrno == EWOULDBLOCK)) {
         // NOT end of stream. serveOne leaves plaintext descriptors non-blocking in
         // virtual-thread mode, so a request whose bytes have not landed yet -- the

@@ -25,7 +25,7 @@ name: JS port barrier-read lint
 jobs:
   barrier-lint:
     name: JS port canvas barrier-read lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Run barrier-read linter

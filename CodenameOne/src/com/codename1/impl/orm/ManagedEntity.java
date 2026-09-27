@@ -28,6 +28,7 @@ package com.codename1.impl.orm;
 /// @hidden
 // The prefix reserves enhancement hooks so they cannot collide with entity APIs.
 @SuppressWarnings("PMD.MethodNamingConventions")
+@com.codename1.impl.SharedWithBackend
 public interface ManagedEntity {
     /// Returns enhancer-managed state, or null before attachment.
     EntityState __cn1OrmState();

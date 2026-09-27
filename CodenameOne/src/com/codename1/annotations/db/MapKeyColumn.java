@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Names the key column of a scalar element-collection Map.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface MapKeyColumn {
     /// Names the column storing keys for a scalar element-collection Map.
     /// @return column name; map_key by default

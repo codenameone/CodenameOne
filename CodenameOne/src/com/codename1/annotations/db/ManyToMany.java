@@ -28,6 +28,7 @@ import java.lang.annotation.*;
 /// repeated links. OrderColumn can override its name; OrderBy controls load order.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface ManyToMany {
     /// Controls relationship initialization.
     /// @return fetch policy; EAGER for to-one and LAZY for collections by default

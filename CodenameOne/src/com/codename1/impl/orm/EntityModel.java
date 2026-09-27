@@ -29,6 +29,7 @@ import com.codename1.orm.session.PersistenceException;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public abstract class EntityModel<T> {
     public abstract Class<T> type();
     public abstract String table();
