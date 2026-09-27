@@ -89,7 +89,8 @@ public class NotesApi {
 
 Built-in injectables: `Config`, `DataSource`, `orm.EntityManager`,
 `com.codename1.orm.session.Session` (the current transaction's session), and — in a
-request or session bean only — `HttpServer.Request` and `HttpSession`.
+request bean only — `HttpServer.Request` and `HttpSession` (a session bean reads the
+current session with `Backend.currentRequest().getSession(true)` instead).
 
 **Parameter names do not survive compilation.** `@PathVariable`, `@RequestParam`,
 `@RequestHeader` and `@McpParam` always need their name spelled out.

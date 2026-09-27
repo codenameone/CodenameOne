@@ -1127,9 +1127,56 @@ final class BackendBeans {
     }
 
     /// Scheduled, tool and managed methods, for a bean class.
+    /**
+     * The methods of {@code cls} and of the superclasses it inherits them from,
+     * minus the ones a subclass overrides: a bean's @Scheduled, @McpTool and
+     * managed methods are its own whether it declares or inherits them, as its
+     * injection points and lifecycle methods already are. A non-public one in a
+     * class this build does not compile needs a bridge it cannot add, and is an
+     * error.
+     */
+    private final Set<String> reportedUnwoven = new HashSet<String>();
+
+    private List<MethodInfo> inheritedMembers(AnnotatedClass cls) {
+        List<MethodInfo> out = new ArrayList<MethodInfo>();
+        Set<String> seen = new HashSet<String>();
+        AnnotatedClass c = cls;
+        for (int depth = 0; c != null && depth < 64; depth++) {
+            boolean unwoven = c != cls && !concerns(c);
+            for (MethodInfo m : c.getMethods()) {
+                if (m.isConstructor() || m.isStatic() && c != cls) {
+                    continue;
+                }
+                String key = m.getName() + m.getDescriptor();
+                if (!m.isPrivate() || c == cls) {
+                    if (!seen.add(key)) {
+                        continue;                  // overridden below
+                    }
+                } else if (seen.contains(key)) {
+                    continue;
+                }
+                if (c != cls && unwoven && !m.isPublic() && callsFromWiring(m)) {
+                    if (!reportedUnwoven.add(cls.getInternalName() + " " + key)) {
+                        continue;                  // said once, not per collector
+                    }
+                    ctx.error(cls, cls.getSourceName() + " inherits " + c.getSourceName() + "."
+                            + m.getName() + ", which is not public and so needs a bridge the "
+                            + "build can only add to a class compiled from this project's "
+                            + "sources. Make it public.");
+                    continue;
+                }
+                out.add(m);
+            }
+            String sup = c.getSuperInternalName();
+            c = sup == null || "java/lang/Object".equals(sup) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, sup);
+        }
+        return out;
+    }
+
     private void collectJobs(Bean bean) {
         AnnotatedClass cls = bean.cls;
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : inheritedMembers(cls)) {
             AnnotationValues s = m.getAnnotation(SCHEDULED);
             if (s == null) {
                 continue;
@@ -1207,7 +1254,7 @@ final class BackendBeans {
 
     private void collectTools(Bean bean) {
         AnnotatedClass cls = bean.cls;
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : inheritedMembers(cls)) {
             AnnotationValues t = m.getAnnotation(MCP_TOOL);
             if (t == null) {
                 continue;
@@ -1291,7 +1338,7 @@ final class BackendBeans {
         AnnotatedClass cls = bean.cls;
         AnnotationValues resource = cls.getClassAnnotation(MANAGED_RESOURCE);
         boolean any = resource != null;
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : inheritedMembers(cls)) {
             if (m.getAnnotation(MANAGED_ATTRIBUTE) != null
                     || m.getAnnotation(MANAGED_OPERATION) != null) {
                 if (resource == null) {
@@ -1320,7 +1367,7 @@ final class BackendBeans {
         managed.objectName = objectName.length() > 0 ? objectName
                 : RestClientAnnotationProcessor.simpleName(cls.getBinaryName().replace('$', '.'));
         managed.description = resource.getStringOrDefault("description", "");
-        for (MethodInfo m : cls.getMethods()) {
+        for (MethodInfo m : inheritedMembers(cls)) {
             String where = cls.getSourceName() + "." + m.getName();
             AnnotationValues attr = m.getAnnotation(MANAGED_ATTRIBUTE);
             if (attr != null) {
@@ -1444,6 +1491,27 @@ final class BackendBeans {
                         + b.scope + "-scoped; an endpoint serves many connections for the "
                         + "life of the server, so it must be a singleton.");
             }
+            if (b.webSocket) {
+                // Its callbacks run outside the HTTP handler that makes a request
+                // current, so a scoped stand-in would throw on first use.
+                List<Point> all = new ArrayList<Point>(b.constructorPoints);
+                all.addAll(b.fields.values());
+                for (Call c : b.setters) {
+                    all.addAll(c.points);
+                }
+                for (Point p : all) {
+                    for (Bean d : p.candidates) {
+                        if (REQUEST.equals(d.scope) || SESSION.equals(d.scope)) {
+                            ctx.error(b.cls, "Websocket endpoint " + b.describe() + " injects "
+                                    + d.describe() + ", which is " + d.scope + "-scoped. A "
+                                    + "websocket callback runs outside any HTTP request, so "
+                                    + "there is no " + d.scope + " to find it in; inject a "
+                                    + "singleton, and keep per-connection state in the "
+                                    + "WebSocketSession's attachment.");
+                        }
+                    }
+                }
+            }
             if (!b.jobs.isEmpty() && (REQUEST.equals(b.scope) || SESSION.equals(b.scope))) {
                 ctx.error(b.cls, b.describe() + " has @Scheduled methods but is " + b.scope
                         + "-scoped; a job runs outside any request.");
@@ -1517,9 +1585,16 @@ final class BackendBeans {
                         + "the handler method instead, or scope the bean.");
                 return;
             }
-            if (SESSION.equals(owner.scope) && REQUEST_TYPE.equals(type)) {
-                ctx.error(where, p.where + " asks for the request, but a session bean outlives "
-                        + "the request that built it. Take the HttpSession instead.");
+            if (SESSION.equals(owner.scope)) {
+                // Both are the objects of the request that BUILT the bean. The
+                // request is gone when it ends; the session is a per-request copy
+                // with the database store, so the bean would read stale
+                // attributes and write to a copy nobody saves.
+                ctx.error(where, p.where + " asks for the " + (REQUEST_TYPE.equals(type)
+                        ? "request" : "session") + ", but a session bean outlives the request "
+                        + "that built it and the copy of the session that request loaded. "
+                        + "Read the current one when it is needed: "
+                        + "Backend.currentRequest().getSession(true).");
                 return;
             }
             p.builtin = REQUEST_TYPE.equals(type) ? "request" : "httpSession";

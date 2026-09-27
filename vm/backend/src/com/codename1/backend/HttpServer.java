@@ -126,6 +126,8 @@ public final class HttpServer {
         Sessions sessions;
         /** See {@link #endedSessions}. */
         private java.util.List endedSessions;
+        /** The id of the session this request counts as using; see Sessions.enter. */
+        String sessionInUse;
         /** This request's session once looked up; see {@link #getSession(boolean)}. */
         private HttpSession session;
         private boolean sessionResolved;
@@ -590,6 +592,7 @@ public final class HttpServer {
             this.scopedBeans = null;
             this.sessions = null;
             this.endedSessions = null;
+            this.sessionInUse = null;
         }
 
         /** The session of this request, creating one if it has none. */
@@ -628,6 +631,10 @@ public final class HttpServer {
                         + err.getMessage());
             }
             sessionResolved = true;
+            if(session != null && sessions != null) {
+                // Counted for a Backend's sessions only: it is what ends the count.
+                owner.enter(this, session);
+            }
             return session;
         }
 
@@ -706,6 +713,7 @@ public final class HttpServer {
             this.scopedBeans = null;
             this.sessions = null;
             this.endedSessions = null;
+            this.sessionInUse = null;
         }
 
         /**

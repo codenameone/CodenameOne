@@ -104,7 +104,8 @@ A bean receives its dependencies in three places, all resolved by type:
   a constructor's.
 
 Injection points and lifecycle methods declared in a superclass count too, and are
-handled before the subclass's own. A method the subclass overrides follows the
+handled before the subclass's own, and the same goes for `@Scheduled`, `@McpTool` and managed
+methods: a job a base class declares runs for every bean that inherits it. A method the subclass overrides follows the
 subclass's annotations, not the superclass's. The build can only do this for a
 superclass compiled from the project's sources: a base class from a jar that has
 injected fields, or lifecycle methods that aren't public, is a build error telling
@@ -158,7 +159,7 @@ and they're injected the same way:
 | The current request. Only a `@RequestScope` bean can take it.
 
 | `HttpSession`
-| The current session. Only a `@RequestScope` or `@SessionScope` bean can take it.
+| The current session. Only a `@RequestScope` bean can take it.
 |===
 
 === Configuration values

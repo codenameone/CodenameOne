@@ -315,6 +315,39 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a null and an empty first label are two histogram series")
+    void histogramNullAndEmptyLabels() {
+        Histogram h = Metrics.histogram("test.labels.nullempty", "", "ms", null,
+                new String[] {"route", "method", null});
+        h.record(1, null, "GET", null);
+        h.record(2, "", "GET", null);
+        assertEquals(2, h.points().size(), "null and \"\" were merged into one series");
+    }
+
+    @Test
+    @DisplayName("an MCP extension that fails to install stops the server it was starting")
+    void failedMcpAttachStopsTheServer() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        assertThrows(IllegalStateException.class, () -> Backend.builder(
+                Config.of(settings, "dev")).quiet()
+                .mcp(new McpServer.Extension() {
+                    public void install(McpServer server, Backend backend) {
+                        throw new IllegalStateException("refused");
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start());
+        // The port is free again: the listener did not outlive the failed start.
+        ServerSocket again = new ServerSocket(port);
+        again.close();
+    }
+
+    @Test
     @DisplayName("an abandoned @Async call fails its Future instead of never finishing")
     void abandonedAsyncFails() throws Exception {
         AsyncTask task = new AsyncTask("test.abandoned", false) {

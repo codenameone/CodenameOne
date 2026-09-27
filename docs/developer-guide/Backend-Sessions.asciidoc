@@ -191,9 +191,11 @@ that doesn't wait for one answer before sending the next -- and they reach the s
 instance. The methods of a session-scoped bean therefore need to be safe to call
 concurrently, which is why the `Cart` above synchronizes them.
 
-A session-scoped bean can inject the `HttpSession` it belongs to. It can't inject
-the request, because it outlives the request that built it, and the build refuses
-that with a message saying so.
+A session-scoped bean can't inject the request or the `HttpSession`: it outlives
+the request that built it, and with the database store each request loads its own
+copy of the session, so a copy held by the bean would go stale. The build refuses
+both. A method that needs the session reads the current one when it runs, with
+`Backend.currentRequest().getSession(true)`.
 
 === Pitfalls
 

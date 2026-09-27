@@ -229,9 +229,9 @@ public final class Sessions {
                 found.touch(now);
                 found.owner = this;
                 synchronized(this) {
-                    // The beans are in use from now, not from when this request
-                    // ends: a purge by another request during a long one must
-                    // not destroy what this one is still using.
+                    // The beans are in use from now until this request ends: a
+                    // purge by another request during a long one -- even one that
+                    // outlasts the timeout -- must not destroy what it is using.
                     Held held = (Held)beans.get(cookieValue);
                     if(held != null) {
                         held.lastAccessed = now;
@@ -260,11 +260,13 @@ public final class Sessions {
                 return;
             }
             lastPurge = now;
-            Iterator it = beans.values().iterator();
+            Iterator it = beans.entrySet().iterator();
             while(it.hasNext()) {
-                Held h = (Held)it.next();
+                Map.Entry e = (Map.Entry)it.next();
+                Held h = (Held)e.getValue();
                 if(h.maxInactiveSeconds > 0
-                        && now - h.lastAccessed > h.maxInactiveSeconds * 1000L) {
+                        && now - h.lastAccessed > h.maxInactiveSeconds * 1000L
+                        && !inUse.containsKey(e.getKey())) {
                     it.remove();
                     if(expired == null) {
                         expired = new ArrayList();
@@ -393,6 +395,45 @@ public final class Sessions {
     /** The object generated code locks while it builds one session's bean. */
     synchronized Object beanLock(HttpSession session) {
         return holderFor(session);
+    }
+
+    /**
+     * Requests using each session right now, by session id: its beans are never
+     * expired while any is -- a request can outlast the inactivity timeout, and
+     * destroying its session's beans under it would hand it closed resources.
+     */
+    private final Map inUse = new HashMap();
+
+    /** A request has resolved {@code session}; counted until {@link #leave}. */
+    synchronized void enter(HttpServer.Request request, HttpSession session) {
+        if(request.sessionInUse != null) {
+            return;
+        }
+        String id = session.getId();
+        int[] count = (int[])inUse.get(id);
+        if(count == null) {
+            count = new int[1];
+            inUse.put(id, count);
+        }
+        count[0]++;
+        request.sessionInUse = id;
+    }
+
+    /** The request is over; its session's beans may expire again. */
+    synchronized void leave(HttpServer.Request request) {
+        String id = request.sessionInUse;
+        if(id == null) {
+            return;
+        }
+        request.sessionInUse = null;
+        int[] count = (int[])inUse.get(id);
+        if(count != null && --count[0] <= 0) {
+            inUse.remove(id);
+        }
+        Held held = (Held)beans.get(id);
+        if(held != null) {
+            held.lastAccessed = System.currentTimeMillis();
+        }
     }
 
     private Held holderFor(HttpSession session) {

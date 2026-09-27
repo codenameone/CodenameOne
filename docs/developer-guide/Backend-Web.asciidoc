@@ -216,6 +216,9 @@ injected the same way, and two endpoints claiming one path is a build error rath
 than something registration order decides. Write the path's characters out: an
 escaped character such as `%61` in the mapping is a build error too, since an
 upgrade is matched against the decoded path, which an escaped mapping never equals.
+An endpoint can't inject a `@RequestScope` or `@SessionScope` bean either: its
+callbacks run outside any HTTP request, so there's no request or session to find
+the bean in. Keep per-connection state in the session's attachment instead.
 
 ==== A server that writes its own main
 

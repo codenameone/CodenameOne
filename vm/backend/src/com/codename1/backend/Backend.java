@@ -1086,7 +1086,10 @@ public final class Backend {
             // Whether THIS server records request metrics, known only once the
             // exporter has opened below; until then, and on a server that turned
             // metrics off, its requests stay out of the process's histograms.
-            final boolean[] instrumented = new boolean[1];
+            // Atomic: the workers are running before it is known, and a plain
+            // write would not have to become visible to them at all.
+            final java.util.concurrent.atomic.AtomicBoolean instrumented =
+                    new java.util.concurrent.atomic.AtomicBoolean();
             boolean bound = false;
             final Application app = application;
             final boolean track = application != null && application.tracksCurrentRequest();
@@ -1105,7 +1108,7 @@ public final class Backend {
 
                             public HttpServer.Response handle(HttpServer.Request request)
                                     throws Exception {
-                                long started = instrumented[0]
+                                long started = instrumented.get()
                                         ? com.codename1.backend.metrics.Metrics.requestStarted()
                                         : 0L;
                                 Object previous = null;
@@ -1217,6 +1220,7 @@ public final class Backend {
                                             CURRENT_REQUEST.set(previous);
                                         }
                                         Tasks.leave(previousTasks);
+                                        sessions.leave(request);
                                     }
                                 }
                             }
@@ -1268,7 +1272,7 @@ public final class Backend {
                 }
                 if(measuring) {
                     com.codename1.backend.metrics.Metrics.enableServer(server, pool);
-                    instrumented[0] = true;
+                    instrumented.set(true);
                 }
                 backend = new Backend(server, pool, manager, config, drain,
                         tracing ? tracer : null, application,
@@ -1289,30 +1293,32 @@ public final class Backend {
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;
-            if(management != null) {
-                management.attach(backend);
-            }
-            if(mcpServer != null) {
-                mcpServer.attach(backend);
-                if(!quiet) {
-                    // The line an agent's setup instructions point at.
-                    System.out.println("cn1: MCP endpoint at http"
-                            + (context != null ? "s" : "") + "://127.0.0.1:" + server.getPort()
-                            + mcpServer.getPath()
-                            + (mcpServer.hasDevTools() ? " (with development tools)" : ""));
+            // From here the Backend owns everything, so ANY failure until it is
+            // announced -- an MCP extension refusing its configuration as much
+            // as a job that cannot start -- stops it: the outer clean-up no
+            // longer knows the listener, the executors or the beans.
+            boolean running = false;
+            try {
+                if(management != null) {
+                    management.attach(backend);
                 }
-            }
-            if(application != null) {
-                boolean running = false;
-                try {
-                    application.started(backend);
-                    running = true;
-                } finally {
-                    if(!running) {
-                        // A job or exporter that cannot start is a server that is
-                        // not what its build says it is; stop the one listening.
-                        backend.stop();
+                if(mcpServer != null) {
+                    mcpServer.attach(backend);
+                    if(!quiet) {
+                        // The line an agent's setup instructions point at.
+                        System.out.println("cn1: MCP endpoint at http"
+                                + (context != null ? "s" : "") + "://127.0.0.1:"
+                                + server.getPort() + mcpServer.getPath()
+                                + (mcpServer.hasDevTools() ? " (with development tools)" : ""));
                     }
+                }
+                if(application != null) {
+                    application.started(backend);
+                }
+                running = true;
+            } finally {
+                if(!running) {
+                    backend.stop();
                 }
             }
             backend.markReady();

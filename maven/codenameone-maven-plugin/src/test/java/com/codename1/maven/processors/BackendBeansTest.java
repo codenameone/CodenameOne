@@ -1115,6 +1115,53 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anInheritedScheduledMethodRuns() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.BaseJob", PKG + "public abstract class BaseJob {\n"
+                + "    public static int runs;\n"
+                + "    @Scheduled(fixedRate = 20) public void tick() { runs++; }\n"
+                + "}\n");
+        s.put("com.example.Cleanup", PKG + "@Component public class Cleanup extends BaseJob { }\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        Class<?> base = backend.getApplication().getClass().getClassLoader()
+                .loadClass("com.example.BaseJob");
+        try {
+            long deadline = System.currentTimeMillis() + 5000;
+            while (base.getField("runs").getInt(null) < 2
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20);
+            }
+            assertTrue("an inherited @Scheduled method never ran",
+                    base.getField("runs").getInt(null) >= 2);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void sessionBeansAndSocketsCannotHoldRequestState() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Cart", PKG + "@Component @SessionScope public class Cart {\n"
+                + "    @Autowired private HttpSession session;\n"
+                + "}\n");
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Chat", PKG + "@WebSocketMapping(\"/chat\")\n"
+                + "public class Chat implements WebSocket {\n"
+                + "    @Autowired private Visit visit;\n"
+                + "    public void onOpen(WebSocketSession s) { }\n"
+                + "    public void onText(WebSocketSession s, String m) { }\n"
+                + "    public void onBinary(WebSocketSession s, byte[] m, int o, int l) { }\n"
+                + "}\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("a session bean outlives the request"));
+        assertTrue(errors, errors.contains("A websocket callback runs outside any HTTP request"));
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

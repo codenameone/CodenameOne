@@ -63,6 +63,8 @@ public final class Histogram extends Instrument {
     private final Series plain;
     /** first label value -> List of Series. */
     private final Map byFirst = new HashMap();
+    /** The byFirst key of a series whose first label value is null. */
+    private static final Object NO_VALUE = new Object();
     private int seriesCount;
     private Series overflow;
 
@@ -114,7 +116,9 @@ public final class Histogram extends Instrument {
     }
 
     private Series find(Object first, Object second, Object third) {
-        Object key = first == null ? "" : first;
+        // Null has a key of its own: exported, null omits the attribute and ""
+        // sends an empty one, so they are two series and must stay two.
+        Object key = first == null ? NO_VALUE : first;
         List list = (List)byFirst.get(key);
         if(list != null) {
             for(int iter = 0 ; iter < list.size() ; iter++) {
