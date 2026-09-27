@@ -218,6 +218,130 @@
     }
    }
   },
+  "macos-arm64": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.324,
+     "runs": 1,
+     "time": 0.989,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.527,
+     "runs": 1,
+     "time": 0.42,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.067,
+     "runs": 1,
+     "time": 1.176,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 1.34,
+     "runs": 1,
+     "time": 0.957,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.116,
+     "runs": 1,
+     "time": 1.033
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.112,
+     "runs": 1,
+     "time": 1.026,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.118,
+     "runs": 1,
+     "time": 1.007,
+     "tolerance": {
+      "memory": 0.4,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.481,
+     "runs": 1,
+     "time": 3.696,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.11,
+     "runs": 1,
+     "time": 1.012
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.118,
+     "runs": 1,
+     "time": 1.235,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.54,
+     "runs": 1,
+     "time": 0.842,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.739,
+     "runs": 1,
+     "time": 0.539
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.088,
+     "runs": 1,
+     "time": 0.507
+    }
+   }
+  },
   "windows-arm64": {
    "arrayRandom": {
     "all": {
