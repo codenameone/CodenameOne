@@ -75,6 +75,21 @@ class OtlpMetricsProtoTest {
     }
 
     @Test
+    @DisplayName("a counter past 2^53 is exported exactly, through as_int")
+    void countersAreIntegral() throws Exception {
+        com.codename1.backend.metrics.Counter big = Metrics.counter("test.proto.big", "", "");
+        big.add(9007199254740993L);
+        Map request = OtlpMetricExporter.request(new LinkedHashMap(),
+                Collections.singletonList(big), System.currentTimeMillis());
+        ExportMetricsServiceRequest decoded = ExportMetricsServiceRequest.parseFrom(
+                OtlpSchema.metricsProtobuf(request));
+        io.opentelemetry.proto.metrics.v1.NumberDataPoint point = decoded.getResourceMetrics(0)
+                .getScopeMetrics(0).getMetrics(0).getSum().getDataPoints(0);
+        assertEquals(9007199254740993L, point.getAsInt(),
+                "a counter was rounded through a double");
+    }
+
+    @Test
     @DisplayName("an exporter opened again after a shutdown exports periodically again")
     void reopenedExporterKeepsExporting() throws Exception {
         java.net.ServerSocket probe = new java.net.ServerSocket(0);

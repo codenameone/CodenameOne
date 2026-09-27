@@ -233,7 +233,9 @@ final class OtlpSchema {
 
         Message numberPoint = new Message(new Field[] {
             attributes(7), f("startTimeUnixNano", 2, FIXED64), f("timeUnixNano", 3, FIXED64),
-            f("asDouble", 4, DOUBLE), f("flags", 8, VARINT)
+            // as_int is sfixed64: the same eight little-endian bytes FIXED64
+            // writes for a long, negative values included.
+            f("asDouble", 4, DOUBLE), f("asInt", 6, FIXED64), f("flags", 8, VARINT)
         });
         // bucket_counts is "repeated fixed64" on HistogramDataPoint in
         // opentelemetry-proto's metrics.proto, like count -- NOT the "repeated

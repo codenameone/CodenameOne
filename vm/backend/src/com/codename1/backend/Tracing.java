@@ -139,12 +139,36 @@ public final class Tracing {
      */
     private static final Object LIFECYCLE = new Object();
 
+    /**
+     * Tracers of servers that are running. A server's start used to retire
+     * whatever tracer it displaced -- including a live server's, whose requests
+     * then went out under the newcomer's name and endpoint while its own
+     * exporter was stopped. An owned tracer is left alone and stopped by its
+     * server.
+     */
+    private static final List OWNED = new ArrayList();
+
     /** A start-up completed: what its tracer displaced is stopped. */
     static void commit(Swap claim) {
+        commit(claim, false);
+    }
+
+    /**
+     * A start-up completed. With {@code owned} the installed tracer belongs to
+     * the server that just started and lives until that server stops it with
+     * {@link #shutdown}; a displaced tracer another running server owns is kept.
+     */
+    static void commit(Swap claim, boolean owned) {
         Tracer displaced;
         synchronized(LIFECYCLE) {
             PENDING.remove(claim);
             displaced = claim.previous;
+            if(owned && claim.installed != null && !OWNED.contains(claim.installed)) {
+                OWNED.add(claim.installed);
+            }
+            if(displaced != null && OWNED.contains(displaced)) {
+                displaced = null;
+            }
         }
         retire(displaced, claim.installed);
     }
@@ -271,7 +295,21 @@ public final class Tracing {
      * another thread; null otherwise.
      */
     static Span captureParent() {
-        return tracer == null ? null : currentOrNull();
+        return active() == null ? null : currentOrNull();
+    }
+
+    /**
+     * The tracer a span started now reports to: the one that made the current
+     * span, so everything a request does is exported by the tracer of the server
+     * serving it -- with two servers in one process, the installed one is only
+     * the latest -- and otherwise the installed one.
+     */
+    static Tracer active() {
+        Span current = currentOrNull();
+        if(current != null && current.owner != null) {
+            return current.owner;
+        }
+        return tracer;
     }
 
     /**
@@ -280,7 +318,8 @@ public final class Tracing {
      * caller -- or as a root span when that is null, as a scheduled job's run is.
      */
     static Object inBackground(String name, Span parent, Work work) throws Exception {
-        Tracer t = tracer;
+        // The parent's tracer: the run belongs to whoever started it.
+        Tracer t = parent != null && parent.owner != null ? parent.owner : tracer;
         if(t == null || isSuppressed()) {
             return work.run(NOOP);
         }
@@ -288,6 +327,7 @@ public final class Tracing {
         try {
             span = t.startSpan(name, Span.KIND_INTERNAL, parent, null, null);
             if(span != null) {
+                span.owner = t;
                 enter(span);
             }
         } catch (RuntimeException err) {
@@ -308,12 +348,15 @@ public final class Tracing {
     }
 
     public static Span startSpan(String name) {
-        Tracer t = tracer;
+        Tracer t = active();
         if(t == null || isSuppressed()) {
             return NOOP;
         }
         try {
             Span span = t.startSpan(name, Span.KIND_INTERNAL, currentOrNull(), null, null);
+            if(span != null) {
+                span.owner = t;
+            }
             return span == null ? NOOP : span;
         } catch (RuntimeException err) {
             failed(err);
@@ -360,7 +403,7 @@ public final class Tracing {
         com.codename1.backend.metrics.Metrics.route(template);
         // Every generated router calls this on every matched request, traced or
         // not; with no tracer that is this one read and nothing else.
-        if(tracer == null) {
+        if(tracer == null && currentOrNull() == null) {
             return;
         }
         Span span = currentOrNull();
@@ -398,7 +441,17 @@ public final class Tracing {
      * request NOW, because a Request is valid only while its handler runs.
      */
     static Span startServer(HttpServer.Request request, boolean secure) {
-        Tracer t = tracer;
+        return startServer(request, secure, null);
+    }
+
+    /**
+     * {@link #startServer(HttpServer.Request, boolean)} with the tracer of the
+     * server the request reached, when it has one of its own: a second server in
+     * the process installs its tracer over the first's, and the first's requests
+     * must still go to the first's endpoint under its service name.
+     */
+    static Span startServer(HttpServer.Request request, boolean secure, Tracer own) {
+        Tracer t = own != null ? own : tracer;
         if(t == null || request == null) {
             return null;
         }
@@ -410,6 +463,7 @@ public final class Tracing {
             if(span == null) {
                 return null;
             }
+            span.owner = t;
             if(span.isRecording()) {
                 span.setAttribute("http.request.method", method);
                 String target = request.getTarget();
@@ -522,7 +576,7 @@ public final class Tracing {
      * outbound operation is one span, whatever it happens to be built from.
      */
     static Span startHttpClient(String method, String url, List callerHeaders) {
-        Tracer t = tracer;
+        Tracer t = active();
         if(t == null || isSuppressed()) {
             return null;
         }
@@ -623,7 +677,7 @@ public final class Tracing {
      * {@code cn1.otel.attributes.exclude=db.query.text}.
      */
     static Span startDatabase(String system, String sql) {
-        Tracer t = tracer;
+        Tracer t = active();
         if(t == null || isSuppressed()) {
             return null;
         }
@@ -796,8 +850,15 @@ public final class Tracing {
         }
         boolean stop = false;
         synchronized(LIFECYCLE) {
+            boolean wasOwned = OWNED.remove(owned);
             if(tracer == owned) {
-                tracer = null;
+                // Another running server's tracer takes the slot, so the work a
+                // thread does outside any request is still traced somewhere.
+                tracer = OWNED.isEmpty() ? null : (Tracer)OWNED.get(OWNED.size() - 1);
+                stop = true;
+            } else if(wasOwned) {
+                // Displaced by a later server, left running for its own; stopped
+                // now that its server is.
                 stop = true;
             }
             for(int iter = 0 ; iter < PENDING.size() ; iter++) {
@@ -845,7 +906,7 @@ public final class Tracing {
      * outbound call cannot have another outbound call inside it.
      */
     private static Span begin(String name, int kind, String traceparent, String tracestate) {
-        Tracer t = tracer;
+        Tracer t = active();
         if(t == null || isSuppressed()) {
             return null;
         }
@@ -858,6 +919,9 @@ public final class Tracing {
                 return null;
             }
             Span span = t.startSpan(name, kind, parent, traceparent, tracestate);
+            if(span != null) {
+                span.owner = t;
+            }
             if(span == null) {
                 return null;
             }

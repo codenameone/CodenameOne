@@ -166,6 +166,78 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("an @Async call dropped at the shutdown deadline fails its Future")
+    void droppedAsyncFails() throws Exception {
+        Tasks.Registry registry = Tasks.open(null);
+        TaskExecutor one = new TaskExecutor("one", false, 1, registry);
+        final CountDownLatch started = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        one.execute(new Runnable() {
+            public void run() {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException err) {
+                    // interrupted by the shutdown
+                }
+            }
+        });
+        assertTrue(started.await(5, TimeUnit.SECONDS));
+        AsyncTask queued = new AsyncTask("test.dropped", false) {
+            protected Object call() {
+                return "ran";
+            }
+        };
+        one.execute(queued);
+        one.shutdown(50);
+        release.countDown();
+        assertTrue(queued.isDone(), "a dropped call's Future never finished");
+        assertThrows(java.util.concurrent.ExecutionException.class, () -> queued.get());
+        Tasks.shutdown(registry, 0);
+    }
+
+    @Test
+    @DisplayName("two metrics that render as one Prometheus name are refused")
+    void prometheusNameClash() {
+        Metrics.gauge("test.clash.total", "", "", new com.codename1.backend.metrics.Gauge.Source() {
+            public double read() {
+                return 1;
+            }
+        });
+        assertThrows(IllegalArgumentException.class,
+                () -> Metrics.counter("test_clash", "", ""),
+                "a counter test_clash exports as test_clash_total, the gauge's name");
+        assertThrows(IllegalArgumentException.class,
+                () -> Metrics.gauge("test_clash_total", "", "",
+                        new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        return 2;
+                    }
+                }));
+    }
+
+    @Test
+    @DisplayName("an enum argument is matched by its constant name, not its toString")
+    void enumArgumentsByName() {
+        Map args = new LinkedHashMap();
+        args.put("state", "PENDING");
+        assertEquals(Labelled.PENDING, com.codename1.backend.mcp.McpArgs.enumValue(
+                Labelled.values(), args, "state", true));
+        args.put("state", "Waiting for payment");
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.enumValue(Labelled.values(), args,
+                        "state", true));
+    }
+
+    enum Labelled {
+        PENDING;
+
+        public String toString() {
+            return "Waiting for payment";
+        }
+    }
+
+    @Test
     @DisplayName("an abandoned @Async call fails its Future instead of never finishing")
     void abandonedAsyncFails() throws Exception {
         AsyncTask task = new AsyncTask("test.abandoned", false) {
@@ -573,6 +645,7 @@ class ApplicationRuntimeTest {
         });
         one.shutdown(50);
         assertEquals(1, one.getDroppedCount());
+
         release.countDown();
         Thread.sleep(200);
         assertEquals(0, late.get(), "a queued task ran after the shutdown deadline");

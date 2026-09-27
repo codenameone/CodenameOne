@@ -280,7 +280,13 @@ public final class OtlpMetricExporter implements MetricReader {
                     if(value instanceof Double && ((Double)value).isNaN()) {
                         continue;
                     }
-                    dp.put("asDouble", value);
+                    if(value instanceof Long) {
+                        // as_int, exactly: through asDouble a counter past 2^53
+                        // would be rounded. A string, as OTLP JSON writes int64.
+                        dp.put("asInt", String.valueOf(value));
+                    } else {
+                        dp.put("asDouble", value);
+                    }
                 }
                 dataPoints.add(dp);
             }

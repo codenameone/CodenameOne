@@ -167,7 +167,10 @@ final class BackendBeans {
     /// One `@Scheduled` method.
     static final class Job {
         final MethodInfo method;
-        final String name;
+        /// The class's simple name and the method; qualified when that clashes.
+        String name;
+        /// The class the method is in, for qualifying a clashing name.
+        String ownerBinary;
         String cron;
         CronCompiler masks;
         String zone = "";
@@ -1010,6 +1013,27 @@ final class BackendBeans {
     /// meant for different profiles, and the server refuses them at start-up if
     /// both turn out active.
     private void checkUniqueNames() {
+        // Jobs are named after their class's simple name, which two packages can
+        // share -- and a manual trigger, the job listing and the metric label all
+        // pick a job by name. Clashing ones are named by the qualified class.
+        Map<String, List<Job>> jobs = new LinkedHashMap<String, List<Job>>();
+        for (Bean b : beans) {
+            for (Job j : b.jobs) {
+                List<Job> same = jobs.get(j.name);
+                if (same == null) {
+                    same = new ArrayList<Job>();
+                    jobs.put(j.name, same);
+                }
+                same.add(j);
+            }
+        }
+        for (List<Job> same : jobs.values()) {
+            if (same.size() > 1) {
+                for (Job j : same) {
+                    j.name = j.ownerBinary.replace('$', '.') + "." + j.method.getName();
+                }
+            }
+        }
         Map<String, Bean> tools = new LinkedHashMap<String, Bean>();
         Map<String, Bean> managed = new LinkedHashMap<String, Bean>();
         for (Bean b : beans) {
@@ -1103,6 +1127,7 @@ final class BackendBeans {
             }
             Job job = new Job(m, RestClientAnnotationProcessor.simpleName(
                     cls.getBinaryName().replace('$', '.')) + "." + m.getName());
+            job.ownerBinary = cls.getBinaryName();
             job.cron = emptyToNull(s.getString("cron"));
             job.zone = s.getStringOrDefault("zone", "").trim();
             job.fixedRate = longOf(s.get("fixedRate"));

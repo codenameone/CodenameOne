@@ -2648,9 +2648,31 @@ public final class HttpServer {
      * host creates the virtual thread itself, because a virtual thread's VM state
      * belongs to the host that runs it.
      */
-    static boolean submitVirtualTask(Runnable task) {
-        HttpServer server = ACTIVE_SERVER;
-        if(task == null || server == null || !server.running || server.vtHosts == null) {
+    /** The tracer this server's requests report to, when it has one of its own. */
+    private volatile Tracer serverTracer;
+
+    /**
+     * Traces this server's requests with {@code tracer} rather than whichever
+     * tracer is installed process-wide -- which, with two servers, is the one
+     * that started last. Called by the server's builder.
+     */
+    void setTracer(Tracer tracer) {
+        this.serverTracer = tracer;
+    }
+
+    /** The server holding the virtual-thread slot, or null. */
+    static HttpServer activeServer() {
+        return ACTIVE_SERVER;
+    }
+
+    /**
+     * Queues {@code task} on a host of {@code server}, which must be the server
+     * that owns the virtual-thread slot; false -- run it elsewhere -- when it is
+     * not, is stopping, or runs no virtual threads.
+     */
+    static boolean submitVirtualTask(Runnable task, HttpServer server) {
+        if(task == null || server == null || server != ACTIVE_SERVER || !server.running
+                || server.vtHosts == null) {
             return false;
         }
         VtHost[] hosts = server.vtHosts;
@@ -5252,7 +5274,7 @@ public final class HttpServer {
                 // the upgrade is done, and a refusal ends here with the status it
                 // wrote. Returning before this point left every handshake, and
                 // everything onOpen called out to, untraced.
-                Span handshake = Tracing.startServer(request, tls != null);
+                Span handshake = Tracing.startServer(request, tls != null, serverTracer);
                 conn.writtenStatus = -1;
                 boolean upgraded;
                 try {
@@ -5285,7 +5307,7 @@ public final class HttpServer {
             // one on this connection. Ended after the write, in the finally below,
             // so the span covers the response reaching the socket and a write that
             // fails is recorded as the failure it is.
-            Span span = Tracing.startServer(request, tls != null);
+            Span span = Tracing.startServer(request, tls != null, serverTracer);
             int sentStatus = -1;
             Exception handlerError = null;
             try {
@@ -5658,7 +5680,7 @@ public final class HttpServer {
                 // request, and ENDS when its stream closes (see http2Spans).
                 // server.address is set here as for HTTP/1: :authority was copied
                 // into these headers as "host" above, which is what startServer reads.
-                Span span = Tracing.startServer(request, tls != null);
+                Span span = Tracing.startServer(request, tls != null, serverTracer);
                 Exception handlerError = null;
                 // -1 until the response has been SUBMITTED to the session, as on the
                 // HTTP/1 path: a respond() that throws is a response the peer never

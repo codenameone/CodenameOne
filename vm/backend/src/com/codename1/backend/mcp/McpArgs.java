@@ -216,20 +216,26 @@ public final class McpArgs {
         throw new IllegalArgumentException("\"" + name + "\" must be an array");
     }
 
+    private static String constantName(Object constant) {
+        return constant instanceof Enum ? ((Enum)constant).name() : String.valueOf(constant);
+    }
+
     /** The constant of {@code values} -- an enum's values() -- that the argument names. */
     public static Object enumValue(Object[] values, Map args, String name, boolean required) {
         String s = string(args, name, required);
         if(s == null) {
             return null;
         }
+        // By name(), which is what the generated schema advertises; toString()
+        // may be overridden into a display label no schema lists.
         for(int iter = 0 ; iter < values.length ; iter++) {
-            if(String.valueOf(values[iter]).equals(s)) {
+            if(constantName(values[iter]).equals(s)) {
                 return values[iter];
             }
         }
         StringBuilder allowed = new StringBuilder();
         for(int iter = 0 ; iter < values.length ; iter++) {
-            allowed.append(iter == 0 ? "" : ", ").append(values[iter]);
+            allowed.append(iter == 0 ? "" : ", ").append(constantName(values[iter]));
         }
         throw new IllegalArgumentException("\"" + name + "\" must be one of " + allowed);
     }

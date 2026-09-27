@@ -94,6 +94,8 @@ public final class Backend {
     private final Sessions sessions;
     /** This server's executors. */
     private final Tasks.Registry tasks;
+    /** This server's managed-attribute gauges, removed from the process's when it stops. */
+    private final List gauges;
     /** The recent requests of this server, kept once the development tools ask. */
     private final RequestLog requestLog;
     /**
@@ -108,7 +110,13 @@ public final class Backend {
                     Application application,
                     com.codename1.backend.metrics.MetricReader metricReader,
                     List managedBeans, Sessions sessions, Tasks.Registry tasks,
-                    RequestLog requestLog) {
+                    RequestLog requestLog, List gauges) {
+        this.gauges = gauges;
+        for(int iter = 0 ; iter < gauges.size() ; iter++) {
+            Object[] g = (Object[])gauges.get(iter);
+            com.codename1.backend.metrics.Metrics.addSource((String)g[0], (String)g[1],
+                    (String)g[2], (com.codename1.backend.metrics.Gauge.Source)g[3]);
+        }
         this.tasks = tasks;
         this.requestLog = requestLog;
         this.metricReader = metricReader;
@@ -249,6 +257,11 @@ public final class Backend {
         // Out of the process's server gauges, which would otherwise keep reading
         // a stopped server and pool.
         com.codename1.backend.metrics.Metrics.disableServer(server, dataSource);
+        for(int iter = 0 ; iter < gauges.size() ; iter++) {
+            Object[] g = (Object[])gauges.get(iter);
+            com.codename1.backend.metrics.Metrics.removeSource((String)g[0],
+                    (com.codename1.backend.metrics.Gauge.Source)g[3]);
+        }
         // Background work next: @Async calls and scheduled runs still going get
         // the same grace the requests did, while the beans they use are alive.
         Tasks.shutdown(tasks, shutdownMillis);
@@ -407,6 +420,8 @@ public final class Backend {
 
         private final List tools;
         private final List managed;
+        /** {name, description, unit, Gauge.Source}, for the server to add and later remove. */
+        final List gauges = new ArrayList();
 
         Environment(Config config, DataSource dataSource, EntityManager entities,
                     List tools, List managed) {
@@ -434,6 +449,15 @@ public final class Backend {
                 }
             }
             tools.add(tool);
+        }
+
+        /**
+         * Publishes a managed attribute as a gauge of this server's: added when
+         * the server starts and removed when it stops. Generated code calls this.
+         */
+        public void registerGauge(String name, String description, String unit,
+                                  com.codename1.backend.metrics.Gauge.Source source) {
+            gauges.add(new Object[] {name, description, unit, source});
         }
 
         /** Registers a managed bean with this server. Generated code calls this. */
@@ -788,7 +812,9 @@ public final class Backend {
                 throw err;
             }
             if(tracing) {
-                Tracing.commit(claim);
+                // Owned: this server's tracer runs until this server stops it,
+                // whatever server starts after it in the same process.
+                Tracing.commit(claim, true);
             }
             return started;
         }
@@ -881,9 +907,10 @@ public final class Backend {
             // the first server's beans into the second.
             List tools = new ArrayList(mcpTools);
             List managedBeans = new ArrayList();
+            Environment environment = null;
             if(application != null) {
-                HttpServer.Handler[] built = application.create(
-                        new Environment(config, pool, manager, tools, managedBeans));
+                environment = new Environment(config, pool, manager, tools, managedBeans);
+                HttpServer.Handler[] built = application.create(environment);
                 if(built != null) {
                     for(int iter = 0 ; iter < built.length ; iter++) {
                         if(built[iter] != null) {
@@ -1152,6 +1179,14 @@ public final class Backend {
                 }
                 throw err;
             }
+            // From now on this server's virtual tasks run on its own hosts, and
+            // its requests are traced by its own tracer.
+            synchronized(tasks) {
+                tasks.server = server;
+            }
+            if(tracing) {
+                server.setTracer(tracer);
+            }
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.
@@ -1174,7 +1209,8 @@ public final class Backend {
             Backend backend = new Backend(server, pool, manager, config, drain,
                     tracing ? tracer : null, application,
                     metricReader != null && measuring ? metricReader : null,
-                    managedBeans, sessions, tasks, requestLog);
+                    managedBeans, sessions, tasks, requestLog,
+                    environment == null ? new ArrayList() : environment.gauges);
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;

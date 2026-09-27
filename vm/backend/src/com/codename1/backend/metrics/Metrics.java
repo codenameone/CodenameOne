@@ -23,6 +23,7 @@
 package com.codename1.backend.metrics;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -126,7 +127,46 @@ public final class Metrics {
             throw new IllegalArgumentException("Metric " + g.getName()
                     + " already exists as another kind");
         }
+        claimPrometheusNames(g.getName(), Instrument.GAUGE);
         INSTRUMENTS.put(g.getName(), g);
+    }
+
+    /** Prometheus series name -> the instrument name that renders it. */
+    private static final Map PROMETHEUS_NAMES = new HashMap();
+
+    /**
+     * The Prometheus view folds every character a metric name cannot hold to
+     * `_` and adds suffixes, so distinct instruments -- orders.total and
+     * orders_total, or a counter orders beside a gauge orders_total -- would
+     * render as one series, which a scrape rejects or silently merges. Refused
+     * when the instrument is created instead.
+     */
+    private static void claimPrometheusNames(String name, int kind) {
+        String base = promName(name);
+        String[] series = kind == Instrument.COUNTER ? new String[] {base + "_total"}
+                : kind == Instrument.HISTOGRAM ? new String[] {base, base + "_bucket",
+                        base + "_sum", base + "_count"}
+                : new String[] {base};
+        for(int iter = 0 ; iter < series.length ; iter++) {
+            Object owner = PROMETHEUS_NAMES.get(series[iter]);
+            if(owner != null && !owner.equals(name)) {
+                throw new IllegalArgumentException("Metric " + name + " would be exported to "
+                        + "Prometheus as " + series[iter] + ", which metric " + owner
+                        + " already is; rename one");
+            }
+        }
+        for(int iter = 0 ; iter < series.length ; iter++) {
+            PROMETHEUS_NAMES.put(series[iter], name);
+        }
+    }
+
+    private static void releasePrometheusNames(String name) {
+        java.util.Iterator it = PROMETHEUS_NAMES.values().iterator();
+        while(it.hasNext()) {
+            if(name.equals(it.next())) {
+                it.remove();
+            }
+        }
     }
 
     private static synchronized Instrument register(String name, int kind, String description,
@@ -149,6 +189,8 @@ public final class Metrics {
         } else {
             created = new Counter(name, description, unit, kind == Instrument.UP_DOWN_COUNTER);
         }
+        // After construction, so a histogram refusing its bounds claims nothing.
+        claimPrometheusNames(name, kind);
         INSTRUMENTS.put(name, created);
         return created;
     }
@@ -169,6 +211,63 @@ public final class Metrics {
     }
 
     // ------------------------------------------------------- server instrumentation
+
+    /** Gauges several servers contribute to: name -> List of Gauge.Source. */
+    private static final Map SHARED = new HashMap();
+
+    /**
+     * Adds one server's source to the gauge called {@code name}, which reports
+     * the sum of every source still registered. A server's managed-resource
+     * gauges go through here and are removed when it stops, so a stopped
+     * server's bean is never read again and a second live server adds to the
+     * gauge instead of silently replacing the first one's.
+     */
+    public static synchronized void addSource(String name, String description, String unit,
+                                              Gauge.Source source) {
+        List sources = (List)SHARED.get(name);
+        if(sources == null) {
+            final List all = new ArrayList();
+            sources = all;
+            SHARED.put(name, all);
+            replaceGauge(new Gauge(name, description, unit, new Gauge.Source() {
+                public double read() {
+                    Object[] each;
+                    synchronized(Metrics.class) {
+                        each = all.toArray();
+                    }
+                    double sum = 0;
+                    boolean any = false;
+                    for(int iter = 0 ; iter < each.length ; iter++) {
+                        try {
+                            double v = ((Gauge.Source)each[iter]).read();
+                            if(!Double.isNaN(v)) {
+                                sum += v;
+                                any = true;
+                            }
+                        } catch (Exception err) {
+                            // One source failing leaves the others' values.
+                        }
+                    }
+                    return any ? sum : Double.NaN;
+                }
+            }));
+        }
+        sources.add(source);
+    }
+
+    /** Removes a source {@link #addSource} added; the gauge goes with its last one. */
+    public static synchronized void removeSource(String name, Gauge.Source source) {
+        List sources = (List)SHARED.get(name);
+        if(sources == null) {
+            return;
+        }
+        sources.remove(source);
+        if(sources.isEmpty()) {
+            SHARED.remove(name);
+            INSTRUMENTS.remove(name);
+            releasePrometheusNames(name);
+        }
+    }
 
     /** The servers recording their own metrics, and their pools. */
     private static final List LIVE_SERVERS = new ArrayList();
@@ -422,8 +521,10 @@ public final class Metrics {
                 } else {
                     sb.append(name);
                     labels(sb, attributes, null);
-                    sb.append(' ').append(number(((Number)point.get("value")).doubleValue()))
-                            .append('\n');
+                    Object value = point.get("value");
+                    // A counter's Long exactly, not through a double.
+                    sb.append(' ').append(value instanceof Long ? String.valueOf(value)
+                            : number(((Number)value).doubleValue())).append('\n');
                 }
             }
         }

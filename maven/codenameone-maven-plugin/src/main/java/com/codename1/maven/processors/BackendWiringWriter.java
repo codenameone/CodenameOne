@@ -220,7 +220,8 @@ final class BackendWiringWriter {
                   .append(ref).append(");\n");
                 sb.append("            environment.registerManaged(managed")
                   .append(b.var).append(");\n");
-                sb.append("            managed").append(b.var).append(".registerGauges();\n");
+                sb.append("            managed").append(b.var)
+                  .append(".registerGauges(environment);\n");
             }
             for (BackendBeans.Tool t : b.tools) {
                 sb.append("            environment.registerTool(new ")
@@ -631,17 +632,20 @@ final class BackendWiringWriter {
 
     private void stopped(StringBuilder sb) {
         sb.append("    public void stopped() {\n");
-        List<BackendBeans.Bean> reverse = new ArrayList<BackendBeans.Bean>(model.order);
-        java.util.Collections.reverse(reverse);
-        for (BackendBeans.Bean b : reverse) {
-            if (b.isEager()) {
-                destroy(sb, b, b.var);
+        // Eager and lazy singletons in ONE reverse-dependency pass: a lazy bean
+        // may use an eager one from its @PreDestroy, and an eager one may use a
+        // lazy one through its stand-in -- destroying all the lazy ones last, or
+        // first, broke one of the two.
+        List<BackendBeans.Bean> singletons = new ArrayList<BackendBeans.Bean>();
+        for (BackendBeans.Bean b : model.beans) {
+            if (b.isEager() || b.lazy) {
+                singletons.add(b);
             }
         }
-        for (BackendBeans.Bean b : model.beans) {
-            if (b.lazy) {
-                destroy(sb, b, b.var + "Real");
-            }
+        List<BackendBeans.Bean> reverse = dependencyOrder(singletons);
+        java.util.Collections.reverse(reverse);
+        for (BackendBeans.Bean b : reverse) {
+            destroy(sb, b, b.lazy ? b.var + "Real" : b.var);
         }
         sb.append("    }\n\n");
     }
@@ -685,7 +689,17 @@ final class BackendWiringWriter {
     /// the array the scope kept them in when the request or session ends.
     private void scopeEnded(StringBuilder sb, String method, String scope) {
         sb.append("    public void ").append(method).append("(Object[] beans) {\n");
+        // Dependents first, as for the singletons: a bean's @PreDestroy may still
+        // use a same-scope bean it depends on.
+        List<BackendBeans.Bean> inScope = new ArrayList<BackendBeans.Bean>();
         for (BackendBeans.Bean b : model.beans) {
+            if (scope.equals(b.scope)) {
+                inScope.add(b);
+            }
+        }
+        List<BackendBeans.Bean> reverse = dependencyOrder(inScope);
+        java.util.Collections.reverse(reverse);
+        for (BackendBeans.Bean b : reverse) {
             // A @Bean(destroyMethod = ...) counts as much as @PreDestroy: a
             // request-scoped factory bean with only a destroyMethod is exactly
             // the resource (a connection, a stream) that must be closed per request.
@@ -765,6 +779,42 @@ final class BackendWiringWriter {
             sb.append(c[0]).append(c[1].length() > 0 ? "=" + c[1] : " set");
         }
         return sb.toString();
+    }
+
+    /// `set` ordered so every bean comes after the beans of the set it is
+    /// injected with -- construction order, which reversed is destruction
+    /// order. A field or setter cycle, which is legal, is broken where it is met.
+    private static List<BackendBeans.Bean> dependencyOrder(List<BackendBeans.Bean> set) {
+        List<BackendBeans.Bean> out = new ArrayList<BackendBeans.Bean>();
+        java.util.Set<BackendBeans.Bean> seen = new java.util.HashSet<BackendBeans.Bean>();
+        for (BackendBeans.Bean b : set) {
+            visitDependencies(b, set, seen, out);
+        }
+        return out;
+    }
+
+    private static void visitDependencies(BackendBeans.Bean b, List<BackendBeans.Bean> set,
+                                          java.util.Set<BackendBeans.Bean> seen,
+                                          List<BackendBeans.Bean> out) {
+        if (!seen.add(b)) {
+            return;
+        }
+        List<BackendBeans.Point> points = new ArrayList<BackendBeans.Point>(b.constructorPoints);
+        points.addAll(b.fields.values());
+        for (BackendBeans.Call c : b.setters) {
+            points.addAll(c.points);
+        }
+        if (b.owner != null && set.contains(b.owner)) {
+            visitDependencies(b.owner, set, seen, out);
+        }
+        for (BackendBeans.Point p : points) {
+            for (BackendBeans.Bean d : p.candidates) {
+                if (set.contains(d)) {
+                    visitDependencies(d, set, seen, out);
+                }
+            }
+        }
+        out.add(b);
     }
 
     private static void collectDependencies(BackendBeans.Bean b, List<String> out) {

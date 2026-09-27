@@ -238,6 +238,11 @@ doesn't look like a job that's always somebody else's turn.
 
 ==== Watching the jobs
 
+A job is named after its class's simple name and its method, `Cleanup.run`. When
+two classes in different packages share a simple name, both jobs take the
+qualified name, `com.example.billing.Cleanup.run`, so each can be listed and
+started on its own.
+
 `GET /manage/jobs` lists every job with its schedule, its runs, failures and
 skipped starts, when it last started, how long that took, the last error, and when
 it's next due. The development MCP server has the same as `backend_jobs`, and

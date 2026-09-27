@@ -324,6 +324,56 @@ class OtlpTracerTest {
     }
 
     @Test
+    @DisplayName("a second traced server leaves the first one's tracer running and in use")
+    void twoTracedServersKeepTheirOwnTracers() throws Exception {
+        int[] ports = {freePort(), freePort()};
+        Backend[] servers = new Backend[2];
+        String[] names = {"first-service", "second-service"};
+        for(int i = 0 ; i < 2 ; i++) {
+            Properties settings = settings(ports[i]);
+            settings.setProperty(OtlpTracer.SERVICE_NAME, names[i]);
+            servers[i] = Backend.builder(Config.of(settings, "test"))
+                    .quiet()
+                    .tracing(new OtlpTracer())
+                    .handler(new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request)
+                                throws Exception {
+                            return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                        }
+                    })
+                    .start();
+        }
+        try {
+            // The first server's request, after the second installed its tracer.
+            HttpURLConnection c = (HttpURLConnection)new URL(
+                    "http://127.0.0.1:" + ports[0] + "/first").openConnection();
+            assertEquals(200, c.getResponseCode());
+            c.getInputStream().close();
+        } finally {
+            servers[0].stop();
+            servers[1].stop();
+        }
+        String service = null;
+        for(int iter = 0 ; iter < exports.size() ; iter++) {
+            ExportTraceServiceRequest request = ExportTraceServiceRequest.parseFrom(
+                    (byte[])exports.get(iter));
+            for(int r = 0 ; r < request.getResourceSpansCount() ; r++) {
+                String name = attribute(request.getResourceSpans(r).getResource()
+                        .getAttributesList(), "service.name");
+                for(int sc = 0 ; sc < request.getResourceSpans(r).getScopeSpansCount() ; sc++) {
+                    for(Span span : request.getResourceSpans(r).getScopeSpans(sc).getSpansList()) {
+                        if("/first".equals(attribute(span.getAttributesList(), "url.path"))) {
+                            service = name;
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals("first-service", service,
+                "the first server's request was not exported by its own tracer");
+    }
+
+    @Test
     @DisplayName("installing a tracer shuts down the one it replaces, and only that one")
     void replacingATracerShutsDownThePreviousOne() {
         final int[] shutdowns = new int[2];

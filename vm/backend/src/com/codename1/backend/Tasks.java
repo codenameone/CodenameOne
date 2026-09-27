@@ -80,15 +80,32 @@ public final class Tasks {
         private final Config config;
         private boolean reportedAuto;
         private boolean shutdown;
+        /**
+         * The server whose hosts this registry's virtual tasks run on, once it is
+         * listening; null before that. Only meaningful when {@link #ownedByServer}.
+         */
+        HttpServer server;
+        /** Whether a server opened this registry, as opposed to a bare process. */
+        final boolean ownedByServer;
 
-        Registry(Config config) {
+        Registry(Config config, boolean ownedByServer) {
             this.config = config;
+            this.ownedByServer = ownedByServer;
+        }
+
+        /**
+         * The server a virtual task of this registry may go to: its own, never
+         * another backend's -- whose stop would then wait on, or abandon, a task
+         * this one still wants. Null means "run it on a platform thread".
+         */
+        synchronized HttpServer virtualHost() {
+            return ownedByServer ? server : HttpServer.activeServer();
         }
     }
 
     /** A new registry for a server that is starting, which threads without one then use. */
     static Registry open(Config config) {
-        Registry r = new Registry(config);
+        Registry r = new Registry(config, true);
         synchronized(Tasks.class) {
             LIVE.add(r);
         }
@@ -124,7 +141,7 @@ public final class Tasks {
             if(LIVE.isEmpty()) {
                 // No server is running -- a test calling an @Async method
                 // directly: executors take their defaults.
-                LIVE.add(new Registry(null));
+                LIVE.add(new Registry(null, false));
             }
             return (Registry)LIVE.get(LIVE.size() - 1);
         }

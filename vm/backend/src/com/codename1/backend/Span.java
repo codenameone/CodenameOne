@@ -50,6 +50,8 @@ public abstract class Span {
      * Owned by {@link Tracing}; a tracer never reads it.
      */
     Span previous;
+    /** The tracer that made this span, which the spans started under it use too. */
+    Tracer owner;
     /** Whether {@link Tracing} made this span current and must restore on end. */
     boolean entered;
     /**

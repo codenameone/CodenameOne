@@ -75,6 +75,18 @@ public abstract class Instrument {
      */
     public abstract List points();
 
+    /**
+     * A point with an integral value, kept as a Long: a counter past 2^53 is not
+     * exactly representable as a double, and the exporter sends a Long as
+     * OTLP's integer field rather than rounding it.
+     */
+    static Map point(Map attributes, long value) {
+        Map p = new LinkedHashMap();
+        p.put("attributes", attributes == null ? new LinkedHashMap() : attributes);
+        p.put("value", new Long(value));
+        return p;
+    }
+
     static Map point(Map attributes, double value) {
         Map p = new LinkedHashMap();
         p.put("attributes", attributes == null ? new LinkedHashMap() : attributes);

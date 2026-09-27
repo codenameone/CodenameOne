@@ -270,7 +270,11 @@ GET  /manage/managed       the managed beans and their attributes
 POST /manage/managed/{bean}/{operation}
 ----
 
-An operation's body is a JSON object of its arguments by parameter name.
+An operation's body is a JSON object of its arguments by parameter name. A body
+that isn't one, or an argument the operation refuses, is answered with 400; 404
+means only that no managed bean or operation has that name. Two managed resources
+with the same `objectName`, or two `@McpTool` methods with the same name, are a
+build error, since each is found by that name.
 
 Health reports `STARTING` until the server has finished starting, including the
 application's scheduled jobs and exporters, `UP` while it serves, and `DRAINING`

@@ -931,6 +931,108 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void jobsOfSameNamedClassesGetDistinctNames() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        for (String pkg : new String[] {"a", "b"}) {
+            s.put("com.example." + pkg + ".Cleanup", "package com.example." + pkg + ";\n"
+                    + "import com.codename1.backend.annotations.*;\n"
+                    + "@Component" + ("b".equals(pkg) ? "(\"cleanupB\")" : "")
+                    + " public class Cleanup {\n"
+                    + "    @Scheduled(fixedDelay = 1000000, initialDelay = 1000000)\n"
+                    + "    public void run() { }\n"
+                    + "}\n");
+        }
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        // The entry point goes in the first bean's package.
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .application((Backend.Application) loader
+                        .loadClass("com.example.a.BackendWiring").newInstance())
+                .start();
+        try {
+            String jobs = String.valueOf(backend.getApplication().getScheduler().describe());
+            assertTrue(jobs, jobs.contains("com.example.a.Cleanup.run")
+                    && jobs.contains("com.example.b.Cleanup.run"));
+            assertTrue(backend.getApplication().getScheduler()
+                    .trigger("com.example.b.Cleanup.run"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void beansAreDestroyedAfterWhatDependsOnThem() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Log", PKG + "public class Log { public static String text = \"\"; }\n");
+        // Aaa is found first and Zzz depends on it: Zzz must go first.
+        s.put("com.example.Aaa", PKG + "@Component @RequestScope public class Aaa {\n"
+                + "    public void use() { }\n"
+                + "    @PreDestroy public void done() { Log.text += \"aaa,\"; }\n"
+                + "}\n");
+        s.put("com.example.Zzz", PKG + "@Component @RequestScope public class Zzz {\n"
+                + "    @Autowired private Aaa aaa;\n"
+                + "    public void use() { aaa.use(); }\n"
+                + "    @PreDestroy public void done() { Log.text += \"zzz,\"; }\n"
+                + "}\n");
+        s.put("com.example.Store", PKG + "@Component public class Store {\n"
+                + "    @PreDestroy public void close() { Log.text += \"store,\"; }\n"
+                + "}\n");
+        s.put("com.example.Report", PKG + "@Component @Lazy public class Report {\n"
+                + "    @Autowired private Store store;\n"
+                + "    public String make() { return \"r\"; }\n"
+                + "    @PreDestroy public void flush() { Log.text += \"report,\"; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired private Zzz zzz;\n"
+                + "    @Autowired private Report report;\n"
+                + "    @GetMapping(\"/x\") public String x() { zzz.use(); report.make(); "
+                + "return Log.text; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            http("GET", port, "/x");
+            assertEquals("same-scope beans were destroyed before their dependents",
+                    "zzz,aaa,", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+        Class<?> log = backend.getApplication().getClass().getClassLoader()
+                .loadClass("com.example.Log");
+        String text = String.valueOf(log.getField("text").get(null));
+        assertTrue("a lazy bean was destroyed after the eager bean it uses: " + text,
+                text.endsWith("report,store,"));
+    }
+
+    @Test
+    public void managedGaugesLeaveWithTheirServer() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Stats", PKG + "@Component @ManagedResource(objectName = \"gaugestats\")\n"
+                + "public class Stats {\n"
+                + "    @ManagedAttribute public int getCount() { return 7; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertNotNull(com.codename1.backend.metrics.Metrics.get("gaugestats.count"));
+        } finally {
+            backend.stop();
+        }
+        assertTrue("a stopped server's managed gauge still reads its destroyed bean",
+                com.codename1.backend.metrics.Metrics.get("gaugestats.count") == null);
+    }
+
+    @Test
     public void everyScopeAndBindingWorksAtRunTime() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Handler", PKG + "public interface Handler { String name(); }\n");

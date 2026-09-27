@@ -116,7 +116,9 @@ public final class TaskExecutor {
                 }
                 active++;
             }
-            if(HttpServer.submitVirtualTask(new Counted(this, task))) {
+            HttpServer host = registry == null ? HttpServer.activeServer()
+                    : registry.virtualHost();
+            if(HttpServer.submitVirtualTask(new Counted(this, task), host)) {
                 return;
             }
             synchronized(this) {
@@ -236,6 +238,15 @@ public final class TaskExecutor {
         timedOut = true;
         int waiting = queue.size();
         dropped += waiting;
+        // A dropped @Async call still has a Future someone may be waiting on;
+        // it fails rather than never finishing.
+        for(int iter = 0 ; iter < queue.size() ; iter++) {
+            Object queued = queue.get(iter);
+            if(queued instanceof AsyncTask) {
+                ((AsyncTask)queued).abandon("dropped when the server stopped before it "
+                        + "could start");
+            }
+        }
         queue.clear();
         if(workers != null) {
             for(int iter = 0 ; iter < workers.length ; iter++) {
@@ -294,6 +305,10 @@ public final class TaskExecutor {
         active--;
         if(timedOut) {
             dropped++;
+            if(task instanceof AsyncTask) {
+                ((AsyncTask)task).abandon("dropped when the server stopped before it could "
+                        + "start");
+            }
             notifyAll();
             return;
         }

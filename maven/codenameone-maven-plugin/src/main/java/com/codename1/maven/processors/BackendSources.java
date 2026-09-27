@@ -642,7 +642,8 @@ final class BackendSources {
         sb.append("            default: throw new IllegalArgumentException(\"No operation \" "
                 + "+ index);\n        }\n    }\n\n");
         sb.append("    /** Publishes the numeric attributes as gauges. */\n");
-        sb.append("    public void registerGauges() {\n");
+        sb.append("    public void registerGauges(com.codename1.backend.Backend.Environment "
+                + "environment) {\n");
         sb.append("        final ").append(type).append(" bean = target;\n");
         for (int i = 0; i < mg.attributes.size(); i++) {
             MethodInfo m = mg.attributes.get(i);
@@ -651,7 +652,7 @@ final class BackendSources {
             if (read == null) {
                 continue;
             }
-            sb.append("        com.codename1.backend.metrics.Metrics.gauge(")
+            sb.append("        environment.registerGauge(")
               .append(quote(mg.objectName + "." + mg.attributeNames.get(i))).append(", ")
               .append(quote(mg.attributeDescriptions.get(i))).append(", ")
               .append(quote(mg.attributeUnits.get(i))).append(",\n")
