@@ -75,16 +75,21 @@ screenshots do, with `SIMCTL_CHILD_PROBE_TINTSWEEP`, `SIMCTL_CHILD_PROBE_APPEARA
 and `SIMCTL_CHILD_PROBE_LOG`) and collect `Documents/<PROBE_LOG>` from the app
 container once it holds `TINTDONE`.
 
-The tint lists the committed tables were measured with are in `tints/`, one file
-per log named in the `vibrancy` command below (`sweep.txt` -> `sweep-light.log`
-and `sweep-dark.log`, and so on). A simulator app can read a host path, so pass the
-list's absolute path.
+`tints/` holds the two lists the committed fixture was captured from, one per log
+pair named in the commands below: `sweep2.txt` (1200 colours spread over the RGB
+cube, `sweep2-light.log` and `sweep2-dark.log`) and `sweep.txt` (a smaller sweep
+with the grey ramp, `sweep-light.log` and `sweep-dark.log`). Both appearances of
+both lists are also what `vibrancy` checks the closed forms against. A simulator
+app can read a host path, so pass the list's absolute path.
 
 ## Regenerating the model
 
 `scripts/fidelity-app/tools/tab-motion/tabmotion.py` (needs numpy and scipy, plus
-Pillow for `material`). Every command that writes Java rewrites only the generated
-tables, so the hand-written code around them survives.
+Pillow for `material`). Most of the model is closed form -- UIKit's springs and the
+vibrancy matrices -- and the tool CHECKS those against a capture, failing if one
+drifts past the tests' tolerance. The channels with no closed form stay 60 Hz
+tables, and the commands that write Java rewrite only those, so the hand-written
+code around them survives.
 
 ```bash
 T=scripts/fidelity-app/tools/tab-motion/tabmotion.py
@@ -94,25 +99,23 @@ V=artifacts/tint-sweeps                           # PROBE_TINTSWEEP logs, see ab
 
 # Tap-driven selection (TabGlassMotion)
 python3 $T fit $O/light-grey-3tabs.log $O/dark-grey-3tabs.log $O/light-grey-5tabs.log -o $O/tpl.json
-python3 $T check $O/tpl.json $O/*grey-*tabs.log   # worst per-tap error of the fitted model
-python3 $T java $O/tpl.json CodenameOne/src/com/codename1/ui/TabGlassMotion.java
+python3 $T check $O/tpl.json $O/*grey-*tabs.log   # checks the springs, prints the worst per-tap errors
+python3 $T java $O/tpl.json CodenameOne/src/com/codename1/ui/TabGlassMotion.java   # the kept tables
 python3 $T fixture $O/light-grey-3tabs.log $O/dark-grey-3tabs.log $O/light-grey-5tabs.log -o $R/native-ios27.csv
 python3 $T material $O                             # prints the GlassRecipe numbers
 
 # Holds and scrubs (TabGlassGesture)
 python3 $T springs --press $O/hold-light.log $O/drag-light.log $O/*grey-*tabs.log \
     --drag $O/drag-light.log                       # prints the spring constants
-python3 $T gesture --hold $O/hold-light.log --templates $O/tpl.json \
+python3 $T gesture --hold $O/hold-light.log \
     --drags $O/drag-light.log $O/dragA-light.log $O/dragB-light.log $O/dragC-light.log $O/dragD-dark.log \
+    --settle $O/hold-light.log $O/dragA-light.log $O/dragC-light.log $O/dragD-dark.log \
     -o CodenameOne/src/com/codename1/ui/TabGlassGesture.java
 python3 $T gesture-fixture $O/hold-light.log $O/dragA-light.log $O/dragC-light.log $O/dragD-dark.log \
     -o $R/native-gestures.csv
 
-# Vibrancy (VibrancyMatrix), from PROBE_TINTSWEEP logs
-python3 $T vibrancy --light $V/adapt-light.log $V/cvw-light.log $V/lowc-light.log $V/grid17-light.log \
-    $V/slices-light.log $V/sweep3-light.log $V/sweep-light.log $V/sweep2-light.log \
-    --grey $V/sweep-dark.log --dark-check $V/sweep2-dark.log \
-    -o CodenameOne/src/com/codename1/ui/plaf/VibrancyMatrix.java
+# Vibrancy (VibrancyMatrix), from PROBE_TINTSWEEP logs: checks the closed forms
+python3 $T vibrancy --dark $V/sweep-dark.log $V/sweep2-dark.log --light $V/sweep-light.log $V/sweep2-light.log
 python3 $T vibrancy-fixture --dark $V/sweep2-dark.log --light $V/sweep2-light.log \
     --grey-dark $V/sweep-dark.log --grey-light $V/sweep-light.log -o $R/native-vibrancy.csv
 ```
@@ -121,8 +124,7 @@ python3 $T vibrancy-fixture --dark $V/sweep2-dark.log --light $V/sweep2-light.lo
 ~66 ms press (a longer press grows the bar pulse further), no frame hitch in the
 first frames, and the fast lift.
 
-`gesture` needs the `fit` output because the settle after a scrub is expressed on
-the tap's position curve. It prints what it fitted along the way:
+`gesture` prints what it fits and checks along the way:
 
 - the **finger offset** of each drag log -- the finger's window x minus the lens
   target in the lens parent's coordinates -- least-squares fitted with the follow
@@ -131,25 +133,30 @@ the tap's position curve. It prints what it fitted along the way:
 - the **release wobble**, read off the quickest press of the hold log over 45
   frames from 0.9 s after touch-up, and its difference from the wobble after each
   long hold;
-- the **settle**, a least-squares fit over every release that travels more than
-  3 pt, with its leave-one-out error;
+- the **settle** after a scrub, replayed over the `--settle` episodes: the tap's own
+  travel spring, started from the follow spring's position and velocity one touch
+  lag after lift-off -- a closed form, so this is a check, not a fit;
 - the **scrub deformation kernels** -- 60 frames of delay over the lens's own speed
   and acceleration, ridge 1e-2, the wobble subtracted first -- with their
   leave-one-log-out error. A press whose lens moves more than 3 pt in its first
   0.25 s started on another tab and plays a tap first; it is left out.
 
-`vibrancy` fits, per light tint, the one `alpha` of the light structure below that
-reproduces the logged matrix, then least-squares fits the trilinear
-(chroma, value, hue) table to all of them with second-difference smoothing (1e-3).
-The grey ramp is read directly from the grey tints of `--grey`. It prints the dark
-formula's error over `--dark-check` and the table's error over every light tint.
+`vibrancy` holds every logged matrix, in both appearances and for the grey tints,
+to the closed forms below, prints the worst entry error and fails if it exceeds
+2e-5 (the logs carry about 5e-6).
 
 ## What the capture showed (iOS 27.0, iPhone 16)
 
 Taps:
 
-- The lens centre follows ONE normalized curve for every jump distance: at the
-  target after ~0.33 s, a 0.6% overshoot at ~0.38 s.
+- The lens centre follows ONE normalized curve for every jump distance: a spring of
+  duration 0.4 s and bounce 0.15 (at the target after ~0.33 s, a 0.6% overshoot at
+  ~0.38 s), which UIKit ends once less than ~0.195 pt remains past the overshoot.
+  Every frame is evaluated on the display's vsync grid; the logged frame times
+  carry the main thread's jitter, so fit on frame boundaries, not log times.
+- The lift and the grey platter are critically damped springs (0.25 s and 0.4 s);
+  the touch glow is critically damped springs of 0.1 s and 0.5 s, its mask opacity
+  a fixed 0.33675 of its layer opacity.
 - On touch the lens lifts: its bounds grow 16 pt both ways, the grey platter fades
   out (clear glass) and the accent copy of the tabs seen through it magnifies by
   16%. The lift is released once the lens is within 3.5 pt of its target, but not
@@ -175,11 +182,12 @@ Holds and scrubs:
   zeta 0.903, 20 ms behind, within the first and last tab.
 - Releasing a scrub selects the tab under the FINGER, not the one nearest the
   lens, which can be far behind after a flick.
-- The settle to that tab is the tap position curve from the release point, plus a
-  term linear in the lens velocity at release and one linear in its follow lag
-  (finger target - lens) at release.
-- Every release -- tap, hold or scrub -- ends in the same small wobble starting
-  ~0.95 s after touch-up, independent of the gesture.
+- The settle to that tab is the tap's own travel spring, started from where the
+  follow spring had the lens, and how fast, one touch lag after lift-off.
+- Every release -- tap, hold or scrub -- ends in the same small wobble. When it
+  becomes visible depends on the gesture: 0.951-0.954 s after touch-up for holds
+  and taps, 0.917-0.919 s for drags that start on the resting tab, 0.851-0.853 s
+  for scrubs (which start at its peak). The model starts it at a fixed 0.9 s.
 - While scrubbing, the lens deforms with its own motion: scaleX/scaleY with its
   speed and acceleration, its centre offset with its velocity and acceleration.
 
@@ -188,8 +196,11 @@ Vibrancy and material:
 - A vibrant glyph is a colour matrix applied to what lies behind it, chosen by the
   tint. In dark the structure is exact (`M = e I + (0.5 - e) 1 t^T / |t|^2`,
   `offset = t`, `e = 0.5 min(t) / max(t)`) and reproduces 1200 held-out tints to
-  1e-5. In light the structure is exact up to one scalar `alpha` per tint, which
-  has no closed form that survived testing and is tabulated. Grey tints use a
-  diagonal gain and offset ramp, the same in both appearances.
+  1e-5. In light it is `M = e I + 0.3 (0.5 - e) (1 + t) d^T / |d|^2` with
+  `d = 1 - t`, offset `alpha (1 + t) - 1 + e t`, and `alpha` exactly the value that
+  maps a white backdrop to the tint. Grey tints `g` use `M = 5/16 I / q` and
+  offset `(19/16 g - 1/4) / q`, `q = 1 + 0.05 g (1 - g)`, in both appearances.
+  Every logged matrix matches to 5e-6.
 - The selection platter is a colour matrix of the bar's glass, not a fill of its
-  own.
+  own: `1.2 I` less a share of the Rec. 709 luminance (0.33 dark, 0.07 light) plus
+  an offset.
