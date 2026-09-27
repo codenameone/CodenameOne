@@ -253,7 +253,11 @@ public final class Sessions {
         return created;
     }
 
-    private void purgeIfDue(SessionStore s, long now) {
+    /**
+     * Expires what is due, at most once a minute. Package-private so a test can
+     * run it at a chosen {@code now} instead of waiting for the next lookup.
+     */
+    void purgeIfDue(SessionStore s, long now) {
         List expired = null;
         synchronized(this) {
             if(now - lastPurge < PURGE_INTERVAL) {

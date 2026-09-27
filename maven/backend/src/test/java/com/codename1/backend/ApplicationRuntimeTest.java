@@ -508,6 +508,31 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("an expired session's beans are not destroyed while a request is still using them")
+    void inUseSessionBeansSurviveThePurge() throws Exception {
+        final List ended = new ArrayList();
+        Sessions sessions = new Sessions(new EmptyApplication() {
+            public void sessionEnded(Object[] beans) {
+                ended.add(beans);
+            }
+        });
+        long now = System.currentTimeMillis();
+        HttpSession session = new HttpSession("busy", now, now, 1);   // a 1-second timeout
+        session.owner = sessions;
+        session.scopedBeans(1)[0] = "cart";
+        HttpServer.Request request = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                new LinkedHashMap(), null);
+        sessions.enter(request, session);
+        // Two minutes on -- long past the timeout and the purge interval -- and
+        // the request is still running: its beans must survive.
+        sessions.purgeIfDue(sessions.getStore(), now + 120000);
+        assertTrue(ended.isEmpty(), "a running request's session beans were destroyed");
+        sessions.leave(request);
+        sessions.purgeIfDue(sessions.getStore(), now + 240000);
+        assertEquals(1, ended.size(), "the idle session's beans were never destroyed");
+    }
+
+    @Test
     @DisplayName("every loaded copy of a session shares one set of session-scoped beans")
     void sessionBeansAreSharedAcrossCopies() {
         Sessions sessions = new Sessions();
