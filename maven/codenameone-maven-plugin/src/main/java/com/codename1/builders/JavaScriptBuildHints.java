@@ -328,7 +328,12 @@ public final class JavaScriptBuildHints {
         // bytes are, whatever else the class file contains.
         String text = new String(data, StandardCharsets.ISO_8859_1);
         for (String name : ALL_THEMES) {
-            if (text.indexOf(name + ".res") >= 0) {
+            // "Name.res" anywhere (a path such as "/Name.res" included), or the bare name as a
+            // whole constant: Resources.openLayered("/Name") appends the extension itself, so
+            // its argument never contains ".res". Whole constants only for the bare form, so a
+            // longer identifier that merely starts with a theme name is not a reference.
+            if (text.indexOf(name + ".res") >= 0 || containsConstant(text, name)
+                    || containsConstant(text, "/" + name)) {
                 found.add(name);
             }
         }

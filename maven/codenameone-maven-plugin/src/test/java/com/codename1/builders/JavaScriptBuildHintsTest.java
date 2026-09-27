@@ -148,6 +148,19 @@ class JavaScriptBuildHintsTest {
     }
 
     @Test
+    void anExtensionlessLayeredThemeReferenceIsKept() {
+        // Resources.openLayered("/AndroidMaterialTheme") appends ".res" itself.
+        Set<String> refs = new LinkedHashSet<String>();
+        JavaScriptBuildHints.scanBytes(utf8Constant("/AndroidMaterialTheme"), refs);
+        JavaScriptBuildHints.scanBytes(utf8Constant("iOSModernTheme"), refs);
+        assertTrue(refs.contains("AndroidMaterialTheme"), refs.toString());
+        assertTrue(refs.contains("iOSModernTheme"), refs.toString());
+        Set<String> longer = new LinkedHashSet<String>();
+        JavaScriptBuildHints.scanBytes(utf8Constant("iOSModernThemeHelper"), longer);
+        assertFalse(longer.contains("iOSModernTheme"), longer.toString());
+    }
+
+    @Test
     void aLongerNameContainingAHintIsNotAThemeChoice() {
         Set<String> refs = new LinkedHashSet<String>();
         JavaScriptBuildHints.scanBytes(utf8Constant("nativeThemeResourceName"), refs);
