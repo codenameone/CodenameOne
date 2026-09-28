@@ -16860,7 +16860,7 @@ JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type
 #ifdef CN1_ALLOC_CENSUS
     cn1RecordAllocSite(__builtin_return_address(0), type, CN1_ARRAY_ALLOC_BYTES(actualSize));
 #endif
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, CN1_ARRAY_ALLOC_BYTES(actualSize), type);
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize), type);
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;
@@ -16886,7 +16886,7 @@ JAVA_OBJECT allocArrayAligned(CODENAME_ONE_THREAD_STATE, int length, struct claz
     // already 16-aligned; the slack is still requested because the alignment is a
     // parameter and the block's own base is only guaranteed pointer-aligned.
     int extraPadding = requestedAlignment - 1;
-    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, CN1_ARRAY_ALLOC_BYTES(actualSize) + extraPadding, type);
+    JAVA_ARRAY array = (JAVA_ARRAY)codenameOneGcMalloc(threadStateData, (int)CN1_ARRAY_ALLOC_BYTES(actualSize) + extraPadding, type);
     (*array).length = length;
     (*array).dimensions = dim;
     (*array).primitiveSize = primitiveSize;
