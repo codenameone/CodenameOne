@@ -318,6 +318,30 @@ async function phone() {
       fs.writeFileSync(path.join(outDir, 'phone-dialog-console.txt'), logs.join('\n'));
       await page.close();
     }
+    {
+      // A touch the browser cancels (palm rejection, focus loss) ends with touchcancel and no
+      // touchend. Left unanswered, the port kept the touch down and took every later touch for
+      // an extra finger, so the tap below did nothing and touch input stayed dead.
+      const logs = [];
+      const page = await context.newPage();
+      await boot(page, logs);
+      const vp = page.viewportSize();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart',
+        touchPoints: [{ x: Math.round(vp.width / 2), y: Math.round(vp.height * 0.6) }] });
+      await page.waitForTimeout(100);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+      await page.waitForTimeout(1500);
+      const before = await canvasPixels(page, [[6, vp.height - 6]]);
+      const button = await span(page, 'Hello World');
+      await page.touchscreen.tap(Math.round(button.x), Math.round(button.y));
+      await page.waitForTimeout(2500);
+      const after = await canvasPixels(page, [[6, vp.height - 6]]);
+      check(luminance(after[0]) < luminance(before[0]) - 15 && after[0][3] === 255,
+        'phone: a tap after a cancelled touch still fires', `corner luminance ${Math.round(luminance(before[0]))} -> ${Math.round(luminance(after[0]))}`);
+      fs.writeFileSync(path.join(outDir, 'phone-cancel-console.txt'), logs.join('\n'));
+      await page.close();
+    }
   } finally {
     await browser.close();
   }

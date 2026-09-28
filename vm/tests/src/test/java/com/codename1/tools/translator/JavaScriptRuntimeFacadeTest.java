@@ -649,6 +649,9 @@ class JavaScriptRuntimeFacadeTest {
         assertTrue(peerEvents.contains("pointerdown:true"));
         assertTrue(peerEvents.contains("pointerup:true"));
         assertTrue(peerEvents.contains("pointercancel:true"));
+        assertTrue(peerEvents.contains("touchend:true"));
+        assertTrue(peerEvents.contains("touchcancel:true"),
+                "a cancelled touch must end the touch, or touchDown stays set and later touches are ignored");
         assertTrue(peerEvents.contains("hittest:true"));
         assertTrue(peerEvents.contains("wheel:true"));
         assertFalse(peerEvents.contains("mousedown:true"),

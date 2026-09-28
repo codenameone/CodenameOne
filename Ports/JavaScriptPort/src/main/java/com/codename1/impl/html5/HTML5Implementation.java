@@ -12224,6 +12224,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // takes it as is, so a selection left behind on the previous screen would be copied from
         // one that shows none of it.
         selectedText = null;
+        selectedTextSelection = null;
         if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
             desktopChrome.setTitle(f.getTitle());
         }
@@ -14284,10 +14285,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private String selectedText;
+    /// The TextSelection selectedText was taken from. The document copy listener is shared by
+    /// every form with selection on, so disabling one form's selection leaves it installed;
+    /// deinitializeTextSelection drops the text when it came from the selection going away.
+    private TextSelection selectedTextSelection;
     private ActionListener textSelectionListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent t) {
-            selectedText = ((TextSelection)t.getSource()).getSelectionAsText();
+            Object source = t.getSource();
+            if (!(source instanceof TextSelection)) {
+                return;
+            }
+            selectedTextSelection = (TextSelection) source;
+            selectedText = selectedTextSelection.getSelectionAsText();
             outputCanvas.focus();
         }
             
@@ -14607,6 +14617,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void deinitializeTextSelection(TextSelection sel) {
         sel.removeTextSelectionListener(textSelectionListener);
+        if (sel == selectedTextSelection) { //NOPMD CompareObjectsWithEquals
+            selectedText = null;
+            selectedTextSelection = null;
+        }
         if (enabledTextSelections > 0 && --enabledTextSelections == 0) {
             contextListenerActive = false;
             HTMLDocument doc = Window.current().getDocument();
