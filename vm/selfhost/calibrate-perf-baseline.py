@@ -16,8 +16,9 @@ For every platform, benchmark and core setting:
              runs most rows moved under 5%, while objectAllocation moved 20-37% on every
              platform and Windows x64's translation rows up to 48% -- one global tolerance
              either fails those on noise or waves real regressions through the rest.
-A platform measured only ONCE has no spread of its own; each of its rows takes the widest
-tolerance any other platform needed for the same benchmark and metric.
+A row measured fewer than MIN_RUNS_FOR_OWN_SPREAD times cannot estimate its own spread;
+it takes the larger of what it measured and the widest tolerance any other row needed
+for the same benchmark and metric.
 
 Runs record the runner's CPU, and rows are written per CPU MODEL (`platform@model`, the
 model as perf-gate.cpu_class names it): hosted pools mix microarchitectures whose ratios
@@ -48,6 +49,10 @@ _spec = importlib.util.spec_from_file_location('perf_gate', HERE / 'perf-gate.py
 perf_gate = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(perf_gate)
 SPREAD_MARGIN = 1.5
+# Fewer runs than this cannot estimate a row's spread: EPYC 7763's hello row, from two
+# runs, failed unchanged code at +15.7% against a 15% tolerance. Such a row takes the
+# widest tolerance its benchmark needed anywhere, as a single-run row always did.
+MIN_RUNS_FOR_OWN_SPREAD = 5
 METRICS = ('time', 'memory')
 
 
@@ -102,8 +107,10 @@ def main(argv=None):
 
     platforms = {}
     for (platform, (bench, cores)), (row, count) in sorted(rows.items()):
-        if count == 1:
-            row['tolerance'] = {m: max(tolerance[m], widest.get((bench, m), tolerance[m]))
+        if count < MIN_RUNS_FOR_OWN_SPREAD:
+            own = row.get('tolerance', {})
+            row['tolerance'] = {m: max(tolerance[m], own.get(m, 0.0),
+                                       widest.get((bench, m), tolerance[m]))
                                 for m in METRICS}
         # A row whose tolerance is just the global one does not need to repeat it.
         tol = {m: t for m, t in row.pop('tolerance', {}).items() if t > tolerance[m]}

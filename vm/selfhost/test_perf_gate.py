@@ -209,6 +209,15 @@ class CalibrationTest(unittest.TestCase):
                                      fresh=True)['platforms']
         self.assertEqual(sorted(fresh), ['linux-x64'])
 
+    def test_a_thinly_sampled_row_borrows_the_widest_tolerance(self):
+        runs = [('linux-x64', {'hello': (v, 0.8)}, 'CPU A') for v in (0.50, 0.70, 0.60, 0.55, 0.65)]
+        runs += [('linux-x64', {'hello': (v, 0.8)}, 'CPU B') for v in (0.79, 0.80)]
+        b = self.run_calibration(runs)['platforms']
+        wide = b['linux-x64@cpu-a']['hello']['all']['tolerance']['time']
+        self.assertEqual(b['linux-x64@cpu-a']['hello']['all']['runs'], 5)
+        # Two runs 1% apart would give 15%; two runs cannot estimate a spread.
+        self.assertEqual(b['linux-x64@cpu-b']['hello']['all']['tolerance']['time'], wide)
+
     def test_a_single_run_row_borrows_tolerance_from_the_existing_file(self):
         old = {'windows-x64@a': {'arraySequential': {'all': {
             'time': 1.35, 'memory': 0.4, 'runs': 3, 'tolerance': {'time': 0.7}}}}}
