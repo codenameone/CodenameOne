@@ -146,4 +146,22 @@ public class SimulatorProjectTest {
                 SimulatorProject.settingsFile());
         assertEquals(new File(dir, "target" + File.separator + "classes"), SimulatorProject.classesDir(dir));
     }
+
+    /// Hot reload's direct recompile uses the project's language level, or a
+    /// source using Java 17 syntax fails to recompile and the simulator keeps
+    /// running the old class.
+    @Test
+    void hotReloadCompilesAtTheProjectsJavaLevel(@TempDir Path tmp) throws IOException {
+        File gradle = gradleProject(new File(tmp.toFile(), "g"));
+        assertEquals("17", SourceChangeWatcher.javaLevel(
+                com.codename1.project.ProjectLayouts.detect(gradle)));
+
+        File maven8 = mavenProject(new File(tmp.toFile(), "m8"));
+        assertEquals("1.8", SourceChangeWatcher.javaLevel(com.codename1.project.ProjectLayouts.detect(maven8)));
+
+        File maven17 = mavenProject(new File(tmp.toFile(), "m17"));
+        write(maven17, "common/codenameone_settings.properties",
+                "codename1.mainName=App\ncodename1.arg.java.version=17\n");
+        assertEquals("17", SourceChangeWatcher.javaLevel(com.codename1.project.ProjectLayouts.detect(maven17)));
+    }
 }

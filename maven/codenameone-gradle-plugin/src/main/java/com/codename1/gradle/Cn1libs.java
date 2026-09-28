@@ -93,8 +93,18 @@ final class Cn1libs {
             // dependencies through which one cn1lib names another.
             java.util.Deque<String[]> queue = new java.util.ArrayDeque<String[]>();
             for (Dependency d : p.getConfigurations().getByName(DECLARED).getAllDependencies()) {
-                if (d instanceof ExternalModuleDependency && d.getVersion() != null) {
-                    queue.add(new String[] {d.getGroup(), d.getName(), d.getVersion()});
+                if (!(d instanceof ExternalModuleDependency)) {
+                    continue;
+                }
+                String version = d.getVersion();
+                if ((version == null || version.isEmpty()) && PluginInfo.GROUP.equals(d.getGroup())) {
+                    // Settings writes com.codenameone cn1libs without a version; the
+                    // resolution strategy (ProjectSupport) gives them the framework's,
+                    // and so must this walk, or their platform jars are never found.
+                    version = p.getExtensions().getByType(CodenameOneExtension.class).getVersion().get();
+                }
+                if (version != null && !version.isEmpty()) {
+                    queue.add(new String[] {d.getGroup(), d.getName(), version});
                 }
             }
             java.util.Set<String> visited = new java.util.HashSet<String>();

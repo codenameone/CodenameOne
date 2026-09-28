@@ -120,6 +120,13 @@ final class ProjectSupport {
         // Kotlin plugin refuses a Java and a Kotlin target that differ -- so a
         // Kotlin project built on JDK 21 failed at compileKotlin ("Inconsistent
         // JVM Target Compatibility"). Pinned to the same release as javac.
+        // The ORM enhancer keeps a bookkeeping file in each classes directory it
+        // processes, and a Kotlin project has two (Java's and Kotlin's), so an
+        // archive of the main output met the same path twice and `jar` failed.
+        // Only the enhancer reads the file, from the directory, never from a jar.
+        project.getTasks().withType(org.gradle.api.tasks.bundling.Jar.class).configureEach(jar ->
+                jar.filesMatching("META-INF/cn1/orm-enhanced-dependencies.list",
+                        f -> f.setDuplicatesStrategy(org.gradle.api.file.DuplicatesStrategy.EXCLUDE)));
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().matching(t -> t.getName().startsWith("compile")
                         && t.getName().endsWith("Kotlin")).configureEach(ProjectSupport::pinKotlinJvmTarget));

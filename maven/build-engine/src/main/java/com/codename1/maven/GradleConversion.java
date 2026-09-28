@@ -203,6 +203,11 @@ public final class GradleConversion {
                 if (!deps.isEmpty()) {
                     writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");
                 }
+            } else {
+                List<String> jars = copyAntLibraryJars(from, targetDir);
+                if (!jars.isEmpty()) {
+                    writeDependencies(new File(targetDir, "build.gradle.kts"), jars, "Ant project's lib/");
+                }
             }
             if (hasSuffix(new File(targetDir, "src"), ".kt")) {
                 // Without the Kotlin plugin Gradle compiles none of it and says
@@ -266,6 +271,32 @@ public final class GradleConversion {
         copyTree(from.cssDir(), to.cssDir());
         File test = new File(from.projectDir(), "test");
         splitSources(test, test, new File(to.projectDir(), "src" + File.separator + "test"));
+    }
+
+    /// The framework jars an Ant project keeps in `lib/`, which the plugin
+    /// supplies (or no longer needs), as opposed to the application's own.
+    private static final java.util.Set<String> ANT_FRAMEWORK_JARS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("CodenameOne.jar", "CLDC11.jar", "JavaSE.jar", "CodeNameOneBuildClient.jar",
+                    "UpdateCodenameOne.jar", "designer_1.jar", "CodenameOneDesigner.jar"));
+
+    /// Copies the application's own jars from the Ant project's `lib/` into
+    /// `libs/` and returns their `implementation(files(...))` lines. Left
+    /// behind, the converted project would not compile against them. `.cn1lib`
+    /// files were refused earlier, and `lib/impl` is their extracted content.
+    private List<String> copyAntLibraryJars(ProjectLayout from, File targetDir) throws IOException {
+        List<String> lines = new ArrayList<String>();
+        File[] jars = new File(from.projectDir(), "lib").listFiles(
+                (d, n) -> n.endsWith(".jar") && !ANT_FRAMEWORK_JARS.contains(n));
+        if (jars == null) {
+            return lines;
+        }
+        java.util.Arrays.sort(jars);
+        for (File jar : jars) {
+            copyTree(jar, new File(targetDir, "libs" + File.separator + jar.getName()));
+            lines.add("    implementation(files(\"libs/" + jar.getName() + "\"))");
+            log.info("Carried over " + jar.getName() + " as libs/" + jar.getName());
+        }
+        return lines;
     }
 
     /// Sorts one Ant source tree into `java/`, `kotlin/` and `resources/` under
@@ -337,6 +368,14 @@ public final class GradleConversion {
         }
     }
 
+    /// The com.codenameone artifacts the Gradle plugin adds by itself. Only these
+    /// are dropped: the group also publishes cn1libs and add-ons (googlemaps-lib,
+    /// ...), which a converted project still needs declared.
+    static final java.util.Set<String> PLUGIN_SUPPLIED = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "codenameone-core", "codenameone-javase", "java-runtime", "codenameone-backend", "cn1-binaries-javase",
+            "codenameone-css-cli", "codenameone-android", "codenameone-ios", "codenameone-javascript",
+            "codenameone-maven-plugin"));
+
     /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of
     /// type `pom` is a cn1lib; a test-scoped one is `testImplementation`. A version that is still a `${...}` expression is
@@ -368,7 +407,7 @@ public final class GradleConversion {
                 String v = text(d, "version");
                 String scope = text(d, "scope");
                 String type = text(d, "type");
-                if (g == null || a == null || "com.codenameone".equals(g)
+                if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)
                         || "org.jetbrains.kotlin".equals(g) || "org.jetbrains".equals(g)) {
                     continue;
                 }

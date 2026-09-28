@@ -155,7 +155,15 @@ final class AppSupport {
         if (skip != null) {
             complianceProperties.put("skipComplianceCheck", String.valueOf(skip));
         }
+        // The two post-compile steps depend on more than the sources: hot reload
+        // compiles with -PskipComplianceCheck=true, and the codename1.* overrides
+        // reach the annotation processors. As inputs, a change in either reruns the
+        // compile -- otherwise a native build after a hot-reload compile found
+        // compileJava up to date and uploaded classes nobody had checked.
+        final String skipInput = String.valueOf(skip);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
+            compile.getInputs().property("cn1UserProperties", userProperties);
             List<String> roots = new ArrayList<String>();
             roots.add(layout.javaSourceDir().getAbsolutePath());
             // Compliance first (it caps and rewrites classes in place), then the
@@ -178,6 +186,8 @@ final class AppSupport {
         // plugin's classpath.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
+                    compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
+                    compile.getInputs().property("cn1UserProperties", userProperties);
                     File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
                     List<String> roots = new ArrayList<String>();
                     roots.add(layout.javaSourceDir().getAbsolutePath());
@@ -244,8 +254,7 @@ final class AppSupport {
             t.setGroup("verification");
             t.setDescription("Runs the Codename One unit tests in the simulator's test runner");
             t.dependsOn(test.getClassesTaskName(), javase.getClassesTaskName(), css);
-            t.getTestClassesDirectory().set(project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class)
-                    .flatMap(JavaCompile::getDestinationDirectory));
+            t.getTestClassesDirectories().from(test.getOutput().getClassesDirs());
             t.getRuntimeClasspath().from(test.getRuntimeClasspath(), javase.getOutput(), simulator,
                     project.getConfigurations().getByName(Cn1libs.configurationName("javase")));
             t.getReportsDirectory().set(new File(layout.buildDir(), "cn1-reports"));
@@ -363,11 +372,14 @@ final class AppSupport {
         if (p == null) {
             return Collections.emptyList();
         }
-        // The directory whether or not it exists yet. Asking here would be answered
-        // once and cached with the configuration, so a directory that
+        // The directories whether or not they exist yet. Asking here would be
+        // answered once and cached with the configuration, so a directory that
         // generateNativeInterfaces creates later would never reach the upload; the
-        // engine skips a classpath element that does not exist.
-        return layout.nativeSourceDir(p);
+        // engine skips a classpath element that does not exist. Beside the native
+        // sources, the platform's resources -- a Maven platform module's
+        // src/main/resources, which the conversion moves to src/<platform>/resources.
+        return java.util.Arrays.asList(layout.nativeSourceDir(p),
+                new File(layout.projectDir(), "src" + File.separator + p.id() + File.separator + "resources"));
     }
 
     /// The native platform whose implementations a build platform needs; the

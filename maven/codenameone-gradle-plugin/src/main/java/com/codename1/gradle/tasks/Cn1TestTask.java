@@ -45,9 +45,11 @@ import java.util.List;
 /// a headless machine needs a virtual display (`xvfb-run ./gradlew cn1Test`).
 @DisableCachingByDefault(because = "Runs the application's UI tests")
 public abstract class Cn1TestTask extends Cn1Task {
-    /// The compiled tests.
+    /// The compiled tests: every output directory of the test source set, so
+    /// Kotlin tests (compiled apart from Java's) are found too. Already on the
+    /// runtime classpath, which is the input.
     @Internal
-    public abstract DirectoryProperty getTestClassesDirectory();
+    public abstract ConfigurableFileCollection getTestClassesDirectories();
 
     /// Everything the tests run against, the JavaSE port included.
     @Classpath
@@ -59,16 +61,22 @@ public abstract class Cn1TestTask extends Cn1Task {
 
     @TaskAction
     public void runTests() {
-        File testClasses = getTestClassesDirectory().get().getAsFile();
+        List<File> testDirs = new ArrayList<File>(getTestClassesDirectories().getFiles());
+        if (testDirs.isEmpty()) {
+            getLogger().lifecycle("No tests were found.");
+            return;
+        }
         List<File> classpath = new ArrayList<File>();
         for (File f : getRuntimeClasspath()) {
-            if (!f.equals(testClasses)) {
+            if (!testDirs.contains(f)) {
                 classpath.add(f);
             }
         }
         Cn1TestRunner runner = new Cn1TestRunner(log());
         try {
-            if (!runner.prepare(testClasses, classpath)) {
+            // tests.dat goes in the first (Java's) directory, which the runner's
+            // classpath carries whether or not javac produced anything.
+            if (!runner.prepare(testDirs, testDirs.get(0), classpath)) {
                 getLogger().lifecycle("No tests were found.");
                 return;
             }
@@ -76,7 +84,7 @@ public abstract class Cn1TestTask extends Cn1Task {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
         List<File> all = new ArrayList<File>();
-        all.add(testClasses);
+        all.addAll(testDirs);
         all.addAll(classpath);
         String main = mainClass();
         if (main == null) {

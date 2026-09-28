@@ -82,6 +82,9 @@ class GradleConversionTest {
         touch(ant, "test/a/AntAppTest.java", "package a; public class AntAppTest {}");
         touch(ant, "native/android/a/MyNativeImpl.java", "package a; public class MyNativeImpl {}");
         touch(ant, "native/ios/a_MyNativeImpl.m", "// ios");
+        touch(ant, "lib/CodenameOne.jar", "framework");
+        touch(ant, "lib/json-helper.jar", "the app's own");
+        touch(ant, "lib/impl/cls/a/FromCn1lib.class", "extracted");
         return ant;
     }
 
@@ -92,6 +95,8 @@ class GradleConversionTest {
                 + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId></dependency>"
                 + "<dependency><groupId>com.acme</groupId><artifactId>maps-lib</artifactId><version>1.2</version>"
                 + "<type>pom</type></dependency>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>googlemaps-lib</artifactId>"
+                + "<version>1.0</version><type>pom</type></dependency>"
                 + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
                 + "</dependency>"
                 + "<dependency><groupId>org.example</groupId><artifactId>api</artifactId><version>${api.version}</version>"
@@ -149,6 +154,10 @@ class GradleConversionTest {
         assertTrue(plugins > 0 && plugins < build.indexOf("dependencies {"),
                 "a Kotlin project needs the Kotlin plugin, first in the script: " + build);
         assertTrue(new File(out, "gradlew").canExecute());
+        assertTrue(new File(out, "libs/json-helper.jar").isFile(), "the app's own jar comes along");
+        assertFalse(new File(out, "libs/CodenameOne.jar").exists(), "the plugin supplies the framework");
+        assertTrue(build.contains("implementation(files(\"libs/json-helper.jar\"))"), build);
+        assertFalse(build.contains("CodenameOne.jar"), build);
 
         ProjectLayout detected = ProjectLayouts.detect(out);
         assertEquals(BuildSystem.GRADLE, detected.buildSystem());
@@ -201,6 +210,8 @@ class GradleConversionTest {
 
         String build = read(new File(out, "build.gradle.kts"));
         assertTrue(build.contains("cn1lib(\"com.acme:maps-lib:1.2\")"), build);
+        assertTrue(build.contains("cn1lib(\"com.codenameone:googlemaps-lib:1.0\")"),
+                "a cn1lib in the com.codenameone group is not the framework: " + build);
         assertTrue(build.contains("implementation(\"org.example:util:2.0\")"), build);
         assertTrue(build.contains("compileOnly(\"org.example:api:${api.version}\") // check this version"), build);
         assertFalse(build.contains("codenameone-core"), "the plugin adds the framework: " + build);

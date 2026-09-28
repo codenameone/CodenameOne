@@ -36,6 +36,11 @@ public interface Greeter extends NativeInterface {
     String greet(String name);
 }
 EOF
+# Platform resources, which a Maven platform module packages from
+# src/main/resources and the conversion moves to src/<platform>/resources.
+mkdir -p "$MAPP/android/src/main/resources" "$MAPP/ios/src/main/resources"
+echo "android" > "$MAPP/android/src/main/resources/parity-android.txt"
+echo "ios" > "$MAPP/ios/src/main/resources/parity-ios.txt"
 (cd "$MAPP" && JAVA_HOME="$GRADLE_JDK" mvn_local install -DskipTests -pl common -am > "$WORKDIR/mvn-common.log" 2>&1 \
   && JAVA_HOME="$GRADLE_JDK" mvn_local "com.codenameone:codenameone-maven-plugin:$CN1_VERSION:generate-native-interfaces" \
      > "$WORKDIR/mvn-ni.log" 2>&1) || { tail -40 "$WORKDIR/mvn-ni.log" "$WORKDIR/mvn-common.log"; fail "Maven native interfaces"; }

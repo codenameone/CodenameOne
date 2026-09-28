@@ -89,6 +89,18 @@ public class MyNativeImpl {
 EOF
 echo "// ios" > "$ANT/native/ios/com_acme_antapp_MyNativeImpl.m"
 echo "stale" > "$ANT/src/theme.res"
+# A Kotlin unit test: Gradle compiles it apart from the Java tests, and cn1Test
+# must still find it.
+mkdir -p "$ANT/test/com/acme/antapp"
+cat > "$ANT/test/com/acme/antapp/HelperTest.kt" <<'EOF'
+package com.acme.antapp
+
+import com.codename1.testing.AbstractTest
+
+class HelperTest : AbstractTest() {
+    override fun runTest(): Boolean = Helper().title() == "Converted"
+}
+EOF
 echo "Form { color: red; }" > "$ANT/css/theme.css"
 
 convert "$ANT" "$WORKDIR/AntApp-gradle" "$WORKDIR/convert-ant.log" || { cat "$WORKDIR/convert-ant.log"; fail "converting the Ant project"; }
@@ -109,7 +121,10 @@ JAR=$(sed -n 's/.*codename1.stageOnly is set: staged \(.*\) ([0-9]* bytes) for .
 assert_zip_has "$JAR" "^com/acme/antapp/AntApp\.class$"
 assert_zip_has "$JAR" "^com/acme/antapp/Helper\.class$"
 assert_zip_has "$JAR" "^com/acme/antapp/MyNativeImpl\.java$"
-echo "   Ant app converted, built with its Kotlin, and staged"
+run_gradle "$AG" cn1Test > "$WORKDIR/ant-test.log" 2>&1 || { cat "$WORKDIR/ant-test.log"; fail "cn1Test on the converted Ant project"; }
+grep -q "com.acme.antapp.HelperTest passed" "$WORKDIR/ant-test.log" \
+  || { cat "$WORKDIR/ant-test.log"; fail "cn1Test did not run the Kotlin test"; }
+echo "   Ant app converted, built with its Kotlin, staged, and its Kotlin test run"
 
 echo "== Maven to Gradle, with a backend of its own"
 rm -rf mvnapp

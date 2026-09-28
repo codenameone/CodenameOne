@@ -69,15 +69,25 @@ public final class Cn1TestRunner {
     /// @param classpath everything the test classes need to load
     /// @return false when there are no tests
     public boolean prepare(File testClassesDir, List<File> classpath) throws BuildExecutionException {
+        return prepare(java.util.Collections.singletonList(testClassesDir), testClassesDir, classpath);
+    }
+
+    /// Finds the tests under every one of `testClassesDirs` -- Gradle compiles
+    /// Java and Kotlin tests into separate directories -- and writes `tests.dat`
+    /// into `metadataDir`, which must be on the runner's classpath.
+    ///
+    /// @param classpath everything the test classes need to load
+    /// @return false when there are no tests
+    public boolean prepare(List<File> testClassesDirs, File metadataDir, List<File> classpath)
+            throws BuildExecutionException {
         try {
-            List<File> paths = new ArrayList<File>();
-            paths.add(testClassesDir);
+            List<File> paths = new ArrayList<File>(testClassesDirs);
             paths.addAll(classpath);
-            Class[] testCases = findTestCases(paths.toArray(new File[paths.size()]));
+            Class[] testCases = findTestCases(testClassesDirs, paths.toArray(new File[paths.size()]));
             if (testCases.length == 0) {
                 return false;
             }
-            File metadataFile = new File(testClassesDir, "tests.dat");
+            File metadataFile = new File(metadataDir, "tests.dat");
             metadataFile.getParentFile().mkdirs();
             DataOutputStream fo = new DataOutputStream(new FileOutputStream(metadataFile));
             try {
@@ -129,7 +139,8 @@ public final class Cn1TestRunner {
         return run(ant, AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO), classpath, mainClass, reportsDir);
     }
 
-    private Class[] findTestCases(File... classesDirectories) throws MalformedURLException, IOException {
+    private Class[] findTestCases(List<File> testDirectories, File... classesDirectories)
+            throws MalformedURLException, IOException {
         URL[] urls = new URL[classesDirectories.length];
         for(int iter = 0 ; iter < urls.length ; iter++) {
             try {
@@ -141,11 +152,10 @@ public final class Cn1TestRunner {
         }
         URLClassLoader cl = new URLClassLoader(urls);
         
-        // first directory is assumed to be the test classes directory
-        File userClassesDirectory = classesDirectories[0];
-        
         List<Class> classList = new ArrayList<Class>();
-        findTestCasesInDir(userClassesDirectory.getAbsolutePath(), userClassesDirectory, cl, classList);
+        for (File testDirectory : testDirectories) {
+            findTestCasesInDir(testDirectory.getAbsolutePath(), testDirectory, cl, classList);
+        }
 
         Class[] arr = new Class[classList.size()];
         classList.toArray(arr);
