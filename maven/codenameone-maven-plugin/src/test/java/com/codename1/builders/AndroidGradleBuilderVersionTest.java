@@ -83,6 +83,22 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void agp9UsesSdkKeepsOnlyWhatTheMergerStillAccepts() {
+        // AGP 9 fails the merge on all three SDK versions in <uses-sdk>, max included.
+        String hint = "tools:overrideLibrary=\"androidx.car.app\" android:minSdkVersion=\"21\""
+                + " android:targetSdkVersion='35' android:maxSdkVersion = \"34\"";
+        assertEquals("    <uses-sdk tools:overrideLibrary=\"androidx.car.app\" />\n",
+                AndroidGradleBuilder.agp9UsesSdk(hint));
+        // Nothing left means no element at all.
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk("android:minSdkVersion=\"21\""));
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk(""));
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk(null));
+        // maxSdkVersion moves to defaultConfig rather than vanishing.
+        assertEquals("34", AndroidGradleBuilder.xmanifestMaxSdkVersion(hint));
+        assertNull(AndroidGradleBuilder.xmanifestMaxSdkVersion("tools:overrideLibrary=\"x\""));
+    }
+
+    @Test
     void aGoogleServicesPinAgp9CannotApplyIsRefusedByName() {
         String old = AndroidGradleBuilder.agp9GoogleServicesRefusal(
                 "\n    classpath 'com.google.gms:google-services:4.3.15'\n");

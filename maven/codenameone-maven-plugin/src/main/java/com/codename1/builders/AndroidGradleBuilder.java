@@ -4049,7 +4049,10 @@ public class AndroidGradleBuilder extends Executor {
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
         String compile = "compile";
-        if (useAndroidX || useArrImplementation) {
+        // useGradle9 is already implied -- useArrImplementation is set for every Gradle 6 and
+        // newer when the version is resolved, long before this -- but Gradle 9 has no compile
+        // configuration at all, so it is named rather than left to that ordering.
+        if (useAndroidX || useArrImplementation || useGradle9) {
             compile = "implementation";
         }
         if (useFCM) {
@@ -6353,7 +6356,7 @@ public class AndroidGradleBuilder extends Executor {
                 // already declares both and always won the merge. What survives is
                 // android.xmanifest -- in practice tools:overrideLibrary, still permitted there --
                 // exactly as the Wear manifest does it.
-                + (useGradle9 ? wearUsesSdk(request)
+                + (useGradle9 ? agp9UsesSdk(request.getArg("android.xmanifest", ""))
                         : "    <uses-sdk android:minSdkVersion=\"" + minSDK + "\""
                         + targetSDKVersion
                         + request.getArg("android.xmanifest", "")
@@ -8322,6 +8325,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "        applicationId \"" + request.getPackageName() + "\"\n"
                 + "        minSdkVersion " + minSDK + "\n"
                 + "        targetSdkVersion " + targetNumber + "\n"
+                // The maxSdkVersion android.xmanifest put in <uses-sdk>, which AGP 9 no
+                // longer accepts there -- see agp9UsesSdk. Emitted only then, so every
+                // other build.gradle is unchanged.
+                + (useGradle9 && xmanifestMaxSdkVersion(request.getArg("android.xmanifest", "")) != null
+                        ? "        maxSdkVersion "
+                        + xmanifestMaxSdkVersion(request.getArg("android.xmanifest", "")) + "\n"
+                        : "")
                 + "        versionCode " + intVersion + "\n"
                 + "        versionName \"" + version + "\"\n"
                 + multidex
@@ -9211,6 +9221,53 @@ public class AndroidGradleBuilder extends Executor {
      * @param request the build being generated
      * @return the element, or an empty string
      */
+    /**
+     * The main and Wear manifests' {@code <uses-sdk>} on AGP 9: android.xmanifest with the
+     * SDK-version attributes taken out, or nothing when nothing else is left.
+     *
+     * <p>AGP 9's manifest merger fails the build on android:minSdkVersion,
+     * android:targetSdkVersion and android:maxSdkVersion in {@code <uses-sdk>} (measured on
+     * 9.4.1 for all three, including max) while still accepting tools:overrideLibrary there. A
+     * project that customised them through this unrestricted hint would otherwise hit exactly
+     * the failure the Gradle 9 path exists to avoid. Min and target lose nothing -- build.gradle
+     * declares both and always won the merge -- and maxSdkVersion is carried into defaultConfig
+     * instead (see {@link #xmanifestMaxSdkVersion}).</p>
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the element, or an empty string
+     */
+    static String agp9UsesSdk(String xmanifest) {
+        String attributes = stripSdkVersionAttributes(xmanifest);
+        if (attributes.length() == 0) {
+            return "";
+        }
+        return "    <uses-sdk " + attributes + " />\n";
+    }
+
+    static String stripSdkVersionAttributes(String xmanifest) {
+        if (xmanifest == null) {
+            return "";
+        }
+        return xmanifest.replaceAll(
+                "android:(minSdkVersion|targetSdkVersion|maxSdkVersion)\\s*=\\s*(\"[^\"]*\"|'[^']*')",
+                "").replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * The android:maxSdkVersion android.xmanifest declares, or null.
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the declared value, unquoted, or null when there is none
+     */
+    static String xmanifestMaxSdkVersion(String xmanifest) {
+        if (xmanifest == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "android:maxSdkVersion\\s*=\\s*[\"']([0-9]+)[\"']").matcher(xmanifest);
+        return m.find() ? m.group(1) : null;
+    }
+
     static String wearUsesSdk(BuildRequest request) {
         String attributes = request.getArg("android.xmanifest", "");
         if (attributes == null || attributes.trim().length() == 0) {
@@ -9511,7 +9568,8 @@ public class AndroidGradleBuilder extends Executor {
                 // the phone module's dependency graph, so that same library manifest is merged
                 // into :wear as well, and without the override carried across the wear merge
                 // fails on exactly the conflict the phone build was told to allow.
-                + wearUsesSdk(request)
+                + (useGradle9 ? agp9UsesSdk(request.getArg("android.xmanifest", ""))
+                        : wearUsesSdk(request))
                 + sharedPermissions
                 // The package-visibility queries, for the same reason the permissions above are
                 // here: this manifest is selected outright rather than merged with the phone's,
