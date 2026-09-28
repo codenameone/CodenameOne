@@ -13865,6 +13865,16 @@ void cn1GcInstallSignalHandler(void) {
    threadActive for tens of seconds, turning a recoverable timeout into the whole-VM
    pause the escalation exists to prevent. */
 #if defined(__APPLE__) && !defined(CN1_GC_NO_OS_SUSPEND)
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+// watchOS has no Mach thread control at all: thread_suspend, thread_resume and
+// thread_get_state are declared unavailable there, so the watch slice cannot even
+// compile this path. It takes the no-OS-suspend behaviour instead -- a worker the stop
+// signal cannot reach is not stopped -- exactly as a CN1_GC_NO_OS_SUSPEND build does.
+#define CN1_GC_NO_OS_SUSPEND 1
+#endif
+#endif
+#if defined(__APPLE__) && !defined(CN1_GC_NO_OS_SUSPEND)
 // Stop a thread the stop signal cannot reach, with Mach instead: thread_suspend, then
 // read the same stack pointer and general registers the signal handler would have
 // captured. The scan that follows cannot tell the two apart. A suspended thread is
@@ -14038,7 +14048,7 @@ static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
         t->gcSuspendHandle = 0;
     }
 #else
-#if defined(__APPLE__)
+#if defined(__APPLE__) && !defined(CN1_GC_NO_OS_SUSPEND)
     if(t->gcOsSuspended) {
         t->gcOsSuspended = 0;
         thread_resume(pthread_mach_thread_np(t->gcPthread));
