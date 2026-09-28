@@ -362,7 +362,7 @@ public final class Tasks {
             registry.shutdown = true;
             all = new ArrayList(registry.executors.values());
         }
-        long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
+        long deadline = AsyncTask.deadline(System.currentTimeMillis(), Math.max(0, waitMillis));
         for (Object element : all) {
             long left = deadline - System.currentTimeMillis();
             ((TaskExecutor) element).shutdown(left > 0 ? left : 0);

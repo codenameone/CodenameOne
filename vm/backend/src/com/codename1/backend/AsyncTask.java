@@ -183,7 +183,13 @@ public abstract class AsyncTask implements Runnable, Future {
         }
     }
 
-    /// `now + millis`, saturated at Long.MAX_VALUE. toMillis() already
+    /// `now + millis`, saturated at Long.MAX_VALUE -- every wait the backend
+    /// takes from a caller goes through it (Future.get, the executor, scheduler
+    /// and task shutdowns, a pool borrow), because each accepts a long. A wait
+    /// that only ever takes `deadline - now` survives the overflow by
+    /// two's-complement wraparound; one that COMPARES the clock to the deadline,
+    /// as the virtual-thread wait does, gave up at once. Saturating here keeps
+    /// every one of them correct whichever way it is written. toMillis() already
     /// saturates a huge timeout -- get(Long.MAX_VALUE, DAYS) -- to Long.MAX_VALUE,
     /// and adding the clock to that wrapped to a deadline in the past, so the
     /// longest possible wait timed out at once.

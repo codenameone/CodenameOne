@@ -740,6 +740,45 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anInactiveOptionalDependencyKeepsTheInitializer() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Feature", PKG + "public class Feature {\n"
+                + "    public String name() { return \"fallback\"; }\n"
+                + "}\n");
+        s.put("com.example.RealFeature", PKG + "@Component @ConditionalOnProperty(\"feature.x\")\n"
+                + "public class RealFeature extends Feature {\n"
+                + "    public String name() { return \"real\"; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @Autowired(required = false) private Feature feature = new Feature();\n"
+                + "    private Feature viaSetter = new Feature();\n"
+                + "    @Autowired(required = false) public void use(Feature f) { viaSetter = f; }\n"
+                + "    @GetMapping(\"/x\") public String x() {\n"
+                + "        return feature.name() + \" \" + viaSetter.name();\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend off = start(classes, port, new Properties());
+        try {
+            assertEquals("an inactive conditional bean overwrote the initializer with null",
+                    "fallback fallback", http("GET", port, "/x"));
+        } finally {
+            off.stop();
+        }
+        Properties settings = new Properties();
+        settings.setProperty("feature.x", "true");
+        Backend on = start(classes, port, settings);
+        try {
+            assertEquals("real real", http("GET", port, "/x"));
+        } finally {
+            on.stop();
+        }
+    }
+
+    @Test
     public void aRestartedApplicationForgetsTheBeansOfTheLastStart() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Feature", PKG + "@Component @ConditionalOnProperty(\"feature.x\")\n"
@@ -1125,6 +1164,19 @@ public class BackendBeansTest {
                 + "}\n");
         errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("is also @Async"));
+    }
+
+    @Test
+    public void anAsyncRouteReturningAFutureIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") @Async\n"
+                + "    public Future<String> x() { return AsyncResult.of(\"x\"); }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("com.example.Api.x returns a "
+                + "java.util.concurrent.Future"));
+        assertTrue(errors, errors.contains("the client would get the pending task"));
     }
 
     @Test

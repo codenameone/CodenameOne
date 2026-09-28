@@ -244,7 +244,7 @@ public final class DataSource {
             throw new IOException("This pool is closed");
         }
         long deadline = borrowTimeoutMillis == 0 ? 0
-                : System.currentTimeMillis() + borrowTimeoutMillis;
+                : AsyncTask.deadline(System.currentTimeMillis(), borrowTimeoutMillis);
         while (true) {
             while (!idle.isEmpty()) {
                 Database candidate = (Database) idle.remove(idle.size() - 1);

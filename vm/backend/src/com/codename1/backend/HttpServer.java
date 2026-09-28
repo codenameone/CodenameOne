@@ -967,6 +967,16 @@ public final class HttpServer {
             this.extraHeaders = null;
         }
 
+        /// Serialises a deferred JSON body now, into an ordinary one, so the
+        /// object graph may change after this without changing the response.
+        void serializeDeferredJson() {
+            if (hasDeferredJson) {
+                body = bytes(Json.write(deferredJson));
+                deferredJson = null;
+                hasDeferredJson = false;
+            }
+        }
+
         /// Re-points this Response. Every field is assigned with no "unchanged"
         /// case: a field left behind describes the PREVIOUS response on this
         /// connection, and deferredJson is the one that would hurt -- it makes the

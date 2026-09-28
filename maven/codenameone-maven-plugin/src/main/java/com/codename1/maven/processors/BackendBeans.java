@@ -681,9 +681,15 @@ final class BackendBeans {
                 Call call = new Call(m);
                 Type[] args = Type.getArgumentTypes(m.getDescriptor());
                 String[] generics = parameterSignatures(m);
+                // @Autowired(required = false) on the METHOD makes its arguments
+                // optional, as in Spring: the method is then not called unless
+                // they resolve. A parameter's own @Autowired still decides for it.
+                boolean methodRequired = m.getAnnotation(AUTOWIRED)
+                        .getBoolOrDefault("required", true);
                 for (int i = 0; i < args.length; i++) {
                     Point p = new Point("parameter " + (i + 1) + " of " + where, args[i],
                             generics == null ? null : generics[i]);
+                    p.required = methodRequired;
                     readPoint(p, parameterAnnotations(m, i));
                     call.points.add(p);
                 }

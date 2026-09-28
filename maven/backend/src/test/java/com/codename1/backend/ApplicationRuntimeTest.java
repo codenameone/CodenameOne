@@ -269,6 +269,21 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("label values that print alike are one histogram series, as Prometheus sees them")
+    void labelValuesThatPrintAlikeShareASeries() {
+        Histogram h = Metrics.histogram("test.labels.text", "", "ms", null,
+                new String[] {"flag", "code"});
+        h.record(1, Boolean.TRUE, Long.valueOf(1), null);
+        h.record(2, "true", "1", null);
+        List points = h.points();
+        assertEquals(1, points.size(), "two series print as one label set: " + points);
+        assertEquals(Long.valueOf(2), ((Map) points.get(0)).get("count"));
+        String text = Metrics.prometheus();
+        assertEquals(text.indexOf("test_labels_text_count{"),
+                text.lastIndexOf("test_labels_text_count{"), text);
+    }
+
+    @Test
     @DisplayName("a float argument out of the float range is refused, not made infinite")
     void floatArgumentRange() {
         Map args = new LinkedHashMap();
@@ -474,6 +489,34 @@ class ApplicationRuntimeTest {
                 java.util.concurrent.ExecutionException.class, () -> bad.get(5, TimeUnit.SECONDS));
         assertTrue(err.getCause() instanceof IllegalStateException);
         Tasks.shutdown(1000);
+    }
+
+    @Test
+    @DisplayName("an executor shut down with the longest wait waits for its tasks")
+    void hugeShutdownWaitWaits() throws Exception {
+        // A guard, not a reproduction: shutdown() only takes deadline - now,
+        // which wraparound already kept right. It holds whichever way the wait
+        // is written.
+        TaskExecutor e = new TaskExecutor("patient", false, 1, null);
+        final AtomicInteger ran = new AtomicInteger();
+        e.execute(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(150);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                ran.incrementAndGet();
+            }
+        });
+        e.execute(new Runnable() {
+            public void run() {
+                ran.incrementAndGet();
+            }
+        });
+        e.shutdown(Long.MAX_VALUE);
+        assertEquals(0, e.getDroppedCount(), "the wait overflowed and gave up at once");
+        assertEquals(2, ran.get());
     }
 
     @Test
@@ -2250,6 +2293,113 @@ class ApplicationRuntimeTest {
             String answer = read(c);
             assertTrue(answer.contains("reached") && answer.contains("\"isError\":false"),
                     answer);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a JSON body a request bean owns is written before the bean is destroyed")
+    void deferredJsonIsWrittenBeforeRequestBeansEnd() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                List owned = new ArrayList();
+                                owned.add("kept");
+                                request.scopedBeans(1)[0] = owned;
+                                return request.respondJson(200, owned);
+                            }
+                        }};
+                    }
+
+                    public void requestEnded(Object[] beans) {
+                        ((List) beans[0]).clear();      // a @PreDestroy that clears
+                    }
+                }).start();
+        try {
+            assertEquals("[\"kept\"]", read(open(port, "/x")));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a rotation whose save fails leaves the session and its beans under the old id")
+    void failedRotationSaveIsUndone() throws Exception {
+        final SessionStore inner = new Sessions().getStore();
+        final boolean[] failRotation = new boolean[1];
+        SessionStore store = new SessionStore() {
+            public HttpSession load(String id) throws IOException {
+                return inner.load(id);
+            }
+
+            public void save(HttpSession session, String previousId) throws IOException {
+                if (previousId != null && failRotation[0]) {
+                    throw new IOException("the store is down");
+                }
+                inner.save(session, previousId);
+            }
+
+            public void delete(String id) throws IOException {
+                inner.delete(id);
+            }
+
+            public int purgeExpired(long now) throws IOException {
+                return inner.purgeExpired(now);
+            }
+
+            public int size() {
+                return inner.size();
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .sessionStore(store)
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request)
+                                    throws Exception {
+                                String t = request.getTarget();
+                                if (t.startsWith("/in")) {
+                                    request.getSession(true).scopedBeans(1)[0] = "cart";
+                                    return HttpServer.Response.text(200, "in");
+                                }
+                                HttpSession s = request.getSession(false);
+                                if (t.startsWith("/rotate")) {
+                                    s.changeSessionId();
+                                    s.scopedBeans(1);       // after the rotation: moves them
+                                    return HttpServer.Response.text(200, "rotated");
+                                }
+                                return HttpServer.Response.text(200, s == null ? "none"
+                                        : s.getId() + " " + s.scopedBeans(1)[0]);
+                            }
+                        }};
+                    }
+                }).start();
+        try {
+            HttpURLConnection in = open(port, "/in");
+            assertEquals("in", read(in));
+            String cookie = in.getHeaderField("Set-Cookie");
+            String pair = cookie.substring(0, cookie.indexOf(';'));
+            String id = pair.substring(pair.indexOf('=') + 1);
+            failRotation[0] = true;
+            HttpURLConnection rotate = open(port, "/rotate");
+            rotate.setRequestProperty("Cookie", pair);
+            assertEquals(500, rotate.getResponseCode());
+            assertNull(rotate.getHeaderField("Set-Cookie"));
+            failRotation[0] = false;
+            HttpURLConnection me = open(port, "/me");
+            me.setRequestProperty("Cookie", pair);
+            assertEquals(id + " cart", read(me),
+                    "the failed rotation left the session or its beans under an id nobody has");
         } finally {
             backend.stop();
         }

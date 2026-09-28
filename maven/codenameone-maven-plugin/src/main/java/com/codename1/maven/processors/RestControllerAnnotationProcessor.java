@@ -905,6 +905,21 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // success. This processor has no DTO codec generation (the @RestClient
         // half does), so the honest answer today is to refuse the shape rather
         // than emit JSON nobody can use.
+        if (route.returnJavaType != null
+                && route.returnJavaType.startsWith("java.util.concurrent.Future")) {
+            // Named on its own rather than left to the generic refusal below: the
+            // shape comes from @Async, whose woven stub returns the queued task at
+            // once, and the route would send that task instead of its result --
+            // a success with a bogus body, the work's failure lost. Spring MVC
+            // does not await a plain Future either.
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns a "
+                    + "java.util.concurrent.Future. A route answers with what its method "
+                    + "returns, and an @Async method returns before its work is done, so "
+                    + "the client would get the pending task, not the result. Return the "
+                    + "value itself -- the request already runs on its own thread -- or "
+                    + "start the work and return an id to ask about it by.");
+            return null;
+        }
         if (!isEncodableReturn(route.returnJavaType, ctx)) {
             ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
                     + route.returnJavaType + ", which the generated router cannot encode: "

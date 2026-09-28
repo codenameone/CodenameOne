@@ -154,12 +154,17 @@ public final class Histogram extends Instrument {
     private Series find(Object first, Object second, Object third) {
         // Null has a key of its own: exported, null omits the attribute and ""
         // sends an empty one, so they are two series and must stay two.
-        Object key = first == null ? NO_VALUE : first;
+        //
+        // Told apart by their TEXT, which is what Prometheus prints: Boolean.TRUE
+        // and "true", or 1L and "1", are one label value there, and as two series
+        // they exported duplicate samples a scrape rejects. The series keeps the
+        // first value's type, so OTLP still gets a typed attribute.
+        Object key = first == null ? NO_VALUE : String.valueOf(first);
         List list = (List) byFirst.get(key);
         if (list != null) {
             for (Object element : list) {
                 Series s = (Series) element;
-                if (same(s.values[1], second) && same(s.values[2], third)) {
+                if (sameText(s.values[1], second) && sameText(s.values[2], third)) {
                     return s;
                 }
             }
@@ -198,8 +203,12 @@ public final class Histogram extends Instrument {
         return v;
     }
 
-    private static boolean same(Object a, Object b) {
-        return a == b || (a != null && a.equals(b)); //NOPMD CompareObjectsWithEquals - identity first, then equals
+    /// Whether two label values print alike: both null, or the same text.
+    private static boolean sameText(Object a, Object b) {
+        if (a == null || b == null) {
+            return a == b; //NOPMD CompareObjectsWithEquals - both null
+        }
+        return String.valueOf(a).equals(String.valueOf(b));
     }
 
     @Override

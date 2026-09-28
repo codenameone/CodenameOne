@@ -264,7 +264,7 @@ public final class Scheduler {
             stopped = true;
             notifyAll();
         }
-        long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
+        long deadline = AsyncTask.deadline(System.currentTimeMillis(), Math.max(0, waitMillis));
         synchronized (this) {
             while (anyRunning()) {
                 long left = deadline - System.currentTimeMillis();

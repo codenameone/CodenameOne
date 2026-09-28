@@ -284,7 +284,7 @@ public final class TaskExecutor {
         notifyAll();
         boolean fromOwnTask = RUNNING.get() == this; //NOPMD CompareObjectsWithEquals - the executor itself, by identity
         int self = fromOwnTask ? 1 : 0;
-        long deadline = System.currentTimeMillis() + Math.max(0, waitMillis);
+        long deadline = AsyncTask.deadline(System.currentTimeMillis(), Math.max(0, waitMillis));
         while ((active > self || !queue.isEmpty()) && waitMillis > 0) {
             long left = deadline - System.currentTimeMillis();
             if (left <= 0) {

@@ -357,18 +357,12 @@ public final class Sessions {
             if (session.isNew()) {
                 destroy(take(session.getId()));
             } else {
-                synchronized (this) {
-                    Held moved = (Held) beans.remove(session.getId());
-                    if (moved != null) {
-                        beans.put(previous, moved);
-                    }
-                }
                 // The rotation is undone on the session itself too, and what else
                 // the request changed is kept, under the id the client still has --
                 // as a failed request's changes are when there was no rotation. The
                 // new id was never stored, and leaving it on the object let a later
                 // request of the memory store move the beans to it.
-                session.undoRotation(previous);
+                revertRotation(session, previous);
                 if (session.isDirty()) {
                     s.save(session, null);
                     session.clean();
@@ -391,7 +385,15 @@ public final class Sessions {
         } else {
             if (session.isDirty()) {
                 boolean announce = session.isNew() || previous != null;
-                s.save(session, previous);
+                try {
+                    s.save(session, previous);
+                } catch (IOException err) {
+                    revertFailedRotation(session, previous);
+                    throw err;
+                } catch (RuntimeException err) {
+                    revertFailedRotation(session, previous);
+                    throw err;
+                }
                 if (session.isRotationLost()) {
                     // Another request of this client moved the session first, and
                     // its response carries the id that has a row. Announcing this
@@ -414,6 +416,29 @@ public final class Sessions {
             return response;
         }
         return withHeader(response, "Set-Cookie", cookie);
+    }
+
+    /// Puts a rotated session back under `previous`: its id, and the beans a
+    /// lookup after the rotation already moved to the new one.
+    private void revertRotation(HttpSession session, String previous) {
+        synchronized (this) {
+            Held moved = (Held) beans.remove(session.getId());
+            if (moved != null) {
+                beans.put(previous, moved);
+            }
+        }
+        session.undoRotation(previous);
+    }
+
+    /// A rotation whose save failed: the response carries no Set-Cookie, so the
+    /// client keeps the old id, and everything must stay under it. Left moved,
+    /// the beans sat under an id nobody would present -- the next request built
+    /// a second set while the first waited for expiry -- and the memory store
+    /// kept a session whose id no longer matched its key.
+    private void revertFailedRotation(HttpSession session, String previous) {
+        if (previous != null && !session.isNew()) {
+            revertRotation(session, previous);
+        }
     }
 
     /// After a request used the session: moves its beans to its new id when it

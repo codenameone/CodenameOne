@@ -349,16 +349,55 @@ final class BackendWiringWriter {
             if (skippable(p)) {
                 continue;
             }
+            if (maybeAbsent(p)) {
+                // Its candidates are all conditional, so whether one is active is
+                // known only at start-up: assigned only when one is, or the null
+                // overwrote the field's initializer -- which Spring leaves intact.
+                sb.append(inner).append("{\n").append(inner).append("    ")
+                  .append(sourceType(p)).append(" v = ").append(point(p)).append(";\n")
+                  .append(inner).append("    if (v != null) {\n").append(inner)
+                  .append("        ").append(ref).append('.')
+                  .append(BackendWeaver.injectSetter(f.getKey().getName()))
+                  .append("(v);\n").append(inner).append("    }\n")
+                  .append(inner).append("}\n");
+                continue;
+            }
             sb.append(inner).append(ref).append('.')
               .append(BackendWeaver.injectSetter(f.getKey().getName())).append('(')
               .append(point(p)).append(");\n");
         }
         for (BackendBeans.Call c : b.setters) {
             boolean skip = false;
+            boolean deferred = false;
             for (BackendBeans.Point p : c.points) {
                 skip |= skippable(p);
+                deferred |= maybeAbsent(p);
             }
             if (skip) {
+                continue;
+            }
+            if (deferred) {
+                // As for a field, and as Spring does for an optional method: the
+                // setter is not called unless every optional argument resolved.
+                // Each is computed once, in order, so a prototype is built once.
+                sb.append(inner).append("{\n");
+                StringBuilder test = new StringBuilder();
+                for (int i = 0; i < c.points.size(); i++) {
+                    BackendBeans.Point p = c.points.get(i);
+                    sb.append(inner).append("    ").append(sourceType(p)).append(" a").append(i)
+                      .append(" = ").append(point(p)).append(";\n");
+                    if (maybeAbsent(p)) {
+                        test.append(test.length() == 0 ? "" : " && ").append('a').append(i)
+                            .append(" != null");
+                    }
+                }
+                sb.append(inner).append("    if (").append(test).append(") {\n")
+                  .append(inner).append("        ").append(ref).append('.')
+                  .append(callName(c.method)).append('(');
+                for (int i = 0; i < c.points.size(); i++) {
+                    sb.append(i > 0 ? ", a" : "a").append(i);
+                }
+                sb.append(");\n").append(inner).append("    }\n").append(inner).append("}\n");
                 continue;
             }
             sb.append(inner).append(ref).append('.').append(callName(c.method)).append('(');
@@ -396,6 +435,27 @@ final class BackendWiringWriter {
     private static boolean skippable(BackendBeans.Point p) {
         return !p.required && p.candidates.isEmpty() && p.builtin == null && p.value == null
                 && !p.list;
+    }
+
+    /// An optional point whose value may be absent at start-up: every candidate
+    /// it has is conditional (@Profile, @ConditionalOnProperty), so none may be
+    /// active in the running configuration.
+    private static boolean maybeAbsent(BackendBeans.Point p) {
+        if (p.required || p.candidates.isEmpty() || p.builtin != null || p.value != null
+                || p.list) {
+            return false;
+        }
+        for (BackendBeans.Bean c : p.candidates) {
+            if (!c.isConditional()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The Java source name of a point's declared type.
+    private static String sourceType(BackendBeans.Point p) {
+        return p.type.getClassName().replace('$', '.');
     }
 
     /// `@PostConstruct` methods and a factory's init method.

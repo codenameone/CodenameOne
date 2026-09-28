@@ -774,9 +774,24 @@ public final class Backend {
 
         /// Destroys the request's scoped beans, once.
         private void endRequestBeans(HttpServer.Request request) {
+            endRequestBeans(request, null);
+        }
+
+        /// Ends the request's scoped beans, serialising `response`'s deferred
+        /// JSON body first when there are any. respondJson() leaves the returned
+        /// object to be serialised by the writer, after this -- so a map, list or
+        /// DTO a request bean owned was written after its @PreDestroy had
+        /// cleared or closed it. Spring MVC writes the body before it destroys
+        /// request-scoped beans, and so does this. Only when there are beans to
+        /// end: without any, the zero-copy write stays as it is.
+        private void endRequestBeans(HttpServer.Request request,
+                                     HttpServer.Response response) {
             if (app != null) {
                 Object[] beans = request.takeScopedBeans();
                 if (beans != null) {
+                    if (response != null) {
+                        response.serializeDeferredJson();
+                    }
                     app.requestEnded(beans);
                 }
             }
@@ -820,7 +835,7 @@ public final class Backend {
                     // stored: a @PreDestroy that changes the
                     // session, or starts one, would otherwise
                     // change it after its only save.
-                    endRequestBeans(request);
+                    endRequestBeans(request, response);
                     // Inside the logged region: a session
                     // store that fails to save is a 500 the
                     // client receives, and the request log
