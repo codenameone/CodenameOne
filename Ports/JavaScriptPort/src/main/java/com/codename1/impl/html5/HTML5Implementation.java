@@ -338,6 +338,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Clears mouseDown for the release of {@code press} -- unless a newer press has begun since.
+     * The release handler suspends at every JSO call, and a quick second click's pointerdown
+     * runs in that window: it finds mouseDown still set, keeps it, and opens its own slot. The
+     * first release clearing the flag when it resumed took it from the second press, whose moves
+     * and release were then dropped by their mouseDown gates -- a double click lost its second
+     * half and could leave the target pressed. The flag belongs to the latest press.
+     */
+    private void releaseMouseDown(PressSlot press) {
+        synchronized (pointerEventOrderLock) {
+            if (press == null || press == lastPress) { //NOPMD CompareObjectsWithEquals
+                pointerState.setMouseDown(false);
+            }
+        }
+    }
+
     /** The press a move belongs to, read at the move handler's entry; see pressForRelease. */
     private PressSlot pressForMove() {
         synchronized (pointerEventOrderLock) {
@@ -2177,8 +2193,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     debugLog("[mouseDown] touchIsDown");
                     // Ignored press (touch already down, or the target is a native
                     // text field): clear mouseDown so the permanent mousemove
-                    // listener's press gate does not dispatch drags for it.
-                    pointerState.setMouseDown(false);
+                    // listener's press gate does not dispatch drags for it -- but only while
+                    // this is still the latest press; see releaseMouseDown.
+                    releaseMouseDown(press);
                     completePressInFlight(press);
                     return;
                 }
@@ -2246,14 +2263,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // Guard against mouseUp if the mouse isn't already dwon
                 if (pointerState.isTouchDown()) {
                     debugLog("[mouseUp] touchIsDown");
-                    pointerState.setMouseDown(false);
+                    releaseMouseDown(press);
                     return;
                 }
 
                 if (!pointerState.isMouseDown()) {
                     return;
                 }
-                pointerState.setMouseDown(false);
+                releaseMouseDown(press);
 
                 pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction(false);
@@ -3643,7 +3660,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         int[] caret = client == null ? null : client.getCaretRect();
         if (caret != null && caret.length >= 4) {
             lightweightTextInputElement.getStyle().setProperty("left", scaleCoord(caret[0]) + "px");
-            lightweightTextInputElement.getStyle().setProperty("top", scaleCoord(caret[1]) + "px");
+            // Fixed, so placed against the viewport rather than the body the HTML chrome moves
+            // down: the chrome's height is added here, or the IME's candidate window would open
+            // one title bar above the field.
+            lightweightTextInputElement.getStyle().setProperty("top", (scaleCoord(caret[1]) + chromeTopCss) + "px");
         }
     }
 
