@@ -6879,6 +6879,12 @@
       if (!(e.ctrlKey || e.metaKey || e.altKey) || e.repeat) {
         return;
       }
+      // AltGr is how many layouts type characters (@ is AltGr+Q on a German keyboard), and on
+      // Windows and Linux it reports ctrlKey AND altKey -- a Ctrl+Alt shortcut to everything
+      // below. A key typed with it is text, never a command.
+      if (e.getModifierState && e.getModifierState('AltGraph')) {
+        return;
+      }
       var chrome = document.getElementById('cn1-desktop-chrome');
       if (!chrome) {
         return;
@@ -6972,14 +6978,43 @@
       if (!panel) {
         return;
       }
-      panel.style.left = '';
+      // The panel is fixed-positioned (the menu bar scrolls, and would clip one hanging off
+      // its menu), so it is put under its title here, from where that title is right now.
+      var summary = details.querySelector('summary');
+      var anchor = (summary || details).getBoundingClientRect();
+      panel.style.top = anchor.bottom + 'px';
+      panel.style.left = anchor.left + 'px';
       var rect = panel.getBoundingClientRect();
       var limit = document.documentElement.clientWidth - 4;
       if (rect.right > limit) {
-        var shift = Math.min(rect.right - limit, rect.left - 4);
-        if (shift > 0) {
-          panel.style.left = (-shift) + 'px';
-        }
+        panel.style.left = Math.max(4, anchor.left - (rect.right - limit)) + 'px';
+      }
+    }, true);
+    // The menu bar scrolls sideways when its titles do not fit. A mouse wheel only scrolls
+    // vertically, so over the bar it is turned into the sideways scroll -- otherwise the titles
+    // past the edge would need a trackpad or Shift+wheel to reach. And since an open panel was
+    // placed under where its title was, scrolling the bar closes it rather than leaving it
+    // under some other title.
+    document.addEventListener('wheel', function(e) {
+      var bar = e.target && e.target.closest ? e.target.closest('.cn1-chrome-menubar') : null;
+      if (!bar || bar.scrollWidth <= bar.clientWidth) {
+        return;
+      }
+      var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (e.deltaMode === 1) {
+        delta *= 16;
+      }
+      bar.scrollLeft += delta;
+      e.preventDefault();
+    }, { capture: true, passive: false });
+    document.addEventListener('scroll', function(e) {
+      var bar = e.target;
+      if (!bar || !bar.classList || !bar.classList.contains('cn1-chrome-menubar')) {
+        return;
+      }
+      var open = bar.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        open[i].removeAttribute('open');
       }
     }, true);
   }

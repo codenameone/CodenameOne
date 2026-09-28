@@ -96,12 +96,6 @@ public final class JavaScriptEventWiring {
         }
         if (touchEndEnabled) {
             registrar.add("touchend", touchEnd, true);
-            // A touch the browser cancels -- palm rejection, the page losing focus, the OS taking
-            // the gesture -- ends with touchcancel and no touchend. Unanswered, touchDown stayed
-            // set and every later touchstart was taken for an extra finger and ignored: touch
-            // input was dead until reload. It ends the touch the same way, as pointercancel
-            // already does for the mouse.
-            registrar.add("touchcancel", touchEnd, true);
         }
         if (wheelEnabled) {
             registrar.add(wheelEventType, wheel, true);

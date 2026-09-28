@@ -320,20 +320,24 @@ async function phone() {
     }
     {
       // A touch the browser cancels (palm rejection, focus loss) ends with touchcancel and no
-      // touchend. Left unanswered, the port kept the touch down and took every later touch for
-      // an extra finger, so the tap below did nothing and touch input stayed dead.
+      // touchend. It must not act as a release -- the button under the finger stays unfired --
+      // but it must end the touch: left unanswered, the port kept the touch down and took every
+      // later touch for an extra finger, so the tap below did nothing and touch input stayed dead.
       const logs = [];
       const page = await context.newPage();
       await boot(page, logs);
       const vp = page.viewportSize();
       const cdp = await context.newCDPSession(page);
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart',
-        touchPoints: [{ x: Math.round(vp.width / 2), y: Math.round(vp.height * 0.6) }] });
-      await page.waitForTimeout(100);
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
-      await page.waitForTimeout(1500);
-      const before = await canvasPixels(page, [[6, vp.height - 6]]);
       const button = await span(page, 'Hello World');
+      const before = await canvasPixels(page, [[6, vp.height - 6]]);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart',
+        touchPoints: [{ x: Math.round(button.x), y: Math.round(button.y) }] });
+      await page.waitForTimeout(300);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+      await page.waitForTimeout(2500);
+      const cancelled = await canvasPixels(page, [[6, vp.height - 6]]);
+      check(Math.abs(luminance(cancelled[0]) - luminance(before[0])) < 15,
+        'phone: a cancelled touch does not fire what it was pressing', `corner luminance ${Math.round(luminance(before[0]))} -> ${Math.round(luminance(cancelled[0]))}`);
       await page.touchscreen.tap(Math.round(button.x), Math.round(button.y));
       await page.waitForTimeout(2500);
       const after = await canvasPixels(page, [[6, vp.height - 6]]);

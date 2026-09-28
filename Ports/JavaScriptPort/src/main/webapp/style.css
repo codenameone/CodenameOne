@@ -333,9 +333,21 @@ div#cn1-video-capture > video {
     height: 28px;
     padding: 0 4px;
     align-items: stretch;
+    /* More menu titles than the window is wide -- a narrow window, or an application with
+       several menus of its own -- would push the last ones past the edge, where the body's
+       overflow: hidden made them unreachable. The bar scrolls sideways instead (the wheel is
+       mapped onto it in browser_bridge.js), without a scrollbar eating into its fixed height.
+       Scrolling clips whatever overflows the bar, which is why the panels are fixed-positioned
+       below rather than hanging off their menu. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar::-webkit-scrollbar {
+    display: none;
 }
 #cn1-desktop-chrome .cn1-chrome-menu {
-    position: relative;
+    flex-shrink: 0;
 }
 #cn1-desktop-chrome .cn1-chrome-menu > summary {
     list-style: none;
@@ -358,10 +370,14 @@ div#cn1-video-capture > video {
     outline-offset: -2px;
 }
 #cn1-desktop-chrome .cn1-chrome-menu-items {
-    position: absolute;
-    left: 0;
-    top: 100%;
-    min-width: 200px;
+    /* Placed against the window, under its menu's title, by browser_bridge.js when the menu
+       opens; these are the fallback until it has. */
+    position: fixed;
+    left: 4px;
+    top: var(--cn1-chrome-top, 59px);
+    /* 200px, unless the window is narrower: a min-width wins over max-width, so a plain 200px
+       would push the panel past the edge of a very narrow window. */
+    min-width: min(200px, calc(100vw - 8px));
     /* As wide as its longest item, so a label wraps only when the window is too narrow: an
        absolutely positioned box otherwise shrinks to its min-content, and a label that may
        wrap anywhere has almost none. */

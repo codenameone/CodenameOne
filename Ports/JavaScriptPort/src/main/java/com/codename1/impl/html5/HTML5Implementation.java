@@ -2800,6 +2800,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // pointerdown / pointerup too.
         outputCanvas.addEventListener("pointermove", onMouseMove, true);
         outputCanvas.addEventListener("touchmove", onTouchMove, true);
+        // A touch the browser cancels -- palm rejection, the page losing focus, the OS taking the
+        // gesture -- ends with touchcancel and no touchend. Unanswered, touchDown stayed set and
+        // every later touchstart was taken for an extra finger and ignored: touch input was dead
+        // until reload. It is not a release, though: releasing would activate whatever the finger
+        // was pressing, a tap the user never finished. So, as Android's ACTION_CANCEL, the gesture
+        // is only forgotten -- the touch and drag bookkeeping cleared, the press's queued moves
+        // dropped (its slot is marked releasing), and anything it staged for a drag abandoned.
+        outputCanvas.addEventListener("touchcancel", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                pressForRelease();
+                pointerState.setTouchDown(false);
+                pointerState.setGrabbedDrag(false);
+                com.codename1.ui.NativeDragAndDrop.gestureCancelled();
+            }
+        }, true);
 
         /**
          *  The installbacksidehooks event is an event that can be triggered from native javascript to install
@@ -12220,11 +12236,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
-        // The cached selection belongs to the form it was made on. The document copy listener
-        // takes it as is, so a selection left behind on the previous screen would be copied from
-        // one that shows none of it.
-        selectedText = null;
-        selectedTextSelection = null;
         if (desktopChrome != null && f != null && !(f instanceof com.codename1.ui.Dialog)) {
             desktopChrome.setTitle(f.getTitle());
         }
@@ -14289,6 +14300,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /// every form with selection on, so disabling one form's selection leaves it installed;
     /// deinitializeTextSelection drops the text when it came from the selection going away.
     private TextSelection selectedTextSelection;
+    private boolean isSelectionOnCurrentForm(TextSelection sel) {
+        if (sel == null || !sel.isEnabled()) {
+            return false;
+        }
+        Component root = sel.getSelectionRoot();
+        Form current = getCurrentForm();
+        return root != null && current != null && root.getComponentForm() == current; //NOPMD CompareObjectsWithEquals
+    }
+
     private ActionListener textSelectionListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent t) {
@@ -14523,6 +14543,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         @SuppressSyncErrors
         public void handleEvent(Event evt) {
             if (selectedText == null || selectedText.isEmpty()) {
+                return;
+            }
+            // Only a selection on the form now showing, and still enabled. The cached text is
+            // kept across form changes -- a dialog or a menu shown over the form and dismissed
+            // again leaves its selection on screen, and it has to stay copyable -- so it is
+            // checked here, where it is used: a selection left on another screen, or on a form
+            // whose selection was switched off, is not what the user is looking at.
+            if (!isSelectionOnCurrentForm(selectedTextSelection)) {
                 return;
             }
             // A copy while a native field is being edited is that field's copy.
