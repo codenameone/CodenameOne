@@ -48,7 +48,9 @@ public final class TaskExecutor {
     }
 
     private final String name;
-    private final boolean virtual;
+    /// Not final: an AUTO executor is pinned to the kind a later caller names
+    /// explicitly -- see [#pin]. Read and written under this executor's lock.
+    private boolean virtual;
     private final int size;
     private final LinkedList queue = new LinkedList();
     private Thread[] workers;
@@ -81,7 +83,20 @@ public final class TaskExecutor {
         this.registry = registry;
     }
 
-    private final boolean auto;
+    private boolean auto;
+
+    /// Fixes an AUTO executor to one kind of thread, when another caller of the
+    /// same name asks for that kind explicitly. Otherwise which kind a
+    /// PLATFORM method got depended on call order: an AUTO call made first
+    /// created the executor, and the PLATFORM method then ran on virtual threads
+    /// -- blocking a host on the database I/O it asked a platform thread for.
+    /// Tasks already handed to a virtual thread finish there.
+    synchronized void pin(boolean toVirtual) {
+        if (auto) {
+            auto = false;
+            virtual = toVirtual;
+        }
+    }
 
     public String getName() {
         return name;
@@ -89,7 +104,7 @@ public final class TaskExecutor {
 
     /// Whether this executor's tasks go to virtual threads: always for a virtual
     /// one, and for an AUTO one while its server has hosts to run them on.
-    public boolean isVirtual() {
+    public synchronized boolean isVirtual() {
         return virtual || (auto && HttpServer.acceptsVirtualTasks());
     }
 
@@ -141,19 +156,23 @@ public final class TaskExecutor {
         if (task == null) {
             return;
         }
-        if (virtual || auto) {
+        boolean tryVirtual;
+        synchronized (this) {
+            tryVirtual = virtual || auto;
             // Refused and counted BEFORE the hand-off, exactly like a pool task:
             // a submission after shutdown must fail rather than run on a server
             // that is stopping, and a task already handed to a host must hold
             // shutdown()'s drain open from the moment it is accepted -- counting
             // it only once it starts let shutdown() return while it still sat in
             // a host's inbox.
-            synchronized (this) {
+            if (tryVirtual) {
                 if (shutdown) {
                     throw new IllegalStateException("Executor " + name + " has been shut down");
                 }
                 active++;
             }
+        }
+        if (tryVirtual) {
             HttpServer host = registry == null ? HttpServer.activeServer()
                     : registry.virtualHost();
             if (HttpServer.submitVirtualTask(new Counted(this, task), host)) {
@@ -380,7 +399,7 @@ public final class TaskExecutor {
     }
 
     @Override
-    public String toString() {
+    public synchronized String toString() {
         return name + (virtual ? " (virtual)" : " (" + size + " threads)");
     }
 

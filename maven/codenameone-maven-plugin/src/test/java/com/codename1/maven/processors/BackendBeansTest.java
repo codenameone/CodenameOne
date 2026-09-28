@@ -1060,8 +1060,12 @@ public class BackendBeansTest {
                 + "}\n");
         ProcessorContext ctx = process(compile(s));
         String errors = String.valueOf(ctx.getErrors());
-        assertTrue(errors, errors.contains("is on a @RequestScope bean"));
-        assertTrue(errors, errors.contains("is on a @SessionScope bean"));
+        // Warnings, as Spring runs them: the task calls the instance itself.
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("is on a @RequestScope bean"));
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("is on a @SessionScope bean"));
+        assertFalse(errors, errors.contains("is on a @"));
         assertTrue(errors, errors.contains("is a segment of the management URL"));
         assertTrue(errors, errors.contains("is also @Async"));
     }
@@ -1227,20 +1231,24 @@ public class BackendBeansTest {
                 + "    public Nightly(Helper helper) { }\n"
                 + "    @Scheduled(fixedRate = 60000) public void run() { }\n"
                 + "}\n");
-        String errors = String.valueOf(process(compile(s)).getErrors());
-        assertTrue(errors, errors.contains("Websocket endpoint chat (com.example.Chat) reaches "
+        // Warned, not refused: Spring starts this, and the stand-in throws only
+        // when it is really used with no request current.
+        assertNoErrors(process(compile(s)));
+        String warned = String.valueOf(warnings);
+        assertTrue(warned, warned.contains("Websocket endpoint chat (com.example.Chat) reaches "
                 + "visit (com.example.Visit) through helper (com.example.Helper)"));
-        assertTrue(errors, errors.contains("A websocket callback runs outside any HTTP request"));
-        assertTrue(errors, errors.contains("nightly (com.example.Nightly) reaches visit"));
-        assertTrue(errors, errors.contains("A scheduled job runs outside any HTTP request"));
+        assertTrue(warned, warned.contains("A websocket callback runs outside any HTTP request"));
+        assertTrue(warned, warned.contains("nightly (com.example.Nightly) reaches visit"));
+        assertTrue(warned, warned.contains("A scheduled job runs outside any HTTP request"));
         // The singleton itself may inject it: it is used from requests.
         s.remove("com.example.Chat");
         s.remove("com.example.Nightly");
         assertNoErrors(process(compile(s)));
+        assertFalse(String.valueOf(warnings), String.valueOf(warnings).contains("reaches"));
     }
 
     @Test
-    public void anAsyncBeanReachingAScopedBeanIsRefused() throws Exception {
+    public void anAsyncBeanReachingAScopedBeanIsWarned() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
         s.put("com.example.Helper", PKG + "@Component public class Helper {\n"
@@ -1250,8 +1258,10 @@ public class BackendBeansTest {
                 + "    @Autowired private Helper helper;\n"
                 + "    @Async public void send() { }\n"
                 + "}\n");
-        String errors = String.valueOf(process(compile(s)).getErrors());
-        assertTrue(errors, errors.contains("Bean with @Async methods mailer (com.example.Mailer) "
+        // Warned, as Spring starts it and fails only on a use off the request.
+        assertNoErrors(process(compile(s)));
+        String warned = String.valueOf(warnings);
+        assertTrue(warned, warned.contains("Bean with @Async methods mailer (com.example.Mailer) "
                 + "reaches visit (com.example.Visit) through helper (com.example.Helper)"));
     }
 
@@ -1272,15 +1282,16 @@ public class BackendBeansTest {
     }
 
     @Test
-    public void aScopedBeanInheritingAnAsyncMethodIsRefused() throws Exception {
+    public void aScopedBeanInheritingAnAsyncMethodIsWarned() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Worker", PKG + "public abstract class Worker {\n"
                 + "    @Async public void later() { }\n"
                 + "}\n");
         s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit "
                 + "extends Worker { }\n");
-        String errors = String.valueOf(process(compile(s)).getErrors());
-        assertTrue(errors, errors.contains("@Async method com.example.Visit.later is on a "
+        assertNoErrors(process(compile(s)));
+        String warned = String.valueOf(warnings);
+        assertTrue(warned, warned.contains("@Async method com.example.Visit.later is on a "
                 + "@RequestScope bean"));
     }
 
@@ -1391,7 +1402,8 @@ public class BackendBeansTest {
         ProcessorContext ctx = process(compile(s));
         String errors = String.valueOf(ctx.getErrors());
         assertTrue(errors, errors.contains("a session bean outlives the request"));
-        assertTrue(errors, errors.contains("A websocket callback runs outside any HTTP request"));
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("A websocket callback runs outside any HTTP request"));
     }
 
     @Test
@@ -1536,6 +1548,9 @@ public class BackendBeansTest {
         return classes;
     }
 
+    /// What the last process() logged as warnings.
+    private final List<String> warnings = new ArrayList<String>();
+
     private ProcessorContext process(File classes) throws Exception {
         return process(classes, new RestControllerAnnotationProcessor());
     }
@@ -1550,8 +1565,15 @@ public class BackendBeansTest {
         for (File f : extraClasspath) {
             cp.add(f.getAbsolutePath());
         }
+        warnings.clear();
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
-                new SystemStreamLog(), tmp.newFolder(), new Properties(), null,
+                new SystemStreamLog() {
+                    @Override
+                    public void warn(CharSequence content) {
+                        warnings.add(String.valueOf(content));
+                        super.warn(content);
+                    }
+                }, tmp.newFolder(), new Properties(), null,
                 Collections.<String>emptyList(), "UTF-8", cp);
         BackendBeanAnnotationProcessor beans = new BackendBeanAnnotationProcessor();
         beans.start(ctx);

@@ -48,11 +48,12 @@ A `synchronized` `@Async` method holds its monitor while the body runs on the
 executor's thread, not merely while it hands the task over, so two calls still
 never run the body at once.
 
-Two combinations are build errors. `@Async` on a `@RequestScope` or
-`@SessionScope` bean would hand the task an instance that's destroyed when its
-request or session ends, possibly before the task runs. `@Async` on a `@Scheduled` method would end the run as soon as the work
-was queued, so runs could overlap and a lock be released early; `@Scheduled`
-already runs off the request thread, on the thread its `thread` attribute picks.
+`@Async` on a `@Scheduled` method is a build error: it would end the run as soon
+as the work was queued, so runs could overlap and a lock be released early;
+`@Scheduled` already runs off the request thread, on the thread its `thread`
+attribute picks. `@Async` on a `@RequestScope` or `@SessionScope` bean builds with
+a warning, as it runs in Spring: the task calls the bean itself, which is destroyed
+when its request or session ends, possibly before the task runs.
 
 Arguments are captured when the method is called, and the body runs later on
 another thread. Pass values rather than objects the caller goes on changing, and

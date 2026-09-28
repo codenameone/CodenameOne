@@ -550,9 +550,10 @@ final class BackendBeans {
             for (MethodInfo m : inheritedMembers(cls)) {
                 if (wovenAsync(cls, m)) {
                     // The task would hold the scoped instance after its request or
-                    // session ended and destroyed it.
+                    // session ended and destroyed it. A warning, as Spring runs it:
+                    // the task calls the instance itself, destroyed or not.
                     String scope = REQUEST.equals(bean.scope) ? "request" : "session";
-                    ctx.error(cls, "@Async method " + cls.getSourceName() + "." + m.getName()
+                    ctx.getLog().warn("cn1: @Async method " + cls.getSourceName() + "." + m.getName()
                             + " is on a @" + (REQUEST.equals(bean.scope) ? "Request" : "Session")
                             + "Scope bean, which is destroyed when its " + scope + " ends -- "
                             + "possibly before the task runs. Move the method to a singleton "
@@ -1587,7 +1588,14 @@ final class BackendBeans {
         // scheduled run and a managed-attribute read all happen on threads with no
         // request current, and a request- or session-scoped stand-in reached from
         // there -- directly, or through a singleton that injects it -- throws on
-        // first use. Only the direct injections used to be checked.
+        // first use.
+        //
+        // A WARNING, as Spring has it: Spring starts such an application and
+        // the scoped proxy throws IllegalStateException only when it is really
+        // used with no request current, which the generated stand-in does too.
+        // Reachability through the graph is an over-approximation -- the job may
+        // never call the method that touches the scoped bean -- so refusing the
+        // build would reject programs Spring runs correctly.
         for (Bean b : beans) {
             boolean async = hasAsync(b);
             String role = b.webSocket ? "Websocket endpoint"
@@ -1610,11 +1618,13 @@ final class BackendBeans {
                     : !b.jobs.isEmpty() ? "A scheduled job runs"
                     : b.managed != null ? "A managed attribute is read"
                     : "An @Async call runs on an executor, even one a request made,";
-            ctx.error(b.cls, role + " " + b.describe() + " reaches " + d.describe() + via
-                    + ", which is " + d.scope + "-scoped. " + outside + " outside any HTTP "
-                    + "request, so there is no " + d.scope + " to find it in; inject a singleton"
+            ctx.getLog().warn("cn1: " + role + " " + b.describe() + " reaches " + d.describe()
+                    + via + ", which is " + d.scope + "-scoped. " + outside + " outside any "
+                    + "HTTP request, where there is no " + d.scope + " to find it in, and using "
+                    + "it there throws IllegalStateException. Inject a singleton instead"
                     + (b.webSocket ? ", and keep per-connection state in the "
-                    + "WebSocketSession's attachment." : "."));
+                    + "WebSocketSession's attachment" : "") + ", unless that path never "
+                    + "touches it.");
         }
         if (!ctx.hasErrors()) {
             orderConstruction();

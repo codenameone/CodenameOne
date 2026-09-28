@@ -5183,14 +5183,15 @@ public final class HttpServer {
             // fails is recorded as the failure it is.
             Span span = Tracing.startServer(request, tls != null, serverTracer);
             int sentStatus = -1;
-            Exception handlerError = null;
+            Throwable handlerError = null;
             try {
                 try {
                     response = handler.handle(request);
                     if (response == null) {
                         response = Response.text(404, "not found");
                     }
-                } catch (Exception err) {
+                } catch (Throwable err) {
+                    rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
                     response = Response.text(500, "internal error");
@@ -5554,7 +5555,7 @@ public final class HttpServer {
                 // server.address is set here as for HTTP/1: :authority was copied
                 // into these headers as "host" above, which is what startServer reads.
                 Span span = Tracing.startServer(request, tls != null, serverTracer);
-                Exception handlerError = null;
+                Throwable handlerError = null;
                 // -1 until the response has been SUBMITTED to the session, as on the
                 // HTTP/1 path: a respond() that throws is a response the peer never
                 // got, and must not be reported as the status the handler chose.
@@ -5570,7 +5571,8 @@ public final class HttpServer {
                     if (response == null) {
                         response = Response.text(404, "not found");
                     }
-                } catch (Exception err) {
+                } catch (Throwable err) {
+                    rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
                     response = Response.text(500, "internal error");
@@ -5886,7 +5888,22 @@ public final class HttpServer {
         }
         int status = sent && entry[1] instanceof Integer ? ((Integer) entry[1]).intValue() : -1;
         Tracing.endServer((Span) entry[0], status,
-                entry[2] instanceof Exception ? (Exception) entry[2] : null);
+                entry[2] instanceof Throwable ? (Throwable) entry[2] : null);
+    }
+
+    /// Rethrows what a handler threw when the process cannot go on serving
+    /// after it; anything else becomes a 500.
+    ///
+    /// As Spring Boot's embedded Tomcat does: a handler's Error -- an
+    /// AssertionError, a NoClassDefFoundError, a StackOverflowError out of a
+    /// deep recursion -- is answered 500 like any exception, where it used to
+    /// drop the connection with no answer at all. What Tomcat rethrows,
+    /// VirtualMachineError other than a stack overflow, is rethrown here too:
+    /// after running out of memory there is nothing a 500 can promise.
+    static void rethrowIfFatal(Throwable err) {
+        if (err instanceof VirtualMachineError && !(err instanceof StackOverflowError)) {
+            throw (VirtualMachineError) err;
+        }
     }
 
     /// The HTTP/2 connection preface, sent by a client that opens with h2.

@@ -84,8 +84,16 @@ public final class McpArgs {
         return raw(args, name, required);
     }
 
+    /// A string argument. A number or boolean is taken as its text, as Jackson
+    /// coerces a scalar for Spring; an array or object is refused. Its Java
+    /// text -- `[value]`, `{id=value}` -- is not what the caller sent, and a
+    /// malformed call would run a side-effecting tool with an identifier nobody
+    /// meant, where the schema promised a JSON string.
     public static String string(Map args, String name, boolean required) {
         Object v = raw(args, name, required);
+        if (v instanceof Map || v instanceof java.util.Collection || v instanceof Object[]) {
+            throw new IllegalArgumentException("\"" + name + "\" must be a string");
+        }
         return v == null ? null : String.valueOf(v);
     }
 

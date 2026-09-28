@@ -164,7 +164,7 @@ public abstract class AsyncTask implements Runnable, Future {
     @Override
     public Object get(long timeout, TimeUnit unit)
             throws InterruptedException, ExecutionException, TimeoutException {
-        long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+        long deadline = deadline(System.currentTimeMillis(), unit.toMillis(timeout));
         if (VirtualThread.isVirtual()) {
             if (!awaitCooperatively(deadline)) {
                 throw new TimeoutException(name + " did not finish in time");
@@ -181,6 +181,17 @@ public abstract class AsyncTask implements Runnable, Future {
             }
             return result();
         }
+    }
+
+    /// `now + millis`, saturated at Long.MAX_VALUE. toMillis() already
+    /// saturates a huge timeout -- get(Long.MAX_VALUE, DAYS) -- to Long.MAX_VALUE,
+    /// and adding the clock to that wrapped to a deadline in the past, so the
+    /// longest possible wait timed out at once.
+    static long deadline(long now, long millis) {
+        if (millis > 0 && now > Long.MAX_VALUE - millis) {
+            return Long.MAX_VALUE;
+        }
+        return now + millis;
     }
 
     /// Waits on a virtual thread without blocking its host.

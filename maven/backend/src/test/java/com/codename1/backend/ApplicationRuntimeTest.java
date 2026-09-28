@@ -247,6 +247,28 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a metric registered again in another unit is kept, as Micrometer keeps it, and warned about")
+    void metricUnitMismatch() throws Exception {
+        Counter first = Metrics.counter("test.unit.counter", "", "ms");
+        java.io.PrintStream err = System.err;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setErr(new java.io.PrintStream(captured, true, "UTF-8"));
+        try {
+            assertTrue(first == Metrics.counter("test.unit.counter", "", "s"));
+            assertTrue(first == Metrics.counter("test.unit.counter", "", "s"));
+            assertTrue(first == Metrics.counter("test.unit.counter", "", ""));
+        } finally {
+            System.setErr(err);
+        }
+        String warned = captured.toString("UTF-8");
+        assertTrue(warned.contains("test.unit.counter is registered again with unit \"s\""),
+                warned);
+        assertEquals(warned.indexOf("test.unit.counter"), warned.lastIndexOf("test.unit.counter"),
+                "warned more than once: " + warned);
+        assertEquals("ms", first.getUnit());
+    }
+
+    @Test
     @DisplayName("a float argument out of the float range is refused, not made infinite")
     void floatArgumentRange() {
         Map args = new LinkedHashMap();
@@ -257,6 +279,27 @@ class ApplicationRuntimeTest {
         assertThrows(IllegalArgumentException.class,
                 () -> com.codename1.backend.mcp.McpArgs.floatObject(args, "f", true));
         assertEquals(1.5f, com.codename1.backend.mcp.McpArgs.floatValue(args, "ok", true));
+    }
+
+    @Test
+    @DisplayName("a string argument refuses an array or object, and takes a scalar's text")
+    void stringArgumentRefusesStructures() {
+        Map args = new LinkedHashMap();
+        List list = new ArrayList();
+        list.add("42");
+        Map object = new LinkedHashMap();
+        object.put("id", "42");
+        args.put("list", list);
+        args.put("object", object);
+        args.put("number", Long.valueOf(42));
+        args.put("text", "42");
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.string(args, "list", true));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.mcp.McpArgs.string(args, "object", true));
+        assertEquals("42", com.codename1.backend.mcp.McpArgs.string(args, "number", true));
+        assertEquals("42", com.codename1.backend.mcp.McpArgs.string(args, "text", true));
+        assertNull(com.codename1.backend.mcp.McpArgs.string(args, "absent", false));
     }
 
     @Test
@@ -430,6 +473,34 @@ class ApplicationRuntimeTest {
         java.util.concurrent.ExecutionException err = assertThrows(
                 java.util.concurrent.ExecutionException.class, () -> bad.get(5, TimeUnit.SECONDS));
         assertTrue(err.getCause() instanceof IllegalStateException);
+        Tasks.shutdown(1000);
+    }
+
+    @Test
+    @DisplayName("the longest timed get waits instead of timing out at once")
+    void hugeTimeoutWaits() throws Exception {
+        assertEquals(Long.MAX_VALUE, AsyncTask.deadline(System.currentTimeMillis(),
+                TimeUnit.DAYS.toMillis(Long.MAX_VALUE)));
+        final CountDownLatch go = new CountDownLatch(1);
+        AsyncTask slow = new AsyncTask("slow", false) {
+            protected Object call() throws Exception {
+                go.await(5, TimeUnit.SECONDS);
+                return AsyncResult.of("done");
+            }
+        };
+        Tasks.platform(slow);
+        Thread opener = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+                go.countDown();
+            }
+        });
+        opener.start();
+        assertEquals("done", slow.get(Long.MAX_VALUE, TimeUnit.DAYS));
         Tasks.shutdown(1000);
     }
 
@@ -642,12 +713,8 @@ class ApplicationRuntimeTest {
             pair = pair.substring(0, pair.indexOf(';'));
             HttpURLConnection out = open(port, "/out");
             out.setRequestProperty("Cookie", pair);
-            try {
-                // An Error drops the connection rather than answering 500.
-                out.getResponseCode();
-            } catch (IOException dropped) {
-                // expected either way
-            }
+            // Answered 500, as Spring Boot's Tomcat answers a handler's Error.
+            assertEquals(500, out.getResponseCode());
             HttpURLConnection me = open(port, "/me");
             me.setRequestProperty("Cookie", pair);
             assertEquals("null", read(me), "the logout was lost when the handler threw an Error");
@@ -736,6 +803,50 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("one exporter given to a second server is refused without touching the first")
+    void sharedExporterSurvivesARefusedSecondServer() throws Exception {
+        ServerSocket probe = new ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        final com.codename1.backend.otel.OtlpMetricExporter exporter =
+                new com.codename1.backend.otel.OtlpMetricExporter("shared");
+        Properties first = new Properties();
+        first.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        first.setProperty(com.codename1.backend.otel.OtlpMetricExporter.ENDPOINT,
+                "http://127.0.0.1:" + closed + "/v1/metrics");
+        first.setProperty(com.codename1.backend.otel.OtlpMetricExporter.INTERVAL, "20");
+        final HttpServer.Handler none = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;
+            }
+        };
+        Backend running = Backend.builder(Config.of(first, "test")).quiet().metrics(exporter)
+                .handler(none).start();
+        try {
+            final Properties second = new Properties();
+            second.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            second.setProperty(com.codename1.backend.otel.OtlpMetricExporter.ENDPOINT,
+                    "http://127.0.0.1:9/elsewhere");
+            assertThrows(Exception.class, () -> Backend.builder(Config.of(second, "test"))
+                    .quiet().metrics(exporter).handler(none).start());
+            assertEquals("http://127.0.0.1:" + closed + "/v1/metrics",
+                    exporter.status().get("endpoint"),
+                    "the refused server reconfigured the running exporter");
+            // Still running: failures keep being counted against the first endpoint.
+            long before = ((Number) exporter.status().get("failures")).longValue();
+            long deadline = System.currentTimeMillis() + 5000;
+            while(System.currentTimeMillis() < deadline
+                    && ((Number) exporter.status().get("failures")).longValue() < before + 2) {
+                Thread.sleep(20);
+            }
+            assertTrue(((Number) exporter.status().get("failures")).longValue() >= before + 2,
+                    "the refused server stopped the running exporter");
+        } finally {
+            running.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a metric reader that declines to open is never shut down")
     void declinedMetricReaderIsNotStopped() throws Exception {
         int port = freePort();
@@ -761,6 +872,80 @@ class ApplicationRuntimeTest {
                 }).start();
         backend.stop();
         assertEquals(0, shutdowns.get(), "stop() shut down a reader that never opened");
+    }
+
+    @Test
+    @DisplayName("an AUTO executor is pinned to the kind a later caller asks for by name")
+    void autoExecutorIsPinnedByAnExplicitKind() {
+        Tasks.Registry mine = Tasks.open(null);
+        try {
+            TaskExecutor first = Tasks.executor(mine, "shared", Tasks.AUTO);
+            assertFalse(first.isVirtual());          // no virtual hosts on this runtime
+            TaskExecutor again = Tasks.executor(mine, "shared", Tasks.VIRTUAL);
+            assertTrue(again == first);
+            assertTrue(again.isVirtual(),
+                    "the explicit kind lost to the AUTO call that happened to come first");
+            // The explicit kind is now the executor's, so the other one conflicts.
+            assertThrows(IllegalStateException.class,
+                    () -> Tasks.executor(mine, "shared", Tasks.PLATFORM));
+        } finally {
+            Tasks.shutdown(mine, 0);
+        }
+    }
+
+    @Test
+    @DisplayName("the task queue gauge leaves out a server that does not measure")
+    void queueGaugeSkipsUnmeasuredServers() throws Exception {
+        Properties measuredSettings = new Properties();
+        measuredSettings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend measured = Backend.builder(Config.of(measuredSettings, "dev")).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        final CountDownLatch release = new CountDownLatch(1);
+        int port = freePort();
+        Properties quietSettings = new Properties();
+        quietSettings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        quietSettings.setProperty("cn1.task.executor.unmeasured.threads", "1");
+        // A development profile turns the management endpoints, and with them
+        // measuring, on by default.
+        quietSettings.setProperty(Management.ENABLED, "false");
+        Backend unmeasured = Backend.builder(Config.of(quietSettings, "test")).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        // On this server's thread, so on its executors: one task
+                        // holds the only thread and the next one waits.
+                        TaskExecutor e = Tasks.executor("unmeasured", Tasks.PLATFORM);
+                        Runnable wait = new Runnable() {
+                            public void run() {
+                                try {
+                                    release.await(10, TimeUnit.SECONDS);
+                                } catch (InterruptedException err) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                        };
+                        e.execute(wait);
+                        e.execute(wait);
+                        return HttpServer.Response.text(200, "queued");
+                    }
+                }).start();
+        try {
+            assertTrue(measured.isMeasured());
+            assertFalse(unmeasured.isMeasured());
+            assertEquals("queued", read(open(port, "/fill")));
+            com.codename1.backend.metrics.Instrument gauge = Metrics.get("cn1.task.queue_depth");
+            assertNotNull(gauge);
+            String points = String.valueOf(gauge.points());
+            assertFalse(points.contains("unmeasured"),
+                    "a server with metrics off reported its queue: " + points);
+        } finally {
+            release.countDown();
+            unmeasured.stop();
+            measured.stop();
+        }
     }
 
     @Test
@@ -2066,6 +2251,89 @@ class ApplicationRuntimeTest {
             assertTrue(answer.contains("reached") && answer.contains("\"isError\":false"),
                     answer);
         } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a retired session's beans are destroyed with their own server's executors")
+    void retiredSessionTeardownKeepsItsServer() throws Exception {
+        final TaskExecutor[] mine = new TaskExecutor[1];
+        final TaskExecutor[] atDestroy = new TaskExecutor[1];
+        final CountDownLatch holding = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request)
+                                    throws Exception {
+                                String t = request.getTarget();
+                                if (t.startsWith("/in")) {
+                                    request.getSession(true).scopedBeans(1)[0] = "cart";
+                                    return HttpServer.Response.text(200, "in");
+                                }
+                                if (t.startsWith("/hold")) {
+                                    request.getSession(false).scopedBeans(1);
+                                    mine[0] = Tasks.executor("probe", Tasks.PLATFORM);
+                                    holding.countDown();
+                                    release.await(10, TimeUnit.SECONDS);
+                                    return HttpServer.Response.text(200, "held");
+                                }
+                                request.getSession(false).invalidate();
+                                return HttpServer.Response.text(200, "out");
+                            }
+                        }};
+                    }
+
+                    public void sessionEnded(Object[] beans) {
+                        atDestroy[0] = Tasks.executor("probe", Tasks.PLATFORM);
+                    }
+                }).start();
+        // Newer, so it is what a thread with no server of its own falls back to.
+        Properties otherSettings = new Properties();
+        otherSettings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend other = Backend.builder(Config.of(otherSettings, "test")).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        try {
+            HttpURLConnection in = open(port, "/in");
+            assertEquals("in", read(in));
+            String cookie = in.getHeaderField("Set-Cookie");
+            final String pair = cookie.substring(0, cookie.indexOf(';'));
+            final int p = port;
+            final String[] held = new String[1];
+            Thread holder = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        HttpURLConnection h = open(p, "/hold");
+                        h.setRequestProperty("Cookie", pair);
+                        held[0] = read(h);
+                    } catch (IOException err) {
+                        held[0] = String.valueOf(err);
+                    }
+                }
+            });
+            holder.start();
+            assertTrue(holding.await(10, TimeUnit.SECONDS));
+            HttpURLConnection out = open(port, "/out");
+            out.setRequestProperty("Cookie", pair);
+            assertEquals("out", read(out));
+            release.countDown();
+            holder.join(10000);
+            assertEquals("held", held[0]);
+            assertNotNull(atDestroy[0], "the retired beans were never destroyed");
+            assertTrue(atDestroy[0] == mine[0],
+                    "a retired session's @PreDestroy ran with another server's executors");
+        } finally {
+            release.countDown();
+            other.stop();
             backend.stop();
         }
     }

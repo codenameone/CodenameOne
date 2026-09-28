@@ -885,14 +885,23 @@ public final class Backend {
                     // no-op: the beans are taken once.
                     endRequestBeans(request);
                 } finally {
-                    if (track) {
-                        CURRENT_REQUEST.set(previous);
+                    try {
+                        // FIRST, while this server's executors and tracer are
+                        // still the thread's: leaving may run the @PreDestroy of
+                        // a retired session's beans, and a destroy callback that
+                        // submits a task or starts a span belongs to this server
+                        // -- restored first, it went to the newest other server's
+                        // executors or tracer, or to the defaults.
+                        sessions.leave(request);
+                    } finally {
+                        if (track) {
+                            CURRENT_REQUEST.set(previous);
+                        }
+                        Tasks.leave(previousTasks);
+                        Tracing.disown(previousOwner);
+                        // Last: a stop() this request made tears down only now.
+                        inFlight.leave();
                     }
-                    Tasks.leave(previousTasks);
-                    Tracing.disown(previousOwner);
-                    sessions.leave(request);
-                    // Last: a stop() this request made tears down only now.
-                    inFlight.leave();
                 }
             }
         }
@@ -1715,13 +1724,15 @@ public final class Backend {
             // refusing its configuration, an application metric that collides
             // with a built-in one, a managed gauge whose Prometheus name clashes.
             boolean owned = false;
-            // Whether the reader may hold anything to stop. False only for a
-            // reader that ANSWERED false -- the contract's "nothing was
-            // started" -- so it is neither kept nor shut down: measuring can be
-            // true for the management endpoints alone, and keeping the reader
-            // on that had stop() shut down a reader that never opened. One whose
-            // open() threw is still shut down; it may have started part of it.
-            boolean readerOpen = metricReader != null;
+            // Whether the reader has anything to stop: only when open() answered
+            // true. False -- the contract's "nothing was started" -- is neither
+            // kept nor shut down: measuring can be true for the management
+            // endpoints alone, and keeping the reader on that had stop() shut
+            // down a reader that never opened. Nor one whose open() THREW, which
+            // starts nothing either: the likeliest reason is that the same
+            // reader is already exporting for another server, and shutting it
+            // down here stopped that server's exporter.
+            boolean readerOpen = false;
             try {
                 if (metricReader != null) {
                     readerOpen = metricReader.open(config);

@@ -178,6 +178,7 @@ public final class Metrics {
                 throw new IllegalArgumentException("Metric " + name
                         + " already exists as another kind");
             }
+            checkSameUnit(existing, unit);
             if (kind == Instrument.HISTOGRAM && !((Histogram) existing).sameShape(
                     new Histogram(name, description, unit, bounds, labels))) {
                 // Shared by name like every instrument, but only when the shape
@@ -200,6 +201,30 @@ public final class Metrics {
         claimPrometheusNames(name, kind);
         INSTRUMENTS.put(name, created);
         return created;
+    }
+
+    /// Names already warned about by [#checkSameUnit], so a registration made
+    /// on every call warns once.
+    private static final java.util.Set UNIT_WARNED = new java.util.HashSet();
+
+    /// Warns, once per name, when `existing` is registered again in another
+    /// unit. Not refused, as Spring Boot's Micrometer does not refuse it -- a
+    /// meter is its name and tags, and the first registration's unit wins --
+    /// and as the OpenTelemetry SDK only warns about a duplicate registration.
+    /// But not silent either: the two would add seconds to milliseconds in one
+    /// stream exported under the first unit. An empty unit is a lookup by name
+    /// and never conflicts.
+    private static void checkSameUnit(Instrument existing, String unit) {
+        if (existing == null || unit == null || unit.length() == 0
+                || existing.getUnit().equals(unit)) {
+            return;
+        }
+        if (UNIT_WARNED.add(existing.getName())) {
+            System.err.println("cn1: metric " + existing.getName() + " is registered again "
+                    + "with unit \"" + unit + "\", but it already exists with unit \""
+                    + existing.getUnit() + "\"; the values are combined and exported in the "
+                    + "first unit. Give one of them another name.");
+        }
     }
 
     /// Every instrument, in registration order.
@@ -235,6 +260,10 @@ public final class Metrics {
     public static synchronized void addSource(String name, String description, String unit,
                                               Gauge.Source source) {
         List sources = (List) SHARED.get(name);
+        if (sources != null) {
+            // Summed with the sources already there, so it must measure the same.
+            checkSameUnit((Instrument) INSTRUMENTS.get(name), unit);
+        }
         if (sources == null) {
             final List all = new ArrayList();
             sources = all;
@@ -395,7 +424,10 @@ public final class Metrics {
                         // "default" executor, and two points with one label set are one
                         // series twice -- duplicate samples a scrape rejects.
                         Map byName = new LinkedHashMap();
-                        List all = com.codename1.backend.Tasks.executors();
+                        // Only the servers that measure: one with metrics off keeps
+                        // its queues out of the others' telemetry, as its
+                        // requests and jobs are.
+                        List all = com.codename1.backend.Tasks.executorsOf(liveServers());
                         for (Object element : all) {
                             com.codename1.backend.TaskExecutor e =
                                     (com.codename1.backend.TaskExecutor) element;

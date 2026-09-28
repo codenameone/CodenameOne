@@ -76,20 +76,6 @@ public final class Sessions {
         this.application = application;
     }
 
-    /// The JDBC namespace of a server that sets no `cn1.session.namespace`: the
-    /// package of its application, which the build generates into the project's
-    /// own. Every replica and every redeploy of one project has the same, and two
-    /// projects sharing a database do not -- so neither accepts the other's
-    /// session cookie. Empty for a server with no generated application.
-    static String defaultNamespace(Backend.Application application) {
-        if (application == null) {
-            return "";
-        }
-        String name = application.getClass().getName();
-        int dot = name.lastIndexOf('.');
-        return dot < 0 ? "" : name.substring(0, dot);
-    }
-
     /// Reads `cn1.session.*` into a server's session settings. Called by the
     /// server when it starts; every server has its own, because cookies are not
     /// scoped by port and a client of two servers on one host would otherwise
@@ -156,8 +142,7 @@ public final class Sessions {
                 throw new IOException("cn1.session.store=jdbc needs a database, and this "
                         + "server has none");
             }
-            out.setStore(new Jdbc(pool, config.get("cn1.session.namespace",
-                    defaultNamespace(application))));
+            out.setStore(new Jdbc(pool, config.get("cn1.session.namespace", "")));
         } else if (!"memory".equalsIgnoreCase(kind)) {
             throw new IOException("cn1.session.store is \"" + kind
                     + "\"; it must be memory or jdbc");
@@ -854,10 +839,13 @@ public final class Sessions {
     /// instance of a server sees every session. Attributes are stored as JSON.
     ///
     /// Every row carries a namespace, and every query is limited to the store's
-    /// own: browsers do not scope cookies by port, so two different servers on
-    /// one host sharing a database would otherwise each accept the other's
-    /// session -- its sign-in included. Replicas of one server share a
-    /// namespace, and with it their sessions.
+    /// own. Empty unless `cn1.session.namespace` is set, so by default every
+    /// server using the database shares its sessions -- as Spring Session's JDBC
+    /// store shares one table. Browsers do not scope cookies by port, so two
+    /// DIFFERENT servers on one host sharing a database then accept each other's
+    /// session, sign-in included; giving each its own namespace keeps them apart,
+    /// the way Spring's table-name setting does, while replicas of one server
+    /// keep a shared one.
     public static final class Jdbc implements SessionStore {
         private static final String TABLE = "cn1_http_session";
         /// How stale the stored last-access time may get before a read refreshes it.

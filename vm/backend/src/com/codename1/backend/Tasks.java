@@ -192,7 +192,10 @@ public final class Tasks {
                             + "or set cn1.task.executor." + key + ".kind");
                 }
                 if (first != null && first.intValue() == AUTO && kind != AUTO) {
+                    // The explicit kind wins whichever call came first: the
+                    // executor stops choosing per task and runs this kind.
                     registry.requestedKinds.put(key, Integer.valueOf(kind));
+                    existing.pin(kind == VIRTUAL);
                 }
                 return existing;
             }
@@ -302,6 +305,28 @@ public final class Tasks {
             Registry r = (Registry) element;
             synchronized (r) {
                 out.addAll(r.executors.values());
+            }
+        }
+        return out;
+    }
+
+    /// The executors of the servers in `servers` only -- what a metric of
+    /// the measured servers reads. [#executors()] also answers for a server that
+    /// turned metrics off, whose queues would then appear in another server's
+    /// telemetry, the one built-in metric counting work from a server that opted
+    /// out.
+    public static List executorsOf(java.util.Collection servers) {
+        List registries;
+        synchronized (Tasks.class) {
+            registries = new ArrayList(LIVE);
+        }
+        List out = new ArrayList();
+        for (Object element : registries) {
+            Registry r = (Registry) element;
+            synchronized (r) {
+                if (r.server != null && servers.contains(r.server)) {
+                    out.addAll(r.executors.values());
+                }
             }
         }
         return out;

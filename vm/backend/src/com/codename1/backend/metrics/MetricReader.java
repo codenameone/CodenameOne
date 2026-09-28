@@ -32,7 +32,9 @@ import com.codename1.backend.Config;
 /// leaves the exporter out of the binary.
 public interface MetricReader {
     /// Reads the configuration and starts. Answers false when the deployment has
-    /// metrics turned off, in which case nothing is started.
+    /// metrics turned off, in which case nothing is started; one that throws
+    /// must leave nothing started either, and changes nothing it was already
+    /// doing -- the server does not shut down a reader whose open() failed.
     boolean open(Config config) throws IOException;
 
     /// Sends what is left and stops, waiting up to `timeoutMillis`.

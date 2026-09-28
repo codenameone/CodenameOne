@@ -77,6 +77,10 @@ public final class OtlpMetricExporter implements MetricReader {
 
     public OtlpMetricExporter(String defaultServiceName) {
         this.defaultServiceName = defaultServiceName;
+        // Set here, not left null until open(): open() compares every open
+        // exporter's, and one is only in OPEN after its own open() set them.
+        this.endpoint = "";
+        this.resource = new LinkedHashMap();
     }
 
     @Override
@@ -84,12 +88,17 @@ public final class OtlpMetricExporter implements MetricReader {
         if (config.getBoolean(OtlpTracer.DISABLED, false) || !config.getBoolean(ENABLED, true)) {
             return false;
         }
+        // Read into locals and applied only once accepted: this instance may
+        // already be exporting for another server, and a second open() that
+        // wrote its endpoint, headers and resource before being refused
+        // reconfigured the running exporter it was then refused for.
         String protocol = config.get(PROTOCOL, config.get(OtlpTracer.PROTOCOL,
                 "http/protobuf")).trim();
+        boolean asProtobuf;
         if ("http/protobuf".equals(protocol)) {
-            protobuf = true;
+            asProtobuf = true;
         } else if ("http/json".equals(protocol)) {
-            protobuf = false;
+            asProtobuf = false;
         } else {
             throw new IOException(PROTOCOL + " is '" + protocol + "'; this server exports "
                     + "OTLP over HTTP, so use http/protobuf or http/json");
@@ -100,17 +109,23 @@ public final class OtlpMetricExporter implements MetricReader {
                     config.get(OtlpTracer.ENDPOINT, "http://localhost:4318").trim(),
                     "/v1/metrics");
         }
-        endpoint = target.trim();
-        if (!OtlpTracer.hasHttpAuthority(endpoint)) {
+        String url = target.trim();
+        if (!OtlpTracer.hasHttpAuthority(url)) {
             throw new IOException("The metrics endpoint must be an http or https URL naming "
-                    + "a host and is '" + BatchExporter.redact(endpoint) + "'");
+                    + "a host and is '" + BatchExporter.redact(url) + "'");
         }
-        headers = new ArrayList();
+        List sent = new ArrayList();
         String own = config.get(HEADERS);
-        OtlpTracer.parseHeaders(own != null ? own : config.get(OtlpTracer.HEADERS), headers);
-        intervalMillis = OtlpTracer.positive(config, INTERVAL, 60000);
-        resource = OtlpTracer.resource(config, defaultServiceName);
+        OtlpTracer.parseHeaders(own != null ? own : config.get(OtlpTracer.HEADERS), sent);
+        int interval = OtlpTracer.positive(config, INTERVAL, 60000);
+        Map describedAs = OtlpTracer.resource(config, defaultServiceName);
         synchronized (OPEN) {
+            if (OPEN.contains(this)) {
+                // A second thread would export the same streams beside the first,
+                // and shutdown() tracks one run: the other would never stop.
+                throw new IOException("This metrics exporter is already open; give each "
+                        + "server its own, or open it once");
+            }
             // The instruments are the process's -- every server's requests, jobs
             // and gauges in one set -- so two exporters with different resources
             // would each send the SAME numbers under their own service name, or
@@ -125,16 +140,14 @@ public final class OtlpMetricExporter implements MetricReader {
             // the order the headers are listed in means nothing.
             for (Object element : OPEN) {
                 OtlpMetricExporter other = (OtlpMetricExporter) element;
-                if (other != this && (!other.resource.equals(resource) //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
-                        || !other.endpoint.equals(endpoint))) {
+                if (!other.resource.equals(describedAs) || !other.endpoint.equals(url)) {
                     throw new IOException("Another server in this process already exports "
                             + "metrics as a different service or to a different collector. "
                             + "Metrics are per process, so they would be reported twice "
                             + "under two names; give both servers the same OpenTelemetry "
                             + "service and endpoint, or set " + ENABLED + "=false on one.");
                 }
-                if (other != this && (other.protobuf != protobuf //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
-                        || !sameHeaders(other.headers, headers))) {
+                if (other.protobuf != asProtobuf || !sameHeaders(other.headers, sent)) {
                     // The values are never printed: they are usually credentials.
                     throw new IOException("Another server in this process already exports "
                             + "metrics to this collector with different " + HEADERS + " or "
@@ -144,12 +157,11 @@ public final class OtlpMetricExporter implements MetricReader {
                             + ENABLED + "=false on one.");
                 }
             }
-            if (OPEN.contains(this)) {
-                // A second thread would export the same streams beside the first,
-                // and shutdown() tracks one run: the other would never stop.
-                throw new IOException("This metrics exporter is already open; give each "
-                        + "server its own, or open it once");
-            }
+            protobuf = asProtobuf;
+            endpoint = url;
+            headers = sent;
+            intervalMillis = interval;
+            resource = describedAs;
             OPEN.add(this);
             if (OPEN.size() > 1) {
                 // The same identity as the one already exporting: sending the
