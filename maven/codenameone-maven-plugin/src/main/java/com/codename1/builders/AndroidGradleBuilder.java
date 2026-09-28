@@ -11625,18 +11625,21 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
-     * Why a google-services plugin pinned in android.topDependency cannot run on AGP 9, or
-     * null when it can (or when there is no readable pin).
+     * The version text of a Gradle declaration: what follows "group:artifact:" up to the
+     * closing quote. Ranges keep their brackets, parentheses and commas.
      *
-     * <p>The builder adds its own google-services classpath only when none is present, so a
-     * pin a project or cn1lib wrote -- 4.3.15 was the builder's own default until Gradle 9 --
-     * would be applied as it is and fail on AGP 9's removed applicationVariants API, minutes
-     * into the build, with nothing naming the hint. Measured: 4.3.15 fails, 4.4.0 and 4.5.0
-     * apply.</p>
-     *
-     * @param topDependency the android.topDependency value
-     * @return the refusal message, or null
+     * @param afterCoordinate the text following "group:artifact:" in a Gradle declaration
+     * @return the version text, trimmed
      */
+    static String versionToken(String afterCoordinate) {
+        int end = 0;
+        while (end < afterCoordinate.length()
+                && "'\"\r\n;".indexOf(afterCoordinate.charAt(end)) < 0) {
+            end++;
+        }
+        return afterCoordinate.substring(0, end).trim();
+    }
+
     /**
      * The numeric part of a dependency version that names one fixed release, or null when the
      * version is resolved by Gradle rather than written down.
@@ -11645,49 +11648,139 @@ public class AndroidGradleBuilder extends Executor {
      * @return the numeric release, or null for a variable, a dynamic selector or a range
      */
     static String fixedVersionOrNull(String afterCoordinate) {
-        int end = 0;
-        while (end < afterCoordinate.length()
-                && "'\") \t\r\n;".indexOf(afterCoordinate.charAt(end)) < 0) {
-            end++;
-        }
-        String token = afterCoordinate.substring(0, end);
+        String token = versionToken(afterCoordinate);
         if (token.length() == 0 || token.startsWith("latest")
                 || token.indexOf('+') >= 0 || token.indexOf('$') >= 0
-                || token.indexOf('[') >= 0 || token.indexOf('(') >= 0 || token.indexOf(',') >= 0) {
+                || token.indexOf('[') >= 0 || token.indexOf(']') >= 0
+                || token.indexOf('(') >= 0 || token.indexOf(',') >= 0) {
             return null;
         }
         return HealthManifestFragments.numericVersionPrefix(token);
     }
 
+    /** What a google-services version selector says about AGP 9's floor. */
+    enum GoogleServicesBound {
+        /** Every release it can resolve to is below the floor. */
+        BELOW_FLOOR,
+        /** It can resolve to a release at or above the floor. */
+        CAN_REACH_FLOOR,
+        /** The text does not say (a Gradle variable, latest.release). */
+        UNKNOWN
+    }
+
+    /**
+     * Whether every release a google-services version can resolve to is below
+     * {@link #GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION}.
+     *
+     * <p>BELOW_FLOOR for a fixed release below it, a prefix selector confined below it (4.3.+, 3.+)
+     * and a range whose upper bound excludes it ([4.0,4.4), [4.0,4.3]). FALSE when the version
+     * can reach the floor: 4.+ and a bare + resolve to the newest release they match, and a
+     * range with a higher or open upper bound resolves to the newest one inside it. Null when
+     * the text says nothing about the version at all -- a Gradle variable, latest.release.</p>
+     *
+     * @param token the version text, as {@link #versionToken} returns it
+     * @return which of the three it is
+     */
+    static GoogleServicesBound googleServicesBelowAgp9Floor(String token) {
+        String floor = GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION;
+        if (token.length() == 0 || token.startsWith("latest") || token.indexOf('$') >= 0) {
+            return GoogleServicesBound.UNKNOWN;
+        }
+        if (token.endsWith("+")) {
+            String prefix = token.substring(0, token.length() - 1);
+            if (prefix.endsWith(".")) {
+                prefix = prefix.substring(0, prefix.length() - 1);
+            }
+            if (prefix.length() == 0) {
+                return GoogleServicesBound.CAN_REACH_FLOOR;
+            }
+            if (!prefix.matches("[0-9]+(\\.[0-9]+)*")) {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            // Compared on the prefix's own length: 4.3.+ is 4.3.x, below 4.4; 4.+ is 4.x,
+            // which is not below 4.
+            String[] floorParts = floor.split("\\.");
+            int components = prefix.split("\\.").length;
+            StringBuilder floorPrefix = new StringBuilder();
+            for (int i = 0; i < components; i++) {
+                if (i > 0) {
+                    floorPrefix.append('.');
+                }
+                floorPrefix.append(i < floorParts.length ? floorParts[i] : "0");
+            }
+            return (compareVersions(prefix, floorPrefix.toString()) < 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+        }
+        char first = token.charAt(0);
+        if (first == '[' || first == '(' || first == ']') {
+            char last = token.charAt(token.length() - 1);
+            if (last != ']' && last != ')' && last != '[') {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            String inner = token.substring(1, token.length() - 1);
+            int comma = inner.indexOf(',');
+            String upper = (comma < 0 ? inner : inner.substring(comma + 1)).trim();
+            if (upper.length() == 0) {
+                return GoogleServicesBound.CAN_REACH_FLOOR;
+            }
+            if (!upper.matches("[0-9]+(\\.[0-9]+)*")) {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            int c = compareVersions(padGradleVersion(upper), floor);
+            // ] includes the bound; ) and [ exclude it.
+            return (last == ']' ? c < 0 : c <= 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+        }
+        String fixed = HealthManifestFragments.numericVersionPrefix(token);
+        if (fixed == null) {
+            return GoogleServicesBound.UNKNOWN;
+        }
+        return (compareVersions(padGradleVersion(fixed), floor) < 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+    }
+
+    /**
+     * Why a google-services plugin pinned in android.topDependency cannot run on AGP 9, or
+     * null when it can (or when that cannot be told from the text).
+     *
+     * <p>The builder adds its own google-services classpath only when none is present, so a
+     * pin a project or cn1lib wrote -- 4.3.15 was the builder's own default until Gradle 9 --
+     * would be applied as it is and fail on AGP 9's removed applicationVariants API, minutes
+     * into the build, with nothing naming the hint. Measured: 4.3.15 fails, 4.4.0 and 4.5.0
+     * apply.</p>
+     *
+     * <p>Every declaration counts, not the first: merged hint values carry one per contributor
+     * (a cn1lib's 4.3.15 beside the project's 4.5.0), and Gradle resolves duplicate buildscript
+     * modules to the highest -- that build uses 4.5.0 and works. So it is refused only when
+     * EVERY declaration is confined below the floor, fixed or dynamic (4.3.+, [4.0,4.4)); one
+     * that can reach it (4.+) lets Gradle resolve past the rest, and one whose version cannot
+     * be read (a variable) leaves nothing to refuse on but a guess.</p>
+     *
+     * @param topDependency the android.topDependency value
+     * @return the refusal message, or null
+     */
     static String agp9GoogleServicesRefusal(String topDependency) {
-        // Every declaration, not the first: merged hint values carry one per contributor (a
-        // cn1lib's 4.3.15 beside the project's 4.5.0), and Gradle resolves duplicate
-        // buildscript modules to the highest -- that build uses 4.5.0 and works. One
-        // declaration whose effective version is not written down -- a Gradle variable, or a
-        // dynamic selector such as 4.+, a range, latest.release -- makes the resolved version
-        // unknowable here, and nothing is refused on a guess. (4.+ used to read as its numeric
-        // prefix 4, i.e. 4.0.0, and refuse a selector that resolves to the newest 4.x.)
         String marker = "com.google.gms:google-services:";
-        String declared = null;
+        StringBuilder declared = new StringBuilder();
         int at = topDependency == null ? -1 : topDependency.indexOf(marker);
         while (at >= 0) {
-            String version = fixedVersionOrNull(topDependency.substring(at + marker.length()));
-            if (version == null) {
+            String token = versionToken(topDependency.substring(at + marker.length()));
+            if (googleServicesBelowAgp9Floor(token) != GoogleServicesBound.BELOW_FLOOR) {
                 return null;
             }
-            if (declared == null || compareVersions(padGradleVersion(version),
-                    padGradleVersion(declared)) > 0) {
-                declared = version;
+            if (declared.length() > 0) {
+                declared.append(", ");
             }
+            declared.append(token);
             at = topDependency.indexOf(marker, at + marker.length());
         }
-        if (declared == null
-                || compareVersions(padGradleVersion(declared), GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION) >= 0) {
+        if (declared.length() == 0) {
             return null;
         }
-        return "android.topDependency pins com.google.gms:google-services:" + declared + ", which"
-                + " Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " cannot apply (it"
-                + " reads the variant API that plugin removed). Raise it to "
+        return "android.topDependency pins com.google.gms:google-services to " + declared
+                + ", which can only resolve below " + GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION
+                + ". Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " cannot apply"
+                + " those (they read the variant API that plugin removed). Raise it to "
                 + GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION + ", or drop it and the build adds that"
                 + " version itself.";
     }

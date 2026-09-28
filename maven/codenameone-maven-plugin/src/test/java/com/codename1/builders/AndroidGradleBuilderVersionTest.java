@@ -145,6 +145,33 @@ class AndroidGradleBuilderVersionTest {
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
                 "classpath 'com.google.gms:google-services:4.3.15'\n"
                 + "classpath 'com.google.gms:google-services:4.+'"));
+        // ...but a selector confined below the floor is as incompatible as a fixed pin, and
+        // it still stops the builder adding 4.5.0 itself, so it is refused.
+        String prefix = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.+'");
+        assertTrue(prefix != null && prefix.contains("4.3.+"), String.valueOf(prefix));
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:3.+'") != null);
+        String range = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,4.4)'");
+        assertTrue(range != null && range.contains("[4.0,4.4)"), String.valueOf(range));
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0, 4.3.15]'") != null);
+        // A bound that admits the floor, or no upper bound, can resolve to a working release.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,4.4]'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,)'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:+'"));
+        // Two confined declarations are refused together; one open one lets Gradle past both.
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.3.+'") != null);
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.CAN_REACH_FLOOR, AndroidGradleBuilder.googleServicesBelowAgp9Floor("4.+"));
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.BELOW_FLOOR, AndroidGradleBuilder.googleServicesBelowAgp9Floor("4.3.+"));
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.UNKNOWN,
+                AndroidGradleBuilder.googleServicesBelowAgp9Floor("latest.release"));
         assertEquals("4.3.15", AndroidGradleBuilder.fixedVersionOrNull("4.3.15'\n"));
         assertEquals("4.4.0", AndroidGradleBuilder.fixedVersionOrNull("4.4.0-alpha01\")"));
     }
