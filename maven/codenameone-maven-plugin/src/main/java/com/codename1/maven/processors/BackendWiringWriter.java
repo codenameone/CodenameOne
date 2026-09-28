@@ -460,7 +460,8 @@ final class BackendWiringWriter {
         }
         if (p.choice || (p.candidates.size() == 1 && p.candidates.get(0).isConditional())) {
             StringBuilder sb = new StringBuilder("(").append(type)
-                    .append(") com.codename1.backend.Wiring.single(new Object[] {");
+                    .append(") com.codename1.backend.Wiring.")
+                    .append(p.preferFirst ? "preferred" : "single").append("(new Object[] {");
             for (int i = 0; i < p.candidates.size(); i++) {
                 if (i > 0) {
                     sb.append(", ");

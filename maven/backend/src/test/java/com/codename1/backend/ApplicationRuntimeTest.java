@@ -2479,6 +2479,24 @@ class ApplicationRuntimeTest {
         }
     }
 
+    @Test
+    @DisplayName("label values that export alike are one series; reserved and empty keys are refused")
+    void labelValuesAndKeysAreChecked() {
+        Histogram h = Metrics.histogram("test.canonical.labels", "", "ms", null,
+                new String[] {"code", null, null});
+        h.record(1, Integer.valueOf(200), null, null);
+        h.record(2, Long.valueOf(200), null, null);
+        assertEquals(1, h.points().size(), "an Integer and a Long label made two series");
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram(
+                "test.reserved.label", "", "ms", null,
+                new String[] {"otel.metric.overflow", null, null}));
+        assertThrows(IllegalArgumentException.class, () -> Metrics.histogram(
+                "test.reserved.folded", "", "ms", null,
+                new String[] {"otel_metric_overflow", null, null}));
+        assertThrows(IllegalArgumentException.class,
+                () -> com.codename1.backend.metrics.Gauge.point("", "x", 1));
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

@@ -146,6 +146,9 @@ final class BackendBeans {
         boolean list;
         /// Whether several conditional candidates are chosen between at start-up.
         boolean choice;
+        /// The first candidate is a CONDITIONAL @Primary: used when it exists, the
+        /// others considered only when its condition leaves it out.
+        boolean preferFirst;
 
         Point(String where, Type type, String genericType) {
             this.where = where;
@@ -856,6 +859,19 @@ final class BackendBeans {
         bean.initMethod = emptyToNull(values.getString("initMethod"));
         bean.destroyMethod = emptyToNull(values.getString("destroyMethod"));
         readModifiers(bean, m.getAnnotations(), cls);
+        boolean scopedOwner = REQUEST.equals(owner.scope) || SESSION.equals(owner.scope);
+        if (!m.isStatic() && scopedOwner && !REQUEST.equals(bean.scope)
+                && !SESSION.equals(bean.scope)) {
+            // The factory is called through the owner, which is a request- or
+            // session-scoped stand-in -- and a bean that is not scoped itself is
+            // built at start-up, when there is no request or session to find the
+            // owner in. The server would refuse to start.
+            ctx.error(cls, "@Bean method " + where + " builds a " + bean.scope + " bean, but "
+                    + "its configuration " + owner.describe() + " is " + owner.scope
+                    + "-scoped, so there is no instance to call it on when the bean is built. "
+                    + "Make the method static, or give the bean the configuration's scope.");
+            return null;
+        }
         // A factory bean exists only when its configuration class does, as in
         // Spring: otherwise a @Profile("prod") configuration's @Bean would be
         // built on every profile -- through a null owner if the method is not
@@ -1730,7 +1746,32 @@ final class BackendBeans {
                     primaries.add(b);
                 }
             }
-            if (primaries.size() == 1) {
+            if (primaries.size() == 1 && primaries.get(0).isConditional()) {
+                // A conditional @Primary may not exist at run time -- a prod-only
+                // primary on a dev profile -- and then the others are the answer.
+                // Discarding them here made that profile fail to start.
+                Bean primary = primaries.get(0);
+                List<Bean> ordered = new ArrayList<Bean>();
+                ordered.add(primary);
+                int unconditional = 0;
+                for (Bean b : matches) {
+                    if (b != primary) {
+                        ordered.add(b);
+                        if (!b.isConditional()) {
+                            unconditional++;
+                        }
+                    }
+                }
+                if (unconditional > 1) {
+                    ctx.error(where, p.where + " could receive any of " + names(ordered)
+                            + " whenever the @Primary " + primary.describe() + " is not "
+                            + "active. Mark the rest conditional, or name one with @Qualifier.");
+                    return;
+                }
+                matches = ordered;
+                p.choice = true;
+                p.preferFirst = true;
+            } else if (primaries.size() == 1) {
                 matches = primaries;
             } else if (primaries.size() > 1) {
                 ctx.error(where, p.where + " could receive any of " + names(primaries)

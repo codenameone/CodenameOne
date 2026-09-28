@@ -93,6 +93,13 @@ public final class Histogram extends Instrument {
             // "le" every bucket sample carries. Two that fold alike, or one that
             // IS le, repeat a label name in a sample, and the scrape is rejected.
             String folded = Metrics.promLabel(this.labels[iter]);
+            if ("otel.metric.overflow".equals(this.labels[iter])
+                    || OVERFLOW_LABEL.equals(folded)) {
+                // Reserved: the overflow series carries it, and a real series with
+                // the same key and value true would export as that one's twin.
+                throw new IllegalArgumentException("Histogram " + name + ": label key "
+                        + this.labels[iter] + " is reserved for the overflow series");
+            }
             if ("le".equals(folded) || !exported.add(folded)) {
                 throw new IllegalArgumentException("Histogram " + name + ": label key "
                         + this.labels[iter] + " is exported to Prometheus as " + folded
@@ -128,9 +135,9 @@ public final class Histogram extends Instrument {
         // must not tell series apart either: one key recorded with two different
         // second values made two series exported as one label set -- duplicate
         // samples a scrape rejects.
-        Object a = labels.length > 0 && labels[0] != null ? first : null;
-        Object b = labels.length > 1 && labels[1] != null ? second : null;
-        Object c = labels.length > 2 && labels[2] != null ? third : null;
+        Object a = labels.length > 0 && labels[0] != null ? canonical(first) : null;
+        Object b = labels.length > 1 && labels[1] != null ? canonical(second) : null;
+        Object c = labels.length > 2 && labels[2] != null ? canonical(third) : null;
         if (a == null && b == null && c == null) {
             // No label values at all is the unlabelled series: a second series
             // with the same empty attribute set exports duplicate samples.
@@ -171,6 +178,24 @@ public final class Histogram extends Instrument {
         list.add(created);
         seriesCount++;
         return created;
+    }
+
+    /// A label value in the one form it is exported in: an Integer 1 and a Long
+    /// 1 are the same attribute to a collector and the same label to Prometheus,
+    /// so they must be one series here too, or the export carries duplicates.
+    /// The overflow attribute's key as Prometheus writes it.
+    /// A literal rather than promLabel(...): computed in a static initializer it
+    /// would start Metrics' class initialization from Histogram's.
+    private static final String OVERFLOW_LABEL = "otel_metric_overflow";
+
+    private static Object canonical(Object v) {
+        if (v instanceof Integer || v instanceof Short || v instanceof Byte) {
+            return Long.valueOf(((Number) v).longValue());
+        }
+        if (v instanceof Float) {
+            return Double.valueOf(((Float) v).doubleValue());
+        }
+        return v;
     }
 
     private static boolean same(Object a, Object b) {

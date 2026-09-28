@@ -57,6 +57,11 @@ public final class Gauge extends Instrument {
 
     /// One labelled value, for a [MultiSource].
     public static java.util.Map point(String key, Object label, double value) {
+        if (key == null || key.length() == 0) {
+            // As a histogram refuses one: rendered as {="value"}, an empty name
+            // makes the whole exposition invalid, not just this gauge.
+            throw new IllegalArgumentException("A gauge point needs a label key");
+        }
         java.util.Map attributes = new java.util.LinkedHashMap();
         attributes.put(key, label);
         return Instrument.point(attributes, value);

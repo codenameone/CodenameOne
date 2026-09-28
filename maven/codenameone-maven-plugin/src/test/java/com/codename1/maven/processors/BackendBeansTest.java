@@ -1260,6 +1260,50 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aScopedConfigurationCannotBuildASingleton() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.PerRequest", PKG + "@Configuration @RequestScope public class PerRequest {\n"
+                + "    @Bean public StringBuilder buffer() { return new StringBuilder(); }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@Bean method com.example.PerRequest.buffer builds a "
+                + "singleton bean"));
+        s.put("com.example.PerRequest", PKG + "@Configuration @RequestScope public class PerRequest {\n"
+                + "    @Bean public static StringBuilder buffer() { return new StringBuilder(); }\n"
+                + "}\n");
+        assertNoErrors(process(compile(s)));
+    }
+
+    @Test
+    public void aConditionalPrimaryFallsBackToTheActiveAlternative() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Greeter", PKG + "public interface Greeter { String greet(); }\n");
+        s.put("com.example.ProdGreeter", PKG + "@Component @Primary @Profile(\"prod\") "
+                + "public class ProdGreeter implements Greeter {\n"
+                + "    public String greet() { return \"prod\"; }\n"
+                + "}\n");
+        s.put("com.example.DevGreeter", PKG + "@Component @Profile(\"dev\") "
+                + "public class DevGreeter implements Greeter {\n"
+                + "    public String greet() { return \"dev\"; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    private final Greeter greeter;\n"
+                + "    public Api(Greeter greeter) { this.greeter = greeter; }\n"
+                + "    @GetMapping(\"/who\") public String who() { return greeter.greet(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());   // the dev profile
+        try {
+            String answer = http("GET", port, "/who");
+            assertTrue(answer, answer.contains("dev"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     public void aPrototypeControllerIsBuiltOnce() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Api", PKG + "@RestController @Scope(\"prototype\") public class Api {\n"

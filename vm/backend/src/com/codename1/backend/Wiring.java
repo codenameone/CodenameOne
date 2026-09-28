@@ -150,6 +150,17 @@ public final class Wiring {
         return bean;
     }
 
+    /// The first of `candidates` -- a conditional @Primary -- when it exists,
+    /// otherwise the one of the rest that does, as [#single] picks it.
+    public static Object preferred(Object[] candidates, boolean required, String what) {
+        if (candidates.length > 0 && candidates[0] != null) {
+            return candidates[0];
+        }
+        Object[] rest = new Object[Math.max(0, candidates.length - 1)];
+        System.arraycopy(candidates, 1, rest, 0, rest.length);
+        return single(rest, required, what);
+    }
+
     /// The one bean of `candidates` that exists, when all of them are
     /// conditional. More than one existing is ambiguous; none is a missing
     /// dependency when `required`.
