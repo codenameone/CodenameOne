@@ -320,6 +320,9 @@ final class BackendBeans {
     final List<Bean> beans = new ArrayList<Bean>();
     final Map<String, Bean> byName = new LinkedHashMap<String, Bean>();
     final Map<String, Aspects> aspects = new TreeMap<String, Aspects>();
+    /// Metric name -> "histogram" or "counter", with where it was declared, for
+    /// the @Timed and @Counted instruments the woven code registers.
+    private final Map<String, String[]> aspectMetrics = new LinkedHashMap<String, String[]>();
     final Map<String, BackendWeaver.Plan> plans = new TreeMap<String, BackendWeaver.Plan>();
     /// Eager singletons (and the prototypes they need) in construction order.
     final List<Bean> order = new ArrayList<Bean>();
@@ -951,7 +954,12 @@ final class BackendBeans {
             prefix = prefix.substring(0, prefix.length() - 1);
         }
         bean.propertiesPrefix = prefix;
-        Set<String> seen = new LinkedHashSet<String>();
+        // ONE setter per property, as Spring Boot's binder picks one: the
+        // overload whose parameter is the getter's type, otherwise the first
+        // found (the subclass's before its base's). Every overload used to bind
+        // from the same key, one after the other, and the last to run decided.
+        Map<String, MethodInfo> byProperty = new LinkedHashMap<String, MethodInfo>();
+        Set<String> overridden = new HashSet<String>();
         AnnotatedClass c = bean.cls;
         while (c != null) {
             for (MethodInfo m : c.getMethods()) {
@@ -963,8 +971,13 @@ final class BackendBeans {
                 if (args.length != 1 || !bindable(args[0])) {
                     continue;
                 }
-                if (seen.add(m.getName() + m.getDescriptor())) {
-                    bean.propertySetters.add(m);
+                if (!overridden.add(m.getName() + m.getDescriptor())) {
+                    continue;                      // overridden below: already seen
+                }
+                MethodInfo current = byProperty.get(m.getName());
+                if (current == null || (!matchesGetter(bean.cls, current)
+                        && matchesGetter(bean.cls, m))) {
+                    byProperty.put(m.getName(), m);
                 }
             }
             // Setters a library base class declares bind as well.
@@ -972,11 +985,35 @@ final class BackendBeans {
             c = parent == null || "java/lang/Object".equals(parent) ? null
                     : RestControllerAnnotationProcessor.resolveClass(ctx, parent);
         }
+        bean.propertySetters.addAll(byProperty.values());
         if (bean.propertySetters.isEmpty()) {
             ctx.error(where, "@ConfigurationProperties(\"" + prefix + "\") on " + bean.name
                     + " binds nothing: " + bean.type.replace('/', '.') + " has no public "
                     + "setter taking a String, a number, a boolean or an enum.");
         }
+    }
+
+    /// Whether `setter`'s parameter is the type its property's getter returns,
+    /// looking through `cls`'s superclasses.
+    private boolean matchesGetter(AnnotatedClass cls, MethodInfo setter) {
+        String property = setter.getName().substring(3);
+        Type arg = Type.getArgumentTypes(setter.getDescriptor())[0];
+        AnnotatedClass c = cls;
+        for (int depth = 0; c != null && depth < 64; depth++) {
+            for (MethodInfo m : c.getMethods()) {
+                if (m.isStatic() || Type.getArgumentTypes(m.getDescriptor()).length != 0) {
+                    continue;
+                }
+                if (("get" + property).equals(m.getName())
+                        || ("is" + property).equals(m.getName())) {
+                    return Type.getReturnType(m.getDescriptor()).equals(arg);
+                }
+            }
+            String parent = c.getSuperInternalName();
+            c = parent == null || "java/lang/Object".equals(parent) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, parent);
+        }
+        return false;
     }
 
     /// Whether a configuration value can be converted to this type.
@@ -2122,6 +2159,41 @@ final class BackendBeans {
         }
     }
 
+    /// Claims the instruments `m`'s @Timed and @Counted register -- named as
+    /// BackendSources names them -- and refuses a name used for both kinds. At
+    /// run time the second registration throws, and it happens in the woven
+    /// finally, AFTER the body ran: a call whose work succeeded would be reported
+    /// as failed, and possibly retried. Metrics are the process's, so a clash
+    /// between two methods counts as much as one within a method.
+    private void claimAspectMetrics(AnnotatedClass cls, MethodInfo m, AnnotationValues timed,
+                                    AnnotationValues counted, String where) {
+        String base = cls.getBinaryName() + "." + m.getName();
+        if (timed != null) {
+            String name = timed.getStringOrDefault("value", "");
+            claimAspectMetric(cls, name.length() > 0 ? name : base + ".duration", "histogram",
+                    "@Timed on " + where);
+        }
+        if (counted != null) {
+            String name = counted.getStringOrDefault("value", "");
+            String calls = name.length() > 0 ? name : base + ".calls";
+            claimAspectMetric(cls, calls, "counter", "@Counted on " + where);
+            claimAspectMetric(cls, calls + ".failures", "counter", "@Counted on " + where);
+        }
+    }
+
+    private void claimAspectMetric(AnnotatedClass cls, String name, String kind, String by) {
+        String[] earlier = aspectMetrics.get(name);
+        if (earlier == null) {
+            aspectMetrics.put(name, new String[] {kind, by});
+            return;
+        }
+        if (!earlier[0].equals(kind)) {
+            ctx.error(cls, "Metric " + name + " is a " + kind + " for " + by + " and a "
+                    + earlier[0] + " for " + earlier[1] + ". One name cannot be both: give "
+                    + "one of them another name.");
+        }
+    }
+
     private void collectAspects() {
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
             if (!concerns(cls) || cls.isInterface()) {
@@ -2182,6 +2254,7 @@ final class BackendBeans {
                 a.async = async;
                 a.timed = timed;
                 a.counted = counted;
+                claimAspectMetrics(cls, m, timed, counted, where);
                 if (async != null) {
                     String pkg = RestClientAnnotationProcessor.packageOf(cls.getBinaryName());
                     a.asyncTaskBinary = qualify(pkg, baseName(cls.getInternalName())

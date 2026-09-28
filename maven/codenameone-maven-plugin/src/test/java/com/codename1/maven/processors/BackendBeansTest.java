@@ -740,6 +740,96 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void oneMetricNameForTwoKindsIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Work", PKG + "@Component public class Work {\n"
+                + "    @Timed(\"work\") @Counted(\"work\") public void both() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Metric work is a counter for @Counted on "
+                + "com.example.Work.both and a histogram for @Timed on com.example.Work.both"));
+        // Across two methods too: the instruments are the process's.
+        s.put("com.example.Work", PKG + "@Component public class Work {\n"
+                + "    @Timed(\"jobs\") public void a() { }\n"
+                + "    @Counted(\"jobs\") public void b() { }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Metric jobs is a"));
+        s.put("com.example.Work", PKG + "@Component public class Work {\n"
+                + "    @Timed(\"jobs.time\") @Counted(\"jobs\") public void a() { }\n"
+                + "    @Counted(\"jobs\") public void b() { }\n"
+                + "}\n");
+        assertNoErrors(process(compile(s)));
+    }
+
+    @Test
+    public void anOverloadedPropertySetterBindsOnce() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Timeouts", PKG + "@Component @ConfigurationProperties(\"t\")\n"
+                + "public class Timeouts {\n"
+                + "    public String calls = \"\";\n"
+                + "    private int timeout;\n"
+                + "    public void setTimeout(String v) { calls += \"string:\" + v + \",\"; }\n"
+                + "    public void setTimeout(int v) { timeout = v; calls += \"int:\" + v + \",\"; }\n"
+                + "    public int getTimeout() { return timeout; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @Autowired private Timeouts timeouts;\n"
+                + "    @GetMapping(\"/x\") public String x() { return timeouts.calls; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty("t.timeout", "5");
+        Backend backend = start(classes, port, settings);
+        try {
+            assertEquals("each overload bound the same key", "int:5,", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void anInactiveControllerIsNotListed() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        s.put("com.example.Admin", PKG + "@RestController @ConditionalOnProperty(\"admin.on\")\n"
+                + "public class Admin {\n"
+                + "    @GetMapping(\"/admin\") public String admin() { return \"admin\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Backend.Application app = (Backend.Application) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties off = new Properties();
+        off.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(off, "dev")).quiet().application(app).start();
+        try {
+            String listed = String.valueOf(app.describeRoutes());
+            assertTrue(listed, listed.contains("/x"));
+            assertFalse("an inactive controller's route was listed: " + listed,
+                    listed.contains("/admin"));
+        } finally {
+            backend.stop();
+        }
+        Properties on = new Properties();
+        on.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        on.setProperty("admin.on", "true");
+        backend = Backend.builder(Config.of(on, "dev")).quiet().application(app).start();
+        try {
+            assertTrue(String.valueOf(app.describeRoutes()).contains("/admin"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     public void anInactiveOptionalDependencyKeepsTheInitializer() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Feature", PKG + "public class Feature {\n"

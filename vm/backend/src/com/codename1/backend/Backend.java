@@ -695,6 +695,19 @@ public final class Backend {
                 unbind(previous);
             }
         }
+
+        /// Forwarded like every callback: left to the interface default, the
+        /// wrapper answered null, the handshake sent no Sec-WebSocket-Protocol,
+        /// and a client asking for the endpoint's protocol could not get it.
+        @Override
+        public String[] getSubprotocols() {
+            Object[] previous = bind();
+            try {
+                return endpoint.getSubprotocols();
+            } finally {
+                unbind(previous);
+            }
+        }
     }
 
     /// The handler a Backend puts in front of the server's handlers: it sets up

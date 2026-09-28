@@ -2575,13 +2575,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     qualify(c.packageName, c.routerSimpleName)));
             for (Route r : c.routes) {
                 routes.add(new String[] {r.httpMethod, r.pattern,
-                        c.binaryName + "." + r.javaMethod});
+                        c.binaryName + "." + r.javaMethod, c.binaryName});
             }
         }
         Map<String, String> sockets = new LinkedHashMap<String, String>();
         for (WebSocketEndpoint e : webSockets.values()) {
             sockets.put(e.path, e.binaryName);
-            routes.add(new String[] {"WEBSOCKET", e.path, e.binaryName});
+            routes.add(new String[] {"WEBSOCKET", e.path, e.binaryName, e.binaryName});
         }
         return new BackendWiringWriter(beans).write(packageName, routers, sockets, routes);
     }

@@ -73,6 +73,8 @@ public final class OtlpMetricExporter implements MetricReader {
     private static final List OPEN = new ArrayList();
     private long exports;
     private long failures;
+    /// Data points collectors reported rejecting in a partial success.
+    private long rejectedDataPoints;
     private String lastError;
 
     public OtlpMetricExporter(String defaultServiceName) {
@@ -173,6 +175,30 @@ public final class OtlpMetricExporter implements MetricReader {
         }
         startExporting();
         return true;
+    }
+
+    /// Reads an ExportMetricsServiceResponse's partial_success, in whichever
+    /// encoding the collector answered; true when it rejected anything or said
+    /// why. An unreadable body is a full success, as a 2xx without the field is.
+    private boolean partialSuccess(Web.Result result, long[] rejected, String[] message) {
+        byte[] body = result.getBody();
+        if (body == null || body.length == 0) {
+            return false;
+        }
+        String type = result.getHeader("content-type");
+        boolean json = type != null ? type.regionMatches(true, 0, "application/json", 0, 16)
+                : !protobuf;
+        try {
+            if (json) {
+                OtlpSchema.jsonPartialSuccess(result.getBodyAsString(), "rejectedDataPoints",
+                        rejected, message);
+            } else {
+                OtlpSchema.protobufPartialSuccess(body, rejected, message);
+            }
+        } catch (Exception err) {
+            return false;
+        }
+        return rejected[0] > 0 || (message[0] != null && message[0].length() > 0);
     }
 
     /// Whether two header lists name the same headers, in any order.
@@ -283,6 +309,22 @@ public final class OtlpMetricExporter implements MetricReader {
                     return false;
                 }
             }
+            // A 2xx can still carry a partial success naming the data points the
+            // collector dropped -- the trace exporter reads the same field for
+            // spans. Unread, the status answered healthy while metrics were
+            // being discarded.
+            long[] rejected = new long[1];
+            String[] message = new String[1];
+            if (partialSuccess(result, rejected, message)) {
+                synchronized (lock) {
+                    failures++;
+                    rejectedDataPoints += Math.max(0, rejected[0]);
+                    lastError = BatchExporter.bounded("the collector rejected "
+                            + rejected[0] + " data point(s)" + (message[0] == null
+                            || message[0].length() == 0 ? "" : ": " + message[0]));
+                }
+                return false;
+            }
             return true;
         } catch (Throwable err) {
             // Throwable, not Exception: this runs on the exporter's only thread,
@@ -352,6 +394,9 @@ public final class OtlpMetricExporter implements MetricReader {
             out.put("endpoint", BatchExporter.redact(endpoint));
             out.put("exports", Long.valueOf(exports));
             out.put("failures", Long.valueOf(failures));
+            if (rejectedDataPoints > 0) {
+                out.put("dataPointsRejected", Long.valueOf(rejectedDataPoints));
+            }
             if (lastError != null) {
                 out.put("lastError", lastError);
             }

@@ -73,7 +73,8 @@ final class BackendWiringWriter {
     ///
     /// @param routers the controllers, with their generated routers, in order
     /// @param sockets path -> endpoint binary name
-    /// @param routes method, path and handler of every route, for the listing
+    /// @param routes method, path, handler and owning class of every route, for
+    /// the listing
     String write(String pkg, List<Router> routers, Map<String, String> sockets,
                  List<String[]> routes) {
         StringBuilder sb = new StringBuilder();
@@ -113,6 +114,10 @@ final class BackendWiringWriter {
         sb.append("    private com.codename1.backend.orm.EntityManager entities;\n");
         sb.append("    private com.codename1.backend.orm.TransactionSession transactionSession;\n");
         sb.append("    private com.codename1.backend.Scheduler scheduler;\n");
+        // The controllers and endpoints this start registered, by binary name,
+        // for describeRoutes(): one whose condition is off serves nothing, and
+        // listing its routes anyway sent an agent to endpoints that answer 404.
+        sb.append("    private final java.util.Set active = new java.util.HashSet();\n");
         for (BackendBeans.Bean b : model.beans) {
             if (BackendBeans.PROTOTYPE.equals(b.scope)) {
                 continue;
@@ -155,6 +160,7 @@ final class BackendWiringWriter {
         // instance and hand it to routes, injections, tools and jobs.
         sb.append("        synchronized (this) {\n");
         sb.append("            scheduler = null;\n            transactionSession = null;\n");
+        sb.append("            active.clear();\n");
         for (BackendBeans.Bean b : model.beans) {
             if (BackendBeans.PROTOTYPE.equals(b.scope)) {
                 continue;
@@ -250,7 +256,10 @@ final class BackendWiringWriter {
               .append(" = ").append(reference(b)).append(";\n");
             sb.append("        if (").append(ref).append(" != null) {\n");
             sb.append("            handlers.add(new ").append(r.routerBinary).append('(').append(ref)
-              .append("));\n        }\n        }\n");
+              .append("));\n");
+            sb.append("            synchronized (this) {\n                active.add(")
+              .append(BackendSources.quote(r.controllerBinary))
+              .append(");\n            }\n        }\n        }\n");
         }
         sb.append("        com.codename1.backend.HttpServer.Handler[] out =\n")
           .append("                new com.codename1.backend.HttpServer.Handler[handlers.size()];\n");
@@ -626,7 +635,10 @@ final class BackendWiringWriter {
             String ref = reference(b);
             sb.append("        if (").append(ref).append(" != null) {\n");
             sb.append("            registry.route(").append(BackendSources.quote(e.getKey()))
-              .append(", ").append(ref).append(");\n        }\n");
+              .append(", ").append(ref).append(");\n");
+            sb.append("            synchronized (this) {\n                active.add(")
+              .append(BackendSources.quote(e.getValue())).append(");\n            }\n");
+            sb.append("        }\n");
         }
         sb.append("    }\n\n");
     }
@@ -927,12 +939,15 @@ final class BackendWiringWriter {
     }
 
     private static void describeRoutes(StringBuilder sb, List<String[]> routes) {
-        sb.append("    public java.util.List describeRoutes() {\n");
+        sb.append("    public synchronized java.util.List describeRoutes() {\n");
         sb.append("        java.util.List out = new java.util.ArrayList();\n");
         for (String[] r : routes) {
-            sb.append("        out.add(route(").append(BackendSources.quote(r[0])).append(", ")
-              .append(BackendSources.quote(r[1])).append(", ").append(BackendSources.quote(r[2]))
-              .append("));\n");
+            // Only what this start registered: r[3] is the controller or
+            // endpoint class the route belongs to.
+            sb.append("        if (active.contains(").append(BackendSources.quote(r[3]))
+              .append(")) {\n            out.add(route(").append(BackendSources.quote(r[0]))
+              .append(", ").append(BackendSources.quote(r[1])).append(", ")
+              .append(BackendSources.quote(r[2])).append("));\n        }\n");
         }
         sb.append("        return out;\n    }\n\n");
         sb.append("    private static java.util.Map route(String method, String path, "

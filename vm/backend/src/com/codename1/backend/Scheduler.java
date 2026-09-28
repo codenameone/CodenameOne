@@ -241,7 +241,7 @@ public final class Scheduler {
                             + job.cron);
                 }
             } else {
-                job.next = now + Math.max(0, job.initialDelay);
+                job.next = AsyncTask.deadline(now, Math.max(0, job.initialDelay));
             }
         }
         if (jobs.isEmpty()) {
@@ -345,7 +345,7 @@ public final class Scheduler {
             job.failures++;
             job.lastError = String.valueOf(err);
             if (job.kind == FIXED_DELAY) {
-                job.next = now + job.period;
+                job.next = AsyncTask.deadline(now, job.period);
             }
         }
     }
@@ -366,11 +366,17 @@ public final class Scheduler {
             // under the monitor every other job and management call waits on.
             if (next <= now) {
                 long missed = (now - next) / job.period + 1;
-                next += missed * job.period;
+                // One period due: it may be longer than the clock has room for.
+                // More than one: each is shorter than the gap, so no overflow.
+                next = missed == 1 ? AsyncTask.deadline(next, job.period)
+                        : next + missed * job.period;
             }
             return next;
         }
-        return now + job.period;
+        // Saturated: every time here is the epoch clock plus a period the
+        // application chose, and fixedDelay = Long.MAX_VALUE -- "once, then
+        // never" -- wrapped to a moment in the past and ran the job back to back.
+        return AsyncTask.deadline(now, job.period);
     }
 
     /// A job's body as a traced unit of work.
@@ -432,7 +438,7 @@ public final class Scheduler {
                     job.lastError = error;
                 }
                 if (job.kind == FIXED_DELAY && !stopped) {
-                    job.next = end + job.period;
+                    job.next = AsyncTask.deadline(end, job.period);
                 }
                 notifyAll();
             }
@@ -452,7 +458,7 @@ public final class Scheduler {
         // own, one running ahead by more than the remaining lease would take a
         // lock another still legitimately holds, and run the job beside it.
         long now = databaseNow();
-        long until = now + job.lockAtMostFor;
+        long until = AsyncTask.deadline(now, job.lockAtMostFor);
         int updated = locks.execute("UPDATE " + LOCK_TABLE + " SET lock_until = ?, locked_at = ?, "
                 + "locked_by = ? WHERE name = ? AND lock_until <= ?",
                 new Object[] {Long.valueOf(until), Long.valueOf(now), lease, job.lock, Long.valueOf(now)});

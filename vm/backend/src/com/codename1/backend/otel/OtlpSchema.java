@@ -780,6 +780,15 @@ final class OtlpSchema {
     /// ExportTraceServiceResponse's partial_success, as OTLP/JSON writes it:
     /// `{"partialSuccess":{"rejectedSpans":"3","errorMessage":"..."}}`.
     static void jsonPartialSuccess(String body, long[] rejected, String[] message) throws IOException {
+        jsonPartialSuccess(body, "rejectedSpans", rejected, message);
+    }
+
+    /// [#jsonPartialSuccess(String, long[], String[])] for a response whose count
+    /// is named `countKey`: rejectedSpans for traces, rejectedDataPoints for
+    /// metrics. The binary form needs no such parameter -- both messages keep the
+    /// count in field 1 -- so [#protobufPartialSuccess] reads either.
+    static void jsonPartialSuccess(String body, String countKey, long[] rejected,
+                                   String[] message) throws IOException {
         Object parsed = Json.parse(body);
         if (!(parsed instanceof Map)) {
             return;
@@ -788,9 +797,9 @@ final class OtlpSchema {
         if (!(partial instanceof Map)) {
             return;
         }
-        Object count = ((Map) partial).get("rejectedSpans");
+        Object count = ((Map) partial).get(countKey);
         if (count != null) {
-            rejected[0] = number(f("rejectedSpans", 1, INT64), count);
+            rejected[0] = number(f(countKey, 1, INT64), count);
         }
         Object text = ((Map) partial).get("errorMessage");
         if (text instanceof String) {

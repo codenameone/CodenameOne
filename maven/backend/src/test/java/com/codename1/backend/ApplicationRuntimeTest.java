@@ -419,6 +419,41 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("the longest fixed delay or rate runs once, not back to back")
+    @org.junit.jupiter.api.Timeout(value = 30, threadMode =
+            org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD)
+    void hugePeriodsDoNotWrap() throws Exception {
+        final AtomicInteger delayRuns = new AtomicInteger();
+        final AtomicInteger rateRuns = new AtomicInteger();
+        Scheduler scheduler = new Scheduler(null);
+        scheduler.fixedDelay("delay", 0, Long.MAX_VALUE, null, Tasks.PLATFORM, null, -1,
+                new Runnable() {
+                    public void run() {
+                        delayRuns.incrementAndGet();
+                    }
+                });
+        scheduler.fixedRate("rate", 0, Long.MAX_VALUE, null, Tasks.PLATFORM, null, -1,
+                new Runnable() {
+                    public void run() {
+                        rateRuns.incrementAndGet();
+                    }
+                });
+        scheduler.start();
+        try {
+            long deadline = System.currentTimeMillis() + 5000;
+            while((delayRuns.get() < 1 || rateRuns.get() < 1)
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);
+            }
+            Thread.sleep(300);
+        } finally {
+            scheduler.stop(1000);
+        }
+        assertEquals(1, delayRuns.get(), "the delay wrapped into the past");
+        assertEquals(1, rateRuns.get(), "the rate wrapped into the past");
+    }
+
+    @Test
     @DisplayName("fixed-delay jobs run, never overlap, and stop with the scheduler")
     void schedulerRunsAndStops() throws Exception {
         final AtomicInteger runs = new AtomicInteger();
@@ -988,6 +1023,33 @@ class ApplicationRuntimeTest {
             release.countDown();
             unmeasured.stop();
             measured.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("the websocket wrapper forwards the endpoint's subprotocols")
+    void wrappedEndpointKeepsItsSubprotocols() {
+        WebSocket endpoint = new WebSocket() {
+            public void onOpen(WebSocketSession session) {
+            }
+
+            public void onText(WebSocketSession session, String message) {
+            }
+
+            public void onBinary(WebSocketSession session, byte[] m, int o, int l) {
+            }
+
+            public String[] getSubprotocols() {
+                return new String[] {"chat.v2"};
+            }
+        };
+        Tasks.Registry mine = Tasks.open(null);
+        try {
+            String[] offered = new Backend.TaskBound(endpoint, mine).getSubprotocols();
+            assertNotNull(offered, "the wrapper hid the endpoint's subprotocols");
+            assertEquals("chat.v2", offered[0]);
+        } finally {
+            Tasks.shutdown(mine, 0);
         }
     }
 

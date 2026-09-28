@@ -138,6 +138,58 @@ class OtlpMetricsProtoTest {
     }
 
     @Test
+    @DisplayName("data points a collector rejects in a partial success are reported, not healthy")
+    void partialSuccessIsReported() throws Exception {
+        final byte[][] answer = {new byte[0]};
+        final String[] type = {"application/x-protobuf"};
+        com.sun.net.httpserver.HttpServer collector = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        collector.createContext("/v1/metrics", exchange -> {
+            java.io.InputStream in = exchange.getRequestBody();
+            while(in.read() >= 0) {
+                // drained
+            }
+            exchange.getResponseHeaders().add("Content-Type", type[0]);
+            exchange.sendResponseHeaders(200, answer[0].length);
+            exchange.getResponseBody().write(answer[0]);
+            exchange.close();
+        });
+        collector.start();
+        try {
+            java.util.Properties p = new java.util.Properties();
+            p.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:"
+                    + collector.getAddress().getPort() + "/v1/metrics");
+            p.setProperty(OtlpMetricExporter.INTERVAL, "3600000");
+            OtlpMetricExporter exporter = new OtlpMetricExporter("partial");
+            exporter.open(com.codename1.backend.Config.of(p, "test"));
+            try {
+                answer[0] = io.opentelemetry.proto.collector.metrics.v1
+                        .ExportMetricsServiceResponse.newBuilder()
+                        .setPartialSuccess(io.opentelemetry.proto.collector.metrics.v1
+                                .ExportMetricsPartialSuccess.newBuilder()
+                                .setRejectedDataPoints(3).setErrorMessage("too old").build())
+                        .build().toByteArray();
+                type[0] = "application/x-protobuf";
+                assertFalse(exporter.export(), "a partial success counted as healthy");
+                assertEquals(Long.valueOf(3), exporter.status().get("dataPointsRejected"));
+                assertTrue(String.valueOf(exporter.status().get("lastError"))
+                        .contains("too old"), String.valueOf(exporter.status()));
+                answer[0] = "{\"partialSuccess\":{\"rejectedDataPoints\":\"2\"}}"
+                        .getBytes("UTF-8");
+                type[0] = "application/json";
+                assertFalse(exporter.export());
+                assertEquals(Long.valueOf(5), exporter.status().get("dataPointsRejected"));
+                answer[0] = new byte[0];
+                assertTrue(exporter.export(), "an empty 200 is a full success");
+            } finally {
+                exporter.shutdown(0);
+            }
+        } finally {
+            collector.stop(0);
+        }
+    }
+
+    @Test
     @DisplayName("a second metrics exporter with another identity is refused")
     void oneMetricsIdentityPerProcess() throws Exception {
         java.util.Properties a = new java.util.Properties();
