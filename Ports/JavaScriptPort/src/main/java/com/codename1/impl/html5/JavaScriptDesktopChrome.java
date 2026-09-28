@@ -276,6 +276,7 @@ final class JavaScriptDesktopChrome {
             item.setAttribute("data-cn1-cmd", id);
             if (hasLabel(c)) {
                 HTMLElement label = document.createElement("span");
+                label.setAttribute("class", "cn1-chrome-label");
                 label.setTextContent(c.getCommandName());
                 item.appendChild(label);
             } else {

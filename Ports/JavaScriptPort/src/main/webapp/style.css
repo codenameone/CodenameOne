@@ -362,6 +362,10 @@ div#cn1-video-capture > video {
     left: 0;
     top: 100%;
     min-width: 200px;
+    /* As wide as its longest item, so a label wraps only when the window is too narrow: an
+       absolutely positioned box otherwise shrinks to its min-content, and a label that may
+       wrap anywhere has almost none. */
+    width: max-content;
     /* Never wider than the window; browser_bridge.js also moves a panel that would run off
        the right edge (a menu near the end of a wide menu bar in a narrow window). */
     max-width: calc(100vw - 8px);
@@ -406,6 +410,19 @@ div#cn1-video-capture > video {
 }
 #cn1-desktop-chrome .cn1-chrome-shortcut {
     opacity: 0.6;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+/* The panel's max-width only holds if its contents can shrink: a flex item keeps
+   min-width: auto -- the width of its longest word -- so a long unbroken command name would
+   push past the panel and be clipped by the body's overflow: hidden. The item and its label may
+   shrink, and the label wraps, anywhere if it has to; the shortcut keeps its own width. */
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    min-width: 0;
+}
+#cn1-desktop-chrome .cn1-chrome-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 /* macOS: the title centred in a lighter bar, the system font, rounded selection. */
