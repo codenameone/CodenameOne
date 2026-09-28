@@ -287,7 +287,15 @@ public final class McpServer implements HttpServer.Handler {
                     + "must be \"2.0\"");
         }
         String method = (String) methodValue;
-        Map params = m.get("params") instanceof Map ? (Map) m.get("params") : new LinkedHashMap();
+        Object rawParams = m.get("params");
+        if (rawParams != null && !(rawParams instanceof Map)) {
+            // Every method here takes named params. An array or a scalar is not
+            // read as "none": initialize with params 1 must not succeed with the
+            // defaults, nor a positional tool call run with no arguments.
+            return notification ? null : rpcError(id, -32602, "Invalid params: params must "
+                    + "be an object");
+        }
+        Map params = rawParams == null ? new LinkedHashMap() : (Map) rawParams;
         // A notification is still an invocation -- an id-less tools/call runs its
         // tool -- and only the answer, result or error, is withheld.
         Object answer = invoke(method, params, id);

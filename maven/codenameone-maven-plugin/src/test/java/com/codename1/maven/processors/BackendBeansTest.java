@@ -1231,6 +1231,22 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void oneExecutorNameWithTwoThreadKindsIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Reports", PKG + "@Component public class Reports {\n"
+                + "    @Async(value = \"reports\", thread = ThreadKind.PLATFORM) public void db() { }\n"
+                + "    @Async(value = \"reports\", thread = ThreadKind.VIRTUAL) public void cpu() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Executor \"reports\" is asked for"));
+        s.put("com.example.Reports", PKG + "@Component public class Reports {\n"
+                + "    @Async(value = \"reports\", thread = ThreadKind.PLATFORM) public void db() { }\n"
+                + "    @Async(value = \"reports\", thread = ThreadKind.AUTO) public void any() { }\n"
+                + "}\n");
+        assertNoErrors(process(compile(s)));
+    }
+
+    @Test
     public void aPrototypeControllerIsBuiltOnce() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Api", PKG + "@RestController @Scope(\"prototype\") public class Api {\n"

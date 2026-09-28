@@ -2052,6 +2052,116 @@ class ApplicationRuntimeTest {
         reader.join(5000);
     }
 
+    @Test
+    @DisplayName("a gauge stuck in its callback delays only its own removal")
+    void aStuckGaugeDelaysOnlyItself() throws Exception {
+        final CountDownLatch reading = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        com.codename1.backend.metrics.Gauge.Source stuck =
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        reading.countDown();
+                        try {
+                            release.await(10, TimeUnit.SECONDS);
+                        } catch (InterruptedException err) {
+                            // test
+                        }
+                        return 1;
+                    }
+                };
+        com.codename1.backend.metrics.Gauge.Source quick =
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        return 2;
+                    }
+                };
+        Metrics.addSource("test.stuck.gauge", "", "", stuck);
+        Metrics.addSource("test.quick.gauge", "", "", quick);
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                Metrics.snapshot();
+            }
+        });
+        reader.start();
+        try {
+            assertTrue(reading.await(5, TimeUnit.SECONDS));
+            long start = System.currentTimeMillis();
+            Metrics.removeSource("test.quick.gauge", quick);
+            assertTrue(System.currentTimeMillis() - start < 1000,
+                    "another gauge's stuck read delayed this removal");
+        } finally {
+            release.countDown();
+            reader.join(5000);
+            Metrics.removeSource("test.stuck.gauge", stuck);
+        }
+    }
+
+    @Test
+    @DisplayName("a gauge without a name is refused, like every other instrument")
+    void aNamelessGaugeIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> Metrics.gauge("", "", "",
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        return 1;
+                    }
+                }));
+    }
+
+    @Test
+    @DisplayName("one named executor asked for two kinds of thread is refused, AUTO agrees with either")
+    void anExecutorHasOneThreadKind() {
+        Tasks.Registry registry = Tasks.open(null);
+        try {
+            Tasks.executor(registry, "reports", Tasks.PLATFORM);
+            Tasks.executor(registry, "reports", Tasks.AUTO);
+            assertThrows(IllegalStateException.class,
+                    () -> Tasks.executor(registry, "reports", Tasks.VIRTUAL));
+        } finally {
+            Tasks.shutdown(registry, 0);
+        }
+    }
+
+    @Test
+    @DisplayName("a rotation a failed request cannot announce is undone, and its other changes kept")
+    void anUnannouncedRotationKeepsTheChanges(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "undo.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions sessions = new Sessions();
+            sessions.setStore(new Sessions.Jdbc(pool));
+            long now = System.currentTimeMillis();
+            HttpSession stored = new HttpSession("kept", now, now, 1800);
+            stored.markNew();
+            sessions.getStore().save(stored, null);
+            HttpSession copy = sessions.getStore().load("kept");
+            copy.owner = sessions;
+            copy.setAttribute("cart", "3 items");
+            String next = copy.changeSessionId();
+            assertNull(sessions.finish(copy, null));     // the handler threw
+            assertEquals("kept", copy.getId(), "the session kept an id the client never got");
+            assertNull(sessions.getStore().load(next));
+            assertEquals("3 items", sessions.getStore().load("kept").getAttribute("cart"),
+                    "the failed request's other changes were lost with the rotation");
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("params that are not an object are Invalid params, not an empty call")
+    void nonObjectParamsAreRefused() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null, null);
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "{\"jsonrpc\":\"2.0\",\"id\":3,"
+                + "\"method\":\"initialize\",\"params\":1}"));
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32602") && !body.contains("protocolVersion"), body);
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

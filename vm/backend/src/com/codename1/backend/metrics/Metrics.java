@@ -116,6 +116,11 @@ public final class Metrics {
     }
 
     private static synchronized void replaceGauge(Gauge g) {
+        if (g.getName() == null || g.getName().length() == 0) {
+            // As counters and histograms refuse it: a nameless gauge renders as a
+            // blank Prometheus name, and the scraper rejects the whole exposition.
+            throw new IllegalArgumentException("A metric needs a name");
+        }
         Instrument existing = (Instrument) INSTRUMENTS.get(g.getName());
         if (existing != null && existing.getKind() != Instrument.GAUGE) {
             throw new IllegalArgumentException("Metric " + g.getName()
@@ -216,9 +221,11 @@ public final class Metrics {
 
     /// Gauges several servers contribute to: name -> List of Gauge.Source.
     private static final Map SHARED = new HashMap();
-    /// Shared-gauge source reads in progress, under Metrics.class. A removal waits
-    /// for them: the server removing its source destroys the bean behind it next.
-    private static int sourceReads;
+    /// Shared-gauge source reads in progress, by source, under Metrics.class. A
+    /// removal waits for ITS source's: the server removing it destroys the bean
+    /// behind it next. Per source, so one gauge stuck in its callback delays only
+    /// its own removal, not every other gauge a stopping server removes.
+    private static final Map SOURCE_READS = new HashMap();
 
     /// Adds one server's source to the gauge called `name`, which reports
     /// the sum of every source still registered. A server's managed-resource
@@ -259,7 +266,7 @@ public final class Metrics {
                         } catch (Throwable err) {
                             // One source failing leaves the others' values.
                         } finally {
-                            endSourceRead();
+                            endSourceRead(element);
                         }
                     }
                     return any ? sum : Double.NaN;
@@ -286,7 +293,7 @@ public final class Metrics {
         // stuck in its callback cannot hold a shutdown -- because the caller
         // destroys the bean behind the source next. New reads skip it already.
         long deadline = System.currentTimeMillis() + SOURCE_READ_WAIT_MILLIS;
-        while (sourceReads > 0) {
+        while (SOURCE_READS.containsKey(source)) {
             long left = deadline - System.currentTimeMillis();
             if (left <= 0) {
                 break;
@@ -305,12 +312,23 @@ public final class Metrics {
         if (!all.contains(source)) {
             return false;
         }
-        sourceReads++;
+        int[] reads = (int[]) SOURCE_READS.get(source);
+        if (reads == null) {
+            reads = new int[1];
+            SOURCE_READS.put(source, reads);
+        }
+        reads[0]++;
         return true;
     }
 
-    private static synchronized void endSourceRead() {
-        sourceReads--;
+    private static synchronized void endSourceRead(Object source) {
+        int[] reads = (int[]) SOURCE_READS.get(source);
+        if (reads != null) {
+            reads[0]--;
+            if (reads[0] <= 0) {
+                SOURCE_READS.remove(source);
+            }
+        }
         Metrics.class.notifyAll();
     }
 

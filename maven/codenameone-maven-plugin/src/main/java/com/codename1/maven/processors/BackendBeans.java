@@ -358,6 +358,9 @@ final class BackendBeans {
             out.collectAspects();
         }
         if (!ctx.hasErrors()) {
+            out.checkExecutorKinds();
+        }
+        if (!ctx.hasErrors()) {
             out.plan();
         }
         if (!ctx.hasErrors()) {
@@ -1988,6 +1991,47 @@ final class BackendBeans {
 
     /// Every project class with a transactional, async, timed or counted method:
     /// beans or not, since the rewrite applies to `new` as much as to injection.
+    /// Refuses one named executor asked for two kinds of thread. An executor is
+    /// created once, by whichever declaration runs first, so the other's kind
+    /// would be ignored depending on call order -- a PLATFORM database method
+    /// could end up on the virtual hosts. AUTO agrees with either; unnamed
+    /// executors are already named by their kind.
+    private void checkExecutorKinds() {
+        Map<String, String[]> kinds = new TreeMap<String, String[]>();
+        for (Aspects owner : aspects.values()) {
+            for (Aspect a : owner.methods) {
+                if (a.async != null) {
+                    noteExecutorKind(kinds, a.async.getStringOrDefault("value", ""),
+                            enumName(a.async.get("thread"), "PLATFORM"), owner.cls,
+                            "@Async " + owner.cls.getSourceName() + "." + a.method.getName());
+                }
+            }
+        }
+        for (Bean b : beans) {
+            for (Job j : b.jobs) {
+                noteExecutorKind(kinds, j.executor, j.thread, b.cls,
+                        "@Scheduled " + j.method.getName() + " of " + b.describe());
+            }
+        }
+    }
+
+    private void noteExecutorKind(Map<String, String[]> kinds, String executor, String thread,
+                                  AnnotatedClass where, String who) {
+        if (executor == null || executor.trim().length() == 0 || "AUTO".equals(thread)) {
+            return;
+        }
+        String name = executor.trim();
+        String[] seen = kinds.get(name);
+        if (seen == null) {
+            kinds.put(name, new String[] {thread, who});
+        } else if (!seen[0].equals(thread)) {
+            ctx.error(where, "Executor \"" + name + "\" is asked for " + seen[0] + " threads by "
+                    + seen[1] + " and for " + thread + " threads by " + who + ". One executor "
+                    + "has one kind of thread, and the first to run would decide; give them "
+                    + "different executor names, or the same thread kind.");
+        }
+    }
+
     private void collectAspects() {
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
             if (!concerns(cls) || cls.isInterface()) {

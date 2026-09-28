@@ -23,6 +23,7 @@
 package com.codename1.backend;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,11 @@ public final class Tasks {
     /// One server's executors.
     static final class Registry {
         private final Map executors = new LinkedHashMap();
+        /// The thread kind each executor was first asked for, when configuration
+        /// does not decide it: a later request for the other kind is refused, as
+        /// the build refuses it between annotations, rather than silently getting
+        /// whichever kind happened to be asked for first.
+        private final Map requestedKinds = new HashMap();
         private final Config config;
         private boolean reportedAuto;
         private boolean shutdown;
@@ -177,6 +183,17 @@ public final class Tasks {
         synchronized (registry) {
             TaskExecutor existing = (TaskExecutor) registry.executors.get(key);
             if (existing != null) {
+                Integer first = (Integer) registry.requestedKinds.get(key);
+                if (first != null && kind != AUTO && first.intValue() != AUTO
+                        && first.intValue() != kind) {
+                    throw new IllegalStateException("Executor " + key + " was created for "
+                            + kindName(first.intValue()) + " threads and is now asked for "
+                            + kindName(kind) + " ones; give the two another executor name, "
+                            + "or set cn1.task.executor." + key + ".kind");
+                }
+                if (first != null && first.intValue() == AUTO && kind != AUTO) {
+                    registry.requestedKinds.put(key, Integer.valueOf(kind));
+                }
                 return existing;
             }
             if (registry.shutdown) {
@@ -211,10 +228,17 @@ public final class Tasks {
             } else {
                 virtual = kind == VIRTUAL;
             }
+            if (configured == null) {
+                registry.requestedKinds.put(key, Integer.valueOf(kind));
+            }
             TaskExecutor created = new TaskExecutor(key, virtual, threads, registry);
             registry.executors.put(key, created);
             return created;
         }
+    }
+
+    private static String kindName(int kind) {
+        return kind == VIRTUAL ? "VIRTUAL" : kind == AUTO ? "AUTO" : "PLATFORM";
     }
 
     /// A configured executor kind, trimmed; null when unset or empty. Refused,

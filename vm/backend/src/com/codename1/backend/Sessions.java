@@ -341,6 +341,17 @@ public final class Sessions {
                         beans.put(previous, moved);
                     }
                 }
+                // The rotation is undone on the session itself too, and what else
+                // the request changed is kept, under the id the client still has --
+                // as a failed request's changes are when there was no rotation. The
+                // new id was never stored, and leaving it on the object let a later
+                // request of the memory store move the beans to it.
+                session.undoRotation(previous);
+                if (session.isDirty()) {
+                    s.save(session, null);
+                    session.clean();
+                }
+                keep(session, null);
             }
             return null;
         }
