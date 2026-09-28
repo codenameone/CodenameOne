@@ -304,6 +304,140 @@
     }
    }
   },
+  "linux-x64@intel-xeon-6973p-c": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.207,
+     "runs": 1,
+     "time": 1.013,
+     "tolerance": {
+      "time": 0.25
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.356,
+     "runs": 1,
+     "time": 2.128,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.098,
+     "runs": 1,
+     "time": 1.021,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 0.769,
+     "runs": 1,
+     "time": 0.982,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.054,
+     "runs": 1,
+     "time": 1.011,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.055,
+     "runs": 1,
+     "time": 1.066,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.057,
+     "runs": 1,
+     "time": 1.029,
+     "tolerance": {
+      "memory": 0.4,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.383,
+     "runs": 1,
+     "time": 5.399,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.128,
+     "runs": 1,
+     "time": 1.098
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.075,
+     "runs": 1,
+     "time": 1.301,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.2
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.221,
+     "runs": 1,
+     "time": 1.659,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.52,
+     "runs": 1,
+     "time": 0.537,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.048,
+     "runs": 1,
+     "time": 0.129,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   }
+  },
   "linux-x64@intel-xeon-platinum-8370c": {
    "arrayRandom": {
     "all": {
