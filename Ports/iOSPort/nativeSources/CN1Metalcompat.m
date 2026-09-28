@@ -46,6 +46,21 @@ static int currentFramebufferWidth = 0;
 static int currentFramebufferHeight = 0;
 static CN1MetalPipelineCache *pipelineCache = nil;
 
+// Graphics state a mid-frame encoder restart must carry over (see
+// CN1MetalFrameFinished): whether a frame is live, the last scissor set on the
+// screen encoder, and the active polygon clip (its points, since a new render
+// pass starts with a cleared stencil; 0 = none, -1 = degenerate / clip all).
+static BOOL frameLive = NO;
+// YES while a mutable image's encoder is swapped in for the screen's (see
+// CN1MetalBeginMutableImageDraw); its clips are not the screen's to carry.
+static BOOL savedScreenStateValid = NO;
+static BOOL carriedScissorValid = NO;
+static int carriedScissor[4];
+static float *carriedPolyX = NULL;
+static float *carriedPolyY = NULL;
+static int carriedPolyCapacity = 0;
+static int carriedPolyN = 0;
+
 // --------------- Per-encoder state cache ---------------
 //
 // Every drawQuad / drawSolidPrimitive used to call setRenderPipelineState
@@ -199,6 +214,11 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
                         simd_float4x4 projection,
                         int framebufferWidth,
                         int framebufferHeight) {
+    BOOL resume = frameLive && encoder != nil;
+    simd_float4x4 carriedTransform = currentTransform;
+    BOOL scissorValid = carriedScissorValid;
+    int scissor[4] = { carriedScissor[0], carriedScissor[1], carriedScissor[2], carriedScissor[3] };
+    int polyN = carriedPolyN;
     activeEncoder = encoder;
     invalidateEncoderStateCache();
     currentProjection = projection;
@@ -207,10 +227,33 @@ void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
     // modelView is always identity for 2D UI rendering. The GL path uses it
     // only as a y-flip in drawFrame; our ortho projection bakes the flip in.
     currentModelView = identityMatrix();
-    if (modelViewStackTop == 0) {
-        currentTransform = identityMatrix();
-    }
     ensurePipelineCache();
+    if (!resume) {
+        if (modelViewStackTop == 0) {
+            currentTransform = identityMatrix();
+        }
+        carriedScissorValid = NO;
+        carriedPolyN = 0;
+        frameLive = encoder != nil;
+        return;
+    }
+    // Mid-frame restart: put back what the previous encoder had. The polygon is
+    // re-stamped first (it opens the scissor), then the scissor narrowed again.
+    currentTransform = carriedTransform;
+    if (polyN > 0) {
+        CN1MetalApplyPolygonStencilClip(carriedPolyX, carriedPolyY, polyN);
+    } else if (polyN < 0) {
+        CN1MetalApplyPolygonStencilClip(NULL, NULL, 0);
+    }
+    if (scissorValid) {
+        CN1MetalSetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+    }
+}
+
+void CN1MetalFrameFinished(void) {
+    frameLive = NO;
+    carriedScissorValid = NO;
+    carriedPolyN = 0;
 }
 
 void CN1MetalEndFrame(void) {
@@ -339,6 +382,13 @@ void CN1MetalRotate(float angle, float x, float y, float z) {
 
 void CN1MetalSetScissor(int x, int y, int width, int height) {
     if (activeEncoder == nil) return;
+    if (!savedScreenStateValid) {
+        carriedScissor[0] = x;
+        carriedScissor[1] = y;
+        carriedScissor[2] = width;
+        carriedScissor[3] = height;
+        carriedScissorValid = YES;
+    }
     if (width <= 0 || height <= 0) {
         // Empty clip -- this MUST cull everything, it does NOT mean
         // "disable clipping". A 0/negative-size rect arrives here when the
@@ -448,6 +498,36 @@ static void ensureDepthStencilStates(void) {
 
 void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords, int num) {
     if (activeEncoder == nil || pipelineCache == nil) return;
+    if (savedScreenStateValid) {
+        // Drawing into a mutable image: nothing to carry for the screen.
+    } else if (num >= 3 && xCoords != NULL && yCoords != NULL) {
+        // Remember the polygon so a mid-frame restart can re-stamp it (the
+        // restart itself passes these same buffers back in).
+        if (xCoords != carriedPolyX) {
+            if (num > carriedPolyCapacity) {
+                float *nx = (float *)realloc(carriedPolyX, sizeof(float) * (size_t)num);
+                float *ny = (float *)realloc(carriedPolyY, sizeof(float) * (size_t)num);
+                if (nx != NULL) {
+                    carriedPolyX = nx;
+                }
+                if (ny != NULL) {
+                    carriedPolyY = ny;
+                }
+                if (nx != NULL && ny != NULL) {
+                    carriedPolyCapacity = num;
+                }
+            }
+            if (num <= carriedPolyCapacity) {
+                memcpy(carriedPolyX, xCoords, sizeof(float) * (size_t)num);
+                memcpy(carriedPolyY, yCoords, sizeof(float) * (size_t)num);
+                carriedPolyN = num;
+            } else {
+                carriedPolyN = 0;
+            }
+        }
+    } else {
+        carriedPolyN = -1;
+    }
     if (num < 3 || xCoords == NULL || yCoords == NULL) {
         // Degenerate polygon: nothing inside it can pass -- emulate by
         // shrinking the scissor to a zero-size rect (matches the
@@ -534,6 +614,9 @@ void CN1MetalApplyPolygonStencilClip(const float *xCoords, const float *yCoords,
 
 void CN1MetalDisablePolygonStencilClip(void) {
     if (activeEncoder == nil) return;
+    if (!savedScreenStateValid) {
+        carriedPolyN = 0;
+    }
     ensureDepthStencilStates();
     [activeEncoder setDepthStencilState:depthStencilStateAlwaysPass];
 }
@@ -859,6 +942,237 @@ void CN1MetalDrawLens(id<MTLTexture> texture, int x, int y, int w, int h,
     [activeEncoder setFragmentBytes:&p0 length:sizeof(p0) atIndex:0];
     [activeEncoder setFragmentBytes:&p1 length:sizeof(p1) atIndex:1];
     [activeEncoder setFragmentBytes:&p2 length:sizeof(p2) atIndex:2];
+    [activeEncoder setFragmentTexture:texture atIndex:0];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+void CN1MetalDrawColorMatrix(id<MTLTexture> texture, id<MTLTexture> mask, int x, int y, int w, int h,
+                             int fw, int fh, const float* matrix, float cornerRadiusPx, float amount) {
+    if (activeEncoder == nil || pipelineCache == nil || texture == nil || matrix == NULL) {
+        return;
+    }
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineColorMatrix];
+    if (state == nil) {
+        return;
+    }
+    bindPipelineStateIfChanged(state);
+    float vertices[8] = {
+        (float)x,       (float)y,
+        (float)(x+w),   (float)y,
+        (float)x,       (float)(y+h),
+        (float)(x+w),   (float)(y+h)
+    };
+    // The source is a direct blit of the screen region (row 0 = region top) and the
+    // mask is sampled exactly as CN1MetalDrawImage would draw it over the region, so
+    // both use the V=0-at-top mapping.
+    static const float texcoords[8] = { 0, 0,  1, 0,  0, 1,  1, 1 };
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    simd_float4 rows[4] = {
+        (simd_float4){ matrix[0], matrix[1], matrix[2], matrix[3] },
+        (simd_float4){ matrix[4], matrix[5], matrix[6], matrix[7] },
+        (simd_float4){ matrix[8], matrix[9], matrix[10], matrix[11] },
+        (simd_float4){ (float)fw, (float)fh, cornerRadiusPx, amount }
+    };
+    simd_float4 flags = (simd_float4){ mask != nil ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f };
+    [activeEncoder setFragmentBytes:rows length:sizeof(rows) atIndex:0];
+    [activeEncoder setFragmentBytes:&flags length:sizeof(flags) atIndex:1];
+    [activeEncoder setFragmentTexture:texture atIndex:0];
+    // A bound texture is required even when unused; the source doubles as a dummy.
+    [activeEncoder setFragmentTexture:(mask != nil ? mask : texture) atIndex:1];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+// Scratch textures of the GPU glass, reused across frames: 0 = the raw backdrop,
+// 1 and 2 = the material / blur ping-pong pair. Sizes are rounded up so a glass
+// rect that changes every frame (the pulsing tab bar) does not reallocate them.
+static id<MTLTexture> cn1GlassScratch[3];
+
+static id<MTLTexture> cn1GlassTexture(int slot, int w, int h) {
+    id<MTLTexture> t = cn1GlassScratch[slot];
+    if (t != nil && (int)t.width >= w && (int)t.height >= h) {
+        return t;
+    }
+    id<MTLDevice> device = CN1MetalDevice();
+    if (device == nil) {
+        return nil;
+    }
+    int aw = (w + 63) & ~63;
+    int ah = (h + 63) & ~63;
+    if (t != nil) {
+        aw = MAX(aw, (int)t.width);
+        ah = MAX(ah, (int)t.height);
+    }
+    MTLTextureDescriptor *desc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:aw height:ah mipmapped:NO];
+    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> nt = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("glassGpuScratch", nt);
+    if (nt == nil) {
+        return nil;
+    }
+#ifndef CN1_USE_ARC
+    [cn1GlassScratch[slot] release];
+#endif
+    cn1GlassScratch[slot] = nt;
+    return nt;
+}
+
+// One offscreen full-viewport pass of a glass pipeline.
+static void cn1GlassPass(id<MTLCommandBuffer> cb, id<MTLRenderPipelineState> ps, id<MTLTexture> target,
+                         int w, int h, id<MTLTexture> src, const void *b0, size_t l0, const void *b1, size_t l1,
+                         const void *b2, size_t l2) {
+    MTLRenderPassDescriptor *d = [MTLRenderPassDescriptor renderPassDescriptor];
+    d.colorAttachments[0].texture = target;
+    d.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+    d.colorAttachments[0].storeAction = MTLStoreActionStore;
+    id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:d];
+    if (enc == nil) {
+        return;
+    }
+    [enc setRenderPipelineState:ps];
+    [enc setViewport:(MTLViewport){ 0.0, 0.0, (double)w, (double)h, 0.0, 1.0 }];
+    if (b0 != NULL) { [enc setFragmentBytes:b0 length:l0 atIndex:0]; }
+    if (b1 != NULL) { [enc setFragmentBytes:b1 length:l1 atIndex:1]; }
+    if (b2 != NULL) { [enc setFragmentBytes:b2 length:l2 atIndex:2]; }
+    [enc setFragmentTexture:src atIndex:0];
+    [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+    [enc endEncoding];
+}
+
+BOOL CN1MetalGlassEncode(id<MTLCommandBuffer> cb, id<MTLTexture> backdrop, int fx, int fy, int fw, int fh,
+                         float rad, float sat, float scale, float offset, float curve, float curveMid,
+                         CN1MetalGlassPatch *out) {
+    if (cb == nil || backdrop == nil || pipelineCache == nil || out == NULL || fw <= 0 || fh <= 0) {
+        return NO;
+    }
+    id<MTLRenderPipelineState> pm = [pipelineCache pipelineFor:CN1MetalPipelineGlassMaterial];
+    id<MTLRenderPipelineState> ph = [pipelineCache pipelineFor:CN1MetalPipelineGlassBoxH];
+    id<MTLRenderPipelineState> pv = [pipelineCache pipelineFor:CN1MetalPipelineGlassBoxV];
+    id<MTLRenderPipelineState> po = [pipelineCache pipelineFor:CN1MetalPipelineGlassOptics];
+    if (pm == nil || ph == nil || pv == nil || po == nil) {
+        return NO;
+    }
+    int texW = (int)backdrop.width, texH = (int)backdrop.height;
+    int pad = (int)ceilf(rad) * 3 + 1;
+    int bw = fw + 2 * pad, bh = fh + 2 * pad;
+    int ax0 = fx - pad; if (ax0 < 0) ax0 = 0;
+    int ay0 = fy - pad; if (ay0 < 0) ay0 = 0;
+    int ax1 = fx + fw + pad; if (ax1 > texW) ax1 = texW;
+    int ay1 = fy + fh + pad; if (ay1 > texH) ay1 = texH;
+    int aw = ax1 - ax0, ah = ay1 - ay0;
+    if (aw <= 0 || ah <= 0) {
+        return NO;
+    }
+    id<MTLTexture> a = cn1GlassTexture(0, aw, ah);
+    id<MTLTexture> b = cn1GlassTexture(1, bw, bh);
+    id<MTLTexture> t = cn1GlassTexture(2, bw, bh);
+    if (a == nil || b == nil || t == nil) {
+        return NO;
+    }
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:backdrop sourceSlice:0 sourceLevel:0
+              sourceOrigin:MTLOriginMake(ax0, ay0, 0) sourceSize:MTLSizeMake(aw, ah, 1)
+                 toTexture:a destinationSlice:0 destinationLevel:0
+         destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
+    // 1) Colour material into the padded buffer, edges replicated.
+    simd_int4 mp = (simd_int4){ fx - pad - ax0, fy - pad - ay0, aw, ah };
+    simd_float4 m1 = (simd_float4){ sat, scale, offset, curve };
+    simd_float4 m2 = (simd_float4){ curveMid, 0, 0, 0 };
+    cn1GlassPass(cb, pm, b, bw, bh, a, &mp, sizeof(mp), &m1, sizeof(m1), &m2, sizeof(m2));
+    // 2) Three box-blur iterations (glassGaussianBlur), each horizontal then vertical.
+    if (rad >= 0.75f) {
+        int r = (int)(rad + 0.5f);
+        if (r < 1) { r = 1; }
+        simd_int4 bp = (simd_int4){ r, bw, bh, 0 };
+        for (int i = 0; i < 3; i++) {
+            cn1GlassPass(cb, ph, t, bw, bh, b, &bp, sizeof(bp), NULL, 0, NULL, 0);
+            cn1GlassPass(cb, pv, b, bw, bh, t, &bp, sizeof(bp), NULL, 0, NULL, 0);
+        }
+    }
+    out->blurred = b;
+    out->raw = a;
+    out->pad = pad;
+    out->bw = bw;
+    out->bh = bh;
+    out->rawX = fx - ax0;
+    out->rawY = fy - ay0;
+    out->rawW = aw;
+    out->rawH = ah;
+    return YES;
+}
+
+void CN1MetalDrawGlass(const CN1MetalGlassPatch *patch, int x, int y, int w, int h, int fw, int fh,
+                       float cornerRadius, float s, float refract, float specular, float outline) {
+    if (activeEncoder == nil || pipelineCache == nil || patch == NULL || patch->blurred == nil) {
+        return;
+    }
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineGlassOptics];
+    if (state == nil) {
+        return;
+    }
+    bindPipelineStateIfChanged(state);
+    float vertices[8] = {
+        (float)x,       (float)y,
+        (float)(x+w),   (float)y,
+        (float)x,       (float)(y+h),
+        (float)(x+w),   (float)(y+h)
+    };
+    static const float texcoords[8] = { 0, 0,  1, 0,  0, 1,  1, 1 };
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    simd_float4 p0 = (simd_float4){ (float)fw, (float)fh, cornerRadius, s };
+    simd_float4 p1 = (simd_float4){ refract, specular, outline, 0 };
+    simd_int4 p2 = (simd_int4){ patch->pad, patch->bw, patch->bh, 0 };
+    simd_int4 p3 = (simd_int4){ patch->rawX, patch->rawY, patch->rawW, patch->rawH };
+    [activeEncoder setFragmentBytes:&p0 length:sizeof(p0) atIndex:0];
+    [activeEncoder setFragmentBytes:&p1 length:sizeof(p1) atIndex:1];
+    [activeEncoder setFragmentBytes:&p2 length:sizeof(p2) atIndex:2];
+    [activeEncoder setFragmentBytes:&p3 length:sizeof(p3) atIndex:3];
+    [activeEncoder setFragmentTexture:patch->blurred atIndex:0];
+    [activeEncoder setFragmentTexture:patch->raw atIndex:1];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+void CN1MetalDrawGlassLens(id<MTLTexture> texture, int srcX, int srcY, int srcW, int srcH,
+                           int qx, int qy, int qw, int qh, float s,
+                           float lx, float ly, float lw, float lh, float cornerRadiusPx,
+                           const float* optics, float amount) {
+    if (activeEncoder == nil || pipelineCache == nil || texture == nil || optics == NULL) {
+        return;
+    }
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineGlassLens];
+    if (state == nil) {
+        return;
+    }
+    bindPipelineStateIfChanged(state);
+    float vertices[8] = {
+        (float)qx,        (float)qy,
+        (float)(qx + qw), (float)qy,
+        (float)qx,        (float)(qy + qh),
+        (float)(qx + qw), (float)(qy + qh)
+    };
+    static const float texcoords[8] = { 0, 0,  1, 0,  0, 1,  1, 1 };
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    // geo: the quad in physical pixels (x, y, w, h); lens: the lens rect;
+    // src: the blit's origin and size; misc: corner radius, amount.
+    simd_float4 geo = (simd_float4){ qx * s, qy * s, qw * s, qh * s };
+    simd_float4 lens = (simd_float4){ lx, ly, lw, lh };
+    simd_float4 src = (simd_float4){ (float)srcX, (float)srcY, (float)srcW, (float)srcH };
+    simd_float4 misc = (simd_float4){ cornerRadiusPx, amount, 0, 0 };
+    float o[16];
+    for (int i = 0; i < 16; i++) { o[i] = optics[i]; }
+    [activeEncoder setFragmentBytes:&geo length:sizeof(geo) atIndex:0];
+    [activeEncoder setFragmentBytes:&lens length:sizeof(lens) atIndex:1];
+    [activeEncoder setFragmentBytes:&src length:sizeof(src) atIndex:2];
+    [activeEncoder setFragmentBytes:&misc length:sizeof(misc) atIndex:3];
+    [activeEncoder setFragmentBytes:o length:sizeof(o) atIndex:4];
     [activeEncoder setFragmentTexture:texture atIndex:0];
     [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 }
@@ -1571,7 +1885,6 @@ static simd_float4x4 savedScreenProjection;
 static int savedScreenFw = 0;
 static int savedScreenFh = 0;
 static uint32_t savedScreenStencilReference = 0;
-static BOOL savedScreenStateValid = NO;
 
 // Build a Y-down ortho projection for an offscreen (w x h) framebuffer.
 // Mirrors METALView's CN1MetalOrtho -- if that one ever changes, update
@@ -1771,13 +2084,32 @@ BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
     id<MTLDevice> device = CN1MetalDevice();
     id<MTLTexture> stencilTex = nil;
     if (device != nil) {
-        MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
-            width:(NSUInteger)w height:(NSUInteger)h mipmapped:NO];
-        stencilDesc.usage = MTLTextureUsageRenderTarget;
-        stencilDesc.storageMode = MTLStorageModePrivate;
-        stencilTex = [device newTextureWithDescriptor:stencilDesc];
-        CN1_TEX_NOTE("mutableDrawStencil", stencilTex);
+        // The stencil only lives for one pass (cleared on load, never stored),
+        // so passes of the same size share one texture: Metal orders passes on
+        // this queue, and allocating (and zeroing) a fresh image-sized texture
+        // per pass dominated frames that draw into an image every frame.
+        static id<MTLTexture> cachedStencil = nil;
+        if (cachedStencil != nil && (int)cachedStencil.width == w && (int)cachedStencil.height == h) {
+            stencilTex = cachedStencil;
+#ifndef CN1_USE_ARC
+            [stencilTex retain];
+#endif
+        } else {
+            MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
+                texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+                width:(NSUInteger)w height:(NSUInteger)h mipmapped:NO];
+            stencilDesc.usage = MTLTextureUsageRenderTarget;
+            stencilDesc.storageMode = MTLStorageModePrivate;
+            stencilTex = [device newTextureWithDescriptor:stencilDesc];
+            CN1_TEX_NOTE("mutableDrawStencil", stencilTex);
+            if (stencilTex != nil) {
+#ifndef CN1_USE_ARC
+                [stencilTex retain];
+                [cachedStencil release];
+#endif
+                cachedStencil = stencilTex;
+            }
+        }
         if (stencilTex != nil) {
             desc.stencilAttachment.texture = stencilTex;
             desc.stencilAttachment.loadAction = MTLLoadActionClear;

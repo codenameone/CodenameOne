@@ -178,6 +178,8 @@ public class FidelitySpecParser {
             component.setPlatforms(splitList(value));
         } else if ("frames".equals(key)) {
             component.setFrames(splitList(value));
+        } else if ("golden_sets".equals(key)) {
+            component.setGoldenSets(splitList(value));
         }
     }
 

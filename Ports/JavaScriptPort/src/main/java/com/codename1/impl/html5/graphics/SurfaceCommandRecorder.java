@@ -146,6 +146,22 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // saturation, scale, offset, refraction, specular.
     public static final int OP_GLASS_SELF_REGION = 82;
 
+    // Graphics.colorMatrixRegion: recolours the surface's own pixels through a
+    // 3x4 colour matrix, see com.codename1.ui.plaf.ColorMatrixBlend. 20 nums:
+    // x, y, w, h, cornerRadius, amount, the 12 matrix floats, maskKind (one of
+    // the COLOR_MATRIX_MASK_* values) and maskSurfaceId; plus ALWAYS 1 obj,
+    // the mask image's host-ref marker or null. The mask travels the way a
+    // drawImage source does: a loaded image as its host-ref, a mutable image
+    // by its surface id (flushed first, like a blit).
+    public static final int OP_COLOR_MATRIX_SELF_REGION = 83;
+
+    /** No mask: the whole region (times the shape) is recoloured. */
+    public static final int COLOR_MATRIX_MASK_NONE = 0;
+    /** The mask is a loaded image, carried in the op's obj slot. */
+    public static final int COLOR_MATRIX_MASK_IMAGE = 1;
+    /** The mask is another surface, named by the maskSurfaceId num. */
+    public static final int COLOR_MATRIX_MASK_SURFACE = 2;
+
     // Text-layer DOM mutations. The layer renders text as real DOM above the canvas, so a frame
     // is only coherent if its elements and its pixels are applied together. Riding the command
     // stream is what guarantees that: the host applies these inside the same task that replays
@@ -350,6 +366,22 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
         op(OP_LENS_SELF_REGION);
         num(x); num(y); num(w); num(h); num(cornerRadius); num(magnify);
         num(aberration); num(tintColor); num(tintStrength);
+    }
+
+    /**
+     * Records an in-place colour matrix; see OP_COLOR_MATRIX_SELF_REGION. A
+     * matrix shorter than 12 floats is padded with zeros so the fixed arity the
+     * host reads never desyncs the ops behind this one.
+     */
+    public void colorMatrixSelfRegion(double x, double y, double w, double h, float[] matrix,
+            double cornerRadius, double amount, int maskKind, int maskSurfaceId, Object maskImage) {
+        op(OP_COLOR_MATRIX_SELF_REGION);
+        num(x); num(y); num(w); num(h); num(cornerRadius); num(amount);
+        for (int i = 0; i < 12; i++) {
+            num(matrix != null && i < matrix.length ? matrix[i] : 0);
+        }
+        num(maskKind); num(maskSurfaceId);
+        obj(maskKind == COLOR_MATRIX_MASK_IMAGE ? maskImage : null);
     }
 
     /** Records a complete in-place Liquid Glass material; see OP_GLASS_SELF_REGION. */
