@@ -22,10 +22,15 @@ tolerance any other platform needed for the same benchmark and metric.
 Runs record the runner's CPU, and rows are written per CPU MODEL (`platform@model`, the
 model as perf-gate.cpu_class names it): hosted pools mix microarchitectures whose ratios
 differ by more than any tolerance absorbs. A runner on a model with no rows is reported
-and not gated until a run of it is calibrated in. A run whose CPU is unknown feeds the
-plain `platform` rows instead.
+and FAILS the gate until a run of it is calibrated in -- which is what this script is
+for: pass that run's perf-results.json and commit the result. A run whose CPU is unknown
+feeds the plain `platform` rows instead.
 
-A platform with no results here keeps its existing rows unchanged.
+Only the rows these results measure are replaced; every other row in the file is kept,
+so adding one new CPU model from one run leaves the rest alone. A single-run row borrows
+the widest tolerance seen for its benchmark across these runs AND the existing file.
+--fresh starts from an empty set of rows instead: a full recalibration after the code
+changed, where a kept row would be a baseline for code that no longer exists.
 
 The global tolerance and the absolute floor (which keeps the tiny memory ratios, 0.03x of
 the JDK, from failing on a few kilobytes) are kept from the existing file.
@@ -53,6 +58,8 @@ def round_up(value, step=0.05):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--out', default=str(HERE / 'perf-baseline.json'))
+    parser.add_argument('--fresh', action='store_true',
+                        help='drop every row these results do not re-measure')
     parser.add_argument('results', nargs='+')
     args = parser.parse_args(argv)
 
@@ -73,6 +80,13 @@ def main(argv=None):
 
     rows = {}
     widest = defaultdict(float)  # (benchmark, metric) -> widest tolerance any platform needed
+    kept = {} if args.fresh else {k: v for k, v in existing.get('platforms', {}).items()
+                                  if k not in runs}
+    for benches in kept.values():
+        for bench, by_cores in benches.items():
+            for row in by_cores.values():
+                for metric, tol in row.get('tolerance', {}).items():
+                    widest[(bench, metric)] = max(widest[(bench, metric)], tol)
     for platform, benches in runs.items():
         for key, metrics in benches.items():
             row = {}
@@ -98,13 +112,10 @@ def main(argv=None):
         row['runs'] = count
         platforms.setdefault(platform, {}).setdefault(bench, {})[cores] = row
 
-    # A platform these results do not cover keeps the rows it has -- and so does every
-    # split row of one: a calibration that happened to get no macOS runner must not
-    # leave macOS ungated. Only what was measured is replaced.
-    measured = {key.split('@')[0] for key in platforms}
-    for key, rows_ in existing.get('platforms', {}).items():
-        if key.split('@')[0] not in measured:
-            platforms[key] = rows_
+    # Rows these results did not measure are kept (unless --fresh): a calibration that got
+    # no macOS runner must not leave macOS without a baseline, and adding one CPU model
+    # must not drop the platform's others.
+    platforms.update(kept)
     existing['platforms'] = platforms
     Path(args.out).write_text(json.dumps(existing, indent=1, sort_keys=True) + '\n')
     for platform in sorted(platforms):

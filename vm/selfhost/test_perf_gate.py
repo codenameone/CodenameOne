@@ -74,16 +74,18 @@ class MarkdownTests(unittest.TestCase):
             for b in ['hello', 'translator'] + gate.WORKLOADS}))
         rows = [l for l in text.splitlines() if l.startswith('| ') and not l.startswith('| Benchmark')]
         self.assertEqual(2 * (2 + len(gate.WORKLOADS)), len(rows))
-        self.assertIn('not gated (no baseline)', text)
+        self.assertIn('**NO BASELINE**', text)
+        self.assertIn('**Result: no baseline: calibration required**', text)
 
-    def test_an_uncalibrated_cpu_says_it_is_not_gated(self):
+    def test_an_uncalibrated_cpu_fails_and_says_how_to_fix_it(self):
         r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
                                           metric(0.9, None, 'uncalibrated'))}})
         r['cpu'] = 'AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD'
         r['baseline_key'] = None
         text = gate.render_markdown(r)
         self.assertIn('Model 17', text)
-        self.assertIn('**not gated**: no baseline for this CPU model', text)
+        self.assertIn('**no baseline for this CPU model** -- the gate fails', text)
+        self.assertIn('**Result: no baseline: calibration required**', text)
 
     def test_an_incomplete_gate_says_so(self):
         text = gate.render_markdown(report({}, error='stale native build'))
@@ -121,7 +123,7 @@ calibrate = load('calibrate_perf_baseline', 'calibrate-perf-baseline.py')
 class CalibrationTest(unittest.TestCase):
     """calibrate-perf-baseline.py: medians as baselines, spread-driven tolerances."""
 
-    def run_calibration(self, runs, existing=None):
+    def run_calibration(self, runs, existing=None, fresh=False):
         import json
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
@@ -140,7 +142,7 @@ class CalibrationTest(unittest.TestCase):
                 f = Path(tmp) / ('run%d.json' % i)
                 f.write_text(json.dumps(report))
                 files.append(str(f))
-            calibrate.main(['--out', str(out)] + files)
+            calibrate.main(['--out', str(out)] + (['--fresh'] if fresh else []) + files)
             return json.loads(out.read_text())
 
     def test_median_baseline_and_global_tolerance_for_a_steady_row(self):
@@ -193,7 +195,7 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(sorted(b), ['macos-arm64'])
         self.assertEqual(gate.baseline_key(b, 'macos-arm64', 'Apple M1 (Virtual)'), 'macos-arm64')
 
-    def test_an_unmeasured_platform_keeps_its_rows_and_a_measured_one_is_replaced(self):
+    def test_only_measured_rows_are_replaced_unless_fresh(self):
         old = {'macos-arm64': {'quicksort': {'all': {'time': 0.9, 'memory': 0.1, 'runs': 1}}},
                'linux-x64': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}},
                'linux-x64@intel': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}}}
@@ -201,7 +203,51 @@ class CalibrationTest(unittest.TestCase):
         b = b['platforms']
         self.assertEqual(b['macos-arm64'], old['macos-arm64'])
         self.assertEqual(b['linux-x64']['quicksort']['all']['time'], 1.0)
-        self.assertNotIn('linux-x64@intel', b)  # measured platform: stale split rows go
+        # Adding one CPU model's rows must not drop the platform's other models.
+        self.assertEqual(b['linux-x64@intel'], old['linux-x64@intel'])
+        fresh = self.run_calibration([('linux-x64', {'quicksort': (1.0, 0.1)})], existing=old,
+                                     fresh=True)['platforms']
+        self.assertEqual(sorted(fresh), ['linux-x64'])
+
+    def test_a_single_run_row_borrows_tolerance_from_the_existing_file(self):
+        old = {'windows-x64@a': {'arraySequential': {'all': {
+            'time': 1.35, 'memory': 0.4, 'runs': 3, 'tolerance': {'time': 0.7}}}}}
+        b = self.run_calibration([('windows-x64', {'arraySequential': (1.67, 0.38)}, 'Model B')],
+                                 existing=old)['platforms']
+        self.assertEqual(b['windows-x64@model-b']['arraySequential']['all']['tolerance']['time'], 0.7)
+
+
+class VerdictStepTests(unittest.TestCase):
+    """ci-perf-gate.sh verdict: the job's last step, which decides pass or fail."""
+
+    def verdict(self, results):
+        import json
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'perf-results.json').write_text(json.dumps(results))
+            return subprocess.run(['bash', str(Path(__file__).parent / 'ci-perf-gate.sh'),
+                                   'verdict', tmp], capture_output=True, text=True)
+
+    def row(self, verdict_):
+        return {'all': {'time': {'median': 1.0, 'baseline': None if verdict_ == 'uncalibrated'
+                                 else 1.0, 'verdict': verdict_},
+                        'memory': {'median': 0.5, 'baseline': 0.5, 'verdict': 'ok'}}}
+
+    def test_a_missing_baseline_fails_the_job(self):
+        r = self.verdict({'platform': 'windows-x64', 'cpu': 'AMD64 Family 25 Model 17',
+                          'calibration_key': 'windows-x64@amd64-family-25-model-17',
+                          'results': {'quicksort': self.row('uncalibrated')},
+                          'calibration': {'quicksort': {'all': {'time': 1.0, 'memory': 0.5}}},
+                          'regression': False})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('NO BASELINE', r.stdout)
+        self.assertIn('calibrate-perf-baseline.py', r.stdout)
+
+    def test_a_judged_run_passes(self):
+        r = self.verdict({'platform': 'linux-x64', 'results': {'quicksort': self.row('ok')},
+                          'regression': False})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
 class CpuClassTests(unittest.TestCase):

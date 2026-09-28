@@ -39,8 +39,10 @@ Every run is verified: translation output byte for byte against the first run, w
 checksums across arms and rounds. A ratio can never come from doing less work.
 
 A ratio more than the tolerance above its baseline in perf-baseline.json is a regression
-and the exit status is 1. A benchmark with no baseline is reported, not gated, and the
-report carries the entry to add.
+and the exit status is 1. So is a MISSING baseline -- a benchmark with no row, or a runner
+whose CPU model has none -- because a gate that goes quiet whenever it cannot judge stops
+preventing regressions without anyone noticing. The report carries the rows to add, and
+calibrate-perf-baseline.py adds them from the run's perf-results.json.
 
 Core counts are enforced with CPU affinity on Linux and Windows (inherited by the child)
 and by CN1_GC_MARK_THREADS plus -XX:ActiveProcessorCount everywhere. macOS has no affinity
@@ -150,8 +152,8 @@ def baseline_key(platforms, platform, cpu):
     platform@model when this CPU model was calibrated. When the platform HAS per-model
     rows but none for this model, None: the runner is a microarchitecture no run has
     measured, and judging it against another model's ratios is what failed unchanged
-    code, so its results are reported (with the rows to add) and not gated. A platform
-    with no per-model rows at all keeps its plain row."""
+    code. Every row is then missing, which FAILS the gate with the rows to add. A
+    platform with no per-model rows at all keeps its plain row."""
     cls = cpu_class(cpu)
     if cls and '%s@%s' % (platform, cls) in platforms:
         return '%s@%s' % (platform, cls)
@@ -422,7 +424,7 @@ def status_cell(entry):
         return '**REGRESSION** (%s)' % ', '.join(regressed)
     verdicts = {entry['time']['verdict'], entry['memory']['verdict']}
     if 'uncalibrated' in verdicts:
-        return 'not gated (no baseline)'
+        return '**NO BASELINE**'
     if 'improved' in verdicts:
         return 'better than baseline'
     return 'ok'
@@ -443,6 +445,14 @@ def _cores_order(key):
     return 1 << 30 if key == 'all' else int(key)
 
 
+def missing_baselines(report):
+    """Rows the gate could not judge for want of a baseline. Each FAILS the gate."""
+    return [(bench, cores, metric)
+            for bench, per_cores in report['results'].items()
+            for cores, entry in per_cores.items() if 'failed' not in entry
+            for metric in ('time', 'memory') if entry[metric]['verdict'] == 'uncalibrated']
+
+
 def render_markdown(report):
     name = PLATFORM_NAMES.get(report['platform'], report['platform'])
     tol = report['tolerance']
@@ -450,8 +460,8 @@ def render_markdown(report):
     if report.get('cpu'):
         key = report.get('baseline_key', report['platform'])
         lines += ['Runner CPU: %s (%s)' % (report['cpu'], 'baseline `%s`' % key if key else
-                  '**not gated**: no baseline for this CPU model yet -- the calibration rows '
-                  'below add one'), '']
+                  '**no baseline for this CPU model** -- the gate fails until one is added; '
+                  'see below'), '']
     if report.get('error'):
         lines += ['**The performance gate could not complete:** `%s`' % report['error'], '']
     regressions = []
@@ -511,13 +521,22 @@ def render_markdown(report):
         lines += ['', '\\* No CPU affinity on this platform: both arms are told the core count '
                   + '(`CN1_GC_MARK_THREADS`, `-XX:ActiveProcessorCount`) but neither is confined to it.']
     if report.get('calibration'):
-        lines += ['', '<details><summary>Baseline entry for %s</summary>' % report['platform'], '',
-                  '```json', json.dumps({report['platform']: report['calibration']}, indent=1),
+        target = report.get('calibration_key') or report['platform']
+        lines += ['', '**No baseline for %d row%s on `%s`, so this gate fails.** Add them from '
+                  'this job\'s `perf-results.json` (in its uploaded artifact) and commit the '
+                  'result:' % (sum(len(v) for v in report['calibration'].values()),
+                               '' if sum(len(v) for v in report['calibration'].values()) == 1
+                               else 's', target), '',
+                  '```', 'python3 vm/selfhost/calibrate-perf-baseline.py perf-results.json', '```',
+                  '', '<details><summary>The rows it will add</summary>', '',
+                  '```json', json.dumps({target: report['calibration']}, indent=1),
                   '```', '', '</details>']
     lines += ['', '**Result: %s**' % (
         'performance regression' if report['regression'] else
         ('gate did not complete' if report.get('error') else
-         ('benchmark failed' if report.get('failures') else 'no regression')))]
+         ('benchmark failed' if report.get('failures') else
+          ('no baseline: calibration required' if missing_baselines(report)
+           else 'no regression'))))]
     return '\n'.join(lines) + '\n'
 
 
@@ -667,6 +686,8 @@ def main(argv):
                          status_cell(entry)), flush=True)
                 write()
         report['calibration'] = calibration
+        cls = cpu_class(report['cpu'])
+        report['calibration_key'] = '%s@%s' % (args.platform, cls) if cls else args.platform
     except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
         # A gate that could not measure is a failed gate, and it says why in the comment.
         report['error'] = str(error).strip().splitlines()[0][:300]
@@ -676,9 +697,11 @@ def main(argv):
     write()
     print(render_markdown(report))
     failed = bool(report.get('failures'))
+    uncalibrated = bool(missing_baselines(report))
     print('perf-gate: %s' % ('REGRESSION' if report['regression'] else
-                             ('FAILED' if failed else 'OK')))
-    return 1 if report['regression'] or failed else 0
+                             ('FAILED' if failed else
+                              ('NO BASELINE' if uncalibrated else 'OK'))))
+    return 1 if report['regression'] or failed or uncalibrated else 0
 
 
 if __name__ == '__main__':

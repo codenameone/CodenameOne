@@ -54,6 +54,18 @@ if report.get('regression'):
     print('ParparVM performance REGRESSION on %s:' % report['platform'])
     print('\n'.join(lines))
     sys.exit(1)
+missing = [(b, c) for b, per in report['results'].items() for c, e in per.items()
+           if 'failed' not in e and 'uncalibrated' in (e['time']['verdict'], e['memory']['verdict'])]
+if missing or report.get('calibration'):
+    # A missing baseline fails rather than passing unjudged: a gate that goes quiet
+    # whenever it cannot judge stops preventing regressions without anyone noticing.
+    key = report.get('calibration_key') or report['platform']
+    print('ParparVM performance gate: NO BASELINE on %s for %s (runner CPU: %s).'
+          % (report['platform'], key, report.get('cpu', 'unknown')))
+    print('Add it from this job\'s perf-results.json and commit perf-baseline.json:')
+    print('  python3 vm/selfhost/calibrate-perf-baseline.py perf-results.json')
+    print(json.dumps({key: report.get('calibration') or sorted(missing)}, indent=1))
+    sys.exit(1)
 print('ParparVM performance gate: no regression on %s' % report['platform'])
 PY
 fi
