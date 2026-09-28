@@ -680,6 +680,25 @@ XCODE_BUILD_CMD=(
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
 )
+# Every simulator build gets an xcconfig, even when ARCHS is not forced, because of
+# the watch app a companion project embeds. Its simulator ARCHS is $(ARCHS_STANDARD)
+# with ONLY_ACTIVE_ARCH, which reads as "follow the host" -- but the run destination
+# is an iPhone, so the watch target, built for a different platform, has no active
+# arch and compiles every standard one. On an arm64 runner that is an x86_64 watch
+# slice nothing can run: a full second ParparVM translation, a third of this step's
+# compile (measured: 3206 x86_64 units beside 3206 arm64 ones). Excluding every
+# simulator arch but BUILD_ARCH keeps the watch on the slice the app itself uses.
+# EXCLUDED_ARCHS rather than ARCHS, because the watch target sets ARCHS itself and
+# a target setting outranks an xcconfig; nothing sets its EXCLUDED_ARCHS.
+# run-ios-native-tests.sh writes the same line: it reuses this derived data, and a
+# watch whose settings differ is rebuilt from scratch.
+case "$BUILD_ARCH" in
+  x86_64) WATCH_SIM_EXCLUDED_ARCHS="arm64" ;;
+  *) WATCH_SIM_EXCLUDED_ARCHS="x86_64" ;;
+esac
+ARCH_XCCONFIG="$(mktemp -t cn1-ios-archs).xcconfig"
+printf 'EXCLUDED_ARCHS[sdk=watchsimulator*] = %s\n' "$WATCH_SIM_EXCLUDED_ARCHS" > "$ARCH_XCCONFIG"
+XCODE_BUILD_CMD+=(-xcconfig "$ARCH_XCCONFIG")
 if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ] || [ "$FORCE_SIMULATOR_ARCH" = "true" ]; then
   ri_log "Forcing simulator ARCHS=$BUILD_ARCH"
   # The override has to be scoped to the simulator SDK: unscoped, it is forced on
@@ -695,17 +714,13 @@ if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ] || [ "$FORCE_SIMULATOR_ARCH" = 
   # resources. An xcconfig is where the conditional syntax is actually evaluated,
   # and it sits below target-level settings, so the watch target's own
   # ARCHS[sdk=watchos*]=arm64_32 still wins where it applies.
-  ARCH_XCCONFIG="$(mktemp -t cn1-ios-archs).xcconfig"
   {
     printf 'ARCHS[sdk=iphonesimulator*] = %s\n' "$BUILD_ARCH"
     printf 'EXCLUDED_ARCHS[sdk=iphonesimulator*] = %s\n' "$SIMULATOR_EXCLUDED_ARCHS"
-  } > "$ARCH_XCCONFIG"
-  ri_log "Simulator arch xcconfig -> $ARCH_XCCONFIG"
-  XCODE_BUILD_CMD+=(
-    -xcconfig "$ARCH_XCCONFIG"
-    "ONLY_ACTIVE_ARCH=YES"
-  )
+  } >> "$ARCH_XCCONFIG"
+  XCODE_BUILD_CMD+=("ONLY_ACTIVE_ARCH=YES")
 fi
+ri_log "Simulator arch xcconfig -> $ARCH_XCCONFIG: $(tr '\n' ';' < "$ARCH_XCCONFIG")"
 # Optimize the translated C (Xcode's Debug config defaults to -O0). With -O0 the
 # scalar baseline is unvectorized, so the SIMD benchmark overstates the speedup;
 # -O2 lets the compiler auto-vectorize scalar, making the SIMD-vs-scalar
