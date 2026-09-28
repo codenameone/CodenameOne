@@ -275,6 +275,15 @@
                                         <exclude name="assets/iOS7Theme.res"/>
                                         <exclude name="assets/iPhoneTheme.res"/>
                                         <exclude name="assets/android_holo_light.res"/>
+                                        <!-- The gitignored mirrors scripts/build-native-themes.sh
+                                             writes here for local runs; the set below comes from
+                                             Themes/ and would otherwise ship twice. -->
+                                        <exclude name="assets/iOSModernTheme.res"/>
+                                        <exclude name="assets/iOSModern27Theme.res"/>
+                                        <exclude name="assets/AndroidMaterialTheme.res"/>
+                                        <exclude name="assets/WindowsFluentTheme.res"/>
+                                        <exclude name="assets/MacOSAquaTheme.res"/>
+                                        <exclude name="assets/GnomeAdwaitaTheme.res"/>
                                     </zipfileset>
                                     <!-- Native themes, straight from the single source of truth in
                                          Themes/ (kept in sync from the CSS sources by
@@ -291,7 +300,13 @@
                                          iOS-like browser and AndroidMaterialTheme.res everywhere
                                          else, and "legacy" to iPhoneTheme.res or androidTheme.res.
                                          Shipping only some of them is why opting in used to fall
-                                         back to the legacy theme instead of applying. -->
+                                         back to the legacy theme instead of applying.
+
+                                         The desktop themes are for nativeTheme=native in a desktop
+                                         browser, by the browser's OS, or javascript.desktopTheme.
+                                         The builders then delete whatever the application's hints
+                                         cannot reach (JavaScriptBuildHints.themesToShip), so an
+                                         app ships only what it can open. -->
                                     <zipfileset dir="${project.basedir}/../../Themes" prefix="webapp/assets">
                                         <include name="iOS7Theme.res"/>
                                         <include name="iPhoneTheme.res"/>
@@ -300,6 +315,9 @@
                                         <include name="androidTheme.res"/>
                                         <include name="android_holo_light.res"/>
                                         <include name="AndroidMaterialTheme.res"/>
+                                        <include name="WindowsFluentTheme.res"/>
+                                        <include name="MacOSAquaTheme.res"/>
+                                        <include name="GnomeAdwaitaTheme.res"/>
                                     </zipfileset>
                                 </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">

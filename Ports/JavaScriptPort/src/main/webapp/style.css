@@ -76,7 +76,10 @@ body::-webkit-scrollbar { width: 0 !important }
 
 .cn1-capture-dialog {
     position: fixed;
-    top: 10px;
+    /* --cn1-chrome-top is the height of the javascript.titleBar=html chrome (0 without it).
+       Fixed boxes are placed against the viewport, not the body the chrome moves down, so each
+       full-window overlay offsets itself or its top would sit under the chrome. */
+    top: calc(10px + var(--cn1-chrome-top, 0px));
     left: 10px;
     right: 10px;
     bottom: 10px;
@@ -90,7 +93,7 @@ body::-webkit-scrollbar { width: 0 !important }
 }
 .cn1-capture-preview-dialog {
     position: fixed;
-    top: 10px;
+    top: calc(10px + var(--cn1-chrome-top, 0px));
     left: 10px;
     right: 10px;
     bottom: 10px;
@@ -156,7 +159,7 @@ body::-webkit-scrollbar { width: 0 !important }
 
 div.cn1-image-capture-dialog {
     position: fixed;
-    top: 0;
+    top: var(--cn1-chrome-top, 0px);
     left: 0;
     bottom: 0;
     right: 0;
@@ -266,8 +269,9 @@ div.cn1-image-capture-dialog.state-accept-snapshot .dontuse-btn {
 
 div#cn1-video-capture {
     position:fixed;
+    top: var(--cn1-chrome-top, 0px);
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--cn1-chrome-top, 0px));
     background-color:black;
     
 }
@@ -298,3 +302,193 @@ div#cn1-video-capture > video {
     padding: 1mm;
 }
 
+
+/* The HTML title bar and menu bar of the javascript.titleBar=html build hint
+   (JavaScriptDesktopChrome). The port moves the body down by the chrome's height,
+   so the canvas and every overlay positioned inside the body start below it. The
+   heights are fixed so the port measures the chrome once. */
+#cn1-desktop-chrome {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 2147483647;
+    font: 13px system-ui, -apple-system, "Segoe UI", Cantarell, Ubuntu, sans-serif;
+    color: #1f1f1f;
+    background: #f3f3f3;
+    border-bottom: 1px solid #d6d6d6;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#cn1-desktop-chrome .cn1-chrome-title {
+    height: 30px;
+    line-height: 30px;
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar {
+    display: flex;
+    height: 28px;
+    padding: 0 4px;
+    align-items: stretch;
+    /* More menu titles than the window is wide -- a narrow window, or an application with
+       several menus of its own -- would push the last ones past the edge, where the body's
+       overflow: hidden made them unreachable. The bar scrolls sideways instead (the wheel is
+       mapped onto it in browser_bridge.js), without a scrollbar eating into its fixed height.
+       Scrolling clips whatever overflows the bar, which is why the panels are fixed-positioned
+       below rather than hanging off their menu. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menubar::-webkit-scrollbar {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menu {
+    flex-shrink: 0;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary {
+    list-style: none;
+    height: 100%;
+    line-height: 28px;
+    padding: 0 10px;
+    border-radius: 4px;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary::-webkit-details-marker {
+    display: none;
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+#cn1-desktop-chrome .cn1-chrome-menu[open] > summary {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu > summary:focus-visible,
+#cn1-desktop-chrome .cn1-chrome-menu-item:focus-visible {
+    outline: 2px solid #0067c0;
+    outline-offset: -2px;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-items {
+    /* Placed against the window, under its menu's title, by browser_bridge.js when the menu
+       opens; these are the fallback until it has. */
+    position: fixed;
+    left: 4px;
+    top: var(--cn1-chrome-top, 59px);
+    /* 200px, unless the window is narrower: a min-width wins over max-width, so a plain 200px
+       would push the panel past the edge of a very narrow window. */
+    min-width: min(200px, calc(100vw - 8px));
+    /* As wide as its longest item, so a label wraps only when the window is too narrow: an
+       absolutely positioned box otherwise shrinks to its min-content, and a label that may
+       wrap anywhere has almost none. */
+    width: max-content;
+    /* Never wider than the window; browser_bridge.js also moves a panel that would run off
+       the right edge (a menu near the end of a wide menu bar in a narrow window). */
+    max-width: calc(100vw - 8px);
+    box-sizing: border-box;
+    /* A long menu scrolls inside the window: the body is fixed with overflow hidden, so a
+       panel taller than the viewport would put its last commands out of reach. */
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    background: #f9f9f9;
+    border: 1px solid #d6d6d6;
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: default;
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+    background: rgba(0, 0, 0, 0.07);
+}
+#cn1-desktop-chrome .cn1-chrome-menu-item[aria-disabled="true"] {
+    opacity: 0.45;
+}
+#cn1-desktop-chrome .cn1-chrome-icon {
+    display: inline-flex;
+    align-items: center;
+}
+#cn1-desktop-chrome .cn1-chrome-icon canvas {
+    display: block;
+}
+#cn1-desktop-chrome .cn1-chrome-shortcut {
+    opacity: 0.6;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+/* The panel's max-width only holds if its contents can shrink: a flex item keeps
+   min-width: auto -- the width of its longest word -- so a long unbroken command name would
+   push past the panel and be clipped by the body's overflow: hidden. The item and its label may
+   shrink, and the label wraps, anywhere if it has to; the shortcut keeps its own width. */
+#cn1-desktop-chrome .cn1-chrome-menu-item {
+    min-width: 0;
+}
+#cn1-desktop-chrome .cn1-chrome-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* macOS: the title centred in a lighter bar, the system font, rounded selection. */
+#cn1-desktop-chrome.cn1-chrome-mac {
+    background: #ececec;
+    border-bottom-color: #cfcfcf;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-title {
+    text-align: center;
+    font-weight: 600;
+}
+#cn1-desktop-chrome.cn1-chrome-mac .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+    background: #0a64d8;
+    color: #fff;
+}
+
+/* GNOME: a HeaderBar-style bar with the title centred in bold. */
+#cn1-desktop-chrome.cn1-chrome-linux {
+    background: #ebebeb;
+    border-bottom-color: #d4d4d4;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-title {
+    text-align: center;
+    font-weight: 700;
+}
+#cn1-desktop-chrome.cn1-chrome-linux .cn1-chrome-menu-items {
+    border-radius: 12px;
+}
+
+/* The menu text colours below (#1f1f1f, #f0f0f0) are also the colours HTML5Implementation
+   draws material command icons in; change them together. */
+@media (prefers-color-scheme: dark) {
+    #cn1-desktop-chrome {
+        color: #f0f0f0;
+        background: #202020;
+        border-bottom-color: #3a3a3a;
+    }
+    #cn1-desktop-chrome.cn1-chrome-mac {
+        background: #2c2c2c;
+    }
+    #cn1-desktop-chrome.cn1-chrome-linux {
+        background: #303030;
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu > summary:hover,
+    #cn1-desktop-chrome .cn1-chrome-menu[open] > summary,
+    #cn1-desktop-chrome .cn1-chrome-menu-item:hover:not([aria-disabled="true"]) {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    #cn1-desktop-chrome .cn1-chrome-menu-items {
+        background: #2b2b2b;
+        border-color: #3f3f3f;
+    }
+}

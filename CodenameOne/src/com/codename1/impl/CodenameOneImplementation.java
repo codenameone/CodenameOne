@@ -3725,6 +3725,20 @@ public abstract class CodenameOneImplementation {
         Display.getInstance().pointerPressed(x, y);
     }
 
+    /// Subclasses invoke this when the platform abandons the pointer gesture in progress without
+    /// a release -- a cancelled touch. It fires nothing; see `Display#pointerCancelled(int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer's last x position
+    ///
+    /// - `y`: the pointer's last y position
+    protected void pointerCancelled(int x, int y) {
+        dragStarted = false;
+        dragActivationCounter = 0;
+        Display.getInstance().pointerCancelled(x, y);
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
@@ -6800,6 +6814,18 @@ public abstract class CodenameOneImplementation {
     /// true if this is a desktop application
     public boolean isDesktop() {
         return false;
+    }
+
+    /// Whether the primary pointer is a mouse, so a press-drag can be claimed for selecting text
+    /// without taking the gesture that scrolls. Defaults to [#isDesktop()]; a port whose desktop
+    /// classification can include touch devices (a browser on a tablet that reports a desktop
+    /// user agent) answers from the pointer itself.
+    ///
+    /// #### Returns
+    ///
+    /// true when the primary pointer is a precise, mouse-like device
+    public boolean isPrimaryPointerMouse() {
+        return isDesktop();
     }
 
     /// Indicates whether the application is running on a smartwatch form factor

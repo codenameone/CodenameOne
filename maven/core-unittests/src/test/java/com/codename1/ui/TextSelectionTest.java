@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -89,6 +111,66 @@ class TextSelectionTest extends UITestBase {
         assertFalse(selection.isEnabled());
         assertEquals(1, implementation.getDeinitializeTextSelectionCount());
         assertSame(selection, implementation.getLastDeinitializedTextSelection());
+    }
+
+    @FormTest
+    void disablingRemovesEveryListenerEnablingAdded() {
+        Form form = Display.getInstance().getCurrent();
+        TextSelection selection = form.getTextSelection();
+        int before = longPressListenerCount(form);
+        selection.setEnabled(true);
+        assertEquals(before + 1, longPressListenerCount(form));
+        selection.setEnabled(false);
+        // The disable path used to ADD the long press listener a second time instead of
+        // removing it, so a long press kept driving a selection that was switched off.
+        assertEquals(before, longPressListenerCount(form));
+    }
+
+    private static int longPressListenerCount(Component c) {
+        return c.longPressListeners == null ? 0 : c.longPressListeners.getListenerCollection().size();
+    }
+
+    @FormTest
+    void defaultSelectableAppliesToReadOnlyTextOnly() {
+        try {
+            Label label = new Label("text");
+            Button button = new Button("button");
+            TextArea readOnly = new TextArea("read only");
+            readOnly.setEditable(false);
+            TextArea editable = new TextArea("editable");
+            assertFalse(label.isTextSelectionEnabled(), "off by default");
+
+            TextSelection.setDefaultSelectable(true);
+            assertTrue(label.isTextSelectionEnabled());
+            assertTrue(readOnly.isTextSelectionEnabled());
+            assertFalse(button.isTextSelectionEnabled(), "a button's press is its action");
+            assertFalse(editable.isTextSelectionEnabled(), "editing owns an editable field's presses");
+            assertTrue(label.getTextSelectionSupport().isTextSelectionEnabled(null));
+
+            // An explicit choice outranks the default in both directions.
+            label.setTextSelectionEnabled(false);
+            assertFalse(label.isTextSelectionEnabled());
+            button.setTextSelectionEnabled(true);
+            assertTrue(button.isTextSelectionEnabled());
+        } finally {
+            TextSelection.setDefaultSelectable(false);
+        }
+    }
+
+    @FormTest
+    void defaultSelectableSkipsTextInsideALeadComponent() {
+        try {
+            TextSelection.setDefaultSelectable(true);
+            Container lead = new Container();
+            Button leadButton = new Button("lead");
+            Label inside = new Label("inside");
+            lead.add(leadButton).add(inside);
+            lead.setLeadComponent(leadButton);
+            assertFalse(inside.isTextSelectionEnabled(), "the press belongs to the lead component");
+            assertTrue(new Label("outside").isTextSelectionEnabled());
+        } finally {
+            TextSelection.setDefaultSelectable(false);
+        }
     }
 
     @FormTest

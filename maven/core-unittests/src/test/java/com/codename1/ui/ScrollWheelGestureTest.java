@@ -171,6 +171,67 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelPastTheEndOfThePageLeavesTheFormWhereItIs() {
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pageMax = page.getScrollDimension().getHeight() - page.getHeight();
+        for (int i = 0; i < 200 && page.getScrollY() < pageMax; i++) {
+            wheelAt(x, y, 0, -px(20));
+        }
+        assertEquals(pageMax, page.getScrollY(), "the page reaches its end");
+
+        // Issue #5910. The form answers isScrollableY() for its content pane, so the walk used
+        // to carry on to the form itself and scroll THAT: the Toolbar went off the top with
+        // the content and the space it left was blank.
+        for (int i = 0; i < 5; i++) {
+            wheelAt(x, y, 0, -px(20));
+        }
+        assertEquals(0, f.getScrollY(), "the form itself never scrolls");
+        assertEquals(pageMax, page.getScrollY(), "and the page stays at its end");
+    }
+
+    @FormTest
+    void aWheelOverTheTitleScrollsThePage() {
+        // The walk from the title area never passes through the content pane, so stopping at
+        // the form -- the fix for #5910 -- left a wheel over the Toolbar doing nothing while the
+        // page below it could still scroll. The form's content pane is scrolled in its place.
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        Component title = f.getTitleArea();
+        assertTrue(title.getHeight() > 0, "the form has a title area to put the pointer over");
+        assertFalse(page.contains(title), "and it lies outside the content pane");
+
+        wheel(title, 0, -px(20));
+
+        assertTrue(page.getScrollY() > 0, "a wheel over the title scrolls the page");
+        assertEquals(0, f.getScrollY(), "never the form itself");
+    }
+
+    @FormTest
+    void aWheelOverAnEmbeddedFormStillMovesThePageAroundIt() {
+        // The walk stops at the ROOT top level only. An embedded Form answers isScrollableY()
+        // for its own content pane just like the root, so it must never be moved itself -- but
+        // the page hosting it still takes the wheel.
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        Form embedded = new Form("embedded", new BorderLayout());
+        embedded.add(BorderLayout.CENTER, new Label("body"));
+        embedded.setPreferredH(px(40));
+        page.addComponent(0, embedded);
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        int x = embedded.getAbsoluteX() + embedded.getWidth() / 2;
+        int y = embedded.getAbsoluteY() + embedded.getHeight() / 2;
+        wheelAt(x, y, 0, -px(20));
+
+        assertTrue(page.getScrollY() > 0, "the page around the embedded form scrolls");
+        assertEquals(0, embedded.getScrollY(), "and the embedded form itself does not");
+    }
+
+    @FormTest
     void aWheelPastTheEndOfAnInnerScrollerMovesThePage() {
         Form f = scrollingForm();
         Container page = f.getContentPane();

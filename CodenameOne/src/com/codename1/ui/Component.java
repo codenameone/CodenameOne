@@ -177,6 +177,9 @@ public class Component implements Animation, StyleListener, Editable {
     /// is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
     /// Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
     static int restoreDragPercentage = -1;
+    /// Client property on the top level holding the release listener a material pull-to-refresh
+    /// armed; see `#updateMaterialPullToRefresh`.
+    static final String PULL_TO_REFRESH_RELEASE = "cn1$pullToRefreshRelease";
     /// A flag to dictate whether style changes should trigger a revalidate() call
     /// on the component's parent.  Eventually we would like to phase this to be false
     /// but for now, we'll leave it as true.
@@ -5723,14 +5726,20 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
                     final Container pc = p.asContainer();
-                    pc.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                    ActionListener<ActionEvent> onRelease = new ActionListener<ActionEvent>() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
+                            pc.putClientProperty(PULL_TO_REFRESH_RELEASE, null);
                             pointerReleaseMaterialPullToRefresh();
                             pc.removePointerReleasedListener(this);
                             evt.consume();
                         }
-                    });
+                    };
+                    // Recorded so a cancelled gesture can withdraw it (Form#pointerCancelled):
+                    // left in place it would run the refresh on the next, unrelated release --
+                    // and consume that release.
+                    pc.putClientProperty(PULL_TO_REFRESH_RELEASE, onRelease);
+                    pc.addPointerReleasedListener(onRelease);
                 } else {
                     Component cc = c.getComponentAt(0);
                     if (cc instanceof InfiniteProgress) {
@@ -7545,6 +7554,45 @@ public class Component implements Animation, StyleListener, Editable {
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.removeListener(l);
         }
+    }
+
+    /// Ends a gesture on this component that the platform cancelled (see
+    /// `Form#pointerCancelled(int, int)`), without anything a release would report: no
+    /// pointer-released listeners, no drop. A lightweight drag-and-drop is abandoned, the source
+    /// shown again; a scroll the gesture was dragging is settled -- its tensile snap-back or
+    /// momentum -- exactly as the release's own handling would, minus the callbacks.
+    void pointerCancelledImpl(int x, int y) {
+        // The press lowered the drag threshold for a draggable component; only the release path
+        // put it back, so after a cancelled drag the next gesture became a drag or a scroll from
+        // a movement of a few pixels.
+        if (restoreDragPercentage > -1) {
+            Display.getInstance().setDragStartPercentage(restoreDragPercentage);
+        }
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.dragAndDropInitialized) {
+            cancelLightweightDrag();
+            return;
+        }
+        leadParent.inPinch = false;
+        // A pull-to-refresh pulled past its threshold is armed by the release and run when it
+        // settles. A cancelled pull only settles back: the marker is cleared and the content
+        // returns to the top, so a palm or a focus change never triggers the refresh.
+        if (leadParent.refreshTask != null && leadParent.dragActivated
+                && leadParent.isScrollableY() && leadParent.scrollY < 0) {
+            leadParent.putClientProperty("$pullToRelease", null);
+            leadParent.dragActivated = false;
+            leadParent.startTensile(leadParent.scrollY, 0, true);
+            return;
+        }
+        if (leadParent.draggingScrollThumbY || leadParent.draggingScrollThumbX) {
+            leadParent.draggingScrollThumbY = false;
+            leadParent.draggingScrollThumbX = false;
+            leadParent.dragActivated = false;
+            leadParent.repaint();
+            return;
+        }
+        pointerReleaseImpl(x, y);
+        leadParent.scrollOpacity = 0xff;
     }
 
     private void pointerReleaseImpl(int x, int y) {
