@@ -2428,6 +2428,82 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a request finishing during a memory-store login does not undo its rotation")
+    void concurrentRequestKeepsTheLoginsRotation() throws Exception {
+        final CountDownLatch rotated = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request)
+                                    throws Exception {
+                                String t = request.getTarget();
+                                if (t.startsWith("/in")) {
+                                    request.getSession(true).setAttribute("visits", "1");
+                                    return HttpServer.Response.text(200, "in");
+                                }
+                                if (t.startsWith("/login")) {
+                                    HttpSession s = request.getSession(false);
+                                    s.changeSessionId();          // fixation defence
+                                    s.setAttribute("user", "ada");
+                                    rotated.countDown();
+                                    release.await(10, TimeUnit.SECONDS);
+                                    return HttpServer.Response.text(200, "login");
+                                }
+                                HttpSession s = request.getSession(false);
+                                return HttpServer.Response.text(200, s == null ? "none"
+                                        : String.valueOf(s.getAttribute("user")));
+                            }
+                        }};
+                    }
+                }).start();
+        try {
+            HttpURLConnection in = open(port, "/in");
+            assertEquals("in", read(in));
+            String cookie = in.getHeaderField("Set-Cookie");
+            final String old = cookie.substring(0, cookie.indexOf(';'));
+            final int p = port;
+            final String[] loginCookie = new String[1];
+            Thread login = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        HttpURLConnection c = open(p, "/login");
+                        c.setRequestProperty("Cookie", old);
+                        read(c);
+                        loginCookie[0] = c.getHeaderField("Set-Cookie");
+                    } catch (IOException err) {
+                        loginCookie[0] = String.valueOf(err);
+                    }
+                }
+            });
+            login.start();
+            assertTrue(rotated.await(10, TimeUnit.SECONDS));
+            HttpURLConnection meanwhile = open(port, "/peek");   // the old cookie, mid-login
+            meanwhile.setRequestProperty("Cookie", old);
+            read(meanwhile);
+            release.countDown();
+            login.join(10000);
+            assertNotNull(loginCookie[0], "the login's rotation was undone: no new cookie");
+            String rotatedPair = loginCookie[0].substring(0, loginCookie[0].indexOf(';'));
+            assertFalse(rotatedPair.equals(old), "the login announced the old id");
+            HttpURLConnection attacker = open(port, "/me");
+            attacker.setRequestProperty("Cookie", old);
+            assertFalse("ada".equals(read(attacker)),
+                    "the old, pre-login id carries the signed-in session");
+            HttpURLConnection user = open(port, "/me");
+            user.setRequestProperty("Cookie", rotatedPair);
+            assertEquals("ada", read(user));
+        } finally {
+            release.countDown();
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a rotation whose save fails leaves the session and its beans under the old id")
     void failedRotationSaveIsUndone() throws Exception {
         final SessionStore inner = new Sessions().getStore();

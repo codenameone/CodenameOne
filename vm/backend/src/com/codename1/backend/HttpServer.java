@@ -596,17 +596,20 @@ public final class HttpServer {
                         + "Backend.builder(), which stores them and sends their cookie");
             }
             Sessions owner = sessions;
+            String presented = sessionResolved ? null
+                    : Sessions.cookieValue(getHeader("cookie"), owner.getCookieName());
             try {
-                session = owner.find(sessionResolved ? null
-                        : Sessions.cookieValue(getHeader("cookie"), owner.getCookieName()),
-                        create);
+                session = owner.find(presented, create);
             } catch (IOException err) {
                 throw new IllegalStateException("The session store failed: "
                         + err.getMessage(), err);
             }
             sessionResolved = true;
             if (session != null) {
-                owner.enter(this, session);
+                // Found under the cookie it was looked up by; a session this
+                // request created was found under its own id.
+                owner.enter(this, session, session.isNew() || presented == null
+                        ? session.getId() : presented);
             }
             return session;
         }

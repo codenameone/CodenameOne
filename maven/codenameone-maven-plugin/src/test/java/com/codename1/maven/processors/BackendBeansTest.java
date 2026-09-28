@@ -752,6 +752,7 @@ public class BackendBeansTest {
                 + "        return AsyncResult.of(\"done\");\n"
                 + "    }\n"
                 + "    @ManagedOperation @Async public void refresh() { }\n"
+                + "    @ManagedAttribute public Future getLevel() { return AsyncResult.of(1); }\n"
                 + "}\n");
         String errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("@McpTool method com.example.Tools.pending returns "
@@ -759,6 +760,8 @@ public class BackendBeansTest {
         assertTrue(errors, errors.contains("@ManagedOperation com.example.Ops.rebuild returns "
                 + "a Future"));
         assertFalse(errors, errors.contains("com.example.Ops.refresh"));
+        assertTrue(errors, errors.contains("@ManagedAttribute com.example.Ops.getLevel returns "
+                + "a Future"));
     }
 
     @Test

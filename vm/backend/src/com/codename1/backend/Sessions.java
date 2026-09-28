@@ -348,6 +348,14 @@ public final class Sessions {
             session.undoRotation(previous);
             previous = null;
         }
+        if (previous != null && request != null && !session.isNew()
+                && !session.rotatedFor(request)) {
+            // Another request's rotation, still in flight on the shared object:
+            // that request stores it and sends the new id when it finishes. This
+            // one announces nothing, and leaves the rotation pending for it.
+            keep(session, null);
+            return response;
+        }
         if (response == null && session.isValid() && (session.isNew() || previous != null)) {
             // No response of the handler's to carry a cookie -- it returned
             // nothing, or threw, and the server answers 404 or 500 itself. A new
@@ -503,7 +511,20 @@ public final class Sessions {
     private final Map retired = new HashMap();
 
     /// A request has resolved `session`; counted until [#leave].
-    synchronized void enter(HttpServer.Request request, HttpSession session) {
+    void enter(HttpServer.Request request, HttpSession session) {
+        enter(request, session, session.getId());
+    }
+
+    /// [#enter(HttpServer.Request, HttpSession)], recording `foundUnder` -- the
+    /// id the request looked the session up by, its cookie -- as the one it found
+    /// it under. Not the object's current id: the memory store hands every request
+    /// the SAME object, and one arriving while a login is rotating it read the new
+    /// id there. finish() then took the login's own rotation for one already
+    /// announced by another request and undid it -- the authenticated attributes
+    /// stayed under the old, attacker-known id and no response sent the new one,
+    /// which is exactly what the rotation exists to prevent.
+    synchronized void enter(HttpServer.Request request, HttpSession session,
+                            String foundUnder) {
         if (request.sessionsInUse == null) {
             request.sessionsInUse = new ArrayList(1);
         } else if (request.sessionsInUse.contains(session)) {
@@ -513,7 +534,7 @@ public final class Sessions {
         if (request.sessionIdsFound == null) {
             request.sessionIdsFound = new HashMap();
         }
-        request.sessionIdsFound.put(session, session.getId());
+        request.sessionIdsFound.put(session, foundUnder);
         int[] count = (int[]) inUse.get(session);
         if (count == null) {
             count = new int[1];

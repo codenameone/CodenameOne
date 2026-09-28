@@ -90,6 +90,7 @@ public final class OtlpMetricExporter implements MetricReader {
         if (config.getBoolean(OtlpTracer.DISABLED, false) || !config.getBoolean(ENABLED, true)) {
             return false;
         }
+        awaitPreviousRun();
         // Read into locals and applied only once accepted: this instance may
         // already be exporting for another server, and a second open() that
         // wrote its endpoint, headers and resource before being refused
@@ -199,6 +200,41 @@ public final class OtlpMetricExporter implements MetricReader {
             return false;
         }
         return rejected[0] > 0 || (message[0] != null && message[0].length() > 0);
+    }
+
+    /// How long a reopen waits for this exporter's previous thread to finish.
+    private static final long PREVIOUS_RUN_WAIT_MILLIS = 60000;
+
+    /// Waits for the thread of this exporter's previous open() to exit. A
+    /// shutdown with a short or zero timeout leaves it finishing its last export,
+    /// and a reopen that went ahead reconfigured the instance under it and
+    /// started a second loop beside it -- two threads calling the gauges and
+    /// sending the same cumulative stream. Refused if it outlasts the wait.
+    private void awaitPreviousRun() throws IOException {
+        synchronized (OPEN) {
+            if (OPEN.contains(this)) {
+                return;                   // still open: the check below refuses it
+            }
+        }
+        Thread previous;
+        synchronized (lock) {
+            previous = thread;
+        }
+        if (previous == null || previous == Thread.currentThread() || !previous.isAlive()) { //NOPMD CompareObjectsWithEquals - the thread itself, by identity
+            return;
+        }
+        try {
+            previous.join(PREVIOUS_RUN_WAIT_MILLIS);
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for this metrics exporter's previous "
+                    + "export to finish", err);
+        }
+        if (previous.isAlive()) {
+            throw new IOException("This metrics exporter's previous run is still exporting; "
+                    + "stop it with a longer timeout, or give the new server its own "
+                    + "exporter");
+        }
     }
 
     /// Whether two header lists name the same headers, in any order.

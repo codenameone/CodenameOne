@@ -1519,6 +1519,15 @@ final class BackendBeans {
                             + "that takes no arguments and returns a value.");
                     continue;
                 }
+                if (returnsFuture(m) || wovenAsync(cls, m)) {
+                    // Read and written as its value: a pending task -- a woven
+                    // @Async getter's, or any Future -- came out as the task's
+                    // toString(), a successful reading of nothing, its failure lost.
+                    ctx.error(cls, "@ManagedAttribute " + where + " returns a Future or is "
+                            + "@Async. An attribute is read as the value its getter returns, so "
+                            + "the reader would get a pending task; return the value itself.");
+                    continue;
+                }
                 if (managed.attributeNames.contains(attributeName(m.getName()))) {
                     ctx.error(cls, "@ManagedAttribute " + where + " has the attribute name "
                             + attributeName(m.getName()) + ", which another getter of "

@@ -173,8 +173,36 @@ public final class HttpSession {
             }
             id = next;
             dirty = true;
+            rotatedBy = SERVING.get();
         }
         return next;
+    }
+
+    /// The request the server is serving on this thread, for [#changeSessionId]
+    /// to record who rotated.
+    private static final ThreadLocal SERVING = new ThreadLocal();
+
+    /// The request that rotated this session, or null outside a request.
+    private Object rotatedBy;
+
+    /// Marks `request` as the one this thread serves; answers what to restore.
+    static Object enterRequest(Object request) {
+        Object previous = SERVING.get();
+        SERVING.set(request);
+        return previous;
+    }
+
+    static void leaveRequest(Object previous) {
+        SERVING.set(previous);
+    }
+
+    /// Whether a pending rotation is `request`'s own to store and announce.
+    /// The memory store hands every request one shared object, so a request can
+    /// find another's login halfway through: finishing THAT rotation stored it
+    /// and sent the new id in its own response -- to whoever presented the old
+    /// cookie, the attacker in a fixation -- and the login announced nothing.
+    synchronized boolean rotatedFor(Object request) {
+        return rotatedBy == null || rotatedBy == request; //NOPMD CompareObjectsWithEquals - the request itself, by identity
     }
 
     private void checkValid() {
@@ -215,6 +243,7 @@ public final class HttpSession {
         dirty = false;
         fresh = false;
         previousId = null;
+        rotatedBy = null;
         rotationLost = false;
         changed.clear();
         maxInactiveChanged = false;
@@ -234,6 +263,7 @@ public final class HttpSession {
     synchronized void undoRotation(String previous) {
         id = previous;
         previousId = null;
+        rotatedBy = null;
     }
 
     synchronized void markRotationLost() {

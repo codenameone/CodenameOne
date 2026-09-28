@@ -833,6 +833,8 @@ public final class Backend {
             inFlight.enter();
             Object previousTasks = Tasks.enter(tasks);
             Object previousOwner = Tracing.own(tracer);
+            // Who rotates a session: see HttpSession.rotatedFor.
+            Object previousServing = HttpSession.enterRequest(request);
             if (track) {
                 previous = CURRENT_REQUEST.get();
                 CURRENT_REQUEST.set(request);
@@ -935,6 +937,7 @@ public final class Backend {
                         }
                         Tasks.leave(previousTasks);
                         Tracing.disown(previousOwner);
+                        HttpSession.leaveRequest(previousServing);
                         // Last: a stop() this request made tears down only now.
                         inFlight.leave();
                     }
