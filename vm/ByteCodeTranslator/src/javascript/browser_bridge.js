@@ -1771,6 +1771,26 @@
   // without losing information. We extend this as more event types show
   // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
   // covered below.
+  function serializeTouchList(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i] || (typeof list.item === 'function' ? list.item(i) : null);
+      if (!t) {
+        continue;
+      }
+      out.push({
+        identifier: t.identifier | 0,
+        clientX: +t.clientX || 0,
+        clientY: +t.clientY || 0,
+        pageX: +t.pageX || 0,
+        pageY: +t.pageY || 0,
+        screenX: +t.screenX || 0,
+        screenY: +t.screenY || 0
+      });
+    }
+    return out;
+  }
+
   function serializeEventForWorker(evt) {
     if (evt == null || typeof evt !== 'object') {
       return evt;
@@ -1789,6 +1809,8 @@
     if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
     if ('screenX' in evt) out.screenX = +evt.screenX || 0;
     if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('pointerType' in evt) out.pointerType = evt.pointerType == null ? '' : String(evt.pointerType);
+    if ('pointerId' in evt) out.pointerId = evt.pointerId | 0;
     if ('button'  in evt) out.button  = evt.button  | 0;
     if ('buttons' in evt) out.buttons = evt.buttons | 0;
     if ('detail'  in evt) out.detail  = evt.detail  | 0;
@@ -1848,12 +1870,22 @@
     if (evt.source && typeof storeHostRef === 'function') out.source = storeHostRef(evt.source);
     // preventDefault / stopPropagation are fire-and-forget from the worker
     // side (we eagerly call them on the main-thread event just in case).
-    // touches arrays are serialised shallow — most user code reads the
-    // first touch's clientX/Y which is the same as the top-level fields
-    // except on real multi-touch, but the port.js shims use the flat
-    // fields already.
+    //
+    // A TouchEvent has no clientX/clientY of its own: its coordinates live
+    // only in the three touch lists, so those are copied point by point.
+    // They used to be left out on the theory that the flat fields covered
+    // them, and they do not exist on a touch event -- the port's touch
+    // handlers read getTargetTouches(), got null and threw on every touch,
+    // so a phone could neither scroll nor reliably tap (issue #5912).
+    if (evt.touches) out.touches = serializeTouchList(evt.touches);
+    if (evt.targetTouches) out.targetTouches = serializeTouchList(evt.targetTouches);
+    if (evt.changedTouches) out.changedTouches = serializeTouchList(evt.changedTouches);
     if (evt.target && typeof storeHostRef === 'function') {
       out.target = storeHostRef(evt.target);
+    }
+    if (evt.type === 'copy' && evt.target && typeof evt.target.getAttribute === 'function'
+        && evt.target.getAttribute('data-cn1-self-copy') === '1') {
+      out.cn1SelfCopy = true;
     }
     if (evt.currentTarget && typeof storeHostRef === 'function') {
       out.currentTarget = storeHostRef(evt.currentTarget);
@@ -3865,6 +3897,10 @@
     }
     var textArea = doc.createElement('textarea');
     textArea.setAttribute('readonly', '');
+    // Marks the copy event execCommand raises below as ours: serializeEventForWorker reports it
+    // as cn1SelfCopy, and the port's document copy listener leaves it alone instead of copying
+    // again -- which would fall back here again and cycle.
+    textArea.setAttribute('data-cn1-self-copy', '1');
     textArea.style.position = 'fixed';
     textArea.style.top = '-1000px';
     textArea.style.left = '0';
@@ -7007,6 +7043,180 @@
     window.addEventListener('pointerdown', evaluate, true);
   }
   try { installPeerPointerToggle(); } catch (e) { /* non-fatal */ }
+
+  // Keyboard accelerators of the HTML menu bar (javascript.titleBar=html). The menu items carry
+  // data-cn1-accel ("primary[+alt][+shift]+<key>"); a matching key press activates the item with
+  // a click, which reaches the app through the item's ordinary listener. Matched HERE, on the main
+  // thread and in the capture phase, because only here can the default be prevented: the worker
+  // sees the event after the browser has acted on it, so Ctrl/Cmd+S would have opened the
+  // browser's Save dialog as well. Only primary-modifier combinations are claimed, so ordinary
+  // typing is never intercepted.
+  function installMenuAccelerators() {
+    // The unshifted character on a physical key, for the keys whose typed character a modifier
+    // changes: Shift+1 reports e.key "!" and Option+S on a Mac reports "\u00df", while the
+    // command was configured with "1" and "s".
+    var CODE_KEYS = { Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Backquote: '`', Comma: ',', Period: '.', Slash: '/',
+      Backslash: '\\' };
+    function baseKey(code) {
+      if (!code) {
+        return '';
+      }
+      if (/^Key[A-Z]$/.test(code)) {
+        return code.charAt(3).toLowerCase();
+      }
+      if (/^(Digit|Numpad)[0-9]$/.test(code)) {
+        return code.charAt(code.length - 1);
+      }
+      return CODE_KEYS[code] || '';
+    }
+    function editable(t) {
+      return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+    }
+    document.addEventListener('keydown', function(e) {
+      if (!(e.ctrlKey || e.metaKey || e.altKey) || e.repeat) {
+        return;
+      }
+      // AltGr is how many layouts type characters (@ is AltGr+Q on a German keyboard), and on
+      // Windows and Linux it reports ctrlKey AND altKey -- a Ctrl+Alt shortcut to everything
+      // below. A key typed with it is text, never a command.
+      if (e.getModifierState && e.getModifierState('AltGraph')) {
+        return;
+      }
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      // The primary modifier is Command on a Mac and Control everywhere else, as the menu
+      // displays it (the chrome's class names the OS). Accepting either would claim Ctrl+S on a
+      // Mac, or Win+S on Windows, for a command shown as the other.
+      var mac = (' ' + chrome.className + ' ').indexOf(' cn1-chrome-mac ') >= 0;
+      var primary = mac ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+      var altOnly = e.altKey && !e.ctrlKey && !e.metaKey;
+      if (!primary && !altOnly) {
+        return;
+      }
+      // Option is how a Mac keyboard types accented and special characters, so an Alt-only
+      // shortcut is left alone while the user is typing into a field there.
+      if (altOnly && mac && editable(e.target)) {
+        return;
+      }
+      var prefix = (primary ? 'primary' + (e.altKey ? '+alt' : '') : 'alt') + (e.shiftKey ? '+shift' : '');
+      // The typed character is the key: it is what the user's layout puts there, and on AZERTY
+      // the key typing "a" reports code "KeyQ". The physical key's US character is only a
+      // fallback when the typed character cannot be what the command was configured with:
+      // Shift or Alt turned it into something that is not a letter or a digit ("!" for
+      // Shift+1, a symbol for Option+S), or the layout is not Latin (Ctrl+S types a Cyrillic
+      // letter on a Russian layout, where desktop apps fall back to the key's Latin letter).
+      // Never for a Latin layout difference, where it would run the Ctrl+Q command for a
+      // press of Ctrl+A.
+      var keys = [];
+      var typed = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (typed) {
+        keys.push(typed);
+      }
+      if (!/^[a-z0-9]$/.test(typed)
+          && (e.shiftKey || e.altKey || !/^[\x20-\x7e]$/.test(typed))) {
+        var base = baseKey(e.code);
+        if (base && base !== typed) {
+          keys.push(base);
+        }
+      }
+      var item = null;
+      for (var k = 0; k < keys.length && !item; k++) {
+        var binding = prefix + '+' + keys[k];
+        var sel = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(binding)
+            : (/["\\]/.test(binding) ? null : binding);
+        if (sel !== null) {
+          item = chrome.querySelector('[data-cn1-accel="' + sel + '"]');
+        }
+      }
+      // Not rejected on aria-disabled: that marker is refreshed when the menu opens, so it can
+      // be stale after Command.setEnabled(). dispatchNativeMenuCommand checks the command's
+      // CURRENT state when the click arrives, which is the authority.
+      if (!item) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      item.click();
+    }, true);
+  }
+  try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
+
+  // An open HTML menu closes on a press anywhere else -- the app's canvas, the title bar, a
+  // native text field, a DOM peer such as a BrowserComponent. Listening on the canvas alone
+  // missed all but the first: peer routing sets the canvas to pointer-events: none over peers,
+  // and the rest are not the canvas at all. Main thread and capture phase, so nothing the app
+  // does with the press can stop it; closing a <details> fires its toggle, which is how the
+  // port's menu state follows.
+  function installMenuDismissal() {
+    document.addEventListener('pointerdown', function(e) {
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      var open = chrome.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        if (!open[i].contains(e.target)) {
+          open[i].removeAttribute('open');
+        }
+      }
+    }, true);
+    // An opened panel starts under its menu title; one that would cross the window's right
+    // edge is shifted left until it fits (or reaches the left edge, where max-width keeps it
+    // inside). Measured here, on the main thread, because that is where layout is.
+    document.addEventListener('toggle', function(e) {
+      var details = e.target;
+      if (!details || !details.open || !details.classList
+          || !details.classList.contains('cn1-chrome-menu')) {
+        return;
+      }
+      var panel = details.querySelector('.cn1-chrome-menu-items');
+      if (!panel) {
+        return;
+      }
+      // The panel is fixed-positioned (the menu bar scrolls, and would clip one hanging off
+      // its menu), so it is put under its title here, from where that title is right now.
+      var summary = details.querySelector('summary');
+      var anchor = (summary || details).getBoundingClientRect();
+      panel.style.top = anchor.bottom + 'px';
+      panel.style.left = anchor.left + 'px';
+      var rect = panel.getBoundingClientRect();
+      var limit = document.documentElement.clientWidth - 4;
+      if (rect.right > limit) {
+        panel.style.left = Math.max(4, anchor.left - (rect.right - limit)) + 'px';
+      }
+    }, true);
+    // The menu bar scrolls sideways when its titles do not fit. A mouse wheel only scrolls
+    // vertically, so over the bar it is turned into the sideways scroll -- otherwise the titles
+    // past the edge would need a trackpad or Shift+wheel to reach. And since an open panel was
+    // placed under where its title was, scrolling the bar closes it rather than leaving it
+    // under some other title.
+    document.addEventListener('wheel', function(e) {
+      var bar = e.target && e.target.closest ? e.target.closest('.cn1-chrome-menubar') : null;
+      if (!bar || bar.scrollWidth <= bar.clientWidth) {
+        return;
+      }
+      var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (e.deltaMode === 1) {
+        delta *= 16;
+      }
+      bar.scrollLeft += delta;
+      e.preventDefault();
+    }, { capture: true, passive: false });
+    document.addEventListener('scroll', function(e) {
+      var bar = e.target;
+      if (!bar || !bar.classList || !bar.classList.contains('cn1-chrome-menubar')) {
+        return;
+      }
+      var open = bar.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        open[i].removeAttribute('open');
+      }
+    }, true);
+  }
+  try { installMenuDismissal(); } catch (e) { /* non-fatal */ }
 
   global.startParparVmApp = function() {
     log('startParparVmApp');

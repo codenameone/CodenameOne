@@ -807,6 +807,8 @@ final class JavascriptReachability {
                         markClassInstantiated(declaringOwner);
                     }
                 }
+            } else if (instr instanceof Ldc) {
+                markReflectivelyNamedClass(((Ldc) instr).getValue());
             } else if (instr instanceof Invoke) {
                 Invoke inv = (Invoke) instr;
                 handleInvoke(inv);
@@ -827,6 +829,37 @@ final class JavascriptReachability {
                 }
             }
         }
+    }
+
+    /**
+     * A string constant that is the binary name of a class in the program -- {@code
+     * "common.Salt"} -- is how an application names a class it creates by reflection:
+     * {@code Class.forName(name).newInstance()}, usually behind a helper, so the call and the
+     * string need not even be in the same method. RTA never sees a {@code NEW} for such a class,
+     * so it kept the class and culled every method on it, and the first call through the
+     * interface it implements failed with "Missing virtual method ... on common_Salt" (issue
+     * #5774). The string is treated as an instantiation, and the no-argument constructor that
+     * {@code newInstance()} runs is kept with it.
+     *
+     * Only an exact binary name of a class that is in the program counts, so ordinary strings
+     * cost nothing; a name that merely happens to spell a class keeps that class's methods,
+     * which is the safe direction.
+     */
+    private void markReflectivelyNamedClass(Object constant) {
+        if (!(constant instanceof String)) {
+            return;
+        }
+        String name = (String) constant;
+        if (name.length() == 0 || name.length() > 256
+                || name.indexOf(' ') >= 0 || name.indexOf('/') >= 0) {
+            return;
+        }
+        String cls = JavascriptNameUtil.sanitizeClassName(name.replace('.', '/'));
+        if (!byName.containsKey(cls)) {
+            return;
+        }
+        markClassInstantiated(cls);
+        enqueueResolved(cls, "<init>", "()V", true);
     }
 
     /**

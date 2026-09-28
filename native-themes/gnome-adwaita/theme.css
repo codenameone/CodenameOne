@@ -764,7 +764,53 @@ ChatSendButton { cn1-derive: RaisedButton; padding: 1.5mm 3mm; margin: 0.5mm; }
 ChatAttachButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
 ChatVoiceButton { cn1-derive: Button; padding: 1.5mm; margin: 0.5mm; }
 
+/* --- Toolbar commands and the side menu ------------------------------------------------ */
+/*
+ * Where a desktop port puts the title and the commands in the window's own title bar and menu
+ * bar, the Toolbar is detached and none of these paint. They exist for the places that keep
+ * the Toolbar: the `toolbar` title-bar mode, and a browser, which has no window title bar or
+ * menu bar to hand them to (the JavaScript port's default, `javascript.titleBar=toolbar`).
+ * Without them the Toolbar's buttons and the side menu fell through to the framework's mobile
+ * defaults on a desktop-styled form.
+ *
+ * TitleCommand is every toolbar button, the side-menu hamburger included; BackCommand the back
+ * arrow; MenuButton/MenuButtonRight the legacy menu buttons; SideNavigationPanel the sliding
+ * panel and SideCommand its rows.
+ */
+TitleCommand { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+TitleCommand.hover { color: var(--text-color, #2e3436); background-color: #dededf; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+TitleCommand.pressed { color: var(--text-color, #2e3436); background-color: #d3d3d4; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+BackCommand { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+BackCommand.hover { color: var(--text-color, #2e3436); background-color: #dededf; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+BackCommand.pressed { color: var(--text-color, #2e3436); background-color: #d3d3d4; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+MenuButton { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+MenuButtonRight { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 1.6mm 3.2mm 1.6mm 3.2mm; margin: 0; }
+SideNavigationPanel { background-color: var(--window-bg-color, #fafafa); border-right: 0.26mm solid var(--separator-color, #d8d4d0); padding: 1.6mm 0 1.6mm 0; margin: 0; }
+RightSideNavigationPanel { background-color: var(--window-bg-color, #fafafa); border-left: 0.26mm solid var(--separator-color, #d8d4d0); padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SideCommand { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+SideCommand.hover { color: var(--text-color, #2e3436); background-color: #dededf; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+SideCommand.pressed { color: var(--text-color, #2e3436); background-color: #d3d3d4; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+SideCommand.selected { color: var(--accent-color, #3584e4); background-color: #dededf; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+RightSideCommand { color: var(--text-color, #2e3436); background-color: transparent; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+RightSideCommand.hover { color: var(--text-color, #2e3436); background-color: #dededf; border-radius: 1.6mm; padding: 2.1mm 3.2mm 2.1mm 3.2mm; margin: 0.5mm 1.6mm 0.5mm 1.6mm; text-align: left; }
+
 @media (prefers-color-scheme: dark) {
+    TitleCommand { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    TitleCommand.hover { color: #ffffff; background-color: #3a3a3a; border-radius: 1.6mm; }
+    TitleCommand.pressed { color: #ffffff; background-color: #444444; border-radius: 1.6mm; }
+    BackCommand { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    BackCommand.hover { color: #ffffff; background-color: #3a3a3a; border-radius: 1.6mm; }
+    BackCommand.pressed { color: #ffffff; background-color: #444444; border-radius: 1.6mm; }
+    MenuButton { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    MenuButtonRight { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    SideNavigationPanel { background-color: #242424; border-right: 0.26mm solid #3d3846; }
+    RightSideNavigationPanel { background-color: #242424; border-left: 0.26mm solid #3d3846; }
+    SideCommand { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    SideCommand.hover { color: #ffffff; background-color: #3a3a3a; border-radius: 1.6mm; }
+    SideCommand.pressed { color: #ffffff; background-color: #444444; border-radius: 1.6mm; }
+    SideCommand.selected { color: #3584e4; background-color: #3a3a3a; border-radius: 1.6mm; }
+    RightSideCommand { color: #ffffff; background-color: transparent; border-radius: 1.6mm; }
+    RightSideCommand.hover { color: #ffffff; background-color: #3a3a3a; border-radius: 1.6mm; }
     Form { background-color: #242424; color: #ffffff; }
     Label { color: #ffffff; }
 
