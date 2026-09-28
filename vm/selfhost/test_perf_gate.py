@@ -76,6 +76,15 @@ class MarkdownTests(unittest.TestCase):
         self.assertEqual(2 * (2 + len(gate.WORKLOADS)), len(rows))
         self.assertIn('not gated (no baseline)', text)
 
+    def test_an_uncalibrated_cpu_says_it_is_not_gated(self):
+        r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
+                                          metric(0.9, None, 'uncalibrated'))}})
+        r['cpu'] = 'AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD'
+        r['baseline_key'] = None
+        text = gate.render_markdown(r)
+        self.assertIn('Model 17', text)
+        self.assertIn('**not gated**: no baseline for this CPU model', text)
+
     def test_an_incomplete_gate_says_so(self):
         text = gate.render_markdown(report({}, error='stale native build'))
         self.assertIn('could not complete', text)
@@ -164,25 +173,25 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(mac['runs'], 1)
         self.assertEqual(mac['tolerance']['time'], linux)
 
-    def test_a_mixed_cpu_pool_gets_per_class_rows_and_a_pooled_fallback(self):
-        amd = 'AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'
+    def test_rows_are_per_cpu_model_and_an_unseen_model_is_not_gated(self):
+        zen3 = 'AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'
+        zen4 = 'AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD'
         intel = 'Intel64 Family 6 Model 207 Stepping 2, GenuineIntel'
-        runs = [('windows-x64', {'objectAllocation': (v, 0.4)}, amd) for v in (6.3, 7.4, 7.0)]
-        runs += [('windows-x64', {'objectAllocation': (v, 0.56)}, intel) for v in (2.6, 2.7)]
+        runs = [('windows-x64', {'arraySequential': (v, 0.4)}, zen3) for v in (1.35, 1.36, 1.38)]
+        runs += [('windows-x64', {'arraySequential': (1.98, 0.38)}, intel)]
         b = self.run_calibration(runs)['platforms']
-        self.assertEqual(b['windows-x64@amd']['objectAllocation']['all']['time'], 7.0)
-        self.assertEqual(b['windows-x64@intel']['objectAllocation']['all']['memory'], 0.56)
-        self.assertEqual(b['windows-x64']['objectAllocation']['all']['runs'], 5)
-        self.assertEqual(gate.baseline_key(b, 'windows-x64', intel), 'windows-x64@intel')
-        self.assertEqual(gate.baseline_key(b, 'windows-x64', 'Some Future CPU'), 'windows-x64')
+        self.assertEqual(sorted(b), ['windows-x64@amd64-family-25-model-1-authenticamd',
+                                     'windows-x64@intel64-family-6-model-207-genuineintel'])
+        self.assertEqual(gate.baseline_key(b, 'windows-x64', zen3.replace('Stepping 1', 'Stepping 2')),
+                         'windows-x64@amd64-family-25-model-1-authenticamd')
+        # A model no run has measured is not judged against another model's ratios.
+        self.assertIsNone(gate.baseline_key(b, 'windows-x64', zen4))
+        self.assertIsNone(gate.baseline_key(b, 'windows-x64', None))
 
-    def test_a_single_cpu_pool_is_not_split(self):
-        cpu = 'AMD EPYC 7763 64-Core Processor'
-        runs = [('linux-x64', {'quicksort': (v, 0.1)}, cpu) for v in (1.0, 1.01)]
-        b = self.run_calibration(runs)['platforms']
-        self.assertEqual(sorted(b), ['linux-x64'])
-        self.assertEqual(gate.baseline_key(b, 'linux-x64', cpu), 'linux-x64')
-
+    def test_a_run_with_no_known_cpu_feeds_the_plain_row(self):
+        b = self.run_calibration([('macos-arm64', {'quicksort': (1.0, 0.1)})])['platforms']
+        self.assertEqual(sorted(b), ['macos-arm64'])
+        self.assertEqual(gate.baseline_key(b, 'macos-arm64', 'Apple M1 (Virtual)'), 'macos-arm64')
 
     def test_an_unmeasured_platform_keeps_its_rows_and_a_measured_one_is_replaced(self):
         old = {'macos-arm64': {'quicksort': {'all': {'time': 0.9, 'memory': 0.1, 'runs': 1}}},
@@ -196,13 +205,19 @@ class CalibrationTest(unittest.TestCase):
 
 
 class CpuClassTests(unittest.TestCase):
-    def test_x64_vendors_and_everything_else(self):
-        self.assertEqual(gate.cpu_class('AMD EPYC 7763 64-Core Processor'), 'amd')
-        self.assertEqual(gate.cpu_class('Intel64 Family 6 Model 207 Stepping 2, GenuineIntel'),
-                         'intel')
-        self.assertIsNone(gate.cpu_class('Neoverse-N2'))
-        self.assertIsNone(gate.cpu_class('Apple M1 (Virtual)'))
-        self.assertIsNone(gate.cpu_class(None))
+    def test_one_model_is_one_key(self):
+        c = gate.cpu_class
+        self.assertEqual(c('AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'),
+                         c('AMD64 Family 25 Model 1 Stepping 2, AuthenticAMD'))
+        self.assertNotEqual(c('AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'),
+                            c('AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD'))
+        self.assertEqual(c('Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz'),
+                         'intel-xeon-platinum-8370c')
+        self.assertEqual(c('Neoverse-N2'), 'neoverse-n2')
+
+    def test_an_undecodable_cpu_is_unknown(self):
+        for cpu in (None, '', 'aarch64', 'unknown', 'AMD64'):
+            self.assertIsNone(gate.cpu_class(cpu), cpu)
 
 
 if __name__ == '__main__':

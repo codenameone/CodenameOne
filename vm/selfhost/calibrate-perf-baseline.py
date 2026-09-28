@@ -19,10 +19,11 @@ For every platform, benchmark and core setting:
 A platform measured only ONCE has no spread of its own; each of its rows takes the widest
 tolerance any other platform needed for the same benchmark and metric.
 
-Runs record the runner's CPU. When one platform's runs came from more than one CPU class
-(perf-gate.cpu_class: the x64 vendor), each class also gets its own `platform@class` rows,
-which the gate prefers for a runner of that class. The plain platform rows always pool
-every run, so a runner from a class no run has seen is still gated, just more loosely.
+Runs record the runner's CPU, and rows are written per CPU MODEL (`platform@model`, the
+model as perf-gate.cpu_class names it): hosted pools mix microarchitectures whose ratios
+differ by more than any tolerance absorbs. A runner on a model with no rows is reported
+and not gated until a run of it is calibrated in. A run whose CPU is unknown feeds the
+plain `platform` rows instead.
 
 A platform with no results here keeps its existing rows unchanged.
 
@@ -59,24 +60,16 @@ def main(argv=None):
     tolerance = existing['tolerance']
     # platform -> (benchmark, cores) -> metric -> [median ratio per run]
     runs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    classes = defaultdict(set)   # platform -> CPU classes its runs came from
-    reports = []
     for path in args.results:
         report = json.loads(Path(path).read_text())
         if report.get('error') or report.get('failures'):
             raise SystemExit('%s did not complete; calibrate only from complete runs' % path)
-        reports.append(report)
-        classes[report['platform']].add(perf_gate.cpu_class(report.get('cpu')))
-    for report in reports:
-        keys = [report['platform']]
         cls = perf_gate.cpu_class(report.get('cpu'))
-        if cls and len(classes[report['platform']]) > 1:
-            keys.append('%s@%s' % (report['platform'], cls))
+        key = '%s@%s' % (report['platform'], cls) if cls else report['platform']
         for bench, by_cores in report['results'].items():
             for cores, entry in by_cores.items():
                 for metric in METRICS:
-                    for key in keys:
-                        runs[key][(bench, cores)][metric].append(entry[metric]['median'])
+                    runs[key][(bench, cores)][metric].append(entry[metric]['median'])
 
     rows = {}
     widest = defaultdict(float)  # (benchmark, metric) -> widest tolerance any platform needed

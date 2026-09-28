@@ -123,26 +123,40 @@ def cpu_model():
 
 
 def cpu_class(cpu):
-    """The processor family a baseline can be split by, or None. Hosted runners of one
-    label draw from mixed pools, and on x64 the vendor moves the ratios by more than any
-    tolerance could absorb: Windows x64 measured objectAllocation at 6.34x on an AMD host
-    and 2.61x on an Intel one, with the JDK's peak on the Intel host swinging 435-549MB
-    between rounds while ParparVM's held at 252-265MB. Nothing else is split yet, for want
-    of runs that show it matters."""
+    """The runner's CPU MODEL as a baseline key ("amd64-family-25-model-1-authenticamd",
+    "intel-xeon-platinum-8370c", "neoverse-n2"), or None when it is not known.
+
+    Baselines are per model because hosted runner labels draw from mixed pools and the
+    ratios move with the microarchitecture by more than any tolerance can absorb. Each
+    was measured on unchanged code: Windows x64 objectAllocation at 6.34x on an AMD
+    Family 25 Model 1 host and 2.61x on an Intel Family 6 Model 207 one, and Windows x64
+    arraySequential at 1.35x on that AMD model and 1.67x on AMD Model 17, where the
+    JDK ran it in 5.0ms against ParparVM's steady 8.4ms. Splitting by vendor alone
+    was tried first and the next Zen generation failed it. Stepping, revision and
+    clock speed are dropped, so one model is one key."""
     text = (cpu or '').lower()
-    if 'intel' in text:
-        return 'intel'
-    if 'amd' in text:
-        return 'amd'
-    return None
+    text = re.sub(r'\((r|tm)\)', '', text)
+    text = re.sub(r'\bstepping\s+\w+|\brevision\s+\w+|\bcpu\s*@\s*[\d.]+\s*ghz|@\s*[\d.]+\s*ghz',
+                  '', text)
+    text = re.sub(r'[^a-z0-9]+', '-', text).strip('-')
+    if text in ('', 'unknown', 'aarch64', 'arm64', 'x86-64', 'amd64', 'x64'):
+        return None   # undecodable: says nothing about the microarchitecture
+    return text
 
 
 def baseline_key(platforms, platform, cpu):
-    """platform@class when perf-baseline.json has one for this runner's CPU, else the
-    platform's own row, which calibration pools across every CPU it saw."""
+    """Which perf-baseline.json row set judges this runner, or None for none.
+
+    platform@model when this CPU model was calibrated. When the platform HAS per-model
+    rows but none for this model, None: the runner is a microarchitecture no run has
+    measured, and judging it against another model's ratios is what failed unchanged
+    code, so its results are reported (with the rows to add) and not gated. A platform
+    with no per-model rows at all keeps its plain row."""
     cls = cpu_class(cpu)
     if cls and '%s@%s' % (platform, cls) in platforms:
         return '%s@%s' % (platform, cls)
+    if any(key.startswith(platform + '@') for key in platforms):
+        return None
     return platform
 
 
@@ -434,8 +448,10 @@ def render_markdown(report):
     tol = report['tolerance']
     lines = ['### ParparVM vs HotSpot (JDK 25): %s' % name, '']
     if report.get('cpu'):
-        lines += ['Runner CPU: %s (baseline `%s`)'
-                  % (report['cpu'], report.get('baseline_key', report['platform'])), '']
+        key = report.get('baseline_key', report['platform'])
+        lines += ['Runner CPU: %s (%s)' % (report['cpu'], 'baseline `%s`' % key if key else
+                  '**not gated**: no baseline for this CPU model yet -- the calibration rows '
+                  'below add one'), '']
     if report.get('error'):
         lines += ['**The performance gate could not complete:** `%s`' % report['error'], '']
     regressions = []
@@ -580,7 +596,8 @@ def main(argv):
         tolerance = baseline['tolerance']
         report['baseline_key'] = baseline_key(baseline['platforms'], args.platform,
                                               report['cpu'])
-        bases = baseline['platforms'].get(report['baseline_key'], {})
+        bases = baseline['platforms'].get(report['baseline_key'], {}) \
+            if report['baseline_key'] else {}
         have = report['available_cores']
         if args.cores == 'all':
             # None = unpinned, all of the runner's CPUs, each runtime's own defaults.
@@ -596,7 +613,8 @@ def main(argv):
               'baseline %s)'
               % (args.platform, args.rounds,
                  ', '.join(cores_text(c) for c in cores_list), len(specs), have,
-                 report['cpu'], report['baseline_key']), flush=True)
+                 report['cpu'], report['baseline_key'] or 'NONE for this CPU model: reported, '
+                 'not gated'), flush=True)
         calibration = {}
         report['failures'] = []
         for spec in specs:
