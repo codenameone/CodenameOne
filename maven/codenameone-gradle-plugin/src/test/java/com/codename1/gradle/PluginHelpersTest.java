@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -77,6 +78,26 @@ class PluginHelpersTest {
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));
+    }
+
+    /// Cached native outputs are rebuilt when a build hint changes, however it
+    /// arrives; the recorded fingerprint never holds a hint's value in the clear.
+    @Test
+    void theBuildHintFingerprintTracksEveryHint() {
+        Properties a = new Properties();
+        a.setProperty("codename1.arg.android.xpermissions", "CAMERA");
+        a.setProperty("codename1.arg.ios.certificatePassword", "s3cret");
+        Properties reordered = new Properties();
+        reordered.setProperty("codename1.arg.ios.certificatePassword", "s3cret");
+        reordered.setProperty("codename1.arg.android.xpermissions", "CAMERA");
+        Properties changed = new Properties();
+        changed.putAll(a);
+        changed.setProperty("codename1.arg.android.xpermissions", "CAMERA,NFC");
+
+        String fingerprint = GradleProjectHost.hintsFingerprint(a);
+        assertEquals(fingerprint, GradleProjectHost.hintsFingerprint(reordered));
+        org.junit.jupiter.api.Assertions.assertNotEquals(fingerprint, GradleProjectHost.hintsFingerprint(changed));
+        org.junit.jupiter.api.Assertions.assertFalse(fingerprint.contains("s3cret"));
     }
 
     @Test

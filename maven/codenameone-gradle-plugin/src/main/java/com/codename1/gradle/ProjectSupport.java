@@ -59,6 +59,19 @@ final class ProjectSupport {
                 .orElse(project.getProviders().gradleProperty("open"))
                 .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
 
+        // A com.codenameone module declared without a version gets the framework's,
+        // the job ${cn1.version} does in the archetype's pom. Settings' add-on
+        // catalog writes its coordinates that way, and so can a build script.
+        final Provider<String> frameworkVersion = ext.getVersion();
+        project.getConfigurations().configureEach(c -> c.getResolutionStrategy().eachDependency(d -> {
+            String requested = d.getRequested().getVersion();
+            if (PluginInfo.GROUP.equals(d.getRequested().getGroup())
+                    && (requested == null || requested.isEmpty())) {
+                d.useVersion(frameworkVersion.get());
+                d.because("the Codename One framework version");
+            }
+        }));
+
         requireJava17(project);
 
         ProjectKind kind = kind(project);

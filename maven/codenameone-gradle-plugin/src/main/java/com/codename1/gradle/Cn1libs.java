@@ -87,32 +87,49 @@ final class Cn1libs {
             });
         }
         project.afterEvaluate(p -> {
+            // Maven activates codename1.platform in EVERY pom of the graph, so a
+            // cn1lib used by another cn1lib contributes its platform jars too. Walk
+            // the same graph: each library's -common module, and the pom-type
+            // dependencies through which one cn1lib names another.
+            java.util.Deque<String[]> queue = new java.util.ArrayDeque<String[]>();
             for (Dependency d : p.getConfigurations().getByName(DECLARED).getAllDependencies()) {
-                if (!(d instanceof ExternalModuleDependency) || d.getVersion() == null) {
+                if (d instanceof ExternalModuleDependency && d.getVersion() != null) {
+                    queue.add(new String[] {d.getGroup(), d.getName(), d.getVersion()});
+                }
+            }
+            java.util.Set<String> visited = new java.util.HashSet<String>();
+            java.util.Set<String> added = new java.util.HashSet<String>();
+            while (!queue.isEmpty()) {
+                String[] m = queue.removeFirst();
+                if (!visited.add(m[0] + ":" + m[1] + ":" + m[2])) {
                     continue;
                 }
-                Map<String, List<Cn1libPomProfiles.Coordinate>> byPlatform = profiles(p, d.getGroup(),
-                        d.getName(), d.getVersion());
-                for (Map.Entry<String, List<Cn1libPomProfiles.Coordinate>> e : byPlatform.entrySet()) {
+                String pom = pomText(p, m[0], m[1], m[2]);
+                if (pom == null) {
+                    continue;
+                }
+                Cn1libPomProfiles.ParentResolver parents = (g, a, v) -> pomText(p, g, a, v);
+                for (Map.Entry<String, List<Cn1libPomProfiles.Coordinate>> e
+                        : Cn1libPomProfiles.read(pom, parents).entrySet()) {
                     Configuration target = p.getConfigurations().findByName(configurationName(e.getKey()));
                     if (target == null) {
                         continue;
                     }
                     for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
-                        target.getDependencies().add(p.getDependencies().create(c.toNotation()));
+                        if (added.add(e.getKey() + "|" + c.toNotation())) {
+                            target.getDependencies().add(p.getDependencies().create(c.toNotation()));
+                        }
+                    }
+                }
+                for (Cn1libPomProfiles.Coordinate c : Cn1libPomProfiles.dependencies(pom, parents)) {
+                    if (c.version != null && c.groupId != null && c.classifier == null
+                            && ("pom".equals(c.type) || c.artifactId.endsWith("-common")
+                                    || c.artifactId.endsWith("-lib"))) {
+                        queue.add(new String[] {c.groupId, c.artifactId, c.version});
                     }
                 }
             }
         });
-    }
-
-    private static Map<String, List<Cn1libPomProfiles.Coordinate>> profiles(final Project project, String group,
-                                                                          String name, String version) {
-        String pom = pomText(project, group, name, version);
-        if (pom == null) {
-            return Collections.emptyMap();
-        }
-        return Cn1libPomProfiles.read(pom, (g, a, v) -> pomText(project, g, a, v));
     }
 
     /// A module's pom, fetched from the project's repositories, or null.

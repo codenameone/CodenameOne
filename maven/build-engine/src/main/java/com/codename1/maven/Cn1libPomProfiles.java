@@ -127,19 +127,7 @@ public final class Cn1libPomProfiles {
             if (platform == null) {
                 continue;
             }
-            List<Coordinate> deps = new ArrayList<Coordinate>();
-            for (Element dep : children(child(profile, "dependencies"), "dependency")) {
-                String scope = interpolate(text(child(dep, "scope")), props);
-                if ("test".equals(scope) || "provided".equals(scope) || "system".equals(scope)) {
-                    continue;
-                }
-                deps.add(new Coordinate(
-                        interpolate(text(child(dep, "groupId")), props),
-                        interpolate(text(child(dep, "artifactId")), props),
-                        interpolate(text(child(dep, "version")), props),
-                        interpolate(text(child(dep, "classifier")), props),
-                        interpolate(text(child(dep, "type")), props)));
-            }
+            List<Coordinate> deps = shipped(child(profile, "dependencies"), props);
             List<Coordinate> existing = out.get(platform);
             if (existing == null) {
                 out.put(platform, deps);
@@ -148,6 +136,36 @@ public final class Cn1libPomProfiles {
             }
         }
         return out;
+    }
+
+    /// The dependencies `pomText` declares outside any profile, in the scopes
+    /// that reach a build (not test, provided or system). A cn1lib's common
+    /// module lists the cn1libs it uses here, as `pom`-type dependencies on
+    /// their `-lib` artifacts -- which is how a consumer finds the libraries it
+    /// uses indirectly, whose platform profiles Maven activates too.
+    public static List<Coordinate> dependencies(String pomText, ParentResolver parents) {
+        Element project = parse(pomText);
+        if (project == null) {
+            return new ArrayList<Coordinate>();
+        }
+        return shipped(child(project, "dependencies"), properties(project, parents, 0));
+    }
+
+    private static List<Coordinate> shipped(Element dependencies, Map<String, String> props) {
+        List<Coordinate> deps = new ArrayList<Coordinate>();
+        for (Element dep : children(dependencies, "dependency")) {
+            String scope = interpolate(text(child(dep, "scope")), props);
+            if ("test".equals(scope) || "provided".equals(scope) || "system".equals(scope)) {
+                continue;
+            }
+            deps.add(new Coordinate(
+                    interpolate(text(child(dep, "groupId")), props),
+                    interpolate(text(child(dep, "artifactId")), props),
+                    interpolate(text(child(dep, "version")), props),
+                    interpolate(text(child(dep, "classifier")), props),
+                    interpolate(text(child(dep, "type")), props)));
+        }
+        return deps;
     }
 
     /// The properties `${...}` expressions in the pom can name: its own

@@ -168,9 +168,10 @@ public final class GradleBuildEditor implements DependencyEditor {
         // A catalog version such as ${cn1.version} names a MAVEN property. In a
         // Kotlin or Groovy string it would be a template expression referring to
         // a variable the script does not have, which fails the build script
-        // itself. The Codename One Gradle plugin aligns the versions of the
-        // com.codenameone artifacts it manages, which is what the Maven property
-        // does in the archetype's POM, so the coordinate is written without one.
+        // itself. The Codename One Gradle plugin gives a com.codenameone module
+        // declared without a version the framework's version (ProjectSupport),
+        // which is what the Maven property does in the archetype's POM, so the
+        // coordinate is written without one.
         if (version.length() > 0 && !version.startsWith("${")) {
             coords.append(':').append(version);
         }

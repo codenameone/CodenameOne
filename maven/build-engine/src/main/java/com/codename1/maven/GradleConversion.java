@@ -186,13 +186,22 @@ public final class GradleConversion {
                         copyTree(f, new File(target, f.getName()));
                     }
                 }
+                // The backend's own libraries, or its code no longer compiles: the
+                // plugin supplies the backend runtime and nothing else.
+                File script = new File(target, "build.gradle.kts");
+                Files.write(script.toPath(), GradleProjectTemplate.text("backend/build.gradle.kts.txt")
+                        .getBytes(StandardCharsets.UTF_8));
+                List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"));
+                if (!backendDeps.isEmpty()) {
+                    writeDependencies(script, backendDeps, "backend/pom.xml");
+                }
             }
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,
                     GradleProjectTemplate.Shape.APP);
             if (from.buildSystem() == BuildSystem.MAVEN) {
                 List<String> deps = dependencyLines(from.dependencyFile());
                 if (!deps.isEmpty()) {
-                    writeDependencies(new File(targetDir, "build.gradle.kts"), deps);
+                    writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");
                 }
             }
             if (hasSuffix(new File(targetDir, "src"), ".kt")) {
@@ -328,9 +337,9 @@ public final class GradleConversion {
         }
     }
 
-    /// `build.gradle.kts` lines for the dependencies `common/pom.xml` declares
+    /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of
-    /// type `pom` is a cn1lib. A version that is still a `${...}` expression is
+    /// type `pom` is a cn1lib; a test-scoped one is `testImplementation`. A version that is still a `${...}` expression is
     /// written as it stands, with a comment, rather than guessed.
     static List<String> dependencyLines(File pom) {
         List<String> out = new ArrayList<String>();
@@ -359,12 +368,15 @@ public final class GradleConversion {
                 String v = text(d, "version");
                 String scope = text(d, "scope");
                 String type = text(d, "type");
-                if (g == null || a == null || "com.codenameone".equals(g) || "test".equals(scope)
+                if (g == null || a == null || "com.codenameone".equals(g)
                         || "org.jetbrains.kotlin".equals(g) || "org.jetbrains".equals(g)) {
                     continue;
                 }
                 String coords = g + ":" + a + (v == null ? "" : ":" + v);
-                String config = "pom".equals(type) ? "cn1lib" : "provided".equals(scope) ? "compileOnly"
+                // Test-scoped libraries go with the test sources the conversion copies,
+                // or those tests stop compiling.
+                String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
+                        : "provided".equals(scope) ? "compileOnly"
                         : "runtime".equals(scope) ? "runtimeOnly" : "implementation";
                 String line = "    " + config + "(\"" + coords + "\")";
                 if (v == null || v.contains("${")) {
@@ -378,7 +390,7 @@ public final class GradleConversion {
         return out;
     }
 
-    private static void writeDependencies(File buildScript, List<String> lines) throws IOException {
+    private static void writeDependencies(File buildScript, List<String> lines, String from) throws IOException {
         String text = new String(Files.readAllBytes(buildScript.toPath()), StandardCharsets.UTF_8);
         int open = text.indexOf("dependencies {");
         if (open < 0) {
@@ -386,7 +398,7 @@ public final class GradleConversion {
         }
         int insert = text.indexOf('\n', open) + 1;
         StringBuilder sb = new StringBuilder();
-        sb.append("    // From the Maven project's common/pom.xml:\n");
+        sb.append("    // From the Maven project's ").append(from).append(":\n");
         for (String l : lines) {
             sb.append(l).append('\n');
         }

@@ -31,21 +31,66 @@ rm -rf "$CN1_REPO/$GROUP_PATH"
 mkdir -p "$WORKDIR" "$LIBREPO"
 cd "$WORKDIR"
 
+TEMPLATES="$SCRIPTPATH/../build-engine/src/main/resources/com/codename1/project/templates/gradle"
+
+# scaffold_lib <dir> <name> -- the whole Gradle cn1lib bootstrap
+scaffold_lib() {
+  local dir="$1" name="$2"
+  mkdir -p "$dir/gradle/wrapper" "$dir/src/main/java/$GROUP_PATH" "$dir/src/android/java/$GROUP_PATH"
+  cp "$TEMPLATES/gradlew" "$TEMPLATES/gradlew.bat" "$dir/"
+  cp "$TEMPLATES"/gradle/wrapper/* "$dir/gradle/wrapper/"
+  chmod +x "$dir/gradlew"
+  sed -e "s/__CN1_VERSION__/$CN1_VERSION/" -e "s/__PROJECT_NAME__/$name/" \
+    "$TEMPLATES/settings.gradle.kts.txt" > "$dir/settings.gradle.kts"
+  cp "$TEMPLATES/gradle.properties.txt" "$dir/gradle.properties"
+  use_local_plugin "$dir"
+  : > "$dir/codenameone_library_appended.properties"
+}
+
+# A library the published one uses in turn: its platform code must reach the
+# applications too, as Maven's profiles deliver it through the whole graph.
+echo "== inner library"
+INNER="$WORKDIR/inner"
+scaffold_lib "$INNER" inner
+cat > "$INNER/build.gradle.kts" <<EOF
+group = "$GROUP"
+version = "$LIBVER"
+
+publishing {
+    repositories { maven(url = uri("$LIBREPO")) }
+}
+EOF
+cat > "$INNER/src/main/java/$GROUP_PATH/Inner.java" <<EOF
+package $GROUP;
+
+public class Inner {
+    public static String prefix() {
+        return "Hello ";
+    }
+}
+EOF
+cat > "$INNER/src/android/java/$GROUP_PATH/InnerAndroid.java" <<EOF
+package $GROUP;
+
+public class InnerAndroid {
+}
+EOF
+run_gradle "$INNER" publish > "$WORKDIR/publish-inner.log" 2>&1 \
+  || { cat "$WORKDIR/publish-inner.log"; fail "publishing the inner library"; }
+
 echo "== library"
 LIB="$WORKDIR/greeter"
-TEMPLATES="$SCRIPTPATH/../build-engine/src/main/resources/com/codename1/project/templates/gradle"
-mkdir -p "$LIB/gradle/wrapper" "$LIB/src/main/java/$GROUP_PATH" "$LIB/src/main/css" \
-  "$LIB/src/android/java/$GROUP_PATH" "$LIB/src/ios/objectivec"
-cp "$TEMPLATES/gradlew" "$TEMPLATES/gradlew.bat" "$LIB/"
-cp "$TEMPLATES"/gradle/wrapper/* "$LIB/gradle/wrapper/"
-chmod +x "$LIB/gradlew"
-sed -e "s/__CN1_VERSION__/$CN1_VERSION/" -e "s/__PROJECT_NAME__/greeter/" \
-  "$TEMPLATES/settings.gradle.kts.txt" > "$LIB/settings.gradle.kts"
-cp "$TEMPLATES/gradle.properties.txt" "$LIB/gradle.properties"
-use_local_plugin "$LIB"
+scaffold_lib "$LIB" greeter
+mkdir -p "$LIB/src/main/css" "$LIB/src/ios/objectivec"
 cat > "$LIB/build.gradle.kts" <<EOF
 group = "$GROUP"
 version = "$LIBVER"
+
+repositories { maven(url = uri("$LIBREPO")) }
+
+dependencies {
+    cn1lib("$GROUP:inner-lib:$LIBVER")
+}
 
 publishing {
     repositories { maven(url = uri("$LIBREPO")) }
@@ -58,7 +103,7 @@ package $GROUP;
 
 public class Greeter {
     public static String greet(String name) {
-        return "Hello " + name;
+        return Inner.prefix() + name;
     }
 }
 EOF
@@ -94,18 +139,33 @@ assert_zip_has "$P/greeter-android/$LIBVER/greeter-android-$LIBVER.jar" "^$GROUP
 assert_zip_has "$P/greeter-ios/$LIBVER/greeter-ios-$LIBVER.jar" "^greeter_ios\.m$"
 grep -q "<name>codename1.platform</name>" "$P/greeter-lib/$LIBVER/greeter-lib-$LIBVER.pom" \
   || fail "the -lib pom has no codename1.platform profiles"
+# A Maven consumer reaches the inner library through this dependency, which only
+# resolves as <type>pom</type>: a -lib artifact has no jar.
+python3 - "$P/greeter-common/$LIBVER/greeter-common-$LIBVER.pom" <<'PY' \
+  || fail "greeter-common does not depend on inner-lib as <type>pom</type>"
+import sys, xml.etree.ElementTree as ET
+ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+root = ET.parse(sys.argv[1]).getroot()
+for d in root.findall('m:dependencies/m:dependency', ns):
+    if d.findtext('m:artifactId', namespaces=ns) == 'inner-lib':
+        sys.exit(0 if d.findtext('m:type', namespaces=ns) == 'pom' else 1)
+sys.exit(1)
+PY
 
 # app-dir -- stages android and ios and checks what the library contributed
 check_consumer() {
   local label="$1" android_jar="$2" ios_jar="$3"
   assert_zip_has "$android_jar" "^$GROUP_PATH/Greeter\.class$"
   assert_zip_has "$android_jar" "^$GROUP_PATH/GreeterAndroid\.java$"
+  assert_zip_has "$android_jar" "^$GROUP_PATH/Inner\.class$"
+  assert_zip_has "$android_jar" "^$GROUP_PATH/InnerAndroid\.java$"
   assert_zip_lacks "$android_jar" "greeter_ios\.m$"
   assert_zip_has "$android_jar" "codenameone_library_appended\.properties$"
   assert_zip_has "$ios_jar" "^$GROUP_PATH/Greeter\.class$"
   assert_zip_has "$ios_jar" "greeter_ios\.m$"
   assert_zip_lacks "$ios_jar" "GreeterAndroid\.java$"
-  echo "   $label: library classes, hints and per-platform sources staged"
+  assert_zip_lacks "$ios_jar" "InnerAndroid\.java$"
+  echo "   $label: library classes, hints and per-platform sources staged, the inner library's too"
 }
 staged_jar() {
   sed -n 's/.*codename1.stageOnly is set: staged \(.*\) ([0-9]* bytes) for .*/\1/p' "$1" | tail -1

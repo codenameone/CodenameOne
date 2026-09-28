@@ -28,6 +28,7 @@ import com.codename1.project.ProjectLayout;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.RegularFileProperty;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -50,6 +51,16 @@ public abstract class PrepareSimulatorTask extends Cn1Task {
     /// The CSS compiler CLI classpath live CSS reload forks with.
     @Internal
     public abstract ConfigurableFileCollection getCssCompilerClasspath();
+
+    /// The two classpaths as the path lists this task writes. The lists, not the
+    /// files' contents, are what the output records, so these are the inputs:
+    /// adding or upgrading a dependency changes them and regenerates the
+    /// properties -- a stale list made hot reload recompile against the old
+    /// classpath -- while an ordinary recompile of the project does not.
+    @Input
+    public String getClasspathPaths() {
+        return getCompileClasspath().getAsPath() + "\n" + getCssCompilerClasspath().getAsPath();
+    }
 
     /// `build/codenameone/simulator.properties`.
     @OutputFile

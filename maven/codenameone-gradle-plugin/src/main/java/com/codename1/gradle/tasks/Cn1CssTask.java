@@ -76,6 +76,22 @@ public abstract class Cn1CssTask extends Cn1Task {
     @Internal
     public abstract DirectoryProperty getWorkDirectory();
 
+    /// Empties `out`. It is a main resource directory, so a theme.res left from
+    /// an earlier run would still be packaged after CSS was switched off.
+    private static void clear(File out) {
+        File[] children = out.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            try {
+                org.apache.commons.io.FileUtils.forceDelete(c);
+            } catch (java.io.IOException ex) {
+                throw new GradleException("Could not delete the stale " + c, ex);
+            }
+        }
+    }
+
     @TaskAction
     public void compile() {
         Log log = log();
@@ -83,10 +99,12 @@ public abstract class Cn1CssTask extends Cn1Task {
         File cssDir = layout().cssDir();
         if (rawSettings().getProperty("codename1.cssTheme") == null) {
             log.info("CSS themes not activated for this project (codename1.cssTheme). Skipping CSS compilation");
+            clear(out);
             return;
         }
         if (!layout().themeCss().isFile()) {
             log.warn("CSS compilation skipped because " + layout().themeCss() + " does not exist");
+            clear(out);
             return;
         }
         File work = getWorkDirectory().get().getAsFile();

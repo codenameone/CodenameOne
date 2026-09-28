@@ -31,6 +31,8 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -228,12 +230,65 @@ final class GradleProjectHost implements ProjectHost {
         return Long.MAX_VALUE;
     }
 
+    /// The newest input a cached native output (an APK, a generated Xcode or
+    /// Android Studio project) was built from. Files are compared by timestamp;
+    /// the build hints are not files -- they arrive as `codename1.*` Gradle
+    /// properties, from `gradle.properties`, `-P` or the build script -- so
+    /// their fingerprint is recorded beside the build output, and a change in it
+    /// counts as a change now. Without it a hint edited in gradle.properties
+    /// returned the artifact built with the old one.
     @Override
     public long sourcesModificationTime() {
         long t = lastModified(new File(layout.projectDir(), "src"));
         t = Math.max(t, layout.settingsFile().lastModified());
         t = Math.max(t, layout.dependencyFile().lastModified());
-        return Math.max(t, layout.rootBuildFile().lastModified());
+        t = Math.max(t, layout.rootBuildFile().lastModified());
+        return Math.max(t, hintsChangedAt());
+    }
+
+    /// When the build hints last changed, as the fingerprint file's timestamp.
+    private long hintsChangedAt() {
+        File fingerprint = new File(layout.buildDir(), "codenameone" + File.separator + "build-hints.fingerprint");
+        String current = hintsFingerprint(userProperties);
+        try {
+            String previous = fingerprint.isFile()
+                    ? new String(java.nio.file.Files.readAllBytes(fingerprint.toPath()), StandardCharsets.UTF_8)
+                    : null;
+            if (!current.equals(previous)) {
+                File dir = fingerprint.getParentFile();
+                if (!dir.isDirectory() && !dir.mkdirs()) {
+                    throw new IOException("Could not create " + dir);
+                }
+                java.nio.file.Files.write(fingerprint.toPath(), current.getBytes(StandardCharsets.UTF_8));
+            }
+            return fingerprint.lastModified();
+        } catch (IOException ex) {
+            // Unknown, so treat the hints as just changed: rebuilding is safe,
+            // reusing a stale artifact is not.
+            log.warn("Could not record the build hint fingerprint in " + fingerprint + ": " + ex.getMessage());
+            return System.currentTimeMillis();
+        }
+    }
+
+    /// A SHA-256 of `properties`, sorted, so equal hints give equal digests. A
+    /// digest, not the text: hints carry signing passwords and tokens, which
+    /// have no business in the build directory.
+    static String hintsFingerprint(Properties properties) {
+        StringBuilder sb = new StringBuilder();
+        for (String key : new java.util.TreeSet<String>(properties.stringPropertyNames())) {
+            sb.append(key).append('=').append(properties.getProperty(key)).append('\n');
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xf, 16)).append(Character.forDigit(b & 0xf, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is required of every JVM", ex);
+        }
     }
 
     private static long lastModified(File f) {

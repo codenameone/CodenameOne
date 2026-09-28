@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// A cn1lib built with Gradle, published in the Maven shape `cn1lib-archetype`
 /// produces, so Maven and Gradle applications can both consume it.
@@ -67,9 +68,51 @@ final class LibrarySupport {
     private LibrarySupport() {
     }
 
+    private static boolean hasFiles(File dir) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File c : children) {
+            if (c.isFile() || c.isDirectory() && hasFiles(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Adds `<type>pom</type>` to the dependencies on `cn1libs` (group:artifact).
+    static void markCn1libDependencies(org.w3c.dom.Element project, Set<String> cn1libs) {
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        for (int i = 0; i < deps.getLength(); i++) {
+            org.w3c.dom.Element dep = (org.w3c.dom.Element) deps.item(i);
+            String key = childText(dep, "groupId") + ":" + childText(dep, "artifactId");
+            if (!cn1libs.contains(key) || dep.getElementsByTagName("type").getLength() > 0) {
+                continue;
+            }
+            // Plain createElement: Gradle's pom DOM is not namespace aware, and a
+            // namespaced element would serialize with a stray xmlns="".
+            org.w3c.dom.Element type = dep.getOwnerDocument().createElement("type");
+            type.setTextContent("pom");
+            dep.appendChild(type);
+        }
+    }
+
+    private static String childText(org.w3c.dom.Element parent, String name) {
+        org.w3c.dom.NodeList n = parent.getElementsByTagName(name);
+        return n.getLength() == 0 ? null : n.item(0).getTextContent().trim();
+    }
+
     static void apply(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
                       final Provider<Map<String, String>> userProperties) {
         project.getPluginManager().apply(MavenPublishPlugin.class);
+        // A library may use other cn1libs, declared the same way an application does.
+        // They are part of its API -- compile scope in cn1lib-archetype's poms -- so
+        // a consumer compiles against them too: java-library's api extends cn1lib.
+        project.getPluginManager().apply(org.gradle.api.plugins.JavaLibraryPlugin.class);
+        Cn1libs.configure(project);
+        project.getConfigurations().getByName("api").extendsFrom(
+                project.getConfigurations().getByName(Cn1libs.DECLARED));
         AppSupport.addFramework(project, "compileOnly", ext.getVersion(), "codenameone-core", "java-runtime");
         AppSupport.addFramework(project, "testImplementation", ext.getVersion(), "codenameone-core",
                 "codenameone-javase");
@@ -108,6 +151,10 @@ final class LibrarySupport {
                         compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
                         compileArtifacts, Collections.<String, String>emptyMap())));
 
+        // A library without CSS publishes no cn1css bundle and its -lib pom names
+        // none: the Zip task would do nothing, and publishing then failed on the
+        // missing archive. Maven cn1libs without CSS have the same shape.
+        final boolean hasCss = hasFiles(layout.cssDir());
         final TaskProvider<Zip> css = project.getTasks().register("cn1libCss", Zip.class, zip -> {
             zip.setGroup(AppSupport.GROUP);
             zip.setDescription("Packages src/main/css as the library's cn1css bundle");
@@ -158,9 +205,25 @@ final class LibrarySupport {
         });
 
         PublishingExtension publishing = project.getExtensions().getByType(PublishingExtension.class);
+        // The cn1libs this library uses, as group:artifact. Gradle publishes them as
+        // ordinary (jar) dependencies; Maven consumers need <type>pom</type>, the
+        // shape cn1lib-archetype's common module uses, or they look for a jar the
+        // -lib artifact does not have.
+        final Provider<Set<String>> usedCn1libs = project.provider(() -> {
+            Set<String> out = new java.util.HashSet<String>();
+            for (org.gradle.api.artifacts.Dependency d
+                    : project.getConfigurations().getByName(Cn1libs.DECLARED).getAllDependencies()) {
+                out.add(d.getGroup() + ":" + d.getName());
+            }
+            return out;
+        });
         publishing.getPublications().create("cn1libCommon", MavenPublication.class, pub -> {
             pub.setArtifactId(name + "-common");
             pub.from(project.getComponents().getByName("java"));
+            pub.getPom().withXml(xml -> markCn1libDependencies(xml.asElement(), usedCn1libs.get()));
+            if (!hasCss) {
+                return;
+            }
             pub.artifact(css, a -> {
                 a.setClassifier("cn1css");
                 a.setExtension("zip");
@@ -190,7 +253,7 @@ final class LibrarySupport {
             pub.getPom().withXml(xml -> {
                 StringBuilder sb = xml.asString();
                 sb.setLength(0);
-                sb.append(Cn1libPom.render(group.get(), name, version.get(), platforms, true));
+                sb.append(Cn1libPom.render(group.get(), name, version.get(), platforms, hasCss));
             });
         });
     }

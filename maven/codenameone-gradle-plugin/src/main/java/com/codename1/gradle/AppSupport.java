@@ -207,6 +207,8 @@ final class AppSupport {
                     t.getCssCompilerClasspath().from(cssCompiler);
                     t.getSimulatorProperties().set(SimulatorSupport.simulatorPropertiesFile(layout.buildDir()));
                     t.getDescriptor().set(layout.descriptorFile());
+                    // The main class and package the descriptor records come from here.
+                    t.getInputs().files(layout.settingsFile()).withPropertyName("settingsFile");
                 });
 
         registerSimulator(project, "run", "Runs the application in the Codename One simulator", false,

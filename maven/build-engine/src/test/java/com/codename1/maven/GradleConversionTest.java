@@ -107,7 +107,12 @@ class GradleConversionTest {
         touch(mvn, "android/src/main/java/a/MyNativeImpl.java", "package a; public class MyNativeImpl {}");
         touch(mvn, "android/src/main/resources/android.png", "png");
         touch(mvn, "ios/src/main/objectivec/.gitignore", "");
-        touch(mvn, "backend/pom.xml", "<project/>");
+        touch(mvn, "backend/pom.xml", "<project><dependencies>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-backend</artifactId>"
+                + "</dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>payments</artifactId><version>3.1</version>"
+                + "</dependency>"
+                + "</dependencies></project>");
         touch(mvn, "backend/application.properties", "cn1.server.port=8080\n");
         touch(mvn, "backend/application-prod.properties", "cn1.server.port=80\n");
         touch(mvn, "backend/src/main/java/a/backend/Api.java", backendApi);
@@ -199,7 +204,8 @@ class GradleConversionTest {
         assertTrue(build.contains("implementation(\"org.example:util:2.0\")"), build);
         assertTrue(build.contains("compileOnly(\"org.example:api:${api.version}\") // check this version"), build);
         assertFalse(build.contains("codenameone-core"), "the plugin adds the framework: " + build);
-        assertFalse(build.contains("junit"), build);
+        assertTrue(build.contains("testImplementation(\"junit:junit:4\")"),
+                "the copied tests keep their libraries: " + build);
     }
 
     @Test
@@ -213,6 +219,10 @@ class GradleConversionTest {
         assertTrue(new File(out, "backend/application.properties").isFile());
         assertTrue(new File(out, "backend/application-prod.properties").isFile());
         assertFalse(new File(out, "backend/pom.xml").exists());
+        String backendBuild = read(new File(out, "backend/build.gradle.kts"));
+        assertTrue(backendBuild.contains("implementation(\"org.example:payments:3.1\")"),
+                "the backend keeps its own libraries: " + backendBuild);
+        assertFalse(backendBuild.contains("codenameone-backend"), "the plugin adds the runtime: " + backendBuild);
     }
 
     @Test

@@ -95,6 +95,26 @@ class Cn1libPomProfilesTest {
         assertEquals("g:x:1:natives@zip", Cn1libPomProfiles.read(pom, null).get("javase").get(0).toNotation());
     }
 
+    /// A cn1lib's common module names the cn1libs it uses as pom-type
+    /// dependencies; that is how a consumer reaches their platform profiles.
+    @Test
+    void mainDependenciesExposeTheCn1libsALibraryUses() {
+        String common = "<project><groupId>com.acme</groupId><artifactId>maps-common</artifactId>"
+                + "<version>1.2</version><properties><geo.version>3.0</geo.version></properties><dependencies>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>geo-lib</artifactId>"
+                + "<version>${geo.version}</version><type>pom</type></dependency>"
+                + "<dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4</version>"
+                + "<scope>test</scope></dependency>"
+                + "</dependencies><profiles><profile><activation><property><name>codename1.platform</name>"
+                + "<value>ios</value></property></activation><dependencies><dependency><groupId>x</groupId>"
+                + "<artifactId>y</artifactId><version>1</version></dependency></dependencies></profile></profiles>"
+                + "</project>";
+        List<Cn1libPomProfiles.Coordinate> deps = Cn1libPomProfiles.dependencies(common, null);
+        assertEquals(1, deps.size(), "test scope and profile dependencies are not main dependencies");
+        assertEquals("com.acme:geo-lib:3.0@pom", deps.get(0).toNotation());
+        assertTrue(Cn1libPomProfiles.dependencies("not xml", null).isEmpty());
+    }
+
     /// A library built with Gradle is consumed through the same pom shape, so what
     /// the Gradle plugin writes must read back as the Maven archetype's does.
     @Test
