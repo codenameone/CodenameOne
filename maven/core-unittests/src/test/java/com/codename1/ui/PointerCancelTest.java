@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -182,8 +183,10 @@ class PointerCancelTest extends UITestBase {
         int y = source.getAbsoluteY() + source.getHeight() / 2;
         int tx = target.getAbsoluteX() + target.getWidth() / 2;
         int ty = target.getAbsoluteY() + target.getHeight() / 2;
+        int threshold = display.getDragStartPercentage();
         display.pointerPressed(new int[]{x}, new int[]{y});
         flushSerialCalls();
+        assertEquals(1, display.getDragStartPercentage(), "pressing a draggable lowers the drag threshold");
         implementation.setHasDragStarted(true);
         for (int i = 1; i <= 10; i++) {
             implementation.dispatchPointerDrag(x + (tx - x) * i / 10, y + (ty - y) * i / 10);
@@ -207,6 +210,68 @@ class PointerCancelTest extends UITestBase {
         assertTrue(source.isVisible(), "a cancelled drag shows its source again");
         assertEquals(0, drops[0], "and drops nothing where the finger happened to be");
         assertEquals(0, finished[0], "nor reports the drag as finished");
+        assertEquals(threshold, display.getDragStartPercentage(),
+                "and puts the drag threshold back, or the next gesture drags from a few pixels");
+    }
+
+    @Test
+    void aCancelledMaterialPullToRefreshNeitherRefreshesNorEatsTheNextTap() {
+        boolean material = InfiniteProgress.isDefaultMaterialDesignMode();
+        InfiniteProgress.setDefaultMaterialDesignMode(true);
+        try {
+            Form f = new Form("pull", BoxLayout.y());
+            Container content = f.getContentPane();
+            content.setScrollableY(true);
+            final int[] refreshed = new int[1];
+            content.addPullToRefresh(new Runnable() {
+                public void run() {
+                    refreshed[0]++;
+                }
+            });
+            final int[] tapped = new int[1];
+            Button b = new Button("Tap");
+            b.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    tapped[0]++;
+                }
+            });
+            content.add(b);
+            for (int i = 0; i < 200; i++) {
+                content.add(new Label("Row " + i));
+            }
+            f.show();
+            f.revalidate();
+            flushSerialCalls();
+
+            int x = content.getAbsoluteX() + content.getWidth() / 2;
+            int y = b.getAbsoluteY() + b.getHeight() + 10;
+            display.pointerPressed(new int[]{x}, new int[]{y});
+            flushSerialCalls();
+            implementation.setHasDragStarted(true);
+            for (int i = 1; i <= 10; i++) {
+                implementation.dispatchPointerDrag(x, y + i * 20);
+            }
+            flushSerialCalls();
+            assertTrue(f.getClientProperty(Component.PULL_TO_REFRESH_RELEASE) != null,
+                    "the pull has to arm the refresh for this to mean anything");
+
+            display.pointerCancelled(x, y + 200);
+            flushSerialCalls();
+            assertEquals(null, f.getClientProperty(Component.PULL_TO_REFRESH_RELEASE),
+                    "a cancel withdraws the armed refresh");
+
+            implementation.setHasDragStarted(false);
+            int bx = b.getAbsoluteX() + b.getWidth() / 2;
+            int by = b.getAbsoluteY() + b.getHeight() / 2;
+            display.pointerPressed(new int[]{bx}, new int[]{by});
+            display.pointerReleased(new int[]{bx}, new int[]{by});
+            flushSerialCalls();
+
+            assertEquals(1, tapped[0], "the next tap is not swallowed by a refresh listener left behind");
+            assertEquals(0, refreshed[0], "and the cancelled pull never refreshed");
+        } finally {
+            InfiniteProgress.setDefaultMaterialDesignMode(material);
+        }
     }
 
     private interface Condition {

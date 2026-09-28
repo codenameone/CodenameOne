@@ -150,13 +150,14 @@ public class ContextMenu extends Container implements ActionListener {
         if (f == null) {
             return null;
         }
-        TextSelection sel = f.getTextSelection();
-        sel.setIgnoreEvents(true);
         final ContextMenu menu = new ContextMenu();
         // A menu already open is closed first, and the pane fetched again afterwards: closing
         // removes the pane from the form, and a menu added to the old one was never painted --
         // a second right-click showed nothing.
         getLayeredPane().removeAll();
+        // After that close, not before: closing the old menu switches selection handling back
+        // on, and the new menu's Copy then found the selection cleared by its own press.
+        f.getTextSelection().setIgnoreEvents(true);
         Container layeredPane = getLayeredPane();
         layeredPane.add(menu);
         layeredPane.setLayout(new Layout() {

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
@@ -4979,6 +4980,20 @@ public class Form extends Container implements TopLevelContainer {
         currentPointerPress = null;
         if (scrolling != null) {
             scrolling.pointerCancelledImpl(x, y);
+        }
+        // A material pull-to-refresh pulled far enough armed a release listener here and put its
+        // indicator in a layered pane. The cancel withdraws both: the refresh does not run, and
+        // the listener does not wait for the next release to run it -- and swallow that release.
+        Object pullRelease = getClientProperty(Component.PULL_TO_REFRESH_RELEASE);
+        if (pullRelease instanceof ActionListener) {
+            putClientProperty(Component.PULL_TO_REFRESH_RELEASE, null);
+            removePointerReleasedListener((ActionListener) pullRelease);
+            Container indicator = getLayeredPane(InfiniteProgress.class, true);
+            if (indicator.getComponentCount() > 0
+                    && !(indicator.getComponentAt(0) instanceof InfiniteProgress)) {
+                indicator.removeAll();
+                indicator.revalidate();
+            }
         }
         repaint();
     }

@@ -40,6 +40,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -376,25 +377,23 @@ public class JavaScriptBuilder extends Executor {
             return;
         }
         Set<String> keep = JavaScriptBuildHints.themesToShip(request, themeReferences);
-        boolean anyKeptPresent = false;
-        for (String theme : keep) {
+        Set<String> present = new LinkedHashSet<String>();
+        for (String theme : JavaScriptBuildHints.ALL_THEMES) {
             if (new File(assets, theme + ".res").isFile()) {
-                anyKeptPresent = true;
-                break;
+                present.add(theme);
             }
         }
-        if (!anyKeptPresent) {
-            // None of the themes the app can reach is here, so pruning would leave it with none
-            // at all -- not even the legacy pair the runtime falls back to. Ship what there is.
-            log("WARNING: none of the native themes " + keep + " is in the port bundle; not pruning");
+        if (!present.containsAll(keep)) {
+            // Pruning a bundle that lacks a theme the app can reach could delete the legacy pair
+            // the runtime falls back to when that theme will not open; see themesToDelete.
+            Set<String> missing = new LinkedHashSet<String>(keep);
+            missing.removeAll(present);
+            log("WARNING: the port bundle lacks the native themes " + missing + "; shipping every theme it has");
             return;
         }
-        for (String theme : JavaScriptBuildHints.ALL_THEMES) {
-            if (keep.contains(theme)) {
-                continue;
-            }
+        for (String theme : JavaScriptBuildHints.themesToDelete(keep, present)) {
             File f = new File(assets, theme + ".res");
-            if (f.isFile() && !f.delete()) {
+            if (!f.delete()) {
                 log("WARNING: could not delete " + f + "; it will ship in the bundle");
             }
         }

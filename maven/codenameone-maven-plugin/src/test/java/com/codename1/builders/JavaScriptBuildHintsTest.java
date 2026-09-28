@@ -57,6 +57,28 @@ class JavaScriptBuildHintsTest {
     }
 
     @Test
+    void aBundleMissingAReachableThemeIsNotPruned() {
+        // With nativeTheme=native a Mac is sent to the Aqua theme. A bundle without it must keep
+        // the legacy pair the runtime falls back to when Aqua will not open -- which pruning to
+        // "what the app can reach" would delete -- so nothing is pruned at all.
+        Set<String> keep = ship(request("nativeTheme", "native"));
+        assertTrue(keep.contains("MacOSAquaTheme"), "the hint reaches the macOS theme");
+        Set<String> present = new LinkedHashSet<String>(JavaScriptBuildHints.ALL_THEMES);
+        present.remove("MacOSAquaTheme");
+        assertTrue(JavaScriptBuildHints.themesToDelete(keep, present).isEmpty(), "a partial bundle is shipped whole");
+    }
+
+    @Test
+    void aCompleteBundleLosesExactlyTheUnreachableThemes() {
+        Set<String> keep = ship(request("nativeTheme", "native"));
+        Set<String> present = new LinkedHashSet<String>(JavaScriptBuildHints.ALL_THEMES);
+        Set<String> expected = new LinkedHashSet<String>(present);
+        expected.removeAll(keep);
+        assertTrue(!expected.isEmpty(), "some theme has to be unreachable for this to mean anything");
+        assertEquals(expected, new LinkedHashSet<String>(JavaScriptBuildHints.themesToDelete(keep, present)), "deleted");
+    }
+
+    @Test
     void launcherPublishesOnlyTheHintsThatAreSet() {
         String src = JavaScriptBuildHints.launcherProperties(request(
                 "nativeTheme", "native", "javascript.titleBar", "html", "unrelated.hint", "x"));

@@ -129,6 +129,34 @@ public final class JavaScriptBuildHints {
         return out;
     }
 
+    /// The themes to delete from a bundle carrying `present` so that it ships `keep`: every
+    /// present theme outside `keep` -- or nothing at all when any theme in `keep` is missing.
+    ///
+    /// All or nothing because the runtime falls back. A theme the resolver picks but cannot
+    /// open sends it to the legacy pair (iOS 7 and Android Holo), which `keep` may not
+    /// include: pruning a bundle that lacks, say, the macOS theme left a Mac with neither the
+    /// theme it asked for nor the fallback, and no theme installed at all. A partial or
+    /// mismatched bundle is therefore shipped whole.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keep`: what `#themesToShip` answered
+    /// - `present`: the theme names (without `.res`) the bundle's assets actually carry
+    static List<String> themesToDelete(Set<String> keep, Set<String> present) {
+        List<String> out = new ArrayList<String>();
+        for (String theme : keep) {
+            if (!present.contains(theme)) {
+                return out;
+            }
+        }
+        for (String theme : ALL_THEMES) {
+            if (!keep.contains(theme) && present.contains(theme)) {
+                out.add(theme);
+            }
+        }
+        return out;
+    }
+
     /// The native themes this application can open at run time, which is what the bundle has
     /// to carry. Everything else in [#ALL_THEMES] is dead weight in the public web root -- up to
     /// 2.5MB of it.
