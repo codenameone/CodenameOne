@@ -43,6 +43,11 @@ def files_under(root):
     return out
 
 
+def read_bytes(path):
+    with open(path, 'rb') as f:
+        return f.read()
+
+
 def normalized(rel, data):
     if rel.endswith('.properties'):
         data = TIMESTAMP.sub(b'#<timestamp>', data)
@@ -65,8 +70,8 @@ def main(maven_dir, gradle_dir):
     for rel in sorted(set(gradle) - set(maven)):
         problems.append('only in Gradle: ' + rel)
     for rel in sorted(set(maven) & set(gradle)):
-        a = open(maven[rel], 'rb').read()
-        b = open(gradle[rel], 'rb').read()
+        a = read_bytes(maven[rel])
+        b = read_bytes(gradle[rel])
         if a == b:
             continue
         if zipfile.is_zipfile(maven[rel]) and zipfile.is_zipfile(gradle[rel]):

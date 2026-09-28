@@ -167,13 +167,6 @@ public final class ProjectIO {
         fs.mkdir(parent);
     }
 
-    /**
-     * Normalizes to forward slashes before building the URL. The Maven plugin hands this editor
-     * native paths, so on Windows every path arrives with backslashes; leaving them in place makes
-     * the separator arithmetic in {@code ensureParent} and {@code fileName} silently find nothing.
-     * A drive-lettered path becomes {@code file://C:/...}, which the JavaSE port maps back to
-     * {@code C:\...}.
-     */
     /// A `file://` URL for an OS path, as `FileSystemStorage` expects.
     ///
     /// The same in all four desktop tools (Settings, GUI Builder, Game Builder,

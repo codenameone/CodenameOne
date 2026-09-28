@@ -103,6 +103,13 @@ final class ProjectSupport {
                     ? "UTF-8" : compile.getOptions().getEncoding());
             compile.doFirst(new RequireRelease());
         });
+        // Kotlin targets the JDK Gradle runs on unless told otherwise, and the
+        // Kotlin plugin refuses a Java and a Kotlin target that differ -- so a
+        // Kotlin project built on JDK 21 failed at compileKotlin ("Inconsistent
+        // JVM Target Compatibility"). Pinned to the same release as javac.
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().matching(t -> t.getName().startsWith("compile")
+                        && t.getName().endsWith("Kotlin")).configureEach(ProjectSupport::pinKotlinJvmTarget));
     }
 
     /// The `codename1.*` properties from the command line (`-P` and `-D`) and
@@ -125,6 +132,33 @@ final class ProjectSupport {
             out.putAll(sp);
             return out;
         });
+    }
+
+    /// Sets a Kotlin compile task's JVM target to [JAVA_RELEASE]. Reflective,
+    /// because the Kotlin Gradle plugin's types are not on this plugin's
+    /// classpath: `compilerOptions.jvmTarget` (Kotlin 1.8 and newer), else the
+    /// older `kotlinOptions.jvmTarget` string.
+    @SuppressWarnings("unchecked")
+    static void pinKotlinJvmTarget(org.gradle.api.Task task) {
+        try {
+            Object options = task.getClass().getMethod("getCompilerOptions").invoke(task);
+            Object target = options.getClass().getMethod("getJvmTarget").invoke(options);
+            Class<?> jvmTarget = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget", false,
+                    task.getClass().getClassLoader());
+            ((org.gradle.api.provider.Property<Object>) target).set(
+                    Enum.valueOf(jvmTarget.asSubclass(Enum.class), "JVM_" + JAVA_RELEASE));
+            return;
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            // An older Kotlin plugin: fall through to kotlinOptions.
+        }
+        try {
+            Object options = task.getClass().getMethod("getKotlinOptions").invoke(task);
+            options.getClass().getMethod("setJvmTarget", String.class).invoke(options, String.valueOf(JAVA_RELEASE));
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            task.getLogger().warn("cn1: could not set " + task.getPath() + "'s JVM target to " + JAVA_RELEASE
+                    + "; set kotlin { compilerOptions { jvmTarget } } in build.gradle.kts if the build refuses "
+                    + "the Java and Kotlin targets as inconsistent (" + ex + ")");
+        }
     }
 
     /// Fails a compile that targets less than [JAVA_RELEASE].

@@ -29,6 +29,35 @@
     </properties>
 
     <dependencies>
+        <!-- FIRST, before any port. Maven orders the test classpath by declaration,
+             and codenameone-android brings the Android platform jar, whose junit.*
+             classes are "Stub!" throwing stubs. Declared after it, JUnit 4 resolved to
+             the stub and the Vintage engine failed to discover any test at all
+             ("Failed to read version of junit:junit"). The Maven plugin's pom declares
+             them in the same order. -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- JUnit 4 tests run through Surefire's JUnit Platform provider, which
+             needs the Vintage engine or it silently reports zero tests. -->
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-project-model</artifactId>
@@ -218,29 +247,6 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <!-- JUnit 4 tests run through Surefire's JUnit Platform provider, which
-             needs the Vintage engine or it silently reports zero tests. -->
-        <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
-            <version>${junit.jupiter.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -298,6 +304,24 @@
                                 <mkdir dir="${project.build.outputDirectory}/com/codename1/maven"/>
                                 <copy file="${maven.multiModuleProjectDirectory}/UpdateCodenameOne.jar"
                                       todir="${project.build.outputDirectory}/com/codename1/maven"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <!-- JavaScriptProxyPackagerTest reads the JavaScript proxy jars from
+                         the ParparVM bundle's build output. It moved here with the
+                         builders, so the copy did too. -->
+                    <execution>
+                        <id>add-javascript-proxy-test-resources</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${maven.multiModuleProjectDirectory}/parparvm/target/bundle/javascript-proxy-javax.jar"
+                                      todir="${project.build.testOutputDirectory}"/>
+                                <copy file="${maven.multiModuleProjectDirectory}/parparvm/target/bundle/javascript-proxy-jakarta.jar"
+                                      todir="${project.build.testOutputDirectory}"/>
                             </target>
                         </configuration>
                     </execution>

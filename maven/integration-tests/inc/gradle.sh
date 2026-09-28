@@ -20,6 +20,21 @@
 CN1_REPO="${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}"
 GRADLE_JDK="${GRADLE_JAVA_HOME:-${JAVA17_HOME:-$JAVA_HOME}}"
 
+# Gradle itself needs JDK 17+. all.sh also runs on JDK 8-only machines (ant.yml),
+# where these scripts have nothing to run on: they skip there, and
+# gradle-smoke.yml, which provides the JDK, sets CN1_GRADLE_REQUIRED=1 so a
+# missing one fails instead of reading as a pass.
+GRADLE_JDK_MAJOR=$("$GRADLE_JDK/bin/java" -version 2>&1 | sed -n 's/.*version "\([0-9]*\)[."].*/\1/p' | head -1)
+[ "$GRADLE_JDK_MAJOR" = "1" ] && GRADLE_JDK_MAJOR=8   # "1.8.0_..." is Java 8
+if [ -z "$GRADLE_JDK_MAJOR" ] || [ "$GRADLE_JDK_MAJOR" -lt 17 ]; then
+  if [ "${CN1_GRADLE_REQUIRED:-}" = "1" ]; then
+    echo "FAIL: Gradle needs JDK 17 or newer; $GRADLE_JDK is ${GRADLE_JDK_MAJOR:-unknown}. Set GRADLE_JAVA_HOME." >&2
+    exit 1
+  fi
+  echo "$(basename "$0"): skipped, no JDK 17 or newer (set GRADLE_JAVA_HOME or JAVA17_HOME)"
+  exit 0
+fi
+
 mvn_local() {
   if [ -n "${MAVEN_REPO_LOCAL:-}" ]; then
     mvn -B -ntp "-Dmaven.repo.local=$MAVEN_REPO_LOCAL" "$@"
