@@ -122,6 +122,30 @@ def cpu_model():
     return platform.processor() or 'unknown'
 
 
+def cpu_class(cpu):
+    """The processor family a baseline can be split by, or None. Hosted runners of one
+    label draw from mixed pools, and on x64 the vendor moves the ratios by more than any
+    tolerance could absorb: Windows x64 measured objectAllocation at 6.34x on an AMD host
+    and 2.61x on an Intel one, with the JDK's peak on the Intel host swinging 435-549MB
+    between rounds while ParparVM's held at 252-265MB. Nothing else is split yet, for want
+    of runs that show it matters."""
+    text = (cpu or '').lower()
+    if 'intel' in text:
+        return 'intel'
+    if 'amd' in text:
+        return 'amd'
+    return None
+
+
+def baseline_key(platforms, platform, cpu):
+    """platform@class when perf-baseline.json has one for this runner's CPU, else the
+    platform's own row, which calibration pools across every CPU it saw."""
+    cls = cpu_class(cpu)
+    if cls and '%s@%s' % (platform, cls) in platforms:
+        return '%s@%s' % (platform, cls)
+    return platform
+
+
 def platform_key():
     system = {'Linux': 'linux', 'Darwin': 'macos', 'Windows': 'windows'}.get(
         platform.system(), platform.system().lower())
@@ -410,7 +434,8 @@ def render_markdown(report):
     tol = report['tolerance']
     lines = ['### ParparVM vs HotSpot (JDK 25): %s' % name, '']
     if report.get('cpu'):
-        lines += ['Runner CPU: %s' % report['cpu'], '']
+        lines += ['Runner CPU: %s (baseline `%s`)'
+                  % (report['cpu'], report.get('baseline_key', report['platform'])), '']
     if report.get('error'):
         lines += ['**The performance gate could not complete:** `%s`' % report['error'], '']
     regressions = []
@@ -553,7 +578,9 @@ def main(argv):
             report['labels'][s['id']] = s['label']
 
         tolerance = baseline['tolerance']
-        bases = baseline['platforms'].get(args.platform, {})
+        report['baseline_key'] = baseline_key(baseline['platforms'], args.platform,
+                                              report['cpu'])
+        bases = baseline['platforms'].get(report['baseline_key'], {})
         have = report['available_cores']
         if args.cores == 'all':
             # None = unpinned, all of the runner's CPUs, each runtime's own defaults.
@@ -565,9 +592,11 @@ def main(argv):
 
         work = TARGET / 'perf-gate' / time.strftime('%Y%m%d-%H%M%S')
         work.mkdir(parents=True)
-        print('perf-gate: %s, %d rounds, %s, %d benchmarks (this runner has %d CPUs)'
+        print('perf-gate: %s, %d rounds, %s, %d benchmarks (this runner has %d CPUs: %s; '
+              'baseline %s)'
               % (args.platform, args.rounds,
-                 ', '.join(cores_text(c) for c in cores_list), len(specs), have), flush=True)
+                 ', '.join(cores_text(c) for c in cores_list), len(specs), have,
+                 report['cpu'], report['baseline_key']), flush=True)
         calibration = {}
         report['failures'] = []
         for spec in specs:

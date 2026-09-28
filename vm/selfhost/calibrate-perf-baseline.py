@@ -19,10 +19,18 @@ For every platform, benchmark and core setting:
 A platform measured only ONCE has no spread of its own; each of its rows takes the widest
 tolerance any other platform needed for the same benchmark and metric.
 
+Runs record the runner's CPU. When one platform's runs came from more than one CPU class
+(perf-gate.cpu_class: the x64 vendor), each class also gets its own `platform@class` rows,
+which the gate prefers for a runner of that class. The plain platform rows always pool
+every run, so a runner from a class no run has seen is still gated, just more loosely.
+
+A platform with no results here keeps its existing rows unchanged.
+
 The global tolerance and the absolute floor (which keeps the tiny memory ratios, 0.03x of
 the JDK, from failing on a few kilobytes) are kept from the existing file.
 """
 import argparse
+import importlib.util
 import json
 import math
 import statistics
@@ -30,6 +38,9 @@ from collections import defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+_spec = importlib.util.spec_from_file_location('perf_gate', HERE / 'perf-gate.py')
+perf_gate = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(perf_gate)
 SPREAD_MARGIN = 1.5
 METRICS = ('time', 'memory')
 
@@ -48,14 +59,24 @@ def main(argv=None):
     tolerance = existing['tolerance']
     # platform -> (benchmark, cores) -> metric -> [median ratio per run]
     runs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    classes = defaultdict(set)   # platform -> CPU classes its runs came from
+    reports = []
     for path in args.results:
         report = json.loads(Path(path).read_text())
         if report.get('error') or report.get('failures'):
             raise SystemExit('%s did not complete; calibrate only from complete runs' % path)
+        reports.append(report)
+        classes[report['platform']].add(perf_gate.cpu_class(report.get('cpu')))
+    for report in reports:
+        keys = [report['platform']]
+        cls = perf_gate.cpu_class(report.get('cpu'))
+        if cls and len(classes[report['platform']]) > 1:
+            keys.append('%s@%s' % (report['platform'], cls))
         for bench, by_cores in report['results'].items():
             for cores, entry in by_cores.items():
                 for metric in METRICS:
-                    runs[report['platform']][(bench, cores)][metric].append(entry[metric]['median'])
+                    for key in keys:
+                        runs[key][(bench, cores)][metric].append(entry[metric]['median'])
 
     rows = {}
     widest = defaultdict(float)  # (benchmark, metric) -> widest tolerance any platform needed
@@ -84,6 +105,13 @@ def main(argv=None):
         row['runs'] = count
         platforms.setdefault(platform, {}).setdefault(bench, {})[cores] = row
 
+    # A platform these results do not cover keeps the rows it has -- and so does every
+    # split row of one: a calibration that happened to get no macOS runner must not
+    # leave macOS ungated. Only what was measured is replaced.
+    measured = {key.split('@')[0] for key in platforms}
+    for key, rows_ in existing.get('platforms', {}).items():
+        if key.split('@')[0] not in measured:
+            platforms[key] = rows_
     existing['platforms'] = platforms
     Path(args.out).write_text(json.dumps(existing, indent=1, sort_keys=True) + '\n')
     for platform in sorted(platforms):

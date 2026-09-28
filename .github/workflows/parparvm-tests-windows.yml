@@ -589,7 +589,14 @@ jobs:
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
     needs: windows-port-screenshot
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Runs when the x64 job FAILED too, not only when it passed: what this leg needs
+    # from it (the compiled classes) is uploaded early, and the x64 job's last step is
+    # the performance verdict. Requiring success let an x64 perf regression skip the
+    # whole arm64 leg, its screenshots and its own perf gate included. An x64 failure
+    # before the upload still fails here, at the download, with its own message.
+    if: >-
+      !cancelled() && needs.windows-port-screenshot.result != 'skipped' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: windows-11-arm
     # 60 for the suite plus the ParparVM vs JDK 25 performance gate.
     timeout-minutes: 110

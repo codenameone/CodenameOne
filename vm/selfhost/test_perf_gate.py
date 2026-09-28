@@ -112,20 +112,24 @@ calibrate = load('calibrate_perf_baseline', 'calibrate-perf-baseline.py')
 class CalibrationTest(unittest.TestCase):
     """calibrate-perf-baseline.py: medians as baselines, spread-driven tolerances."""
 
-    def run_calibration(self, runs):
+    def run_calibration(self, runs, existing=None):
         import json
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'baseline.json'
             out.write_text(json.dumps({'tolerance': {'time': 0.15, 'memory': 0.15},
                                        'floor': {'time': 0.0, 'memory': 0.05},
-                                       'platforms': {}}))
+                                       'platforms': existing or {}}))
             files = []
-            for i, (platform, per_bench) in enumerate(runs):
+            for i, run in enumerate(runs):
+                platform, per_bench = run[0], run[1]
                 results = {b: {'all': {'time': {'median': t}, 'memory': {'median': m}}}
                            for b, (t, m) in per_bench.items()}
+                report = {'platform': platform, 'results': results}
+                if len(run) > 2:
+                    report['cpu'] = run[2]
                 f = Path(tmp) / ('run%d.json' % i)
-                f.write_text(json.dumps({'platform': platform, 'results': results}))
+                f.write_text(json.dumps(report))
                 files.append(str(f))
             calibrate.main(['--out', str(out)] + files)
             return json.loads(out.read_text())
@@ -159,6 +163,46 @@ class CalibrationTest(unittest.TestCase):
         mac = b['platforms']['macos-arm64']['objectAllocation']['all']
         self.assertEqual(mac['runs'], 1)
         self.assertEqual(mac['tolerance']['time'], linux)
+
+    def test_a_mixed_cpu_pool_gets_per_class_rows_and_a_pooled_fallback(self):
+        amd = 'AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'
+        intel = 'Intel64 Family 6 Model 207 Stepping 2, GenuineIntel'
+        runs = [('windows-x64', {'objectAllocation': (v, 0.4)}, amd) for v in (6.3, 7.4, 7.0)]
+        runs += [('windows-x64', {'objectAllocation': (v, 0.56)}, intel) for v in (2.6, 2.7)]
+        b = self.run_calibration(runs)['platforms']
+        self.assertEqual(b['windows-x64@amd']['objectAllocation']['all']['time'], 7.0)
+        self.assertEqual(b['windows-x64@intel']['objectAllocation']['all']['memory'], 0.56)
+        self.assertEqual(b['windows-x64']['objectAllocation']['all']['runs'], 5)
+        self.assertEqual(gate.baseline_key(b, 'windows-x64', intel), 'windows-x64@intel')
+        self.assertEqual(gate.baseline_key(b, 'windows-x64', 'Some Future CPU'), 'windows-x64')
+
+    def test_a_single_cpu_pool_is_not_split(self):
+        cpu = 'AMD EPYC 7763 64-Core Processor'
+        runs = [('linux-x64', {'quicksort': (v, 0.1)}, cpu) for v in (1.0, 1.01)]
+        b = self.run_calibration(runs)['platforms']
+        self.assertEqual(sorted(b), ['linux-x64'])
+        self.assertEqual(gate.baseline_key(b, 'linux-x64', cpu), 'linux-x64')
+
+
+    def test_an_unmeasured_platform_keeps_its_rows_and_a_measured_one_is_replaced(self):
+        old = {'macos-arm64': {'quicksort': {'all': {'time': 0.9, 'memory': 0.1, 'runs': 1}}},
+               'linux-x64': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}},
+               'linux-x64@intel': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}}}
+        b = self.run_calibration([('linux-x64', {'quicksort': (1.0, 0.1)})], existing=old)
+        b = b['platforms']
+        self.assertEqual(b['macos-arm64'], old['macos-arm64'])
+        self.assertEqual(b['linux-x64']['quicksort']['all']['time'], 1.0)
+        self.assertNotIn('linux-x64@intel', b)  # measured platform: stale split rows go
+
+
+class CpuClassTests(unittest.TestCase):
+    def test_x64_vendors_and_everything_else(self):
+        self.assertEqual(gate.cpu_class('AMD EPYC 7763 64-Core Processor'), 'amd')
+        self.assertEqual(gate.cpu_class('Intel64 Family 6 Model 207 Stepping 2, GenuineIntel'),
+                         'intel')
+        self.assertIsNone(gate.cpu_class('Neoverse-N2'))
+        self.assertIsNone(gate.cpu_class('Apple M1 (Virtual)'))
+        self.assertIsNone(gate.cpu_class(None))
 
 
 if __name__ == '__main__':
