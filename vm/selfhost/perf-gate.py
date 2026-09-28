@@ -632,8 +632,8 @@ def main(argv):
               'baseline %s)'
               % (args.platform, args.rounds,
                  ', '.join(cores_text(c) for c in cores_list), len(specs), have,
-                 report['cpu'], report['baseline_key'] or 'NONE for this CPU model: reported, '
-                 'not gated'), flush=True)
+                 report['cpu'], report['baseline_key'] or 'NONE for this CPU model: the gate '
+                 'fails until it is calibrated'), flush=True)
         calibration = {}
         report['failures'] = []
         for spec in specs:
