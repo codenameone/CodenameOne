@@ -22,6 +22,7 @@
  */
 #import "BlurRegion.h"
 #import "CodenameOne_GLViewController.h"
+#import "GLUIImage.h"
 #include "TargetConditionals.h"
 #ifdef CN1_USE_METAL
 #import "METALView.h"
@@ -77,11 +78,58 @@
     return self;
 }
 
+-(id)initWithGlassLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h cornerRadius:(float)cr
+                     optics:(const float*)o count:(int)count amount:(float)am {
+    x = xpos;
+    y = ypos;
+    width = w;
+    height = h;
+    glass = NO;
+    lens = NO;
+    colorMatrix = NO;
+    glassLens = YES;
+    for (int i = 0; i < 16; i++) {
+        optics[i] = i < count ? o[i] : 0.0f;
+    }
+    cornerRadius = cr;
+    amount = am;
+    return self;
+}
+
+-(id)initWithColorMatrixArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
+                      matrix:(const float*)m mask:(GLUIImage*)mask
+                cornerRadius:(float)cr amount:(float)am {
+    x = xpos;
+    y = ypos;
+    width = w;
+    height = h;
+    glass = NO;
+    lens = NO;
+    colorMatrix = YES;
+    for (int i = 0; i < 12; i++) {
+        matrix[i] = m[i];
+    }
+    maskImage = mask;
+#ifndef CN1_USE_ARC
+    [maskImage retain];
+#endif
+    cornerRadius = cr;
+    amount = am;
+    return self;
+}
+
 -(void)execute {
 #if defined(CN1_USE_METAL) && !TARGET_OS_WATCH
     id view = [[CodenameOne_GLViewController instance] renderingView];
     if ([view isKindOfClass:[METALView class]]) {
-        if (lens) {
+        if (glassLens) {
+            [(METALView*)view glassLensScreenRegionX:x y:y w:width h:height cornerRadius:cornerRadius
+                                              optics:optics amount:amount];
+        } else if (colorMatrix) {
+            [(METALView*)view colorMatrixScreenRegionX:x y:y w:width h:height matrix:matrix
+                                                 mask:(maskImage == nil ? nil : [maskImage getMTLTexture])
+                                         cornerRadius:cornerRadius amount:amount];
+        } else if (lens) {
             [(METALView*)view lensScreenRegionX:x y:y w:width h:height
                                   cornerRadius:cornerRadius magnify:magnify
                                    aberration:aberration tintColor:tintColor tintStrength:tintStrength];
@@ -105,6 +153,7 @@
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {
+    [maskImage release];
     [super dealloc];
 }
 #endif

@@ -147,6 +147,36 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
             desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_lens"];
             configureBlendPremultiplied(desc.colorAttachments[0]);
             break;
+        case CN1MetalPipelineGlassMaterial:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_fullscreen"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_glass_material"];
+            configureBlendDisabled(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineGlassBoxH:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_fullscreen"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_glass_box_h"];
+            configureBlendDisabled(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineGlassBoxV:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_fullscreen"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_glass_box_v"];
+            configureBlendDisabled(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineGlassOptics:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_glass_optics"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineGlassLens:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_glass_lens"];
+            configureBlendDisabled(desc.colorAttachments[0]);
+            break;
+        case CN1MetalPipelineColorMatrix:
+            desc.vertexFunction = [library newFunctionWithName:@"cn1_vs_textured"];
+            desc.fragmentFunction = [library newFunctionWithName:@"cn1_fs_colormatrix"];
+            configureBlendPremultiplied(desc.colorAttachments[0]);
+            break;
         default:
             return nil;
     }
@@ -156,6 +186,11 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
     // this Metal aborts the draw call with a pixel-format mismatch even
     // for shaders that never engage the stencil test.
     desc.stencilAttachmentPixelFormat = MTLPixelFormatStencil8;
+    if (pipeline == CN1MetalPipelineGlassMaterial || pipeline == CN1MetalPipelineGlassBoxH
+            || pipeline == CN1MetalPipelineGlassBoxV) {
+        // Offscreen passes into scratch textures, which carry no stencil.
+        desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
+    }
     if (desc.vertexFunction == nil || desc.fragmentFunction == nil) {
         NSLog(@"CN1MetalPipelineCache: shader function missing for pipeline %ld", (long)pipeline);
         return nil;

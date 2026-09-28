@@ -1513,6 +1513,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         // teardown, so a test that switches touch off and forgets -- or restores the
         // wrong value -- cannot decide the command behaviour of the classes after it.
         touchDevice = true;
+        colorMatrixRegionSupported = false;
+        colorMatrixCalls.clear();
+        lensCalls.clear();
         minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;
@@ -1929,6 +1932,135 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void shear(Object nativeGraphics, float x, float y) {
+    }
+
+    private boolean colorMatrixRegionSupported;
+    private final java.util.List<ColorMatrixCall> colorMatrixCalls =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<ColorMatrixCall>());
+
+    /// One recorded Graphics.colorMatrixRegion call, with a snapshot of the mask
+    /// as it was when the call was made (the caller reuses its masks).
+    public static final class ColorMatrixCall {
+        public final int x;
+        public final int y;
+        public final int width;
+        public final int height;
+        public final float[] matrix;
+        public final int[] mask;
+        public final int maskWidth;
+        public final int maskHeight;
+        public final float cornerRadius;
+        public final float amount;
+
+        ColorMatrixCall(int x, int y, int width, int height, float[] matrix, int[] mask, int maskWidth,
+                int maskHeight, float cornerRadius, float amount) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.matrix = matrix;
+            this.mask = mask;
+            this.maskWidth = maskWidth;
+            this.maskHeight = maskHeight;
+            this.cornerRadius = cornerRadius;
+            this.amount = amount;
+        }
+    }
+
+    /// Makes this implementation claim colorMatrixRegion support and record the calls.
+    public void setColorMatrixRegionSupported(boolean supported) {
+        colorMatrixRegionSupported = supported;
+    }
+
+    public java.util.List<ColorMatrixCall> getColorMatrixCalls() {
+        synchronized (colorMatrixCalls) {
+            return new java.util.ArrayList<ColorMatrixCall>(colorMatrixCalls);
+        }
+    }
+
+    public void clearColorMatrixCalls() {
+        colorMatrixCalls.clear();
+    }
+
+    private final java.util.List<LensCall> lensCalls =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<LensCall>());
+
+    /// One recorded Graphics.lensRegion call: the region and the clip in force when
+    /// it was made, both in the same (translated) coordinates.
+    public static final class LensCall {
+        public final int x;
+        public final int y;
+        public final int width;
+        public final int height;
+        public final int clipX;
+        public final int clipY;
+        public final int clipWidth;
+        public final int clipHeight;
+
+        LensCall(int x, int y, int width, int height, int clipX, int clipY, int clipWidth, int clipHeight) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.clipX = clipX;
+            this.clipY = clipY;
+            this.clipWidth = clipWidth;
+            this.clipHeight = clipHeight;
+        }
+    }
+
+    public java.util.List<LensCall> getLensCalls() {
+        synchronized (lensCalls) {
+            return new java.util.ArrayList<LensCall>(lensCalls);
+        }
+    }
+
+    /// Records the call (painting nothing) and reports it unsupported, like the base.
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float magnify, float aberration, int tintColor, float tintStrength) {
+        if (graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            lensCalls.add(new LensCall(x + g.translateX, y + g.translateY, width, height, g.clipX, g.clipY,
+                    g.clipWidth, g.clipHeight));
+        }
+        return false;
+    }
+
+    /// Clears to transparent on mutable images, the way the real ports do (the
+    /// base class only logs), so reused off-screen buffers start empty.
+    @Override
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        if (!(graphics instanceof TestGraphics) || ((TestGraphics) graphics).image == null) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        int startX = Math.max(Math.max(x + g.translateX, g.clipX), 0);
+        int startY = Math.max(Math.max(y + g.translateY, g.clipY), 0);
+        int endX = Math.min(Math.min(x + g.translateX + width, g.clipX + g.clipWidth), g.image.width);
+        int endY = Math.min(Math.min(y + g.translateY + height, g.clipY + g.clipHeight), g.image.height);
+        for (int row = startY; row < endY; row++) {
+            for (int col = startX; col < endX; col++) {
+                g.image.argb[row * g.image.width + col] = 0;
+            }
+        }
+    }
+
+    @Override
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        return colorMatrixRegionSupported;
+    }
+
+    @Override
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            com.codename1.ui.Image mask, float cornerRadius, float amount) {
+        if (!colorMatrixRegionSupported) {
+            return false;
+        }
+        int[] maskPixels = mask == null ? null : mask.getRGB();
+        colorMatrixCalls.add(new ColorMatrixCall(x, y, width, height, matrix.clone(), maskPixels,
+                mask == null ? 0 : mask.getWidth(), mask == null ? 0 : mask.getHeight(), cornerRadius, amount));
+        return true;
     }
 
     @Override
@@ -2999,6 +3131,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public Object getDefaultFont() {
         return defaultFont;
+    }
+
+    /// A native font with its own metrics, for tests that need two fonts to measure
+    /// text differently (every other font here is 8 px a character).
+    public Object createTestFont(int charWidth, int height) {
+        return new TestFont(charWidth, height);
     }
 
     @Override

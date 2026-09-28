@@ -202,6 +202,7 @@ FRAME_ARGS=(
   --frames-dir "$FRAMES_WORK_DIR"
   --goldens-dir "$FRAME_GOLDENS_DIR"
   --spec "$CN1SS_FIDELITY_SPEC"
+  --golden-set "$GOLDEN_SET"
   --out-json "$ARTIFACTS_DIR/morph-frames.json"
   --strip-dir "$ARTIFACTS_DIR"
 )

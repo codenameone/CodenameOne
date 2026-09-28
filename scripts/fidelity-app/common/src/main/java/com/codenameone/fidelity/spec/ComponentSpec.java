@@ -49,6 +49,7 @@ public class ComponentSpec {
     private List states = new ArrayList();
     private List platforms = new ArrayList();
     private List frames = new ArrayList();
+    private List goldenSets = new ArrayList();
 
     public String getId() {
         return id;
@@ -264,6 +265,36 @@ public class ComponentSpec {
 
     public void setFrames(List frames) {
         this.frames = frames;
+    }
+
+    /**
+     * The golden sets (OS design generations, e.g. ios-27-metal) a frames row belongs
+     * to; empty = every set. A motion that only one generation plays is captured and
+     * validated only in that generation's run.
+     */
+    public List getGoldenSets() {
+        return goldenSets;
+    }
+
+    public void setGoldenSets(List goldenSets) {
+        this.goldenSets = goldenSets;
+    }
+
+    /**
+     * True when this row belongs to a golden set whose name starts with the given
+     * generation prefix (e.g. "ios-27-"), or declares no golden sets at all.
+     */
+    public boolean appliesToGeneration(String generationPrefix) {
+        if (goldenSets == null || goldenSets.isEmpty() || generationPrefix == null) {
+            return true;
+        }
+        for (int i = 0; i < goldenSets.size(); i++) {
+            String g = (String) goldenSets.get(i);
+            if (g != null && g.startsWith(generationPrefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
