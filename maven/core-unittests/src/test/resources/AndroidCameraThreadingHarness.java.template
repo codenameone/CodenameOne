@@ -1,0 +1,246 @@
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import androidx.camera.core.Preview.SurfaceProvider;
+
+/** CameraX doubles enforce its main-thread contract, with a separate CN1 caller thread. */
+public class AndroidCameraThreadingHarness {
+    private static volatile Thread uiThread;
+    private static final ExecutorService ui = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "Android main");
+        thread.setDaemon(true);
+        uiThread = thread;
+        return thread;
+    });
+    private static final Activity testActivity = new Activity();
+    private static boolean failPreview;
+    private static boolean failBind;
+    private static boolean delayProvider;
+    private static Runnable delayedBinding;
+    private static int binds;
+    private static int unbinds;
+    private static int liveBindings;
+    private static int loggedErrors;
+
+    /* PRODUCTION_FIELDS */
+
+    public AndroidCameraThreadingHarness() { activity = testActivity; }
+
+    /* PRODUCTION_METHODS */
+
+    private static void check(boolean ok, String message) {
+        if (!ok) throw new AssertionError(message);
+    }
+    private static void checkMain() {
+        check(Thread.currentThread() == uiThread, "CameraX called outside Android main");
+    }
+    private static boolean ensureCameraXResolved() { return true; }
+    private void requireCameraPermission() {}
+    private void requireAudioPermission() {}
+    private void installFrameAnalyzer() {}
+    private CameraInfo[] enumerateCameras() { return new CameraInfo[] {new CameraInfo(), new CameraInfo()}; }
+
+    private static void reset() {
+        failPreview = false;
+        failBind = false;
+        delayProvider = false;
+        delayedBinding = null;
+        binds = unbinds = liveBindings = loggedErrors = 0;
+        clsProcessCameraProvider = Provider.class;
+        clsCameraSelector = Selector.class;
+        clsCameraSelectorBuilder = Selector.Builder.class;
+        clsPreview = PreviewUseCase.class;
+        clsPreviewBuilder = PreviewUseCase.Builder.class;
+        clsImageCaptureBuilder = Capture.Builder.class;
+        clsImageAnalysisBuilder = Analysis.Builder.class;
+        clsPreviewView = PreviewView.class;
+        clsUseCase = UseCase.class;
+        clsLifecycleOwner = LifecycleOwner.class;
+        clsProcessLifecycleOwner = ProcessLifecycleOwner.class;
+        frontLensFacing = 0;
+        backLensFacing = 1;
+    }
+
+    private static AndroidCameraThreadingHarness openCamera() throws Exception {
+        AndroidCameraThreadingHarness camera = new AndroidCameraThreadingHarness();
+        camera.open("back", new CameraSessionOptions());
+        check(camera.previewView != null, "native preview must be ready when open returns");
+        PeerComponent peer = camera.createPreviewPeer();
+        check(peer != null && peer.view == camera.previewView, "missing preview peer");
+        check(peer.creator == Thread.currentThread(), "CN1 peer must be created on caller thread");
+        return camera;
+    }
+
+    public static void openAndClose() throws Exception {
+        reset();
+        AndroidCameraThreadingHarness camera = openCamera();
+        ExecutorService executor = (ExecutorService) camera.cameraExecutor;
+        camera.close();
+        camera.close();
+        check(unbinds == 1 && liveBindings == 0, "close must unbind exactly once before returning");
+        check(executor.isShutdown(), "camera executor leaked");
+        check(camera.createPreviewPeer() == null, "closed camera exposes a peer");
+        check(loggedErrors == 0, "teardown swallowed an error");
+        openCamera().close();
+        check(binds == 2 && unbinds == 2, "camera cannot reopen cleanly");
+    }
+
+    public static void failedPreview() throws Exception {
+        reset();
+        failPreview = true;
+        AndroidCameraThreadingHarness camera = new AndroidCameraThreadingHarness();
+        try {
+            camera.open("back", new CameraSessionOptions());
+            throw new AssertionError("preview failure was swallowed");
+        } catch (IOException expected) {
+            check(expected.getCause() != null, "lost preview failure cause");
+        }
+        check(binds == 0, "bound camera after preview initialization failed");
+        check(camera.cameraExecutor == null || ((ExecutorService) camera.cameraExecutor).isShutdown(), "failed open leaked executor");
+        check(camera.createPreviewPeer() == null, "failed open exposes a peer");
+        failPreview = false;
+        openCamera().close();
+        check(liveBindings == 0 && loggedErrors == 0, "retry did not clean up");
+    }
+
+    public static void failedBind() throws Exception {
+        reset();
+        failBind = true;
+        AndroidCameraThreadingHarness camera = new AndroidCameraThreadingHarness();
+        try {
+            camera.open("back", new CameraSessionOptions());
+            throw new AssertionError("bind failure was swallowed");
+        } catch (IOException expected) {}
+        check(unbinds == 1 && liveBindings == 0, "failed bind not cleaned up");
+        check(camera.cameraExecutor == null || ((ExecutorService) camera.cameraExecutor).isShutdown(), "failed bind leaked executor");
+        failBind = false;
+        openCamera().close();
+        check(liveBindings == 0 && loggedErrors == 0, "retry did not clean up");
+    }
+
+    public static void closeFromMain() throws Exception {
+        reset();
+        final AndroidCameraThreadingHarness camera = openCamera();
+        Future<?> result = ui.submit(() -> camera.close());
+        result.get(2, TimeUnit.SECONDS);
+        check(unbinds == 1 && liveBindings == 0, "main-thread close failed");
+        check(loggedErrors == 0, "main-thread close swallowed an error");
+    }
+
+    public static void timedOutOpen() throws Exception {
+        reset();
+        delayProvider = true;
+        AndroidCameraThreadingHarness camera = new AndroidCameraThreadingHarness();
+        try {
+            camera.open("back", new CameraSessionOptions());
+            throw new AssertionError("open without provider did not time out");
+        } catch (IOException expected) {
+            check(expected.getMessage().contains("timed out"), "unexpected open failure");
+        }
+        check(camera.cameraExecutor == null || ((ExecutorService) camera.cameraExecutor).isShutdown(), "timeout leaked executor");
+        check(delayedBinding != null, "provider callback not registered");
+        ui.submit(delayedBinding).get(2, TimeUnit.SECONDS);
+        check(binds == 0 && camera.previewView == null, "late callback reopened a closed camera");
+        delayProvider = false;
+        openCamera().close();
+        check(liveBindings == 0 && loggedErrors == 0, "retry after timeout failed");
+    }
+
+    public static void shutdown() { ui.shutdownNow(); }
+
+    public static class Context {
+        public Context getApplicationContext() { return this; }
+    }
+    public static class Activity extends Context {
+        public void runOnUiThread(Runnable r) {
+            if (Thread.currentThread() == uiThread) r.run();
+            else ui.execute(r);
+        }
+    }
+    public static class View {}
+    public static class PreviewView extends View {
+        public PreviewView(Context context) {
+            checkMain();
+            if (failPreview) throw new IllegalStateException("injected preview failure");
+        }
+        public SurfaceProvider getSurfaceProvider() { checkMain(); return new SurfaceProvider() {}; }
+    }
+    public static class PeerComponent {
+        final View view;
+        final Thread creator = Thread.currentThread();
+        PeerComponent(View view) { this.view = view; }
+        public static PeerComponent create(View view) { return new PeerComponent(view); }
+    }
+    public static class UseCase {}
+    public static class PreviewUseCase extends UseCase {
+        SurfaceProvider provider;
+        public void setSurfaceProvider(SurfaceProvider p) { checkMain(); provider = p; }
+        public static class Builder {
+            public PreviewUseCase build() { return new PreviewUseCase(); }
+        }
+    }
+    public static class Capture extends UseCase {
+        public static class Builder { public Capture build() { return new Capture(); } }
+    }
+    public static class Analysis extends UseCase {
+        public static class Builder {
+            public Builder setTargetResolution(android.util.Size size) { return this; }
+            public Builder setBackpressureStrategy(int strategy) { return this; }
+            public Analysis build() { return new Analysis(); }
+        }
+    }
+    public static class Selector {
+        public static class Builder {
+            public Builder requireLensFacing(int facing) { return this; }
+            public Selector build() { return new Selector(); }
+        }
+    }
+    public interface LifecycleOwner {}
+    public static class ProcessLifecycleOwner {
+        public static LifecycleOwner get() { return new LifecycleOwner() {}; }
+    }
+    public static class Provider {
+        public static ProviderFuture getInstance(Context context) { return new ProviderFuture(); }
+        public Object bindToLifecycle(LifecycleOwner owner, Selector selector, UseCase[] cases) {
+            checkMain();
+            check(((PreviewUseCase) cases[0]).provider != null, "camera bound without preview surface provider");
+            check(liveBindings == 0, "previous session still bound");
+            binds++;
+            liveBindings++;
+            if (failBind) throw new IllegalStateException("injected bind failure");
+            return new Object();
+        }
+        public void unbindAll() { checkMain(); unbinds++; liveBindings = 0; }
+    }
+    public static class ProviderFuture {
+        public void addListener(Runnable r, Executor executor) {
+            if (delayProvider) delayedBinding = r;
+            else executor.execute(r);
+        }
+        public Provider get() { return new Provider(); }
+    }
+    public static class Looper {
+        public static Looper getMainLooper() { return new Looper(); }
+    }
+    public static class Handler {
+        public Handler(Looper looper) {}
+        public boolean post(Runnable r) { ui.execute(r); return true; }
+    }
+    public static class AndroidImplementation {
+        public static Activity getActivity() { return testActivity; }
+        /* UI_SYNC_METHOD */
+    }
+    public static class Log {
+        public static void e(String tag, String message, Throwable error) { loggedErrors++; }
+    }
+    public static class CameraInfo {}
+    public static class CameraSessionOptions {
+        public boolean isCaptureAudio() { return false; }
+        public int getPreviewWidth() { return 640; }
+        public int getPreviewHeight() { return 480; }
+    }
+    public interface FrameListener {}
+    public enum FrameFormat { JPEG }
+}

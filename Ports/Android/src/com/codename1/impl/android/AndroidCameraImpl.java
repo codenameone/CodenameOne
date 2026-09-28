@@ -66,6 +66,7 @@ import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -119,9 +120,9 @@ public class AndroidCameraImpl extends CameraImpl {
     private volatile FrameFormat frameFormat = FrameFormat.JPEG;
     private CameraInfo info;
     private CameraSessionOptions options;
-    private Executor cameraExecutor;
+    private ExecutorService cameraExecutor;
     private boolean isFrontFacing;
-    private boolean closed;
+    private volatile boolean closed;
 
     public AndroidCameraImpl(Activity activity) {
         this.activity = activity;
@@ -253,6 +254,14 @@ public class AndroidCameraImpl extends CameraImpl {
             addListener.invoke(futureProvider, new Runnable() {
                 @Override public void run() {
                     try {
+                        if (closed) {
+                            throw new IOException("Camera closed before binding");
+                        }
+                        // CameraX checks Android's main thread in both PreviewView and
+                        // setSurfaceProvider. The caller is normally the CN1 EDT.
+                        // Attach the provider before binding, so the camera cannot start
+                        // opening with a Preview that has no surface provider.
+                        preparePreview();
                         cameraProvider = futureProvider.getClass().getMethod("get").invoke(futureProvider);
                         Object lifecycleOwner = clsProcessLifecycleOwner
                                 .getMethod("get").invoke(null);
@@ -283,32 +292,30 @@ public class AndroidCameraImpl extends CameraImpl {
             if (openErr[0] != null) throw openErr[0];
             if (camera == null) throw new IOException("CameraX bind timed out");
         } catch (IOException e) {
+            close();
             throw e;
         } catch (Throwable t) {
+            close();
             throw new IOException("Could not open Android camera: " + t.getMessage(), t);
         }
     }
 
+    // Called only by the main-executor binding callback. Keep the native View
+    // setup here, but create the CN1 peer on the calling (CN1 EDT) thread.
+    private void preparePreview() throws Exception {
+        Constructor<?> ctor = clsPreviewView.getConstructor(Context.class);
+        previewView = (View) ctor.newInstance(activity);
+        Object surfaceProvider = clsPreviewView.getMethod("getSurfaceProvider")
+                .invoke(previewView);
+        Class<?> surfaceProviderCls = Class.forName(
+                "androidx.camera.core.Preview$SurfaceProvider");
+        clsPreview.getMethod("setSurfaceProvider", surfaceProviderCls)
+                .invoke(preview, surfaceProvider);
+    }
+
     @Override
     public PeerComponent createPreviewPeer() {
-        if (!ensureCameraXResolved()) return null;
-        try {
-            // PreviewView pv = new PreviewView(activity);
-            Constructor<?> ctor = clsPreviewView.getConstructor(Context.class);
-            previewView = (View) ctor.newInstance(activity);
-            // Hook the preview UseCase's surface provider to the PreviewView.
-            Object surfaceProvider = clsPreviewView.getMethod("getSurfaceProvider")
-                    .invoke(previewView);
-            // Preview#setSurfaceProvider(SurfaceProvider)
-            Class<?> surfaceProviderCls = Class.forName(
-                    "androidx.camera.core.Preview$SurfaceProvider");
-            clsPreview.getMethod("setSurfaceProvider", surfaceProviderCls)
-                    .invoke(preview, surfaceProvider);
-            return PeerComponent.create(previewView);
-        } catch (Throwable t) {
-            Log.e(TAG, "Could not create preview view", t);
-            return null;
-        }
+        return closed || previewView == null ? null : PeerComponent.create(previewView);
     }
 
     @Override
@@ -552,18 +559,31 @@ public class AndroidCameraImpl extends CameraImpl {
     public void close() {
         if (closed) return;
         closed = true;
-        try {
-            if (cameraProvider != null) {
-                clsProcessCameraProvider.getMethod("unbindAll").invoke(cameraProvider);
-            }
-        } catch (Throwable ignored) { }
-        previewView = null;
-        camera = null;
-        preview = null;
-        imageCapture = null;
-        imageAnalysis = null;
-        cameraProvider = null;
         frameListener = null;
+        // unbindAll() is also main-thread-only. Waiting prevents a subsequent
+        // session from binding before this one's teardown has completed.
+        AndroidImplementation.runOnUiThreadSync(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (cameraProvider != null) {
+                        clsProcessCameraProvider.getMethod("unbindAll").invoke(cameraProvider);
+                    }
+                } catch (Throwable t) {
+                    Log.e(TAG, "Could not unbind camera", t);
+                } finally {
+                    previewView = null;
+                    camera = null;
+                    preview = null;
+                    imageCapture = null;
+                    imageAnalysis = null;
+                    cameraProvider = null;
+                }
+            }
+        });
+        if (cameraExecutor != null) {
+            cameraExecutor.shutdown();
+            cameraExecutor = null;
+        }
     }
 
     // --------------------------------------------------------------------
