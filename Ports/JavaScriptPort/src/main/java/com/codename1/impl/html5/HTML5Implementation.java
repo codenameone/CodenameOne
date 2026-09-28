@@ -4151,6 +4151,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             press.release = null;
             moves = press.moves;
             press.moves = null;
+            // A cancelled gesture delivers none of what queued behind its press: the press
+            // itself was suppressed or is being cancelled, so its drags would move a scroller or
+            // start drag state for a gesture that no longer exists. Only cancelled -- a slot that
+            // is merely releasing keeps its queued moves, which happened before the finger lifted
+            // and are the distance a quick swipe scrolls by.
+            if (press.cancelled) {
+                moves = null;
+            }
         }
         if (moves != null) {
             for (Runnable move : moves) {

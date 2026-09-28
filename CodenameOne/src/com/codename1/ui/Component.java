@@ -7513,6 +7513,29 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+    /// Ends a gesture on this component that the platform cancelled (see
+    /// `Form#pointerCancelled(int, int)`), without anything a release would report: no
+    /// pointer-released listeners, no drop. A lightweight drag-and-drop is abandoned, the source
+    /// shown again; a scroll the gesture was dragging is settled -- its tensile snap-back or
+    /// momentum -- exactly as the release's own handling would, minus the callbacks.
+    void pointerCancelledImpl(int x, int y) {
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.dragAndDropInitialized) {
+            cancelLightweightDrag();
+            return;
+        }
+        leadParent.inPinch = false;
+        if (leadParent.draggingScrollThumbY || leadParent.draggingScrollThumbX) {
+            leadParent.draggingScrollThumbY = false;
+            leadParent.draggingScrollThumbX = false;
+            leadParent.dragActivated = false;
+            leadParent.repaint();
+            return;
+        }
+        pointerReleaseImpl(x, y);
+        leadParent.scrollOpacity = 0xff;
+    }
+
     private void pointerReleaseImpl(int x, int y) {
         LeadUtil.leadParentImpl(this).pointerReleaseImplLead(x, y);
     }
