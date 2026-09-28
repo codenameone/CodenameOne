@@ -4953,6 +4953,33 @@ public class Form extends Container implements TopLevelContainer {
         return false;
     }
 
+    /// Ends a gesture the platform abandoned, without the release it never sent: see
+    /// `Display#pointerCancelled(int, int)`. What the press left waiting for a release is
+    /// un-pressed without firing -- `setReleased()`, the same path a drag out of a button
+    /// takes -- and a scroll the gesture was dragging gets its release, which is what settles
+    /// it; with nothing left awaiting release there is nothing for that to fire.
+    void pointerCancelled(int x, int y) {
+        if (componentsAwaitingRelease != null) {
+            for (Component c : componentsAwaitingRelease) {
+                Component lead = LeadUtil.leadComponentImpl(c);
+                if (lead instanceof ReleasableComponent) {
+                    ((ReleasableComponent) lead).setReleased();
+                }
+            }
+            componentsAwaitingRelease = null;
+        }
+        Component scrolling = dragged;
+        dragged = null;
+        stickyDrag = null;
+        pressedCmp = null;
+        currentPointerPress = null;
+        // A drag-and-drop is not finished: finishing it drops the item where the finger was.
+        if (scrolling != null && !scrolling.isDragAndDropInitialized()) {
+            LeadUtil.pointerReleased(scrolling, x, y);
+        }
+        repaint();
+    }
+
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {

@@ -3726,6 +3726,20 @@ public abstract class CodenameOneImplementation {
         Display.getInstance().pointerPressed(x, y);
     }
 
+    /// Subclasses invoke this when the platform abandons the pointer gesture in progress without
+    /// a release -- a cancelled touch. It fires nothing; see `Display#pointerCancelled(int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer's last x position
+    ///
+    /// - `y`: the pointer's last y position
+    protected void pointerCancelled(int x, int y) {
+        dragStarted = false;
+        dragActivationCounter = 0;
+        Display.getInstance().pointerCancelled(x, y);
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///

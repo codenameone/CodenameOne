@@ -28,11 +28,13 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.HeavyButtonImpl;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.PointerEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.Layout;
@@ -151,8 +153,11 @@ public class ContextMenu extends Container implements ActionListener {
         TextSelection sel = f.getTextSelection();
         sel.setIgnoreEvents(true);
         final ContextMenu menu = new ContextMenu();
+        // A menu already open is closed first, and the pane fetched again afterwards: closing
+        // removes the pane from the form, and a menu added to the old one was never painted --
+        // a second right-click showed nothing.
+        getLayeredPane().removeAll();
         Container layeredPane = getLayeredPane();
-        layeredPane.removeAll();
         layeredPane.add(menu);
         layeredPane.setLayout(new Layout() {
             @Override
@@ -201,6 +206,13 @@ public class ContextMenu extends Container implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent t) {
+        // Not the right-button press: the browser raises contextmenu straight after its
+        // pointerdown, and that press reaches the form behind the worker bridge -- often after
+        // this menu is already up -- so closing on it took the menu down the moment it opened.
+        // A right-click elsewhere raises contextmenu again and moves the menu there anyway.
+        if (Display.getInstance().getPointerButton() == PointerEvent.BUTTON_SECONDARY) {
+            return;
+        }
         if (!contains(t.getX(), t.getY())) {
             close();
         }

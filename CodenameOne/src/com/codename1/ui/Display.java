@@ -219,6 +219,8 @@ public final class Display extends CN1Constants {
     private static final int POINTER_PRESSED_MULTI = 21;
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
+    /// The platform abandoned the gesture in progress; see `#pointerCancelled(int, int)`.
+    private static final int POINTER_CANCELLED = 24;
     private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
     private static final int[] xArray1 = new int[1];
     private static final int[] yArray1 = new int[1];
@@ -2636,6 +2638,7 @@ public final class Display extends CN1Constants {
     private static boolean isTerminationEvent(int packedType) {
         int type = packedType & 0xFF;
         return type == POINTER_RELEASED || type == POINTER_RELEASED_MULTI
+                || type == POINTER_CANCELLED
                 || type == POINTER_HOVER_RELEASED || type == KEY_RELEASED
                 || type == SIZE_CHANGED;
     }
@@ -3165,6 +3168,26 @@ public final class Display extends CN1Constants {
             return;
         }
         pointerReleasedImpl(0, x, y);
+    }
+
+    /// Tells Codename One that the platform abandoned the pointer gesture in progress on the
+    /// main surface -- a touch the system cancelled (palm rejection, the window losing focus,
+    /// the OS claiming the gesture) -- which delivers no release. Unlike a release it fires
+    /// nothing: what the press left pressed is un-pressed, a scroll the gesture was dragging is
+    /// settled, and the gesture's bookkeeping is dropped. Queued behind the press it cancels,
+    /// so a press still on its way is cancelled too rather than left pressed after it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer's last x position
+    ///
+    /// - `y`: the pointer's last y position
+    public void pointerCancelled(int x, int y) {
+        cancelLongPress(0);
+        if (impl.getCurrentForm() == null) {
+            return;
+        }
+        addPointerEvent(POINTER_CANCELLED, x, y);
     }
 
     void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
@@ -3891,6 +3914,19 @@ public final class Display extends CN1Constants {
                     // dispatches a fresh press, and that press records a target. Freeing
                     // the ring then would strip the replacement gesture of its velocity.
                     break;
+                case POINTER_CANCELLED: {
+                    clearSelectionPressed(windowId);
+                    Container cancelled = takePointerPressTarget(windowId);
+                    int cancelledX = inputEventStackTmp[offset];
+                    offset++;
+                    int cancelledY = inputEventStackTmp[offset];
+                    offset++;
+                    if (cancelled instanceof Form) {
+                        ((Form) cancelled).pointerCancelled(cancelledX, cancelledY);
+                    }
+                    NativeDragAndDrop.gestureCancelled();
+                    break;
+                }
                 case POINTER_RELEASED_MULTI:
                     recursivePointerReleaseA = true;
                     clearSelectionPressed(windowId);
@@ -4034,6 +4070,7 @@ public final class Display extends CN1Constants {
                 return offset + 1;
             case POINTER_PRESSED:
             case POINTER_RELEASED:
+            case POINTER_CANCELLED:
             case POINTER_HOVER_RELEASED:
             case POINTER_HOVER_PRESSED:
             case SIZE_CHANGED:

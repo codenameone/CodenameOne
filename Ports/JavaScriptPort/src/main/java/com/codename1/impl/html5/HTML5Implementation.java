@@ -295,6 +295,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static final class PressSlot {
         Runnable release;
         boolean done;
+        /**
+         * Set by a touchcancel that arrived before this press reached the framework. The press
+         * is then never dispatched: the finger is gone, and a cancelled gesture delivers no
+         * release, so a pointerPressed arriving after it would leave its target pressed.
+         */
+        boolean cancelled;
         /** Drags that arrived before the press itself was dispatched, in order. */
         List<Runnable> moves;
         /**
@@ -351,6 +357,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (press == null || press == lastPress) { //NOPMD CompareObjectsWithEquals
                 pointerState.setMouseDown(false);
             }
+        }
+    }
+
+    /**
+     * A touchcancel's counterpart to pressForRelease: the latest press gets no release, and if
+     * it has not reached the framework yet -- its touchstart still suspended on a host call, or
+     * its pointerPressed still queued -- it never will. Marked releasing too, so its queued and
+     * late moves are dropped.
+     */
+    private PressSlot cancelPressInFlight() {
+        synchronized (pointerEventOrderLock) {
+            if (lastPress != null) {
+                lastPress.releasing = true;
+                if (!lastPress.done) {
+                    lastPress.cancelled = true;
+                }
+            }
+            return lastPress;
         }
     }
 
@@ -2223,9 +2247,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     }
                 });
-                if (contextListenerActive && me.getButton() == 2) {
-                    contextListener.handleEvent(me);
-                }
+                // No context menu from here: the browser raises contextmenu for the same click
+                // (and for Ctrl+click on a Mac), and contextListener answers that. Calling it here
+                // too showed the menu twice, and the second showing tore down the first's pane.
                 
                 
                 
@@ -2371,6 +2395,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     pointerState.setMouseDown(false);
                     pointerState.setTouchDown(false);
                 }
+                // Cancelled while this handler was suspended above: the touchcancel handler has
+                // already ended the touch, and setting touchDown again would leave it stuck.
+                if (press != null && press.cancelled) {
+                    completePressInFlight(press);
+                    return;
+                }
                 pointerState.setTouchDown(true);
                 
                 
@@ -2404,7 +2434,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         @Override
                         public void run() {
                             try {
-                                HTML5Implementation.this.pointerPressed(x, y);
+                                // Cancelled after it was queued: the finger is gone and no
+                                // release will follow, so the press is dropped too.
+                                if (press == null || !press.cancelled) {
+                                    HTML5Implementation.this.pointerPressed(x, y);
+                                }
                             } finally {
                                 completePressInFlight(press);
                             }
@@ -2804,16 +2838,29 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // gesture -- ends with touchcancel and no touchend. Unanswered, touchDown stayed set and
         // every later touchstart was taken for an extra finger and ignored: touch input was dead
         // until reload. It is not a release, though: releasing would activate whatever the finger
-        // was pressing, a tap the user never finished. So, as Android's ACTION_CANCEL, the gesture
-        // is only forgotten -- the touch and drag bookkeeping cleared, the press's queued moves
-        // dropped (its slot is marked releasing), and anything it staged for a drag abandoned.
+        // was pressing, a tap the user never finished. So the gesture is cancelled instead: the
+        // touch and drag bookkeeping cleared, the press's queued moves dropped (its slot is marked
+        // releasing), a press not yet dispatched suppressed, and one that was dispatched ended
+        // through the framework's pointerCancelled, which fires nothing.
         outputCanvas.addEventListener("touchcancel", new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                pressForRelease();
+                final PressSlot press = cancelPressInFlight();
                 pointerState.setTouchDown(false);
                 pointerState.setGrabbedDrag(false);
-                com.codename1.ui.NativeDragAndDrop.gestureCancelled();
+                int[] tx = press != null && press.touchX != null ? press.touchX : pointerState.getTouchesX();
+                int[] ty = press != null && press.touchY != null ? press.touchY : pointerState.getTouchesY();
+                final int cx = tx != null && tx.length > 0 ? tx[0] : 0;
+                final int cy = ty != null && ty.length > 0 ? ty[0] : 0;
+                // Behind the press on the same queue, so a press that did reach the framework is
+                // cancelled after it: whatever it left pressed is un-pressed without firing, and
+                // a scroll it was dragging settles. A press suppressed above leaves nothing for
+                // this to find.
+                nativeCallSerially(new Runnable() {
+                    public void run() {
+                        HTML5Implementation.this.pointerCancelled(cx, cy);
+                    }
+                });
             }
         }, true);
 
@@ -14591,15 +14638,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }
     };
-    private boolean contextListenerActive;
     EventListener<MouseEvent> contextListener = new EventListener<MouseEvent>() {
         @SuppressSyncErrors
         public void handleEvent(final MouseEvent evt) {
             _log("In context listener");
-            if (!jQuery_is_(outputCanvas, ":focus")) {
+            // Only a right-click on the app itself. This used to require the canvas to hold DOM
+            // focus, which it never can -- it has no tabindex, and focus in this port belongs to
+            // Codename One components, not to the element they are drawn on -- so the Copy menu
+            // never opened. What matters is where the click landed: the HTML menu bar, a native
+            // text field or a peer keep the browser's own menu. Compared by id: the event's
+            // target crosses the worker bridge as a fresh host reference, never the same object
+            // as outputCanvas, so an identity test refused every click.
+            // Cast rather than instanceof, as the port's other handlers read their targets: a
+            // bridged host object is not an instance of the JSO interface it is read through.
+            HTMLElement target = (HTMLElement) evt.getTarget();
+            if (target == null || !"codenameone-canvas".equals(target.getAttribute("id"))) {
                 return;
             }
-            _log("focused");
             Form f = CN.getCurrentForm();
             if (f == null) {
                 return;
@@ -14637,7 +14692,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (enabledTextSelections++ == 0) {
             HTMLDocument doc = Window.current().getDocument();
             doc.addEventListener("copy", copyListener);
-            contextListenerActive = true;
             doc.addEventListener("contextmenu", contextListener);
         }
     }
@@ -14650,7 +14704,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             selectedTextSelection = null;
         }
         if (enabledTextSelections > 0 && --enabledTextSelections == 0) {
-            contextListenerActive = false;
             HTMLDocument doc = Window.current().getDocument();
             doc.removeEventListener("copy", copyListener);
             doc.removeEventListener("contextmenu", contextListener);
