@@ -108,6 +108,8 @@ public class AndroidGradleBuilder extends Executor {
     // 4.5.0 moved to the androidComponents API; 4.3.15 fails to apply on AGP 9 with "Could not
     // get unknown property 'applicationVariants'".
     static final String GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION = "4.5.0";
+    // The oldest google-services measured to apply on AGP 9.4.1.
+    static final String GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION = "4.4.0";
     // Four attempts with a GROWING wait -- 10s, 40s, 160s -- rather than three a couple
     // of seconds apart.
     //
@@ -1726,6 +1728,11 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("android.gradleVersion=" + request.getArg("android.gradleVersion", "")
                     + " selects Gradle 9, which needs the modern Gradle project the builder generates"
                     + " only with android.useGradle8=true. Remove android.useGradle8=false.");
+        }
+        String googleServicesRefusal = useGradle9
+                ? agp9GoogleServicesRefusal(request.getArg("android.topDependency", "")) : null;
+        if (googleServicesRefusal != null) {
+            throw new BuildException(googleServicesRefusal);
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
@@ -8313,12 +8320,20 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n"
                 + "    }\n"
                 + "\n"
-                + "    lintOptions {\n"
-                + "        lintOptions {\n"
-                + "        checkReleaseBuilds false\n"
-                + "        abortOnError false\n"
-                + "        }\n"
-                + "    }\n"
+                // lint, not lintOptions, on Gradle 9. AGP 9.4.1 still accepts lintOptions
+                // (measured), but it is the deprecated spelling, and the nested block with
+                // space-assigned properties is also Groovy syntax Gradle 10 removes.
+                + (useGradle9
+                        ? "    lint {\n"
+                        + "        checkReleaseBuilds = false\n"
+                        + "        abortOnError = false\n"
+                        + "    }\n"
+                        : "    lintOptions {\n"
+                        + "        lintOptions {\n"
+                        + "        checkReleaseBuilds false\n"
+                        + "        abortOnError false\n"
+                        + "        }\n"
+                        + "    }\n")
                 + "    signingConfigs {\n"
                 + "        release {\n"
                 + "            storeFile file(\"keyStore\")\n"
@@ -9323,7 +9338,8 @@ public class AndroidGradleBuilder extends Executor {
     private void addWatchSurfaceDependencies(BuildRequest request) throws BuildException {
         // The same keyword the rest of the dependency block uses; AndroidX builds are
         // "implementation" and the legacy ones "compile".
-        String compile = useAndroidX ? "implementation" : "compile";
+        // Gradle 9 has no compile configuration at all, AndroidX or not.
+        String compile = useAndroidX || useGradle9 ? "implementation" : "compile";
         boolean anyTile = false;
         for (String[] kind : watchSurfaceKinds) {
             if (declaresTile(kind[2])) {
@@ -11476,8 +11492,10 @@ public class AndroidGradleBuilder extends Executor {
      * Whether a requireKotlinStdlib value asks AGP 9 for a NEWER Kotlin than the one it
      * bundles, which is the only thing that value can usefully mean on built-in Kotlin.
      *
-     * <p>A version this cannot read (a pre-release suffix, a Gradle variable) is taken at its
-     * word: it was written deliberately, and only its author knows what it is.</p>
+     * <p>A qualified release is judged by its numeric part, so 1.9.22-RC2 is a legacy floor
+     * like 1.9.22 and 2.3.0-Beta1 is a newer compiler. Only a value with no leading number at
+     * all -- a Gradle variable -- is taken at its word: its author is the only one who knows
+     * what it resolves to.</p>
      *
      * @param kotlinVersion the requireKotlinStdlib value, possibly empty
      * @return true when it should be written into the generated project
@@ -11487,10 +11505,43 @@ public class AndroidGradleBuilder extends Executor {
         if (value.length() == 0) {
             return false;
         }
-        if (!value.matches("[0-9]+(\\.[0-9]+){0,2}")) {
+        String numeric = HealthManifestFragments.numericVersionPrefix(value);
+        if (numeric == null) {
             return true;
         }
-        return compareVersions(padGradleVersion(value), AGP_9_BUILT_IN_KOTLIN_VERSION) > 0;
+        return compareVersions(padGradleVersion(numeric), AGP_9_BUILT_IN_KOTLIN_VERSION) > 0;
+    }
+
+    /**
+     * Why a google-services plugin pinned in android.topDependency cannot run on AGP 9, or
+     * null when it can (or when there is no readable pin).
+     *
+     * <p>The builder adds its own google-services classpath only when none is present, so a
+     * pin a project or cn1lib wrote -- 4.3.15 was the builder's own default until Gradle 9 --
+     * would be applied as it is and fail on AGP 9's removed applicationVariants API, minutes
+     * into the build, with nothing naming the hint. Measured: 4.3.15 fails, 4.4.0 and 4.5.0
+     * apply.</p>
+     *
+     * @param topDependency the android.topDependency value
+     * @return the refusal message, or null
+     */
+    static String agp9GoogleServicesRefusal(String topDependency) {
+        String marker = "com.google.gms:google-services:";
+        int at = topDependency == null ? -1 : topDependency.indexOf(marker);
+        if (at < 0) {
+            return null;
+        }
+        String declared = HealthManifestFragments.numericVersionPrefix(
+                topDependency.substring(at + marker.length()));
+        if (declared == null
+                || compareVersions(padGradleVersion(declared), GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION) >= 0) {
+            return null;
+        }
+        return "android.topDependency pins com.google.gms:google-services:" + declared + ", which"
+                + " Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " cannot apply (it"
+                + " reads the variant API that plugin removed). Raise it to "
+                + GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION + ", or drop it and the build adds that"
+                + " version itself.";
     }
 
     static int compareVersions(String v1, String v2) {

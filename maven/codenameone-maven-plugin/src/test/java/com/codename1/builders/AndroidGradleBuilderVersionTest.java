@@ -73,8 +73,28 @@ class AndroidGradleBuilderVersionTest {
         // A newer Kotlin is exactly what the classpath entry is for.
         assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0"));
         assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.2.20"));
-        // Unreadable values are the author's to vouch for.
+        // A qualified release is judged by its numeric part: an old RC is still a legacy
+        // floor, a newer beta is still a newer compiler.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.9.22-RC2"));
         assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0-Beta1"));
+        // Only a value with no number to read -- a Gradle variable -- is the author's call.
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("$kotlinVersion"));
+    }
+
+    @Test
+    void aGoogleServicesPinAgp9CannotApplyIsRefusedByName() {
+        String old = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+        assertTrue(old != null && old.contains("4.3.15"), String.valueOf(old));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.4.0'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.5.0'"));
+        // Nothing pinned, or nothing readable: nothing to refuse.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(""));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(null));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath \"com.google.gms:google-services:$gsVersion\""));
     }
 
     @Test
