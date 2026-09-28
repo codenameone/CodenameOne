@@ -115,7 +115,10 @@ final class AppSupport {
         TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setDescription("Transcodes SVG and Lottie assets into Java sources");
-            t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"));
+            // Every directory the transcoder reads, or adding an asset to one of
+            // them leaves the task up to date and its generated classes stale.
+            t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"),
+                    new File(layout.projectDir(), "src/main/lottie"));
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-svg"));
             t.getPlaceholderDirectory().set(new File(layout.buildDir(), "css-resources"));
         });
@@ -178,6 +181,10 @@ final class AppSupport {
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath()));
+            // Last: in a Java and Kotlin project, both passes have run by now.
+            compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
+                    compile.getDestinationDirectory().get().getAsFile(),
+                    new File(layout.buildDir(), "classes/kotlin/main")));
         });
 
         // Kotlin compiles into a directory of its own, before javac. The same two
@@ -405,8 +412,7 @@ final class AppSupport {
                                      SourceSet main) {
         common(t, project, layout, ext, userProperties);
         t.dependsOn(main.getClassesTaskName());
-        t.getClassesDirectory().set(project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
-                .flatMap(JavaCompile::getDestinationDirectory));
+        t.getClassesDirectories().from(main.getOutput().getClassesDirs());
         t.getCompileClasspath().from(main.getCompileClasspath());
     }
 

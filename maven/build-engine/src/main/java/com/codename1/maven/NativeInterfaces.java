@@ -52,14 +52,21 @@ public final class NativeInterfaces {
     private static final String NATIVE_INTERFACE = "com/codename1/system/NativeInterface";
 
     private final Log log;
-    private final File classesDir;
+    private final List<File> classesDirs;
     private final List<String> classpath;
 
     /// @param classesDir the project's compiled classes
     /// @param classpath the compile classpath the interfaces are loaded with
     public NativeInterfaces(Log log, File classesDir, List<String> classpath) {
+        this(log, Collections.singletonList(classesDir), classpath);
+    }
+
+    /// @param classesDirs every directory of the project's compiled classes --
+    ///        Gradle compiles Java and Kotlin into separate ones
+    /// @param classpath the compile classpath the interfaces are loaded with
+    public NativeInterfaces(Log log, List<File> classesDirs, List<String> classpath) {
         this.log = log;
-        this.classesDir = classesDir;
+        this.classesDirs = new ArrayList<File>(classesDirs);
         this.classpath = classpath == null ? Collections.<String>emptyList() : classpath;
     }
 
@@ -67,7 +74,9 @@ public final class NativeInterfaces {
     /// extends `NativeInterface`.
     public List<String> find() throws IOException {
         List<String> out = new ArrayList<String>();
-        scan(classesDir, out);
+        for (File dir : classesDirs) {
+            scan(dir, out);
+        }
         Collections.sort(out);
         return out;
     }
@@ -110,10 +119,12 @@ public final class NativeInterfaces {
 
     private URLClassLoader loader() throws IOException {
         List<URL> urls = new ArrayList<URL>();
-        urls.add(classesDir.toURI().toURL());
+        for (File dir : classesDirs) {
+            urls.add(dir.toURI().toURL());
+        }
         for (String element : classpath) {
             File f = new File(element);
-            if (f.exists() && !f.equals(classesDir)) {
+            if (f.exists() && !classesDirs.contains(f)) {
                 urls.add(f.toURI().toURL());
             }
         }
@@ -152,7 +163,7 @@ public final class NativeInterfaces {
         try {
             names = find();
         } catch (IOException ex) {
-            throw new BuildExecutionException("Failed to scan " + classesDir + " for native interfaces", ex);
+            throw new BuildExecutionException("Failed to scan " + classesDirs + " for native interfaces", ex);
         }
         boolean matched = false;
         URLClassLoader cl = null;
@@ -186,11 +197,11 @@ public final class NativeInterfaces {
             closeQuietly(cl);
         }
         if (only != null && !matched) {
-            throw new BuildFailureException("No native interface named " + only + " was found in " + classesDir
+            throw new BuildFailureException("No native interface named " + only + " was found in " + classesDirs
                     + ". Native interfaces found: " + names);
         }
         if (names.isEmpty()) {
-            log.info("No native interfaces found in " + classesDir + ". Declare one by extending "
+            log.info("No native interfaces found in " + classesDirs + ". Declare one by extending "
                     + "com.codename1.system.NativeInterface, compile, and run this again.");
         }
         return written;
@@ -206,7 +217,7 @@ public final class NativeInterfaces {
         try {
             names = find();
         } catch (IOException ex) {
-            throw new BuildExecutionException("Failed to scan " + classesDir + " for native interfaces", ex);
+            throw new BuildExecutionException("Failed to scan " + classesDirs + " for native interfaces", ex);
         }
         if (names.isEmpty()) {
             return out;

@@ -88,4 +88,21 @@ class TaskHelpersTest {
         assertEquals(BuildSystem.GRADLE, back.buildSystem());
         assertEquals(layout.javaSourceDir(), back.javaSourceDir());
     }
+
+    /// Java and Kotlin compile into separate directories; the same generated
+    /// path in both means one language's registry is lost. The ORM enhancer's
+    /// per-directory bookkeeping is the one legitimate overlap.
+    @Test
+    void theSameGeneratedPathInBothClassDirectoriesIsACollision() throws IOException {
+        touch("java/cn1app/DaoBootstrap.class");
+        touch("java/a/Main.class");
+        touch("java/" + SplitOutputCheck.PER_DIRECTORY);
+        touch("kotlin/cn1app/DaoBootstrap.class");
+        touch("kotlin/a/Helper.class");
+        touch("kotlin/" + SplitOutputCheck.PER_DIRECTORY);
+        assertEquals(Collections.singletonList("cn1app/DaoBootstrap.class"), SplitOutputCheck.collisions(
+                new File(tmp.toFile(), "java"), new File(tmp.toFile(), "kotlin")));
+        assertEquals(Collections.emptyList(), SplitOutputCheck.collisions(
+                new File(tmp.toFile(), "java"), new File(tmp.toFile(), "missing")));
+    }
 }

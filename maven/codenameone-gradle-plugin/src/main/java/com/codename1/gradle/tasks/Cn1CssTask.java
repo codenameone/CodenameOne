@@ -97,7 +97,10 @@ public abstract class Cn1CssTask extends Cn1Task {
         Log log = log();
         File out = getOutputDirectory().get().getAsFile();
         File cssDir = layout().cssDir();
-        if (rawSettings().getProperty("codename1.cssTheme") == null) {
+        // Effective, not the file alone: codename1.cssTheme set in gradle.properties,
+        // with -P/-D or in codenameone { buildHints } counts as it does for the
+        // simulator and the native builds.
+        if (effectiveSettings().getProperty("codename1.cssTheme") == null) {
             log.info("CSS themes not activated for this project (codename1.cssTheme). Skipping CSS compilation");
             clear(out);
             return;

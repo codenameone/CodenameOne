@@ -110,7 +110,9 @@ public final class GradleConversion {
         for (File f : children) {
             if (f.isDirectory()) {
                 collectJava(f, out);
-            } else if (f.getName().endsWith(".java")) {
+            } else if (f.getName().endsWith(".java") || f.getName().endsWith(".kt")) {
+                // Kotlin counts: a backend whose additions are all Kotlin is not
+                // the untouched skeleton, and must not be left behind.
                 out.add(f);
             }
         }
@@ -193,7 +195,13 @@ public final class GradleConversion {
                         .getBytes(StandardCharsets.UTF_8));
                 List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"));
                 if (!backendDeps.isEmpty()) {
+                    warnUnresolved(backendDeps, "backend/pom.xml");
                     writeDependencies(script, backendDeps, "backend/pom.xml");
+                }
+                // Gradle plugins are per project: the application's Kotlin plugin
+                // does not compile the backend's Kotlin, so it would be dropped.
+                if (hasSuffix(new File(target, "src"), ".kt")) {
+                    addKotlinPlugin(script);
                 }
             }
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,
@@ -201,6 +209,7 @@ public final class GradleConversion {
             if (from.buildSystem() == BuildSystem.MAVEN) {
                 List<String> deps = dependencyLines(from.dependencyFile());
                 if (!deps.isEmpty()) {
+                    warnUnresolved(deps, "common/pom.xml");
                     writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");
                 }
             } else {
@@ -386,13 +395,8 @@ public final class GradleConversion {
             return out;
         }
         try {
-            DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
-            f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            Element project;
-            try (InputStream in = new FileInputStream(pom)) {
-                project = f.newDocumentBuilder().parse(in).getDocumentElement();
-            }
+            Element project = parsePom(pom);
+            java.util.Map<String, String> properties = pomProperties(pom, 0);
             Element deps = child(project, "dependencies");
             if (deps == null) {
                 return out;
@@ -402,8 +406,8 @@ public final class GradleConversion {
                     continue;
                 }
                 Element d = (Element) n;
-                String g = text(d, "groupId");
-                String a = text(d, "artifactId");
+                String g = interpolate(text(d, "groupId"), properties);
+                String a = interpolate(text(d, "artifactId"), properties);
                 String v = text(d, "version");
                 String scope = text(d, "scope");
                 String type = text(d, "type");
@@ -411,15 +415,25 @@ public final class GradleConversion {
                         || "org.jetbrains.kotlin".equals(g) || "org.jetbrains".equals(g)) {
                     continue;
                 }
-                String coords = g + ":" + a + (v == null ? "" : ":" + v);
+                if (v != null && v.contains("${")) {
+                    v = interpolate(v, properties);
+                }
                 // Test-scoped libraries go with the test sources the conversion copies,
                 // or those tests stop compiling.
                 String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
                         : "provided".equals(scope) ? "compileOnly"
                         : "runtime".equals(scope) ? "runtimeOnly" : "implementation";
+                if (v != null && v.contains("${")) {
+                    // Written as it stands it would be a Kotlin string template naming a
+                    // variable the script lacks, and the build script would not compile.
+                    out.add("    // " + config + "(\"" + g + ":" + a + ":VERSION\") -- set the version; the pom "
+                            + "gave it as " + v + ", which no pom property defines");
+                    continue;
+                }
+                String coords = g + ":" + a + (v == null ? "" : ":" + v);
                 String line = "    " + config + "(\"" + coords + "\")";
-                if (v == null || v.contains("${")) {
-                    line += " // check this version: it came from common/pom.xml as " + (v == null ? "managed" : v);
+                if (v == null) {
+                    line += " // check this version: the pom leaves it to dependency management";
                 }
                 out.add(line);
             }
@@ -427,6 +441,76 @@ public final class GradleConversion {
             out.add("    // Could not read the dependencies of " + pom + ": " + ex.getMessage());
         }
         return out;
+    }
+
+    /// Says which dependencies were written commented out for want of a version.
+    private void warnUnresolved(List<String> lines, String from) {
+        for (String line : lines) {
+            if (line.trim().startsWith("//") && line.contains("-- set the version")) {
+                log.warn("A dependency in " + from + " has a version no pom property defines; it is commented "
+                        + "out in the build script until you set one:" + line.trim().substring(2));
+            }
+        }
+    }
+
+    private static Element parsePom(File pom) throws Exception {
+        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+        f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        try (InputStream in = new FileInputStream(pom)) {
+            return f.newDocumentBuilder().parse(in).getDocumentElement();
+        }
+    }
+
+    /// The properties `${...}` in `pom` can name: its parents' (found on disk by
+    /// `relativePath`, `../pom.xml` by default; nearest wins), its own
+    /// `<properties>`, and the `project.*` coordinates.
+    static java.util.Map<String, String> pomProperties(File pom, int depth) {
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        Element project;
+        try {
+            project = parsePom(pom);
+        } catch (Exception ex) {
+            return props;
+        }
+        Element parent = child(project, "parent");
+        if (parent != null && depth < 8) {
+            String relative = text(parent, "relativePath");
+            File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
+            if (parentPom.isDirectory()) {
+                parentPom = new File(parentPom, "pom.xml");
+            }
+            if (parentPom.isFile()) {
+                props.putAll(pomProperties(parentPom, depth + 1));
+            }
+        }
+        Element own = child(project, "properties");
+        if (own != null) {
+            for (Node n = own.getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (n instanceof Element) {
+                    String value = n.getTextContent();
+                    props.put(((Element) n).getTagName(), value == null ? "" : value.trim());
+                }
+            }
+        }
+        String groupId = text(project, "groupId");
+        String version = text(project, "version");
+        if (parent != null) {
+            if (text(parent, "groupId") != null) {
+                props.put("project.parent.groupId", text(parent, "groupId"));
+            }
+            if (text(parent, "version") != null) {
+                props.put("project.parent.version", text(parent, "version"));
+            }
+        }
+        props.put("project.groupId", groupId != null ? groupId : text(parent == null ? project : parent, "groupId"));
+        props.put("project.version", version != null ? version : text(parent == null ? project : parent, "version"));
+        props.put("project.artifactId", text(project, "artifactId"));
+        return props;
+    }
+
+    private static String interpolate(String value, java.util.Map<String, String> properties) {
+        return Cn1libPomProfiles.interpolate(value, properties);
     }
 
     private static void writeDependencies(File buildScript, List<String> lines, String from) throws IOException {

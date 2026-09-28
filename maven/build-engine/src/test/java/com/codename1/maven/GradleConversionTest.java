@@ -90,11 +90,13 @@ class GradleConversionTest {
 
     private File mavenApp(String backendApi) throws IOException {
         File mvn = new File(tmp.toFile(), "mvnapp");
-        touch(mvn, "pom.xml", "<project/>");
-        touch(mvn, "common/pom.xml", "<project><dependencies>"
+        touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version><properties><maps.version>1.2</maps.version></properties></project>");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
                 + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId></dependency>"
-                + "<dependency><groupId>com.acme</groupId><artifactId>maps-lib</artifactId><version>1.2</version>"
-                + "<type>pom</type></dependency>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>maps-lib</artifactId>"
+                + "<version>${maps.version}</version><type>pom</type></dependency>"
                 + "<dependency><groupId>com.codenameone</groupId><artifactId>googlemaps-lib</artifactId>"
                 + "<version>1.0</version><type>pom</type></dependency>"
                 + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
@@ -209,11 +211,14 @@ class GradleConversionTest {
         assertFalse(new File(out, "common").exists());
 
         String build = read(new File(out, "build.gradle.kts"));
-        assertTrue(build.contains("cn1lib(\"com.acme:maps-lib:1.2\")"), build);
+        assertTrue(build.contains("cn1lib(\"com.acme:maps-lib:1.2\")"),
+                "a property version resolves through the parent pom: " + build);
         assertTrue(build.contains("cn1lib(\"com.codenameone:googlemaps-lib:1.0\")"),
                 "a cn1lib in the com.codenameone group is not the framework: " + build);
         assertTrue(build.contains("implementation(\"org.example:util:2.0\")"), build);
-        assertTrue(build.contains("compileOnly(\"org.example:api:${api.version}\") // check this version"), build);
+        assertTrue(build.contains("// compileOnly(\"org.example:api:VERSION\") -- set the version"),
+                "a version no property defines is commented out, not written as a Kotlin template: " + build);
+        assertFalse(build.contains("\"org.example:api:${"), build);
         assertFalse(build.contains("codenameone-core"), "the plugin adds the framework: " + build);
         assertTrue(build.contains("testImplementation(\"junit:junit:4\")"),
                 "the copied tests keep their libraries: " + build);
@@ -234,6 +239,18 @@ class GradleConversionTest {
         assertTrue(backendBuild.contains("implementation(\"org.example:payments:3.1\")"),
                 "the backend keeps its own libraries: " + backendBuild);
         assertFalse(backendBuild.contains("codenameone-backend"), "the plugin adds the runtime: " + backendBuild);
+        assertFalse(backendBuild.contains("kotlin("), "a Java backend needs no Kotlin plugin: " + backendBuild);
+    }
+
+    @Test
+    void aKotlinBackendGetsTheKotlinPluginInItsOwnScript() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "backend/src/main/kotlin/a/backend/Orders.kt", "package a.backend\nclass Orders");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(read(new File(out, "backend/build.gradle.kts")).contains("kotlin(\"jvm\")"));
+        assertFalse(read(new File(out, "build.gradle.kts")).contains("kotlin(\"jvm\")"),
+                "the application has no Kotlin of its own");
     }
 
     @Test

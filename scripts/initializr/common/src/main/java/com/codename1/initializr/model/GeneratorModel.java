@@ -44,6 +44,18 @@ import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
     private static final String CN1_PLUGIN_VERSION = "7.0.273";
+    /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
+    /// A Gradle download resolves the plugin by that version, so until a release
+    /// carrying the plugin is what the initializr generates against, a Gradle
+    /// project could not build at all -- and the UI does not offer Gradle.
+    /// `update-cn1-version.sh` sets this with the version, from whether the
+    /// plugin's marker exists in the repository.
+    static final boolean GRADLE_PLUGIN_PUBLISHED = false;
+
+    /// Whether the initializr offers Gradle projects; see [GRADLE_PLUGIN_PUBLISHED].
+    public static boolean isGradleOffered() {
+        return GRADLE_PLUGIN_PUBLISHED;
+    }
     /// The Kotlin version a Gradle Kotlin project builds with, for both the Kotlin
     /// Gradle plugin and kotlin-stdlib (the plugin adds its own stdlib anyway, so
     /// the two cannot usefully differ).

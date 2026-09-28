@@ -31,7 +31,7 @@ import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputDirectory;
+import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -52,10 +52,12 @@ import java.util.List;
 /// would otherwise only report minutes later.
 @DisableCachingByDefault(because = "Writes into src/, or is a check")
 public abstract class NativeInterfacesTask extends Cn1Task {
-    /// The compiled classes to scan.
-    @InputDirectory
+    /// The compiled classes to scan: every classes directory of the main source
+    /// set, since Gradle compiles Kotlin apart from Java. A directory that does
+    /// not exist (javac's, in a pure Kotlin project) is simply empty.
+    @InputFiles
     @PathSensitive(PathSensitivity.RELATIVE)
-    public abstract DirectoryProperty getClassesDirectory();
+    public abstract ConfigurableFileCollection getClassesDirectories();
 
     /// The compile classpath the interfaces load against.
     @Classpath
@@ -89,7 +91,8 @@ public abstract class NativeInterfacesTask extends Cn1Task {
         for (File f : getCompileClasspath()) {
             cp.add(f.getAbsolutePath());
         }
-        NativeInterfaces ni = new NativeInterfaces(log(), getClassesDirectory().get().getAsFile(), cp);
+        NativeInterfaces ni = new NativeInterfaces(log(),
+                new ArrayList<File>(getClassesDirectories().getFiles()), cp);
         try {
             if (getVerifyPlatform().isPresent()) {
                 NativePlatform platform = NativePlatform.fromId(getVerifyPlatform().get());

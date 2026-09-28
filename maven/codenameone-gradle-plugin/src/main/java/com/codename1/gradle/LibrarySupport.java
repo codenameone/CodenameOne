@@ -152,7 +152,17 @@ final class LibrarySupport {
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile ->
                 compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
                         compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
-                        compileArtifacts, Collections.<String, String>emptyMap())));
+                        compileArtifacts, Collections.<String, String>emptyMap())
+                        .withSiblingClasses(new File(layout.buildDir(), "classes/kotlin/main"))));
+        // A Kotlin library's classes are checked too, as an application's are: in
+        // a pure Kotlin library compileJava has no sources and runs no action at
+        // all, and a mixed one would otherwise publish its Kotlin half unchecked.
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().named("compileKotlin").configure(compile ->
+                        compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
+                                new File(layout.buildDir(), "classes/kotlin/main"), name, main.getCompileClasspath(),
+                                compileArtifacts, Collections.<String, String>emptyMap())
+                                .withPendingJavaSources(layout.javaSourceDir()))));
 
         // A library without CSS publishes no cn1css bundle and its -lib pom names
         // none: the Zip task would do nothing, and publishing then failed on the
@@ -194,8 +204,7 @@ final class LibrarySupport {
             AppSupport.common(t, project, layout, ext, userProperties);
             t.setDescription("Writes implementation stubs for every NativeInterface into src/<platform>/");
             t.dependsOn(main.getClassesTaskName());
-            t.getClassesDirectory().set(project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
-                    .flatMap(JavaCompile::getDestinationDirectory));
+            t.getClassesDirectories().from(main.getOutput().getClassesDirs());
             t.getCompileClasspath().from(main.getCompileClasspath());
             t.getOnly().set(project.getProviders().gradleProperty("cn1.nativeInterface"));
             t.getSwift().set(project.getProviders().gradleProperty("cn1.swift").map(Boolean::parseBoolean)

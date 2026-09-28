@@ -188,6 +188,10 @@ public class Initializr extends Lifecycle {
         // ----- live preview (stacked at the end of the single column) -----
         Container previewWrap = createPreviewWrap(previewPanel);
 
+        // Gradle is offered once the plugin is published at the version the
+        // generated projects use; until then the Maven default stands alone.
+        buildPanel.setHidden(!GeneratorModel.isGradleOffered());
+        buildPanel.setVisible(GeneratorModel.isGradleOffered());
         Container column = BoxLayout.encloseY(hero, essentials, idePanel, buildPanel, localePanel,
                 javaPanel, settingsPanel, previewWrap);
         column.setUIID("InitializrColumn");
