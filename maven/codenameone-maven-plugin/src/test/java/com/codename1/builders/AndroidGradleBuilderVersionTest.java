@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AndroidGradleBuilderVersionTest {
@@ -35,6 +37,44 @@ class AndroidGradleBuilderVersionTest {
         assertTrue(AndroidGradleBuilder.compareVersions("8.1", "8.13") < 0);
         assertEquals(0, AndroidGradleBuilder.compareVersions("8.13", "8.13"));
         assertTrue(AndroidGradleBuilder.compareVersions("8.13.2", "8.13") > 0);
+    }
+
+    @Test
+    void gradleVersionHintSelectsGradle9OnlyFromNineUp() throws Exception {
+        // Absent, blank or below 9: the default Gradle 8 build, as before the hint was read.
+        assertNull(AndroidGradleBuilder.requestedGradle9Version(null));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version(""));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("  "));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.1"));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("6.5"));
+        // The bare major is the measured pairing; an explicit release is honoured as given.
+        assertEquals(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.requestedGradle9Version("9"));
+        assertEquals(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.requestedGradle9Version(" 9 "));
+        assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6.0"));
+        assertEquals("9.9", AndroidGradleBuilder.requestedGradle9Version("9.9"));
+    }
+
+    @Test
+    void gradleVersionHintRefusesWhatTheAndroidGradlePluginCannotRunOn() {
+        // Below AGP 9.4.1's own floor: refused before the build instead of inside Gradle.
+        BuildException old = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("9.1.0"));
+        assertTrue(old.getMessage().contains(AndroidGradleBuilder.GRADLE_9_MIN_VERSION),
+                old.getMessage());
+        BuildException future = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("10.0"));
+        assertTrue(future.getMessage().contains("not supported"), future.getMessage());
+        BuildException garbage = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("latest"));
+        assertTrue(garbage.getMessage().contains("not a Gradle version"), garbage.getMessage());
+    }
+
+    @Test
+    void theGradle9FloorIsNotAboveTheDefaultPairing() {
+        assertTrue(AndroidGradleBuilder.compareVersions(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.GRADLE_9_MIN_VERSION) >= 0);
     }
 
     @Test

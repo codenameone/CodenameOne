@@ -1138,6 +1138,19 @@ final class BuildHintsAndroid {
                 .type(HintType.STRING)
                 .platform("android"));
 
+        h.add(new Hint("android.gradleVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .platform("android")
+                .doc("Opts the build into Gradle 9. `9` builds with Gradle 9.8.0 and Android Gradle plugin "
+                        + "9.4.1 instead of the default Gradle 8 toolchain. Any 9.x release of 9.6.0 or newer "
+                        + "(the oldest Gradle that plugin runs on) is accepted: a local build downloads that "
+                        + "release, the cloud build uses its provisioned 9.8.0. Older 9.x releases and "
+                        + "Gradle 10 are refused. Kotlin sources are compiled "
+                        + "by the plugin's built-in Kotlin, so a hint that applies `kotlin-android` itself "
+                        + "fails on this path, and so does any Gradle plugin a hint adds that still uses the "
+                        + "variant API Android Gradle plugin 9 removed."));
+
         h.add(new Hint("android.versionCode")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
