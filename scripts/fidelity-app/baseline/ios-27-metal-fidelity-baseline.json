@@ -281,34 +281,34 @@
       "width_ratio": 1.0282
     },
     "TabOne_normal_dark": {
-      "center_offset": 5.1,
-      "height_ratio": 0.9422,
-      "width_ratio": 0.9932
+      "center_offset": 5.59,
+      "height_ratio": 1.0636,
+      "width_ratio": 0.863
     },
     "TabOne_normal_light": {
-      "center_offset": 4.61,
-      "height_ratio": 0.948,
-      "width_ratio": 0.9932
+      "center_offset": 6.08,
+      "height_ratio": 1.0694,
+      "width_ratio": 0.863
     },
     "TabsGeom_normal_dark": {
-      "center_offset": 0.71,
-      "height_ratio": 1.0058,
-      "width_ratio": 0.9704
+      "center_offset": 5.59,
+      "height_ratio": 1.0636,
+      "width_ratio": 0.9897
     },
     "TabsGeom_normal_light": {
-      "center_offset": 1.12,
-      "height_ratio": 1.0116,
-      "width_ratio": 0.9704
+      "center_offset": 6.08,
+      "height_ratio": 1.0694,
+      "width_ratio": 0.9897
     },
     "Tabs_normal_dark": {
-      "center_offset": 1.12,
-      "height_ratio": 1.0116,
-      "width_ratio": 0.9679
+      "center_offset": 5.1,
+      "height_ratio": 1.0578,
+      "width_ratio": 0.9871
     },
     "Tabs_normal_light": {
-      "center_offset": 1.0,
-      "height_ratio": 1.0116,
-      "width_ratio": 0.9691
+      "center_offset": 5.52,
+      "height_ratio": 1.0636,
+      "width_ratio": 0.9884
     },
     "TextField_disabled_dark": {
       "center_offset": 0.0,
@@ -398,12 +398,12 @@
     "Switch_normal_light": 95.51,
     "Switch_selected_dark": 95.9,
     "Switch_selected_light": 92.13,
-    "TabOne_normal_dark": 97.51,
-    "TabOne_normal_light": 96.19,
-    "TabsGeom_normal_dark": 90.72,
-    "TabsGeom_normal_light": 89.35,
-    "Tabs_normal_dark": 73.45,
-    "Tabs_normal_light": 81.7,
+    "TabOne_normal_dark": 97.36,
+    "TabOne_normal_light": 96.9,
+    "TabsGeom_normal_dark": 93.67,
+    "TabsGeom_normal_light": 92.99,
+    "Tabs_normal_dark": 85.89,
+    "Tabs_normal_light": 86.12,
     "TextField_disabled_dark": 96.35,
     "TextField_disabled_light": 89.39,
     "TextField_normal_dark": 96.0,

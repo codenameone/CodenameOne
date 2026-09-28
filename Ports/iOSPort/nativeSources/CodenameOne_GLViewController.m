@@ -2718,6 +2718,34 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl
 #endif
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassLensScreenRegionImpl
+(int x, int y, int width, int height, float cornerRadius, const float* optics, int count, float amount) {
+    BlurRegion* f = [[BlurRegion alloc] initWithGlassLensArgs:x ypos:y w:width h:height cornerRadius:cornerRadius
+                                                       optics:optics count:count amount:amount];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+// Defined further down; declared here for the mask hand-off below.
+void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeColorMatrixScreenRegionImpl
+(int x, int y, int width, int height, const float* matrix, void* maskPeer, float cornerRadius, float amount) {
+    if (maskPeer != NULL && ((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == maskPeer) {
+        // The mask is still being drawn into; close it so its texture is complete.
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    BlurRegion* f = [[BlurRegion alloc] initWithColorMatrixArgs:x ypos:y w:width h:height matrix:matrix
+                                                           mask:(BRIDGE_CAST GLUIImage*)maskPeer
+                                                   cornerRadius:cornerRadius amount:amount];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 (float angle, int x, int y) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
