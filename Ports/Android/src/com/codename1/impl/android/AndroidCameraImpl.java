@@ -65,6 +65,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -558,54 +559,77 @@ public class AndroidCameraImpl extends CameraImpl {
 
     @Override
     public void close() {
-        if (closed) return;
-        closed = true;
+        final ExecutorService executor;
+        synchronized (this) {
+            if (closed) return;
+            closed = true;
+            executor = cameraExecutor;
+            cameraExecutor = null;
+        }
         frameListener = null;
-        // Use the activity captured by this session: the global activity may
-        // already have been cleared during teardown. Wait for main-thread
-        // unbinding before another session can open the camera.
+        // Native state belongs to the main-thread callback until it completes.
+        // A stalled main thread must not turn open's timeout into an EDT hang.
         final CountDownLatch unbound = new CountDownLatch(1);
+        boolean dispatched = false;
         boolean interrupted = false;
         try {
             activity.runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
                         if (cameraProvider != null) {
-                            clsProcessCameraProvider.getMethod("unbindAll").invoke(cameraProvider);
+                            Object useCases = java.lang.reflect.Array.newInstance(clsUseCase, 3);
+                            java.lang.reflect.Array.set(useCases, 0, preview);
+                            java.lang.reflect.Array.set(useCases, 1, imageCapture);
+                            java.lang.reflect.Array.set(useCases, 2, imageAnalysis);
+                            // Deferred cleanup must not unbind a newer session.
+                            clsProcessCameraProvider.getMethod("unbind", useCases.getClass())
+                                    .invoke(cameraProvider, useCases);
                         }
                     } catch (Throwable t) {
                         Log.e(TAG, "Could not unbind camera", t);
                     } finally {
+                        clearCameraReferences();
                         unbound.countDown();
                     }
                 }
             });
+            dispatched = true;
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
             for (;;) {
                 try {
-                    unbound.await();
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0 || !unbound.await(remaining, TimeUnit.NANOSECONDS)) {
+                        Log.w(TAG, "Camera teardown deferred until Android main thread resumes");
+                    }
                     break;
                 } catch (InterruptedException e) {
-                    // Finish releasing the camera, then restore the caller's flag.
                     interrupted = true;
                 }
             }
         } catch (Throwable t) {
             Log.e(TAG, "Could not dispatch camera teardown", t);
         } finally {
-            previewView = null;
-            camera = null;
-            preview = null;
-            imageCapture = null;
-            imageAnalysis = null;
-            cameraProvider = null;
-            if (cameraExecutor != null) {
-                cameraExecutor.shutdown();
-                cameraExecutor = null;
+            // If dispatched, only that callback may clear the references: it
+            // can still need them after this bounded wait has returned.
+            if (!dispatched) {
+                clearCameraReferences();
+            }
+            if (executor != null) {
+                executor.shutdown();
             }
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    private void clearCameraReferences() {
+        previewView = null;
+        camera = null;
+        preview = null;
+        imageCapture = null;
+        imageAnalysis = null;
+        cameraProvider = null;
     }
 
     // --------------------------------------------------------------------

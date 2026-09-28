@@ -17,6 +17,9 @@ public class AndroidCameraThreadingHarness {
     private static final Activity testActivity = new Activity();
     private static Activity registeredActivity = testActivity;
     private static boolean failDispatch;
+    private static boolean deferDispatch;
+    private static Runnable deferredTeardown;
+    private static final java.util.Set<UseCase> boundCases = new java.util.HashSet<>();
     private static boolean failPreview;
     private static boolean failBind;
     private static boolean delayProvider;
@@ -47,6 +50,9 @@ public class AndroidCameraThreadingHarness {
     private static void reset() {
         registeredActivity = testActivity;
         failDispatch = false;
+        deferDispatch = false;
+        deferredTeardown = null;
+        boundCases.clear();
         failPreview = false;
         failBind = false;
         delayProvider = false;
@@ -198,6 +204,108 @@ public class AndroidCameraThreadingHarness {
         check(liveBindings == 0 && loggedErrors == 0, "retry after timeout failed");
     }
 
+    public static void blockedMainOpen() throws Exception {
+        reset();
+        CountDownLatch blocked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ui.execute(() -> {
+            blocked.countDown();
+            try { release.await(); } catch (InterruptedException e) { throw new AssertionError(e); }
+        });
+        check(blocked.await(2, TimeUnit.SECONDS), "could not block main thread");
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        AndroidCameraThreadingHarness camera = new AndroidCameraThreadingHarness();
+        Future<?> result = caller.submit(() -> {
+            try {
+                camera.open("back", new CameraSessionOptions());
+                throw new AssertionError("blocked open succeeded");
+            } catch (IOException expected) {
+                check(expected.getMessage().contains("timed out"), "unexpected open failure");
+            }
+        });
+        try {
+            result.get(8, TimeUnit.SECONDS);
+            check(camera.cameraExecutor == null, "timed-out open retained executor");
+        } finally {
+            release.countDown();
+            // Drain both the late binding callback and queued cleanup, even on failure.
+            ui.submit(() -> {}).get(2, TimeUnit.SECONDS);
+            caller.shutdownNow();
+        }
+        check(binds == 0 && camera.cameraProvider == null && camera.preview == null,
+                "late callback reopened or retained the timed-out camera");
+        openCamera().close();
+    }
+
+    public static void deferredClose() throws Exception {
+        reset();
+        AndroidCameraThreadingHarness old = openCamera();
+        ExecutorService executor = (ExecutorService) old.cameraExecutor;
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        deferDispatch = true;
+        Future<?> result = caller.submit(() -> old.close());
+        try {
+            result.get(3, TimeUnit.SECONDS);
+            check(executor.isShutdown(), "bounded close retained its executor");
+            check(old.cameraProvider != null && old.preview != null,
+                    "bounded close discarded native handles before queued unbind");
+            deferDispatch = false;
+            AndroidCameraThreadingHarness next = openCamera();
+            ui.submit(deferredTeardown).get(2, TimeUnit.SECONDS);
+            checkReleased(old, executor);
+            check(liveBindings == 1, "old cleanup unbound the newer camera session");
+            next.close();
+            check(liveBindings == 0 && unbinds == 2, "session-specific cleanup failed");
+        } finally {
+            deferDispatch = false;
+            if (!result.isDone() && deferredTeardown != null) {
+                ui.submit(deferredTeardown).get(2, TimeUnit.SECONDS);
+            }
+            caller.shutdownNow();
+        }
+    }
+
+    private static class CountingExecutor extends AbstractExecutorService {
+        final java.util.concurrent.atomic.AtomicInteger shutdowns = new java.util.concurrent.atomic.AtomicInteger();
+        public void shutdown() { shutdowns.incrementAndGet(); }
+        public java.util.List<Runnable> shutdownNow() { shutdown(); return java.util.Collections.emptyList(); }
+        public boolean isShutdown() { return shutdowns.get() != 0; }
+        public boolean isTerminated() { return isShutdown(); }
+        public boolean awaitTermination(long timeout, TimeUnit unit) { return isShutdown(); }
+        public void execute(Runnable r) { throw new AssertionError("unexpected camera task"); }
+    }
+
+    public static void concurrentClose() throws Exception {
+        ExecutorService callers = Executors.newFixedThreadPool(8);
+        try {
+            for (int attempt = 0; attempt < 100; attempt++) {
+                reset();
+                AndroidCameraThreadingHarness camera = openCamera();
+                camera.cameraExecutor.shutdown();
+                CountingExecutor executor = new CountingExecutor();
+                camera.cameraExecutor = executor;
+                CountDownLatch ready = new CountDownLatch(8);
+                CountDownLatch start = new CountDownLatch(1);
+                java.util.List<Future<?>> results = new java.util.ArrayList<>();
+                for (int i = 0; i < 8; i++) {
+                    results.add(callers.submit(() -> {
+                        ready.countDown();
+                        try { start.await(); } catch (InterruptedException e) { throw new AssertionError(e); }
+                        camera.close();
+                    }));
+                }
+                check(ready.await(2, TimeUnit.SECONDS), "close callers did not start");
+                start.countDown();
+                for (Future<?> result : results) result.get(3, TimeUnit.SECONDS);
+                check(unbinds == 1 && executor.shutdowns.get() == 1,
+                        "concurrent close took cleanup ownership more than once");
+                checkReleased(camera, executor);
+            }
+        } finally {
+            callers.shutdownNow();
+        }
+    }
+
     public static void shutdown() { ui.shutdownNow(); }
 
     public static class Context {
@@ -206,6 +314,7 @@ public class AndroidCameraThreadingHarness {
     public static class Activity extends Context {
         public void runOnUiThread(Runnable r) {
             if (failDispatch) throw new IllegalStateException("injected dispatch failure");
+            if (deferDispatch) { deferredTeardown = r; return; }
             if (Thread.currentThread() == uiThread) r.run();
             else ui.execute(r);
         }
@@ -257,13 +366,22 @@ public class AndroidCameraThreadingHarness {
         public Object bindToLifecycle(LifecycleOwner owner, Selector selector, UseCase[] cases) {
             checkMain();
             check(((PreviewUseCase) cases[0]).provider != null, "camera bound without preview surface provider");
-            check(liveBindings == 0, "previous session still bound");
             binds++;
-            liveBindings++;
+            java.util.Collections.addAll(boundCases, cases);
+            liveBindings = boundCases.size() / 3;
             if (failBind) throw new IllegalStateException("injected bind failure");
             return new Object();
         }
-        public void unbindAll() { checkMain(); unbinds++; liveBindings = 0; }
+        public void unbindAll() { checkMain(); unbinds++; boundCases.clear(); liveBindings = 0; }
+        public void unbind(UseCase[] cases) {
+            checkMain();
+            unbinds++;
+            for (UseCase useCase : cases) {
+                check(useCase != null, "deferred cleanup lost its use case");
+                boundCases.remove(useCase);
+            }
+            liveBindings = boundCases.size() / 3;
+        }
     }
     public static class ProviderFuture {
         public void addListener(Runnable r, Executor executor) {
@@ -284,6 +402,7 @@ public class AndroidCameraThreadingHarness {
         /* UI_SYNC_METHOD */
     }
     public static class Log {
+        public static void w(String tag, String message) {}
         public static void e(String tag, String message, Throwable error) { loggedErrors++; }
     }
     public static class CameraInfo {}

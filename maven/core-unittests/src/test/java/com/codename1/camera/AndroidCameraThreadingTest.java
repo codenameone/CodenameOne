@@ -54,6 +54,9 @@ class AndroidCameraThreadingTest {
         if (android.contains("private void preparePreview(")) {
             methods.append(method(android, "private void preparePreview("));
         }
+        if (android.contains("private void clearCameraReferences(")) {
+            methods.append(method(android, "private void clearCameraReferences("));
+        }
         String fields = android.substring(android.indexOf("private static final String TAG"),
                 android.indexOf("public AndroidCameraImpl("));
         String impl = read(Paths.get("../../Ports/Android/src/com/codename1/impl/android/AndroidImplementation.java"));
@@ -136,6 +139,21 @@ class AndroidCameraThreadingTest {
     @Test
     void interruptedCloseFinishesCleanupAndRestoresInterruptFlag() throws Exception {
         harness.getMethod("interruptedClose").invoke(null);
+    }
+
+    @Test
+    void blockedAndroidMainThreadCannotHangTimedOutOpen() throws Exception {
+        harness.getMethod("blockedMainOpen").invoke(null);
+    }
+
+    @Test
+    void deferredTeardownReleasesOnlyItsOwnSession() throws Exception {
+        harness.getMethod("deferredClose").invoke(null);
+    }
+
+    @Test
+    void concurrentCloseTakesCleanupOwnershipOnce() throws Exception {
+        harness.getMethod("concurrentClose").invoke(null);
     }
 
     @Test
