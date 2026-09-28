@@ -57,6 +57,20 @@ class AndroidGradleBuilderVersionTest {
         // itself rather than something below 9.6.0.
         assertEquals("9.9.0", AndroidGradleBuilder.requestedGradle9Version("9.9"));
         assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6"));
+        // Below 9 is ignored whatever its shape: qualified pre-9 values in shared settings
+        // must not start failing an unchanged Gradle 8 build.
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.13-rc-1"));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.14.4-milestone-2"));
+    }
+
+    @Test
+    void aQualifiedGradle9ValueIsRefusedNotGuessed() {
+        BuildException rc = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("9.7.0-rc-1"));
+        assertTrue(rc.getMessage().contains("not a Gradle 9 release"), rc.getMessage());
+        BuildException ten = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("10-rc-1"));
+        assertTrue(ten.getMessage().contains("not supported"), ten.getMessage());
     }
 
     @Test
@@ -95,6 +109,9 @@ class AndroidGradleBuilderVersionTest {
         assertEquals("", AndroidGradleBuilder.agp9UsesSdk(null));
         // maxSdkVersion moves to defaultConfig rather than vanishing.
         assertEquals("34", AndroidGradleBuilder.xmanifestMaxSdkVersion(hint));
+        // Padded exactly as agp9MaxSdkRefusal accepts it, so it moves rather than vanishing.
+        assertEquals("34", AndroidGradleBuilder.xmanifestMaxSdkVersion("android:maxSdkVersion=\" 34 \""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion=\" 34 \""));
         assertNull(AndroidGradleBuilder.xmanifestMaxSdkVersion("tools:overrideLibrary=\"x\""));
     }
 

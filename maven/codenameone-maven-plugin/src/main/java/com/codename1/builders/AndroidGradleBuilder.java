@@ -9302,7 +9302,10 @@ public class AndroidGradleBuilder extends Executor {
             return null;
         }
         java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-                "android:maxSdkVersion\\s*=\\s*[\"']([0-9]+)[\"']").matcher(xmanifest);
+                // Whitespace inside the quotes allowed, by the same rule agp9MaxSdkRefusal
+                // accepts the value with: " 34 " passed that check and then failed to match
+                // here, so the attribute was stripped and nothing replaced it.
+                "android:maxSdkVersion\\s*=\\s*[\"']\\s*([0-9]+)\\s*[\"']").matcher(xmanifest);
         return m.find() ? m.group(1) : null;
     }
 
@@ -11530,12 +11533,23 @@ public class AndroidGradleBuilder extends Executor {
         if (value.length() == 0) {
             return null;
         }
-        if (!value.matches("[0-9]+(\\.[0-9]+){0,2}")) {
+        // The major first, the strict release format only for 9 and up. A value below 9 was
+        // always ignored here, qualified ones included -- 8.13-rc-1 in settings shared with a
+        // builder that reads it must not start failing an unchanged Gradle 8 build.
+        int digits = 0;
+        while (digits < value.length() && Character.isDigit(value.charAt(digits))) {
+            digits++;
+        }
+        if (digits == 0) {
             throw new BuildException("android.gradleVersion=" + value + " is not a Gradle version."
                     + " Use 9 for Gradle " + GRADLE_9_VERSION + ", or an explicit 9.x release.");
         }
-        int dot = value.indexOf('.');
-        int major = Integer.parseInt(dot < 0 ? value : value.substring(0, dot));
+        int major;
+        try {
+            major = Integer.parseInt(value.substring(0, digits));
+        } catch (NumberFormatException tooLarge) {
+            major = Integer.MAX_VALUE;
+        }
         if (major < 9) {
             return null;
         }
@@ -11544,6 +11558,12 @@ public class AndroidGradleBuilder extends Executor {
                     + " newest supported Gradle line is 9, with Android Gradle plugin "
                     + ANDROID_GRADLE_PLUGIN_9_VERSION + ". Use android.gradleVersion=9.");
         }
+        if (!value.matches("[0-9]+(\\.[0-9]+){0,2}")) {
+            throw new BuildException("android.gradleVersion=" + value + " is not a Gradle 9"
+                    + " release. Use 9 for Gradle " + GRADLE_9_VERSION + ", or an explicit 9.x"
+                    + " release such as " + GRADLE_9_MIN_VERSION + ".");
+        }
+        int dot = value.indexOf('.');
         if (dot < 0) {
             return GRADLE_9_VERSION;
         }
