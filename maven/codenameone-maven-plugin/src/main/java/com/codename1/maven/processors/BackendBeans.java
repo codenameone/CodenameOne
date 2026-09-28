@@ -1146,6 +1146,22 @@ final class BackendBeans {
      */
     private final Set<String> reportedUnwoven = new HashSet<String>();
 
+    /// Whether the bean has a method the build runs on an executor: `@Async` on
+    /// the method, or on the class for its public instance methods.
+    private boolean hasAsync(Bean b) {
+        if (b.cls == null) {
+            return false;
+        }
+        boolean onClass = b.cls.getClassAnnotation(ASYNC) != null;
+        for (MethodInfo m : inheritedMembers(b.cls)) {
+            if (m.getAnnotation(ASYNC) != null || (onClass && m.isPublic() && !m.isStatic()
+                    && !m.isConstructor())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<MethodInfo> inheritedMembers(AnnotatedClass cls) {
         List<MethodInfo> out = new ArrayList<MethodInfo>();
         Set<String> seen = new HashSet<String>();
@@ -1521,9 +1537,11 @@ final class BackendBeans {
         // there -- directly, or through a singleton that injects it -- throws on
         // first use. Only the direct injections used to be checked.
         for (Bean b : beans) {
+            boolean async = hasAsync(b);
             String role = b.webSocket ? "Websocket endpoint"
                     : !b.jobs.isEmpty() ? "Bean with @Scheduled methods"
-                    : b.managed != null ? "@ManagedResource bean" : null;
+                    : b.managed != null ? "@ManagedResource bean"
+                    : async ? "Bean with @Async methods" : null;
             if (role == null || b.cls == null) {
                 continue;
             }
@@ -1538,7 +1556,8 @@ final class BackendBeans {
             }
             String outside = b.webSocket ? "A websocket callback runs"
                     : !b.jobs.isEmpty() ? "A scheduled job runs"
-                    : "A managed attribute is read";
+                    : b.managed != null ? "A managed attribute is read"
+                    : "An @Async call runs on an executor, even one a request made,";
             ctx.error(b.cls, role + " " + b.describe() + " reaches " + d.describe() + via
                     + ", which is " + d.scope + "-scoped. " + outside + " outside any HTTP "
                     + "request, so there is no " + d.scope + " to find it in; inject a singleton"

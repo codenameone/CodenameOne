@@ -259,6 +259,14 @@ public final class McpServer implements HttpServer.Handler {
         // explicit null is a request JSON-RPC answers -- with null as its id.
         // Reading the value alone left such a client waiting forever on a 202.
         boolean notification = !m.containsKey("id");
+        if (id != null && !(id instanceof String) && !(id instanceof Number)) {
+            // JSON-RPC ids are strings, numbers or null. An object, array or
+            // boolean id is refused before the method runs -- a tool call must not
+            // take effect for a request whose answer the client cannot match --
+            // and the error carries null, the id of a request it could not read.
+            return rpcError(null, -32600, "Invalid request: id must be a string, a number "
+                    + "or null");
+        }
         Object methodValue = m.get("method");
         if (!(methodValue instanceof String)) {
             if (m.containsKey("result") || m.containsKey("error")) {

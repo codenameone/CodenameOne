@@ -745,14 +745,51 @@ public final class Backend {
         }
     }
 
-    /// Whether `host` names this machine's loopback interface.
-    static boolean isLoopback(String host) {
-        String h = host.trim();
-        return "localhost".equalsIgnoreCase(h) || h.startsWith("127.")
-                || "::1".equals(h) || "[::1]".equals(h);
+    /// The address a client should use for a listener bound to `host`: the
+    /// address itself -- a listener bound to one address answers on no other --
+    /// in brackets when it is IPv6, and 127.0.0.1 for every-interface binds.
+    static String advertised(String host) {
+        String h = host == null ? "" : host.trim();
+        if (h.length() == 0 || "0.0.0.0".equals(h) || "::".equals(h) || "[::]".equals(h)) {
+            return "127.0.0.1";
+        }
+        return h.indexOf(':') >= 0 && !h.startsWith("[") ? "[" + h + "]" : h;
     }
 
-        /// What an [Application] is built from.
+    /// Whether `host` names this machine's loopback interface.
+    ///
+    /// Only what is loopback by definition: `localhost`, the IPv6 `::1`, and a
+    /// NUMERIC IPv4 literal in 127/8. A name that merely starts "127." --
+    /// 127.backend.example -- resolves wherever its DNS says, and a prefix test
+    /// took it for loopback and let a tokenless MCP endpoint listen publicly.
+    static boolean isLoopback(String host) {
+        String h = host.trim();
+        if ("localhost".equalsIgnoreCase(h) || "::1".equals(h) || "[::1]".equals(h)
+                || "0:0:0:0:0:0:0:1".equals(h)) {
+            return true;
+        }
+        // By hand: vm/JavaAPI has no String.split.
+        int octets = 0;
+        int start = 0;
+        for (int end = 0 ; end <= h.length() ; end++) {
+            if (end < h.length() && h.charAt(end) != '.') {
+                char c = h.charAt(end);
+                if (c < '0' || c > '9' || end - start >= 3) {
+                    return false;
+                }
+                continue;
+            }
+            if (end == start || Integer.parseInt(h.substring(start, end)) > 255
+                    || (octets == 0 && !"127".equals(h.substring(start, end)))) {
+                return false;
+            }
+            octets++;
+            start = end + 1;
+        }
+        return octets == 4;
+    }
+
+    /// What an [Application] is built from.
     public static final class Environment {
         private final Config config;
         private final DataSource dataSource;
@@ -1502,8 +1539,8 @@ public final class Backend {
                     if (!quiet) {
                         // The line an agent's setup instructions point at.
                         System.out.println("cn1: MCP endpoint at http"
-                                + (context != null ? "s" : "") + "://127.0.0.1:"
-                                + server.getPort() + mcpServer.getPath()
+                                + (context != null ? "s" : "") + "://" + advertised(bindHost)
+                                + ":" + server.getPort() + mcpServer.getPath()
                                 + (mcpServer.hasDevTools() ? " (with development tools)" : ""));
                     }
                 }

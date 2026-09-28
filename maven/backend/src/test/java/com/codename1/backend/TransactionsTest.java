@@ -138,6 +138,25 @@ class TransactionsTest {
     }
 
     @Test
+    @DisplayName("a savepoint that cannot be set leaves the outer transaction unable to commit")
+    void aFailedSavepointMarksTheOuterRollbackOnly() throws Exception {
+        Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);
+        insert("a");
+        Database connection = pool.borrow();       // the transaction's own
+        pool.release(connection);
+        connection.close();                        // so the SAVEPOINT fails
+        assertThrows(TransactionException.class,
+                () -> Transactions.begin(Transactions.NESTED, false, -1));
+        assertTrue(Transactions.isRollbackOnly(),
+                "a caught savepoint failure left the outer transaction free to commit");
+        try {
+            Transactions.afterThrow(outer, true);
+        } catch (RuntimeException closed) {
+            // the connection is gone; the rollback cannot reach it
+        }
+    }
+
+    @Test
     @DisplayName("NESTED rolls back to its savepoint and leaves the outer transaction able to commit")
     void nestedSavepoint() throws Exception {
         Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);

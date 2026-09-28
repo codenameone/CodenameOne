@@ -146,6 +146,25 @@ public final class OtlpMetricExporter implements MetricReader {
         return true;
     }
 
+    /// Starts exporting for a leader that stopped -- but only while this one is
+    /// still open and first in line, checked and started under the same lock
+    /// its own shutdown() takes: a successor that shut down meanwhile would
+    /// otherwise get a thread nothing ever stops, exporting after both servers
+    /// are gone.
+    void takeOver() {
+        synchronized (OPEN) {
+            if (OPEN.isEmpty() || OPEN.get(0) != this) { //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
+                return;
+            }
+            synchronized (lock) {
+                if (run != null && !run.stopping) {
+                    return;
+                }
+            }
+            startExporting();
+        }
+    }
+
     /// Starts this exporter's thread: it is the one exporting the process's metrics.
     private void startExporting() {
         final Run mine = new Run();
@@ -244,7 +263,7 @@ public final class OtlpMetricExporter implements MetricReader {
             // The one that waited behind this, with the same identity, exports
             // from now on; the process's metrics are not left unreported while
             // another server is still running.
-            successor.startExporting();
+            successor.takeOver();
         }
         Thread exporter;
         synchronized (lock) {

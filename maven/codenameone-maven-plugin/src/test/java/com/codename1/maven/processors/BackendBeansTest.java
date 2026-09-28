@@ -1215,6 +1215,22 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anAsyncBeanReachingAScopedBeanIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit { }\n");
+        s.put("com.example.Helper", PKG + "@Component public class Helper {\n"
+                + "    @Autowired private Visit visit;\n"
+                + "}\n");
+        s.put("com.example.Mailer", PKG + "@Component public class Mailer {\n"
+                + "    @Autowired private Helper helper;\n"
+                + "    @Async public void send() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Bean with @Async methods mailer (com.example.Mailer) "
+                + "reaches visit (com.example.Visit) through helper (com.example.Helper)"));
+    }
+
+    @Test
     public void aPrototypeControllerIsBuiltOnce() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Api", PKG + "@RestController @Scope(\"prototype\") public class Api {\n"

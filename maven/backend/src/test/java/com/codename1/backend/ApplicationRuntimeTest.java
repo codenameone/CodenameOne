@@ -1872,6 +1872,62 @@ class ApplicationRuntimeTest {
                 "the run that finished in the drain was not recorded");
     }
 
+    @Test
+    @DisplayName("loopback is 127/8 as a numeric literal, ::1 or localhost -- not a name that starts 127.")
+    void loopbackIsCheckedStrictly() {
+        assertTrue(Backend.isLoopback("127.0.0.1"));
+        assertTrue(Backend.isLoopback("127.1.2.3"));
+        assertTrue(Backend.isLoopback("::1"));
+        assertTrue(Backend.isLoopback("localhost"));
+        assertFalse(Backend.isLoopback("127.backend.example"));
+        assertFalse(Backend.isLoopback("127.0.0.1.evil.example"));
+        assertFalse(Backend.isLoopback("127.0.0.256"));
+        assertFalse(Backend.isLoopback("127.0.0"));
+        assertFalse(Backend.isLoopback("10.0.0.1"));
+        assertEquals("127.0.0.1", Backend.advertised(null));
+        assertEquals("127.0.0.1", Backend.advertised("0.0.0.0"));
+        assertEquals("[::1]", Backend.advertised("::1"));
+        assertEquals("192.0.2.10", Backend.advertised("192.0.2.10"));
+    }
+
+    @Test
+    @DisplayName("a JSON-RPC id that is an object, array or boolean is refused before the method runs")
+    void unsupportedIdTypesAreRefused() throws Exception {
+        final int[] calls = {0};
+        com.codename1.backend.mcp.McpTool tool = new com.codename1.backend.mcp.McpTool() {
+            public String name() {
+                return "touch";
+            }
+
+            public String description() {
+                return "counts calls";
+            }
+
+            public Map inputSchema() {
+                Map schema = new LinkedHashMap();
+                schema.put("type", "object");
+                return schema;
+            }
+
+            public Object call(Map arguments) {
+                calls[0]++;
+                return "ok";
+            }
+        };
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null,
+                java.util.Collections.singletonList(tool));
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "{\"jsonrpc\":\"2.0\",\"id\":{\"x\":1},"
+                + "\"method\":\"tools/call\",\"params\":{\"name\":\"touch\","
+                + "\"arguments\":{}}}"));
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32600") && body.contains("\"id\":null"), body);
+        assertEquals(0, calls[0], "a request with an object id ran its tool");
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

@@ -272,6 +272,12 @@ public final class Transactions {
             flushSession(current);
             db.savepoint(name);
         } catch (IOException err) {
+            // The outer transaction cannot commit after this, even if its method
+            // catches the exception: the failed flush may have left some of its
+            // statements applied (MySQL) or the transaction aborted (PostgreSQL),
+            // and a commit would persist half of it or report success for work
+            // the server threw away.
+            current.rollbackOnly = true;
             throw new TransactionException("Could not set savepoint " + name + ": "
                     + err.getMessage(), err);
         }

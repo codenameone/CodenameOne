@@ -227,4 +227,25 @@ class OtlpMetricsProtoTest {
     private static long failures(OtlpMetricExporter e) {
         return ((Number) e.status().get("failures")).longValue();
     }
+
+    @Test
+    @DisplayName("an exporter that shut down is not started by a late hand-over")
+    void aStoppedSuccessorIsNotStarted() throws Exception {
+        java.net.ServerSocket probe = new java.net.ServerSocket(0);
+        int closed = probe.getLocalPort();
+        probe.close();
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:" + closed + "/v1/metrics");
+        p.setProperty(OtlpMetricExporter.INTERVAL, "20");
+        com.codename1.backend.Config config = com.codename1.backend.Config.of(p, "test");
+        OtlpMetricExporter leader = new OtlpMetricExporter("race");
+        OtlpMetricExporter successor = new OtlpMetricExporter("race");
+        leader.open(config);
+        successor.open(config);
+        successor.shutdown(0);       // stops first, while the leader is deciding
+        successor.takeOver();        // the leader's hand-over, arriving late
+        leader.shutdown(0);
+        Thread.sleep(200);
+        assertEquals(0L, failures(successor), "a shut-down exporter was started and exports");
+    }
 }
