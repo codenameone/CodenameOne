@@ -99,6 +99,18 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void aMaxSdkVersionWithNoNumberToMoveIsRefusedNotDropped() {
+        String placeholder = AndroidGradleBuilder.agp9MaxSdkRefusal(
+                "tools:overrideLibrary=\"x\" android:maxSdkVersion=\"${maxSdk}\"");
+        assertTrue(placeholder != null && placeholder.contains("${maxSdk}"), String.valueOf(placeholder));
+        assertTrue(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion='@integer/max'") != null);
+        // A literal moves to defaultConfig; no attribute means nothing to refuse.
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion = \"34\""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("tools:overrideLibrary=\"x\""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal(null));
+    }
+
+    @Test
     void aGoogleServicesPinAgp9CannotApplyIsRefusedByName() {
         String old = AndroidGradleBuilder.agp9GoogleServicesRefusal(
                 "\n    classpath 'com.google.gms:google-services:4.3.15'\n");

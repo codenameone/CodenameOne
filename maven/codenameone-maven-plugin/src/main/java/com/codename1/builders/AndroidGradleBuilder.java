@@ -1734,6 +1734,11 @@ public class AndroidGradleBuilder extends Executor {
         if (googleServicesRefusal != null) {
             throw new BuildException(googleServicesRefusal);
         }
+        String maxSdkRefusal = useGradle9
+                ? agp9MaxSdkRefusal(request.getArg("android.xmanifest", "")) : null;
+        if (maxSdkRefusal != null) {
+            throw new BuildException(maxSdkRefusal);
+        }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             minimumGradleVersion = GRADLE_8_VERSION;
@@ -9251,6 +9256,39 @@ public class AndroidGradleBuilder extends Executor {
         return xmanifest.replaceAll(
                 "android:(minSdkVersion|targetSdkVersion|maxSdkVersion)\\s*=\\s*(\"[^\"]*\"|'[^']*')",
                 "").replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Why android.xmanifest's maxSdkVersion cannot be carried to Gradle 9, or null.
+     *
+     * <p>{@link #agp9UsesSdk} takes the attribute out of {@code <uses-sdk>}, where AGP 9 no
+     * longer accepts it, and {@link #xmanifestMaxSdkVersion} moves it into defaultConfig --
+     * which takes a number. A manifest placeholder such as {@code ${maxSdk}} has no number to
+     * move, and dropping it would let the app install on the very platforms the project set
+     * out to exclude, with nothing saying so. Refused instead, naming the fix.</p>
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the refusal message, or null
+     */
+    static String agp9MaxSdkRefusal(String xmanifest) {
+        if (xmanifest == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "android:maxSdkVersion\\s*=\\s*(\"([^\"]*)\"|'([^']*)')").matcher(xmanifest);
+        if (!m.find()) {
+            return null;
+        }
+        String value = m.group(2) != null ? m.group(2) : m.group(3);
+        if (value.trim().matches("[0-9]+")) {
+            return null;
+        }
+        return "android.xmanifest sets android:maxSdkVersion=\"" + value + "\" on <uses-sdk>, which"
+                + " Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " no longer accepts"
+                + " there. The build moves a literal value into build.gradle's defaultConfig, but"
+                + " this one is not a number. Write the number itself, or set it with"
+                + " android.xgradle_default_config (maxSdkVersion <n>) and remove it from"
+                + " android.xmanifest.";
     }
 
     /**
