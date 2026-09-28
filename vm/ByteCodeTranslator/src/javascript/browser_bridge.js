@@ -6898,15 +6898,25 @@
         return;
       }
       var prefix = (primary ? 'primary' + (e.altKey ? '+alt' : '') : 'alt') + (e.shiftKey ? '+shift' : '');
-      // The typed character first (it is what a non-QWERTY layout puts on the key), then the
-      // physical key's unshifted character for a modifier-transformed one.
+      // The typed character is the key: it is what the user's layout puts there, and on AZERTY
+      // the key typing "a" reports code "KeyQ". The physical key's US character is only a
+      // fallback when the typed character cannot be what the command was configured with:
+      // Shift or Alt turned it into something that is not a letter or a digit ("!" for
+      // Shift+1, a symbol for Option+S), or the layout is not Latin (Ctrl+S types a Cyrillic
+      // letter on a Russian layout, where desktop apps fall back to the key's Latin letter).
+      // Never for a Latin layout difference, where it would run the Ctrl+Q command for a
+      // press of Ctrl+A.
       var keys = [];
-      if (e.key && e.key.length === 1) {
-        keys.push(e.key.toLowerCase());
+      var typed = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (typed) {
+        keys.push(typed);
       }
-      var base = baseKey(e.code);
-      if (base && keys.indexOf(base) < 0) {
-        keys.push(base);
+      if (!/^[a-z0-9]$/.test(typed)
+          && (e.shiftKey || e.altKey || !/^[\x20-\x7e]$/.test(typed))) {
+        var base = baseKey(e.code);
+        if (base && base !== typed) {
+          keys.push(base);
+        }
       }
       var item = null;
       for (var k = 0; k < keys.length && !item; k++) {

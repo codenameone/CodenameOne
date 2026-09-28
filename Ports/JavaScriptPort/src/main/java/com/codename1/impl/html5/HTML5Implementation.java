@@ -2300,7 +2300,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // and most taps on a button (issue #5912).
                 final boolean touchAlreadyDown = pointerState.isTouchDown();
                 pointerState.setTouchDown(true);
-                final PressSlot press = beginPressInFlight();
+                // A further finger joining a touch already down is not a new press --
+                // resolveTouchStart ignores it -- so it keeps the slot the first finger opened.
+                // Replacing that slot would hand the gesture's later moves and its release to a
+                // slot this handler completes at once, running them ahead of a first press that
+                // may still be crossing the bridge.
+                final PressSlot press = touchAlreadyDown ? null : beginPressInFlight();
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -4052,6 +4057,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private void completePressInFlight(PressSlot press) {
+        if (press == null) {
+            return;
+        }
         Runnable pending;
         List<Runnable> moves;
         synchronized (pointerEventOrderLock) {
@@ -5039,11 +5047,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     /// isDesktop() classifies by user agent, and iPadOS Safari reports a Mac one by default, as
     /// does any tablet browser asked for the desktop site -- so a touch device answers "desktop"
-    /// there. The pointer is what decides whether a press-drag may select text (TextSelection's
-    /// trigger) without stealing the swipe that scrolls.
+    /// there. The pointers are what decide whether a press-drag may select text (TextSelection's
+    /// trigger, fixed for the form) without stealing the swipe that scrolls.
+    ///
+    /// ANY coarse pointer counts, not only the primary one: a laptop with a touch screen reports
+    /// its fine mouse as primary, and a Press trigger would then claim a finger's swipe over text
+    /// as a selection. Long press still selects with the mouse there -- a press held in place --
+    /// while a press-drag from the mouse scrolls, as it does on every touch-capable surface.
     @Override
     public boolean isPrimaryPointerMouse() {
-        return isDesktop() && !isIOS() && !matchesMediaQuery("(pointer: coarse)");
+        return isDesktop() && !isIOS() && !matchesMediaQuery("(any-pointer: coarse)");
     }
 
     private int isDesktop = -1;
