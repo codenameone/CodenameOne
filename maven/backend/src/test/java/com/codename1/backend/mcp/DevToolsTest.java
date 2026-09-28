@@ -136,4 +136,15 @@ class DevToolsTest {
         assertTrue(answer != null && answer.startsWith("[") && answer.contains("\"id\":1")
                 && answer.contains("\"id\":\"two\""), String.valueOf(answer));
     }
+
+    @Test
+    @DisplayName("credentials in exporter headers and URL queries are masked")
+    void credentialsInValuesAreMasked() {
+        assertTrue(DevTools.secret("cn1.otel.headers", "api-key=abc123"));
+        assertTrue(DevTools.secret("cn1.datasource.url",
+                "postgres://db.example/app?user=app&password=hunter2"));
+        assertTrue(DevTools.secret("DATABASE_URL", "postgres://app:hunter2@db/app"));
+        assertFalse(DevTools.secret("cn1.server.port", "8080"));
+        assertFalse(DevTools.secret("cn1.datasource.url", "sqlite:app.db"));
+    }
 }

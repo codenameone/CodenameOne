@@ -198,7 +198,10 @@ running the job on UTC without a word.
 
 In a zone with daylight saving time, a time the clocks skip doesn't exist, and a
 job due then doesn't run that day: `0 30 2 * * *` in `America/New_York` skips the
-spring-forward night instead of running at 03:30.
+spring-forward night instead of running at 03:30. A time the clocks pass twice, on
+the night they go back, runs once, at the first of the two. Once that has passed
+the day's run is spent, so a server started inside the repeated hour doesn't run it
+that night.
 
 ==== Fixed rate and fixed delay
 

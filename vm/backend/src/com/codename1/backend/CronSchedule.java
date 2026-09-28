@@ -402,19 +402,20 @@ public final class CronSchedule {
                 t = candidate > t ? candidate : t + 1000L;
                 continue;
             }
-            // A time the clocks pass twice -- 01:30 on a fall-back night -- is the
-            // FIRST of the two, as Spring and Quartz fire it; the second only when
-            // the search starts after the first, as a server started in that
-            // repeated hour does.
+            // A time the clocks pass twice -- 01:30 on a fall-back night -- fires
+            // ONCE, at the first of the two, as Quartz and Spring fire it. Once the
+            // first has passed that day's is spent, whichever side of the change
+            // the search starts on: after a run at the first, the scheduler asks
+            // again from just past it, and a search that could still return the
+            // second would run a daily job twice that night. A server started
+            // inside the repeated hour missed that day's run like any other.
             if (first > afterMillis) {
                 return first;
             }
+            // Spent: search on from just past its SECOND occurrence, so the other
+            // times of that day -- 02:00 for an every-half-hour job -- still count.
             long second = localToUtc(candidateLocal, false);
-            if (second > afterMillis) {
-                return second;
-            }
-            // Both are at or before the start: step past them.
-            t = second <= t ? t + 1000L : second + 1000L;
+            t = second >= t ? second + 1000L : t + 1000L;
         }
         return -1;
     }

@@ -129,7 +129,7 @@ public final class McpServer implements HttpServer.Handler {
                     + TOKEN + " is not set, so anyone who can reach the port could call its "
                     + "tools. Set a token, or " + ENABLED + "=false.");
         }
-        String path = config.get(PATH, "/mcp");
+        String path = config.getRoutePath(PATH, "/mcp");
         if (!path.startsWith("/")) {
             throw new IOException(PATH + " must start with /");
         }
@@ -383,8 +383,14 @@ public final class McpServer implements HttpServer.Handler {
         if (!(name instanceof String)) {
             throw new IllegalArgumentException("tools/call needs a tool name");
         }
-        Map arguments = params.get("arguments") instanceof Map ? (Map) params.get("arguments")
-                : new LinkedHashMap();
+        Object rawArguments = params.get("arguments");
+        if (rawArguments != null && !(rawArguments instanceof Map)) {
+            // Refused, not read as "no arguments": a tool that needs none, or has
+            // defaults, would otherwise run -- side effects and all -- for a call
+            // the client got wrong.
+            throw new IllegalArgumentException("tools/call arguments must be an object");
+        }
+        Map arguments = rawArguments == null ? new LinkedHashMap() : (Map) rawArguments;
         List all = tools();
         for (Object element : all) {
             McpTool tool = (McpTool) element;

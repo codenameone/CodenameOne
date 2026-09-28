@@ -1721,17 +1721,25 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("a time the clocks pass twice fires at the first, or the second when started between")
+    @DisplayName("a time the clocks pass twice fires once, at the first, from either side of the change")
     void cronInAFallBackOverlap() {
         CronSchedule c = CronSchedule.parse("0 30 1 * * *", "America/New_York");
         long hour = 3600000L;
-        // 2026-11-01: 01:30 EDT is 05:30Z and 01:30 EST is 06:30Z.
+        long minute = 60000L;
+        // 2026-11-01: 01:30 EDT is 05:30Z, the clocks go back at 06:00Z, and 01:30
+        // EST is 06:30Z. The next day's 01:30 EST is 30.5 hours after midnight UTC.
         long midnightUtc = 1793491200000L;                  // 2026-11-01T00:00:00Z
-        assertEquals(midnightUtc + 5 * hour + 30 * 60000L, c.next(midnightUtc + 4 * hour));
-        assertEquals(midnightUtc + 6 * hour + 30 * 60000L, c.next(midnightUtc + 6 * hour));
-        // After the first, the next is the following day's, not the repeat.
-        assertEquals(midnightUtc + 30 * hour + 30 * 60000L,
-                c.next(midnightUtc + 5 * hour + 30 * 60000L));
+        long tomorrow = midnightUtc + 30 * hour + 30 * minute;
+        assertEquals(midnightUtc + 5 * hour + 30 * minute, c.next(midnightUtc + 4 * hour));
+        // Once the first has passed, that day's is spent -- before the change
+        // (just after a run at the first) and after it alike.
+        assertEquals(tomorrow, c.next(midnightUtc + 5 * hour + 30 * minute));
+        assertEquals(tomorrow, c.next(midnightUtc + 5 * hour + 45 * minute));
+        assertEquals(tomorrow, c.next(midnightUtc + 6 * hour));
+        // A job that fires through the night still gets the times after the fold.
+        CronSchedule half = CronSchedule.parse("0 */30 * * * *", "America/New_York");
+        assertEquals(midnightUtc + 7 * hour, half.next(midnightUtc + 6 * hour + 10 * minute),
+                "the 02:00 EST after the repeated hour was skipped");
     }
 
     @Test
@@ -2160,6 +2168,99 @@ class ApplicationRuntimeTest {
         String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
                 : Json.write(r.deferredJson);
         assertTrue(body.contains("-32602") && !body.contains("protocolVersion"), body);
+    }
+
+    @Test
+    @DisplayName("tools/call with arguments that are not an object is refused, and the tool never runs")
+    void nonObjectArgumentsAreRefused() throws Exception {
+        final int[] calls = {0};
+        com.codename1.backend.mcp.McpTool tool = new com.codename1.backend.mcp.McpTool() {
+            public String name() {
+                return "touch";
+            }
+
+            public String description() {
+                return "counts calls";
+            }
+
+            public Map inputSchema() {
+                Map schema = new LinkedHashMap();
+                schema.put("type", "object");
+                return schema;
+            }
+
+            public Object call(Map arguments) {
+                calls[0]++;
+                return "ok";
+            }
+        };
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        McpServer server = McpServer.fromConfig(Config.of(settings, "dev"), null, null,
+                java.util.Collections.singletonList(tool));
+        HttpServer.Response r = server.handle(new HttpServer.Request("POST", "/mcp",
+                "HTTP/1.1", new LinkedHashMap(), "{\"jsonrpc\":\"2.0\",\"id\":6,"
+                + "\"method\":\"tools/call\",\"params\":{\"name\":\"touch\","
+                + "\"arguments\":[1]}}"));
+        String body = r.body != null && r.body.length > 0 ? new String(r.body, "UTF-8")
+                : Json.write(r.deferredJson);
+        assertTrue(body.contains("-32602"), body);
+        assertEquals(0, calls[0], "a call with array arguments ran its tool");
+    }
+
+    @Test
+    @DisplayName("a configured MCP or management path is compared in its canonical form")
+    void configuredPathsAreCanonical() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(McpServer.ENABLED, "true");
+        settings.setProperty(McpServer.PATH, "/%6dcp");
+        assertEquals("/mcp", McpServer.fromConfig(Config.of(settings, "dev"), null, null,
+                null).getPath());
+        Properties manage = new Properties();
+        manage.setProperty(Management.PATH, "/%6danage");
+        assertEquals("/manage", Config.of(manage, "dev").getRoutePath(Management.PATH,
+                "/manage"));
+    }
+
+    @Test
+    @DisplayName("one DevTools given to two servers answers each from its own server")
+    void devToolsStayWithTheirServer() throws Exception {
+        com.codename1.backend.mcp.DevTools shared = new com.codename1.backend.mcp.DevTools();
+        int portA = freePort();
+        int portB = freePort();
+        Backend a = startAnswering(portA, "from A", shared);
+        Backend b = startAnswering(portB, "from B", shared);
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + portA
+                    + "/mcp").openConnection();
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setRequestProperty("Accept", "application/json, text/event-stream");
+            c.getOutputStream().write(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"backend_call\",\"arguments\":"
+                    + "{\"method\":\"GET\",\"path\":\"/x\"}}}").getBytes("UTF-8"));
+            String answer = read(c);
+            assertTrue(answer.contains("from A"), "server A's tool reached another server: "
+                    + answer);
+        } finally {
+            b.stop();
+            a.stop();
+        }
+    }
+
+    private static Backend startAnswering(int port, final String text,
+            com.codename1.backend.mcp.DevTools tools) throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        return Backend.builder(Config.of(settings, "dev")).quiet()
+                .application(new EmptyApplication()).mcp(tools)
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        return request.respond(200, "text/plain", text.getBytes("UTF-8"));
+                    }
+                }).start();
     }
 
     /** A tracer that records nothing, for tests that only check which one is used. */

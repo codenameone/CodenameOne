@@ -64,9 +64,22 @@ import com.codename1.backend.orm.EntityManager;
 public final class DevTools implements McpServer.Extension {
     private Backend backend;
 
+    private synchronized Backend installed() {
+        return backend;
+    }
+
+    /// Takes `running` as this instance's server, unless it already has one.
+    private synchronized boolean claim(Backend running) {
+        if (backend != null && backend != running) { //NOPMD CompareObjectsWithEquals - servers by identity
+            return false;
+        }
+        backend = running;
+        return true;
+    }
+
     /// The server the tools were installed on; they are only reachable after that.
     private Backend backend() {
-        Backend running = backend;
+        Backend running = installed();
         if (running == null) {
             throw new IllegalStateException("The development tools are not installed");
         }
@@ -75,7 +88,14 @@ public final class DevTools implements McpServer.Extension {
 
     @Override
     public void install(McpServer server, Backend running) {
-        this.backend = running;
+        if (!claim(running)) {
+            // Already installed on another server. Every tool reads the server it
+            // works on from its DevTools, so sharing one would point the first
+            // server's backend_sql, backend_call and operations at the second; this
+            // installation gets an instance of its own instead.
+            new DevTools().install(server, running);
+            return;
+        }
         running.getRequestLog().enable(200);
         DevConsole.install();
         server.register(new Tool("backend_routes",
@@ -224,7 +244,7 @@ public final class DevTools implements McpServer.Extension {
     }
 
     private Backend.Application application() {
-        return backend == null ? null : backend().getApplication();
+        return installed() == null ? null : backend().getApplication();
     }
 
     private Map config() throws Exception {
@@ -250,10 +270,24 @@ public final class DevTools implements McpServer.Extension {
 
     static boolean secret(String key, String value) {
         String k = key;
-        String[] marks = {"password", "secret", "token", "key", "credential"};
+        // "header" and "auth" too: cn1.otel.headers carries api-key=... and
+        // Authorization=... pairs under a key that names none of the others.
+        String[] marks = {"password", "secret", "token", "key", "credential", "header",
+            "auth"};
         for (String element : marks) {
             if (containsIgnoreCase(k, element)) {
                 return true;
+            }
+        }
+        // A value carrying a credential as name=value, whatever its key: a
+        // datasource URL's ?password=..., a header list's api-key=....
+        String[] inValue = {"password", "passwd", "pwd", "secret", "token", "key", "auth",
+            "credential"};
+        if (value != null && value.indexOf('=') >= 0) {
+            for (String element : inValue) {
+                if (containsIgnoreCase(value, element)) {
+                    return true;
+                }
             }
         }
         // A URL with a password in it: scheme://user:password@host

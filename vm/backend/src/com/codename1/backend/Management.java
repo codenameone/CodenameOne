@@ -84,7 +84,7 @@ public final class Management implements HttpServer.Handler {
                     + "by anyone who can reach the port; set a token, or leave the "
                     + "endpoints off.");
         }
-        String path = config.get(PATH, "/manage");
+        String path = config.getRoutePath(PATH, "/manage");
         while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }

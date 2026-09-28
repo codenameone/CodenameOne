@@ -250,6 +250,15 @@ public final class Config {
         return get(key, null);
     }
 
+    /// A path a handler of the server's own answers, in the canonical form every
+    /// request target is compared in: escaped unreserved characters decoded,
+    /// other escapes upper-cased. Compared as configured, `/%6dcp` was announced
+    /// and never matched a request, which reaches handlers as `/mcp`.
+    public String getRoutePath(String key, String fallback) throws IOException {
+        String value = get(key, fallback);
+        return value == null ? null : HttpServer.canonicalDeclaredPath(value.trim());
+    }
+
     /// A secret that clients present in a request header -- a bearer token -- or
     /// null when no layer has one.
     ///
