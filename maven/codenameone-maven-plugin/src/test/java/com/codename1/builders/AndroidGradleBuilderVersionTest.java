@@ -133,6 +133,20 @@ class AndroidGradleBuilderVersionTest {
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(null));
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
                 "classpath \"com.google.gms:google-services:$gsVersion\""));
+        // Dynamic selectors resolve to a release this cannot see: 4.+ is the newest 4.x, not
+        // 4.0.0, and a range or latest.release is no more knowable. Never refused on a guess.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.+'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,5.0)'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:latest.release'"));
+        // ...and an unknowable one beside an old fixed pin leaves the result unknowable too.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.+'"));
+        assertEquals("4.3.15", AndroidGradleBuilder.fixedVersionOrNull("4.3.15'\n"));
+        assertEquals("4.4.0", AndroidGradleBuilder.fixedVersionOrNull("4.4.0-alpha01\")"));
     }
 
     @Test

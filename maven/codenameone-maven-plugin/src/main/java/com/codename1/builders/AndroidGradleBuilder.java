@@ -11637,18 +11637,41 @@ public class AndroidGradleBuilder extends Executor {
      * @param topDependency the android.topDependency value
      * @return the refusal message, or null
      */
+    /**
+     * The numeric part of a dependency version that names one fixed release, or null when the
+     * version is resolved by Gradle rather than written down.
+     *
+     * @param afterCoordinate the text following "group:artifact:" in a Gradle declaration
+     * @return the numeric release, or null for a variable, a dynamic selector or a range
+     */
+    static String fixedVersionOrNull(String afterCoordinate) {
+        int end = 0;
+        while (end < afterCoordinate.length()
+                && "'\") \t\r\n;".indexOf(afterCoordinate.charAt(end)) < 0) {
+            end++;
+        }
+        String token = afterCoordinate.substring(0, end);
+        if (token.length() == 0 || token.startsWith("latest")
+                || token.indexOf('+') >= 0 || token.indexOf('$') >= 0
+                || token.indexOf('[') >= 0 || token.indexOf('(') >= 0 || token.indexOf(',') >= 0) {
+            return null;
+        }
+        return HealthManifestFragments.numericVersionPrefix(token);
+    }
+
     static String agp9GoogleServicesRefusal(String topDependency) {
         // Every declaration, not the first: merged hint values carry one per contributor (a
         // cn1lib's 4.3.15 beside the project's 4.5.0), and Gradle resolves duplicate
         // buildscript modules to the highest -- that build uses 4.5.0 and works. One
-        // unreadable declaration (a Gradle variable) makes the effective version unknowable,
-        // and nothing is refused on a guess.
+        // declaration whose effective version is not written down -- a Gradle variable, or a
+        // dynamic selector such as 4.+, a range, latest.release -- makes the resolved version
+        // unknowable here, and nothing is refused on a guess. (4.+ used to read as its numeric
+        // prefix 4, i.e. 4.0.0, and refuse a selector that resolves to the newest 4.x.)
         String marker = "com.google.gms:google-services:";
         String declared = null;
         int at = topDependency == null ? -1 : topDependency.indexOf(marker);
         while (at >= 0) {
-            String version = HealthManifestFragments.numericVersionPrefix(
-                    topDependency.substring(at + marker.length()));
+            String version = fixedVersionOrNull(topDependency.substring(at + marker.length()));
             if (version == null) {
                 return null;
             }
