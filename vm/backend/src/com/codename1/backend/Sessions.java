@@ -346,11 +346,12 @@ public final class Sessions {
         }
         if (!session.isValid()) {
             s.delete(session.getId());
-            // The beans end with the session, not with whatever next finds it gone.
-            destroy(take(session.getId()));
+            // The beans end with the session, not with whatever next finds it gone
+            // -- but not under a request still using them: see retire().
+            destroy(retire(session.getId(), session));
             if (previous != null) {
                 s.delete(previous);
-                destroy(take(previous));
+                destroy(retire(previous, session));
             }
             destroy(session.takeLocalBeans());
             cookie = cookie("", 0);
@@ -437,6 +438,11 @@ public final class Sessions {
     /// resources. By object, not id, so a session rotated or replaced during the
     /// request is still covered: the purge reads each one's CURRENT id.
     private final Map inUse = new HashMap();
+    /// The beans of sessions invalidated while another request still held a copy
+    /// of them, by id. That request goes on using them until it ends -- its own
+    /// proxies look here rather than building a fresh set under a deleted id --
+    /// and the last one to leave destroys them.
+    private final Map retired = new HashMap();
 
     /// A request has resolved `session`; counted until [#leave].
     synchronized void enter(HttpServer.Request request, HttpSession session) {
@@ -459,10 +465,35 @@ public final class Sessions {
     }
 
     /// The request is over; the sessions it used may expire again.
-    synchronized void leave(HttpServer.Request request) {
+    void leave(HttpServer.Request request) {
+        List done = null;
+        synchronized (this) {
+            if (!release(request)) {
+                return;
+            }
+            // Retired beans whose last user this was end now, outside the lock.
+            Iterator it = retired.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry e = (Map.Entry) it.next();
+                if (!usedByOthers((String) e.getKey(), null)) {
+                    if (done == null) {
+                        done = new ArrayList(1);
+                    }
+                    done.add(((Held) e.getValue()).beans);
+                    it.remove();
+                }
+            }
+        }
+        for (int iter = 0 ; done != null && iter < done.size() ; iter++) {
+            destroy((Object[]) done.get(iter));
+        }
+    }
+
+    /// The bookkeeping half of [#leave]; false when the request held nothing.
+    private boolean release(HttpServer.Request request) {
         List used = request.sessionsInUse;
         if (used == null) {
-            return;
+            return false;
         }
         request.sessionsInUse = null;
         // With the list: a pooled request would otherwise hold every session a
@@ -483,6 +514,47 @@ public final class Sessions {
                 held.lastAccessed = now;
             }
         }
+        return true;
+    }
+
+    /// The beans held under `id`, taken out: to destroy now, or null when
+    /// there are none -- or when a request other than the one finishing
+    /// `finishing` still uses the session, in which case they are retired and
+    /// the last request to leave destroys them. Two requests load separate copies
+    /// from a database store, and the one that invalidates must not tear down a
+    /// bean the other is in the middle of calling.
+    private synchronized Object[] retire(String id, HttpSession finishing) {
+        Held held = (Held) beans.remove(id);
+        if (held == null) {
+            return null;
+        }
+        if (usedByOthers(id, finishing)) {
+            retired.put(id, held);
+            return null;
+        }
+        return held.beans;
+    }
+
+    /// Whether a request is using a session known by `id` -- as its id, or as
+    /// the one it had before a rotation not yet stored -- other than through
+    /// `except`. Under this lock.
+    private boolean usedByOthers(String id, HttpSession except) {
+        Iterator it = inUse.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry e = (Map.Entry) it.next();
+            HttpSession s = (HttpSession) e.getKey();
+            if (!id.equals(s.getId()) && !id.equals(s.previousId())) {
+                continue;
+            }
+            // The memory store hands concurrent requests ONE object, so for the
+            // finishing request's own object it is its count that says whether
+            // another request holds it too.
+            int users = ((int[]) e.getValue())[0];
+            if (s != except || users > 1) { //NOPMD CompareObjectsWithEquals - session copies are told apart by identity
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The current ids of the sessions in use. Under this lock.
@@ -507,6 +579,14 @@ public final class Sessions {
     private Held holderFor(HttpSession session) {
         String id = session.getId();
         Held held = (Held) beans.get(id);
+        if (held == null) {
+            // Invalidated by another request while this one still runs: it keeps
+            // the beans it had, rather than building new ones under a dead id.
+            Held parting = (Held) retired.get(id);
+            if (parting != null) {
+                return parting;
+            }
+        }
         String previous = held == null ? session.previousId() : null;
         if (previous != null) {
             // Rotated by changeSessionId() earlier in this request: the beans
@@ -553,7 +633,9 @@ public final class Sessions {
         synchronized (this) {
             closed = true;
             all = new ArrayList(beans.values());
+            all.addAll(retired.values());
             beans.clear();
+            retired.clear();
         }
         for (Object element : all) {
             destroy(((Held) element).beans);

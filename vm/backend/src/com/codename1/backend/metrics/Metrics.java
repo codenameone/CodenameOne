@@ -216,6 +216,9 @@ public final class Metrics {
 
     /// Gauges several servers contribute to: name -> List of Gauge.Source.
     private static final Map SHARED = new HashMap();
+    /// Shared-gauge source reads in progress, under Metrics.class. A removal waits
+    /// for them: the server removing its source destroys the bean behind it next.
+    private static int sourceReads;
 
     /// Adds one server's source to the gauge called `name`, which reports
     /// the sum of every source still registered. A server's managed-resource
@@ -241,6 +244,12 @@ public final class Metrics {
                     double sum = 0;
                     boolean any = false;
                     for (Object element : each) {
+                        // Still registered, checked and counted under the lock
+                        // removeSource() takes: the copy above may hold a source
+                        // whose server has since stopped and is tearing it down.
+                        if (!beginSourceRead(all, element)) {
+                            continue;
+                        }
                         try {
                             double v = ((Gauge.Source) element).read();
                             if (!Double.isNaN(v)) {
@@ -249,6 +258,8 @@ public final class Metrics {
                             }
                         } catch (Throwable err) {
                             // One source failing leaves the others' values.
+                        } finally {
+                            endSourceRead();
                         }
                     }
                     return any ? sum : Double.NaN;
@@ -271,7 +282,40 @@ public final class Metrics {
             INSTRUMENTS.remove(name);
             releasePrometheusNames(name);
         }
+        // Reads that began before the removal finish first -- bounded, so a gauge
+        // stuck in its callback cannot hold a shutdown -- because the caller
+        // destroys the bean behind the source next. New reads skip it already.
+        long deadline = System.currentTimeMillis() + SOURCE_READ_WAIT_MILLIS;
+        while (sourceReads > 0) {
+            long left = deadline - System.currentTimeMillis();
+            if (left <= 0) {
+                break;
+            }
+            try {
+                Metrics.class.wait(left);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
+
+    /// Counts a read of `source` in, unless it has been removed from `all`.
+    private static synchronized boolean beginSourceRead(List all, Object source) {
+        if (!all.contains(source)) {
+            return false;
+        }
+        sourceReads++;
+        return true;
+    }
+
+    private static synchronized void endSourceRead() {
+        sourceReads--;
+        Metrics.class.notifyAll();
+    }
+
+    /// How long [#removeSource] waits for shared-gauge reads already running.
+    private static final long SOURCE_READ_WAIT_MILLIS = 2000;
 
     /// The servers recording their own metrics, and their pools.
     private static final List LIVE_SERVERS = new ArrayList();

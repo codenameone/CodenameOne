@@ -131,6 +131,9 @@ public final class TaskExecutor {
             }
             synchronized (this) {
                 active--;
+                // A shutdown() may be waiting on exactly this count; nothing else
+                // would wake it, and it would sleep out its whole timeout.
+                notifyAll();
             }
         }
         synchronized (this) {

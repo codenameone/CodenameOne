@@ -306,7 +306,10 @@ public final class DevTools implements McpServer.Extension {
         // The server's own scheme: plain HTTP to a TLS listener is answered
         // with a handshake failure, never with the route's response.
         String scheme = backend().getServer().isSecure() ? "https" : "http";
-        Web.Result result = Web.request(asciiUpper(method), scheme + "://127.0.0.1:" + port
+        // The address the listener is bound to: one bound to ::1 or to a single
+        // interface does not answer on 127.0.0.1.
+        Web.Result result = Web.request(asciiUpper(method), scheme + "://"
+                + backend().getListenAddress() + ":" + port
                 + path, headers, body == null ? null : McpServer.utf8(body));
         Map out = new LinkedHashMap();
         out.put("status", Integer.valueOf(result.getStatus()));

@@ -158,6 +158,15 @@ public final class Backend {
         return new Builder(config);
     }
 
+    private String listenAddress = "127.0.0.1";
+
+    /// The address a client on this machine reaches the listener at: the one
+    /// it is bound to (bracketed when IPv6), or 127.0.0.1 when it listens on
+    /// every interface. A listener bound to one address answers on no other.
+    public String getListenAddress() {
+        return listenAddress;
+    }
+
     /// The running server, for its metrics or to stop it.
     public HttpServer getServer() {
         return server;
@@ -289,6 +298,12 @@ public final class Backend {
             com.codename1.backend.metrics.Metrics.removeSource((String) g[0],
                     (com.codename1.backend.metrics.Gauge.Source) g[3]);
         }
+        // This server's exporter too, BEFORE the beans: an export in progress
+        // reads gauges whose sources are those beans, and its final export must
+        // not call one during its @PreDestroy, or against a closed pool.
+        if (metricReader != null) {
+            metricReader.shutdown(shutdownMillis);
+        }
         // @PreDestroy after the drain, so no request is still using a bean it
         // tears down, and before the pool closes, so a bean can still flush to
         // the database on its way out. Session beans first: they may use the
@@ -303,9 +318,6 @@ public final class Backend {
         }
         if (dataSource != null) {
             dataSource.close();
-        }
-        if (metricReader != null) {
-            metricReader.shutdown(shutdownMillis);
         }
         // LAST, so the spans of the requests the drain let finish are exported
         // rather than lost with the process -- and, when a request handler is the
@@ -1522,6 +1534,7 @@ public final class Backend {
                 }
             }
             backend.measured = measuring;
+            backend.listenAddress = advertised(bindHost);
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;

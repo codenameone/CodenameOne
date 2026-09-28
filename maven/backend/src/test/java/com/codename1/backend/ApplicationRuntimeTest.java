@@ -1928,6 +1928,130 @@ class ApplicationRuntimeTest {
         assertEquals(0, calls[0], "a request with an object id ran its tool");
     }
 
+    @Test
+    @DisplayName("backend_call reaches a listener bound to one address, IPv6 loopback included")
+    void backendCallUsesTheBoundAddress() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend;
+        try {
+            backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                    .application(new EmptyApplication())
+                    .mcp(new com.codename1.backend.mcp.DevTools())
+                    .handler(new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request)
+                                throws Exception {
+                            return request.respond(200, "text/plain", "reached".getBytes("UTF-8"));
+                        }
+                    }).host("::1").start();
+        } catch (IOException noIpv6) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "no IPv6 loopback here");
+            return;
+        }
+        try {
+            assertEquals("[::1]", backend.getListenAddress());
+            HttpURLConnection c = (HttpURLConnection) new URL("http://[::1]:" + port + "/mcp")
+                    .openConnection();
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setRequestProperty("Accept", "application/json, text/event-stream");
+            c.getOutputStream().write(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"backend_call\",\"arguments\":"
+                    + "{\"method\":\"GET\",\"path\":\"/x\"}}}").getBytes("UTF-8"));
+            String answer = read(c);
+            assertTrue(answer.contains("reached") && answer.contains("\"isError\":false"),
+                    answer);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("an invalidated session's beans outlive the invalidating request while another uses them")
+    void invalidatedBeansWaitForOtherUsers(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "inv.db").getAbsolutePath(),
+                2, 5000, 10000);
+        final List ended = new ArrayList();
+        try {
+            Sessions sessions = new Sessions(new EmptyApplication() {
+                public void sessionEnded(Object[] beans) {
+                    ended.add(beans);
+                }
+            });
+            sessions.setStore(new Sessions.Jdbc(pool));
+            long now = System.currentTimeMillis();
+            HttpSession stored = new HttpSession("shared", now, now, 1800);
+            stored.markNew();
+            sessions.getStore().save(stored, null);
+            HttpSession a = sessions.getStore().load("shared");
+            HttpSession b = sessions.getStore().load("shared");
+            a.owner = sessions;
+            b.owner = sessions;
+            HttpServer.Request ra = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null);
+            HttpServer.Request rb = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null);
+            sessions.enter(ra, a);
+            sessions.enter(rb, b);
+            Object[] beans = b.scopedBeans(1);
+            beans[0] = "cart";
+            a.invalidate();                              // a logout in request A
+            sessions.finish(ra, a, HttpServer.Response.text(200, "a"));
+            sessions.leave(ra);
+            assertTrue(ended.isEmpty(), "request B's beans were destroyed under it");
+            assertTrue(b.scopedBeans(1) == beans,
+                    "request B was handed fresh beans under the deleted id");
+            sessions.leave(rb);
+            assertEquals(1, ended.size(), "the retired beans were never destroyed");
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("removing a shared gauge source waits for a read of it already running")
+    void removingASourceWaitsForItsRead() throws Exception {
+        final CountDownLatch reading = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        com.codename1.backend.metrics.Gauge.Source slow =
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        reading.countDown();
+                        try {
+                            release.await(5, TimeUnit.SECONDS);
+                        } catch (InterruptedException err) {
+                            // test
+                        }
+                        return 1;
+                    }
+                };
+        Metrics.addSource("test.drain.gauge", "", "", slow);
+        Thread reader = new Thread(new Runnable() {
+            public void run() {
+                Metrics.snapshot();
+            }
+        });
+        reader.start();
+        assertTrue(reading.await(5, TimeUnit.SECONDS));
+        final boolean[] removed = {false};
+        Thread remover = new Thread(new Runnable() {
+            public void run() {
+                Metrics.removeSource("test.drain.gauge", slow);
+                removed[0] = true;
+            }
+        });
+        remover.start();
+        Thread.sleep(300);
+        assertFalse(removed[0], "the source was removed while its read was still running");
+        release.countDown();
+        remover.join(5000);
+        assertTrue(removed[0]);
+        reader.join(5000);
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

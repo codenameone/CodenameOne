@@ -167,10 +167,13 @@ public final class Histogram extends Instrument {
     @Override
     public List points() {
         List out = new ArrayList();
-        if (plain.count() > 0 || byFirst.isEmpty()) {
-            out.add(plain.point(bounds, null, false));
-        }
         synchronized (this) {
+            // Under the lock find() adds labelled series with: decided outside it,
+            // a first labelled observation racing this read exported a zero
+            // unlabelled series beside the real one.
+            if (plain.count() > 0 || byFirst.isEmpty()) {
+                out.add(plain.point(bounds, null, false));
+            }
             java.util.Iterator lists = byFirst.values().iterator();
             while (lists.hasNext()) {
                 List list = (List) lists.next();

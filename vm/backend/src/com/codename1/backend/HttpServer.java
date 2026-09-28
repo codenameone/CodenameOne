@@ -2636,6 +2636,9 @@ public final class HttpServer {
                 // Kept so a task abandoned at shutdown can still be told.
                 me.tasks.put(Long.valueOf(handle), queued);
             }
+            if (handle != 0) {
+                me.taskTokens.put(Long.valueOf(handle), element);
+            }
             if (handle == 0) {
                 Runnable task = takeVirtualTask(token);
                 if (task != null) {
@@ -2655,6 +2658,7 @@ public final class HttpServer {
         int state = VirtualThread.resume(handle);
         if (state == VirtualThread.FINISHED) {
             me.tasks.remove(Long.valueOf(handle));
+            me.taskTokens.remove(Long.valueOf(handle));
             VirtualThread.free(handle);
             return;
         }
@@ -2737,6 +2741,11 @@ public final class HttpServer {
         /// The task each background virtual thread on this host runs, by handle.
         /// Touched only by the host thread.
         final java.util.HashMap tasks = new java.util.HashMap();
+        /// Each task handle's token in VIRTUAL_TASKS. A task abandoned before its
+        /// first turn never reached Tasks.runVirtual, which is what removes it,
+        /// so the abandon has to -- or the static map keeps the task, its
+        /// arguments and the beans it captured for the life of the process.
+        final java.util.HashMap taskTokens = new java.util.HashMap();
 
         boolean hasQueuedTasks() {
             synchronized (inbox) {
@@ -3043,6 +3052,11 @@ public final class HttpServer {
                 long handle = me.ringTake();
                 if (VirtualThread.descriptorOf(handle) < 0) {
                     Runnable task = (Runnable) me.tasks.remove(Long.valueOf(handle));
+                    Long token = (Long) me.taskTokens.remove(Long.valueOf(handle));
+                    if (token != null) {
+                        // A no-op for a task that started: runVirtual removed it.
+                        takeVirtualTask(token.longValue());
+                    }
                     VirtualThread.free(handle);
                     if (task != null) {
                         TaskExecutor.abandoned(task);
