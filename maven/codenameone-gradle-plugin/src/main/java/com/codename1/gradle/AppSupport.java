@@ -1,0 +1,481 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gradle;
+
+import com.codename1.gradle.tasks.Cn1BuildTask;
+import com.codename1.gradle.tasks.Cn1CssTask;
+import com.codename1.gradle.tasks.NativeInterfacesTask;
+import com.codename1.gradle.tasks.PrepareSimulatorTask;
+import com.codename1.gradle.tasks.ProcessAnnotationsAction;
+import com.codename1.gradle.tasks.TranscodeSvgTask;
+import com.codename1.maven.SimulatorSupport;
+import com.codename1.project.NativePlatform;
+import com.codename1.project.ProjectLayout;
+import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.artifacts.result.ResolvedArtifactResult;
+import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.plugins.JavaPluginExtension;
+import org.gradle.api.provider.Provider;
+import org.gradle.api.tasks.JavaExec;
+import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.SourceSetContainer;
+import org.gradle.api.tasks.TaskProvider;
+import org.gradle.api.tasks.compile.JavaCompile;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/// Everything an application project gets.
+final class AppSupport {
+    /// The task group the Codename One tasks are listed under.
+    static final String GROUP = "codename one";
+    /// The task group the build targets are listed under.
+    static final String BUILD_GROUP = "codename one build";
+
+    /// Each named build task: task name, `codename1.platform`,
+    /// `codename1.buildTarget`, description. The same pairs as the Maven
+    /// build wrappers and the archetype's build.sh.
+    static final String[][] BUILD_TARGETS = {
+        {"buildAndroid", "android", "android-device", "Sends an Android build to the build server"},
+        {"buildAndroidGradleProject", "android", "android-source", "Generates an Android Studio project locally"},
+        {"buildIos", "ios", "ios-device", "Sends an iOS debug build to the build server"},
+        {"buildIosRelease", "ios", "ios-device-release", "Sends an iOS App Store build to the build server"},
+        {"buildIosXcodeProject", "ios", "ios-source", "Generates an Xcode project locally"},
+        {"buildMacNative", "ios", "mac-os-x-native", "Sends a native macOS build to the build server"},
+        {"buildMacDesktop", "javase", "mac-os-x-desktop", "Sends a macOS desktop (JVM) build to the build server"},
+        {"buildWindowsDesktop", "javase", "windows-desktop", "Sends a Windows desktop (JVM) build to the build server"},
+        {"buildWindowsDevice", "win", "windows-device", "Sends a native Windows build to the build server"},
+        {"buildLinuxDevice", "linux", "linux-device", "Sends a native Linux build to the build server"},
+        {"buildJavascript", "javascript", "javascript", "Sends a JavaScript build to the build server"},
+        {"buildJavascriptLocal", "javascript", "local-javascript", "Builds the JavaScript port locally"},
+    };
+
+    private AppSupport() {
+    }
+
+    static void apply(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
+                      final Provider<Map<String, String>> userProperties) {
+        final Provider<String> version = ext.getVersion();
+        SourceSetContainer sourceSets = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets();
+        final SourceSet main = sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+
+        // The framework is `provided`: compiled against, supplied by the build server
+        // or the simulator, never part of the upload.
+        addFramework(project, "compileOnly", version, "codenameone-core", "java-runtime");
+        addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
+        Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
+        framework.setTransitive(false);
+        addFramework(project, framework.getName(), version, "codenameone-core", "java-runtime");
+        Configuration simulator = resolvable(project, "cn1Simulator", "The simulator: the JavaSE port and its natives");
+        addFramework(project, simulator.getName(), version, "codenameone-core", "codenameone-javase");
+        project.getDependencies().addProvider(simulator.getName(),
+                version.map(v -> PluginInfo.GROUP + ":cn1-binaries-javase:" + v));
+        Configuration cssCompiler = resolvable(project, "cn1CssCompiler", "The Codename One CSS compiler");
+        addFramework(project, cssCompiler.getName(), version, "codenameone-css-cli");
+
+        Cn1libs.configure(project);
+
+        // The simulator's native-interface implementations: a real source set, so
+        // src/javase/java compiles against the application and the JavaSE port and
+        // lands on the simulator's classpath the next time it runs. Declared always;
+        // Gradle is happy with a directory that does not exist yet.
+        final SourceSet javase = sourceSets.create("javase", ss -> {
+            ss.getJava().setSrcDirs(Collections.singletonList(layout.nativeSourceDir(NativePlatform.JAVASE)));
+            ss.getResources().setSrcDirs(Collections.singletonList(
+                    new File(layout.projectDir(), "src" + File.separator + "javase" + File.separator + "resources")));
+            ss.setCompileClasspath(main.getOutput().plus(main.getCompileClasspath()).plus(simulator)
+                    .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
+        });
+
+        TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
+            common(t, project, layout, ext, userProperties);
+            t.setDescription("Transcodes SVG and Lottie assets into Java sources");
+            t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"));
+            t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-svg"));
+            t.getPlaceholderDirectory().set(new File(layout.buildDir(), "css-resources"));
+        });
+        main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
+
+        TaskProvider<com.codename1.gradle.tasks.GenerateGuiSourcesTask> gui = project.getTasks().register(
+                "generateGuiSources", com.codename1.gradle.tasks.GenerateGuiSourcesTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Generates sources from GUI builder XML and CodeRAD view templates");
+                    t.getSources().from(layout.guiBuilderDir(), layout.radViewsDir());
+                    // The simulator's hot reload regenerates views into the same place.
+                    t.getRadOutputDirectory().set(new File(layout.buildDir(), "generated-sources/rad-views"));
+                });
+        main.getJava().srcDir(gui.flatMap(com.codename1.gradle.tasks.GenerateGuiSourcesTask::getRadOutputDirectory));
+
+        TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
+            common(t, project, layout, ext, userProperties);
+            t.setDescription("Compiles src/main/css into theme.res");
+            t.getSources().from(layout.cssDir(), layout.l10nDir(), layout.settingsFile());
+            t.getCompilerClasspath().from(cssCompiler);
+            t.getOutputDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-css"));
+            t.getWorkDirectory().set(new File(layout.buildDir(), "css"));
+            Provider<Set<ResolvedArtifactResult>> resolved = project.getConfigurations().getByName("compileClasspath")
+                    .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts();
+            t.getLibraryCss().set(resolved.map(AppSupport::cssBundles));
+            t.getLibraryCssFiles().from(resolved.map(set -> filesOf(set, true)));
+        });
+        main.getResources().srcDir(css.flatMap(Cn1CssTask::getOutputDirectory));
+
+        final File stubs = new File(layout.buildDir(), "generated/sources/cn1-annotations");
+        final Provider<List<String>> compileArtifacts = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName()).getIncoming()
+                .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
+                .map(set -> AppSupport.encode(set, "provided"));
+        final Map<String, String> complianceProperties = new java.util.HashMap<String, String>();
+        Object skip = project.findProperty("skipComplianceCheck");
+        if (skip != null) {
+            complianceProperties.put("skipComplianceCheck", String.valueOf(skip));
+        }
+        project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            List<String> roots = new ArrayList<String>();
+            roots.add(layout.javaSourceDir().getAbsolutePath());
+            // Compliance first (it caps and rewrites classes in place), then the
+            // annotation processors, which stamp the result -- the order the Maven
+            // poms bind process-classes in.
+            // Kotlin's classes (compiled first, into a directory of their own) are
+            // the Java pass's siblings, so Java calling Kotlin resolves.
+            compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
+                    layout.projectDir(), compile.getDestinationDirectory().get().getAsFile(), project.getName(),
+                    main.getCompileClasspath(), compileArtifacts, complianceProperties)
+                    .withSiblingClasses(new File(layout.buildDir(), "classes/kotlin/main")));
+            compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
+                    compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
+                    layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath()));
+        });
+
+        // Kotlin compiles into a directory of its own, before javac. The same two
+        // steps run over it, so a Kotlin application is checked and processed like a
+        // Java one. Wired by name because the Kotlin plugin's types are not on this
+        // plugin's classpath.
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().named("compileKotlin").configure(compile -> {
+                    File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
+                    List<String> roots = new ArrayList<String>();
+                    roots.add(layout.javaSourceDir().getAbsolutePath());
+                    roots.add(new File(layout.projectDir(), "src/main/kotlin").getAbsolutePath());
+                    // javac has not run yet, so the Java classes Kotlin calls are
+                    // known by their sources.
+                    compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
+                            layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
+                            main.getCompileClasspath(), compileArtifacts, complianceProperties)
+                            .withPendingJavaSources(layout.javaSourceDir()));
+                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
+                            layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties.get(),
+                            main.getCompileClasspath()));
+                }));
+
+        project.getTasks().register("cn1Compile", t -> {
+            t.setGroup(GROUP);
+            t.setDescription("Compiles the application and its simulator native code (used by hot reload)");
+            t.dependsOn(main.getClassesTaskName(), javase.getClassesTaskName());
+        });
+
+        TaskProvider<PrepareSimulatorTask> prepare = project.getTasks().register("prepareSimulator",
+                PrepareSimulatorTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Writes the files the simulator reads at startup");
+                    t.getCompileClasspath().from(main.getCompileClasspath());
+                    t.getCssCompilerClasspath().from(cssCompiler);
+                    t.getSimulatorProperties().set(SimulatorSupport.simulatorPropertiesFile(layout.buildDir()));
+                    t.getDescriptor().set(layout.descriptorFile());
+                });
+
+        registerSimulator(project, "run", "Runs the application in the Codename One simulator", false,
+                layout, main, javase, simulator, prepare, css, ext, userProperties);
+        registerSimulator(project, "debug", "Runs the simulator suspended, waiting for a debugger on port 5005", true,
+                layout, main, javase, simulator, prepare, css, ext, userProperties);
+
+        project.getTasks().register("generateNativeInterfaces",
+                NativeInterfacesTask.class, t -> {
+                    nativeCommon(t, project, layout, ext, userProperties, main);
+                    t.setDescription("Writes implementation stubs for every NativeInterface into src/<platform>/");
+                    t.getOnly().set(project.getProviders().gradleProperty("cn1.nativeInterface"));
+                    t.getSwift().set(flag(project, "cn1.swift"));
+                    t.getKotlin().set(flag(project, "cn1.kotlin"));
+                    t.getOverwrite().set(flag(project, "cn1.overwrite"));
+                    t.getOutputs().upToDateWhen(x -> false);
+                });
+
+        final Provider<BuildQueue> queue = project.getGradle().getSharedServices().registerIfAbsent(
+                BuildQueue.NAME, BuildQueue.class, spec -> spec.getMaxParallelUsages().set(1));
+        for (String[] target : BUILD_TARGETS) {
+            registerBuild(project, target[0], target[1], target[2], target[3], layout, main, javase, framework, ext,
+                    userProperties, queue);
+        }
+        // The generic form, for any target: -Pcodename1.platform=... -Pcodename1.buildTarget=...
+        registerBuild(project, "cn1Build", null, null,
+                "Runs the build given by -Pcodename1.platform and -Pcodename1.buildTarget",
+                layout, main, javase, framework, ext, userProperties, queue);
+
+        final SourceSet test = sourceSets.getByName(SourceSet.TEST_SOURCE_SET_NAME);
+        project.getTasks().register("cn1Test", com.codename1.gradle.tasks.Cn1TestTask.class, t -> {
+            common(t, project, layout, ext, userProperties);
+            t.setGroup("verification");
+            t.setDescription("Runs the Codename One unit tests in the simulator's test runner");
+            t.dependsOn(test.getClassesTaskName(), javase.getClassesTaskName(), css);
+            t.getTestClassesDirectory().set(project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class)
+                    .flatMap(JavaCompile::getDestinationDirectory));
+            t.getRuntimeClasspath().from(test.getRuntimeClasspath(), javase.getOutput(), simulator,
+                    project.getConfigurations().getByName(Cn1libs.configurationName("javase")));
+            t.getReportsDirectory().set(new File(layout.buildDir(), "cn1-reports"));
+        });
+
+        BackendSupport.registerAddBackend(project, layout);
+        ToolSupport.register(project, layout, main, ext, userProperties);
+        UpdateSupport.register(project, layout);
+    }
+
+    private static void registerSimulator(final Project project, String name, String description, final boolean debug,
+                                          final ProjectLayout layout, final SourceSet main, final SourceSet javase,
+                                          final Configuration simulator,
+                                          final TaskProvider<PrepareSimulatorTask> prepare,
+                                          final TaskProvider<Cn1CssTask> css, final CodenameOneExtension ext,
+                                          final Provider<Map<String, String>> userProperties) {
+        project.getTasks().register(name, JavaExec.class, t -> {
+            t.setGroup(GROUP);
+            t.setDescription(description);
+            t.dependsOn(prepare, css, main.getClassesTaskName(), javase.getClassesTaskName());
+            t.getMainClass().set(SimulatorSupport.SIMULATOR_MAIN_CLASS);
+            t.setClasspath(main.getRuntimeClasspath().plus(javase.getOutput()).plus(simulator)
+                    .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
+            t.setWorkingDir(layout.projectDir());
+            t.setMaxHeapSize("1024M");
+            t.setDebug(debug);
+            // Live CSS reload recompiles into the resources the simulator runs from.
+            t.systemProperty(SimulatorSupport.CSS_INPUT_PROPERTY, layout.themeCss().getAbsolutePath());
+            t.systemProperty(SimulatorSupport.CSS_OUTPUT_PROPERTY,
+                    new File(layout.resourcesOutputDir(), "theme.res").getAbsolutePath());
+            t.systemProperty(SimulatorSupport.CSS_MERGE_PROPERTY,
+                    new File(layout.buildDir(), "css" + File.separator + "theme.css").getAbsolutePath());
+            t.getArgumentProviders().add(new MainClassArgument(layout.settingsFile(), userProperties));
+        });
+    }
+
+    private static void registerBuild(final Project project, String name, final String platform,
+                                      final String buildTarget, String description, final ProjectLayout layout,
+                                      final SourceSet main, final SourceSet javase, final Configuration framework,
+                                      final CodenameOneExtension ext,
+                                      final Provider<Map<String, String>> userProperties,
+                                      final Provider<BuildQueue> queue) {
+        final Provider<String> platformProvider = platform != null ? project.provider(() -> platform)
+                : project.getProviders().gradleProperty("codename1.platform");
+        final Provider<String> targetProvider = buildTarget != null ? project.provider(() -> buildTarget)
+                : project.getProviders().gradleProperty("codename1.buildTarget");
+
+        TaskProvider<NativeInterfacesTask> verify = project.getTasks().register("verifyNativeInterfaces"
+                + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
+                NativeInterfacesTask.class, t -> {
+                    nativeCommon(t, project, layout, ext, userProperties, main);
+                    t.setGroup(null);
+                    t.setDescription("Checks every NativeInterface is implemented for " + name);
+                    t.getVerifyPlatform().set(platformProvider.map(AppSupport::nativePlatformOf));
+                    t.getSwift().set(false);
+                    t.getKotlin().set(false);
+                    t.getOverwrite().set(false);
+                });
+
+        project.getTasks().register(name, Cn1BuildTask.class, t -> {
+            common(t, project, layout, ext, userProperties);
+            t.setGroup(BUILD_GROUP);
+            t.setDescription(description);
+            t.dependsOn(main.getClassesTaskName(), javase.getClassesTaskName(), verify);
+            t.usesService(queue);
+            t.getPlatform().set(platformProvider);
+            t.getBuildTarget().set(targetProvider);
+            t.getAutomated().set(project.getProviders().gradleProperty("automated").map(Boolean::parseBoolean)
+                    .orElse(Boolean.FALSE));
+            t.getStageOnly().set(project.getProviders().gradleProperty("codename1.stageOnly")
+                    .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
+            t.getOpen().set(ext.getOpenGeneratedProjects());
+            t.getFrameworkJars().from(framework);
+            t.getSourceRoots().set(Collections.singletonList(layout.javaSourceDir().getAbsolutePath()));
+            t.getFinalName().set(project.getName());
+            t.getGroupId().set(project.provider(() -> String.valueOf(project.getGroup())));
+            // A Maven platform module declares codename1.projectPlatform, and the
+            // build runs only in the module whose platform matches. A Gradle
+            // project is every platform at once, so each build task says which.
+            t.getProjectProperties().set(platformProvider.map(
+                    p -> Collections.singletonMap("codename1.projectPlatform", p)));
+
+            ConfigurableFileCollection upload = t.getUploadClasspath();
+            upload.from(main.getOutput());
+            upload.from(platformProvider.map(p -> platformSources(layout, p, javase)));
+            upload.from(project.getConfigurations().getByName(main.getRuntimeClasspathConfigurationName()));
+            final Configuration runtime = project.getConfigurations().getByName(main.getRuntimeClasspathConfigurationName());
+            Provider<Set<ResolvedArtifactResult>> runtimeArtifacts = runtime.getIncoming()
+                    .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts();
+            Provider<List<String>> encoded = runtimeArtifacts.map(set -> encode(set, "compile"));
+            upload.from(platformProvider.map(p -> {
+                Configuration c = project.getConfigurations().findByName(Cn1libs.configurationName(p));
+                return c == null ? Collections.emptyList() : c;
+            }));
+            t.getArtifacts().set(encoded.zip(platformProvider, (list, p) -> {
+                List<String> all = new ArrayList<String>(list);
+                Configuration c = project.getConfigurations().findByName(Cn1libs.configurationName(p));
+                if (c != null) {
+                    all.addAll(encode(c.getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts()
+                            .getArtifacts(), "compile"));
+                }
+                return all;
+            }));
+        });
+    }
+
+    /// The platform's own sources that ride the upload: the simulator's
+    /// compiled native code for the JVM targets, the native source directory
+    /// (as resources, exactly as Maven packages a platform module) otherwise.
+    private static Object platformSources(ProjectLayout layout, String platform, SourceSet javase) {
+        if ("javase".equals(platform)) {
+            return javase.getOutput();
+        }
+        NativePlatform p = NativePlatform.fromId(platform);
+        if (p == null) {
+            return Collections.emptyList();
+        }
+        // The directory whether or not it exists yet. Asking here would be answered
+        // once and cached with the configuration, so a directory that
+        // generateNativeInterfaces creates later would never reach the upload; the
+        // engine skips a classpath element that does not exist.
+        return layout.nativeSourceDir(p);
+    }
+
+    /// The native platform whose implementations a build platform needs; the
+    /// JVM desktop targets use the simulator's.
+    static String nativePlatformOf(String platform) {
+        return platform;
+    }
+
+    static void common(com.codename1.gradle.tasks.Cn1Task t, Project project, ProjectLayout layout,
+                       CodenameOneExtension ext, Provider<Map<String, String>> userProperties) {
+        if (t.getGroup() == null) {
+            t.setGroup(GROUP);
+        }
+        t.getRootDirectory().set(layout.rootDir());
+        t.getProjectDirectory().set(layout.projectDir());
+        t.getKind().set(layout.kind().name());
+        t.getUserProperties().set(userProperties);
+        t.getCodenameOneVersion().set(ext.getVersion());
+    }
+
+    private static void nativeCommon(NativeInterfacesTask t, Project project, ProjectLayout layout,
+                                     CodenameOneExtension ext, Provider<Map<String, String>> userProperties,
+                                     SourceSet main) {
+        common(t, project, layout, ext, userProperties);
+        t.dependsOn(main.getClassesTaskName());
+        t.getClassesDirectory().set(project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
+                .flatMap(JavaCompile::getDestinationDirectory));
+        t.getCompileClasspath().from(main.getCompileClasspath());
+    }
+
+    private static Provider<Boolean> flag(Project project, String name) {
+        return project.getProviders().gradleProperty(name).map(v -> v.isEmpty() || Boolean.parseBoolean(v))
+                .orElse(Boolean.FALSE);
+    }
+
+    static Configuration resolvable(Project project, String name, String description) {
+        return project.getConfigurations().create(name, c -> {
+            c.setCanBeResolved(true);
+            c.setCanBeConsumed(false);
+            c.setDescription(description);
+        });
+    }
+
+    static void addFramework(Project project, String configuration, Provider<String> version, String... artifactIds) {
+        for (final String artifactId : artifactIds) {
+            project.getDependencies().addProvider(configuration,
+                    version.map(v -> PluginInfo.GROUP + ":" + artifactId + ":" + v));
+        }
+    }
+
+    static List<String> encode(Set<ResolvedArtifactResult> set, String scope) {
+        List<String> out = new ArrayList<String>();
+        for (ResolvedArtifactResult r : set) {
+            String e = GradleHostFactory.encode(r, scope);
+            if (e != null) {
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    private static List<String> cssBundles(Set<ResolvedArtifactResult> set) {
+        List<String> out = new ArrayList<String>();
+        for (String e : encode(set, "compile")) {
+            com.codename1.build.BuildArtifact a = GradleHostFactory.decode(e);
+            if (a != null && "cn1css".equals(a.getClassifier())) {
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    private static List<File> filesOf(Set<ResolvedArtifactResult> set, boolean cssOnly) {
+        List<File> out = new ArrayList<File>();
+        for (ResolvedArtifactResult r : set) {
+            if (!cssOnly || r.getFile().getName().endsWith("-cn1css.zip")) {
+                out.add(r.getFile());
+            }
+        }
+        return out;
+    }
+
+    /// The simulator's one argument: the application's main class, from the
+    /// effective settings so a `-Pcodename1.mainName` override is honoured.
+    static final class MainClassArgument implements org.gradle.process.CommandLineArgumentProvider {
+        private final File settingsFile;
+        private final Provider<Map<String, String>> userProperties;
+
+        MainClassArgument(File settingsFile, Provider<Map<String, String>> userProperties) {
+            this.settingsFile = settingsFile;
+            this.userProperties = userProperties;
+        }
+
+        @Override
+        public Iterable<String> asArguments() {
+            java.util.Properties p = new java.util.Properties();
+            if (settingsFile.isFile()) {
+                try (java.io.InputStream in = new java.io.FileInputStream(settingsFile)) {
+                    p.load(in);
+                } catch (java.io.IOException ignored) {
+                    // The simulator reports a missing main class itself.
+                }
+            }
+            for (Map.Entry<String, String> e : userProperties.get().entrySet()) {
+                p.setProperty(e.getKey(), e.getValue());
+            }
+            String main = p.getProperty("codename1.mainName", "").trim();
+            String pkg = p.getProperty("codename1.packageName", "").trim();
+            return Collections.singletonList(pkg.isEmpty() ? main : pkg + "." + main);
+        }
+    }
+
+}

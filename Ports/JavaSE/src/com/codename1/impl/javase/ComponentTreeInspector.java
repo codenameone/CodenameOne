@@ -22,6 +22,8 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
 import com.codename1.impl.javase.simulator.PropertyDetailsPanel;
 import com.codename1.impl.javase.simulator.SelectableAction;
 import com.codename1.impl.javase.util.SwingUtils;
@@ -773,12 +775,26 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
                     if (dot >= 0) {
                         name = name.substring(0, dot);
                     }
+                    // The project model knows where each build keeps its CSS
+                    // (css/, common/src/main/css, src/main/css); the sibling
+                    // css/ below is the old Ant-only guess, kept as a fallback.
+                    ProjectLayout layout = ProjectLayouts.detect(resFile);
+                    if (layout != null) {
+                        File modelCss = new File(layout.cssDir(), name);
+                        if (modelCss.exists()) {
+                            return modelCss;
+                        }
+                    }
                     File cssThemeFile = new File(new File(projectDir, "css"), name);
                     if (cssThemeFile.exists()) {
                         return cssThemeFile;
                     }
                 }
             }
+        }
+        ProjectLayout current = SimulatorProject.current();
+        if (current != null && current.themeCss().exists()) {
+            return current.themeCss();
         }
         File defaultCss = new File(JavaSEPort.getCWD(), "css" + File.separator + "theme.css");
         if (defaultCss.exists()) {
@@ -840,6 +856,14 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
      * or any of the IDE marker directories. Returns {@code null} when no marker is found.
      */
     private File findProjectRoot(File start) {
+        // The top of the build (the Maven multi-module root, the Gradle root
+        // project, the Ant project) is where an IDE keeps .idea, .vscode or
+        // nbproject; the nearest pom.xml of a Maven file is common/'s, one
+        // level too deep to see them.
+        ProjectLayout layout = ProjectLayouts.detect(start);
+        if (layout != null) {
+            return layout.rootDir();
+        }
         File dir = start.isDirectory() ? start : start.getParentFile();
         while (dir != null) {
             if (new File(dir, "pom.xml").isFile()

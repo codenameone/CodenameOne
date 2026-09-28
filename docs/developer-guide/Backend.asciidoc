@@ -95,6 +95,17 @@ mvn -pl backend -Dcodename1.platform=backend cn1:backend           # run it on t
 mvn -pl backend -Dcodename1.platform=backend cn1:backend-package   # build the native binary
 ----
 
+In a Gradle project the backend is the `backend` subproject (or the whole project,
+for a backend-only application), and the same two steps are tasks:
+
+----
+./gradlew :backend:runBackend       # run it on this JVM
+./gradlew :backend:backendPackage   # build the native binary
+----
+
+Drop the `:backend:` prefix in a backend-only project. <<gradle-backend>> covers
+adding a backend to an existing Gradle application.
+
 The first is the development loop. Both run the same protocol code -- there is one
 copy of `HttpServer`, and only the layer underneath it differs -- so behaviour
 can't drift between the loop you develop in and the binary you ship. The local

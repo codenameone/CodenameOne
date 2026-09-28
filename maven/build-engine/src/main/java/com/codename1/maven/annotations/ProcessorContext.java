@@ -1,0 +1,240 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven.annotations;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import com.codename1.build.Log;
+
+/// Shared state passed to every `AnnotationProcessor`.
+///
+/// Exposes:
+/// - A read-only **class index** of every non-synthetic class found in the
+///   project's compiled output, keyed by JVM internal name. Processors use it
+///   to traverse superclass chains, check interface implementations, etc.
+/// - The **output class directory** so emitted bytecode lands in the same
+///   tree the rest of the build references.
+/// - An **error sink** (`#error`) processors call when a class fails validation.
+///   Errors accumulate rather than throwing immediately, so a single run can
+///   surface every offending class.
+/// - A **stub source directory** in `target/generated-sources/cn1-annotations`
+///   used by the GENERATE_SOURCES Mojo; the PROCESS_CLASSES path doesn't write
+///   to it but the directory may exist either way.
+/// - The **project settings** exactly as `codenameone_settings.properties`
+///   holds them, plus the main class those settings name. A processor that
+///   validates against project configuration needs both.
+public final class ProcessorContext {
+
+    private final File outputClassDir;
+    private final File stubSourceDir;
+    private final Map<String, AnnotatedClass> classIndex;
+    private final Log log;
+    private final List<ProcessingError> errors = new ArrayList<ProcessingError>();
+    private final Map<String, byte[]> emittedClasses = new LinkedHashMap<String, byte[]>();
+    private final Map<String, String> emittedStubSources = new LinkedHashMap<String, String>();
+    private final Map<String, byte[]> emittedResources = new LinkedHashMap<String, byte[]>();
+    private final File projectDir;
+    private final Properties projectSettings;
+    private final String mainClassBinaryName;
+    private final List<String> compileSourceRoots;
+    private final String sourceEncoding;
+    private final List<String> compileClasspath;
+
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log) {
+        this(outputClassDir, stubSourceDir, classIndex, log, null, null, null, null, null, null);
+    }
+
+    /// Full form, adding the project configuration.
+    ///
+    /// `projectSettings` must be the **raw** contents of
+    /// `codenameone_settings.properties`, without any `-D` overlay: a hint given
+    /// on the command line is the documented way to override one for a single
+    /// build, so it must never be mistaken for something the project declares.
+    ///
+    /// `compileSourceRoots` is passed in rather than guessed at from the project
+    /// directory: a module may add `generated-sources`, or a Kotlin root, or
+    /// replace the conventional one altogether, and a processor that assumes
+    /// `src/main/java` would decide a perfectly live class has no source.
+    ///
+    /// `sourceEncoding` is the encoding the module's sources are COMPILED with.
+    /// A processor that reads a source file back has to decode it the way javac
+    /// did or it is reading a different text. Guessing from the bytes settles
+    /// UTF-16 and UTF-8 but cannot separate one single-byte encoding from
+    /// another, so a Windows-1251 source came back as the wrong -- and equally
+    /// valid -- identifier characters. Null means the module did not say, which
+    /// a reader must treat as "cannot tell" rather than as a licence to guess.
+    ///
+    /// `compileClasspath` is where the build hint ANNOTATIONS live. A processor
+    /// that must know what an annotation member sets reads the annotation
+    /// itself, off this classpath. The alternative was a generated table listing
+    /// every annotation by name -- a second statement of which types exist,
+    /// which had to be regenerated whenever one was added.
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log,
+                             File projectDir, Properties projectSettings,
+                             String mainClassBinaryName, List<String> compileSourceRoots,
+                             String sourceEncoding, List<String> compileClasspath) {
+        this.compileClasspath = compileClasspath == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileClasspath));
+        this.sourceEncoding = sourceEncoding == null || sourceEncoding.trim().length() == 0
+                ? null : sourceEncoding.trim();
+        this.outputClassDir = outputClassDir;
+        this.stubSourceDir = stubSourceDir;
+        this.classIndex = classIndex == null
+                ? Collections.<String, AnnotatedClass>emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotatedClass>(classIndex));
+        this.log = log;
+        this.projectDir = projectDir;
+        this.projectSettings = projectSettings;
+        this.mainClassBinaryName = mainClassBinaryName;
+        this.compileSourceRoots = compileSourceRoots == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileSourceRoots));
+    }
+
+    /// The compile classpath, where the build hint annotations are found.
+    public List<String> getCompileClasspath() { return compileClasspath; }
+
+    /// The encoding the module's sources are compiled with, null when unknown.
+    public String getSourceEncoding() { return sourceEncoding; }
+
+    /// The module's configured compile source roots, empty when unknown.
+    ///
+    /// Empty means "not told", never "there are none": a caller deciding whether
+    /// a class still has a source has to treat the two differently, or an
+    /// unfamiliar layout looks exactly like a deleted file.
+    public List<String> getCompileSourceRoots() { return compileSourceRoots; }
+
+    /// The Codename One project directory -- the one holding
+    /// `codenameone_settings.properties` -- or null when it could not be found.
+    public File getProjectDir() { return projectDir; }
+
+    /// The raw `codenameone_settings.properties`, or null when absent. Never
+    /// carries a `-D` overlay; see the constructor.
+    public Properties getProjectSettings() { return projectSettings; }
+
+    /// Fully qualified name of the class named by `codename1.mainName`, or null
+    /// when the project does not declare one (a cn1lib, for instance).
+    public String getMainClassBinaryName() { return mainClassBinaryName; }
+
+    /// `target/classes` for the project, or the equivalent output directory.
+    public File getOutputClassDir() { return outputClassDir; }
+
+    /// `target/generated-sources/cn1-annotations` (or the configured stub dir).
+    /// Always present even during PROCESS_CLASSES so processors can probe for
+    /// previously generated stubs.
+    public File getStubSourceDir() { return stubSourceDir; }
+
+    /// All non-synthetic classes from `target/classes`, keyed by internal name.
+    public Map<String, AnnotatedClass> getClassIndex() { return classIndex; }
+
+    /// Looks up a class by internal name (`com/example/Foo`). Returns null when
+    /// the class is not in the project's compiled output (e.g. it's a JDK or
+    /// dependency class).
+    public AnnotatedClass lookup(String internalName) { return classIndex.get(internalName); }
+
+    public Log getLog() { return log; }
+
+    /// Reports a validation error attributed to `source`. Continues processing.
+    public void error(AnnotatedClass source, String message) {
+        errors.add(new ProcessingError(source, message));
+    }
+
+    /// Reports a global (non-class-bound) error.
+    public void error(String message) {
+        errors.add(new ProcessingError(null, message));
+    }
+
+    /// Queues a generated class for write-out. Path comes from the internal
+    /// name. Subsequent calls with the same name overwrite — useful for
+    /// processors that update existing stubs.
+    public void emitClass(String internalName, byte[] bytecode) {
+        emittedClasses.put(internalName, bytecode);
+    }
+
+    /// Queues a generated Java source for write-out under the stub source
+    /// directory. Used by GENERATE_SOURCES phase. `internalName` follows the
+    /// same `com/example/Foo` convention as #emitClass.
+    public void emitStubSource(String internalName, String javaSource) {
+        emittedStubSources.put(internalName, javaSource);
+    }
+
+    /// Queues a generated resource for write-out under the output class
+    /// directory, so it is packaged into the project jar alongside the classes.
+    ///
+    /// This is the route by which build-time metadata reaches the **native**
+    /// builders. A resource in the jar survives the trip to a cloud build
+    /// server, where the whole artifact is uploaded and unpacked, and the
+    /// iOS/Android builders already read project resources that way.
+    ///
+    /// Emitting through the context rather than writing the file directly is
+    /// what keeps the Mojo's fail-fast promise intact: nothing is written when a
+    /// processor reported an error, so a build that failed validation cannot
+    /// leave a stale manifest behind for the native build to compile against.
+    ///
+    /// #### Parameters
+    ///
+    /// - `relativePath`: path relative to the output class directory, e.g.
+    ///   `intents.json`
+    /// - `content`: the file content
+    public void emitResource(String relativePath, byte[] content) {
+        emittedResources.put(relativePath, content);
+    }
+
+    public Map<String, byte[]> getEmittedResources() {
+        return Collections.unmodifiableMap(emittedResources);
+    }
+
+    public boolean hasErrors() { return !errors.isEmpty(); }
+    public List<ProcessingError> getErrors() { return Collections.unmodifiableList(errors); }
+    public Map<String, byte[]> getEmittedClasses() { return Collections.unmodifiableMap(emittedClasses); }
+    public Map<String, String> getEmittedStubSources() { return Collections.unmodifiableMap(emittedStubSources); }
+
+    /// One validation error.
+    public static final class ProcessingError {
+        private final AnnotatedClass source;
+        private final String message;
+
+        ProcessingError(AnnotatedClass source, String message) {
+            this.source = source;
+            this.message = message;
+        }
+
+        public AnnotatedClass getSource() { return source; }
+        public String getMessage() { return message; }
+
+        @Override
+        public String toString() {
+            if (source == null) return message;
+            return source.getBinaryName() + ": " + message;
+        }
+    }
+}

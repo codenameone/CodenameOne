@@ -2,8 +2,8 @@
 
 A **cn1lib** is a reusable Codename One library: Java/Kotlin source, optional CSS, optional resources, and platform-native code (Objective-C for iOS, Java/Kotlin for Android, JavaScript for the web port, plain Java for the desktop simulator) packaged into a single artifact. CN1 has two cn1lib distribution formats:
 
-- **Maven (modern, preferred for new libraries)** — published to Maven Central or a private Maven repo, consumed via a regular `<dependency>` in `common/pom.xml`.
-- **`.cn1lib` binary (legacy)** — a self-contained zip of jars and native source trees, dropped into the consuming project's `cn1libs/` directory. Still in active use; many older CN1 libraries (ZipSupport, CodeRAD, push integrations) ship this way.
+- **Maven (modern, preferred for new libraries)** — published to Maven Central or a private Maven repo, consumed via a regular `<dependency>` in `common/pom.xml`, or a `cn1lib("...")` line in a Gradle project's `build.gradle.kts`.
+- **`.cn1lib` binary (legacy)** — a self-contained zip of jars and native source trees, dropped into the consuming project's `cn1libs/` directory. Still in active use; many older CN1 libraries (ZipSupport, CodeRAD, push integrations) ship this way. **Maven projects only**: the Gradle build consumes cn1libs by Maven coordinates and does not read `cn1libs/`.
 
 This guide covers both directions: **creating** a new cn1lib and **consuming** existing ones.
 
@@ -26,6 +26,18 @@ The `<type>pom</type>` matters — Maven cn1libs aggregate multiple per-platform
 
 Rebuild: `mvn -pl common compile`. The cn1lib's CSS, resources, and per-platform native sources are wired in by the CN1 maven plugin.
 
+### Maven cn1lib in a Gradle project
+
+Declare the same coordinates with `cn1lib(...)` in `build.gradle.kts` (there is no `<type>pom</type>` to remember; the plugin reads the cn1lib's pom and picks each platform's classifier jars itself):
+
+```kotlin
+dependencies {
+    cn1lib("com.example.libs:my-cn1lib:1.0.0")
+}
+```
+
+Rebuild with `./gradlew classes` (or just `./gradlew run`). A library that is published only as a `.cn1lib` file cannot be used from Gradle; switch that project to Maven or publish the library to a Maven repository.
+
 ### Legacy `.cn1lib` binary
 
 Drop the `.cn1lib` file into `<project>/cn1libs/`:
@@ -46,6 +58,10 @@ To verify a cn1lib is wired in correctly, run the bytecode compliance check — 
 ```bash
 mvn -pl common compile cn1:bytecode-compliance
 ```
+
+Under Gradle the check runs as the last step of every compile, so `./gradlew classes` is enough.
+
+Creating and publishing a cn1lib (the rest of this file) is done with the Maven project layout; a Gradle app consumes the published result.
 
 ## Creating a new cn1lib (Maven)
 

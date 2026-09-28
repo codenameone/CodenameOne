@@ -1,0 +1,3160 @@
+/*
+ * Copyright (c) 2021, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import com.codename1.ant.AntExecutor;
+import com.codename1.ant.SortedProperties;
+import com.codename1.builders.*;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.PatternFileSelector;
+import org.apache.commons.vfs2.VFS;
+import com.codename1.build.BuildArtifact;
+import com.codename1.build.BuildExecutionException;
+import com.codename1.build.BuildFailureException;
+import com.codename1.build.AntSupport;
+import com.codename1.build.CodenameOneUpdater;
+import com.codename1.build.Log;
+import com.codename1.build.ProjectHost;
+import org.apache.tools.ant.Project;
+import org.apache.tools.ant.taskdefs.Expand;
+import org.apache.tools.ant.taskdefs.Zip;
+import org.apache.tools.ant.types.FileSet;
+import org.apache.tools.ant.types.ZipFileSet;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+
+import static com.codename1.maven.PathUtil.path;
+
+/// Sends a build to the Codename One build server, or runs one of the local
+/// build targets ("ios-source", "android-source", the native desktop and
+/// JavaScript targets) on this machine.
+///
+/// This is the build-tool independent body of what used to be all of
+/// `CN1BuildMojo`: staging the jar-with-dependencies, the class closure and
+/// icon checks, merging the settings a build is submitted with (annotations,
+/// command-line overrides, cn1lib properties), both preflights, and handing the
+/// result to the cloud or to a local builder. A build tool subclasses it and
+/// answers the handful of questions only it can -- where the build directory
+/// is, what the resolved dependencies are, how to attach an output -- through
+/// a [ProjectHost]. The Maven plugin's `CN1BuildMojo` and the Gradle plugin's
+/// build tasks both run it, so a fix here reaches both.
+public class AppBuilder {
+
+    protected static final String GROUP_ID = "com.codenameone";
+    protected static final String OS = System.getProperty("os.name", "").toLowerCase();
+    protected static final boolean isWindows = OS.indexOf("win") >= 0;
+    protected static final boolean isMac = OS.indexOf("mac") >= 0;
+
+    /// The Ant project the zip/unzip tasks run in.
+    protected final Project antProject;
+
+    /// The build tool's answers about the project.
+    protected final ProjectHost host;
+
+    /// A builder for the project `host` describes.
+    public AppBuilder(ProjectHost host) {
+        this.host = host;
+        this.antProject = AntSupport.newProject(host.baseDir());
+    }
+
+    /// Sets the platform (`codename1.platform`: ios, android, javase, ...).
+    public AppBuilder platform(String platform) {
+        this.platform = platform;
+        return this;
+    }
+
+    /// Sets the build target (ios-device, android-device, ios-source, ...).
+    public AppBuilder buildTarget(String buildTarget) {
+        this.buildTarget = buildTarget;
+        return this;
+    }
+
+    /// Whether to wait for a cloud build and download its result.
+    public AppBuilder automated(boolean automated) {
+        this.automated = automated;
+        return this;
+    }
+
+    /// Stop once the upload jar is staged and checked.
+    public AppBuilder stageOnly(boolean stageOnly) {
+        this.stageOnly = stageOnly;
+        return this;
+    }
+
+    /// Whether to open a generated Xcode or Android Studio project.
+    public AppBuilder open(boolean open) {
+        this.open = open;
+        return this;
+    }
+
+    // ---- Answers from the build tool. Protected so a tool can refine one. ----------
+
+    protected Log getLog() {
+        return host.log();
+    }
+
+    protected File getCN1ProjectDir() {
+        return host.cn1ProjectDir();
+    }
+
+    protected File baseDir() {
+        return host.baseDir();
+    }
+
+    protected String buildDirectory() {
+        return host.buildDirectory().getPath();
+    }
+
+    protected String finalName() {
+        return host.finalName();
+    }
+
+    /// The scratch directory this build assembles its Ant project in:
+    /// `<build dir>/codenameone`. A Maven platform module has a build directory
+    /// of its own; the Gradle plugin, whose platforms share one, gives each build
+    /// task a directory beneath this so two builds can run at once.
+    protected File workDirectory() {
+        return new File(buildDirectory(), "codenameone");
+    }
+
+    protected String projectGroupId() {
+        return host.groupId();
+    }
+
+    protected Properties projectProperties() {
+        return host.projectProperties();
+    }
+
+    protected List<String> compileClasspathElements() throws Exception {
+        return host.compileClasspathElements();
+    }
+
+    protected Collection<BuildArtifact> artifacts() {
+        return host.artifacts();
+    }
+
+    /// The dependency keys (see [dependencyKey(String, String, String)]) the
+    /// application's compile dependencies need once the desktop runtime
+    /// aggregator is removed, or null when that cannot be determined -- in which
+    /// case nothing is stripped as desktop runtime.
+    protected Set<String> neededWithoutDesktopRuntime() {
+        return host.neededWithoutDesktopRuntime();
+    }
+
+    protected File getJar(BuildArtifact artifact) {
+        return host.getJar(artifact);
+    }
+
+    protected File getJar(String groupId, String artifactId) {
+        return host.getJar(groupId, artifactId, null);
+    }
+
+    protected long sessionStartTime() {
+        return host.sessionStartTime();
+    }
+
+    protected long getSourcesModificationTime() throws IOException {
+        return host.sourcesModificationTime();
+    }
+
+    /// Installs or refreshes the Codename One build client in `~/.codenameone`.
+    protected void updateCodenameOne(boolean force) throws BuildExecutionException {
+        new CodenameOneUpdater(getLog(), antProject).update(force,
+                new File(buildDirectory(), "codenameone"), getCN1ProjectDir());
+    }
+
+    /// Overlays the build hints declared as annotations on the main class.
+    protected void mergeAnnotationBuildHints(Properties target, List<String> classpathElements)
+            throws BuildFailureException {
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream in = new FileInputStream(settingsFile)) {
+                settings.load(in);
+            } catch (IOException ex) {
+                getLog().debug("Could not read " + settingsFile, ex);
+            }
+        }
+        overlayCommandLineBuildHints(settings);
+        final List<String> roots = host.compileSourceRoots();
+        final String encoding = projectProperties().getProperty("project.build.sourceEncoding");
+        new AnnotationBuildHints(getLog(), settings, host.userProperties(), new AnnotationBuildHints.Sources() {
+            @Override
+            public List<String> rootsFor(File element) {
+                return roots;
+            }
+
+            @Override
+            public String encodingFor(File element) {
+                return encoding;
+            }
+        }).merge(target, classpathElements);
+    }
+
+    /// Overlays `codename1.*` properties given on the command line.
+    protected void overlayCommandLineBuildHints(Properties target) {
+        Properties user = host.userProperties();
+        if (user == null || target == null) {
+            return;
+        }
+        for (String key : user.stringPropertyNames()) {
+            if (key.startsWith("codename1.")) {
+                target.setProperty(key, user.getProperty(key));
+            }
+        }
+    }
+
+    /// Records a build output beside the project's primary artifact.
+    protected void attachArtifact(String type, String classifier, File file) {
+        host.attachArtifact(type, classifier, file);
+    }
+
+    /// [attachArtifact(String, String, File)] with no classifier.
+    protected void attachArtifact(String type, File file) {
+        attachArtifact(type, null, file);
+    }
+
+    protected String codenameOneVersion() {
+        return host.codenameOneVersion();
+    }
+
+    protected String pluginVersion() {
+        return host.pluginVersion();
+    }
+
+    protected static boolean contains(String needle, String... haystack) {
+        for (String s : haystack) {
+            if (s.equals(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected static long lastModifiedRecursive(File file) {
+        long lastModified = 0L;
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    lastModified = Math.max(lastModifiedRecursive(child), lastModified);
+                }
+            }
+        } else {
+            lastModified = file.lastModified();
+        }
+        return lastModified;
+    }
+
+
+    public static final String BUILD_TARGET_XCODE_PROJECT = Executor.BUILD_TARGET_XCODE_PROJECT;
+    public static final String BUILD_TARGET_ANDROID_PROJECT = Executor.BUILD_TARGET_ANDROID_PROJECT;
+    public static final String BUILD_TARGET_WINDOWS_NATIVE = Executor.BUILD_TARGET_WINDOWS_NATIVE;
+    public static final String BUILD_TARGET_WINDOWS_NATIVE_PROJECT = Executor.BUILD_TARGET_WINDOWS_NATIVE_PROJECT;
+
+    private String serverMustProvideKotlinVersion;
+
+    /**
+     * The target platform.  E.g. javase, javascript, ios, android, win
+     */
+    protected String platform;
+
+    /**
+     * The build target, corresponding to ANT build targets in build-template.xml.  E.g. javascript,
+     * mac-os-x-desktop, windows-desktop, ios-device, ios-device-release, android-device, war
+     */
+    protected String buildTarget;
+
+    /**
+     * Flag to indicate whether to use an automated build or not.
+     */
+    protected boolean automated;
+
+    /**
+     * Stop once the jar the build would send has been assembled and checked,
+     * without submitting anything or building locally. The jar is left at
+     * target/&lt;finalName&gt;-&lt;buildTarget&gt;-jar-with-dependencies.jar. This is
+     * what lets CI inspect the real upload for every target with no account
+     * and no network: maven/integration-tests/cn1app-staged-jar-test.sh.
+     */
+    protected boolean stageOnly;
+
+
+    /**
+     * Flag of whether to open the xcode/android studio project.
+     */
+    protected boolean open = true;
+
+
+    private String cn1MavenPluginVersion = "";
+    private String cn1MavenVersion = "";
+
+
+    /// Runs the build.
+    public void execute() throws BuildExecutionException {
+        if ("none".equalsIgnoreCase(buildTarget)) {
+            getLog().info("BuildTarget is None.  Skipping cn1build goal");
+            return;
+        }
+        cn1MavenPluginVersion = pluginVersion() == null ? "" : pluginVersion();
+        cn1MavenVersion = codenameOneVersion() == null ? "" : codenameOneVersion();
+
+
+        String projectPlatform = projectProperties().getProperty("codename1.projectPlatform");
+        if (projectPlatform == null) {
+            getLog().debug("Skipping build because codename1.projectPlatform property is not defined");
+            return;
+        }
+        if (!projectPlatform.equals(platform)) {
+            getLog().debug("Skipping build because codename1.projectPlatform doesn't match the given platform");
+            return;
+        }
+
+        // Run the hardening pre-flight BEFORE the Android up-to-date cache short-circuit below. The cache
+        // check keys only on source-file timestamps (getSourcesModificationTime), not on build hints, so an
+        // explicit hardening request -- especially one made via a -D command-line property -- would
+        // otherwise return a stale, potentially unhardened APK without the pre-flight ever validating (or
+        // refusing) it. Checking here means an invalid/unsupported hardening request fails loudly instead
+        // of silently succeeding with the cached artifact.
+        applyHardeningPreflight();
+
+        // Signing problems that are visible in the .mobileprovision on disk should not cost a
+        // cloud build slot to discover. See applyIOSProvisioningPreflight.
+        applyIOSProvisioningPreflight();
+
+        // stageOnly builds no APK, so it must neither short-circuit on a cached one (it would
+        // then stage nothing) nor, below, stamp that cached APK as matching this configuration.
+        if (platform.contains("android") && !stageOnly) {
+            if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                File apkFile = androidApkFile();
+                try {
+                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
+                    // hardening outcome, recorded in the marker beside it. The source-timestamp check cannot
+                    // see a hardening change made through a build hint, so a change in EITHER direction --
+                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
+                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
+                    // current configuration.
+                    if (apkFile.exists()
+                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
+                            && apkFile.lastModified() >= getSourcesModificationTime()) {
+                        getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
+                        return;
+                    }
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to check sources modification time", ex);
+                }
+            }
+        }
+
+        try {
+            createAntProject();
+        } catch (IOException ex) {
+            getLog().error("Failed to create and build ANT project", ex);
+            throw new BuildFailureException("Failed to create and build ANT project", ex);
+        } catch (LibraryPropertiesException ex) {
+            getLog().error("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage());
+            throw new BuildExecutionException("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage(), ex);
+        }
+
+        // Record the hardening outcome this APK was built with, so a later invocation that changes
+        // hardening (in either direction) invalidates the timestamp-only up-to-date cache above.
+        if (platform.contains("android") && !stageOnly && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+            File marker = androidHardeningCacheMarker();
+            if (androidApkFile().exists()) {
+                try {
+                    writeStringToFile(marker, hardeningCacheKey);
+                } catch (IOException ex) {
+                    getLog().debug("Could not record the hardening cache key at " + marker, ex);
+                }
+            }
+        }
+    }
+
+    /** The Android APK this build produces (also the cache key's anchor). */
+    private File androidApkFile() {
+        String apkName = finalName() + ".apk";
+        return new File(buildDirectory() + File.separator + apkName);
+    }
+
+    /** The marker recording the hardening outcome the cached APK was built with, beside the APK. */
+    private File androidHardeningCacheMarker() {
+        File apk = androidApkFile();
+        return new File(apk.getParentFile(), apk.getName() + ".cn1hardenkey");
+    }
+
+    /**
+     * A stable fingerprint of every effective {@code codename1.arg.harden.*} setting, so a transform,
+     * keep-rule or seed change -- not only a level change -- invalidates the APK cache. Keys are sorted so
+     * the fingerprint is order-independent.
+     */
+    private static String hardeningSettingsFingerprint(Properties settings) {
+        java.util.TreeMap<String, String> hints = new java.util.TreeMap<String, String>();
+        for (String key : settings.stringPropertyNames()) {
+            if (key.startsWith("codename1.arg.harden.")) {
+                hints.put(key, settings.getProperty(key));
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : hints.entrySet()) {
+            sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
+        }
+        return sha256Hex(sb.toString());
+    }
+
+    /** SHA-256 of {@code s} as lowercase hex (falls back to the string hash if SHA-256 is somehow absent). */
+    private static String sha256Hex(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(s.getBytes(java.nio.charset.Charset.forName("UTF-8")));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) {
+                sb.append(Character.forDigit((b >> 4) & 0xf, 16));
+                sb.append(Character.forDigit(b & 0xf, 16));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            return Integer.toHexString(s.hashCode());
+        }
+    }
+
+    /** Reads a small text file's trimmed content, or {@code null} if it is absent or unreadable. */
+    private static String readTextFileOrNull(File f) {
+        if (f == null || !f.isFile()) {
+            return null;
+        }
+        try {
+            return new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                    java.nio.charset.Charset.forName("UTF-8")).trim();
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** Writes {@code content} to {@code f} (UTF-8), creating parent directories as needed. */
+    private static void writeStringToFile(File f, String content) throws IOException {
+        if (f.getParentFile() != null) {
+            f.getParentFile().mkdirs();
+        }
+        java.nio.file.Files.write(f.toPath(),
+                content.getBytes(java.nio.charset.Charset.forName("UTF-8")));
+    }
+
+    /**
+     * App-hardening pre-flight (Check 1). Validates {@code harden.level} and refuses targets that
+     * cannot be hardened before a build is spent. Runs for every target: for cloud targets it fails
+     * fast client-side before submission; for local/source targets it stops (or, with the escape
+     * hatch, forces hardening off) because a locally built binary never reaches the server and its
+     * mapping would be orphaned from the crash-symbolication service.
+     */
+    /**
+     * The hardening pre-flight decisions, carried on the Mojo INSTANCE (not JVM-global state) so a
+     * concurrent module build under {@code mvn -T} cannot clobber them. Each reactor module executes its
+     * own CN1BuildMojo instance, so instance fields are naturally per-build; a shared System property was
+     * racy -- another platform's build could clear {@code cn1.harden.forceOff} between this build setting
+     * it and the Executor reading it, running hardening locally despite the escape-hatch decision. These
+     * are injected into this build's BuildRequest ({@link #applyHardeningRequestArgs}) so the Executor
+     * reads them from the request it was handed rather than from process-wide state.
+     */
+    private boolean hardeningForceOff;
+    private String hardeningLibraryJars;
+    /** True once the pre-flight has resolved that hardening will ACTUALLY run for this build (non-off,
+     * not force-off). Used to publish the library classpath the engine needs. */
+    private boolean hardeningWillRun;
+    /** A fingerprint of the hardening OUTCOME for this build ("unhardened", or "hardened:&lt;level&gt;"),
+     * recorded next to the Android APK so the timestamp-only up-to-date cache -- which cannot see a
+     * hardening change made through a build hint -- is invalidated when the outcome changes in EITHER
+     * direction (enabling or disabling hardening), not just off-&gt;on. */
+    private String hardeningCacheKey = "unhardened";
+
+    /** Injects the pre-flight hardening decisions into this build's request (per-build, not global). */
+    private void applyHardeningRequestArgs(BuildRequest r) {
+        if (hardeningForceOff) {
+            r.putArgument("cn1.harden.forceOff", "true");
+        }
+        if (hardeningLibraryJars != null && hardeningLibraryJars.length() > 0) {
+            r.putArgument("cn1.hardening.libraryJars", hardeningLibraryJars);
+        }
+    }
+
+    private void applyHardeningPreflight() throws BuildFailureException {
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
+            }
+        }
+        // A hint set by @Hardening reaches the settings only in createAntProject, which runs after
+        // the Android up-to-date short-circuit below and after hardeningCacheKey is read from it.
+        // Without this the early pass computes "unhardened" from the file while the completed build
+        // records "hardened:...", the two never match, and an up-to-date APK is rebuilt on every
+        // invocation -- and, worse, an unsupported hardening request made through an annotation
+        // escapes the refusal this early pass exists to perform.
+        try {
+            mergeAnnotationBuildHints(settings, compileClasspathElements());
+        } catch (Exception ex) {
+            getLog().debug("Could not read annotation build hints for the hardening pre-flight", ex);
+        }
+        // Overlay -D command-line hints (e.g. -Dcodename1.arg.harden.level=standard) so an explicit
+        // hardening request made only on the command line is seen by this early check -- and, because this
+        // runs before the Android up-to-date cache short-circuit, is not silently dropped when a prior APK
+        // is newer than the sources (getSourcesModificationTime does not account for build hints).
+        // After the annotations, so -D still wins over one.
+        overlayCommandLineBuildHints(settings);
+        applyHardeningPreflight(settings);
+    }
+
+    /**
+     * Refuses an iOS device build whose provisioning profile makes signing impossible, before
+     * the build is packaged and sent.
+     *
+     * <p>These failures used to be discoverable only on a build server: an unreadable profile
+     * surfaced as an XML parser stack trace that never named the profile, and a profile of the
+     * wrong kind surfaced as an {@code exportArchive} error minutes into the build, after the
+     * whole app had already been compiled and archived. Both are decided by a file sitting in
+     * the project.
+     *
+     * <p>Only cloud iOS device builds are checked. A local Xcode-project generation signs
+     * later (or not at all), and the native-Mac targets ride the same platform with a different
+     * signing identity, so neither is this check's business.
+     */
+    private void applyIOSProvisioningPreflight() throws BuildFailureException {
+        if (!isIOSDeviceBuild()) {
+            return;
+        }
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for the iOS provisioning pre-flight", ex);
+                return;
+            }
+        } else {
+            return;
+        }
+        overlayCommandLineBuildHints(settings);
+
+        // Only what the file itself decides. Whether the profile's KIND matches the export
+        // method cannot be judged yet: a CN1Lib can supply ios.*.distributionMethod through
+        // its appended/required properties, which createAntProject merges further down, so
+        // that comparison waits for applyIOSProvisioningPreflight(Properties) below.
+        report(IOSProvisioningPreflight.checkProfileFile(settings,
+                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
+    }
+
+    private boolean isIOSDeviceBuild() {
+        return IOSProvisioningPreflight.appliesTo(platform, buildTarget);
+    }
+
+    /**
+     * The full pre-flight, run against the settings the build is actually submitted with --
+     * the project's own, plus the command-line overlay, plus every CN1Lib-contributed
+     * property. This is where a profile-kind/distribution-method mismatch is decided, since
+     * a library can still change the method after the early pass has run.
+     */
+    private void applyIOSProvisioningPreflight(Properties mergedSettings) throws BuildFailureException {
+        if (!isIOSDeviceBuild()) {
+            return;
+        }
+        boolean release = IOSProvisioningPreflight.isReleaseTarget(buildTarget);
+        report(IOSProvisioningPreflight.check(mergedSettings, release, new Date()));
+        // Every embedded app extension needs a profile of its own, and the app's profile says
+        // whether it can stand in for one. Run after check() so an unreadable or expired
+        // profile is reported as itself rather than as an extension problem.
+        report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
+                baseDir()));
+        report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release));
+        report(IOSProvisioningPreflight.checkContinuitySync(mergedSettings, release));
+    }
+
+    private void report(List<IOSProvisioningPreflight.Problem> problems) throws BuildFailureException {
+        String fatal = null;
+        for (IOSProvisioningPreflight.Problem problem : problems) {
+            if (problem.fatal) {
+                getLog().error(problem.message);
+                if (fatal == null) {
+                    fatal = problem.message;
+                }
+            } else {
+                getLog().warn(problem.message);
+            }
+        }
+        if (fatal != null) {
+            throw new BuildFailureException(fatal);
+        }
+    }
+
+    /**
+     * Runs the hardening pre-flight against a given set of effective settings. Called first with the
+     * project's own {@code codenameone_settings.properties} (fail-fast before the merged jar is built),
+     * and again after {@code createAntProject} merges the CN1Lib-contributed
+     * {@code codenameone_library_appended/required.properties} -- a library can turn hardening on via
+     * {@code codename1.arg.harden.level}, which the early call cannot see, and without this second pass
+     * such a build would slip past the local-build refusal / force-off and produce a locally hardened
+     * artifact whose mapping is never uploaded.
+     */
+    private void applyHardeningPreflight(Properties settings) throws BuildFailureException {
+        String level = settings.getProperty("codename1.arg.harden.level", "off");
+        // A per-platform opt-out (harden.<platform>.enabled=false) means hardening won't run for
+        // this target, so the pre-flight must not reject it -- treat the level as off. The native-Mac
+        // targets ride the iOS pipeline with platform=ios, so derive their opt-out key from the
+        // build target instead (matching IPhoneBuilder, which reports "mac" for them).
+        String hardenPlatform = hardenPlatformForBuildTarget(buildTarget);
+        if (hardenPlatform == null) {
+            hardenPlatform = normalizeHardenPlatform(platform);
+        }
+        // A combined Apple build (iOS app + native-Mac/watch/tvOS slice) hardens ONE shared jar, so the
+        // builder hardens it unless EVERY shipped slice is opted out (Executor.anySliceHardeningEnabled).
+        // The preflight must use that same all-slice decision: keying off only the selected slice would,
+        // e.g. with harden.mac.enabled=false but iOS still on, treat the level as off and skip the
+        // local-build/on-device-debug refusal while the engine goes on to harden the shared jar locally
+        // and orphan its mapping. A non-Apple target has a single slice, so its own opt-out still applies.
+        boolean platformOptedOut;
+        if (isNativeMacOsTarget(buildTarget)) {
+            // A native macOS target is not a slice of an iOS build. It runs its
+            // own builder against the macosx SDK, and that builder's hardening
+            // platform list is "mac" alone -- there is no shared jar and no iOS
+            // app. The all-slice rule below starts by reading harden.ios.enabled,
+            // which defaults to true and is answering about a slice this build
+            // does not ship, so harden.mac.enabled=false was overruled by it and
+            // the build was refused as a hardened local/source one that the
+            // builder would in fact have hardened nothing for.
+            //
+            // Mac Catalyst is deliberately NOT here: it really is an iOS build
+            // with a hint set, it does ship the shared jar, and the all-slice
+            // rule is right for it. hardenPlatformForBuildTarget draws the same
+            // line for the same reason.
+            platformOptedOut = isHardenFalse(
+                    settings.getProperty("codename1.arg.harden.mac.enabled", "true"));
+        } else if (isAppleHardenPlatform(hardenPlatform)) {
+            platformOptedOut = allAppleHardeningSlicesOptedOut(settings);
+        } else {
+            platformOptedOut = hardenPlatform != null && isHardenFalse(
+                    settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"));
+        }
+        if (platformOptedOut) {
+            level = "off";
+        }
+        // Even at a non-off level, a build that has overridden every individual transform off
+        // (e.g. harden.rename=false, harden.strings=off, harden.controlFlow=false) requests nothing:
+        // the engine treats that as SKIPPED_NOT_REQUESTED, which is equivalent to off. Resolve the
+        // overrides to the effective transform set so such a build is not rejected on a local/source
+        // or on-device-debug target for a "hardening" it isn't actually asking for. An unknown level
+        // is NOT reduced here -- it must reach the preflight so the invalid-level check rejects it.
+        if (hardeningReducesToOff(settings, level, hardenPlatform)) {
+            level = "off";
+        }
+        boolean allowLocal = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.harden.allowUnhardenedLocalBuild", "false").trim());
+        boolean onDeviceDebug = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.android.onDeviceDebug", "false").trim())
+                || (buildTarget != null && buildTarget.contains("on-device-debug"));
+
+        HardeningPreflight.Result r = HardeningPreflight.check(level, buildTarget, allowLocal, onDeviceDebug);
+        if (r.isFailed()) {
+            throw new BuildFailureException(r.getMessage());
+        }
+        if (r.isForceOff()) {
+            getLog().warn(r.getMessage());
+            hardeningForceOff = true;
+        } else {
+            hardeningForceOff = false;
+        }
+        hardeningWillRun = !"off".equalsIgnoreCase(level.trim()) && !r.isForceOff();
+        // The APK's hardening OUTCOME. An unhardened build has one key regardless of the nominal level, so
+        // two off/force-off invocations still hit the cache. A hardened build fingerprints EVERY effective
+        // harden.* setting -- not just the level -- because harden.strings/rename/controlFlow/keep/seed all
+        // change the produced transforms and mapping, so two hardened:aggressive builds with different seeds
+        // or keep rules must still invalidate the cache. Compared against the marker recorded beside the APK.
+        hardeningCacheKey = hardeningWillRun
+                ? "hardened:" + hardeningSettingsFingerprint(settings)
+                : "unhardened";
+        // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
+        // jars (so an application method that overrides a framework method is not renamed apart from
+        // its superclass). Only needed when hardening will actually run.
+        if (hardeningWillRun) {
+            try {
+                List<String> cp = compileClasspathElements();
+                StringBuilder sb = new StringBuilder();
+                for (String element : cp) {
+                    File f = new File(element);
+                    if (f.isFile() && element.endsWith(".jar")) {
+                        if (sb.length() > 0) {
+                            sb.append(File.pathSeparator);
+                        }
+                        sb.append(f.getAbsolutePath());
+                    }
+                }
+                hardeningLibraryJars = sb.toString();
+            } catch (Exception ex) {
+                getLog().debug("Could not resolve compile classpath for hardening library jars", ex);
+            }
+        } else {
+            hardeningLibraryJars = null;
+        }
+    }
+
+    /**
+     * True for the targets that run the standalone macOS builder rather than a
+     * slice of an iOS build.
+     *
+     * <p>The same three {@link #hardenPlatformForBuildTarget(String)} maps to
+     * "mac", kept beside it so the two cannot come to disagree about which
+     * targets are natively macOS.</p>
+     */
+    // Package-visible so a test can pin which targets are natively macOS; the
+    // hardening preflight's answer turns on it.
+    static boolean isNativeMacOsTarget(String buildTarget) {
+        return BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget);
+    }
+
+    /**
+     * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
+     * whose {@code codename1.platform} does not name their real hardening platform. The macOS
+     * targets run with {@code platform=ios} but harden as "mac", so their opt-out is
+     * {@code harden.mac.enabled}. Mac Catalyst needs no entry: it has no target of its own and
+     * really is an iOS build, so {@code harden.ios.enabled} is the correct key for it.
+     * Returns {@code null} when the target carries no such override and the platform value
+     * should be used.
+     */
+    static String hardenPlatformForBuildTarget(String buildTarget) {
+        if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
+            return "mac";
+        }
+        return null;
+    }
+
+    /**
+     * True when a {@code harden.*} boolean setting reads as disabled, using the same tri-state rules
+     * as the engine's {@code HardeningConfig.boolTri}: {@code false}, {@code 0} and {@code off} all
+     * mean off. Recognizing only the literal {@code false} here would preflight-reject a
+     * local/source build that {@code harden.<platform>.enabled=off} had actually turned off.
+     */
+    private static boolean isHardenFalse(String value) {
+        if (value == null) {
+            return false;
+        }
+        String t = value.trim().toLowerCase();
+        return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /** True for the Apple hardening tags whose build ships several slices from one shared hardened jar. */
+    private static boolean isAppleHardenPlatform(String hardenPlatform) {
+        return "ios".equals(hardenPlatform) || "mac".equals(hardenPlatform);
+    }
+
+    /**
+     * True only when EVERY Apple slice this build ships (the iOS app plus any native-Mac/watch/tvOS
+     * target) has opted out via {@code harden.<slice>.enabled}. Mirrors IPhoneBuilder.appleHardeningSlices
+     * / Executor.anySliceHardeningEnabled from the settings so the preflight's "reduced to off" decision
+     * matches the builder's "harden unless every slice opted out". A slice is present only when its target
+     * is enabled, so an unrelated tvOS opt-out never affects a plain iOS build.
+     */
+    static boolean allAppleHardeningSlicesOptedOut(Properties settings) {
+        if (!isHardenFalse(settings.getProperty("codename1.arg.harden.ios.enabled", "true"))) {
+            return false;
+        }
+        if ("true".equals(settings.getProperty("codename1.arg.macNative.enabled", "false"))
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.mac.enabled", "true"))) {
+            return false;
+        }
+        if (appleSliceTargetEnabled(settings, "watch")
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.watch.enabled", "true"))) {
+            return false;
+        }
+        if (appleSliceTargetEnabled(settings, "tv")
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.tv.enabled", "true"))) {
+            return false;
+        }
+        return true;
+    }
+
+    /** True when the watch/tv slice is shipped: its {@code <slice>Native.enabled} or a {@code <slice>Main}. */
+    private static boolean appleSliceTargetEnabled(Properties settings, String slice) {
+        return "true".equals(settings.getProperty("codename1.arg." + slice + "Native.enabled", "false"))
+                || settings.getProperty("codename1.arg." + slice + "Main",
+                        settings.getProperty("codename1.arg." + slice + "Native.mainClass", "")).trim()
+                        .length() > 0;
+    }
+
+    /**
+     * True when, at this level, at least one hardening transform is still requested once the
+     * individual {@code harden.*} overrides are applied -- mirroring the engine's
+     * {@code HardeningConfig}/{@code willApplyAnyTransform} "is anything requested" decision (the
+     * platform-safety refinement is the server's, and only ever narrows this). A level whose every
+     * transform is overridden off requests nothing and is equivalent to {@code off}, so the preflight
+     * must not reject it.
+     */
+    /**
+     * True when a <em>valid</em> non-off level requests no transform once the {@code harden.*}
+     * overrides are applied, so it is equivalent to {@code off} and must not be rejected. An unknown
+     * or misspelled level (rank 0) returns {@code false} so it is left untouched and reaches
+     * {@link HardeningPreflight#check} -- which rejects it fast, client-side, rather than letting a
+     * cloud build be submitted for the forked engine to reject later.
+     */
+    static boolean hardeningReducesToOff(Properties settings, String level) {
+        return hardeningReducesToOff(settings, level, null);
+    }
+
+    /**
+     * As {@link #hardeningReducesToOff(Properties, String)}, but taking the resolved hardening
+     * {@code platform} so a transform the engine SKIPS as unsafe on that target does not keep the level
+     * from reducing to off. Without this, a local iOS build with only control-flow left on (which the
+     * engine skips on the ParparVM native ports), or a JavaScript build with only string encryption left
+     * on (skipped on JS), would be rejected for a hardening it would never actually apply.
+     */
+    static boolean hardeningReducesToOff(Properties settings, String level, String platform) {
+        return hardenLevelRank(level) >= 1 && !hardeningRequestsAnyTransform(settings, level, platform);
+    }
+
+    static boolean hardeningRequestsAnyTransform(Properties settings, String level) {
+        return hardeningRequestsAnyTransform(settings, level, null);
+    }
+
+    static boolean hardeningRequestsAnyTransform(Properties settings, String level, String platform) {
+        int rank = hardenLevelRank(level);
+        if (rank <= 0) {
+            return false;
+        }
+        // rank is 1..3 here (standard/aggressive/paranoid), so the standard-level defaults -- renaming
+        // and constant-string encryption -- are on unless explicitly overridden off. Control-flow is a
+        // default only from aggressive up.
+        boolean atLeastAggressive = rank >= 2;
+        // Rename is delivered on every platform (by the engine, or by R8 on Android), so it always counts.
+        boolean rename = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.rename"), true);
+        // String encryption and control-flow are subject to the engine's platform-safety rules: a
+        // transform the engine would skip on this target must not, on its own, keep the level from
+        // reducing to off. When the platform is unknown the safety checks pass (conservative -- the
+        // build is still preflighted rather than silently allowed).
+        boolean stringsOn = hardenStringsRequested(
+                settings.getProperty("codename1.arg.harden.strings"), true)
+                && stringEncryptionAppliesOn(platform);
+        boolean controlFlow = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.controlFlow"), atLeastAggressive)
+                && controlFlowAppliesOn(platform);
+        return rename || stringsOn || controlFlow;
+    }
+
+    /** Engine rule: string encryption is skipped only on JavaScript (it would break the JS bridge). */
+    private static boolean stringEncryptionAppliesOn(String platform) {
+        return !"javascript".equals(platform);
+    }
+
+    /**
+     * Engine rule: control-flow obfuscation runs only on the JVM-bytecode ports (Android, JavaSE/
+     * desktop); it is skipped on the ParparVM native ports and JavaScript. An unknown platform is
+     * treated as applicable so an ambiguous build is preflighted rather than silently allowed.
+     */
+    private static boolean controlFlowAppliesOn(String platform) {
+        if (platform == null) {
+            return true;
+        }
+        return "and".equals(platform) || "android".equals(platform)
+                || "javase".equals(platform) || "desktop".equals(platform);
+    }
+
+    /** off/empty/unknown = 0, standard = 1, aggressive = 2, paranoid = 3. */
+    private static int hardenLevelRank(String level) {
+        if (level == null) {
+            return 0;
+        }
+        String v = level.trim().toLowerCase();
+        if ("standard".equals(v)) {
+            return 1;
+        }
+        if ("aggressive".equals(v)) {
+            return 2;
+        }
+        if ("paranoid".equals(v)) {
+            return 3;
+        }
+        return 0;
+    }
+
+    /** Tri-state boolean matching the engine's {@code HardeningConfig.boolTri}. */
+    private static boolean hardenBoolTri(String value, boolean def) {
+        if (value == null) {
+            return def;
+        }
+        String t = value.trim().toLowerCase();
+        if (t.isEmpty()) {
+            return def;
+        }
+        if ("true".equals(t) || "1".equals(t) || "2".equals(t) || "3".equals(t) || "on".equals(t)) {
+            return true;
+        }
+        if ("false".equals(t) || "0".equals(t) || "off".equals(t)) {
+            return false;
+        }
+        return def;
+    }
+
+    /**
+     * Whether string encryption is requested, matching {@code HardeningConfig}'s {@code harden.strings}
+     * parsing: {@code off} disables; {@code constants}/{@code all} enable; anything else (including an
+     * unset value) falls back to the level default, which the CLI validates up front.
+     */
+    private static boolean hardenStringsRequested(String strings, boolean def) {
+        if (strings == null) {
+            return def;
+        }
+        String v = strings.trim().toLowerCase();
+        if (v.isEmpty()) {
+            return def;
+        }
+        if ("off".equals(v)) {
+            return false;
+        }
+        if ("constants".equals(v) || "all".equals(v)) {
+            return true;
+        }
+        return def;
+    }
+
+    /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */
+    private static String normalizeHardenPlatform(String platform) {
+        if (platform == null) {
+            return null;
+        }
+        String p = platform.trim().toLowerCase();
+        if (p.startsWith("android")) {
+            return "and";
+        }
+        if (p.startsWith("ios")) {
+            return "ios";
+        }
+        if (p.contains("javascript")) {
+            return "javascript";
+        }
+        if (p.contains("win")) {
+            return "win";
+        }
+        if (p.contains("mac")) {
+            return "mac";
+        }
+        if (p.contains("linux")) {
+            return "linux";
+        }
+        if (p.contains("javase") || p.contains("desktop")) {
+            return "javase";
+        }
+        return null;
+    }
+
+    /**
+     * Merge a set of jars into a single jar file.
+     * @param dest The destination jar file. Also the first source if it already exists.
+     * @param src The source jar files to be merged into the destination.
+     */
+    private  void mergeJars(File dest, File... src) {
+        Zip task = (Zip)antProject.createTask("zip");
+        task.setDestFile(dest);
+        task.setUpdate(true);
+        for (File srcFile : src) {
+
+            if (srcFile.isDirectory()) {
+                FileSet fs = new FileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fs.setExcludes("**/META-INF/versions/**");
+                fs.setProject(this.antProject);
+                fs.setDir(srcFile);
+                task.addFileset(fs);
+
+            } else {
+                ZipFileSet fileset = new ZipFileSet();
+                // Multiversioned jars trip out the ASM class parsing.
+                // Specifically module-info.class files
+                fileset.setExcludes("**/META-INF/versions/**");
+                fileset.setProject(antProject);
+                fileset.setSrc(srcFile);
+                task.addZipfileset(fileset);
+            }
+        }
+        task.execute();
+    }
+
+    /**
+     * Local JavaScript builds run ParparVM's translator on this machine, so
+     * they keep the classes a server build would have re-supplied.
+     */
+    public static boolean isLocalJavascriptBuild(String buildTarget) {
+        return buildTarget != null && buildTarget.contains("javascript") && isLocalBuildTarget(buildTarget);
+    }
+
+    // A null build target never reaches these from the mojo -- the parameter is
+    // required -- but they are static and package private, so treat an absent
+    // target as "not local": the conservative answer, since it keeps the server
+    // supplied artifacts out of the staged jar rather than throwing.
+
+    /**
+     * Whether the build itself re-supplies the artifact's classes after they
+     * are left out of the staged jar: codenameone-core and java-runtime come
+     * from the build server (or, for a local JavaScript build, stay in the jar
+     * so ParparVM's translator can see them), and kotlin-stdlib comes from the
+     * build server too. This is deliberately narrower than
+     * {@link #isStrippedFromStagedJar}: a reference into anything else that is
+     * left out really is a reference to a class nobody will supply.
+     */
+    public static boolean isSuppliedByBuildServer(String groupId, String artifactId, String buildTarget) {
+        if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+            return !isLocalJavascriptBuild(buildTarget);
+        }
+        return !isLocalBuildTarget(buildTarget)
+                && "org.jetbrains.kotlin".equals(groupId)
+                && "kotlin-stdlib".equals(artifactId);
+    }
+
+    /**
+     * Whether the given artifact is left out of the jar-with-dependencies that
+     * is staged for the build, either because the build re-supplies it or
+     * because its scope says it is not part of the application. Shared by the
+     * jar assembly and the class closure check so the two can never disagree
+     * about what is in the jar.
+     */
+    public static boolean isStrippedFromStagedJar(String groupId, String artifactId, String scope, String buildTarget) {
+        if (GROUP_ID.equals(groupId) && contains(artifactId, BUNDLE_ARTIFACT_ID_BLACKLIST)) {
+            // For local JavaScript builds we need codenameone-core and java-runtime classes
+            // in the staged jar - the build server normally re-supplies those, but ParparVM's
+            // ByteCodeTranslator runs locally here and resolves everything from the staged class
+            // directory.
+            return !isLocalJavascriptBuild(buildTarget);
+        }
+        if (isSuppliedByBuildServer(groupId, artifactId, buildTarget)) {
+            // When sending to the build server, we'll strip the kotlin-stdlib and the server will
+            // provide it. For local builds, it's easier to just include it.
+            return true;
+        }
+        // An artifact with no scope was never scoped out of the application, so
+        // keep its classes rather than dropping them from the jar.
+        return scope != null && !"compile".equals(scope);
+    }
+
+    private boolean isStrippedFromStagedJar(BuildArtifact artifact) {
+        return isStrippedAsDesktopRuntime(artifact)
+                || isStrippedFromStagedJar(artifact.getGroupId(), artifact.getArtifactId(), artifact.getScope(), buildTarget);
+    }
+
+    private boolean isStrippedAsDesktopRuntime(BuildArtifact artifact) {
+        if (!isDesktopRuntimeBinary(artifact.getGroupId(), artifact.getArtifactId(), artifact.getDependencyTrail())) {
+            return false;
+        }
+        if (isDesktopRuntimeAggregator(artifact.getGroupId(), artifact.getArtifactId())) {
+            return true;
+        }
+        return isStrippedAsDesktopRuntime(dependencyKey(artifact.getGroupId(), artifact.getArtifactId(),
+                artifact.getClassifier()), neededWithoutDesktopRuntime());
+    }
+
+    /**
+     * Whether an artifact reached through the desktop runtime aggregator is left out of the
+     * staged jar: only when nothing else the application ships needs it.
+     *
+     * <p>The dependency trail cannot answer that on its own. Maven keeps one resolved
+     * artifact and one winning trail per coordinate, so when an application library also
+     * needs an ffmpeg artifact but the aggregator's path is the nearer one, the trail names
+     * only the aggregator. Stripping on the trail alone would then leave the library without
+     * classes it needs.</p>
+     *
+     * @param neededElsewhere the dependency keys the application's own compile dependencies
+     *                        need with the aggregator removed, or {@code null} when that could
+     *                        not be determined, in which case nothing is stripped
+     */
+    public static boolean isStrippedAsDesktopRuntime(String dependencyKey, Set<String> neededElsewhere) {
+        return neededElsewhere != null && !neededElsewhere.contains(dependencyKey);
+    }
+
+    /** groupId:artifactId:classifier, the identity {@link #isStrippedAsDesktopRuntime} compares. */
+    public static String dependencyKey(String groupId, String artifactId, String classifier) {
+        return groupId + ":" + artifactId + ":" + (classifier == null ? "" : classifier);
+    }
+
+    public static boolean isDesktopRuntimeAggregator(String groupId, String artifactId) {
+        return GROUP_ID.equals(groupId) && DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID.equals(artifactId);
+    }
+
+    /**
+     * Whether an existing staged jar may be used instead of merging a new one (before the
+     * timestamp check, which still applies).
+     *
+     * <p>With a record, only when it names exactly the current inputs. Without one, the jar
+     * was not written by this mojo -- or was written by a plugin older than the record, which
+     * is indistinguishable from a stale one. A project may deliberately produce this jar from
+     * its own pom to control what is uploaded, and that is still honoured: such a jar is
+     * written during the current Maven run, while a stale one predates it.</p>
+     *
+     * <p>Known limit, left deliberately: a record wins over the current-run exception. A
+     * project that once let this mojo stage the jar, then starts producing it from its own
+     * pom without cleaning target, and whose dependencies changed in between, has its jar
+     * replaced by a merged one. That customization is undocumented and used by nothing in
+     * the tree or the archetypes; the fix is to clean target once.</p>
+     *
+     * @param recorded the recorded inputs, trimmed, or {@code null} if there is no record
+     * @param current the inputs this build would merge
+     * @param jarModified the staged jar's modification time
+     * @param sessionStart when the current Maven run started
+     */
+    static boolean mayReuseStagedJar(String recorded, String current, long jarModified, long sessionStart) {
+        if (recorded == null) {
+            return jarModified >= sessionStart;
+        }
+        return recorded.equals(current.trim());
+    }
+
+    /**
+     * Deletes a staged jar that must not be reused, and fails if it is still there. Ignoring
+     * a failed delete (a jar held open on Windows, a read-only target) would skip the merge
+     * and upload the very jar that was just found stale.
+     */
+    static void discardStagedJar(File jar) throws BuildExecutionException {
+        if (!jar.delete() && jar.exists()) {
+            throw new BuildExecutionException("Could not delete the out of date staged jar " + jar
+                    + ", so it cannot be rebuilt and would be uploaded as it is. Close anything that"
+                    + " has it open (an IDE, an antivirus scanner) or delete it by hand, then build again.");
+        }
+    }
+
+    /**
+     * The record of what a staged jar was merged from, one absolute path per line in merge
+     * order. Compared, not parsed: any difference means the cached jar is not this build's.
+     */
+    static String describeStagedInputs(List<File> jarsToMerge) {
+        StringBuilder sb = new StringBuilder();
+        for (File f : jarsToMerge) {
+            sb.append(f.getAbsolutePath()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The aggregator that puts the desktop media runtime -- org.bytedeco's ffmpeg,
+     * with natives for Android, iOS, Linux, macOS and Windows -- on the simulator
+     * and desktop run classpaths.
+     */
+    public static final String DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID = "cn1-binaries-javase";
+
+    /**
+     * Whether the artifact is the desktop runtime aggregator or was resolved
+     * through it: the candidates for leaving out of the staged jar, whatever
+     * their scope. The aggregator itself is always left out; anything it pulled
+     * in is left out only when nothing else needs it
+     * ({@link #isStrippedAsDesktopRuntime(String, Set)}).
+     *
+     * <p>Projects generated from the archetype between #5380 and the fix for it
+     * declare the aggregator at compile scope, and no profile re-scopes it, so
+     * by scope alone it lands in the staged jar: about 300 MB of ffmpeg natives
+     * that the build client refuses to upload, failing every desktop build of
+     * every such project. Deciding by the dependency graph rather than the scope
+     * repairs those projects without asking anyone to edit a pom.</p>
+     */
+    public static boolean isDesktopRuntimeBinary(String groupId, String artifactId, List<String> dependencyTrail) {
+        if (isDesktopRuntimeAggregator(groupId, artifactId)) {
+            return true;
+        }
+        if (dependencyTrail == null) {
+            return false;
+        }
+        // Trail entries are Artifact.getId(): groupId:artifactId:type:version.
+        String aggregator = GROUP_ID + ":" + DESKTOP_RUNTIME_BINARIES_ARTIFACT_ID + ":";
+        for (String node : dependencyTrail) {
+            if (node != null && node.startsWith(aggregator)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Fails the build when the staged jar-with-dependencies contains an
+     * application class that references another application class which is not
+     * in the jar. Stale build output causes exactly this -- e.g. an IDE deletes
+     * the class files of removed/renamed sources while a dependent class
+     * compiled against them survives in target/classes, and an incremental
+     * Maven compile then ships it. The server-side VM translators only warn
+     * about the dangling reference and the build later fails with an obscure
+     * native compiler error (a missing generated header on iOS), so catch it
+     * here with an actionable message before uploading anything.
+     */
+    private void verifyApplicationClassClosure(File jarWithDependencies, List<String> cpElements) throws BuildFailureException {
+        if ("true".equals(System.getProperty("codename1.skipClassClosureCheck", "false"))
+                || "true".equals(projectProperties().getProperty("codename1.skipClassClosureCheck", "false"))) {
+            getLog().info("Skipping application class closure check because codename1.skipClassClosureCheck=true");
+            return;
+        }
+        // The project package space: compiled output directories plus module
+        // jars owned by this build (the app's common jar reaches the platform
+        // modules as a jar dependency, identified by the shared groupId).
+        List<File> projectClassRoots = new ArrayList<File>();
+        for (String element : cpElements) {
+            File dir = new File(element);
+            if (dir.isDirectory()) {
+                projectClassRoots.add(dir);
+            }
+        }
+        for (BuildArtifact artifact : artifacts()) {
+            if (projectGroupId().equals(artifact.getGroupId())) {
+                File jar = getJar(artifact);
+                if (jar != null && jar.isFile()) {
+                    projectClassRoots.add(jar);
+                }
+            }
+        }
+        // Classes left out of the staged jar that the build re-supplies: references
+        // into them are not missing. Anything else that was left out -- a `provided`
+        // scope third party dependency, say -- stays reportable, because nothing
+        // puts those classes back before the translators run.
+        boolean localJavascriptBuild = isLocalJavascriptBuild(buildTarget);
+        Set<File> providedJars = new LinkedHashSet<File>();
+        for (BuildArtifact artifact : artifacts()) {
+            if (isSuppliedByBuildServer(artifact.getGroupId(), artifact.getArtifactId(), buildTarget)) {
+                File jar = getJar(artifact);
+                if (jar != null && jar.isFile()) {
+                    providedJars.add(jar);
+                }
+            }
+        }
+        if (!localJavascriptBuild) {
+            // codenameone-core and java-runtime are `provided` scope in the app's common
+            // module and `provided` is not transitive, so a platform module (ios, android,
+            // ...) that only depends on common does not see them among its own artifacts.
+            // They still have to count as provided: without them every reference into a
+            // package the app shares with the framework -- a patched framework class, or a
+            // helper deliberately placed in a com.codename1 package to reach package
+            // private API -- makes the whole framework package look like it is missing
+            // from the build. Resolve them from the plugin's own dependencies instead.
+            boolean coreResolved = false;
+            for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                File jar = getJar(GROUP_ID, bundled);
+                if (jar != null && jar.isFile()) {
+                    providedJars.add(jar);
+                    if ("codenameone-core".equals(bundled)) {
+                        coreResolved = true;
+                    }
+                }
+            }
+            if (!coreResolved) {
+                // Every application class references the framework, so without its class
+                // list the check cannot tell a stale class from a framework class and would
+                // report false positives. Skipping is the only safe answer, but say so
+                // loudly: a stale class will now reach the build unreported.
+                getLog().warn("Skipping the application class closure check for build target " + buildTarget
+                        + " because " + GROUP_ID + ":codenameone-core could not be resolved."
+                        + " Stale application classes will not be detected before the build runs.");
+                return;
+            }
+        }
+        Map<String, Set<String>> missing;
+        try {
+            missing = ClassClosureVerifier.findMissingProjectReferences(jarWithDependencies, projectClassRoots, providedJars);
+        } catch (IOException ex) {
+            getLog().warn("Could not verify the consistency of the application classes: " + ex.getMessage());
+            return;
+        }
+        if (missing.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("The compiled application classes are inconsistent. The following class");
+        sb.append(missing.size() == 1 ? " is" : "es are");
+        sb.append(" referenced by your code but missing from the build:\n");
+        for (Map.Entry<String, Set<String>> e : missing.entrySet()) {
+            sb.append(" - ").append(e.getKey().replace('/', '.'))
+                    .append(" (referenced from ");
+            boolean first = true;
+            for (String referencing : e.getValue()) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                first = false;
+                sb.append(referencing.replace('/', '.'));
+            }
+            sb.append(")\n");
+        }
+        sb.append("This usually means the build output contains stale classes from a previous build,\n");
+        sb.append("e.g. after renaming, moving or deleting a class, or switching branches, without a\n");
+        sb.append("clean rebuild. Run 'mvn clean' and rebuild. If a listed class was removed\n");
+        sb.append("intentionally, also remove or update the code that still references it.\n");
+        sb.append("To bypass this check build with -Dcodename1.skipClassClosureCheck=true");
+        throw new BuildFailureException(sb.toString());
+    }
+
+
+    /**
+     * Localized launcher icons (cn1_icon_&lt;lang&gt;[_&lt;country&gt;].png) are scaled up to the
+     * largest launcher density by the build server, so a low-resolution source produces a
+     * blurry icon. Maven copies these into the build output (target/classes) with its
+     * incremental resource plugin, which also leaves stale copies behind when a source icon
+     * is removed or replaced (only {@code mvn clean} clears them). Scan the compiled output
+     * directories that will be bundled and sent to the build server and warn about any
+     * localized icon that is too small to render sharply -- this catches both an undersized
+     * new icon and an outdated low-resolution one lingering in target/classes.
+     *
+     * @param classpathElements the compile classpath; directory entries are the project /
+     *                          module {@code target/classes} folders that get bundled.
+     * @param codenameOneSettings the project's codenameone_settings.properties, used to detect
+     *                           whether adaptive icons are enabled (which raises the target size).
+     */
+    private void warnAboutSmallLocalizedIcons(List<String> classpathElements, File codenameOneSettings)
+            throws BuildFailureException {
+        int largestTarget = 192;
+        try {
+            Properties settings = new Properties();
+            try (FileInputStream fis = new FileInputStream(codenameOneSettings)) {
+                settings.load(fis);
+            }
+            if ("true".equals(settings.getProperty("codename1.arg.android.enableAdaptiveIcons", "false").trim())) {
+                largestTarget = 432;
+            }
+        } catch (IOException ex) {
+            getLog().debug("Could not read " + codenameOneSettings + " to determine adaptive icon setting", ex);
+        }
+        List<String> undersizedIcons = new ArrayList<String>();
+        for (String element : classpathElements) {
+            File dir = new File(element);
+            if (dir.isDirectory()) {
+                collectSmallLocalizedIcons(dir, largestTarget, undersizedIcons);
+            }
+        }
+        if (!undersizedIcons.isEmpty()) {
+            throw new BuildFailureException("The following localized launcher icon(s) are smaller than "
+                    + largestTarget + "x" + largestTarget + "px and would be upscaled to a blurry icon in the "
+                    + "production build:\n  " + String.join("\n  ", undersizedIcons)
+                    + "\nSupply each localized icon at no less than " + largestTarget + "x" + largestTarget
+                    + "px (1024x1024 recommended, matching the main app icon). NOTE: if you recently replaced an icon, "
+                    + "an offending copy may be a stale resource left in target/classes -- run 'mvn clean' to clear it.");
+        }
+    }
+
+    private void collectSmallLocalizedIcons(File dir, int largestTarget, List<String> undersizedIcons) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                collectSmallLocalizedIcons(child, largestTarget, undersizedIcons);
+                continue;
+            }
+            String lower = child.getName().toLowerCase();
+            if (!lower.startsWith("cn1_icon_") || !lower.endsWith(".png")) {
+                continue;
+            }
+            try {
+                BufferedImage img = ImageIO.read(child);
+                if (img == null) {
+                    undersizedIcons.add(child + " (not a valid PNG image)");
+                    continue;
+                }
+                if (img.getWidth() < largestTarget || img.getHeight() < largestTarget) {
+                    undersizedIcons.add(child + " (" + img.getWidth() + "x" + img.getHeight() + "px)");
+                }
+            } catch (IOException ex) {
+                getLog().debug("Could not read localized icon " + child + " to check its resolution", ex);
+            }
+        }
+    }
+
+    /**
+     * The dependency scopes to include in the jar file that is sent to the build server.
+     */
+    private static String[] BUNDLE_ARTIFACT_SCOPES = new String[] { "compile" };
+
+    /**
+     * Artifact IDs that should not be sent to the build server.
+     */
+    private static String[] BUNDLE_ARTIFACT_ID_BLACKLIST = new String[] {"codenameone-core", "java-runtime"};
+
+
+    /**
+     * Gets the app extensions jar file that should be included in any iOS builds.
+     * @return The app extensions jar file if it exists.  null otherwise.
+     * @throws IOException
+     */
+    private File getAppExtensionsJar() throws IOException {
+
+        if (!"ios".equalsIgnoreCase(platform)) {
+            // App extensions are only for iOS
+            return null;
+        }
+
+        File appExtensionsDir = host.layout().iosAppExtensionsDir();
+
+        if (!appExtensionsDir.isDirectory()) return null;
+
+        File appExtensionsJar = new File(workDirectory(), "app_extensions.jar");
+        if (appExtensionsJar.exists() && appExtensionsJar.lastModified() < lastModifiedRecursive(appExtensionsDir)) {
+            // The app extensions jar is out of date.
+            appExtensionsJar.delete();
+        }
+
+        if (!appExtensionsJar.exists()) {
+            File tmpDir = new File(appExtensionsJar.getParentFile(), "app_extensions");
+            if (tmpDir.exists()) {
+                FileUtils.deleteDirectory(tmpDir);
+            }
+            tmpDir.mkdirs();
+            for (File appExtension : appExtensionsDir.listFiles()) {
+                Zip task = (Zip)antProject.createTask("zip");
+                File dest = new File(tmpDir, appExtension.getName()+".ios.appext");
+                task.setDestFile(dest);
+                task.setUpdate(false);
+                if (appExtension.isDirectory()) {
+                    FileSet fs = new FileSet();
+                    fs.setProject(this.antProject);
+                    fs.setDir(appExtension);
+                    task.addFileset(fs);
+                    task.execute();
+                } else if (appExtension.getName().endsWith(".zip")) {
+                    ZipFileSet fileset = new ZipFileSet();
+                    fileset.setProject(antProject);
+                    fileset.setSrc(appExtension);
+                    task.addZipfileset(fileset);
+                    task.execute();
+                }
+
+
+            }
+            Zip task = (Zip)antProject.createTask("zip");
+            task.setDestFile(appExtensionsJar);
+            task.setUpdate(false);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(tmpDir);
+            task.addFileset(fs);
+            task.execute();
+
+        }
+
+        if (appExtensionsJar.exists()) {
+            return appExtensionsJar;
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets the  localizations jar file that should be included in any iOS builds.
+     * @return The localizations jar file if it exists.  null otherwise.
+     * @throws IOException
+     */
+    private File getStringsJar() throws IOException {
+
+        if (!"ios".equalsIgnoreCase(platform)) {
+            // Localized strings are only for iOS
+            return null;
+        }
+
+        File stringsDir = host.layout().iosStringsDir();
+
+        if (!stringsDir.isDirectory()) return null;
+
+        File stringsJar = new File(workDirectory(), "strings.jar");
+        if (stringsJar.exists() && stringsJar.lastModified() < lastModifiedRecursive(stringsDir)) {
+            // The app extensions jar is out of date.
+            stringsJar.delete();
+        }
+
+        if (!stringsJar.exists()) {
+            File tmpDir = new File(stringsJar.getParentFile(), "strings");
+            if (tmpDir.exists()) {
+                FileUtils.deleteDirectory(tmpDir);
+            }
+            tmpDir.mkdirs();
+            for (File lproj : stringsDir.listFiles()) {
+                Zip task = (Zip)antProject.createTask("zip");
+                File dest = new File(tmpDir, lproj.getName()+".zip");
+                task.setDestFile(dest);
+                task.setUpdate(false);
+                if (lproj.isDirectory()) {
+                    FileSet fs = new FileSet();
+                    fs.setProject(this.antProject);
+                    fs.setDir(lproj);
+                    task.addFileset(fs);
+                    task.execute();
+                } else if (lproj.getName().endsWith(".zip")) {
+                    ZipFileSet fileset = new ZipFileSet();
+                    fileset.setProject(antProject);
+                    fileset.setSrc(lproj);
+                    task.addZipfileset(fileset);
+                    task.execute();
+                }
+
+
+            }
+            Zip task = (Zip)antProject.createTask("zip");
+            task.setDestFile(stringsJar);
+            task.setUpdate(false);
+            FileSet fs = new FileSet();
+            fs.setProject(this.antProject);
+            fs.setDir(tmpDir);
+            task.addFileset(fs);
+            task.execute();
+
+        }
+
+        if (stringsJar.exists()) {
+            return stringsJar;
+        }
+
+        return null;
+    }
+
+    public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
+    public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
+    public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = Executor.BUILD_TARGET_MAC_NATIVE_LOCAL;
+    public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
+
+    /**
+     * The entry points a project can declare besides {@code codename1.mainName},
+     * mapped to the build argument each one becomes. A project with a
+     * {@code codename1.watchMain} gets an Apple Watch and a Wear OS app built
+     * from that root; {@code codename1.tvMain} does the same for tvOS. The
+     * accompanying {@code codename1.watchStandalone} says the watch app ships on
+     * its own rather than alongside the phone app.
+     *
+     * <p>These ride the extensible build-argument map rather than the
+     * {@link BuildRequest} wire format, so adding an entry point needs no
+     * protocol change.
+     */
+    private static final Map<String, String> SECONDARY_ENTRY_POINTS;
+    static {
+        Map<String, String> m = new LinkedHashMap<String, String>();
+        m.put("codename1.watchMain", "watchMain");
+        m.put("codename1.watchStandalone", "watchStandalone");
+        m.put("codename1.tvMain", "tvMain");
+        SECONDARY_ENTRY_POINTS = Collections.unmodifiableMap(m);
+    }
+
+    /**
+     * Copies the secondary entry points declared in the project settings onto a
+     * local {@link BuildRequest}. The cloud path does the equivalent by mirroring
+     * them into the {@code codename1.arg.} namespace of the uploaded settings
+     * file, so both paths hand the builders the same arguments.
+     *
+     * @param r the request being assembled
+     * @param props the project's codenameone_settings.properties
+     */
+    static void putSecondaryEntryPointArguments(BuildRequest r, Properties props) {
+        for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
+            // The overlaid build argument first, exactly as the cloud mirror resolves it.
+            //
+            // Reading only the unprefixed project setting made the two paths disagree about the
+            // same invocation: -Dcodename1.arg.watchMain=... reached the daemon, because the
+            // mirror leaves an existing value alone, and was ignored locally -- so the standard
+            // override built one product in the cloud and a different one, or none, on the
+            // developer's machine. An override that works in one place and silently does nothing
+            // in the other is worse than one that works nowhere.
+            String value = props.getProperty("codename1.arg." + entry.getValue());
+            if (value == null || value.trim().length() == 0) {
+                value = props.getProperty(entry.getKey());
+            }
+            if (value != null && value.trim().length() > 0) {
+                r.putArgument(entry.getValue(), value.trim());
+            }
+        }
+    }
+
+    /**
+     * Copies the secondary entry points into the {@code codename1.arg.} namespace
+     * of the settings file that is uploaded to the build server.
+     *
+     * <p>They are declared without that prefix because they sit next to
+     * {@code codename1.mainName} and that is the shape developers expect. The
+     * server, however, only lifts {@code codename1.arg.*} keys out of the
+     * uploaded file, so without this mirror a cloud build never learns that the
+     * project has a watch or TV app and silently produces neither.
+     *
+     * @param props the settings being prepared for upload, mutated in place
+     */
+    static void mirrorSecondaryEntryPointsToBuildArgs(Properties props) {
+        for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
+            String value = props.getProperty(entry.getKey());
+            if (value == null || value.trim().length() == 0) {
+                continue;
+            }
+            String argKey = "codename1.arg." + entry.getValue();
+            // An existing value WINS. This runs after overlayCommandLineBuildHints, so a
+            // -Dcodename1.arg.watchMain=... passed on the command line is already sitting here --
+            // and overwriting it with the project file's codename1.watchMain made the standard
+            // build-argument override silently do nothing, handing the cloud the wrong lifecycle or
+            // a companion where a standalone Wear build was asked for.
+            //
+            // The mirror exists to carry a project-file setting into the args channel the daemon
+            // reads, which is only needed when nothing has put it there already.
+            String existing = props.getProperty(argKey);
+            if (existing != null && existing.trim().length() > 0) {
+                continue;
+            }
+            props.setProperty(argKey, value.trim());
+        }
+    }
+
+    public static boolean isLocalBuildTarget(String buildTarget) {
+        if (buildTarget == null) {
+            return false;
+        }
+        // windows-device (BUILD_TARGET_WINDOWS_NATIVE) is a *cloud* build: it sends
+        // a "win32" build to the server (see the windows-device target in
+        // buildxml-template.xml), mirroring linux-device. Only the explicit
+        // local-windows-device cross-compile and the windows-source project
+        // generation are local.
+        return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget));
+    }
+
+    /**
+     * Collapses build-type-qualified app-extension keys into the unqualified keys the rest
+     * of the build pipeline understands. Like the app's own signing assets
+     * ({@code codename1.ios.debug.provision} vs {@code codename1.ios.release.provision}),
+     * an extension's provisioning profile differs between development and distribution
+     * builds, so both plain settings ({@code codename1.ios.debug.appext.<Name>.provision})
+     * and build hints ({@code codename1.arg.ios.release.appext.<Name>.provisioningURL})
+     * accept a {@code debug}/{@code release} qualifier after the {@code ios.} segment.
+     * The variant matching the build target overrides the unqualified key; both variants
+     * are removed afterwards so the build server only ever sees the resolved value.
+     */
+    static void resolveAppExtensionBuildTypeQualifiers(Properties props, String buildTarget) {
+        String matching = buildTarget != null && buildTarget.contains("release") ? "release" : "debug";
+        for (String key : new ArrayList<String>(props.stringPropertyNames())) {
+            for (String prefix : new String[] {"codename1.arg.ios.", "codename1.ios."}) {
+                String qualifier;
+                if (key.startsWith(prefix + "debug.appext.")) {
+                    qualifier = "debug";
+                } else if (key.startsWith(prefix + "release.appext.")) {
+                    qualifier = "release";
+                } else {
+                    continue;
+                }
+                String value = props.getProperty(key);
+                props.remove(key);
+                if (qualifier.equals(matching) && value != null && value.trim().length() > 0) {
+                    props.setProperty(prefix + "appext."
+                            + key.substring((prefix + qualifier + ".appext.").length()), value);
+                }
+                break;
+            }
+        }
+    }
+
+    private void createAntProject() throws IOException, LibraryPropertiesException, BuildExecutionException, BuildFailureException {
+        File cn1dir = workDirectory();
+        File antProject = new File(cn1dir, "antProject");
+
+        antProject.mkdirs();
+        File codenameOneSettings = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        File icon = new File(getCN1ProjectDir(), "icon.png");
+        if (icon.exists()) {
+            FileUtils.copyFile(icon, new File(antProject, "icon.png"));
+        } else {
+            FileUtils.copyInputStreamToFile(AppBuilder.class.getResourceAsStream("codenameone-icon.png"), new File(antProject, "icon.png"));
+        }
+
+        File codenameOneSettingsCopy = new File(antProject, codenameOneSettings.getName());
+        FileUtils.copyFile(codenameOneSettings, codenameOneSettingsCopy);
+        FileUtils.copyInputStreamToFile(AppBuilder.class.getResourceAsStream("buildxml-template.xml"), new File(antProject, "build.xml"));
+        File distDir = new File(antProject, "dist");
+        distDir.mkdirs();
+        // The UpdateCodenameOne run inside the ant build writes lib/CLDC11.jar without
+        // creating parent dirs; make sure the dir exists (same latent hole as the
+        // template tmpProject -- only surfaces when the server publishes new versions).
+        new File(antProject, "lib").mkdirs();
+
+
+        // Build a jar with all dependencies that we will send to the build server.
+        File jarWithDependencies = new File(path(buildDirectory(), finalName() + "-"+buildTarget+"-jar-with-dependencies.jar"));
+        List<String> cpElements;
+        try {
+            //getLog().info("Classpath Elements: "+ compileClasspathElements());
+            cpElements = compileClasspathElements();
+        } catch (Exception ex) {
+            throw new BuildExecutionException("Failed to get classpath elements", ex);
+
+        }
+
+        warnAboutSmallLocalizedIcons(cpElements, codenameOneSettings);
+
+        File appExtensionsJar = getAppExtensionsJar();
+        if (appExtensionsJar != null) {
+            cpElements.add(appExtensionsJar.getAbsolutePath());
+        }
+        File stringsJar = getStringsJar();
+        if (stringsJar != null) {
+            cpElements.add(stringsJar.getAbsolutePath());
+        }
+        getLog().debug("Classpath Elements: "+cpElements);
+        // Decide what goes into the staged jar BEFORE deciding whether a cached one can be
+        // reused. The decision has side effects the build needs either way (the kotlin-stdlib
+        // version the server must supply), and the cached jar is only reusable when it was
+        // built from exactly this set.
+        List<String> blackListJars = new ArrayList<String>();
+        boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
+        for (BuildArtifact artifact : artifacts()) {
+            boolean addToBlacklist = isStrippedFromStagedJar(artifact);
+            if (addToBlacklist && !isLocalBuildTarget(buildTarget)
+                    && "org.jetbrains.kotlin".equals(artifact.getGroupId())
+                    && "kotlin-stdlib".equals(artifact.getArtifactId())) {
+                serverMustProvideKotlinVersion = artifact.getVersion();
+                getLog().debug("Adding kotlin-stdlib to blacklist.  Server will provide this:" + artifact);
+            }
+            if (addToBlacklist) {
+                File jar = getJar(artifact);
+                if (jar != null) {
+                    blackListJars.add(jar.getAbsolutePath());
+                    blackListJars.add(jar.getPath());
+                    try {
+                        blackListJars.add(jar.getCanonicalPath());
+                        getLog().debug("Added "+jar+" to blacklist");
+                    } catch (Exception ex){
+                        getLog().debug("Failed to add " + jar + " to blacklist. This is not a fatal error: " + ex);
+                    }
+                }
+            }
+        }
+        List<File> jarsToMerge = new ArrayList<File>();
+        for (String element : cpElements) {
+
+            String canonicalEl = element;
+            try {
+                canonicalEl = new File(canonicalEl).getCanonicalPath();
+            } catch (Exception ex){
+                if (getLog().isDebugEnabled()) {
+                    getLog().warn("Failed to resolve canonical path for " + element, ex);
+                }
+            }
+
+            if (blackListJars.contains(element) || blackListJars.contains(canonicalEl)) {
+                getLog().debug("NOT adding jar "+element+" because it is on the blacklist");
+                continue;
+            }
+            if (!new File(element).exists()) {
+                continue;
+            }
+            jarsToMerge.add(new File(element));
+        }
+        if (localJsBuild) {
+            // For local JavaScript builds we need codenameone-core and java-runtime classes
+            // in the staged jar -- the build server normally re-supplies those, but ParparVM's
+            // ByteCodeTranslator runs locally here and resolves everything from the staged class
+            // directory. `provided`-scope deps are not transitive, so a child module that only
+            // depends on a `common` library never sees the project's codenameone-core /
+            // java-runtime jars on its compile classpath. Pull them in explicitly here.
+            for (String bundled : BUNDLE_ARTIFACT_ID_BLACKLIST) {
+                File jar = getJar("com.codenameone", bundled);
+                if (jar != null && jar.isFile() && !jarsToMerge.contains(jar)) {
+                    getLog().info("Adding local-javascript dependency to jar-with-dependencies: " + jar);
+                    jarsToMerge.add(jar);
+                }
+            }
+        }
+
+        // Each staged jar this mojo writes records the inputs it was merged from. Timestamps
+        // alone cannot see a change in what the plugin excludes, so a jar staged before an
+        // exclusion was added (the ~157 MB of ffmpeg natives from #5380) would otherwise be
+        // reused, and uploaded, for as long as nothing on the classpath was rebuilt.
+        File stagedInputsFile = new File(jarWithDependencies.getPath() + ".inputs");
+        String stagedInputs = describeStagedInputs(jarsToMerge);
+        if (jarWithDependencies.exists()) {
+            getLog().debug("Found jar file with dependencies at "+jarWithDependencies+". Will use that one unless it is out of date.");
+            long sessionStart = sessionStartTime();
+            if (!mayReuseStagedJar(readTextFileOrNull(stagedInputsFile), stagedInputs,
+                    jarWithDependencies.lastModified(), sessionStart)) {
+                getLog().debug("Jar file was not staged from these inputs. "+jarWithDependencies+". Deleting");
+                discardStagedJar(jarWithDependencies);
+            } else {
+                for (String artifact : cpElements) {
+                    File jar = new File(artifact);
+                    if (jar.isDirectory()) {
+                        if (jarWithDependencies.lastModified() < lastModifiedRecursive(jar)) {
+                            getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                            discardStagedJar(jarWithDependencies);
+                            break;
+                        }
+                    } else if (jar.exists() && jar.lastModified() > jarWithDependencies.lastModified()) {
+                        // One of the dependency jar files is newer... so we delete the dependencies jar file
+                        // and will generate a new one.
+                        getLog().debug("Jar file out of date.  Dependencies have changed. "+jarWithDependencies+". Deleting");
+                        discardStagedJar(jarWithDependencies);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!jarWithDependencies.exists()) {
+            getLog().info(jarWithDependencies + " not found.  Generating jar with dependencies now");
+            getLog().debug("Merging into jar with dependencies: "+jarsToMerge);
+            stagedInputsFile.delete();
+            mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
+            writeStringToFile(stagedInputsFile, stagedInputs);
+        }
+
+        verifyApplicationClassClosure(jarWithDependencies, cpElements);
+
+        if (stageOnly) {
+            getLog().info("codename1.stageOnly is set: staged " + jarWithDependencies + " ("
+                    + jarWithDependencies.length() + " bytes) for " + buildTarget + " and stopped before building");
+            return;
+        }
+
+        try {
+            updateCodenameOne(false);
+        } catch (BuildExecutionException ex) {
+            getLog().error("Failed to update Codename One");
+            throw new IOException("Failed to update Codename One", ex);
+        }
+        File antDistDir = new File(antProject, "dist");
+        File antDistJar = new File(antDistDir, finalName() + "-"+buildTarget+"-jar-with-dependencies.jar");
+        antDistDir.mkdirs();
+        FileUtils.copyFile(jarWithDependencies, antDistJar);
+        Properties p = new Properties();
+        p.setProperty("codenameone_settings.properties", codenameOneSettingsCopy.getAbsolutePath());
+        p.setProperty("CodeNameOneBuildClient.jar", path(System.getProperty("user.home"), ".codenameone", "CodeNameOneBuildClient.jar"));
+        p.setProperty("dist.jar", antDistJar.getAbsolutePath());
+        if (automated) {
+            p.setProperty("automated", "true");
+        }
+        getLog().info("Running ANT build target " + buildTarget);
+        String logPasskey = UUID.randomUUID().toString();
+        Properties cn1SettingsProps = new Properties();
+        try (FileInputStream fis = new FileInputStream(codenameOneSettingsCopy)) {
+            cn1SettingsProps.load(fis);
+        }
+        // Build hints declared as annotations on the main class. Merged here, before
+        // everything that consumes the effective configuration: the command-line
+        // overlay below (so -D still wins), the CN1Lib appended/required merges (so a
+        // library appends onto an annotation-supplied value exactly as it would onto a
+        // file-supplied one), the gradle sanity check, both preflights, and the copy
+        // that is written back out and uploaded.
+        mergeAnnotationBuildHints(cn1SettingsProps, cpElements);
+        // The build request is assembled from this copy, not from the mojo's
+        // own properties, so the command-line overlay has to be applied here
+        // too -- otherwise a hint passed with -D is read by the mojo and still
+        // absent from what the builder actually sees.
+        overlayCommandLineBuildHints(cn1SettingsProps);
+        if (serverMustProvideKotlinVersion != null) {
+            cn1SettingsProps.setProperty("codename1.arg.requireKotlinStdlib", serverMustProvideKotlinVersion);
+        }
+        FileSystemManager fsManager = VFS.getManager();
+        FileObject jarFile = fsManager.resolveFile( "jar:"+jarWithDependencies.getAbsolutePath() + "!/META-INF/codenameone" );
+        if (jarFile != null) {
+            FileObject[] appendedPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_appended.properties"));
+            if (appendedPropsFiles != null) {
+                for (FileObject appendedPropsFile : appendedPropsFiles) {
+                    SortedProperties appendedProps = new SortedProperties();
+                    try (InputStream appendedPropsIn = appendedPropsFile.getContent().getInputStream()) {
+                        appendedProps.load(appendedPropsIn);
+                    }
+
+                    for (String propName : appendedProps.stringPropertyNames()) {
+                        String propVal = appendedProps.getProperty(propName);
+                        if (!cn1SettingsProps.containsKey(propName)) {
+                            cn1SettingsProps.put(propName, propVal);
+                        } else {
+                            String existing = cn1SettingsProps.getProperty(propName);
+                            // Separator decided by the hint rather than by whatever the library
+                            // baked into its own value -- see LibraryHintMerger for why a bare
+                            // concatenation welds two Gradle statements into one.
+                            if (!LibraryHintMerger.alreadyContains(propName, existing, propVal)) {
+                                cn1SettingsProps.setProperty(propName,
+                                        LibraryHintMerger.append(propName, existing, propVal));
+                            }
+                        }
+                    }
+                }
+            }
+            FileObject[] requiredPropsFiles = jarFile.findFiles(new PatternFileSelector(".*\\/codenameone_library_required.properties"));
+            if (requiredPropsFiles != null) {
+                for (FileObject requiredPropsFile : requiredPropsFiles) {
+                    SortedProperties requiredProps = new SortedProperties();
+                    try (InputStream appendedPropsIn = requiredPropsFile.getContent().getInputStream()) {
+                        requiredProps.load(appendedPropsIn);
+                    }
+
+                    String artifactId = requiredPropsFile.getParent().getName().getBaseName();
+                    String groupId = requiredPropsFile.getParent().getParent().getName().getBaseName();
+                    String libraryName = groupId + ":" + artifactId;
+                    cn1SettingsProps = mergeRequiredProperties(libraryName, requiredProps, cn1SettingsProps);
+                }
+            }
+
+        }
+
+        // Fail here rather than in Gradle. A dependency hint that ran two statements together
+        // surfaces on the build server as a Groovy MissingMethodException against a generated
+        // build.gradle line, which says nothing about which hint or which library produced it --
+        // and on a cloud build that answer costs a queue slot and a round trip to discover.
+        for (String gradleHint : new String[] {"codename1.arg.android.gradleDep",
+                "codename1.arg.gradleDependencies"}) {
+            String problem = LibraryHintMerger.findUnseparatedStatement(
+                    gradleHint, cn1SettingsProps.getProperty(gradleHint));
+            if (problem != null) {
+                throw new BuildExecutionException(problem);
+            }
+        }
+
+        // Re-run the hardening pre-flight against the MERGED effective settings: a CN1Lib can supply
+        // codename1.arg.harden.level (or a per-platform opt-out) via the appended/required properties
+        // just merged above, which the early pre-flight -- run before this jar existed -- could not see.
+        // Without this, a library that turns hardening on would slip a local/source build past the
+        // local-build refusal / force-off and produce a locally hardened artifact whose mapping is never
+        // uploaded (so its crashes could never be retraced).
+        applyHardeningPreflight(cn1SettingsProps);
+
+        // Same reason, for the same reason: a CN1Lib can supply ios.*.distributionMethod, so the
+        // profile's kind is compared against the export method only now that those properties
+        // have been merged -- an early refusal would reject a build the merge was about to fix.
+        applyIOSProvisioningPreflight(cn1SettingsProps);
+
+
+        cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
+        cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-maven-plugin", cn1MavenPluginVersion);
+
+        mirrorSecondaryEntryPointsToBuildArgs(cn1SettingsProps);
+
+        // App-extension provisioning profiles (e.g. the generated CN1Widgets WidgetKit
+        // extension) are named by the codename1.ios.appext.<Name>.provision setting, which
+        // points at a local .mobileprovision file. Cloud builds have no folder to drop the
+        // file into, so base64-encode its bytes into the ios.appext.<Name>.provisioningData
+        // build arg; the daemon decodes it back to <Name>.mobileprovision before signing.
+        // Done generically over <Name>, mirroring the daemon's per-extension plumbing.
+        // Extension profiles differ between build types just like the app's own
+        // (development for device/debug builds, distribution for release), so debug/release
+        // qualified keys are collapsed into the unqualified ones first.
+        resolveAppExtensionBuildTypeQualifiers(cn1SettingsProps, buildTarget);
+        String appExtPrefix = "codename1.ios.appext.";
+        String appExtSuffix = ".provision";
+        for (String settingKey : new ArrayList<String>(cn1SettingsProps.stringPropertyNames())) {
+            if (!settingKey.startsWith(appExtPrefix) || !settingKey.endsWith(appExtSuffix)) {
+                continue;
+            }
+            String extName = settingKey.substring(appExtPrefix.length(), settingKey.length() - appExtSuffix.length());
+            if (extName.isEmpty()) {
+                continue;
+            }
+            String dataKey = "codename1.arg.ios.appext." + extName + ".provisioningData";
+            if (cn1SettingsProps.containsKey(dataKey)) {
+                continue;
+            }
+            String profilePath = cn1SettingsProps.getProperty(settingKey);
+            if (profilePath == null || profilePath.trim().isEmpty()) {
+                continue;
+            }
+            File profileFile = new File(profilePath.trim());
+            if (!profileFile.exists() || !profileFile.isFile()) {
+                getLog().warn("The app extension provisioning profile referenced by " + settingKey
+                        + " was not found at " + profileFile.getAbsolutePath() + ". Skipping it; the "
+                        + extName + " extension will not receive a provisioning profile for this build.");
+                continue;
+            }
+            try {
+                byte[] profileBytes = FileUtils.readFileToByteArray(profileFile);
+                cn1SettingsProps.setProperty(dataKey, java.util.Base64.getEncoder().encodeToString(profileBytes));
+            } catch (IOException ex) {
+                getLog().warn("Failed to read the app extension provisioning profile referenced by " + settingKey
+                        + " at " + profileFile.getAbsolutePath() + ". Skipping it: " + ex.getMessage());
+            }
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(codenameOneSettingsCopy)) {
+            cn1SettingsProps.store(fos,"");
+
+        }
+        final Process[] proc = new Process[1];
+        final boolean[] closingHypLog = new boolean[1];
+        Thread hyperBeamThread = new Thread(()->{
+
+            ProcessBuilder pb = new ProcessBuilder("hyp", "beam", logPasskey);
+            pb.redirectErrorStream(true);
+            try {
+                proc[0] = pb.start();
+
+
+                InputStream out = proc[0].getInputStream();
+
+
+                byte[] buffer = new byte[4000];
+                while (isAlive(proc[0])) {
+                    int no = out.available();
+                    if (no > 0) {
+                        int n = out.read(buffer, 0, Math.min(no, buffer.length));
+                        getLog().info(new String(buffer, 0, n, StandardCharsets.UTF_8));
+                    }
+
+
+                    try {
+                        Thread.sleep(10);
+                    }
+                    catch (InterruptedException e) {
+                    }
+                }
+
+            } catch (Exception ex) {
+                if (!closingHypLog[0]) {
+                    getLog().warn("Failed to start hyperlog.  The build log will not stream to your console.  If the build fails, you can download the error log at https://cloud.codenameone.com/secure/index.html");
+                    getLog().debug(ex);
+                }
+
+            }
+
+        });
+
+
+        try {
+
+            if (isLocalBuildTarget(buildTarget)) {
+                automated = false;
+                if (BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget)
+                        || "local-windows-device".equals(buildTarget)) {
+                    // Local native ParparVM Windows cross-compile (clang-cl) and the
+                    // windows-source project generation. The cloud win32 build
+                    // (windows-device) is NOT local -- it falls through to the
+                    // server submission below. Distinct from the JVM-bundled
+                    // "windows-desktop" (javase) target.
+                    doWindowsNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if ("local-linux-device".equals(buildTarget)) {
+                    // Native ParparVM Linux build (GTK3/Cairo, CMake/Ninja). Distinct
+                    // from the JVM-bundled "linux-desktop" (javase) target.
+                    doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+                    doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                        || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
+                    // The native AppKit build. mac-source stops once the Xcode
+                    // project exists; local-mac-device goes on to build it, and
+                    // both run the same builder, so what a developer opens in
+                    // Xcode is what the device target compiles. mac-os-x-native
+                    // is the cloud target and is not handled here -- it has its
+                    // own queue rather than riding the iOS one.
+                    if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                        cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
+                    }
+                    doMacOSNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (buildTarget.contains("javascript")) {
+                    doJavaScriptLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else {
+                    throw new BuildExecutionException("Build target not supported "+buildTarget);
+                }
+            } else {
+                // Cloud builds route through a remote build server. Nothing is
+                // injected for Mac Catalyst here: it is an iOS build that the
+                // user turns on with macNative.enabled, and the server-side
+                // IPhoneBuilder reads that hint directly.
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
+                }
+                if (automated) {
+                    getLog().debug("Attempting to start hyper beam stream the build log to the console");
+                    hyperBeamThread.start();
+                }
+                AntExecutor.executeAntTask(new File(antProject, "build.xml").getAbsolutePath(), buildTarget, p);
+            }
+        } finally {
+            if (automated) {
+                try {
+                    closingHypLog[0] = true;
+                    proc[0].destroyForcibly();
+                } catch (Exception ex) {
+                    if (getLog().isDebugEnabled()) {
+                        getLog().warn("Failed to shut down hyperlog process cleanly", ex);
+                    }
+                }
+            }
+        }
+
+        if (automated) {
+            getLog().info("Extracting server result");
+            File result = new File(antDistDir, "result.zip");
+            if (!result.exists()) {
+                throw new IOException("Failed to find result.zip after automated build");
+            }
+
+            Expand unzip = (Expand)this.antProject.createTask("unzip");
+            unzip.setSrc(result);
+            File resultDir = new File(antDistDir, "result");
+            resultDir.mkdir();
+            unzip.setDest(resultDir);
+            unzip.execute();
+            File[] resultFiles = resultDir.listFiles();
+            // Every returned base, by extension, collected BEFORE anything is classified: see
+            // roleSuffixFor, which needs to know whether a suffixed entry names an artifact that
+            // is also here.
+            java.util.Map<String, java.util.Set<String>> basesByExtension =
+                    new java.util.HashMap<String, java.util.Set<String>>();
+            for (File child : resultFiles) {
+                String name = child.getName();
+                int dot = name.lastIndexOf(".");
+                if (dot < 0) {
+                    continue;
+                }
+                String ext = name.substring(dot);
+                java.util.Set<String> bases = basesByExtension.get(ext);
+                if (bases == null) {
+                    bases = new java.util.HashSet<String>();
+                    basesByExtension.put(ext, bases);
+                }
+                bases.add(name.substring(0, dot));
+            }
+            for (File child : resultFiles) {
+                String name = child.getName();
+                int dotpos = name.lastIndexOf(".");
+                if (dotpos < 0) {
+                    continue;
+                }
+                String extension = name.substring(dotpos);
+                String base = name.substring(0, dotpos);
+                // The role suffix has to survive into the copied name. Every entry used to land on
+                // target/<finalName><extension>, keyed on the extension alone, so a build that
+                // returns two artifacts of the same kind -- a phone APK and its companion Wear APK
+                // -- collapsed both onto one path and the last one written won. That is silent and
+                // it corrupts the primary artifact, not merely the secondary one.
+                String roleSuffix = roleSuffixFor(base, extension, basesByExtension);
+                File copyTo = new File(buildDirectory() + File.separator + finalName() + roleSuffix + extension);
+                FileUtils.copyFile(child, copyTo);
+                if (roleSuffix.length() > 0) {
+                    // Attached with a classifier so the companion artifact is installed and
+                    // deployed beside the primary one rather than being an orphan in target/.
+                    attachArtifact(extension.substring(1),
+                            roleSuffix.substring(1), copyTo);
+                } else if (".war".equals(extension)) {
+                    attachArtifact("war", copyTo);
+                } else if (".zip".equals(extension) && "javascript".equals(buildTarget)) {
+                    attachArtifact("zip", "webapp", copyTo);
+                } else if (".dmg".equals(extension) && "mac-os-x-desktop".equals(buildTarget)) {
+                    attachArtifact("dmg", "mac-app", copyTo);
+
+                } else if (".pkg".equals(extension) && "mac-os-x-desktop".equals(buildTarget)) {
+                    attachArtifact("pkg", "mac-app-installer", copyTo);
+
+                }
+
+            }
+            FileUtils.deleteDirectory(resultDir);
+            result.delete();
+            afterBuild();
+        }
+
+
+
+
+    }
+
+    private static boolean isAlive(Process proc) {
+        try {
+            proc.exitValue();
+            return false;
+        }
+        catch (IllegalThreadStateException e) {
+            return true;
+        }
+    }
+    private String generateCertificate(String password, String alias, String fullName, String orgName, String company, String city, String state, String twoLetterCountryCode, boolean sha512) throws Exception {
+        File keyTool = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "keytool");
+        if (!keyTool.exists()) {
+            keyTool = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "keytool.exe");
+        }
+        File keyfileLocation = new File(System.getProperty("user.home") + File.separator + "Keychain.ks");
+        int counter = 1;
+        while (keyfileLocation.exists()) {
+            keyfileLocation = new File(System.getProperty("user.home") + File.separator + "Keychain_" + counter + ".ks");
+            counter++;
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(keyTool.getAbsolutePath(),
+                "-genkey", "-keystore", keyfileLocation.getAbsolutePath(), "-storetype", "jks", "-alias", alias,
+                "-keyalg", "RSA", "-keysize", "2048", "-validity", "15000", "-dname", "CN=" + fullName.replace(",", "\\,")
+                + ", OU=" + orgName.replace(",", "\\,")
+                + ", O=" + company.replace(",", "\\,")
+                + ", L=" + city.replace(",", "\\,")
+                + ", S=" + state.replace(",", "\\,")
+                + ", C=" + twoLetterCountryCode, "-storepass", password, "-keypass", password, "-v");
+
+        if(sha512) {
+            pb.command().add("-sigalg");
+            pb.command().add("SHA512withRSA");
+        }
+
+        Process p = pb.start();
+        int res = p.waitFor();
+        //error occurred
+        if(res > 0){
+            final InputStream input = p.getInputStream();
+            final InputStream stream = p.getErrorStream();
+
+            byte[] buffer = new byte[8192];
+            int i = input.read(buffer);
+            while (i > -1) {
+                String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
+                System.out.print(str);
+                i = stream.read(buffer);
+            }
+            i = stream.read(buffer);
+            while (i > -1) {
+                String str = new String(buffer, 0, i, StandardCharsets.UTF_8);
+                System.out.print(str);
+                i = stream.read(buffer);
+            }
+
+            return null;
+        }
+
+
+
+        return keyfileLocation.getAbsolutePath();
+    }
+
+
+    private File getGeneratedAndroidProjectSourceDirectory() {
+        return new File(buildDirectory(), finalName() + "-android-source");
+    }
+
+    private File getGeneratedIOSProjectSourceDirectory() {
+        return new File(buildDirectory(), finalName() + "-ios-source");
+    }
+
+    private File getGeneratedMacProjectSourceDirectory() {
+        return new File(buildDirectory(), finalName() + "-mac-source");
+    }
+
+    private boolean isMacNativeBuild(Properties props) {
+        return "true".equalsIgnoreCase(props.getProperty("codename1.arg.macNative.enabled", "false"));
+    }
+
+    private void doAndroidLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+        if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+
+            File generatedProject = getGeneratedAndroidProjectSourceDirectory();
+            getLog().info("Generating android gradle Project to "+generatedProject+"...");
+            try {
+                if (generatedProject.exists()) {
+                    getLog().info("Android gradle project already exists.  Checking to see if it needs updating...");
+                    if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
+                        getLog().info("Sources have not changed.  Skipping android gradle project generation");
+                        if (open) {
+                            openAndroidStudioProject(generatedProject);
+                        }
+                        return;
+
+                    }
+                }
+
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Failed to find last modification time of "+generatedProject);
+            }
+        }
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+
+        AndroidGradleBuilder e = new AndroidGradleBuilder();
+        e.setBuildTarget(buildTarget);
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "android-build");
+        e.setBuildDirectory(buildDirectory);
+
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        String iconPath = props.getProperty("codename1.icon");
+        File iconFile = new File(iconPath);
+        if (!iconFile.isAbsolute()) {
+            iconFile = new File(getCN1ProjectDir(), iconPath);
+        }
+        try {
+            BufferedImage bi = ImageIO.read(iconFile);
+            if(bi.getWidth() != 512 || bi.getHeight() != 512) {
+                throw new BuildExecutionException("The icon must be a 512x512 pixel PNG image. It will be scaled to the proper sizes for devices");
+            }
+            r.setIcon(iconFile.getAbsolutePath());
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Error reading the icon: the icon must be a 512x512 pixel PNG image. It will be scaled to the proper sizes for devices");
+        }
+
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
+        r.setType("android");
+
+        r.setKeystoreAlias(props.getProperty("codename1.android.keystoreAlias"));
+        String keystorePath = props.getProperty("codename1.android.keystore");
+        if (keystorePath != null) {
+            File keystoreFile = new File(keystorePath);
+            if (!keystoreFile.isAbsolute()) {
+                keystoreFile = new File(getCN1ProjectDir(), keystorePath);
+            }
+            if (keystoreFile.exists() && keystoreFile.isFile()) {
+                try {
+                    r.setCertificate(keystoreFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to load keystore file. ", ex);
+                }
+            } else {
+
+                File androidCerts = new File(getCN1ProjectDir(), "androidCerts");
+                androidCerts.mkdirs();
+                keystoreFile = new File(androidCerts, "KeyChain.ks");
+                if (!keystoreFile.exists()) {
+                    try {
+                        String alias = r.getKeystoreAlias();
+                        if (alias == null || alias.isEmpty()) {
+                            alias = "androidKey";
+                            r.setKeystoreAlias(alias);
+                            props.setProperty("codename1.android.keystoreAlias", alias);
+                        }
+                        String password = props.getProperty("codename1.android.keystorePassword");
+                        if (password == null || password.isEmpty()) {
+                            password = "password";
+                            props.setProperty("codename1.android.keystorePassword", password);
+
+
+                        }
+                        getLog().info("No Keystore found.  Generating one now");
+                        String keyPath = generateCertificate(password, alias, r.getVendor(), "", r.getVendor(), "Vancouver", "BC", "CA", false);
+                        FileUtils.copyFile(new File(keyPath), keystoreFile);
+                        r.setCertificate(keystoreFile.getAbsolutePath());
+                        getLog().info("Generated keystore with password 'password' at "+keystoreFile+". alias=androidKey");
+                        new File(keyPath).delete();
+                        SortedProperties sp = new SortedProperties();
+                        try (FileInputStream fis = new FileInputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties"))) {
+                            sp.load(fis);
+                        }
+                        sp.setProperty("codename1.android.keystore", keystoreFile.getAbsolutePath());
+                        sp.setProperty("codename1.android.keystorePassword", password);
+                        sp.setProperty("codename1.android.keystoreAlias", alias);
+                        try (FileOutputStream fos = new FileOutputStream(new File(getCN1ProjectDir(), "codenameone_settings.properties"))) {
+                            sp.store(fos, "Updated keystore");
+                        }
+                    } catch (Exception ex) {
+                        getLog().error("Failed to generate keystore", ex);
+                        throw new BuildExecutionException("Failed to generate keystore", ex);
+                    }
+                }
+
+
+            }
+        }
+        r.setCertificatePassword(props.getProperty("codename1.android.keystorePassword"));
+
+        for (Object k : props.keySet()) {
+            String key = (String)k;
+            if(key.startsWith("codename1.arg.")) {
+                String value = props.getProperty(key);
+                String currentKey = key.substring(14);
+                if(currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, value);
+            }
+        }
+        applyHardeningRequestArgs(r);
+
+        BuildRequest request = r;
+        request.setIncludeSource(true);
+        String testBuild = request.getArg("build.unitTest", null);
+        if(testBuild != null && testBuild.equals("1")) {
+            e.setUnitTestMode(true);
+        }
+
+        try {
+            getLog().info("Starting android project builder...");
+            boolean result = e.runBuild(distJar, request);
+            getLog().info("Android project builder completed with result "+result);
+            if (!result) {
+                getLog().error("Received false return value from build()");
+                throw new BuildExecutionException("Android build failed.  Received false return value for build");
+            }
+
+            if (BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget) && e.getGradleProjectDirectory() != null) {
+                File gradleProject = e.getGradleProjectDirectory();
+                File output = getGeneratedAndroidProjectSourceDirectory();
+                output.getParentFile().mkdirs();
+                try {
+                    getLog().info("Copying Gradle Project to "+output);
+                    FileUtils.copyDirectory(gradleProject, output);
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to copy gradle project at "+gradleProject+" to "+output, ex);
+                }
+
+            }
+            if (open) {
+                openAndroidStudioProject(getGeneratedAndroidProjectSourceDirectory());
+            }
+
+
+        } catch (BuildException ex) {
+
+            getLog().error("Failed to build Android project with error: "+ex.getMessage(), ex);
+            getLog().error(e.getErrorMessage());
+            throw new BuildExecutionException("Failed to build android app", ex);
+        } finally {
+
+            e.cleanup();
+        }
+
+    }
+
+    private void openAndroidStudioProject(File generatedProject) {
+        if (isMac) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("open", "-a", "/Applications/Android Studio.app", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else if (isWindows) {
+            getLog().info("Trying to open project in Android studio");
+            ProcessBuilder pb = new ProcessBuilder("C:\\Program Files\\Android\\Android Studio\\bin\\studio.bat", generatedProject.getAbsolutePath());
+            try {
+                pb.start();
+            } catch (Exception ex) {
+                getLog().warn("Failed to open project in Android studio", ex);
+                getLog().warn("Please open the project in Android studio manually.");
+                getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+            }
+        } else {
+            getLog().warn("Opening automatically in Android studio not supported on this platform.");
+            getLog().warn("Please open the project in Android studio manually.");
+            getLog().warn("The project is located at "+generatedProject.getAbsolutePath());
+        }
+    }
+
+    private File getWorkspace(Properties props, File xcprojectRoot) {
+        return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcworkspace");
+    }
+
+    private File getXcodeProject(Properties props, File xcprojectRoot) {
+        return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcodeproj");
+    }
+
+    private File getWorkspaceOrProject(Properties props, File xcprojectRoot) {
+        File workspace = getWorkspace(props, xcprojectRoot);
+        if (workspace.exists()) {
+            return workspace;
+        }
+        return getXcodeProject(props, xcprojectRoot);
+    }
+
+    private void openWorkspace(File workspace) throws BuildExecutionException {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("open", workspace.getAbsolutePath());
+            Process p = pb.start();
+            int result = p.waitFor();
+            if (result != 0) {
+                throw new BuildExecutionException("Failed to open project at "+workspace+".  Result code: "+result);
+            }
+        } catch (Exception ex) {
+            throw new BuildExecutionException("Failed to open project at "+workspace, ex);
+        }
+    }
+
+    private void doIOSLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+
+        boolean macNativeBuild = isMacNativeBuild(props);
+
+        if (BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+
+            File generatedProject = macNativeBuild
+                    ? getGeneratedMacProjectSourceDirectory()
+                    : getGeneratedIOSProjectSourceDirectory();
+            getLog().info("Generating Xcode Project to "+generatedProject+"...");
+            try {
+                if (generatedProject.exists()) {
+                    getLog().info("Xcode project already exists.  Checking to see if it needs updating...");
+                    if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
+                        getLog().info("Sources have not changed.  Skipping Xcode project generation");
+                        if (open) {
+                            File projectToOpen = getWorkspaceOrProject(props, generatedProject);
+                            getLog().info("Opening Xcode project "+projectToOpen);
+                            openWorkspace(projectToOpen);
+                        }
+                        return;
+
+                    }
+                }
+
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Failed to find last modification time of "+generatedProject);
+            }
+        }
+
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+
+        IPhoneBuilder e = new IPhoneBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir,
+                "dist" + File.separator + (macNativeBuild ? "mac-build" : "ios-build"));
+        e.setBuildDirectory(buildDirectory);
+
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setAppid(props.getProperty("codename1.ios.appid"));
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        String iconPath = props.getProperty("codename1.icon");
+        File iconFile = new File(iconPath);
+        if (!iconFile.isAbsolute()) {
+            iconFile = new File(getCN1ProjectDir(), iconPath);
+        }
+        try {
+            BufferedImage bi = ImageIO.read(iconFile);
+            if(bi.getWidth() != 512 || bi.getHeight() != 512) {
+                throw new BuildExecutionException("The icon must be a 512x512 pixel PNG image. It will be scaled to the proper sizes for devices");
+            }
+            r.setIcon(iconFile.getAbsolutePath());
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Error reading the icon: the icon must be a 512x512 pixel PNG image. It will be scaled to the proper sizes for devices");
+        }
+
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
+        r.setType("ios");
+
+
+        for (Object k : props.keySet()) {
+            String key = (String)k;
+            if(key.startsWith("codename1.arg.")) {
+                String value = props.getProperty(key);
+                String currentKey = key.substring(14);
+                if(currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, value);
+            }
+        }
+        applyHardeningRequestArgs(r);
+
+        BuildRequest request = r;
+        String incSources = request.getArg("build.incSources", null);
+        request.setIncludeSource(true);
+
+        String testBuild = request.getArg("build.unitTest", null);
+        if(testBuild != null && testBuild.equals("1")) {
+            e.setUnitTestMode(true);
+        }
+
+        try {
+            boolean result = e.runBuild(distJar, request);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("iOS builder log:\n" + builderLog);
+                }
+                throw new BuildExecutionException("iOS build failed");
+            }
+
+            if ((BUILD_TARGET_XCODE_PROJECT.equals(buildTarget) || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) && e.getXcodeProjectDir() != null) {
+                File xcodeProject = e.getXcodeProjectDir();
+                File output = macNativeBuild
+                        ? getGeneratedMacProjectSourceDirectory()
+                        : getGeneratedIOSProjectSourceDirectory();
+                output.getParentFile().mkdirs();
+                try {
+                    // This directory is a generated target. Replacing it is
+                    // required when class scanning removes a dependency:
+                    // copyDirectory() alone leaves stale Podfiles, workspaces,
+                    // Pods and optional native sources from the prior build.
+                    if (output.exists()) {
+                        FileUtils.deleteDirectory(output);
+                    }
+                    getLog().info("Copying Xcode Project to "+output);
+                    FileUtils.copyDirectory(xcodeProject, output);
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to copy xcode project at "+xcodeProject+" to "+output, ex);
+                }
+                if (open) {
+
+                    File projectToOpen = getWorkspaceOrProject(props, output);
+                    getLog().info("Opening Xcode project "+projectToOpen);
+                    openWorkspace(projectToOpen);
+
+                }
+            }
+
+
+        } catch (BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("iOS builder log:\n" + builderLog);
+            }
+            throw new BuildExecutionException("Failed to build ios app", ex);
+        } finally {
+
+            e.cleanup();
+        }
+
+    }
+
+    /**
+     * Local native Windows build via {@link WindowsNativeBuilder}: translates the
+     * app with ParparVM's windows target and compiles it with clang-cl for the
+     * selected architecture ({@code windows.arch}). Mirrors the iOS local-build
+     * wiring. The native compile only succeeds on Windows with the MSVC/clang-cl
+     * toolchain present; elsewhere the builder fails fast with a clear message.
+     */
+    /**
+     * Builds the native macOS (AppKit) application locally.
+     *
+     * <p>Unlike Mac Catalyst, which is the iOS build with one hint set, this
+     * runs its own builder against the macosx SDK. Both {@code mac-source} and
+     * {@code mac-os-x-native} come here; the former sets
+     * {@code macos.sourceOnly} so the builder stops once the Xcode project
+     * exists.</p>
+     */
+    private void doMacOSNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        MacOSNativeBuilder e = new MacOSNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "macos-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        // The icon rides the request rather than the source archive, exactly as
+        // it does for iOS and Windows, and the builder renders the asset catalog
+        // from it. Omitted here, the generated AppIcon.appiconset references ten
+        // PNGs that are never written: a generic icon in the Dock, and an App
+        // Store validation failure for having none.
+        String iconPath = props.getProperty("codename1.icon");
+        if (iconPath != null && iconPath.length() > 0) {
+            File iconFile = new File(iconPath);
+            if (!iconFile.isAbsolute()) {
+                iconFile = new File(getCN1ProjectDir(), iconPath);
+            }
+            try {
+                r.setIcon(iconFile.getAbsolutePath());
+            } catch (IOException ex) {
+                throw new BuildExecutionException("Error reading the icon at "
+                        + iconFile.getAbsolutePath()
+                        + ": it must be a 512x512 pixel PNG, which is scaled to the sizes the "
+                        + "macOS asset catalog asks for.", ex);
+            }
+        }
+        r.setType("macos");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        applyHardeningRequestArgs(r);
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("macOS builder log:\n" + builderLog);
+                }
+                throw new BuildExecutionException("Native macOS build failed");
+            }
+            if (e.getXcodeProjectDir() != null && BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                // Collected under the same <finalName>-mac-source name the
+                // Catalyst path used, so a project that switches between the
+                // two ports finds its Xcode project in the same place.
+                File output = getGeneratedMacProjectSourceDirectory();
+                output.getParentFile().mkdirs();
+                try {
+                    // Replaced rather than merged: a stale source file from a
+                    // previous build is still compiled by the regenerated
+                    // project, and the resulting failure names a file the
+                    // developer never wrote.
+                    if (output.exists()) {
+                        FileUtils.deleteDirectory(output);
+                    }
+                    getLog().info("Copying macOS Xcode project to " + output);
+                    FileUtils.copyDirectory(e.getXcodeProjectDir(), output);
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to collect the generated macOS Xcode project", ex);
+                }
+                // Opened, as the iOS project path beside this one does. The
+                // Mac Native Project IDE shortcut and a plain mac-source build
+                // both default to open=true, and without this they completed
+                // with no Xcode window and no indication that the documented
+                // option had been ignored.
+                //
+                // getWorkspaceOrProject rather than the .xcodeproj directly:
+                // it prefers a workspace when the generated project has one,
+                // which is the thing Xcode should be handed.
+                if (open) {
+                    File projectToOpen = getWorkspaceOrProject(props, output);
+                    getLog().info("Opening macOS Xcode project " + projectToOpen);
+                    openWorkspace(projectToOpen);
+                }
+            }
+            if (e.getAppBundle() != null) {
+                getLog().info("Built native macOS application: " + e.getAppBundle().getAbsolutePath());
+                // Every artifact, not just the first bundle: with
+                // macos.distribution=both there are two, each with its own
+                // container, and a dmg or pkg nobody is told about is a dmg
+                // nobody ships.
+                for (java.io.File artifact : e.getArtifacts()) {
+                    if (!artifact.equals(e.getAppBundle())) {
+                        getLog().info("  also produced: " + artifact.getAbsolutePath());
+                    }
+                }
+            } else if (e.getXcodeProjectDir() != null) {
+                getLog().info("Generated macOS Xcode project: " + e.getXcodeProjectDir().getAbsolutePath());
+            }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("macOS builder log:\n" + builderLog);
+            }
+            throw new BuildExecutionException("Failed to build the macOS app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
+    private void doWindowsNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        WindowsNativeBuilder e = new WindowsNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "windows-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setType("windows");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        applyHardeningRequestArgs(r);
+        // Authenticode signing certificate. Configured through settings/properties
+        // (codename1.windows.signing.certificate = path to the .p12/.pfx, and
+        // codename1.windows.signing.password). This mirrors the cloud build, whose
+        // codeNameOne task uploads the same certificate into the request, so a
+        // local build and a cloud build sign from the same configuration.
+        String winCert = props.getProperty("codename1.windows.signing.certificate");
+        if (winCert != null && !winCert.isEmpty()) {
+            File certFile = new File(winCert);
+            if (!certFile.isAbsolute()) {
+                certFile = new File(getCN1ProjectDir(), winCert);
+            }
+            if (certFile.isFile()) {
+                try {
+                    r.setCertificate(certFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to read the Windows signing certificate: " + certFile, ex);
+                }
+                r.setCertificatePassword(props.getProperty("codename1.windows.signing.password"));
+            } else {
+                getLog().warn("codename1.windows.signing.certificate points at a missing file: " + certFile);
+            }
+        }
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("Windows builder log:\n" + builderLog);
+                }
+                throw new BuildExecutionException("Windows native build failed");
+            }
+            if (e.getWindowsExecutable() != null) {
+                getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
+            }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("Windows builder log:\n" + builderLog);
+            }
+            throw new BuildExecutionException("Failed to build Windows app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
+    /**
+     * Local native Linux build via {@link LinuxNativeBuilder}: translates the app
+     * with ParparVM's linux target and compiles it with CMake/Ninja for the
+     * selected architecture ({@code linux.arch}). Mirrors the Windows local-build
+     * wiring. The native compile only succeeds on Linux with the GTK3 dev stack +
+     * pkg-config present (and, for musl targets, a {@code zig}/musl toolchain);
+     * elsewhere the builder fails fast with a clear message.
+     */
+    private void doLinuxNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        LinuxNativeBuilder e = new LinuxNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "linux-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setType("linux");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        applyHardeningRequestArgs(r);
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("Linux builder log:\n" + builderLog);
+                }
+                throw new BuildExecutionException("Linux native build failed");
+            }
+            if (e.getLinuxExecutable() != null) {
+                getLog().info("Built native Linux executable: " + e.getLinuxExecutable().getAbsolutePath());
+            }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("Linux builder log:\n" + builderLog);
+            }
+            throw new BuildExecutionException("Failed to build Linux app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
+    // Local ParparVM-backed JavaScript build target.
+    private void doJavaScriptLocalBuild(File tmpProjectDir, Properties props, File distJar) throws BuildExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+
+        JavaScriptBuilder e = new JavaScriptBuilder();
+        e.setLogger(getLog());
+        e.setBuildTarget(buildTarget);
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "javascript-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        String iconPath = props.getProperty("codename1.icon");
+        if (iconPath != null) {
+            File iconFile = new File(iconPath);
+            if (!iconFile.isAbsolute()) {
+                iconFile = new File(getCN1ProjectDir(), iconPath);
+            }
+            if (iconFile.isFile()) {
+                try {
+                    r.setIcon(iconFile.getAbsolutePath());
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to read icon " + iconFile, ex);
+                }
+            }
+        }
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setSubTitle(props.getProperty("codename1.secondaryTitle"));
+        r.setType("javascript");
+
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String value = props.getProperty(key);
+                String currentKey = key.substring(14);
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new BuildExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, value);
+            }
+        }
+        applyHardeningRequestArgs(r);
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("JavaScript builder log:\n" + builderLog);
+                }
+                throw new BuildExecutionException("JavaScript build failed");
+            }
+            File outputZip = e.getJavaScriptOutputZip();
+            if (outputZip != null && outputZip.isFile()) {
+                File copyTo = new File(buildDirectory() + File.separator + finalName() + ".zip");
+                try {
+                    FileUtils.copyFile(outputZip, copyTo);
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to copy JavaScript bundle to " + copyTo, ex);
+                }
+                attachArtifact("zip", "webapp", copyTo);
+                getLog().info("JavaScript bundle written to " + copyTo);
+            }
+            File deployable = e.getJavaScriptDeployableArtifact();
+            if (deployable != null && deployable.isFile()) {
+                String name = deployable.getName();
+                int dot = name.lastIndexOf('.');
+                String extension = dot < 0 ? "zip" : name.substring(dot + 1);
+                String classifier = "war".equals(extension) ? "webapp-proxy" : "proxy-"
+                        + r.getArg("javascript.proxy.target", "jakarta-servlet");
+                File copyTo = new File(buildDirectory(), name);
+                try {
+                    FileUtils.copyFile(deployable, copyTo);
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to copy JavaScript deployable bundle to " + copyTo, ex);
+                }
+                attachArtifact(extension, classifier, copyTo);
+                getLog().info("JavaScript deployable bundle written to " + copyTo);
+            }
+            // The translator writes its deployment configuration and its build report BESIDE
+            // the bundle rather than inside it, so unpacking the zip into a web root cannot
+            // publish them. The zip copied above is all that leaves the build directory, and
+            // the finally below deletes that directory outright -- without this the developer
+            // never sees either artifact at all. They are copied, not attached: host
+            // configuration is not something to publish to a Maven repository.
+            for (File artifact : e.getJavaScriptBuildArtifacts()) {
+                File copyTo = new File(buildDirectory(), artifact.getName());
+                try {
+                    if (artifact.isDirectory()) {
+                        FileUtils.copyDirectory(artifact, copyTo);
+                    } else {
+                        FileUtils.copyFile(artifact, copyTo);
+                    }
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Failed to copy JavaScript build artifact to "
+                            + copyTo, ex);
+                }
+                getLog().info("JavaScript build artifact written to " + copyTo);
+            }
+        } catch (BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("JavaScript builder log:\n" + builderLog);
+            }
+            throw new BuildExecutionException("Failed to build JavaScript app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
+    /// Called once a cloud build's results have been collected.
+    protected void afterBuild() {
+
+    }
+
+    /**
+     * Role suffixes a returned artifact may carry, longest first so a future
+     * "-wear-debug" cannot be shadowed by "-wear".
+     *
+     * <p>Kept deliberately closed. Anything not on this list is the primary artifact and
+     * keeps the plain {@code <finalName><extension>} name it has always had, so adding a
+     * role here is the only way to change where a file lands.</p>
+     */
+    // Longest first: "-wear-debug" ends with neither "-wear" nor anything else here, but a
+    // future suffix that is a tail of another would match the shorter one if it came first.
+    /**
+     * The role a result entry plays, given what else came back.
+     *
+     * <p>A role suffix is a claim about a SET, not about a name, and the question it answers is
+     * "is there something here that this one is the companion TO". An app called
+     * {@code fitness-wear} returns one APK whose base ends in {@code -wear} and it is the primary
+     * artifact; the same app with a companion returns {@code fitness-wear} and
+     * {@code fitness-wear-wear}, where the second is not. Neither reading the name alone nor
+     * asking whether any unsuffixed entry exists separates those two cases -- in the second, no
+     * entry is unsuffixed at all.</p>
+     *
+     * <p>What does separate them is the artifact the suffix points at: strip it, and a companion
+     * names something else in the set while a primary names nothing.</p>
+     *
+     * @param base the entry's name with its extension removed
+     * @param extension the entry's extension, including the dot
+     * @param basesByExtension every returned base, keyed by extension
+     * @return the role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixFor(String base, String extension,
+            java.util.Map<String, java.util.Set<String>> basesByExtension) {
+        String suffix = roleSuffixOf(base);
+        if (suffix.length() == 0 || basesByExtension == null) {
+            return "";
+        }
+        java.util.Set<String> siblings = basesByExtension.get(extension);
+        if (siblings == null) {
+            return "";
+        }
+        return siblings.contains(base.substring(0, base.length() - suffix.length()))
+                ? suffix : "";
+    }
+
+    private static final String[] ARTIFACT_ROLE_SUFFIXES = {"-wear-debug", "-wear"};
+
+    /**
+     * The role suffix carried by a result entry's base name, or an empty string when it is
+     * the primary artifact.
+     *
+     * <p>A build may hand back more than one artifact of the same kind -- an Android
+     * companion build returns the phone APK and the Wear APK beside it -- and the two
+     * cannot share a destination path. The builder names the secondary one with a role
+     * suffix; this recovers it so the copy keeps it and the artifact can be attached
+     * under a matching classifier.</p>
+     *
+     * @param base the result file's name with its extension already removed
+     * @return the matching role suffix including its leading dash, or an empty string
+     */
+    static String roleSuffixOf(String base) {
+        if (base == null) {
+            return "";
+        }
+        for (String suffix : ARTIFACT_ROLE_SUFFIXES) {
+            if (base.endsWith(suffix)) {
+                return suffix;
+            }
+        }
+        return "";
+    }
+
+    static class LibraryPropertiesException extends Exception {
+        private String libName;
+        LibraryPropertiesException(String libName, String message) {
+            super(message);
+            this.libName = libName;
+        }
+    }
+
+    private static class VersionMismatchException extends LibraryPropertiesException {
+        VersionMismatchException(String libName, String message) {
+            super(libName, message);
+        }
+    }
+
+    private static class PropertyConflictException extends LibraryPropertiesException {
+        PropertyConflictException(String libName, String message) {
+            super(libName, message);
+        }
+    }
+
+    static SortedProperties mergeRequiredProperties(String libraryName, Properties libProps, Properties projectProps) throws LibraryPropertiesException {
+
+
+        String javaVersion = (String)projectProps.getProperty("codename1.arg.java.version", "8");
+        String javaVersionLib = (String)libProps.get("codename1.arg.java.version");
+        if(javaVersionLib != null){
+            int v1 = JavaVersionUtil.parseJavaVersion(javaVersion, 5);
+            int v2 = JavaVersionUtil.parseJavaVersion(javaVersionLib, 5);
+            //if the lib java version is bigger, this library cannot be used
+            if(v1 < v2){
+                throw new VersionMismatchException(libraryName, "Cannot use a cn1lib with java version "
+                        + "greater then the project java version");
+            }
+        }
+        //merge and save
+        SortedProperties merged = new SortedProperties();
+        merged.putAll(projectProps);
+        Enumeration keys = libProps.propertyNames();
+        while(keys.hasMoreElements()){
+            String key = (String) keys.nextElement();
+            if(!merged.containsKey(key)){
+                merged.put(key, libProps.getProperty(key));
+            }else{
+
+                //if this property already exists with a different value the
+                //install will fail
+                if(!merged.get(key).equals(libProps.getProperty(key))){
+                    if ("codename1.arg.java.version".equals(key)) {
+                        // Preserve the project's java version when it is equal to or greater than
+                        // the library requirement. This is validated above and allows using
+                        // Java 8 cn1libs in Java 11/17+ projects.
+                        continue;
+                    }
+                    throw new PropertyConflictException(libraryName, "Property " + key + " has a conflict");
+                }
+            }
+        }
+        return merged;
+
+    }
+
+}

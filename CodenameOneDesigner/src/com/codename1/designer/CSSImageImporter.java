@@ -25,6 +25,8 @@ package com.codename1.designer;
 import com.codename1.designer.css.CN1CSSCLI;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -70,12 +72,24 @@ public class CSSImageImporter {
     
    
     
-    private File getProjectDir() {
-        return MavenHelper.getProjectDir(resourceFile);
+    /// The project the resource file belongs to: Ant, Maven or Gradle.
+    /// Null when the file is not inside a Codename One project.
+    private ProjectLayout getLayout() {
+        return ProjectLayouts.detect(resourceFile);
     }
-    
+
+    /// The directory holding `codenameone_settings.properties`: the project
+    /// root under Ant and Gradle, `common/` under Maven.
+    private File getProjectDir() {
+        ProjectLayout layout = getLayout();
+        return layout == null ? null : layout.projectDir();
+    }
+
+    /// `css/` under Ant, `src/main/css` under Maven and Gradle.
     private File getCSSDir() {
-        return MavenHelper.getCSSDir(resourceFile);
+        ProjectLayout layout = getLayout();
+        // Outside a project this always resolved to a relative "css".
+        return layout == null ? new File("css") : layout.cssDir();
     }
     
     private File getCSSFile() {
@@ -90,7 +104,7 @@ public class CSSImageImporter {
     
     
     private File getCodenameOneSettingsFile() {
-        return new File(getProjectDir(), "codenameone_settings.properties");
+        return new File(getProjectDir(), ProjectLayout.SETTINGS_FILE);
     }
     
     private Properties loadCodenameOneSettings() throws IOException {

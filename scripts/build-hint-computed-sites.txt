@@ -33,10 +33,10 @@
 # literal search -- including this gate -- reported success while all ten had no
 # catalog row.
 
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MapsProviderInjector.java|platform + ".maps.provider"|android.maps.provider,ios.maps.provider
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/NativeVerifyOption.java|platformPrefix + "." + HINT|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MacNativeBuilder.java|"macNative.provisioningProfile." + (isAppStore ? "appStore" : "developerID")|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + suffix|ios.entitlements.com.apple.developer.healthkit.access
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/WatchNativeBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + canonicalKey|ios.entitlements.com.apple.developer.healthkit.access
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|hintAndMarker[0]|ios.wallet.nonuiImportsInject,ios.wallet.statusInject,ios.wallet.passEntriesInject,ios.wallet.remotePassEntriesInject,ios.wallet.generateRequestInject,ios.wallet.generateResponseInject,ios.wallet.uiImportsInject,ios.wallet.uiViewDidLoadInject,ios.wallet.uiAuthRequestInject,ios.wallet.uiAuthResponseInject
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios." + privacyKey|ios.NSBluetoothAlwaysUsageDescription,ios.NSBluetoothPeripheralUsageDescription,ios.NSCameraUsageDescription,ios.NSMicrophoneUsageDescription,ios.NSSpeechRecognitionUsageDescription
+maven/build-engine/src/main/java/com/codename1/builders/MapsProviderInjector.java|platform + ".maps.provider"|android.maps.provider,ios.maps.provider
+maven/build-engine/src/main/java/com/codename1/builders/NativeVerifyOption.java|platformPrefix + "." + HINT|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
+maven/build-engine/src/main/java/com/codename1/builders/MacNativeBuilder.java|"macNative.provisioningProfile." + (isAppStore ? "appStore" : "developerID")|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
+maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + suffix|ios.entitlements.com.apple.developer.healthkit.access
+maven/build-engine/src/main/java/com/codename1/builders/WatchNativeBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + canonicalKey|ios.entitlements.com.apple.developer.healthkit.access
+maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java|hintAndMarker[0]|ios.wallet.nonuiImportsInject,ios.wallet.statusInject,ios.wallet.passEntriesInject,ios.wallet.remotePassEntriesInject,ios.wallet.generateRequestInject,ios.wallet.generateResponseInject,ios.wallet.uiImportsInject,ios.wallet.uiViewDidLoadInject,ios.wallet.uiAuthRequestInject,ios.wallet.uiAuthResponseInject
+maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios." + privacyKey|ios.NSBluetoothAlwaysUsageDescription,ios.NSBluetoothPeripheralUsageDescription,ios.NSCameraUsageDescription,ios.NSMicrophoneUsageDescription,ios.NSSpeechRecognitionUsageDescription

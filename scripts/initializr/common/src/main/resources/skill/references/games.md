@@ -180,7 +180,8 @@ view.start();
 
 Scaffold a scene with `mvn cn1:create-game-scene -DclassName=com.example.Level1 -Dmode=2d`
 (writes `<Name>.game` + a `GameSceneView` companion), then edit it visually with
-`mvn cn1:gamebuilder` (the standalone level/map editor; Java-17 CN1 projects only).
+`mvn cn1:gamebuilder` (the standalone level/map editor; Java-17 CN1 projects only). In a Gradle
+project the editor is `./gradlew gameBuilder`; the scene scaffold is a Maven goal only for now.
 
 ## Platform support
 

@@ -348,7 +348,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Container empty = new Container(BoxLayout.y());
         empty.setUIID("BuilderWelcome");
         empty.add(new Label("GUI Builder", "BuilderWelcomeTitle"));
-        empty.add(new SpanLabel("Open the builder from a Codename One Maven project with mvn cn1:guibuilder.", "BuilderWelcomeCopy"));
+        empty.add(new SpanLabel("Open the builder from a Codename One project: mvn cn1:guibuilder in a Maven project, or ./gradlew guibuilder in a Gradle project.", "BuilderWelcomeCopy"));
         form.add(BorderLayout.CENTER, BorderLayout.centerAbsolute(empty));
         form.show();
     }

@@ -48,6 +48,21 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateLegacyJava8Generation();
         validateCoordinateGuardRejectsBrokenArtifacts();
         validateLocaleIndependentArtifactIds();
+        validateGradleRefusesUnsupportedCombinations();
+        validateMavenIgnoresAppProjectType();
+        validateGradleTemplateDependencies();
+        validateAgentsMdMatchesBuildTool();
+        validateGradleLocalization();
+        for (Template template : Template.values()) {
+            if (!template.supportsGradle()) {
+                continue;
+            }
+            for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
+                for (IDE ide : IDE.values()) {
+                    validateGradleCombination(template, type, ide);
+                }
+            }
+        }
         for (Template template : Template.values()) {
             for (IDE ide : IDE.values()) {
                 validateCombination(template, ide);
@@ -60,6 +75,287 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
 
+
+    private static ProjectOptions gradleOptions(ProjectOptions.ProjectType type) {
+        return ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.GRADLE, type);
+    }
+
+    /// Every Gradle download, per template, project type and IDE: a single project
+    /// at the root with the shared template's build files, and nothing of Maven's.
+    private void validateGradleCombination(Template template, ProjectOptions.ProjectType type, IDE ide) throws Exception {
+        String mainClassName = "Grd" + template.ordinal() + type.ordinal() + ide.ordinal() + "App";
+        String packageName = "com.acme.g" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
+        String packagePath = packageName.replace('.', '/');
+        String label = template + "/" + type + "/" + ide + ": ";
+        byte[] zipData = createProjectZip(ide, template, mainClassName, packageName, gradleOptions(type));
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        for (String path : entries.keySet()) {
+            assertFalse(path.startsWith("common/"), label + "Gradle projects have no common/ module: " + path);
+            assertFalse(path.endsWith("pom.xml"), label + "Gradle projects carry no pom: " + path);
+            assertFalse(path.startsWith("mvnw") || path.startsWith(".mvn/"), label + "Maven wrapper leaked: " + path);
+            assertFalse(path.equals("build.sh") || path.equals("run.sh") || path.equals("build.bat")
+                    || path.equals("run.bat"), label + "Maven launcher leaked: " + path);
+            String[] mavenModules = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/", "cn1libs/"};
+            for (int i = 0; i < mavenModules.length; i++) {
+                assertFalse(path.startsWith(mavenModules[i]), label + "Maven module leaked: " + path);
+            }
+            // Native directories (src/<platform>/<lang>) are created on demand by
+            // generateNativeInterfaces, never shipped empty or pre-populated.
+            if (path.startsWith("src/") || path.startsWith("backend/src/")) {
+                String rel = path.startsWith("backend/") ? path.substring("backend/".length()) : path;
+                assertTrue(rel.startsWith("src/main/"), label + "unexpected source set: " + path);
+            }
+            assertFalse(path.indexOf("com/example/myapp") >= 0, label + "Unrefactored placeholder path found: " + path);
+        }
+
+        assertNotNull(entries.get("gradlew"), label + "missing gradlew");
+        assertNotNull(entries.get("gradlew.bat"), label + "missing gradlew.bat");
+        assertNotNull(entries.get("gradle/wrapper/gradle-wrapper.jar"), label + "missing wrapper jar");
+        assertNotNull(entries.get("gradle/wrapper/gradle-wrapper.properties"), label + "missing wrapper properties");
+        assertTrue(unixMode(zipData, "gradlew") == 0100755, label + "gradlew must extract executable");
+        assertTrue(unixMode(zipData, "gradlew.bat") == 0100644, label + "gradlew.bat is not a Unix executable");
+
+        String settings = getText(entries, "settings.gradle.kts");
+        assertContains(settings, "id(\"com.codenameone\") version \"7.0.273\"",
+                label + "settings.gradle.kts should apply the Codename One plugin at the generated version");
+        assertContains(settings, "rootProject.name = \"" + GeneratorModel.toLowerCaseInvariant(mainClassName) + "\"",
+                label + "settings.gradle.kts should name the project like the Maven artifactId");
+        assertContains(getText(entries, "gradle.properties"), "org.gradle.configuration-cache=true",
+                label + "gradle.properties should come from the shared template");
+        String gitIgnore = getText(entries, ".gitignore");
+        assertContains(gitIgnore, ".gradle/", label + ".gitignore should ignore the Gradle cache");
+        assertContains(gitIgnore, "build/", label + ".gitignore should ignore build outputs");
+        for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+            if (e.getKey().endsWith(".kts") || e.getKey().endsWith(".properties") || e.getKey().endsWith(".java")) {
+                String text = StringUtil.newString(e.getValue());
+                assertFalse(text.indexOf("__CN1_VERSION__") >= 0 || text.indexOf("__PROJECT_NAME__") >= 0
+                        || text.indexOf("__BACKEND__") >= 0 || text.indexOf("${package}") >= 0,
+                        label + "unrendered template token in " + e.getKey());
+            }
+        }
+
+        String readme = getText(entries, "README.md");
+        assertContains(readme, "./gradlew", label + "README should document Gradle commands");
+        assertFalse(readme.indexOf("mvn") >= 0, label + "Gradle README must not mention Maven commands");
+        assertFalse(readme.indexOf("build.sh") >= 0, label + "Gradle README must not mention the Maven launchers");
+
+        String apiPath;
+        if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+            assertNull(entries.get("codenameone_settings.properties"),
+                    label + "a backend has no Codename One app settings");
+            assertNull(entries.get("icon.png"), label + "a backend has no icon");
+            assertNull(entries.get("src/main/css/theme.css"), label + "a backend has no theme");
+            assertNull(entries.get("AGENTS.md"), label + "the UI authoring skill is not shipped with a backend");
+            assertNotNull(entries.get("application.properties"), label + "backend settings belong at the root");
+            assertNotNull(entries.get("application-dev.properties"), label + "backend dev profile belongs at the root");
+            assertContains(getText(entries, "build.gradle.kts"), "runBackend",
+                    label + "a backend-only root build script is the backend template");
+            apiPath = "src/main/java/" + packagePath + "/Api.java";
+            String api = getText(entries, apiPath);
+            assertContains(api, "./gradlew runBackend", label + "backend-only tasks are addressed from the root");
+            assertFalse(api.indexOf(":backend:") >= 0, label + "backend-only has no :backend: subproject");
+            assertContains(readme, "./gradlew runBackend", label + "backend README should say how to run it");
+        } else {
+            String settingsProps = getText(entries, "codenameone_settings.properties");
+            assertContains(settingsProps, "codename1.packageName=" + packageName, label + "settings package");
+            assertContains(settingsProps, "codename1.mainName=" + mainClassName, label + "settings main class");
+            assertContains(settingsProps, "codename1.kotlin=" + template.IS_KOTLIN, label + "settings kotlin flag");
+            assertContains(settingsProps, "codename1.arg.java.version=17", label + "Gradle projects are Java 17");
+            assertNotNull(entries.get("icon.png"), label + "icon belongs at the root");
+            String themeCss = getText(entries, "src/main/css/theme.css");
+            assertContains(themeCss, "useLargerTextScaleBool: true;", label + "theme defaults apply at the root too");
+            String mainPath = template.IS_KOTLIN
+                    ? "src/main/kotlin/" + packagePath + "/" + mainClassName + ".kt"
+                    : "src/main/java/" + packagePath + "/" + mainClassName + ".java";
+            assertContains(getText(entries, mainPath), "package " + packageName, label + "main source package");
+            String buildScript = getText(entries, "build.gradle.kts");
+            if (template.IS_KOTLIN) {
+                assertContains(buildScript, "kotlin(\"jvm\") version \"" + GeneratorModel.KOTLIN_VERSION + "\"",
+                        label + "Kotlin projects apply the Kotlin Gradle plugin");
+                assertContains(buildScript, "org.jetbrains.kotlin:kotlin-stdlib:" + GeneratorModel.KOTLIN_VERSION,
+                        label + "Kotlin projects declare kotlin-stdlib, as the Maven template does");
+                assertTrue(buildScript.indexOf("plugins {") < buildScript.indexOf("dependencies {"),
+                        label + "plugins {} must precede every other block");
+            } else {
+                assertFalse(buildScript.indexOf("kotlin(") >= 0, label + "Java projects do not apply Kotlin");
+            }
+            assertContains(getText(entries, "AGENTS.md"), "./gradlew run", label + "AGENTS.md should use Gradle");
+            assertNotNull(entries.get(".agent-skills/codename-one/SKILL.md"), label + "the skill ships with Gradle apps");
+            apiPath = "backend/src/main/java/" + packagePath + "/Api.java";
+            if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
+                assertNotNull(entries.get("backend/application.properties"), label + "backend settings");
+                assertNotNull(entries.get("backend/application-dev.properties"), label + "backend dev profile");
+                assertNotNull(entries.get("backend/build.gradle.kts"), label + "backend build script");
+                String api = getText(entries, apiPath);
+                assertContains(api, "package " + packageName + ";", label + "backend shares the app package");
+                assertContains(api, "./gradlew :backend:runBackend", label + "backend tasks are addressed as a subproject");
+                assertContains(getText(entries, "backend/application.properties"), ":backend:runBackend",
+                        label + "backend settings comment should name the subproject task");
+            } else {
+                for (String path : entries.keySet()) {
+                    assertFalse(path.startsWith("backend/"), label + "an App project has no backend: " + path);
+                }
+                assertContains(readme, "./gradlew addBackend", label + "README should say how to add a backend");
+            }
+        }
+
+        if (ide == IDE.INTELLIJ) {
+            assertContains(getText(entries, ".idea/gradle.xml"), "GradleProjectSettings",
+                    label + "IntelliJ should link the Gradle build");
+            assertNull(entries.get(".idea/workspace.xml"), label + "Maven run configurations must not ship with Gradle");
+            if (type == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                assertContains(getText(entries, ".idea/runConfigurations/Run_Backend.xml"),
+                        "<option value=\"runBackend\" />", label + "IntelliJ backend run configuration");
+            } else {
+                String[][] expected = {
+                        {"Run_in_Simulator", "run"}, {"Debug_in_Simulator", "debug"},
+                        {"Android_Build", "buildAndroid"}, {"iOS_Debug_Build", "buildIos"}
+                };
+                for (int i = 0; i < expected.length; i++) {
+                    String xml = getText(entries, ".idea/runConfigurations/" + expected[i][0] + ".xml");
+                    assertContains(xml, "type=\"GradleRunConfiguration\"", label + "IntelliJ Gradle run configuration");
+                    assertContains(xml, "<option value=\"" + expected[i][1] + "\" />", label + "IntelliJ task " + expected[i][1]);
+                }
+            }
+        } else if (ide == IDE.VS_CODE) {
+            String tasks = getText(entries, ".vscode/tasks.json");
+            assertContains(tasks, "\"command\": \"./gradlew\"", label + "VS Code tasks run the wrapper");
+            assertContains(tasks, type == ProjectOptions.ProjectType.BACKEND_ONLY ? "[\"runBackend\"]" : "[\"run\"]",
+                    label + "VS Code should have a run task");
+            assertContains(getText(entries, ".vscode/extensions.json"), "vscjava.vscode-gradle",
+                    label + "VS Code should recommend the Gradle extension");
+            assertNull(entries.get(".vscode/settings.json"), label + "Maven favorites must not ship with Gradle");
+        } else if (ide == IDE.ECLIPSE) {
+            for (String path : entries.keySet()) {
+                assertFalse(path.endsWith(".launch"), label + "Maven launch files must not ship with Gradle: " + path);
+            }
+            assertContains(readme, "Existing Gradle Project", label + "README should explain the Eclipse import");
+        } else {
+            assertNull(entries.get("nbactions.xml"), label + "Maven actions must not ship with Gradle");
+            assertNull(entries.get("nb-configuration.xml"), label + "Maven configuration must not ship with Gradle");
+            assertContains(readme, "File > Open Project", label + "README should explain the NetBeans import");
+        }
+    }
+
+    private void validateGradleRefusesUnsupportedCombinations() throws Exception {
+        ProjectOptions java8 = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                true, false, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_8, null,
+                ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP);
+        assertRefused(GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "NoJava8", "com.acme.nojava8", java8),
+                "Java 17", "Gradle projects must refuse Java 8");
+        for (Template template : Template.values()) {
+            if (template.supportsGradle()) {
+                continue;
+            }
+            assertRefused(GeneratorModel.create(IDE.INTELLIJ, template, "NoGradle", "com.acme.nogradle",
+                    gradleOptions(ProjectOptions.ProjectType.APP)), template.GRADLE_UNSUPPORTED_REASON,
+                    template + " cannot be generated for Gradle and must say why");
+        }
+        assertRefused(GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "NoMavenBackend", "com.acme.nomavenbackend",
+                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.BACKEND_ONLY)),
+                "backend-only", "Maven has no backend-only scaffold");
+    }
+
+    private void assertRefused(GeneratorModel model, String expectedReason, String message) {
+        String reason = null;
+        try {
+            model.collectProjectEntries();
+        } catch (IOException expected) {
+            reason = expected.getMessage();
+        }
+        assertNotNull(reason, message);
+        assertContains(reason, expectedReason, message);
+    }
+
+    /// Maven projects always carry the backend module, so "App" and "App + backend"
+    /// are the same Maven download.
+    private void validateMavenIgnoresAppProjectType() throws Exception {
+        Map<String, byte[]> app = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "SameApp", "com.acme.same",
+                ProjectOptions.defaults()).collectProjectEntries();
+        Map<String, byte[]> withBackend = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "SameApp", "com.acme.same",
+                ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN,
+                        ProjectOptions.ProjectType.APP_WITH_BACKEND)).collectProjectEntries();
+        assertEqual(app.keySet(), withBackend.keySet(), "Maven App and App + backend should be the same download");
+        assertNotNull(app.get("backend/pom.xml"), "Maven projects keep the backend module");
+    }
+
+    /// No template that has cn1libs generates for Gradle yet (see Template), so the
+    /// translation from the template's pom to build.gradle.kts is checked directly.
+    private void validateGradleTemplateDependencies() {
+        String script = GeneratorModel.create(IDE.INTELLIJ, Template.TWEET, "LibsApp", "com.acme.libs",
+                gradleOptions(ProjectOptions.ProjectType.APP)).gradleAppBuildScript("// c\ndependencies {\n}\n");
+        assertContains(script, "dependencies {\n    cn1lib(\"com.codenameone:coderad-lib:2.0.5\")",
+                "Template cn1libs should become cn1lib(...) lines inside dependencies {}");
+        assertContains(script, "cn1lib(\"com.codenameone:tweet-app-ui-kit-lib:1.0-pre1\")",
+                "Every template cn1lib should be declared");
+        assertContains(script, "annotationProcessor(\"com.codenameone:coderad-annotation-processor:2.0.5\")",
+                "The template's annotation processor should be declared");
+        String bare = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, "LibsApp", "com.acme.libs",
+                gradleOptions(ProjectOptions.ProjectType.APP)).gradleAppBuildScript("dependencies {\n}\n");
+        assertEqual("dependencies {\n}\n", bare, "A template with no libraries leaves the build script alone");
+    }
+
+    /// AGENTS.md is the one skill file that states commands outright, so it comes in
+    /// a Maven and a Gradle variant; the SKILL.md body covers both layouts itself.
+    private void validateAgentsMdMatchesBuildTool() throws Exception {
+        Map<String, byte[]> gradle = readZipEntries(createProjectZip(IDE.INTELLIJ, Template.BAREBONES, "AgentsGradle",
+                "com.acme.agents", gradleOptions(ProjectOptions.ProjectType.APP)));
+        String gradleAgents = getText(gradle, "AGENTS.md");
+        assertFalse(gradleAgents.indexOf("mvn ") >= 0, "A Gradle project's AGENTS.md must not give Maven commands");
+        assertFalse(gradleAgents.indexOf("common/src") >= 0, "A Gradle project's AGENTS.md must not use Maven paths");
+        assertContains(gradleAgents, "./gradlew run", "A Gradle project's AGENTS.md should say how to run it");
+        assertContains(gradleAgents, ".agent-skills/codename-one/SKILL.md", "AGENTS.md should point at the skill");
+
+        Map<String, byte[]> maven = readZipEntries(createProjectZip(IDE.INTELLIJ, Template.BAREBONES, "AgentsMaven",
+                "com.acme.agents"));
+        String mavenAgents = getText(maven, "AGENTS.md");
+        assertContains(mavenAgents, "mvn -pl common cn1:run", "A Maven project's AGENTS.md keeps its Maven commands");
+        assertFalse(mavenAgents.indexOf("gradlew") >= 0, "A Maven project's AGENTS.md must not give Gradle commands");
+
+        String skill = getText(gradle, ".agent-skills/codename-one/SKILL.md");
+        assertContains(skill, "settings.gradle.kts", "SKILL.md should teach an agent to recognise the Gradle layout");
+    }
+
+    private void validateGradleLocalization() throws Exception {
+        ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                true, true, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_17, null,
+                ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP);
+        for (Template template : new Template[] {Template.BAREBONES, Template.KOTLIN}) {
+            Map<String, byte[]> entries = readZipEntries(createProjectZip(IDE.INTELLIJ, template, "L10nApp",
+                    "com.acme.l10n", options));
+            assertNotNull(entries.get("src/main/l10n/messages.properties"),
+                    "Gradle bundles belong in src/main/l10n, where the CSS compiler bakes them into theme.res");
+            assertNotNull(entries.get("src/main/l10n/messages_he.properties"), "Gradle should ship every bundle");
+            String main = getText(entries, template.IS_KOTLIN
+                    ? "src/main/kotlin/com/acme/l10n/L10nApp.kt" : "src/main/java/com/acme/l10n/L10nApp.java");
+            assertContains(main, "setBundle", "The Gradle starter should install the localization bundle too");
+        }
+    }
+
+    /// The Unix mode ProjectZipPermissions stored for `name`, read from the ZIP's
+    /// central directory (zipme does not expose external attributes).
+    private static int unixMode(byte[] zip, String name) throws IOException {
+        int end = zip.length - 22;
+        int count = (zip[end + 10] & 255) | ((zip[end + 11] & 255) << 8);
+        int offset = readInt(zip, end + 16);
+        for (int i = 0; i < count; i++) {
+            int nameLength = (zip[offset + 28] & 255) | ((zip[offset + 29] & 255) << 8);
+            int extra = (zip[offset + 30] & 255) | ((zip[offset + 31] & 255) << 8);
+            int comment = (zip[offset + 32] & 255) | ((zip[offset + 33] & 255) << 8);
+            String entryName = new String(zip, offset + 46, nameLength, "UTF-8");
+            if (entryName.equals(name)) {
+                return readInt(zip, offset + 38) >>> 16;
+            }
+            offset += 46 + nameLength + extra + comment;
+        }
+        throw new IOException("No entry " + name);
+    }
+
+    private static int readInt(byte[] data, int offset) {
+        return (data[offset] & 255) | ((data[offset + 1] & 255) << 8)
+                | ((data[offset + 2] & 255) << 16) | ((data[offset + 3] & 255) << 24);
+    }
 
     private void validateAppendedCustomCssGeneration() throws Exception {
         String mainClassName = "DemoAdvancedTheme";

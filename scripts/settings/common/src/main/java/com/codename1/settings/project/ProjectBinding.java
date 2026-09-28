@@ -23,9 +23,19 @@
 package com.codename1.settings.project;
 
 public final class ProjectBinding {
+    /// The build tools a binding can name in `buildSystem=`, the values the
+    /// launcher's `ProjectDescriptor` writes.
+    public static final String BUILD_ANT = "ANT";
+    public static final String BUILD_MAVEN = "MAVEN";
+    public static final String BUILD_GRADLE = "GRADLE";
+
     private String projectDir;
     private String settings;
     private String pom;
+    private String buildSystem;
+    private String kind;
+    private String rootDir;
+    private String dependencyFile;
     private String multimoduleRoot;
     private final java.util.List<String> sourceRoots = new java.util.ArrayList<>();
     private String sourceEncoding;
@@ -46,6 +56,55 @@ public final class ProjectBinding {
 
     public String multimoduleRoot() {
         return multimoduleRoot;
+    }
+
+    /// `ANT`, `MAVEN` or `GRADLE` as the launcher wrote it, or null when an
+    /// older launcher did not say. A binding with no `buildSystem=` but a
+    /// `pom=` came from the Maven plugin, which is the only launcher that
+    /// predates the key, so [buildSystem()] answers `MAVEN` for it.
+    public String buildSystem() {
+        if (buildSystem != null && buildSystem.length() > 0) {
+            return buildSystem;
+        }
+        return pom != null && pom.length() > 0 ? BUILD_MAVEN : null;
+    }
+
+    /// Whether the project is built by the Gradle plugin.
+    public boolean isGradle() {
+        return BUILD_GRADLE.equals(buildSystem());
+    }
+
+    /// Whether the project is built by Maven.
+    public boolean isMaven() {
+        return BUILD_MAVEN.equals(buildSystem());
+    }
+
+    /// `APP`, `LIB` or `BACKEND`, or null when the launcher did not say.
+    public String kind() {
+        return kind;
+    }
+
+    /// The top of the build (the Maven multi-module root, the Gradle root
+    /// project or the Ant project). Falls back to `multimoduleRoot=` and then
+    /// `projectDir=` for a binding written before the key existed.
+    public String rootDir() {
+        if (rootDir != null && rootDir.length() > 0) {
+            return rootDir;
+        }
+        if (multimoduleRoot != null && multimoduleRoot.length() > 0) {
+            return multimoduleRoot;
+        }
+        return projectDir;
+    }
+
+    /// The build file the project's own dependencies are declared in: the
+    /// `common/pom.xml` of a Maven project or the `build.gradle.kts` of a
+    /// Gradle one. Falls back to `pom=` for a binding that predates the key.
+    public String dependencyFile() {
+        if (dependencyFile != null && dependencyFile.length() > 0) {
+            return dependencyFile;
+        }
+        return pom;
     }
 
     /// The compile source roots Maven RESOLVED, one per `sourceRoot=` line, or
@@ -113,6 +172,10 @@ public final class ProjectBinding {
                 case "settings" -> b.settings = val;
                 case "pom" -> b.pom = val;
                 case "multimoduleRoot" -> b.multimoduleRoot = val;
+                case "buildSystem" -> b.buildSystem = val;
+                case "kind" -> b.kind = val;
+                case "rootDir" -> b.rootDir = val;
+                case "dependencyFile" -> b.dependencyFile = val;
                 case "sourceRoot" -> {
                     if (!val.isEmpty()) {
                         b.sourceRoots.add(val);

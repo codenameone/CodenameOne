@@ -1,0 +1,143 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gradle;
+
+import com.codename1.project.BuildSystem;
+import com.codename1.project.ProjectKind;
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
+import org.gradle.api.GradleException;
+import org.gradle.api.Project;
+import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.provider.Provider;
+import org.gradle.api.tasks.compile.JavaCompile;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// The plugin applied to a project: common setup, then the kind-specific part.
+final class ProjectSupport {
+    /// The Java release every Codename One Gradle project compiles for.
+    static final int JAVA_RELEASE = 17;
+
+    private ProjectSupport() {
+    }
+
+    static void apply(Project project) {
+        if (project.getExtensions().findByName("codenameone") != null) {
+            return;
+        }
+        SettingsSupport.addRepositoriesIfMissing(project);
+        project.getPluginManager().apply(JavaPlugin.class);
+
+        final CodenameOneExtension ext = project.getExtensions().create("codenameone", CodenameOneExtension.class);
+        ext.getVersion().convention(project.getProviders().gradleProperty("codename1.version")
+                .orElse(PluginInfo.version()));
+        // -Popen=false is the Maven plugin's -Dopen=false, so the switch people
+        // already pass to keep Xcode or Android Studio shut works here too.
+        ext.getOpenGeneratedProjects().convention(project.getProviders().gradleProperty("codename1.open")
+                .orElse(project.getProviders().gradleProperty("open"))
+                .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
+
+        requireJava17(project);
+
+        ProjectKind kind = kind(project);
+        ProjectLayout layout = ProjectLayouts.of(BuildSystem.GRADLE, kind,
+                project.getRootDir(), project.getProjectDir());
+        Provider<Map<String, String>> userProperties = userProperties(project, ext);
+
+        switch (kind) {
+            case BACKEND:
+                BackendSupport.apply(project, layout, ext, userProperties);
+                break;
+            case LIB:
+                LibrarySupport.apply(project, layout, ext, userProperties);
+                break;
+            default:
+                AppSupport.apply(project, layout, ext, userProperties);
+                break;
+        }
+    }
+
+    /// The kind from the `codename1.kind` Gradle property, else from the
+    /// project's files.
+    static ProjectKind kind(Project project) {
+        Object explicit = project.findProperty("codename1.kind");
+        if (explicit != null) {
+            try {
+                return ProjectKind.valueOf(String.valueOf(explicit).trim().toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                throw new GradleException("codename1.kind must be APP, LIB or BACKEND, not " + explicit, ex);
+            }
+        }
+        return ProjectLayouts.gradleKind(project.getProjectDir());
+    }
+
+    /// Every compile targets Java 17. A project that asks for less is refused
+    /// with the reason, rather than compiling classes the Codename One
+    /// toolchain was never verified against for a Gradle build.
+    private static void requireJava17(Project project) {
+        project.getTasks().withType(JavaCompile.class).configureEach(compile -> {
+            compile.getOptions().getRelease().convention(JAVA_RELEASE);
+            compile.getOptions().setEncoding(compile.getOptions().getEncoding() == null
+                    ? "UTF-8" : compile.getOptions().getEncoding());
+            compile.doFirst(new RequireRelease());
+        });
+    }
+
+    /// The `codename1.*` properties from the command line (`-P` and `-D`) and
+    /// the `codenameone { buildHints }` block, as `codename1.*` keys.
+    ///
+    /// These are what the Maven plugin calls user properties: they override
+    /// the settings file for this build only.
+    static Provider<Map<String, String>> userProperties(Project project, CodenameOneExtension ext) {
+        Provider<Map<String, String>> gradleProps = project.getProviders().gradlePropertiesPrefixedBy("codename1.");
+        Provider<Map<String, String>> systemProps = project.getProviders().systemPropertiesPrefixedBy("codename1.");
+        return ext.getBuildHints().zip(gradleProps, (hints, gp) -> {
+            Map<String, String> out = new LinkedHashMap<String, String>();
+            for (Map.Entry<String, String> e : hints.entrySet()) {
+                out.put("codename1.arg." + e.getKey(), e.getValue());
+            }
+            out.putAll(gp);
+            return out;
+        }).zip(systemProps, (m, sp) -> {
+            Map<String, String> out = new LinkedHashMap<String, String>(m);
+            out.putAll(sp);
+            return out;
+        });
+    }
+
+    /// Fails a compile that targets less than [JAVA_RELEASE].
+    static final class RequireRelease implements org.gradle.api.Action<org.gradle.api.Task> {
+        @Override
+        public void execute(org.gradle.api.Task task) {
+            JavaCompile compile = (JavaCompile) task;
+            Integer release = compile.getOptions().getRelease().getOrNull();
+            if (release != null && release < JAVA_RELEASE) {
+                throw new GradleException("Codename One Gradle projects compile for Java " + JAVA_RELEASE
+                        + " or newer, but " + task.getPath() + " asks for Java " + release + ". Remove the "
+                        + "release setting, or use the Maven build for a project that must target Java 8.");
+            }
+        }
+    }
+}

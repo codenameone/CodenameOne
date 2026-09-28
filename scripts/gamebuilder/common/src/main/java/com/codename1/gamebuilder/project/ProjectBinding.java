@@ -32,6 +32,10 @@ public final class ProjectBinding {
     private String sourceDir;
     private String packageName;
     private String output;
+    private String buildSystem;
+    private String kind;
+    private String rootDir;
+    private String dependencyFile;
 
     public String projectDir() {
         return projectDir;
@@ -41,12 +45,52 @@ public final class ProjectBinding {
         return packageName;
     }
 
+    /// The scene directory: `gamesDir=` when the launcher named it, otherwise
+    /// `games/` in the resources directory the binding's `buildSystem=`
+    /// implies (`src/` under Ant, `src/main/resources` under Maven's `common/`
+    /// and Gradle), so a bare project descriptor is enough to open a project.
     public String gamesDir() {
-        return gamesDir;
+        if (gamesDir != null || projectDir == null || buildSystem == null) {
+            return gamesDir;
+        }
+        return projectDir + (isAnt() ? "/src/games" : "/src/main/resources/games");
     }
 
+    /// The Java source root, `sourceDir=` or else the build system's convention.
     public String sourceDir() {
-        return sourceDir;
+        if (sourceDir != null || projectDir == null || buildSystem == null) {
+            return sourceDir;
+        }
+        return projectDir + (isAnt() ? "/src" : "/src/main/java");
+    }
+
+    /// `ANT`, `MAVEN` or `GRADLE`: the standard `buildSystem=` key of the
+    /// project descriptor the build writes, or null when the launcher did not
+    /// say (a Maven launcher that predates the key).
+    public String buildSystem() {
+        return buildSystem;
+    }
+
+    /// `APP`, `LIB` or `BACKEND`, or null when the launcher did not say.
+    public String kind() {
+        return kind;
+    }
+
+    /// The top of the build (Maven multi-module root, Gradle root project or
+    /// Ant project), falling back to [projectDir()] when the launcher did not
+    /// say.
+    public String rootDir() {
+        return rootDir != null && rootDir.length() > 0 ? rootDir : projectDir;
+    }
+
+    /// The build file the project's dependencies are declared in (the
+    /// `pom.xml` or `build.gradle.kts`), or null when the launcher did not say.
+    public String dependencyFile() {
+        return dependencyFile;
+    }
+
+    private boolean isAnt() {
+        return "ANT".equals(buildSystem);
     }
 
     public String output() {
@@ -54,7 +98,8 @@ public final class ProjectBinding {
     }
 
     public boolean isValid() {
-        return gamesDir != null && !gamesDir.isEmpty();
+        String dir = gamesDir();
+        return dir != null && !dir.isEmpty();
     }
 
     /// Parses the {@code key=value} descriptor (lines starting with {@code #} are ignored).
@@ -81,6 +126,10 @@ public final class ProjectBinding {
                 case "sourceDir" -> b.sourceDir = val;
                 case "packageName" -> b.packageName = val;
                 case "output" -> b.output = val;
+                case "buildSystem" -> b.buildSystem = val;
+                case "kind" -> b.kind = val;
+                case "rootDir" -> b.rootDir = val;
+                case "dependencyFile" -> b.dependencyFile = val;
                 default -> {
                     // ignore unknown keys for forward-compatibility
                 }

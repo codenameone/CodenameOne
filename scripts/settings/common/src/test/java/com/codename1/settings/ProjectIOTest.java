@@ -118,4 +118,38 @@ public class ProjectIOTest {
         assertNull(b.mainName());
         assertNull(b.packageName());
     }
+
+    /// The standard keys of the project descriptor a Gradle launcher writes.
+    @Test
+    public void theBindingReadsTheDescriptorKeys() {
+        ProjectBinding b = ProjectBinding.parse(
+                "buildSystem=GRADLE\n"
+                        + "kind=APP\n"
+                        + "rootDir=/p\n"
+                        + "projectDir=/p\n"
+                        + "settings=/p/codenameone_settings.properties\n"
+                        + "dependencyFile=/p/build.gradle.kts\n");
+        assertTrue(b.isGradle());
+        assertEquals("GRADLE", b.buildSystem());
+        assertEquals("APP", b.kind());
+        assertEquals("/p", b.rootDir());
+        assertEquals("/p/build.gradle.kts", b.dependencyFile());
+        assertNull(b.pom());
+    }
+
+    /// A binding from a Maven plugin that predates `buildSystem=` still reads
+    /// as Maven, with its POM as the dependency file and its multi-module root
+    /// as the root.
+    @Test
+    public void anOlderMavenBindingReadsAsMaven() {
+        ProjectBinding b = ProjectBinding.parse(
+                "projectDir=/p/common\n"
+                        + "settings=/p/common/codenameone_settings.properties\n"
+                        + "pom=/p/common/pom.xml\n"
+                        + "multimoduleRoot=/p\n");
+        assertEquals("MAVEN", b.buildSystem());
+        assertTrue(b.isMaven());
+        assertEquals("/p/common/pom.xml", b.dependencyFile());
+        assertEquals("/p", b.rootDir());
+    }
 }

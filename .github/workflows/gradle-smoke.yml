@@ -1,0 +1,214 @@
+name: Gradle build smoke
+
+# End-to-end checks of the optional Gradle build (maven/codenameone-gradle-plugin),
+# through the scripts in maven/integration-tests:
+#
+#   gradle-app-test.sh           convert, build, native interfaces, every target's
+#                                upload jar, addBackend + /healthz
+#   gradle-maven-parity-test.sh  one app built by Maven and by Gradle uploads the
+#                                same entries for every target and generates the
+#                                same Android Studio project (and, on the macOS
+#                                job, the same Xcode project) -- the proof that
+#                                the Gradle plugin reuses the Maven engine
+#   gradle-cn1lib-test.sh        a Gradle-built cn1lib consumed by a Gradle app
+#                                AND a Maven app
+#   gradle-migrate-test.sh       Ant and Maven to Gradle; legacy .cn1lib refused
+#   gradle-tools-test.sh         Settings opens, and renders, from cn1:settings and
+#                                from ./gradlew settings
+#   gradle-initializr-test.sh    the initializr's Gradle downloads build; the
+#                                backend-only one runs, packages, and its native
+#                                binary serves /healthz
+#
+# The framework builds on JDK 8 as everywhere else; Gradle runs on the matrix JDK,
+# the floor Gradle projects support and the current LTS, and on both the Gradle
+# the wrapper pins and the oldest one the plugin supports.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'scripts/ci/apt-get-install.sh'
+      - 'Ports/JavaSE/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/codenameone-gradle-plugin-marker/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/backend/**'
+      - 'maven/pom.xml'
+      - 'maven/javase/**'
+      - 'maven/integration-tests/gradle-*.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/settings/**'
+      - 'scripts/initializr/common/src/main/java/com/codename1/initializr/model/**'
+      - 'scripts/tests/GenerateInitializr.java'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/initializr/common/src/main/resources/**'
+      - '.github/workflows/gradle-smoke.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'scripts/ci/apt-get-install.sh'
+      - 'Ports/JavaSE/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/codenameone-gradle-plugin-marker/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/backend/**'
+      - 'maven/pom.xml'
+      - 'maven/javase/**'
+      - 'maven/integration-tests/gradle-*.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/settings/**'
+      - 'scripts/initializr/common/src/main/java/com/codename1/initializr/model/**'
+      - 'scripts/tests/GenerateInitializr.java'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/initializr/common/src/main/resources/**'
+      - '.github/workflows/gradle-smoke.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  gradle-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    name: gradle-smoke (JDK ${{ matrix.gradle-jdk }}, Gradle ${{ matrix.gradle-version || 'wrapper' }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Gradle the template's wrapper pins, on both supported JDKs.
+          - gradle-jdk: '17'
+          - gradle-jdk: '21'
+          # The oldest Gradle the plugin supports (CodenameOnePlugin.MINIMUM_GRADLE),
+          # and the release before it, which must be refused with the fix.
+          - gradle-jdk: '17'
+            gradle-version: '8.5'
+            refused-gradle-version: '8.4'
+    env:
+      CN1_TEST_GRADLE_VERSION: ${{ matrix.gradle-version }}
+      CN1_TEST_REFUSED_GRADLE_VERSION: ${{ matrix.refused-gradle-version }}
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK ${{ matrix.gradle-jdk }} for Gradle
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.gradle-jdk }}
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      # xvfb for the CSS compiler, which opens an AWT frame. clang and the
+      # libraries the generated backend links (see archetype-smoke.yml) for
+      # backendPackage, which the backend-only test otherwise skips.
+      - name: Install xvfb and the native backend toolchain
+        run: |
+          bash scripts/ci/apt-get-install.sh xvfb clang \
+            libcurl4-openssl-dev libssl-dev libnghttp2-dev
+      - name: Build Codename One Maven artifacts (includes archetypes and the Gradle plugin)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
+          xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+      - name: Gradle application
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash gradle-app-test.sh
+      - name: Maven and Gradle upload parity
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash gradle-maven-parity-test.sh
+      - name: Gradle cn1lib, consumed by Gradle and Maven
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash gradle-cn1lib-test.sh
+      - name: Migration to Gradle
+        working-directory: maven/integration-tests
+        run: xvfb-run -a bash gradle-migrate-test.sh
+      - name: Initializr Gradle downloads (app, app + backend, backend only)
+        working-directory: maven/integration-tests
+        env:
+          # A skip reads like a pass; this runner has clang.
+          CN1_BACKEND_PACKAGE_REQUIRED: '1'
+        run: xvfb-run -a bash gradle-initializr-test.sh
+      # The desktop tools are separate Maven projects under scripts/; Settings
+      # stands in for all four, which start through the same launcher.
+      - name: Build Codename One Settings
+        working-directory: scripts/settings
+        run: JAVA_HOME="$GRADLE_JAVA_HOME" mvn -B -ntp install -DskipTests -Pexecutable-jar -Dcodename1.platform=javase
+      - name: Desktop tools launch from Maven and Gradle
+        working-directory: maven/integration-tests
+        env:
+          CN1_TOOLS_REQUIRED: '1'
+        run: xvfb-run -a bash gradle-tools-test.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gradle-smoke-logs-jdk${{ matrix.gradle-jdk }}-gradle${{ matrix.gradle-version || 'wrapper' }}
+          path: maven/integration-tests/build/**/*.log
+          if-no-files-found: ignore
+
+  # The Xcode project a local ios-source build generates, from Maven and from
+  # Gradle, compared file by file. It needs Xcode (the builder asks xcodebuild
+  # for its version) but never compiles anything, so it stays cheap. The same
+  # script's upload-jar and android-source comparisons run again here for free.
+  gradle-maven-parity-macos:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 17 for Gradle
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build Codename One Maven artifacts (includes archetypes and the Gradle plugin)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          mvn archetype:update-local-catalog -Plocal-dev-javase
+          mvn archetype:crawl -Plocal-dev-javase
+      - name: Maven and Gradle parity, including the generated Xcode project
+        working-directory: maven/integration-tests
+        env:
+          # A skip reads like a pass; this runner has Xcode.
+          CN1_IOS_SOURCE_REQUIRED: '1'
+        run: bash gradle-maven-parity-test.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gradle-parity-macos-logs
+          path: |
+            maven/integration-tests/build/**/*.log
+            maven/integration-tests/build/**/compare-*.txt
+          if-no-files-found: ignore

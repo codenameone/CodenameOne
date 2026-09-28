@@ -174,10 +174,26 @@ public final class ProjectIO {
      * A drive-lettered path becomes {@code file://C:/...}, which the JavaSE port maps back to
      * {@code C:\...}.
      */
+    /// A `file://` URL for an OS path, as `FileSystemStorage` expects.
+    ///
+    /// The same in all four desktop tools (Settings, GUI Builder, Game Builder,
+    /// Certificate Wizard), because they read the same launch binding. A Windows
+    /// drive-letter path (`C:\Users\...`) needs a slash before the drive:
+    /// without it, stripping the `file://` prefix on the consumer side yields a
+    /// drive-relative `/C:\...` that resolves to `C:\C:\...` and silently
+    /// breaks every project-file read. Backslashes become forward slashes, and a
+    /// value that is already a URL passes through.
     public static String fsUrl(String path) {
-        if (path == null) return null;
+        if (path == null) {
+            return null;
+        }
+        if (path.startsWith("file:") || path.indexOf("://") > 0) {
+            return path;
+        }
         String normalized = path.replace('\\', '/');
-        if (normalized.startsWith("file://") || normalized.indexOf("://") > 0) return normalized;
+        if (normalized.length() > 1 && normalized.charAt(1) == ':') {
+            return "file:///" + normalized;
+        }
         return "file://" + normalized;
     }
 }

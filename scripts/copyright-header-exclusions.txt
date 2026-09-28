@@ -190,7 +190,7 @@ Ports/CLDC11/src/java/text/ParseException.java | Codename One contribution whose
 Ports/CLDC11/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/cn1app-archetype/src/main/resources/archetype-resources/common/src/test/java/MyFirstTest.java | Archetype template copied into user projects, which carries no Codename One header by design
 maven/cn1lib-archetype/src/main/resources/archetype-resources/common/src/test/java/FilechooserTest.java | Archetype template copied into user projects, which carries no Codename One header by design
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+maven/build-engine/src/main/java/com/codename1/builders/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomActivation.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomActivationProperty.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomBacked.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
@@ -219,12 +219,13 @@ maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/Mod
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/ModelETLFactory.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/ModelETLRequest.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
 maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/util/JDomUtils.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/Octal.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarConstants.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarEntry.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
-maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarHeader.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/Octal.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarConstants.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarEntry.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/build-engine/src/main/java/org/xeustechnologies/jtar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
 scripts/cn1playground/common/src/main/java/bsh/BSHEnhancedForStatement.java | BeanShell source, Apache-2.0, retaining its original notice
 scripts/cn1playground/common/src/main/java/bsh/Primitive.java | BeanShell source, Apache-2.0, retaining its original notice
 vm/JavaAPI/src/java/net/URI.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
@@ -235,3 +236,4 @@ vm/JavaAPI/src/java/text/DateFormatSymbols.java | Codename One contribution whos
 vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim

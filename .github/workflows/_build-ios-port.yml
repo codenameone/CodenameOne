@@ -80,6 +80,8 @@ jobs:
           # forwarding fix landed in the transcoder source).
           SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
               maven/codenameone-maven-plugin/src/main \
+              maven/build-engine/src/main \
+              maven/project-model/src/main \
               maven/svg-transcoder/src/main \
               -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')

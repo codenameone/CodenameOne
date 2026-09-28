@@ -1,0 +1,44 @@
+package ${package};
+
+import com.codename1.backend.annotations.GetMapping;
+import com.codename1.backend.annotations.RequestParam;
+import com.codename1.backend.annotations.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * The server side of this app.
+ *
+ * Routes are methods. The build turns the annotations into a router and the
+ * main that serves them, so there is no server lifecycle to write here.
+ *
+ * While developing, run it on this JVM, which starts in a couple of seconds:
+ *
+ *     ./gradlew __BACKEND__runBackend
+ *
+ * and build a single native binary, with no JVM to install beneath it, with
+ *
+ *     ./gradlew __BACKEND__backendPackage
+ *
+ * Settings come from application.properties beside this project's build files,
+ * overridden by application-<profile>.properties (CN1_PROFILE=dev) and then by
+ * the environment.
+ */
+@RestController
+public class Api {
+
+    /** What a load balancer polls. A String answer is sent as text. */
+    @GetMapping("/healthz")
+    public String health() {
+        return "ok";
+    }
+
+    /** Anything that is not a String is sent as JSON. */
+    @GetMapping("/echo")
+    public Map echo(@RequestParam(value = "say", defaultValue = "hello") String say) {
+        Map out = new LinkedHashMap();
+        out.put("say", say);
+        return out;
+    }
+}

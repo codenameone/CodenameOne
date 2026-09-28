@@ -16,6 +16,7 @@ on:
       - 'CodenameOne/src/com/codename1/io/grpc/**'
       - 'CodenameOne/src/com/codename1/io/rest/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
       - '.github/workflows/protocol-e2e.yml'
   push:
     branches: [ master ]

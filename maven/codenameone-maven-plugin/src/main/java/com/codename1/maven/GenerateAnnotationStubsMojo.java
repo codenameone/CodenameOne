@@ -92,7 +92,7 @@ public class GenerateAnnotationStubsMojo extends AbstractCN1Mojo {
         File outputDir = new File(project.getBuild().getOutputDirectory());
         ProcessorContext ctx = new ProcessorContext(outputDir, stubSourceDirectory,
                 /*classIndex*/ java.util.Collections.<String, com.codename1.maven.annotations.AnnotatedClass>emptyMap(),
-                getLog());
+                MavenLog.of(getLog()));
 
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
             AnnotationProcessor p = it.next();

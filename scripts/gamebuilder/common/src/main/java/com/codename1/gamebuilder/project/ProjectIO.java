@@ -264,11 +264,26 @@ public final class ProjectIO {
 
     /// Converts an OS path (as written into the binding by the Maven goal) to the
     /// `file:` URL `FileSystemStorage` requires. Pass-through if already a URL.
-    private static String fsUrl(String osPath) {
-        if (osPath == null || osPath.startsWith("file:")) {
-            return osPath;
+    /// A `file://` URL for an OS path, as `FileSystemStorage` expects.
+    ///
+    /// The same in all four desktop tools (Settings, GUI Builder, Game Builder,
+    /// Certificate Wizard), because they read the same launch binding. A Windows
+    /// drive-letter path (`C:\Users\...`) needs a slash before the drive:
+    /// without it, stripping the `file://` prefix on the consumer side yields a
+    /// drive-relative `/C:\...` that resolves to `C:\C:\...` and silently
+    /// breaks every project-file read. Backslashes become forward slashes, and a
+    /// value that is already a URL passes through.
+    public static String fsUrl(String path) {
+        if (path == null) {
+            return null;
         }
-        String s = osPath.replace('\\', '/');
-        return s.startsWith("/") ? "file://" + s : "file:///" + s;
+        if (path.startsWith("file:") || path.indexOf("://") > 0) {
+            return path;
+        }
+        String normalized = path.replace('\\', '/');
+        if (normalized.length() > 1 && normalized.charAt(1) == ':') {
+            return "file:///" + normalized;
+        }
+        return "file://" + normalized;
     }
 }

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nothing is excluded: the project model has no SpotBugs findings to accept. -->
+<FindBugsFilter>
+</FindBugsFilter>

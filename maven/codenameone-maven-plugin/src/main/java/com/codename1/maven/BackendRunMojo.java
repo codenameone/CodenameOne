@@ -105,19 +105,16 @@ public class BackendRunMojo extends AbstractMojo {
             throw new MojoExecutionException("Could not resolve the runtime classpath", err);
         }
 
-        String main = mainClass;
-        if (main == null || main.length() == 0) {
-            // The generator's own answer first. Annotation processing writes the
-            // entry point it created into META-INF/cn1-backend-main, and that is
-            // a statement of WHICH main to run -- scanning for main methods is a
-            // guess, and it fails the moment the module also holds a demo or a
-            // tool with one: the run is refused as ambiguous though the choice
-            // had already been made. cn1:backend-package reads the same marker,
-            // and the two must not disagree about what the module runs.
-            main = generatedMainClass(classes);
-        }
-        if (main == null || main.length() == 0) {
-            main = findMainClass(classes);
+        // The generator's own answer first: annotation processing writes the entry
+        // point it created into META-INF/cn1-backend-main, and that is a statement
+        // of WHICH main to run. Scanning for main methods is the fallback, and is
+        // refused as ambiguous rather than guessed. See BackendMainClass, which
+        // cn1:backend-package and the Gradle plugin share.
+        String main;
+        try {
+            main = new BackendMainClass(MavenLog.of(getLog()), "-Dcn1.backend.mainClass").resolve(classes, mainClass);
+        } catch (com.codename1.build.BuildFailureException err) {
+            throw new MojoFailureException(err.getMessage(), err);
         }
 
         List<String> command = new ArrayList<String>();
@@ -152,125 +149,6 @@ public class BackendRunMojo extends AbstractMojo {
             Thread.currentThread().interrupt();
             throw new MojoExecutionException("Interrupted while running " + main, err);
         }
-    }
-
-    /**
-     * The one class in this module with a main method.
-     *
-     * Deliberately an error when there are several rather than a guess: picking
-     * one and running it is how a developer ends up debugging the wrong process.
-     */
-    /**
-     * The entry point annotation processing generated, or null when this module
-     * has none -- one written by hand, with no @RestController in it, has no
-     * marker and falls through to the scan below.
-     */
-    private String generatedMainClass(File classesDir) {
-        File marker = new File(classesDir,
-                com.codename1.maven.processors.RestControllerAnnotationProcessor
-                        .MAIN_CLASS_RESOURCE.replace('/', File.separatorChar));
-        if (!marker.isFile()) {
-            return null;
-        }
-        try {
-            byte[] raw = new byte[(int) marker.length()];
-            InputStream in = new java.io.FileInputStream(marker);
-            try {
-                int at = 0;
-                while (at < raw.length) {
-                    int n = in.read(raw, at, raw.length - at);
-                    if (n <= 0) {
-                        break;
-                    }
-                    at += n;
-                }
-            } finally {
-                in.close();
-            }
-            String name = new String(raw, "UTF-8").trim();
-            return name.length() == 0 ? null : name;
-        } catch (IOException err) {
-            // Unreadable is not the same as absent, and the scan below still has
-            // a fair chance of being right; refusing outright would be worse.
-            getLog().warn("cn1: could not read " + marker + ": " + err);
-            return null;
-        }
-    }
-
-    private String findMainClass(File classesDir) throws MojoFailureException {
-        List<String> found = new ArrayList<String>();
-        collectMainClasses(classesDir, classesDir, found);
-        if (found.size() == 1) {
-            return found.get(0);
-        }
-        if (found.isEmpty()) {
-            throw new MojoFailureException("No class with a main method under "
-                    + classesDir + "; set -Dcn1.backend.mainClass");
-        }
-        throw new MojoFailureException("Several classes have a main method ("
-                + join(found, ", ") + "); choose one with -Dcn1.backend.mainClass");
-    }
-
-    private void collectMainClasses(File root, File dir, List<String> found) {
-        File[] children = dir.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (File child : children) {
-            if (child.isDirectory()) {
-                collectMainClasses(root, child, found);
-            } else if (child.getName().endsWith(".class") && child.getName().indexOf('$') < 0) {
-                String name = child.getAbsolutePath()
-                        .substring(root.getAbsolutePath().length() + 1)
-                        .replace(File.separatorChar, '.');
-                name = name.substring(0, name.length() - ".class".length());
-                if (hasMainMethod(child)) {
-                    found.add(name);
-                }
-            }
-        }
-    }
-
-    /**
-     * Whether the class DECLARES `public static void main(String[])`.
-     *
-     * Read from the class file rather than by loading it: loading runs the static
-     * initialiser, and a backend's initialiser is as likely as not to open a
-     * socket or a database. The method table is read with ASM rather than by
-     * searching the bytes, because the constant pool of a class that merely CALLS
-     * main carries the same two strings.
-     */
-    private boolean hasMainMethod(File classFile) {
-        final boolean[] found = new boolean[1];
-        try {
-            InputStream in = new java.io.FileInputStream(classFile);
-            try {
-                new org.objectweb.asm.ClassReader(in).accept(
-                        new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
-                            @Override
-                            public org.objectweb.asm.MethodVisitor visitMethod(int access,
-                                    String name, String descriptor, String signature,
-                                    String[] exceptions) {
-                                int wanted = org.objectweb.asm.Opcodes.ACC_PUBLIC
-                                        | org.objectweb.asm.Opcodes.ACC_STATIC;
-                                if ("main".equals(name)
-                                        && "([Ljava/lang/String;)V".equals(descriptor)
-                                        && (access & wanted) == wanted) {
-                                    found[0] = true;
-                                }
-                                return null;
-                            }
-                        },
-                        org.objectweb.asm.ClassReader.SKIP_CODE
-                                | org.objectweb.asm.ClassReader.SKIP_DEBUG
-                                | org.objectweb.asm.ClassReader.SKIP_FRAMES);
-            } finally {
-                in.close();
-            }
-        } catch (Exception err) {
-            return false;
-        }
-        return found[0];
     }
 
     private static String javaExecutable() {
