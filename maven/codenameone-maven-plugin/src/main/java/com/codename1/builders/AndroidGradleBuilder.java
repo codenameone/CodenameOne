@@ -8024,8 +8024,9 @@ public class AndroidGradleBuilder extends Executor {
         if (builtInKotlin && !kotlinOverridesBuiltIn(kotlinVersion)) {
             // A floor the built-in compiler already meets -- the Health Connect path above
             // raises requireKotlinStdlib to 1.9.x, and cn1libs carry legacy values too.
-            // Writing it out would put an older kotlin-gradle-plugin beside AGP 9's own, so
-            // it is dropped and the bundled compiler is used as it is.
+            // Gradle would resolve an older kotlin-gradle-plugin up to AGP 9's own anyway
+            // (see the topDependency note below), so writing it only states a version the
+            // build does not use; it is dropped and the bundled compiler is used as it is.
             kotlinVersion = "";
         }
         if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
@@ -8046,6 +8047,12 @@ public class AndroidGradleBuilder extends Executor {
                 kotlinRuntimeDependency = "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:" + kotlinVersion + "'\n";
             }
         }
+        // Appended as written on Gradle 9 too, including a kotlin-gradle-plugin older than
+        // AGP 9's own. That is not a conflict: the buildscript classpath resolves one
+        // version per module, the highest, so AGP 9.4.1's dependency wins -- measured,
+        // buildEnvironment reports "kotlin-gradle-plugin:1.9.22 -> 2.2.10" and the Kotlin
+        // app assembles. Refusing such a pin would fail builds that succeed; it is
+        // requireKotlinStdlib above that the builder itself writes, and trims.
         gradleDependency += request.getArg("android.topDependency", "");
 
         String compileSdkVersion = "'android-21'";
