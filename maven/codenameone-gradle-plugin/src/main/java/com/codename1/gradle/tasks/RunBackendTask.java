@@ -57,9 +57,10 @@ public abstract class RunBackendTask extends DefaultTask {
     @Classpath
     public abstract ConfigurableFileCollection getClasspath();
 
-    /// The compiled classes, where the generated entry point is recorded.
+    /// The compiled classes, where the generated entry point is recorded: every
+    /// classes directory of the main source set, Kotlin's included.
     @Internal
-    public abstract DirectoryProperty getClassesDirectory();
+    public abstract ConfigurableFileCollection getClassesDirectories();
 
     /// The class to run, when not the generated or the only one.
     @Input
@@ -78,12 +79,57 @@ public abstract class RunBackendTask extends DefaultTask {
     @Internal
     public abstract DirectoryProperty getWorkingDirectory();
 
+    /// The explicit main class, else the generated entry point in whichever
+    /// classes directory holds it, else the one class with a main method.
+    private String resolveMainClass() throws BuildFailureException {
+        BackendMainClass finder = new BackendMainClass(new GradleLog(getLogger()), "-Pcn1.backend.mainClass");
+        String explicit = getMainClass().getOrNull();
+        if (explicit != null && !explicit.isEmpty()) {
+            return explicit;
+        }
+        java.util.List<java.io.File> dirs = new java.util.ArrayList<java.io.File>();
+        for (java.io.File dir : getClassesDirectories().getFiles()) {
+            if (dir.isDirectory()) {
+                dirs.add(dir);
+            }
+        }
+        for (java.io.File dir : dirs) {
+            String generated = finder.generatedMainClass(dir);
+            if (generated != null && !generated.isEmpty()) {
+                return generated;
+            }
+        }
+        if (dirs.size() == 1) {
+            return finder.findMainClass(dirs.get(0));
+        }
+        // Several directories and no generated entry point: the one directory
+        // holding a main method decides; more than one is ambiguous, as it is
+        // within a directory.
+        String found = null;
+        BuildFailureException last = null;
+        for (java.io.File dir : dirs) {
+            try {
+                String candidate = finder.findMainClass(dir);
+                if (found != null) {
+                    throw new BuildFailureException("Both " + found + " and " + candidate + " have a main method; "
+                            + "choose one with -Pcn1.backend.mainClass");
+                }
+                found = candidate;
+            } catch (BuildFailureException ex) {
+                last = ex;
+            }
+        }
+        if (found == null) {
+            throw last != null ? last : new BuildFailureException("No compiled classes to run");
+        }
+        return found;
+    }
+
     @TaskAction
     public void run() {
         final String main;
         try {
-            main = new BackendMainClass(new GradleLog(getLogger()), "-Pcn1.backend.mainClass")
-                    .resolve(getClassesDirectory().get().getAsFile(), getMainClass().getOrNull());
+            main = resolveMainClass();
         } catch (BuildFailureException ex) {
             throw new GradleException(ex.getMessage(), ex);
         }

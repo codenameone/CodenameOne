@@ -140,11 +140,18 @@ final class ProjectSupport {
     static Provider<Map<String, String>> userProperties(Project project, CodenameOneExtension ext) {
         Provider<Map<String, String>> gradleProps = project.getProviders().gradlePropertiesPrefixedBy("codename1.");
         Provider<Map<String, String>> systemProps = project.getProviders().systemPropertiesPrefixedBy("codename1.");
-        return ext.getBuildHints().zip(gradleProps, (hints, gp) -> {
+        // codenameone { mainClass } is the settings file's packageName + mainName,
+        // so it becomes those two overrides; the command line still wins.
+        Provider<String> mainClass = ext.getMainClass().orElse("");
+        return ext.getBuildHints().zip(mainClass, (hints, main) -> {
             Map<String, String> out = new LinkedHashMap<String, String>();
             for (Map.Entry<String, String> e : hints.entrySet()) {
                 out.put("codename1.arg." + e.getKey(), e.getValue());
             }
+            out.putAll(mainClassProperties(main));
+            return out;
+        }).zip(gradleProps, (m, gp) -> {
+            Map<String, String> out = new LinkedHashMap<String, String>(m);
             out.putAll(gp);
             return out;
         }).zip(systemProps, (m, sp) -> {
@@ -152,6 +159,20 @@ final class ProjectSupport {
             out.putAll(sp);
             return out;
         });
+    }
+
+    /// `codename1.packageName` and `codename1.mainName` for a fully qualified
+    /// main class, or nothing for an empty one.
+    static Map<String, String> mainClassProperties(String mainClass) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        String main = mainClass == null ? "" : mainClass.trim();
+        if (main.isEmpty()) {
+            return out;
+        }
+        int dot = main.lastIndexOf('.');
+        out.put("codename1.packageName", dot < 0 ? "" : main.substring(0, dot));
+        out.put("codename1.mainName", dot < 0 ? main : main.substring(dot + 1));
+        return out;
     }
 
     /// Sets a Kotlin compile task's JVM target to [JAVA_RELEASE]. Reflective,

@@ -231,7 +231,8 @@ final class GradleProjectHost implements ProjectHost {
     }
 
     /// The newest input a cached native output (an APK, a generated Xcode or
-    /// Android Studio project) was built from. Files are compared by timestamp;
+    /// Android Studio project) was built from: the sources, the build files, every
+    /// file on the upload classpath, and the build hints. Files are compared by timestamp;
     /// the build hints are not files -- they arrive as `codename1.*` Gradle
     /// properties, from `gradle.properties`, `-P` or the build script -- so
     /// their fingerprint is recorded beside the build output, and a change in it
@@ -243,6 +244,12 @@ final class GradleProjectHost implements ProjectHost {
         t = Math.max(t, layout.settingsFile().lastModified());
         t = Math.max(t, layout.dependencyFile().lastModified());
         t = Math.max(t, layout.rootBuildFile().lastModified());
+        // The dependencies too: a jar replaced in place (a converted Ant project's
+        // libs/foo.jar) edits no build file, and the cached APK or generated
+        // project still held the old code.
+        for (String element : classpath) {
+            t = Math.max(t, lastModified(new File(element)));
+        }
         return Math.max(t, hintsChangedAt());
     }
 

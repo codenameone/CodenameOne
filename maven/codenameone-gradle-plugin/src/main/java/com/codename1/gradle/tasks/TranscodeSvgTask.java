@@ -54,6 +54,20 @@ public abstract class TranscodeSvgTask extends Cn1Task {
 
     @TaskAction
     public void transcode() {
+        // Every run regenerates everything, so start empty: the runner neither
+        // deletes the class of an asset that was removed nor rewrites SVGRegistry
+        // when it looks newer than what is left, and the deleted image stayed
+        // compiled and registered until a clean build.
+        for (DirectoryProperty dir : java.util.Arrays.asList(getOutputDirectory(), getPlaceholderDirectory())) {
+            java.io.File f = dir.get().getAsFile();
+            try {
+                if (f.isDirectory()) {
+                    org.apache.commons.io.FileUtils.cleanDirectory(f);
+                }
+            } catch (java.io.IOException ex) {
+                throw new GradleException("Could not clear " + f, ex);
+            }
+        }
         try {
             new SvgTranscodeRunner(layout().projectDir(), null, getOutputDirectory().get().getAsFile(),
                     getPlaceholderDirectory().get().getAsFile(), null, log()).run();

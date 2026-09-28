@@ -201,7 +201,9 @@ public final class GradleConversion {
                 // Gradle plugins are per project: the application's Kotlin plugin
                 // does not compile the backend's Kotlin, so it would be dropped.
                 if (hasSuffix(new File(target, "src"), ".kt")) {
-                    addKotlinPlugin(script);
+                    // Without a version when the application declares one: Gradle
+                    // refuses a second version of a plugin already on the classpath.
+                    addKotlinPlugin(script, !hasSuffix(new File(targetDir, "src"), ".kt"));
                 }
             }
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,
@@ -221,7 +223,7 @@ public final class GradleConversion {
             if (hasSuffix(new File(targetDir, "src"), ".kt")) {
                 // Without the Kotlin plugin Gradle compiles none of it and says
                 // nothing: the app would build, minus its Kotlin classes.
-                addKotlinPlugin(new File(targetDir, "build.gradle.kts"));
+                addKotlinPlugin(new File(targetDir, "build.gradle.kts"), true);
             }
         } catch (IOException ex) {
             throw new BuildFailureException("Could not convert " + sourceDir + ": " + ex.getMessage(), ex);
@@ -347,12 +349,13 @@ public final class GradleConversion {
     /// `plugins {}` must be the first statement of a Kotlin build script, so it
     /// goes after the leading comment, before `dependencies {}`, as the
     /// initializr writes it.
-    static void addKotlinPlugin(File buildScript) throws IOException {
+    static void addKotlinPlugin(File buildScript, boolean withVersion) throws IOException {
         String text = new String(Files.readAllBytes(buildScript.toPath()), StandardCharsets.UTF_8);
         if (text.contains("kotlin(\"jvm\")")) {
             return;
         }
-        String plugins = "plugins {\n    kotlin(\"jvm\") version \"" + KOTLIN_VERSION + "\"\n}\n\n";
+        String plugins = "plugins {\n    kotlin(\"jvm\")" + (withVersion ? " version \"" + KOTLIN_VERSION + "\"" : "")
+                + "\n}\n\n";
         int deps = text.indexOf("dependencies {");
         String updated = deps < 0 ? plugins + text : text.substring(0, deps) + plugins + text.substring(deps);
         Files.write(buildScript.toPath(), updated.getBytes(StandardCharsets.UTF_8));
@@ -397,6 +400,7 @@ public final class GradleConversion {
         try {
             Element project = parsePom(pom);
             java.util.Map<String, String> properties = pomProperties(pom, 0);
+            java.util.Map<String, String> managed = managedVersions(pom, 0);
             Element deps = child(project, "dependencies");
             if (deps == null) {
                 return out;
@@ -411,6 +415,11 @@ public final class GradleConversion {
                 String v = text(d, "version");
                 String scope = text(d, "scope");
                 String type = text(d, "type");
+                String classifier = interpolate(text(d, "classifier"), properties);
+                if (v == null && g != null && a != null) {
+                    // Left to <dependencyManagement> here or in a parent.
+                    v = managed.get(g + ":" + a);
+                }
                 if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)
                         || "org.jetbrains.kotlin".equals(g) || "org.jetbrains".equals(g)) {
                     continue;
@@ -423,19 +432,17 @@ public final class GradleConversion {
                 String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
                         : "provided".equals(scope) ? "compileOnly"
                         : "runtime".equals(scope) ? "runtimeOnly" : "implementation";
-                if (v != null && v.contains("${")) {
-                    // Written as it stands it would be a Kotlin string template naming a
-                    // variable the script lacks, and the build script would not compile.
+                if (v == null || v.contains("${")) {
+                    // Without a version Gradle cannot resolve it (only com.codenameone
+                    // modules get one from the plugin), and a ${...} left as it stands
+                    // would be a Kotlin string template naming a variable the script
+                    // lacks. Either way the line is written commented out.
                     out.add("    // " + config + "(\"" + g + ":" + a + ":VERSION\") -- set the version; the pom "
-                            + "gave it as " + v + ", which no pom property defines");
+                            + (v == null ? "leaves it to dependency management it could not resolve (a BOM?)"
+                                    : "gave it as " + v + ", which no pom property defines"));
                     continue;
                 }
-                String coords = g + ":" + a + (v == null ? "" : ":" + v);
-                String line = "    " + config + "(\"" + coords + "\")";
-                if (v == null) {
-                    line += " // check this version: the pom leaves it to dependency management";
-                }
-                out.add(line);
+                out.add("    " + config + "(\"" + notation(g, a, v, classifier, type) + "\")");
             }
         } catch (Exception ex) {
             out.add("    // Could not read the dependencies of " + pom + ": " + ex.getMessage());
@@ -451,6 +458,69 @@ public final class GradleConversion {
                         + "out in the build script until you set one:" + line.trim().substring(2));
             }
         }
+    }
+
+    /// Gradle notation for a Maven dependency, keeping the classifier and the
+    /// artifact type: without them Gradle resolves the module's main jar, not the
+    /// artifact Maven compiled against. `test-jar` is Maven's name for the
+    /// `tests` classifier; `pom` (a cn1lib) and `jar` need no extension.
+    static String notation(String g, String a, String v, String classifier, String type) {
+        String c = classifier;
+        String ext = type;
+        if ("test-jar".equals(type)) {
+            ext = "jar";
+            if (c == null) {
+                c = "tests";
+            }
+        }
+        StringBuilder sb = new StringBuilder(g).append(':').append(a).append(':').append(v);
+        if (c != null && !c.isEmpty()) {
+            sb.append(':').append(c);
+        }
+        if (ext != null && !"jar".equals(ext) && !"pom".equals(ext)) {
+            sb.append('@').append(ext);
+        }
+        return sb.toString();
+    }
+
+    /// The versions `<dependencyManagement>` gives, as `group:artifact`, from
+    /// the pom and its parents on disk (nearest wins). Imported BOMs are not
+    /// followed.
+    static java.util.Map<String, String> managedVersions(File pom, int depth) {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        Element project;
+        try {
+            project = parsePom(pom);
+        } catch (Exception ex) {
+            return out;
+        }
+        Element parent = child(project, "parent");
+        if (parent != null && depth < 8) {
+            String relative = text(parent, "relativePath");
+            File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
+            if (parentPom.isDirectory()) {
+                parentPom = new File(parentPom, "pom.xml");
+            }
+            if (parentPom.isFile()) {
+                out.putAll(managedVersions(parentPom, depth + 1));
+            }
+        }
+        Element management = child(project, "dependencyManagement");
+        Element deps = management == null ? null : child(management, "dependencies");
+        if (deps != null) {
+            java.util.Map<String, String> props = pomProperties(pom, 0);
+            for (Node n = deps.getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (n instanceof Element && "dependency".equals(((Element) n).getTagName())) {
+                    Element d = (Element) n;
+                    String version = interpolate(text(d, "version"), props);
+                    if (version != null && !version.contains("${")) {
+                        out.put(interpolate(text(d, "groupId"), props) + ":"
+                                + interpolate(text(d, "artifactId"), props), version);
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     private static Element parsePom(File pom) throws Exception {

@@ -166,9 +166,8 @@ final class AppSupport {
         final String skipInput = String.valueOf(skip);
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
-            compile.getInputs().property("cn1UserProperties", userProperties);
-            List<String> roots = new ArrayList<String>();
-            roots.add(layout.javaSourceDir().getAbsolutePath());
+            processingInputs(compile, layout, userProperties);
+            List<String> roots = sourceRoots(main, layout);
             // Compliance first (it caps and rewrites classes in place), then the
             // annotation processors, which stamp the result -- the order the Maven
             // poms bind process-classes in.
@@ -194,11 +193,9 @@ final class AppSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
-                    compile.getInputs().property("cn1UserProperties", userProperties);
+                    processingInputs(compile, layout, userProperties);
                     File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
-                    List<String> roots = new ArrayList<String>();
-                    roots.add(layout.javaSourceDir().getAbsolutePath());
-                    roots.add(new File(layout.projectDir(), "src/main/kotlin").getAbsolutePath());
+                    List<String> roots = sourceRoots(main, layout);
                     // javac has not run yet, so the Java classes Kotlin calls are
                     // known by their sources.
                     compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
@@ -427,6 +424,38 @@ final class AppSupport {
             c.setCanBeConsumed(false);
             c.setDescription(description);
         });
+    }
+
+    /// What the annotation processors read besides the compiled classes: the
+    /// codename1.* overrides and the settings file -- its mainName and
+    /// packageName pick the entry point the manifest is stamped for. As inputs,
+    /// changing either reruns the compile and so the processing.
+    static void processingInputs(org.gradle.api.Task compile, ProjectLayout layout,
+                                 Provider<Map<String, String>> userProperties) {
+        compile.getInputs().property("cn1UserProperties", userProperties);
+        compile.getInputs().files(layout.settingsFile()).withPropertyName("cn1Settings")
+                .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
+    }
+
+    /// The main source set's source directories, as the build really has them:
+    /// Java's and, with the Kotlin plugin, Kotlin's -- including any a build
+    /// script added. The processors use them to tell live classes from stale
+    /// output, so a directory missing here makes its classes look orphaned.
+    static List<String> sourceRoots(SourceSet main, ProjectLayout layout) {
+        java.util.LinkedHashSet<String> roots = new java.util.LinkedHashSet<String>();
+        roots.add(layout.javaSourceDir().getAbsolutePath());
+        for (File dir : main.getJava().getSrcDirs()) {
+            roots.add(dir.getAbsolutePath());
+        }
+        Object kotlin = main.getExtensions().findByName("kotlin");
+        if (kotlin instanceof org.gradle.api.file.SourceDirectorySet) {
+            for (File dir : ((org.gradle.api.file.SourceDirectorySet) kotlin).getSrcDirs()) {
+                roots.add(dir.getAbsolutePath());
+            }
+        } else {
+            roots.add(new File(layout.projectDir(), "src/main/kotlin").getAbsolutePath());
+        }
+        return new ArrayList<String>(roots);
     }
 
     static void addFramework(Project project, String configuration, Provider<String> version, String... artifactIds) {

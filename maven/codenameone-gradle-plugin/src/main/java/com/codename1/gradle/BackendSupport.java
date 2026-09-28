@@ -71,19 +71,34 @@ final class BackendSupport {
         // The @RestController router and the entry point are generated here, from
         // the compiled classes, exactly as the Maven module's process-annotations
         // execution does.
-        project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile ->
-                compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                        compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
-                        layout.settingsFile(), Collections.singletonList(layout.javaSourceDir().getAbsolutePath()),
-                        "UTF-8", userProperties.get(), main.getCompileClasspath())));
+        final File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
+        project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            AppSupport.processingInputs(compile, layout, userProperties);
+            compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
+                    compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
+                    layout.settingsFile(), AppSupport.sourceRoots(main, layout),
+                    "UTF-8", userProperties.get(), main.getCompileClasspath()));
+            compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
+                    compile.getDestinationDirectory().get().getAsFile(), kotlinClasses));
+        });
+        // Kotlin controllers and entities are processed like Java ones: in a pure
+        // Kotlin backend compileJava has no sources and would generate no router or
+        // entry point at all. (backendPackage compiles Java sources itself, so a
+        // Kotlin backend runs on the JVM with runBackend; see BackendPackager.)
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().named("compileKotlin").configure(compile -> {
+                    AppSupport.processingInputs(compile, layout, userProperties);
+                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
+                            layout.projectDir(), layout.settingsFile(), AppSupport.sourceRoots(main, layout),
+                            "UTF-8", userProperties.get(), main.getCompileClasspath()));
+                }));
 
         project.getTasks().register("runBackend", RunBackendTask.class, t -> {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Runs the backend on this JVM (the fast development loop)");
             t.dependsOn(main.getClassesTaskName());
             t.getClasspath().from(main.getRuntimeClasspath());
-            t.getClassesDirectory().set(project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
-                    .flatMap(JavaCompile::getDestinationDirectory));
+            t.getClassesDirectories().from(main.getOutput().getClassesDirs());
             t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
             t.getArgs().set(project.getProviders().gradleProperty("cn1.backend.args").map(BackendSupport::split)
                     .orElse(Collections.<String>emptyList()));

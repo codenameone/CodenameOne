@@ -100,6 +100,16 @@ class PluginHelpersTest {
         org.junit.jupiter.api.Assertions.assertFalse(fingerprint.contains("s3cret"));
     }
 
+    /// codenameone { mainClass } overrides the settings file's two keys.
+    @Test
+    void theMainClassExtensionSplitsIntoPackageAndName() {
+        java.util.Map<String, String> p = ProjectSupport.mainClassProperties("com.acme.app.OtherApp");
+        assertEquals("com.acme.app", p.get("codename1.packageName"));
+        assertEquals("OtherApp", p.get("codename1.mainName"));
+        assertEquals(Collections.emptyMap(), ProjectSupport.mainClassProperties(""));
+        assertEquals("", ProjectSupport.mainClassProperties("Bare").get("codename1.packageName"));
+    }
+
     @Test
     void eachPlatformHasItsOwnCn1libConfiguration() {
         assertEquals("cn1libIos", Cn1libs.configurationName("ios"));

@@ -91,7 +91,10 @@ class GradleConversionTest {
     private File mavenApp(String backendApi) throws IOException {
         File mvn = new File(tmp.toFile(), "mvnapp");
         touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
-                + "<version>1.0</version><properties><maps.version>1.2</maps.version></properties></project>");
+                + "<version>1.0</version><properties><maps.version>1.2</maps.version></properties>"
+                + "<dependencyManagement><dependencies><dependency><groupId>org.example</groupId>"
+                + "<artifactId>managed</artifactId><version>5.0</version></dependency></dependencies>"
+                + "</dependencyManagement></project>");
         touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
                 + "<version>1.0</version></parent><dependencies>"
                 + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId></dependency>"
@@ -105,6 +108,12 @@ class GradleConversionTest {
                 + "<scope>provided</scope></dependency>"
                 + "<dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4</version>"
                 + "<scope>test</scope></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>managed</artifactId></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>unmanaged</artifactId></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>natives</artifactId><version>2</version>"
+                + "<classifier>linux</classifier><type>zip</type></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>fixtures</artifactId><version>3</version>"
+                + "<type>test-jar</type><scope>test</scope></dependency>"
                 + "</dependencies></project>");
         touch(mvn, "common/codenameone_settings.properties", "codename1.mainName=MvnApp\ncodename1.arg.java.version=17\n");
         touch(mvn, "common/icon.png", "png");
@@ -219,6 +228,13 @@ class GradleConversionTest {
         assertTrue(build.contains("// compileOnly(\"org.example:api:VERSION\") -- set the version"),
                 "a version no property defines is commented out, not written as a Kotlin template: " + build);
         assertFalse(build.contains("\"org.example:api:${"), build);
+        assertTrue(build.contains("implementation(\"org.example:managed:5.0\")"),
+                "a version left to the parent's dependencyManagement is resolved: " + build);
+        assertTrue(build.contains("// implementation(\"org.example:unmanaged:VERSION\")"),
+                "an unresolvable managed version is commented out, not left versionless: " + build);
+        assertTrue(build.contains("implementation(\"org.example:natives:2:linux@zip\")"),
+                "the classifier and type select the same artifact Maven used: " + build);
+        assertTrue(build.contains("testImplementation(\"org.example:fixtures:3:tests\")"), build);
         assertFalse(build.contains("codenameone-core"), "the plugin adds the framework: " + build);
         assertTrue(build.contains("testImplementation(\"junit:junit:4\")"),
                 "the copied tests keep their libraries: " + build);
@@ -251,6 +267,20 @@ class GradleConversionTest {
         assertTrue(read(new File(out, "backend/build.gradle.kts")).contains("kotlin(\"jvm\")"));
         assertFalse(read(new File(out, "build.gradle.kts")).contains("kotlin(\"jvm\")"),
                 "the application has no Kotlin of its own");
+    }
+
+    /// Gradle refuses a version for a plugin the root project already put on
+    /// the classpath, so a Kotlin backend under a Kotlin application names none.
+    @Test
+    void aKotlinBackendUnderAKotlinAppDeclaresNoSecondVersion() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/src/main/kotlin/a/Helper.kt", "package a\nclass Helper");
+        touch(mvn, "backend/src/main/kotlin/a/backend/Orders.kt", "package a.backend\nclass Orders");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(read(new File(out, "build.gradle.kts")).contains("kotlin(\"jvm\") version"));
+        String backend = read(new File(out, "backend/build.gradle.kts"));
+        assertTrue(backend.contains("kotlin(\"jvm\")") && !backend.contains("kotlin(\"jvm\") version"), backend);
     }
 
     @Test
