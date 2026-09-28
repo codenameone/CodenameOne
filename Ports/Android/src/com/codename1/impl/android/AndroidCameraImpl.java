@@ -64,6 +64,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -560,29 +561,50 @@ public class AndroidCameraImpl extends CameraImpl {
         if (closed) return;
         closed = true;
         frameListener = null;
-        // unbindAll() is also main-thread-only. Waiting prevents a subsequent
-        // session from binding before this one's teardown has completed.
-        AndroidImplementation.runOnUiThreadSync(new Runnable() {
-            @Override public void run() {
-                try {
-                    if (cameraProvider != null) {
-                        clsProcessCameraProvider.getMethod("unbindAll").invoke(cameraProvider);
+        // Use the activity captured by this session: the global activity may
+        // already have been cleared during teardown. Wait for main-thread
+        // unbinding before another session can open the camera.
+        final CountDownLatch unbound = new CountDownLatch(1);
+        boolean interrupted = false;
+        try {
+            activity.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        if (cameraProvider != null) {
+                            clsProcessCameraProvider.getMethod("unbindAll").invoke(cameraProvider);
+                        }
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Could not unbind camera", t);
+                    } finally {
+                        unbound.countDown();
                     }
-                } catch (Throwable t) {
-                    Log.e(TAG, "Could not unbind camera", t);
-                } finally {
-                    previewView = null;
-                    camera = null;
-                    preview = null;
-                    imageCapture = null;
-                    imageAnalysis = null;
-                    cameraProvider = null;
+                }
+            });
+            for (;;) {
+                try {
+                    unbound.await();
+                    break;
+                } catch (InterruptedException e) {
+                    // Finish releasing the camera, then restore the caller's flag.
+                    interrupted = true;
                 }
             }
-        });
-        if (cameraExecutor != null) {
-            cameraExecutor.shutdown();
-            cameraExecutor = null;
+        } catch (Throwable t) {
+            Log.e(TAG, "Could not dispatch camera teardown", t);
+        } finally {
+            previewView = null;
+            camera = null;
+            preview = null;
+            imageCapture = null;
+            imageAnalysis = null;
+            cameraProvider = null;
+            if (cameraExecutor != null) {
+                cameraExecutor.shutdown();
+                cameraExecutor = null;
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

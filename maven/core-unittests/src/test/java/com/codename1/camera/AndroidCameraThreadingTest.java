@@ -124,6 +124,21 @@ class AndroidCameraThreadingTest {
     }
 
     @Test
+    void closingAfterGlobalActivityIsClearedStillReleasesCamera() throws Exception {
+        harness.getMethod("closeWithoutRegisteredActivity").invoke(null);
+    }
+
+    @Test
+    void dispatchFailureStillReleasesExecutorAndNativeReferences() throws Exception {
+        harness.getMethod("failedCloseDispatch").invoke(null);
+    }
+
+    @Test
+    void interruptedCloseFinishesCleanupAndRestoresInterruptFlag() throws Exception {
+        harness.getMethod("interruptedClose").invoke(null);
+    }
+
+    @Test
     void closeFromAndroidMainThreadDoesNotDeadlock() throws Exception {
         harness.getMethod("closeFromMain").invoke(null);
     }

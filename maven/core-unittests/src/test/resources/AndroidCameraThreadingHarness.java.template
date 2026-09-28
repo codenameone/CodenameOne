@@ -15,6 +15,8 @@ public class AndroidCameraThreadingHarness {
         return thread;
     });
     private static final Activity testActivity = new Activity();
+    private static Activity registeredActivity = testActivity;
+    private static boolean failDispatch;
     private static boolean failPreview;
     private static boolean failBind;
     private static boolean delayProvider;
@@ -43,6 +45,8 @@ public class AndroidCameraThreadingHarness {
     private CameraInfo[] enumerateCameras() { return new CameraInfo[] {new CameraInfo(), new CameraInfo()}; }
 
     private static void reset() {
+        registeredActivity = testActivity;
+        failDispatch = false;
         failPreview = false;
         failBind = false;
         delayProvider = false;
@@ -120,6 +124,52 @@ public class AndroidCameraThreadingHarness {
         check(liveBindings == 0 && loggedErrors == 0, "retry did not clean up");
     }
 
+    private static void checkReleased(AndroidCameraThreadingHarness camera, ExecutorService executor) {
+        check(executor.isShutdown(), "camera executor leaked");
+        check(camera.cameraExecutor == null && camera.previewView == null && camera.camera == null
+                && camera.preview == null && camera.imageCapture == null && camera.imageAnalysis == null
+                && camera.cameraProvider == null, "native references retained after close");
+    }
+
+    public static void closeWithoutRegisteredActivity() throws Exception {
+        reset();
+        AndroidCameraThreadingHarness camera = openCamera();
+        ExecutorService executor = (ExecutorService) camera.cameraExecutor;
+        registeredActivity = null;
+        camera.close();
+        camera.close();
+        check(unbinds == 1 && liveBindings == 0, "captured activity did not unbind on main thread");
+        checkReleased(camera, executor);
+        check(loggedErrors == 0, "close without global activity logged an error");
+    }
+
+    public static void failedCloseDispatch() throws Exception {
+        reset();
+        AndroidCameraThreadingHarness camera = openCamera();
+        ExecutorService executor = (ExecutorService) camera.cameraExecutor;
+        failDispatch = true;
+        camera.close();
+        camera.close();
+        checkReleased(camera, executor);
+        check(loggedErrors == 1, "dispatch failure must be reported once");
+        check(unbinds == 0, "failed dispatch cannot claim hardware was unbound");
+    }
+
+    public static void interruptedClose() throws Exception {
+        reset();
+        AndroidCameraThreadingHarness camera = openCamera();
+        ExecutorService executor = (ExecutorService) camera.cameraExecutor;
+        Thread.currentThread().interrupt();
+        try {
+            camera.close();
+            check(Thread.currentThread().isInterrupted(), "close discarded caller interruption");
+            check(unbinds == 1 && liveBindings == 0, "interrupted close did not finish unbinding");
+            checkReleased(camera, executor);
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     public static void closeFromMain() throws Exception {
         reset();
         final AndroidCameraThreadingHarness camera = openCamera();
@@ -155,6 +205,7 @@ public class AndroidCameraThreadingHarness {
     }
     public static class Activity extends Context {
         public void runOnUiThread(Runnable r) {
+            if (failDispatch) throw new IllegalStateException("injected dispatch failure");
             if (Thread.currentThread() == uiThread) r.run();
             else ui.execute(r);
         }
@@ -229,7 +280,7 @@ public class AndroidCameraThreadingHarness {
         public boolean post(Runnable r) { ui.execute(r); return true; }
     }
     public static class AndroidImplementation {
-        public static Activity getActivity() { return testActivity; }
+        public static Activity getActivity() { return registeredActivity; }
         /* UI_SYNC_METHOD */
     }
     public static class Log {
