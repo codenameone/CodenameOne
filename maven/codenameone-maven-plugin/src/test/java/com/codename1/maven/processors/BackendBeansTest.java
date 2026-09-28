@@ -1247,6 +1247,19 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aScopedBeanInheritingAnAsyncMethodIsRefused() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Worker", PKG + "public abstract class Worker {\n"
+                + "    @Async public void later() { }\n"
+                + "}\n");
+        s.put("com.example.Visit", PKG + "@Component @RequestScope public class Visit "
+                + "extends Worker { }\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@Async method com.example.Visit.later is on a "
+                + "@RequestScope bean"));
+    }
+
+    @Test
     public void aPrototypeControllerIsBuiltOnce() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Api", PKG + "@RestController @Scope(\"prototype\") public class Api {\n"

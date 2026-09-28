@@ -138,6 +138,29 @@ class TransactionsTest {
     }
 
     @Test
+    @DisplayName("a transaction on one pool refuses work on another, which would commit on its own")
+    void aSecondPoolIsRefusedInsideATransaction(@TempDir File dir) throws Exception {
+        DataSource other = DataSource.open(new File(dir, "other.db").getAbsolutePath(), 2, 5000,
+                10000);
+        try {
+            other.execute("CREATE TABLE u (v TEXT)", null);
+            Transactions.Transaction tx = Transactions.begin(Transactions.REQUIRED, false, -1);
+            insert("a");
+            assertThrows(TransactionException.IllegalState.class,
+                    () -> other.execute("INSERT INTO u (v) VALUES ('b')", null));
+            Transactions.Transaction own = Transactions.begin(Transactions.REQUIRES_NEW, false, -1);
+            other.execute("INSERT INTO u (v) VALUES ('c')", null);
+            Transactions.commit(own);
+            Transactions.afterThrow(tx, true);
+            assertEquals(0, rows());
+            assertEquals(1, ((Number) other.queryOne("SELECT COUNT(*) AS n FROM u", null)
+                    .get("n")).intValue());
+        } finally {
+            other.close();
+        }
+    }
+
+    @Test
     @DisplayName("a savepoint that cannot be set leaves the outer transaction unable to commit")
     void aFailedSavepointMarksTheOuterRollbackOnly() throws Exception {
         Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);

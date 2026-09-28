@@ -2404,6 +2404,81 @@ class ApplicationRuntimeTest {
         again.stop();
     }
 
+    @Test
+    @DisplayName("a copy that rotates after another request invalidated its session keeps the retired beans")
+    void aStaleRotationUsesTheRetiredBeans(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "retired.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions sessions = new Sessions(new EmptyApplication());
+            sessions.setStore(new Sessions.Jdbc(pool));
+            long now = System.currentTimeMillis();
+            HttpSession stored = new HttpSession("shared", now, now, 1800);
+            stored.markNew();
+            sessions.getStore().save(stored, null);
+            HttpSession a = sessions.getStore().load("shared");
+            HttpSession b = sessions.getStore().load("shared");
+            a.owner = sessions;
+            b.owner = sessions;
+            HttpServer.Request ra = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null);
+            HttpServer.Request rb = new HttpServer.Request("GET", "/", "HTTP/1.1",
+                    new LinkedHashMap(), null);
+            sessions.enter(ra, a);
+            sessions.enter(rb, b);
+            Object[] beans = b.scopedBeans(1);
+            a.invalidate();
+            sessions.finish(ra, a, HttpServer.Response.text(200, "a"));
+            sessions.leave(ra);
+            b.changeSessionId();                        // B rotates its stale copy
+            assertTrue(b.scopedBeans(1) == beans,
+                    "a fresh set of beans was built under the rotated id");
+            sessions.leave(rb);
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
+    @DisplayName("recording with no label values is the unlabelled series, not a second empty one")
+    void noLabelValuesIsThePlainSeries() {
+        Histogram h = Metrics.histogram("test.plain.labels", "", "ms", null,
+                new String[] {"route", null, null});
+        h.record(1);
+        h.record(2, null, null, null);
+        assertEquals(1, h.points().size(), "two series exported with the same empty labels");
+    }
+
+    @Test
+    @DisplayName("a database session's beans get the same expiry grace as its row")
+    void jdbcBeansGetTheRowsGrace(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "grace.db").getAbsolutePath(),
+                2, 5000, 10000);
+        final List ended = new ArrayList();
+        try {
+            Sessions sessions = new Sessions(new EmptyApplication() {
+                public void sessionEnded(Object[] beans) {
+                    ended.add(beans);
+                }
+            });
+            sessions.setStore(new Sessions.Jdbc(pool));
+            long now = System.currentTimeMillis();
+            // A minute's timeout, last used 65 seconds ago: past the timeout, inside
+            // the 15-second touch interval the store still accepts the row for.
+            HttpSession s = new HttpSession("graced", now - 65000, now - 65000, 60);
+            s.owner = sessions;
+            s.scopedBeans(1)[0] = "cart";
+            sessions.purgeIfDue(sessions.getStore(), now);
+            assertTrue(ended.isEmpty(), "the beans expired while the row was still accepted");
+            sessions.purgeIfDue(sessions.getStore(), now + 61000);
+            assertEquals(1, ended.size(), "the beans never expired");
+        } finally {
+            pool.close();
+        }
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

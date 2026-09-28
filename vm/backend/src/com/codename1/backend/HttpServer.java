@@ -2575,9 +2575,12 @@ public final class HttpServer {
                 return false;
             }
             host.inbox.add(Long.valueOf(token));
-        }
-        if (host.wakeWrite >= 0) {
-            Reactor.wake(host.wakeWrite);
+            // Under the same lock that closes the pipe: released first, a
+            // submitter paused here could write after the descriptor was closed
+            // and its number reused -- the wake byte landing in another socket.
+            if (host.wakeWrite >= 0) {
+                Reactor.wake(host.wakeWrite);
+            }
         }
         return true;
     }
@@ -2590,18 +2593,20 @@ public final class HttpServer {
             tokens = (Long[]) host.inbox.toArray(new Long[host.inbox.size()]);
             host.inbox.clear();
             host.inboxClosed = true;
+            // Closed under the lock a submitter wakes the host under, so no wake
+            // can be written between the close and the -1.
+            if (host.wakeRead >= 0) {
+                ServerSocket.closeFd(host.wakeRead);
+                ServerSocket.closeFd(host.wakeWrite);
+                host.wakeRead = -1;
+                host.wakeWrite = -1;
+            }
         }
         for (Long element : tokens) {
             Runnable task = takeVirtualTask(element.longValue());
             if (task != null) {
                 TaskExecutor.fallBack(task);
             }
-        }
-        if (host.wakeRead >= 0) {
-            ServerSocket.closeFd(host.wakeRead);
-            ServerSocket.closeFd(host.wakeWrite);
-            host.wakeRead = -1;
-            host.wakeWrite = -1;
         }
     }
 
@@ -3044,35 +3049,73 @@ public final class HttpServer {
                     return;
                 }
             }
-            // Out of time: free what is left rather than leaking its stack. Its
-            // Future never completes, so say so.
+            // Out of time. A task that never had its first turn has no frames:
+            // its stack is freed and its Future failed. One that STARTED is never
+            // freed -- free() does not unwind, so its finally blocks and monitor
+            // exits would never run, and a lock it holds would stay owned by a
+            // thread that no longer exists. It goes on running past the deadline
+            // instead, as a platform task that overruns does; the drain is over
+            // for the rest of the stop either way.
             int abandoned = 0;
+            int overrunning = 0;
             int left = me.ringCount;
             while (left-- > 0 && !me.ringEmpty()) {
                 long handle = me.ringTake();
-                if (VirtualThread.descriptorOf(handle) < 0) {
-                    Runnable task = (Runnable) me.tasks.remove(Long.valueOf(handle));
-                    Long token = (Long) me.taskTokens.remove(Long.valueOf(handle));
-                    if (token != null) {
-                        // A no-op for a task that started: runVirtual removed it.
-                        takeVirtualTask(token.longValue());
-                    }
-                    VirtualThread.free(handle);
-                    if (task != null) {
-                        TaskExecutor.abandoned(task);
-                    }
-                    abandoned++;
-                } else {
+                if (VirtualThread.descriptorOf(handle) >= 0) {
                     me.ringAdd(handle);
+                    continue;
                 }
+                Long token = (Long) me.taskTokens.get(Long.valueOf(handle));
+                // Present only until runVirtual takes it on the task's first turn.
+                Runnable unstarted = token == null ? null : takeVirtualTask(token.longValue());
+                if (unstarted == null) {
+                    me.ringAdd(handle);
+                    overrunning++;
+                    continue;
+                }
+                Runnable task = (Runnable) me.tasks.remove(Long.valueOf(handle));
+                me.taskTokens.remove(Long.valueOf(handle));
+                VirtualThread.free(handle);
+                TaskExecutor.abandoned(task != null ? task : unstarted);
+                abandoned++;
             }
             if (abandoned > 0) {
                 System.err.println(abandoned + " background task(s) on virtual threads did "
-                        + "not finish within the shutdown window and were abandoned");
+                        + "not start within the shutdown window and were dropped");
+            }
+            if (overrunning > 0) {
+                System.err.println(overrunning + " background task(s) on virtual threads are "
+                        + "still running past the shutdown window; they are left to finish");
+                synchronized (me.inbox) {
+                    me.tasksDrained = true;
+                }
+                finishOverrunningTasks(me);
             }
         } finally {
             synchronized (me.inbox) {
                 me.tasksDrained = true;
+            }
+        }
+    }
+
+    /// Resumes a stopped host's started tasks until each has finished, so every
+    /// one unwinds -- its finally blocks run, its monitors are released -- rather
+    /// than having its stack freed from under it.
+    private void finishOverrunningTasks(VtHost me) {
+        while (!me.ringEmpty()) {
+            int budget = me.ringCount;
+            int tasks = 0;
+            while (budget-- > 0 && !me.ringEmpty()) {
+                long handle = me.ringTake();
+                if (VirtualThread.descriptorOf(handle) < 0) {
+                    advanceTask(me, handle);
+                    tasks++;
+                } else {
+                    me.ringAdd(handle);
+                }
+            }
+            if (tasks == 0) {
+                return;
             }
         }
     }

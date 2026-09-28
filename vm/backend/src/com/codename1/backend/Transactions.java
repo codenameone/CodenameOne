@@ -531,7 +531,14 @@ public final class Transactions {
             }
             p.pool = pool;
         } else if (pool != null && p.pool != pool) { //NOPMD CompareObjectsWithEquals - pools and connections are compared by identity
-            return null;
+            // Refused rather than answered with "no transaction": the caller would
+            // then take an ordinary connection that commits each statement on its
+            // own, and a method that failed afterwards would roll back only the
+            // first database -- half of its work kept.
+            throw new TransactionException.IllegalState("This thread's transaction is on "
+                    + "another database, and one transaction cannot span two. Do the work "
+                    + "on this one in a @Transactional(propagation = REQUIRES_NEW) method for "
+                    + "a transaction of its own, or NOT_SUPPORTED to run it outside any.");
         }
         if (p.db != null) {
             return p.db;

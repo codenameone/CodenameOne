@@ -542,7 +542,9 @@ final class BackendBeans {
             bindProperties(bean, props, cls);
         }
         if (REQUEST.equals(bean.scope) || SESSION.equals(bean.scope)) {
-            for (MethodInfo m : cls.getMethods()) {
+            // Inherited ones too: an @Async method a superclass declares queues a
+            // task holding the scoped instance just the same.
+            for (MethodInfo m : inheritedMembers(cls)) {
                 if (m.getAnnotation(ASYNC) != null
                         || (cls.getClassAnnotation(ASYNC) != null && m.isPublic()
                         && !m.isConstructor() && !m.isStatic())) {

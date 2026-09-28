@@ -276,8 +276,13 @@ public final class Sessions {
             while (it.hasNext()) {
                 Map.Entry e = (Map.Entry) it.next();
                 Held h = (Held) e.getValue();
+                // The database store accepts a row for a touch interval past the
+                // timeout, because the last use it has stored lags; the beans get
+                // the same grace, or a request in that window would find the row
+                // still valid after its beans were destroyed, and build a second set.
+                long grace = s instanceof Jdbc ? Jdbc.touchInterval(h.maxInactiveSeconds) : 0;
                 if (h.maxInactiveSeconds > 0
-                        && now - h.lastAccessed > h.maxInactiveSeconds * 1000L
+                        && now - h.lastAccessed > h.maxInactiveSeconds * 1000L + grace
                         && !busy.contains(e.getKey())) {
                     it.remove();
                     if (expired == null) {
@@ -622,6 +627,14 @@ public final class Sessions {
             held = (Held) beans.remove(previous);
             if (held != null) {
                 beans.put(id, held);
+            } else {
+                // Unless another request invalidated that old id meanwhile and
+                // its beans were retired: this copy's rotation will lose, so it
+                // uses those rather than building a set under the new id.
+                Held parting = (Held) retired.get(previous);
+                if (parting != null) {
+                    return parting;
+                }
             }
         }
         if (held == null) {

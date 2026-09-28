@@ -131,6 +131,12 @@ public final class Histogram extends Instrument {
         Object a = labels.length > 0 && labels[0] != null ? first : null;
         Object b = labels.length > 1 && labels[1] != null ? second : null;
         Object c = labels.length > 2 && labels[2] != null ? third : null;
+        if (a == null && b == null && c == null) {
+            // No label values at all is the unlabelled series: a second series
+            // with the same empty attribute set exports duplicate samples.
+            plain.record(value, bounds);
+            return;
+        }
         Series s;
         synchronized (this) {
             s = find(a, b, c);
