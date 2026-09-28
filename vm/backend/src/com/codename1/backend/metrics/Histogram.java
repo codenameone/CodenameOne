@@ -124,9 +124,16 @@ public final class Histogram extends Instrument {
     /// Records one value in the series for these label values, given in the
     /// order of the keys the histogram was created with.
     public void record(double value, Object first, Object second, Object third) {
+        // Values past the label keys this histogram has are not exported, so they
+        // must not tell series apart either: one key recorded with two different
+        // second values made two series exported as one label set -- duplicate
+        // samples a scrape rejects.
+        Object a = labels.length > 0 && labels[0] != null ? first : null;
+        Object b = labels.length > 1 && labels[1] != null ? second : null;
+        Object c = labels.length > 2 && labels[2] != null ? third : null;
         Series s;
         synchronized (this) {
-            s = find(first, second, third);
+            s = find(a, b, c);
         }
         s.record(value, bounds);
     }

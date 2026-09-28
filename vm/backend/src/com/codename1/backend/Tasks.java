@@ -306,6 +306,18 @@ public final class Tasks {
         shutdown(current(), waitMillis);
     }
 
+    /// Waits until no task of `registry` runs any more, or `deadline` passes --
+    /// after [#shutdown], which does not wait for the task that called it.
+    static void awaitIdle(Registry registry, long deadline) {
+        List all;
+        synchronized (registry) {
+            all = new ArrayList(registry.executors.values());
+        }
+        for (Object element : all) {
+            ((TaskExecutor) element).awaitIdle(deadline);
+        }
+    }
+
     /// Stops `registry`'s executors, waiting up to `waitMillis` in
     /// total, and retires it: nothing new is accepted, and threads that fell
     /// back to it move on to another running server's.

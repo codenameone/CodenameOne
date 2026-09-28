@@ -257,16 +257,104 @@ public final class Backend {
             }
             stopping = true;
         }
+        // A caller that is itself in-flight work -- a handler, a callback, a task
+        // -- is discounted by the drains below, so they return while it still
+        // runs. The teardown after them (beans destroyed, pool closed) must then
+        // wait for it to leave: it goes on using those, and its request still
+        // stores its session and destroys its request beans on the way out.
+        boolean callerInFlight = HttpServer.servingOnThisThread()
+                || TaskExecutor.runningOnThisThread();
         // The callbacks below work for this server, whichever thread stops it.
         Object callerTasks = Tasks.enter(tasks);
+        boolean deferred = false;
         try {
-            stopOnce();
+            drain();
+            if (callerInFlight) {
+                deferred = true;
+                // The tracer is arranged HERE, on the caller's thread, where its
+                // request's span can be found: it ends after the response is
+                // written, later than the teardown below may run, and the tracer
+                // must outlive it or the request that stopped the server loses its
+                // own trace.
+                final boolean tracerArranged = ownTracer != null
+                        && Tracing.shutdownWhenServingEnds(ownTracer, shutdownMillis);
+                Thread finisher = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        finishAfterCaller(!tracerArranged);
+                    }
+                }, "cn1-backend-stop");
+                finisher.start();
+            } else {
+                tearDown(true);
+            }
         } finally {
             Tasks.leave(callerTasks);
-            synchronized (this) {
-                stopping = false;
-                stopped = true;
-                notifyAll();
+            if (!deferred) {
+                markStopped();
+            }
+        }
+    }
+
+    /// The teardown of a stop() called from in-flight work, once that work --
+    /// and any other the drain discounted -- has left, or the timeout has passed.
+    private void finishAfterCaller(boolean stopTracer) {
+        long deadline = System.currentTimeMillis() + Math.max(0, shutdownMillis);
+        InFlight work = inFlight;
+        if (work != null) {
+            work.awaitIdle(deadline);
+        }
+        Tasks.awaitIdle(tasks, deadline);
+        Object previous = Tasks.enter(tasks);
+        try {
+            tearDown(stopTracer);
+        } finally {
+            Tasks.leave(previous);
+            markStopped();
+        }
+    }
+
+    private synchronized void markStopped() {
+        stopping = false;
+        stopped = true;
+        notifyAll();
+    }
+
+    /// Whether [#stop] has finished: the beans are destroyed and the pool closed.
+    public synchronized boolean isStopped() {
+        return stopped;
+    }
+
+    /// The requests and websocket callbacks this server is running, counted so a
+    /// stop() called from one of them can wait for it to leave before the
+    /// teardown. Null for a Backend built without a listener of its own.
+    InFlight inFlight;
+
+    /// A count of work in flight that can be waited out.
+    static final class InFlight {
+        private int count;
+
+        synchronized void enter() {
+            count++;
+        }
+
+        synchronized void leave() {
+            count--;
+            notifyAll();
+        }
+
+        synchronized void awaitIdle(long deadline) {
+            while (count > 0) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0) {
+                    return;
+                }
+                try {
+                    wait(left);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
     }
@@ -274,7 +362,8 @@ public final class Backend {
     private boolean stopping;
     private boolean stopped;
 
-    private void stopOnce() {
+    /// Stops taking work and lets what is in flight finish, up to the timeout.
+    private void drain() {
         // Scheduled jobs first, so none starts while the server drains; the
         // jobs already running are waited for with the requests.
         if (application != null) {
@@ -304,6 +393,13 @@ public final class Backend {
         if (metricReader != null) {
             metricReader.shutdown(shutdownMillis);
         }
+    }
+
+    /// Destroys the beans and closes the pool, once nothing uses them.
+    ///
+    /// @param stopTracer false when the tracer's shutdown is already arranged
+    /// on the end of the request that called stop()
+    private void tearDown(boolean stopTracer) {
         // @PreDestroy after the drain, so no request is still using a bean it
         // tears down, and before the pool closes, so a bean can still flush to
         // the database on its way out. Session beans first: they may use the
@@ -322,7 +418,7 @@ public final class Backend {
         // LAST, so the spans of the requests the drain let finish are exported
         // rather than lost with the process -- and, when a request handler is the
         // caller, after THAT request's span has ended, which is after this returns.
-        if (ownTracer != null) {
+        if (ownTracer != null && stopTracer) {
             Tracing.shutdownAfterServing(ownTracer, shutdownMillis);
         }
     }
@@ -445,11 +541,20 @@ public final class Backend {
     static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
                                                   final Tasks.Registry tasks,
                                                   final Tracer tracer) {
+        return withTasks(registry, tasks, tracer, null);
+    }
+
+    /// And counted in `inFlight` while each callback runs, for a stop() one of
+    /// them makes.
+    static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
+                                                  final Tasks.Registry tasks,
+                                                  final Tracer tracer,
+                                                  final InFlight inFlight) {
         return new HttpServer.WebSocketRegistry() {
             @Override
             public void route(String path, WebSocket endpoint) {
                 registry.route(path, endpoint == null ? null
-                        : new TaskBound(endpoint, tasks, tracer));
+                        : new TaskBound(endpoint, tasks, tracer, inFlight));
             }
 
             @Override
@@ -460,7 +565,8 @@ public final class Backend {
                         Object previous = Tasks.enter(tasks);
                         try {
                             WebSocket endpoint = router.open(request);
-                            return endpoint == null ? null : new TaskBound(endpoint, tasks, tracer);
+                            return endpoint == null ? null
+                                    : new TaskBound(endpoint, tasks, tracer, inFlight);
                         } finally {
                             Tasks.leave(previous);
                         }
@@ -478,24 +584,36 @@ public final class Backend {
         private final WebSocket endpoint;
         private final Tasks.Registry tasks;
         private final Tracer tracer;
+        private final InFlight inFlight;
 
         TaskBound(WebSocket endpoint, Tasks.Registry tasks) {
-            this(endpoint, tasks, null);
+            this(endpoint, tasks, null, null);
         }
 
         TaskBound(WebSocket endpoint, Tasks.Registry tasks, Tracer tracer) {
+            this(endpoint, tasks, tracer, null);
+        }
+
+        TaskBound(WebSocket endpoint, Tasks.Registry tasks, Tracer tracer, InFlight inFlight) {
             this.endpoint = endpoint;
             this.tasks = tasks;
             this.tracer = tracer;
+            this.inFlight = inFlight;
         }
 
         private Object[] bind() {
+            if (inFlight != null) {
+                inFlight.enter();
+            }
             return new Object[] {Tasks.enter(tasks), Tracing.own(tracer)};
         }
 
-        private static void unbind(Object[] previous) {
+        private void unbind(Object[] previous) {
             Tracing.disown(previous[1]);
             Tasks.leave(previous[0]);
+            if (inFlight != null) {
+                inFlight.leave();
+            }
         }
 
         @Override
@@ -589,11 +707,14 @@ public final class Backend {
         /// This server's tracer, or the untraced marker; bound for the request
         /// so work it hands to another thread -- an @Async call -- keeps it.
         private final Tracer tracer;
+        /// Every request counted in and out, for a stop() one of them makes.
+        private final InFlight inFlight;
 
         Serving(HttpServer.Handler[] chain, Sessions sessions, Tasks.Registry tasks,
                 RequestLog requestLog, java.util.concurrent.atomic.AtomicBoolean instrumented,
-                Application app, boolean track, Tracer tracer) {
+                Application app, boolean track, Tracer tracer, InFlight inFlight) {
             this.tracer = tracer;
+            this.inFlight = inFlight;
             this.chain = chain;
             this.sessions = sessions;
             this.tasks = tasks;
@@ -667,6 +788,7 @@ public final class Backend {
             // two servers on one host would otherwise present
             // one's session to the other and be let in.
             request.sessions = sessions;
+            inFlight.enter();
             Object previousTasks = Tasks.enter(tasks);
             Object previousOwner = Tracing.own(tracer);
             if (track) {
@@ -711,7 +833,18 @@ public final class Backend {
                     }
                     if (session != null) {
                         attempted.add(session);
-                        response = sessions.finish(request, session, response);
+                        boolean stored = false;
+                        try {
+                            response = sessions.finish(request, session, response);
+                            stored = true;
+                        } finally {
+                            if (!stored) {
+                                // A new session whose first save failed: its cookie
+                                // was never sent, so nothing can find it again --
+                                // its beans and any half-written row go now.
+                                sessions.discardUnsaved(session);
+                            }
+                        }
                     }
                 } catch (Exception err) {
                     failed(request, attempted, startedMillis, err);
@@ -752,6 +885,8 @@ public final class Backend {
                     Tasks.leave(previousTasks);
                     Tracing.disown(previousOwner);
                     sessions.leave(request);
+                    // Last: a stop() this request made tears down only now.
+                    inFlight.leave();
                 }
             }
         }
@@ -1153,9 +1288,51 @@ public final class Backend {
             return this;
         }
 
+        private SessionStore sessionStore;
+
+        /// Keeps sessions in `store` instead of the configured one. Installed
+        /// before the server listens, so no request can have used another store
+        /// first -- which is why this is the way to set one, rather than
+        /// replacing the store of a server already running.
+        public Builder sessionStore(SessionStore store) {
+            this.sessionStore = store;
+            return this;
+        }
+
         /// Starts the server and returns, without installing a signal handler or
         /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
+            claimStart();
+            try {
+                Backend running = startOnce();
+                synchronized (this) {
+                    live = running;
+                }
+                return running;
+            } finally {
+                synchronized (this) {
+                    starting = false;
+                }
+            }
+        }
+
+        /// The Backend this builder last started, until it stops.
+        private Backend live;
+        private boolean starting;
+
+        /// One live Backend per builder. The generated application is one object,
+        /// and a second create() replaces its beans and scheduler: stopping the
+        /// first server would then destroy what the second still uses. A builder
+        /// may start again once its previous server has stopped.
+        private synchronized void claimStart() {
+            if (starting || (live != null && !live.isStopped())) {
+                throw new IllegalStateException("This builder's server is still running; "
+                        + "stop it before starting it again, or use another builder");
+            }
+            starting = true;
+        }
+
+        private Backend startOnce() throws Exception {
             if (config == null) {
                 config = Config.load();
             }
@@ -1277,6 +1454,7 @@ public final class Backend {
             // it carry; Tasks explains why they are not the process's.
             final Tasks.Registry tasks = Tasks.open(config);
             startingTasks = tasks;
+            final InFlight inFlight = new InFlight();
             // Restored by startTraced when this returns or throws.
             Tasks.enter(tasks);
             // From here until a Backend owns it, a failed start must still run
@@ -1440,6 +1618,9 @@ public final class Backend {
             // send a TLS server's session cookie without Secure.
             final Sessions sessions = Sessions.configure(config, context != null, pool,
                     application);
+            if (sessionStore != null) {
+                sessions.setStore(sessionStore);
+            }
             // This server's own, which the development tools switch on.
             final RequestLog requestLog = new RequestLog();
             // Whether THIS server records request metrics, known only once the
@@ -1462,7 +1643,7 @@ public final class Backend {
                             // Every endpoint's callbacks carry this server's
                             // executors, as its HTTP requests do.
                             HttpServer.WebSocketRegistry registry = withTasks(direct, tasks,
-                                    active != null ? active : Tracing.NONE);
+                                    active != null ? active : Tracing.NONE, inFlight);
                             // The same two arguments a Handlers factory gets,
                             // and for the same reason: an endpoint that needs
                             // the database declares it rather than reaching
@@ -1478,7 +1659,7 @@ public final class Backend {
                 }
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         new Serving(chain, sessions, tasks, requestLog, instrumented, app, track,
-                                active != null ? active : Tracing.NONE),
+                                active != null ? active : Tracing.NONE, inFlight),
                         context, routes);
                 bound = true;
             } finally {
@@ -1535,6 +1716,7 @@ public final class Backend {
             }
             backend.measured = measuring;
             backend.listenAddress = advertised(bindHost);
+            backend.inFlight = inFlight;
             // Backend.stop() tears the beans down from here on.
             createdApplication = null;
             startingTasks = null;

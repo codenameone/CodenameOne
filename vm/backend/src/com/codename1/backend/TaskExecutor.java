@@ -88,6 +88,22 @@ public final class TaskExecutor {
         return queue.size();
     }
 
+    /// Waits until no task of this executor is running, or `deadline` passes.
+    synchronized void awaitIdle(long deadline) {
+        while (active > 0) {
+            long left = deadline - System.currentTimeMillis();
+            if (left <= 0) {
+                return;
+            }
+            try {
+                wait(left);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     /// Tasks running now.
     public synchronized int getActiveCount() {
         return active;

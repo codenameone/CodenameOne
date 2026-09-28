@@ -62,6 +62,9 @@ public final class Sessions {
     /// would be built again per request and never destroyed.
     private final Map beans = new HashMap();
     private boolean closed;
+    /// Set by the first lookup: from then on sessions live in the store, and
+    /// replacing it would lose them.
+    private boolean used;
 
     /// Default settings and an in-memory store, for a server with no generated
     /// application.
@@ -163,10 +166,23 @@ public final class Sessions {
         return true;
     }
 
-    /// Replaces the store, for one of the application's own.
+    /// Replaces the store, for one of the application's own -- before the first
+    /// request uses a session. A server hands out sessions from the moment it
+    /// listens, so a store set later would lose the ones already in the old
+    /// store, cookies and beans alike; `Backend.Builder.sessionStore` installs one
+    /// before the listener binds.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: once a session has been looked up
     public synchronized void setStore(SessionStore replacement) {
         if (replacement == null) {
             throw new IllegalArgumentException("No store");
+        }
+        if (used) {
+            throw new IllegalStateException("Sessions are already in use, and replacing their "
+                    + "store now would lose them; set it with Backend.builder().sessionStore(...), "
+                    + "which installs it before the server listens");
         }
         store = replacement;
     }
@@ -201,6 +217,7 @@ public final class Sessions {
         synchronized (this) {
             s = store;
             timeout = timeoutSeconds;
+            used = true;
         }
         long now = System.currentTimeMillis();
         purgeIfDue(s, now);
@@ -619,6 +636,26 @@ public final class Sessions {
     private synchronized Object[] take(String id) {
         Held held = (Held) beans.remove(id);
         return held == null ? null : held.beans;
+    }
+
+    /// A NEW session whose first save threw: the request fails without its
+    /// cookie, so no request can ever present its id. Its session-scoped beans
+    /// are destroyed and the row a failure part-way through may have written is
+    /// removed, instead of both waiting for an expiry that a zero timeout never
+    /// brings. An existing session is left alone: its client still holds the id.
+    void discardUnsaved(HttpSession session) {
+        if (session == null || !session.isNew()) {
+            return;
+        }
+        destroy(take(session.getId()));
+        try {
+            getStore().delete(session.getId());
+        } catch (IOException err) {
+            System.err.println("Could not remove a session whose first save failed: "
+                    + err.getMessage());
+        } catch (RuntimeException err) {
+            System.err.println("Could not remove a session whose first save failed: " + err);
+        }
     }
 
     /// Runs the destroy methods of one session's beans.

@@ -2263,6 +2263,147 @@ class ApplicationRuntimeTest {
                 }).start();
     }
 
+    @Test
+    @DisplayName("a stop() a handler makes tears the beans down only after that handler returns")
+    void aHandlerStoppingTheServerFinishesFirst() throws Exception {
+        final boolean[] handlerDone = {false};
+        final boolean[] destroyedEarly = {false};
+        final CountDownLatch destroyed = new CountDownLatch(1);
+        final Backend[] self = new Backend[1];
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public void stopped() {
+                        synchronized (handlerDone) {
+                            destroyedEarly[0] = !handlerDone[0];
+                        }
+                        destroyed.countDown();
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        self[0].stop();
+                        Thread.sleep(200);                 // still using the beans
+                        synchronized (handlerDone) {
+                            handlerDone[0] = true;
+                        }
+                        return request.respond(200, "text/plain", "bye".getBytes("UTF-8"));
+                    }
+                }).start();
+        self[0] = backend;
+        assertEquals("bye", read(open(port, "/")));
+        assertTrue(destroyed.await(10, TimeUnit.SECONDS), "the beans were never destroyed");
+        assertFalse(destroyedEarly[0], "the beans were destroyed while the handler still ran");
+        long deadline = System.currentTimeMillis() + 5000;
+        while(!backend.isStopped() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue(backend.isStopped());
+    }
+
+    @Test
+    @DisplayName("values past a histogram's label keys do not make series of their own")
+    void extraLabelValuesAreIgnored() {
+        Histogram h = Metrics.histogram("test.extra.labels", "", "ms", null,
+                new String[] {"route", null, null});
+        h.record(1, "/a", "x", null);
+        h.record(2, "/a", "y", null);
+        int labelled = 0;
+        for(Object p : h.points()) {
+            Map attributes = (Map) ((Map) p).get("attributes");
+            if(attributes != null && "/a".equals(attributes.get("route"))) {
+                labelled++;
+            }
+        }
+        assertEquals(1, labelled, "two series exported under one label set");
+    }
+
+    @Test
+    @DisplayName("a new session whose first save fails has its beans destroyed and its row removed")
+    void anUnsavedNewSessionIsDiscarded() throws Exception {
+        final List ended = new ArrayList();
+        final List deleted = new ArrayList();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        final SessionStore memory = new Sessions.Memory();
+        final SessionStore failing = new SessionStore() {
+            public HttpSession load(String id) throws IOException {
+                return memory.load(id);
+            }
+
+            public void save(HttpSession session, String previousId) throws IOException {
+                throw new IOException("the store refused");
+            }
+
+            public void delete(String id) throws IOException {
+                deleted.add(id);
+                memory.delete(id);
+            }
+
+            public int purgeExpired(long now) throws IOException {
+                return memory.purgeExpired(now);
+            }
+
+            public int size() {
+                return memory.size();
+            }
+        };
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .sessionStore(failing)
+                .application(new EmptyApplication() {
+                    public void sessionEnded(Object[] beans) {
+                        ended.add(beans);
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request)
+                            throws Exception {
+                        HttpSession s = request.getSession(true);
+                        s.scopedBeans(1)[0] = "cart";
+                        s.setAttribute("n", "x");
+                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
+                    }
+                }).start();
+        try {
+            assertEquals(500, open(port, "/").getResponseCode());
+            assertEquals(1, ended.size(), "the unsaved session's beans were kept");
+            assertEquals(1, deleted.size(), "a half-written row was left behind");
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a session store is set before the server listens; replacing it later is refused")
+    void sessionStoresAreSetBeforeUse() throws Exception {
+        Sessions sessions = new Sessions();
+        sessions.setStore(new Sessions.Memory());         // nothing used yet: fine
+        sessions.find(null, true);
+        assertThrows(IllegalStateException.class,
+                () -> sessions.setStore(new Sessions.Memory()));
+    }
+
+    @Test
+    @DisplayName("a builder runs one server at a time, and may start again once it stopped")
+    void aBuilderRunsOneServerAtATime() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend.Builder builder = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication());
+        Backend first = builder.start();
+        try {
+            assertThrows(IllegalStateException.class, () -> builder.start());
+        } finally {
+            first.stop();
+        }
+        Backend again = builder.start();
+        again.stop();
+    }
+
     /** A tracer that records nothing, for tests that only check which one is used. */
     static class QuietTracer implements Tracer {
         public boolean open(Config config) {

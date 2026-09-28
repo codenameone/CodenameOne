@@ -587,13 +587,21 @@ public final class Tracing {
     /// ends after that write; shutting the tracer down first made the exporter
     /// refuse that span, so every shutdown requested over HTTP lost its own trace.
     static void shutdownAfterServing(Tracer owned, int timeoutMillis) {
-        Span serving = servingSpan();
-        if (serving != null) {
-            serving.shutdownOnEnd = owned;
-            serving.shutdownOnEndMillis = timeoutMillis;
-            return;
+        if (!shutdownWhenServingEnds(owned, timeoutMillis)) {
+            shutdown(owned, timeoutMillis);
         }
-        shutdown(owned, timeoutMillis);
+    }
+
+    /// Arranges for `owned` to stop once the request this thread is serving
+    /// has ended its span; false, arranging nothing, when it serves none.
+    static boolean shutdownWhenServingEnds(Tracer owned, int timeoutMillis) {
+        Span serving = servingSpan();
+        if (serving == null) {
+            return false;
+        }
+        serving.shutdownOnEnd = owned;
+        serving.shutdownOnEndMillis = timeoutMillis;
+        return true;
     }
 
     /// The server span of the request this thread is serving, or null.
