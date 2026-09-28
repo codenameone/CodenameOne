@@ -76,6 +76,20 @@ public final class Sessions {
         this.application = application;
     }
 
+    /// The JDBC namespace of a server that sets no `cn1.session.namespace`: the
+    /// package of its application, which the build generates into the project's
+    /// own. Every replica and every redeploy of one project has the same, and two
+    /// projects sharing a database do not -- so neither accepts the other's
+    /// session cookie. Empty for a server with no generated application.
+    static String defaultNamespace(Backend.Application application) {
+        if (application == null) {
+            return "";
+        }
+        String name = application.getClass().getName();
+        int dot = name.lastIndexOf('.');
+        return dot < 0 ? "" : name.substring(0, dot);
+    }
+
     /// Reads `cn1.session.*` into a server's session settings. Called by the
     /// server when it starts; every server has its own, because cookies are not
     /// scoped by port and a client of two servers on one host would otherwise
@@ -142,7 +156,8 @@ public final class Sessions {
                 throw new IOException("cn1.session.store=jdbc needs a database, and this "
                         + "server has none");
             }
-            out.setStore(new Jdbc(pool));
+            out.setStore(new Jdbc(pool, config.get("cn1.session.namespace",
+                    defaultNamespace(application))));
         } else if (!"memory".equalsIgnoreCase(kind)) {
             throw new IOException("cn1.session.store is \"" + kind
                     + "\"; it must be memory or jdbc");
@@ -837,15 +852,34 @@ public final class Sessions {
 
     /// Sessions in the server's database, in `cn1_http_session`, so every
     /// instance of a server sees every session. Attributes are stored as JSON.
+    ///
+    /// Every row carries a namespace, and every query is limited to the store's
+    /// own: browsers do not scope cookies by port, so two different servers on
+    /// one host sharing a database would otherwise each accept the other's
+    /// session -- its sign-in included. Replicas of one server share a
+    /// namespace, and with it their sessions.
     public static final class Jdbc implements SessionStore {
         private static final String TABLE = "cn1_http_session";
         /// How stale the stored last-access time may get before a read refreshes it.
         private static final long TOUCH_INTERVAL = 60000L;
         private final DataSource pool;
+        private final String namespace;
         private boolean ready;
 
+        /// A store in the empty namespace.
         public Jdbc(DataSource pool) {
+            this(pool, "");
+        }
+
+        /// A store whose sessions only servers with the same `namespace` see.
+        public Jdbc(DataSource pool, String namespace) {
             this.pool = pool;
+            this.namespace = namespace == null ? "" : namespace;
+        }
+
+        /// The namespace this store reads and writes.
+        public String getNamespace() {
+            return namespace;
         }
 
         private synchronized void prepare() throws IOException {
@@ -859,7 +893,8 @@ public final class Sessions {
                     + d.columnType(Dialect.BIGINT) + " NOT NULL, max_inactive "
                     + d.columnType(Dialect.INTEGER) + " NOT NULL, attributes "
                     + d.columnType(Dialect.TEXT) + ", version "
-                    + d.columnType(Dialect.BIGINT) + " NOT NULL)", null);
+                    + d.columnType(Dialect.BIGINT) + " NOT NULL, namespace "
+                    + d.columnType(Dialect.TEXT) + " NOT NULL)", null);
             ready = true;
         }
 
@@ -867,7 +902,8 @@ public final class Sessions {
         public HttpSession load(String id) throws IOException {
             prepare();
             Map row = pool.queryOne("SELECT created, last_accessed, max_inactive, attributes "
-                    + "FROM " + TABLE + " WHERE id = ?", new Object[] {id});
+                    + "FROM " + TABLE + " WHERE id = ? AND namespace = ?",
+                    new Object[] {id, namespace});
             if (row == null) {
                 return null;
             }
@@ -908,11 +944,12 @@ public final class Sessions {
             if (session.isNew()) {
                 // A new id: nobody else can have written this row yet.
                 pool.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
-                        + "max_inactive, attributes, version) VALUES (?, ?, ?, ?, ?, 0)",
+                        + "max_inactive, attributes, version, namespace) VALUES (?, ?, ?, ?, ?, "
+                        + "0, ?)",
                         new Object[] {session.getId(), Long.valueOf(session.getCreationTime()),
                         Long.valueOf(session.getLastAccessedTime()),
                         Integer.valueOf(session.getMaxInactiveInterval()),
-                        Json.write(session.attributesCopy())});
+                        Json.write(session.attributesCopy()), namespace});
                 session.storedAccessed = session.getLastAccessedTime();
                 if (previousId != null) {
                     delete(previousId);
@@ -924,7 +961,8 @@ public final class Sessions {
             Long used = Long.valueOf(session.getLastAccessedTime());
             for (int attempt = 0 ; attempt < SAVE_ATTEMPTS ; attempt++) {
                 Map row = pool.queryOne("SELECT max_inactive, attributes, version FROM "
-                        + TABLE + " WHERE id = ?", new Object[] {session.getId()});
+                        + TABLE + " WHERE id = ? AND namespace = ?",
+                        new Object[] {session.getId(), namespace});
                 if (row == null) {
                     // The row is gone: another request invalidated this session,
                     // or it expired, while this one held its own copy. Writing it
@@ -951,9 +989,9 @@ public final class Sessions {
                 int updated = pool.execute("UPDATE " + TABLE + " SET attributes = ?, "
                         + "max_inactive = ?, last_accessed = CASE WHEN last_accessed > ? "
                         + "THEN last_accessed ELSE ? END, version = ? WHERE id = ? AND "
-                        + "version = ?", new Object[] {Json.write(merged),
+                        + "namespace = ? AND version = ?", new Object[] {Json.write(merged),
                         Integer.valueOf(maxInactive), used, used, Long.valueOf(version + 1),
-                        session.getId(), Long.valueOf(version)});
+                        session.getId(), namespace, Long.valueOf(version)});
                 if (updated > 0) {
                     session.storedAccessed = session.getLastAccessedTime();
                     return;
@@ -980,7 +1018,8 @@ public final class Sessions {
             final Map mine = session.attributesCopy();
             Object moved;
             try {
-                moved = pool.inTransaction(new Rotation(session, previousId, lock, changed, mine));
+                moved = pool.inTransaction(new Rotation(session, previousId, lock, changed, mine,
+                        namespace));
             } catch (IOException err) {
                 throw err;
             } catch (Exception err) {
@@ -1000,20 +1039,23 @@ public final class Sessions {
             private final String lock;
             private final java.util.Set changed;
             private final Map mine;
+            private final String namespace;
 
             Rotation(HttpSession session, String previousId, String lock, java.util.Set changed,
-                     Map mine) {
+                     Map mine, String namespace) {
                 this.session = session;
                 this.previousId = previousId;
                 this.lock = lock;
                 this.changed = changed;
                 this.mine = mine;
+                this.namespace = namespace;
             }
 
             @Override
             public Object run(Database db) throws Exception {
                 Map row = db.queryOne("SELECT created, max_inactive, attributes FROM "
-                        + TABLE + " WHERE id = ?" + lock, new Object[] {previousId});
+                        + TABLE + " WHERE id = ? AND namespace = ?" + lock,
+                        new Object[] {previousId, namespace});
                 if (row == null) {
                     // Rotated or invalidated meanwhile by another request of this
                     // client: stays gone, and the caller must not announce the id.
@@ -1037,12 +1079,13 @@ public final class Sessions {
                         ? session.getMaxInactiveInterval()
                         : (int) number(row.get("max_inactive"));
                 db.execute("INSERT INTO " + TABLE + " (id, created, last_accessed, "
-                        + "max_inactive, attributes, version) VALUES (?, ?, ?, ?, ?, 0)",
+                        + "max_inactive, attributes, version, namespace) VALUES (?, ?, ?, ?, "
+                        + "?, 0, ?)",
                         new Object[] {session.getId(), Long.valueOf(number(row.get("created"))),
                         Long.valueOf(session.getLastAccessedTime()),
-                        Integer.valueOf(maxInactive), Json.write(merged)});
-                db.execute("DELETE FROM " + TABLE + " WHERE id = ?",
-                        new Object[] {previousId});
+                        Integer.valueOf(maxInactive), Json.write(merged), namespace});
+                db.execute("DELETE FROM " + TABLE + " WHERE id = ? AND namespace = ?",
+                        new Object[] {previousId, namespace});
                 return Boolean.TRUE;
             }
         }
@@ -1058,8 +1101,8 @@ public final class Sessions {
             // Forward only: a slower request must not move the last use back.
             Long at = Long.valueOf(now);
             pool.execute("UPDATE " + TABLE + " SET last_accessed = CASE WHEN last_accessed "
-                    + "> ? THEN last_accessed ELSE ? END WHERE id = ?",
-                    new Object[] {at, at, session.getId()});
+                    + "> ? THEN last_accessed ELSE ? END WHERE id = ? AND namespace = ?",
+                    new Object[] {at, at, session.getId(), namespace});
             session.storedAccessed = now;
         }
 
@@ -1076,7 +1119,8 @@ public final class Sessions {
         @Override
         public void delete(String id) throws IOException {
             prepare();
-            pool.execute("DELETE FROM " + TABLE + " WHERE id = ?", new Object[] {id});
+            pool.execute("DELETE FROM " + TABLE + " WHERE id = ? AND namespace = ?",
+                    new Object[] {id, namespace});
         }
 
         @Override
@@ -1096,6 +1140,9 @@ public final class Sessions {
             List params = new ArrayList();
             params.add(at);
             params.add(at);
+            // Only this namespace's: which of another server's sessions are in
+            // use is something only that server knows.
+            params.add(namespace);
             if (!busy.isEmpty()) {
                 spare.append(" AND id NOT IN (");
                 Iterator ids = busy.iterator();
@@ -1114,8 +1161,8 @@ public final class Sessions {
             // double's exact range on SQLite.
             return pool.execute("DELETE FROM " + TABLE + " WHERE max_inactive > 0 AND "
                     + "(last_accessed + max_inactive * 1250.0 < ? OR "
-                    + "last_accessed + max_inactive * 1000.0 + " + TOUCH_INTERVAL + " < ?)"
-                    + spare.toString(), params.toArray());
+                    + "last_accessed + max_inactive * 1000.0 + " + TOUCH_INTERVAL + " < ?) "
+                    + "AND namespace = ?" + spare.toString(), params.toArray());
         }
 
         @Override

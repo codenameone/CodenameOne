@@ -160,6 +160,44 @@ class OtlpMetricsProtoTest {
     }
 
     @Test
+    @DisplayName("a second metrics exporter with other credentials or protocol is refused")
+    void oneMetricsTransportPerProcess() throws Exception {
+        java.util.Properties a = new java.util.Properties();
+        a.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:9/v1/metrics");
+        a.setProperty(OtlpTracer.SERVICE_NAME, "shared");
+        a.setProperty(OtlpMetricExporter.HEADERS, "x-api-key=tenant-a,x-team=one");
+        java.util.Properties otherKey = new java.util.Properties(a);
+        otherKey.setProperty(OtlpMetricExporter.HEADERS, "x-api-key=tenant-b,x-team=one");
+        java.util.Properties json = new java.util.Properties(a);
+        json.setProperty(OtlpMetricExporter.PROTOCOL, "http/json");
+        java.util.Properties reordered = new java.util.Properties(a);
+        reordered.setProperty(OtlpMetricExporter.HEADERS, "x-team=one,x-api-key=tenant-a");
+        OtlpMetricExporter first = new OtlpMetricExporter("x");
+        // Shut down even when the refusal fails, so a wrongly opened exporter
+        // cannot collide with the next test's.
+        final OtlpMetricExporter keyed = new OtlpMetricExporter("x");
+        final OtlpMetricExporter asJson = new OtlpMetricExporter("x");
+        first.open(com.codename1.backend.Config.of(a, "test"));
+        try {
+            java.io.IOException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                    java.io.IOException.class,
+                    () -> keyed.open(com.codename1.backend.Config.of(otherKey, "test")));
+            assertTrue(refused.getMessage().contains("different"), refused.getMessage());
+            assertFalse(refused.getMessage().contains("tenant"),
+                    "the refusal printed a header value: " + refused.getMessage());
+            org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                    () -> asJson.open(com.codename1.backend.Config.of(json, "test")));
+            OtlpMetricExporter same = new OtlpMetricExporter("x");
+            same.open(com.codename1.backend.Config.of(reordered, "test"));
+            same.shutdown(0);
+        } finally {
+            keyed.shutdown(0);
+            asJson.shutdown(0);
+            first.shutdown(0);
+        }
+    }
+
+    @Test
     @DisplayName("an exporter opened again after a shutdown exports periodically again")
     void reopenedExporterKeepsExporting() throws Exception {
         java.net.ServerSocket probe = new java.net.ServerSocket(0);

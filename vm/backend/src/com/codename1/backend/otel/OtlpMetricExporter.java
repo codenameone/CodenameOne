@@ -116,6 +116,13 @@ public final class OtlpMetricExporter implements MetricReader {
             // would each send the SAME numbers under their own service name, or
             // to their own collector, and both would be wrong. One process, one
             // metrics identity; the same one twice is fine.
+            //
+            // The same identity includes how it is sent: only one of them
+            // exports, so a second server's API-key header -- the tenant on a
+            // shared collector -- or its protocol would be silently ignored,
+            // its numbers sent under the first one's credentials, and the
+            // credentials would change again at a hand-over. Compared as sets:
+            // the order the headers are listed in means nothing.
             for (Object element : OPEN) {
                 OtlpMetricExporter other = (OtlpMetricExporter) element;
                 if (other != this && (!other.resource.equals(resource) //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
@@ -125,6 +132,16 @@ public final class OtlpMetricExporter implements MetricReader {
                             + "Metrics are per process, so they would be reported twice "
                             + "under two names; give both servers the same OpenTelemetry "
                             + "service and endpoint, or set " + ENABLED + "=false on one.");
+                }
+                if (other != this && (other.protobuf != protobuf //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
+                        || !sameHeaders(other.headers, headers))) {
+                    // The values are never printed: they are usually credentials.
+                    throw new IOException("Another server in this process already exports "
+                            + "metrics to this collector with different " + HEADERS + " or "
+                            + PROTOCOL + ". Metrics are per process and only one server "
+                            + "sends them, so this one's settings would be ignored; give "
+                            + "both servers the same headers and protocol, or set "
+                            + ENABLED + "=false on one.");
                 }
             }
             if (OPEN.contains(this)) {
@@ -144,6 +161,11 @@ public final class OtlpMetricExporter implements MetricReader {
         }
         startExporting();
         return true;
+    }
+
+    /// Whether two header lists name the same headers, in any order.
+    private static boolean sameHeaders(List a, List b) {
+        return new java.util.HashSet(a).equals(new java.util.HashSet(b));
     }
 
     /// Starts exporting for a leader that stopped -- but only while this one is

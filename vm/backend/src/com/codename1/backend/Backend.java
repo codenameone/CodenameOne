@@ -391,7 +391,13 @@ public final class Backend {
         // reads gauges whose sources are those beans, and its final export must
         // not call one during its @PreDestroy, or against a closed pool.
         if (metricReader != null) {
-            metricReader.shutdown(shutdownMillis);
+            // An application's own reader failing must not keep the sessions,
+            // the beans and the pool from being torn down after it.
+            try {
+                metricReader.shutdown(shutdownMillis);
+            } catch (Throwable err) {
+                System.err.println("Stopping the metric reader failed: " + err);
+            }
         }
     }
 
@@ -1412,8 +1418,11 @@ public final class Backend {
             startingTasks = null;
             if (tasks != null) {
                 // Whatever @PostConstruct submitted stops before the beans it
-                // uses are destroyed, as in stop().
-                Tasks.shutdown(tasks, 0);
+                // uses are destroyed, as in stop() -- and with stop()'s grace. A
+                // zero wait only interrupted a running task, which it may ignore,
+                // and went straight on to its beans' @PreDestroy and the pool's
+                // close while it was still using both.
+                Tasks.shutdown(tasks, startupDrainMillis());
             }
             if (built != null) {
                 // Before the pool closes, as Backend.stop() orders it, so a
@@ -1427,6 +1436,25 @@ public final class Backend {
             }
             if (pool != null && dataSource == null) {
                 pool.close();
+            }
+        }
+
+        /// The shutdown timeout for tearing down a failed start: the configured
+        /// one, or none when it is itself what failed -- a negative value, or one
+        /// that does not parse.
+        private int startupDrainMillis() {
+            if (shutdownMillis >= 0) {
+                return shutdownMillis;
+            }
+            try {
+                int configured = config == null ? 10000
+                        : config.getInt(Config.SERVER_SHUTDOWN_MILLIS, 10000);
+                return Math.max(0, configured);
+            } catch (IOException err) {
+                // The unreadable value is what failed the start; nothing to wait by.
+                return 0;
+            } catch (RuntimeException err) {
+                return 0;
             }
         }
 
@@ -1687,9 +1715,17 @@ public final class Backend {
             // refusing its configuration, an application metric that collides
             // with a built-in one, a managed gauge whose Prometheus name clashes.
             boolean owned = false;
+            // Whether the reader may hold anything to stop. False only for a
+            // reader that ANSWERED false -- the contract's "nothing was
+            // started" -- so it is neither kept nor shut down: measuring can be
+            // true for the management endpoints alone, and keeping the reader
+            // on that had stop() shut down a reader that never opened. One whose
+            // open() threw is still shut down; it may have started part of it.
+            boolean readerOpen = metricReader != null;
             try {
                 if (metricReader != null) {
-                    measuring |= metricReader.open(config);
+                    readerOpen = metricReader.open(config);
+                    measuring |= readerOpen;
                 }
                 if (measuring) {
                     com.codename1.backend.metrics.Metrics.enableServer(server, pool);
@@ -1697,7 +1733,7 @@ public final class Backend {
                 }
                 backend = new Backend(server, pool, manager, config, drain,
                         active, application,
-                        metricReader != null && measuring ? metricReader : null,
+                        readerOpen ? metricReader : null,
                         managedBeans, sessions, tasks, requestLog,
                         environment == null ? new ArrayList() : environment.gauges);
                 owned = true;
@@ -1709,7 +1745,7 @@ public final class Backend {
                     // the outer clean-up ends only the singletons, and after them.
                     sessions.close();
                     com.codename1.backend.metrics.Metrics.disableServer(server, pool);
-                    if (metricReader != null) {
+                    if (readerOpen) {
                         metricReader.shutdown(0);
                     }
                 }

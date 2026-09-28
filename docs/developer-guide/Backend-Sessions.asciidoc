@@ -156,6 +156,14 @@ attributes are stored as JSON, so a value must be a string, a number, a boolean,
 a map or list of those. Anything else is written as JSON can write it and read back
 as whatever JSON reads, which isn't the object that was stored.
 
+The table is shared, so each row belongs to a namespace, and a server only reads
+the rows of its own. `cn1.session.namespace` sets it; by default it's the package
+of the application the build generates, so every instance of one project shares
+sessions and two projects that use the same database don't. Without that, two
+different servers on one host would each accept the session cookie the browser
+sends to both, including a signed-in user's. Set the same namespace on two
+projects only when they should share their users' sessions.
+
 Either way, an expired session is removed at most once a minute, by the next
 request that asks for a session, and a request that presents an expired session's
 cookie is treated as having no session at all.

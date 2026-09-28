@@ -548,9 +548,7 @@ final class BackendBeans {
             // Inherited ones too: an @Async method a superclass declares queues a
             // task holding the scoped instance just the same.
             for (MethodInfo m : inheritedMembers(cls)) {
-                if (m.getAnnotation(ASYNC) != null
-                        || (cls.getClassAnnotation(ASYNC) != null && m.isPublic()
-                        && !m.isConstructor() && !m.isStatic())) {
+                if (wovenAsync(cls, m)) {
                     // The task would hold the scoped instance after its request or
                     // session ended and destroyed it.
                     String scope = REQUEST.equals(bean.scope) ? "request" : "session";
@@ -1220,6 +1218,41 @@ final class BackendBeans {
         return out;
     }
 
+    /// Whether `m`, a member of `cls` or inherited by it, is woven to run as
+    /// an @Async task: annotated itself, or a public instance method of a class
+    /// annotated @Async. By the class that DECLARES it, exactly as
+    /// collectAspects() weaves -- a class-level annotation reaches only that
+    /// class's own methods, so an inherited method stays synchronous under a
+    /// subclass's @Async, and reporting it as asynchronous refused a valid bean.
+    private boolean wovenAsync(AnnotatedClass cls, MethodInfo m) {
+        if (m.getAnnotation(ASYNC) != null) {
+            return true;
+        }
+        if (!m.isPublic() || m.isStatic() || m.isConstructor() || m.isSynthetic()) {
+            return false;
+        }
+        AnnotatedClass declaring = declaringClass(cls, m);
+        return declaring != null && !declaring.isInterface()
+                && declaring.getClassAnnotation(ASYNC) != null;
+    }
+
+    /// The class in `cls`'s superclass chain whose own methods include `m`, or
+    /// null when none does.
+    private AnnotatedClass declaringClass(AnnotatedClass cls, MethodInfo m) {
+        AnnotatedClass c = cls;
+        for (int depth = 0; c != null && depth < 64; depth++) {
+            for (MethodInfo own : c.getMethods()) {
+                if (own == m) { //NOPMD CompareObjectsWithEquals - the same parsed method, by identity
+                    return c;
+                }
+            }
+            String sup = c.getSuperInternalName();
+            c = sup == null || "java/lang/Object".equals(sup) ? null
+                    : RestControllerAnnotationProcessor.resolveClass(ctx, sup);
+        }
+        return null;
+    }
+
     private void collectJobs(Bean bean) {
         AnnotatedClass cls = bean.cls;
         for (MethodInfo m : inheritedMembers(cls)) {
@@ -1233,8 +1266,7 @@ final class BackendBeans {
                         + "that takes no arguments.");
                 continue;
             }
-            if (m.getAnnotation(ASYNC) != null
-                    || (cls.getClassAnnotation(ASYNC) != null && m.isPublic())) {
+            if (wovenAsync(cls, m)) {
                 // The scheduler would call the stub, which returns once the body
                 // is queued: the run would count as over -- and a lock be
                 // released -- while it is still going, so runs could overlap.
@@ -1310,8 +1342,7 @@ final class BackendBeans {
                 ctx.error(cls, "@McpTool method " + where + " must be an instance method.");
                 continue;
             }
-            if (m.getAnnotation(ASYNC) != null
-                    || (cls.getClassAnnotation(ASYNC) != null && m.isPublic())) {
+            if (wovenAsync(cls, m)) {
                 // The adapter would call the stub and receive the queued task at
                 // once, and the agent would get neither the value nor the failure.
                 ctx.error(cls, "@McpTool method " + where + " is also @Async. A tool call "

@@ -449,6 +449,33 @@ class ApplicationRuntimeTest {
     // --------------------------------------------------------------- sessions
 
     @Test
+    @DisplayName("two servers' database session stores never read each other's sessions")
+    void jdbcSessionNamespaces(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        DataSource pool = DataSource.open(new java.io.File(dir, "ns.db").getAbsolutePath(),
+                2, 5000, 10000);
+        try {
+            Sessions.Jdbc orders = new Sessions.Jdbc(pool, "com.example.orders");
+            Sessions.Jdbc admin = new Sessions.Jdbc(pool, "com.example.admin");
+            long now = System.currentTimeMillis();
+            HttpSession signedIn = new HttpSession("shared-cookie", now, now, 1800);
+            signedIn.markNew();
+            signedIn.setAttribute("user", "ada");
+            orders.save(signedIn, null);
+            assertNull(admin.load("shared-cookie"),
+                    "another server accepted this server's session cookie");
+            admin.delete("shared-cookie");
+            assertEquals(0, admin.purgeExpired(Long.MAX_VALUE / 4));
+            assertEquals("ada", orders.load("shared-cookie").getAttribute("user"));
+            // A replica of the same server shares them.
+            assertEquals("ada", new Sessions.Jdbc(pool, "com.example.orders")
+                    .load("shared-cookie").getAttribute("user"));
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("the database session store: no resurrection, and no early expiry for a short timeout")
     void jdbcSessionStore(@org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
         DataSource pool = DataSource.open(new java.io.File(dir, "s.db").getAbsolutePath(),
@@ -667,6 +694,73 @@ class ApplicationRuntimeTest {
         backend.stop();
         ServerSocket again = new ServerSocket(port);          // the listener is gone
         again.close();
+    }
+
+    @Test
+    @DisplayName("a failed start waits for its start-up tasks before destroying their beans")
+    void failedStartDrainsItsTasks() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        final java.util.concurrent.atomic.AtomicBoolean finished =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        final java.util.concurrent.atomic.AtomicBoolean seenAtDestroy =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        assertThrows(IllegalStateException.class, () -> Backend.builder(
+                Config.of(settings, "test")).quiet().shutdownTimeoutMillis(5000)
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        // A @PostConstruct that starts work, then a later bean
+                        // that refuses its configuration.
+                        Tasks.executor("boot", Tasks.PLATFORM).execute(new Runnable() {
+                            public void run() {
+                                long until = System.currentTimeMillis() + 300;
+                                while(System.currentTimeMillis() < until) {
+                                    try {
+                                        Thread.sleep(20);
+                                    } catch (InterruptedException ignored) {
+                                        // keeps going, as a task may
+                                    }
+                                }
+                                finished.set(true);
+                            }
+                        });
+                        throw new IllegalStateException("a later bean refuses to start");
+                    }
+
+                    public void stopped() {
+                        seenAtDestroy.set(finished.get());
+                    }
+                }).start());
+        assertTrue(seenAtDestroy.get(),
+                "the beans were destroyed while a start-up task was still using them");
+    }
+
+    @Test
+    @DisplayName("a metric reader that declines to open is never shut down")
+    void declinedMetricReaderIsNotStopped() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        final AtomicInteger shutdowns = new AtomicInteger();
+        // The dev profile turns the management endpoints on, so the server
+        // measures whatever the reader answers.
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+                .metrics(new com.codename1.backend.metrics.MetricReader() {
+                    public boolean open(Config config) {
+                        return false;
+                    }
+
+                    public void shutdown(int timeoutMillis) {
+                        shutdowns.incrementAndGet();
+                    }
+                })
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        backend.stop();
+        assertEquals(0, shutdowns.get(), "stop() shut down a reader that never opened");
     }
 
     @Test

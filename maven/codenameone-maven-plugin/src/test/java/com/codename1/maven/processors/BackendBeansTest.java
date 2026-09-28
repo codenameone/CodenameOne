@@ -1099,6 +1099,31 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aClassLevelAsyncReachesOnlyItsOwnMethods() throws Exception {
+        // The subclass's @Async weaves only what the subclass declares, so the
+        // inherited scheduled method stays synchronous and is valid.
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Base", PKG + "public class Base {\n"
+                + "    @Scheduled(fixedRate = 1000) public void tick() { }\n"
+                + "}\n");
+        s.put("com.example.Worker", PKG + "@Component @Async public class Worker extends Base {\n"
+                + "    public void send() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertFalse(errors, errors.contains("is also @Async"));
+
+        // The base class's own @Async does reach it, inherited or not.
+        s = new LinkedHashMap<String, String>();
+        s.put("com.example.Base", PKG + "@Async public class Base {\n"
+                + "    @Scheduled(fixedRate = 1000) public void tick() { }\n"
+                + "}\n");
+        s.put("com.example.Worker", PKG + "@Component public class Worker extends Base {\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("is also @Async"));
+    }
+
+    @Test
     public void asyncToolsAndDuplicateParametersAreBuildErrors() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Tools", PKG + "@Component public class Tools {\n"
