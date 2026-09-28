@@ -221,13 +221,22 @@ class VerdictStepTests(unittest.TestCase):
     """ci-perf-gate.sh verdict: the job's last step, which decides pass or fail."""
 
     def verdict(self, results):
+        # The verdict is the Python heredoc inside ci-perf-gate.sh; run THAT text with this
+        # interpreter. Not through bash: on a Windows runner a bare "bash" can resolve to
+        # System32's WSL launcher, which has no distribution installed and fails.
         import json
         import subprocess
+        import sys
         import tempfile
+        script = (Path(__file__).parent / 'ci-perf-gate.sh').read_text()
+        start = script.index("<<'PY'", script.index('if [ "$MODE" = verdict ]'))
+        start = script.index('\n', start) + 1
+        body = script[start:script.index('\nPY\n', start)]
         with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / 'perf-results.json').write_text(json.dumps(results))
-            return subprocess.run(['bash', str(Path(__file__).parent / 'ci-perf-gate.sh'),
-                                   'verdict', tmp], capture_output=True, text=True)
+            path = Path(tmp) / 'perf-results.json'
+            path.write_text(json.dumps(results))
+            return subprocess.run([sys.executable, '-', str(path)], input=body,
+                                  capture_output=True, text=True)
 
     def row(self, verdict_):
         return {'all': {'time': {'median': 1.0, 'baseline': None if verdict_ == 'uncalibrated'
