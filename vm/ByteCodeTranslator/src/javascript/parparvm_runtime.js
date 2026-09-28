@@ -2450,7 +2450,15 @@ const jvm = {
         return inferred;
       }
     }
-    return expectedClass || "com_codename1_html5_js_JSObject";
+    // java.lang.Object is what an ERASED generic slot asks for -- JSArray<MouseEvent>.get(i),
+    // a JSObject collection, a JSO callback's Object parameter. Wrapping a plain JS object as
+    // java_lang_Object gave it a class with no JSO bridge, so the interface call that follows
+    // (touches.get(i).getClientX()) failed with "Missing virtual method ... on
+    // java_lang_Object". A browser value in an Object slot is still a browser value.
+    if (!expectedClass || expectedClass === "java_lang_Object") {
+      return "com_codename1_html5_js_JSObject";
+    }
+    return expectedClass;
   },
   log(message) {
     emitVmMessage({ type: this.protocol.messages.LOG, message: message });

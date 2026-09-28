@@ -87,6 +87,21 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void keepsTheMethodsOfAClassCreatedByNameThroughReflection(CompilerHelper.CompilerConfig config) throws Exception {
+        // Issue #5774: RTA never saw a NEW for a class built by Class.forName(name).newInstance(),
+        // kept the class and culled its methods, and the call through its interface failed with
+        // "Missing virtual method".
+        WorkerRunResult result = translateAndRunFixture(config,
+                "JsReflectiveInstanceApp.java", "JsReflectiveInstanceApp");
+
+        assertEquals(42, result.result,
+                "a class named in a string and created by reflection keeps its methods. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void restoresClassesUsedByRtaResurrectedMethods(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config,
                 "JsRtaResurrectedClassApp.java", "JsRtaResurrectedClassApp");

@@ -649,6 +649,9 @@ class JavaScriptRuntimeFacadeTest {
         assertTrue(peerEvents.contains("pointerdown:true"));
         assertTrue(peerEvents.contains("pointerup:true"));
         assertTrue(peerEvents.contains("pointercancel:true"));
+        assertTrue(peerEvents.contains("touchend:true"));
+        assertFalse(peerEvents.contains("touchcancel:true"),
+                "touchcancel is not a release: HTML5Implementation registers its own handler, which dispatches none");
         assertTrue(peerEvents.contains("hittest:true"));
         assertTrue(peerEvents.contains("wheel:true"));
         assertFalse(peerEvents.contains("mousedown:true"),
