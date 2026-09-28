@@ -2401,7 +2401,7 @@ void com_codename1_impl_ios_IOSNative_nativeGlassLensScreenRegion___int_int_int_
         float o[16];
         int n = ((JAVA_ARRAY)optics)->length;
         if (n > 16) { n = 16; }
-        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)optics)->data;
+        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)optics);
         for (int i = 0; i < n; i++) {
             o[i] = data[i];
         }
@@ -2416,7 +2416,7 @@ void com_codename1_impl_ios_IOSNative_nativeColorMatrixScreenRegion___int_int_in
     POOL_BEGIN();
     if (matrix != JAVA_NULL && ((JAVA_ARRAY)matrix)->length >= 12) {
         float m[12];
-        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)matrix)->data;
+        JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)matrix);
         for (int i = 0; i < 12; i++) {
             m[i] = data[i];
         }
