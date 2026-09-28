@@ -77,8 +77,9 @@ class AndroidGradleBuilderVersionTest {
         // floor, a newer beta is still a newer compiler.
         assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.9.22-RC2"));
         assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0-Beta1"));
-        // Only a value with no number to read -- a Gradle variable -- is the author's call.
-        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("$kotlinVersion"));
+        // A Gradle variable lands in a single-quoted coordinate Groovy never interpolates, so
+        // it is not an override: the built-in compiler is used.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("$kotlinVersion"));
     }
 
     @Test
@@ -90,6 +91,15 @@ class AndroidGradleBuilderVersionTest {
                 "classpath 'com.google.gms:google-services:4.4.0'"));
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
                 "classpath 'com.google.gms:google-services:4.5.0'"));
+        // Gradle resolves duplicates to the highest, so a cn1lib's old pin beside the
+        // project's new one is fine; two old ones are not.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.5.0'"));
+        String twoOld = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.3.10'");
+        assertTrue(twoOld != null && twoOld.contains("4.3.15"), String.valueOf(twoOld));
         // Nothing pinned, or nothing readable: nothing to refuse.
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(""));
         assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(null));

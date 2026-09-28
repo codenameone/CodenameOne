@@ -2330,7 +2330,9 @@ public class AndroidGradleBuilder extends Executor {
                         name);
                 boolean arrImplementationLib = request.getArg("android.arrimplementation", "").contains(
                         name);
-                if(!arrCompileLib && (useArrImplementation || arrImplementationLib)) {
+                // Gradle 9 has no compile configuration, so android.arrcompile cannot be
+                // honoured there; the AAR is declared the only way AGP 9 accepts.
+                if(useGradle9 || (!arrCompileLib && (useArrImplementation || arrImplementationLib))) {
                     aarDependencies += "    implementation(name:'" + name + "', ext:'aar')\n";
                 } else {
                     aarDependencies += "    compile(name:'" + name + "', ext:'aar')\n";
@@ -8022,6 +8024,11 @@ public class AndroidGradleBuilder extends Executor {
         // the stdlib, which is how AGP 9 is told to use a newer Kotlin than its own.
         boolean builtInKotlin = useGradle9;
         if (builtInKotlin && !kotlinOverridesBuiltIn(kotlinVersion)) {
+            if (kotlinVersion.length() > 0) {
+                log("requireKotlinStdlib=" + kotlinVersion + " is not newer than Android Gradle"
+                        + " plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + "'s built-in Kotlin "
+                        + AGP_9_BUILT_IN_KOTLIN_VERSION + ", which this build uses instead.");
+            }
             // A floor the built-in compiler already meets -- the Health Connect path above
             // raises requireKotlinStdlib to 1.9.x, and cn1libs carry legacy values too.
             // Gradle would resolve an older kotlin-gradle-plugin up to AGP 9's own anyway
@@ -11500,9 +11507,11 @@ public class AndroidGradleBuilder extends Executor {
      * bundles, which is the only thing that value can usefully mean on built-in Kotlin.
      *
      * <p>A qualified release is judged by its numeric part, so 1.9.22-RC2 is a legacy floor
-     * like 1.9.22 and 2.3.0-Beta1 is a newer compiler. Only a value with no leading number at
-     * all -- a Gradle variable -- is taken at its word: its author is the only one who knows
-     * what it resolves to.</p>
+     * like 1.9.22 and 2.3.0-Beta1 is a newer compiler. A value with no number at all -- a
+     * Gradle variable such as $kotlinVersion -- is not an override either: the generator
+     * writes it into a single-quoted coordinate, which Groovy does not interpolate, so it
+     * could only ever resolve a literal "$kotlinVersion" artifact. The built-in compiler is
+     * used instead, and the build says so.</p>
      *
      * @param kotlinVersion the requireKotlinStdlib value, possibly empty
      * @return true when it should be written into the generated project
@@ -11514,7 +11523,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         String numeric = HealthManifestFragments.numericVersionPrefix(value);
         if (numeric == null) {
-            return true;
+            return false;
         }
         return compareVersions(padGradleVersion(numeric), AGP_9_BUILT_IN_KOTLIN_VERSION) > 0;
     }
@@ -11533,13 +11542,26 @@ public class AndroidGradleBuilder extends Executor {
      * @return the refusal message, or null
      */
     static String agp9GoogleServicesRefusal(String topDependency) {
+        // Every declaration, not the first: merged hint values carry one per contributor (a
+        // cn1lib's 4.3.15 beside the project's 4.5.0), and Gradle resolves duplicate
+        // buildscript modules to the highest -- that build uses 4.5.0 and works. One
+        // unreadable declaration (a Gradle variable) makes the effective version unknowable,
+        // and nothing is refused on a guess.
         String marker = "com.google.gms:google-services:";
+        String declared = null;
         int at = topDependency == null ? -1 : topDependency.indexOf(marker);
-        if (at < 0) {
-            return null;
+        while (at >= 0) {
+            String version = HealthManifestFragments.numericVersionPrefix(
+                    topDependency.substring(at + marker.length()));
+            if (version == null) {
+                return null;
+            }
+            if (declared == null || compareVersions(padGradleVersion(version),
+                    padGradleVersion(declared)) > 0) {
+                declared = version;
+            }
+            at = topDependency.indexOf(marker, at + marker.length());
         }
-        String declared = HealthManifestFragments.numericVersionPrefix(
-                topDependency.substring(at + marker.length()));
         if (declared == null
                 || compareVersions(padGradleVersion(declared), GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION) >= 0) {
             return null;
