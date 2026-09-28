@@ -740,6 +740,28 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void futuresFromToolsAndOperationsAreBuildErrors() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Tools", PKG + "@Component public class Tools {\n"
+                + "    @McpTool(description = \"a\")\n"
+                + "    public Future pending() { return AsyncResult.of(\"x\"); }\n"
+                + "}\n");
+        s.put("com.example.Ops", PKG + "@Component @ManagedResource(objectName = \"ops\")\n"
+                + "public class Ops {\n"
+                + "    @ManagedOperation @Async public Future rebuild() {\n"
+                + "        return AsyncResult.of(\"done\");\n"
+                + "    }\n"
+                + "    @ManagedOperation @Async public void refresh() { }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@McpTool method com.example.Tools.pending returns "
+                + "a Future"));
+        assertTrue(errors, errors.contains("@ManagedOperation com.example.Ops.rebuild returns "
+                + "a Future"));
+        assertFalse(errors, errors.contains("com.example.Ops.refresh"));
+    }
+
+    @Test
     public void oneMetricNameForTwoKindsIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Work", PKG + "@Component public class Work {\n"

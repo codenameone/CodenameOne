@@ -33,6 +33,7 @@ import com.codename1.maven.annotations.ProcessorContext;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1395,6 +1396,16 @@ final class BackendBeans {
                         + "id to ask about it by.");
                 continue;
             }
+            if (returnsFuture(m)) {
+                // Not only a woven stub's: a Future from any executor or API is
+                // written as its toString() while it is still pending, a success
+                // with a bogus body and its failure lost -- as a route refuses.
+                ctx.error(cls, "@McpTool method " + where + " returns a Future. A tool call "
+                        + "answers with what the method returns, so it would send the "
+                        + "pending task, not its result; return the value, or start the work "
+                        + "and return an id to ask about it by.");
+                continue;
+            }
             String name = t.getStringOrDefault("name", "").trim();
             Tool tool = new Tool(m, name.length() > 0 ? name : m.getName(),
                     t.getStringOrDefault("description", ""));
@@ -1525,6 +1536,16 @@ final class BackendBeans {
                     ctx.error(cls, "@ManagedOperation " + where + " must be an instance method.");
                     continue;
                 }
+                if (returnsFuture(m)) {
+                    // The management endpoint answers with the result, so an @Async
+                    // one's queued task -- or any pending Future -- was sent as its
+                    // toString(), a success while the work still ran.
+                    ctx.error(cls, "@ManagedOperation " + where + " returns a Future. An "
+                            + "operation answers with what the method returns, so the caller "
+                            + "would get the pending task, not its result; return the value, "
+                            + "or return nothing and let @Async run it in the background.");
+                    continue;
+                }
                 Type[] args = Type.getArgumentTypes(m.getDescriptor());
                 List<String> names = new ArrayList<String>();
                 boolean ok = true;
@@ -1565,6 +1586,41 @@ final class BackendBeans {
             }
         }
         bean.managed = managed;
+    }
+
+    /// Future types the JDK and the backend provide, which the class index
+    /// cannot look inside.
+    private static final Set<String> FUTURE_TYPES = new HashSet<String>(Arrays.asList(
+            "java/util/concurrent/Future", "java/util/concurrent/RunnableFuture",
+            "java/util/concurrent/ScheduledFuture", "java/util/concurrent/RunnableScheduledFuture",
+            "java/util/concurrent/FutureTask", "java/util/concurrent/CompletableFuture",
+            "java/util/concurrent/ForkJoinTask", "com/codename1/backend/AsyncResult",
+            "com/codename1/backend/AsyncTask"));
+
+    /// Whether `m` returns a Future: declared as one, or a type implementing it.
+    private boolean returnsFuture(MethodInfo m) {
+        Type ret = Type.getReturnType(m.getDescriptor());
+        return ret.getSort() == Type.OBJECT
+                && isFutureType(ret.getInternalName(), new HashSet<String>());
+    }
+
+    private boolean isFutureType(String internal, Set<String> seen) {
+        if (internal == null || !seen.add(internal)) {
+            return false;
+        }
+        if (FUTURE_TYPES.contains(internal)) {
+            return true;
+        }
+        AnnotatedClass c = RestControllerAnnotationProcessor.resolveClass(ctx, internal);
+        if (c == null) {
+            return false;
+        }
+        for (String i : c.getInterfaceInternalNames()) {
+            if (isFutureType(i, seen)) {
+                return true;
+            }
+        }
+        return isFutureType(c.getSuperInternalName(), seen);
     }
 
     static String attributeName(String getter) {

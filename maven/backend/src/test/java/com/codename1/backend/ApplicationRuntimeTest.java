@@ -527,6 +527,43 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("an async call returning another's pending future does not hold its worker")
+    void chainedFutureDoesNotStarveItsExecutor() throws Exception {
+        final TaskExecutor solo = new TaskExecutor("solo", false, 1, null);
+        AsyncTask outer = new AsyncTask("outer", false) {
+            protected Object call() {
+                AsyncTask inner = new AsyncTask("inner", false) {
+                    protected Object call() {
+                        return AsyncResult.of("inner-done");
+                    }
+                };
+                solo.execute(inner);           // queued behind this, on the only thread
+                return inner;
+            }
+        };
+        solo.execute(outer);
+        assertEquals("inner-done", outer.get(10, TimeUnit.SECONDS),
+                "the outer call held the only worker waiting for the inner one");
+        AsyncTask failing = new AsyncTask("failing", false) {
+            protected Object call() {
+                AsyncTask inner = new AsyncTask("broken", false) {
+                    protected Object call() {
+                        throw new IllegalStateException("inner failed");
+                    }
+                };
+                solo.execute(inner);
+                return inner;
+            }
+        };
+        solo.execute(failing);
+        java.util.concurrent.ExecutionException err = assertThrows(
+                java.util.concurrent.ExecutionException.class,
+                () -> failing.get(10, TimeUnit.SECONDS));
+        assertEquals("inner failed", err.getCause().getMessage());
+        solo.shutdown(1000);
+    }
+
+    @Test
     @DisplayName("an executor shut down with the longest wait waits for its tasks")
     void hugeShutdownWaitWaits() throws Exception {
         // A guard, not a reproduction: shutdown() only takes deadline - now,

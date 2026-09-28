@@ -569,11 +569,19 @@ public final class Backend {
                     @Override
                     public WebSocket open(HttpServer.Request request) throws Exception {
                         Object previous = Tasks.enter(tasks);
+                        // Counted like every callback: a router that stops the
+                        // server must see its teardown wait for it to return.
+                        if (inFlight != null) {
+                            inFlight.enter();
+                        }
                         try {
                             WebSocket endpoint = router.open(request);
                             return endpoint == null ? null
                                     : new TaskBound(endpoint, tasks, tracer, inFlight);
                         } finally {
+                            if (inFlight != null) {
+                                inFlight.leave();
+                            }
                             Tasks.leave(previous);
                         }
                     }
@@ -1725,7 +1733,7 @@ public final class Backend {
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         new Serving(chain, sessions, tasks, requestLog, instrumented, app, track,
                                 active != null ? active : Tracing.NONE, inFlight),
-                        context, routes);
+                        context, routes, active != null ? active : Tracing.NONE);
                 bound = true;
             } finally {
                 if (!bound && ownsContext) {
@@ -1737,9 +1745,9 @@ public final class Backend {
             synchronized (tasks) {
                 tasks.server = server;
             }
-            // Always set: with tracing off, the untraced marker, so another traced
+            // Given to start() above, before the listener accepted anything:
+            // always set, with tracing off the untraced marker, so another traced
             // server in the process cannot claim this one's requests.
-            server.setTracer(active != null ? active : Tracing.NONE);
             // The websocket routes went in through start() above, before the
             // listener began accepting -- registering them here instead left a
             // window in which a valid upgrade was answered as ordinary HTTP.

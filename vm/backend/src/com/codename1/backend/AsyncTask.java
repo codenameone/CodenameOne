@@ -51,6 +51,8 @@ public abstract class AsyncTask implements Runnable, Future {
     private boolean started;
     private Object value;
     private Throwable failure;
+    /// Run once this completes, outside its lock; see [#whenDone].
+    private java.util.List listeners;
 
     /// #### Parameters
     ///
@@ -78,6 +80,7 @@ public abstract class AsyncTask implements Runnable, Future {
         }
         Object result = null;
         Throwable error = null;
+        AsyncTask chained = null;
         try {
             result = Tracing.inBackground(name, parent, owner, new Tracing.Work() {
                 @Override
@@ -85,7 +88,17 @@ public abstract class AsyncTask implements Runnable, Future {
                     return call();
                 }
             });
-            if (result instanceof Future) {
+            if (result instanceof AsyncTask && result != this //NOPMD CompareObjectsWithEquals - itself, by identity
+                    && !((AsyncTask) result).isDone()) {
+                // Another @Async call's pending future: finished when that one
+                // is, instead of waiting for it here. Waiting held this worker,
+                // and with the inner call queued on the same executor a
+                // one-thread pool -- or enough concurrent outer calls on any
+                // pool -- waited for itself for ever. Spring's interceptor does
+                // block here; the result is the same either way.
+                chained = (AsyncTask) result;
+            } else if (result instanceof Future) {
+                // Any other Future is awaited, as Spring awaits it.
                 result = ((Future) result).get();
             }
         } catch (ExecutionException err) {
@@ -93,12 +106,23 @@ public abstract class AsyncTask implements Runnable, Future {
         } catch (Throwable err) {
             error = err;
         }
+        if (chained != null) {
+            final AsyncTask inner = chained;
+            inner.whenDone(new Runnable() {
+                @Override
+                public void run() {
+                    adopt(inner);
+                }
+            });
+            return;
+        }
+        java.util.List fire;
         synchronized (this) {
             value = result;
             failure = error;
-            done = true;
-            notifyAll();
+            fire = completeLocked();
         }
+        fire(fire);
         if (error != null && returnsVoid) {
             // Nobody holds a Future for a void method, so the failure goes to the
             // executor running this, which reports and counts it -- the only
@@ -116,24 +140,85 @@ public abstract class AsyncTask implements Runnable, Future {
     /// Ends a call whose virtual thread the server freed at shutdown before it
     /// finished: nothing will ever complete it otherwise, and a caller blocked
     /// in get() would wait for ever.
-    synchronized void abandon(String reason) {
-        if (done) {
-            return;
+    void abandon(String reason) {
+        java.util.List fire;
+        synchronized (this) {
+            if (done) {
+                return;
+            }
+            failure = new IllegalStateException(name + ": " + reason);
+            fire = completeLocked();
         }
-        failure = new IllegalStateException(name + ": " + reason);
+        fire(fire);
+    }
+
+    /// Marks this done and wakes its waiters; answers the listeners to run once
+    /// the lock is released. Called under this object's lock.
+    private java.util.List completeLocked() {
         done = true;
         notifyAll();
+        java.util.List out = listeners;
+        listeners = null;
+        return out;
+    }
+
+    private static void fire(java.util.List listeners) {
+        for (int iter = 0 ; listeners != null && iter < listeners.size() ; iter++) {
+            ((Runnable) listeners.get(iter)).run();
+        }
+    }
+
+    /// Runs `listener` once this completes -- at once when it already has.
+    void whenDone(Runnable listener) {
+        synchronized (this) {
+            if (!done) {
+                if (listeners == null) {
+                    listeners = new java.util.ArrayList(1);
+                }
+                listeners.add(listener);
+                return;
+            }
+        }
+        listener.run();
+    }
+
+    /// Completes this with the outcome of `inner`, the pending call it returned.
+    private void adopt(AsyncTask inner) {
+        Object v = null;
+        Throwable f = null;
+        synchronized (inner) {
+            if (inner.cancelled) {
+                f = new java.util.concurrent.CancellationException(inner.name
+                        + " was cancelled");
+            } else {
+                v = inner.value;
+                f = inner.failure;
+            }
+        }
+        java.util.List fire;
+        synchronized (this) {
+            if (done) {
+                return;
+            }
+            value = v;
+            failure = f;
+            fire = completeLocked();
+        }
+        fire(fire);
     }
 
     /// Cancels the call if it has not started. A running call is never interrupted.
     @Override
-    public synchronized boolean cancel(boolean mayInterruptIfRunning) {
-        if (started || done) {
-            return false;
+    public boolean cancel(boolean mayInterruptIfRunning) {
+        java.util.List fire;
+        synchronized (this) {
+            if (started || done) {
+                return false;
+            }
+            cancelled = true;
+            fire = completeLocked();
         }
-        cancelled = true;
-        done = true;
-        notifyAll();
+        fire(fire);
         return true;
     }
 

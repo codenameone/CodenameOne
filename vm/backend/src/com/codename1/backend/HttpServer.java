@@ -1753,6 +1753,17 @@ public final class HttpServer {
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls, WebSocketRoutes webSockets)
             throws IOException {
+        return start(host, port, backlog, workerCount, handler, tls, webSockets, null);
+    }
+
+    /// [#start(String,int,int,int,Handler,Tls,WebSocketRoutes)], tracing its
+    /// requests with `tracer` from the first one it accepts. Set afterwards, a
+    /// request accepted in between found no tracer of this server's and was
+    /// reported to the process-wide one -- another server's service and
+    /// credentials. Tracing.NONE marks a server that traces nothing.
+    static HttpServer start(String host, int port, int backlog, int workerCount,
+                            Handler handler, Tls tls, WebSocketRoutes webSockets,
+                            Tracer tracer) throws IOException {
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -1827,6 +1838,9 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
+        if (tracer != null) {
+            server.serverTracer = tracer;
+        }
         // Before any thread that could accept a connection exists. A callback that
         // throws takes the whole start down rather than leaving a server running
         // with half its routes -- the same answer a Handlers factory gets.
@@ -2297,6 +2311,9 @@ public final class HttpServer {
     /// Set while a websocket callback is running, so stop() called from inside one
     /// can discount the turn that callback is itself holding.
     private static final ThreadLocal SERVING_WS = new ThreadLocal();
+    /// Set while a websocket handshake runs application code -- the router,
+    /// getSubprotocols(), onOpen() -- holding only its connection.
+    private static final ThreadLocal SERVING_UPGRADE = new ThreadLocal();
 
     /// The headers a refusal this server invented may carry: none of the handler's.
     ///
@@ -2315,7 +2332,8 @@ public final class HttpServer {
     /// some server -- work a stop() drain waits for.
     static boolean servingOnThisThread() {
         return SERVING_FD.get() != null || Boolean.TRUE.equals(SERVING_WS.get())
-                || Boolean.TRUE.equals(SERVING_H2.get());
+                || Boolean.TRUE.equals(SERVING_H2.get())
+                || Boolean.TRUE.equals(SERVING_UPGRADE.get());
     }
 
     /// workOutstanding(), minus what the calling handler is itself holding.
@@ -2333,6 +2351,13 @@ public final class HttpServer {
         if (Boolean.TRUE.equals(SERVING_WS.get())) {
             return inFlightRequests.get() > 0 || activeRequests.get() > 0
                     || http2Turns.get() > 0 || webSocketTurns.get() > 1
+                    || pendingWork.get() > 0;
+        }
+        if (Boolean.TRUE.equals(SERVING_UPGRADE.get())) {
+            // A handshake holds its connection and nothing else: no request is
+            // in flight for it and no websocket turn is running yet.
+            return inFlightRequests.get() > 0 || activeRequests.get() > 1
+                    || http2Turns.get() > 0 || webSocketTurns.get() > 0
                     || pendingWork.get() > 0;
         }
         if (callerFd < 0) {
@@ -2536,14 +2561,10 @@ public final class HttpServer {
     }
 
     /// The tracer this server's requests report to, when it has one of its own.
-    private volatile Tracer serverTracer; //NOPMD AvoidUsingVolatile - set by setTracer after start, read by every worker
-
-    /// Traces this server's requests with `tracer` rather than whichever
-    /// tracer is installed process-wide -- which, with two servers, is the one
-    /// that started last. Called by the server's builder.
-    void setTracer(Tracer tracer) {
-        this.serverTracer = tracer;
-    }
+    /// Rather than whichever tracer is installed process-wide -- which, with two
+    /// servers, is the one that started last. Set by start() before any worker
+    /// can accept.
+    private volatile Tracer serverTracer; //NOPMD AvoidUsingVolatile - written before the workers start, read by every worker
 
     /// The server holding the virtual-thread slot, or null.
     static HttpServer activeServer() {
@@ -3711,6 +3732,21 @@ public final class HttpServer {
     /// means the request was refused with a status and the connection is still an
     /// ordinary HTTP one.
     private boolean tryUpgrade(Conn conn, int fd, long session, Request request, Span span) {
+        // Marked for the handshake: the router, getSubprotocols() and onOpen() are
+        // application code, and a stop() from one of them must defer its
+        // teardown and discount this connection, as from any other callback --
+        // unmarked, it waited out the drain on its own connection and then tore
+        // down the beans and the pool under the callback it was called from.
+        SERVING_UPGRADE.set(Boolean.TRUE);
+        try {
+            return tryUpgradeMarked(conn, fd, session, request, span);
+        } finally {
+            SERVING_UPGRADE.set(null);
+        }
+    }
+
+    private boolean tryUpgradeMarked(Conn conn, int fd, long session, Request request,
+                                     Span span) {
         // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
         // Taking the raw target substring instead meant `/ch%61t` missed the
         // websocket route for `/chat` and fell through to the catch-all router or
@@ -3856,6 +3892,8 @@ public final class HttpServer {
         // its child -- and not the session, which can last for hours. Messages
         // after this are not spans of their own.
         Tracing.endServer(span, 101, onOpenError);
+        // The session is not the handshake: its turns are marked by the pump.
+        SERVING_UPGRADE.set(null);
         runWebSocket(fd, socket);
         return true;
     }

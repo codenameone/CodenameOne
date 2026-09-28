@@ -118,6 +118,56 @@ class WebSocketReviewFixesTest {
     }
 
     @Test
+    @DisplayName("stop() from onOpen discounts its own connection and defers the teardown")
+    void stopFromTheHandshakeIsACallersStop() throws Exception {
+        final Backend[] running = new Backend[1];
+        final long[] took = new long[1];
+        final String[] poolAfterStop = new String[1];
+        final java.util.concurrent.CountDownLatch opened =
+                new java.util.concurrent.CountDownLatch(1);
+        Backend backend = Backend.builder().port(0).quiet().shutdownTimeoutMillis(4000)
+                .dataSource(":memory:")
+                .webSockets(new Backend.WebSocketEndpoints() {
+                    public void register(HttpServer.WebSocketRegistry registry,
+                                         DataSource dataSource,
+                                         com.codename1.backend.orm.EntityManager entities) {
+                        registry.route("/stop", new WebSocket() {
+                            public void onOpen(WebSocketSession session) {
+                                long started = System.currentTimeMillis();
+                                running[0].stop();
+                                took[0] = System.currentTimeMillis() - started;
+                                try {
+                                    DataSource pool = running[0].getDataSource();
+                                    pool.release(pool.borrow());
+                                    poolAfterStop[0] = "open";
+                                } catch (Exception err) {
+                                    poolAfterStop[0] = String.valueOf(err);
+                                }
+                                opened.countDown();
+                            }
+                            public void onText(WebSocketSession session, String message) {
+                            }
+                            public void onBinary(WebSocketSession s, byte[] m, int o, int l) {
+                            }
+                        });
+                    }
+                })
+                .start();
+        running[0] = backend;
+        RawWebSocketClient client = new RawWebSocketClient(backend.getServer().getPort(),
+                "/stop", null);
+        try {
+            assertTrue(opened.await(15, java.util.concurrent.TimeUnit.SECONDS));
+        } finally {
+            client.close();
+        }
+        assertTrue(took[0] < 2000, "stop() from onOpen waited " + took[0]
+                + "ms for its own connection");
+        assertEquals("open", poolAfterStop[0],
+                "the teardown ran under the callback that stopped the server");
+    }
+
+    @Test
     @DisplayName("a percent-spelled path reaches the same endpoint as the plain one")
     void pathsAreRoutedCanonically() throws Exception {
         // pathIs canonicalizes percent-encoded unreserved octets for every HTTP
