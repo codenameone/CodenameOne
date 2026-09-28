@@ -102,6 +102,9 @@ public class AndroidGradleBuilder extends Executor {
     // anything older, so an explicit android.gradleVersion below this is refused up front
     // instead of minutes into the build.
     static final String GRADLE_9_MIN_VERSION = "9.6.0";
+    // The kotlin-gradle-plugin AGP 9.4.1 depends on (its POM): the compiler its built-in
+    // Kotlin runs and the kotlin-stdlib it adds.
+    static final String AGP_9_BUILT_IN_KOTLIN_VERSION = "2.2.10";
     // 4.5.0 moved to the androidComponents API; 4.3.15 fails to apply on AGP 9 with "Could not
     // get unknown property 'applicationVariants'".
     static final String GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION = "4.5.0";
@@ -1730,8 +1733,8 @@ public class AndroidGradleBuilder extends Executor {
             gradleDistributionUrl = gradle8DistributionUrl;
         }
         if (useGradle9) {
-            // A floor, like the Gradle 8 one: a managed Gradle that is already newer is used
-            // as it is, and an older one is replaced by this distribution.
+            // An exact version, not a floor like the Gradle 8 one -- see
+            // gradleVersionAcceptable.
             minimumGradleVersion = requestedGradle9;
             gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-"
                     + requestedGradle9 + "-bin.zip";
@@ -2061,7 +2064,11 @@ public class AndroidGradleBuilder extends Executor {
         // A home of its own for Gradle 9, so opting one project in does not replace the managed
         // Gradle 8 every other project on the machine builds with (the version check below
         // deletes and re-downloads a managed home that is older than the floor).
-        String gradleHomeVersion = useGradle9 ? "9" : (useGradle8 ? "8" : "6_5");
+        // Gradle 9 homes are per release as well: the version is exact there (see
+        // gradleVersionAcceptable), so one shared home would be deleted and re-downloaded
+        // every time two projects on the machine asked for different 9.x releases.
+        String gradleHomeVersion = useGradle9 ? minimumGradleVersion
+                : (useGradle8 ? "8" : "6_5");
         File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle" + gradleHomeVersion));
 
         String gradleHome = System.getenv("GRADLE_HOME");
@@ -2095,7 +2102,7 @@ public class AndroidGradleBuilder extends Executor {
         debug("FOUND gradleVersion "+gradleVersion);
         int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
         debug("Found gradleVersionInt="+gradleVersionInt);
-        if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+        if (!gradleVersionAcceptable(gradleVersion)) {
             // The minimum version is too low.
             if (managedGradleHome.exists()) {
                 gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
@@ -2107,7 +2114,7 @@ public class AndroidGradleBuilder extends Executor {
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
 
             }
-            if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+            if (!gradleVersionAcceptable(gradleVersion)) {
                 if (managedGradleHome.exists()) {
                     delTree(managedGradleHome);
                 }
@@ -2160,7 +2167,7 @@ public class AndroidGradleBuilder extends Executor {
                     throw new BuildException("Failed to get gradle version even after downloading it from "+gradleDistributionUrl+".  Something must have gone wrong with the gradle installation.");
                 }
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
-                if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+                if (!gradleVersionAcceptable(gradleVersion)) {
                     throw new BuildException("Required Gradle version is "+minimumGradleVersion+" but found version "+gradleVersion);
                 }
             }
@@ -8007,6 +8014,13 @@ public class AndroidGradleBuilder extends Executor {
         // pinned a version with requireKotlinStdlib -- and then only the plugin classpath and
         // the stdlib, which is how AGP 9 is told to use a newer Kotlin than its own.
         boolean builtInKotlin = useGradle9;
+        if (builtInKotlin && !kotlinOverridesBuiltIn(kotlinVersion)) {
+            // A floor the built-in compiler already meets -- the Health Connect path above
+            // raises requireKotlinStdlib to 1.9.x, and cn1libs carry legacy values too.
+            // Writing it out would put an older kotlin-gradle-plugin beside AGP 9's own, so
+            // it is dropped and the bundled compiler is used as it is.
+            kotlinVersion = "";
+        }
         if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
             kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
         }
@@ -11374,7 +11388,8 @@ public class AndroidGradleBuilder extends Executor {
      * Gradle 8 build.
      *
      * <p>{@code 9} alone means the measured pairing, {@link #GRADLE_9_VERSION}. An explicit 9.x is
-     * a floor the managed Gradle must reach and is refused below {@link #GRADLE_9_MIN_VERSION},
+     * the exact release to build with, padded to three components (9.6 is 9.6.0, the name
+     * Gradle publishes it under), and is refused below {@link #GRADLE_9_MIN_VERSION},
      * which the Android Gradle plugin would refuse anyway, only later. A value below 9 is
      * ignored, as this builder always ignored the hint: its Gradle 8 line is not selectable.
      * Gradle 10 and later are refused rather than attempted, because nothing here knows which
@@ -11406,6 +11421,7 @@ public class AndroidGradleBuilder extends Executor {
         if (dot < 0) {
             return GRADLE_9_VERSION;
         }
+        value = padGradleVersion(value);
         if (compareVersions(value, GRADLE_9_MIN_VERSION) < 0) {
             throw new BuildException("android.gradleVersion=" + value + " is older than Gradle "
                     + GRADLE_9_MIN_VERSION + ", the oldest Android Gradle plugin "
@@ -11421,6 +11437,60 @@ public class AndroidGradleBuilder extends Executor {
      */
     private String googleServicesPluginVersion() {
         return useGradle9 ? GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION : "4.3.15";
+    }
+
+    /**
+     * Whether a Gradle installation can run this build.
+     *
+     * <p>The Gradle 8 version is a floor: any newer 8.x runs AGP 8.13.2. A Gradle 9 version
+     * is exact, because android.gradleVersion names one -- the bare 9 means the measured
+     * 9.8.0 pairing and an explicit 9.x means that release -- and a floor let whatever newer
+     * release a GRADLE_HOME or an earlier build left behind stand in for it, so which Gradle
+     * ran depended on the machine's history rather than on the hint.</p>
+     */
+    private boolean gradleVersionAcceptable(String installedVersion) {
+        if (!useGradle9) {
+            return compareVersions(installedVersion, minimumGradleVersion) >= 0;
+        }
+        return installedVersion.matches("[0-9]+(\\.[0-9]+){0,2}")
+                && compareVersions(padGradleVersion(installedVersion), minimumGradleVersion) == 0;
+    }
+
+    /**
+     * A version padded to major.minor.patch, as every Gradle 9 release is numbered -- so a
+     * hint of 9.6 downloads gradle-9.6.0, which exists, rather than gradle-9.6, which does not.
+     *
+     * @param version one to three dot-separated numbers
+     * @return the same version with missing components written as 0
+     */
+    static String padGradleVersion(String version) {
+        String padded = version.trim();
+        int dots = padded.length() - padded.replace(".", "").length();
+        for (int i = dots; i < 2; i++) {
+            padded += ".0";
+        }
+        return padded;
+    }
+
+    /**
+     * Whether a requireKotlinStdlib value asks AGP 9 for a NEWER Kotlin than the one it
+     * bundles, which is the only thing that value can usefully mean on built-in Kotlin.
+     *
+     * <p>A version this cannot read (a pre-release suffix, a Gradle variable) is taken at its
+     * word: it was written deliberately, and only its author knows what it is.</p>
+     *
+     * @param kotlinVersion the requireKotlinStdlib value, possibly empty
+     * @return true when it should be written into the generated project
+     */
+    static boolean kotlinOverridesBuiltIn(String kotlinVersion) {
+        String value = kotlinVersion == null ? "" : kotlinVersion.trim();
+        if (value.length() == 0) {
+            return false;
+        }
+        if (!value.matches("[0-9]+(\\.[0-9]+){0,2}")) {
+            return true;
+        }
+        return compareVersions(padGradleVersion(value), AGP_9_BUILT_IN_KOTLIN_VERSION) > 0;
     }
 
     static int compareVersions(String v1, String v2) {

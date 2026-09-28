@@ -53,7 +53,28 @@ class AndroidGradleBuilderVersionTest {
         assertEquals(AndroidGradleBuilder.GRADLE_9_VERSION,
                 AndroidGradleBuilder.requestedGradle9Version(" 9 "));
         assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6.0"));
-        assertEquals("9.9", AndroidGradleBuilder.requestedGradle9Version("9.9"));
+        // Padded: Gradle 9 publishes every release as major.minor.patch, and 9.6 is the floor
+        // itself rather than something below 9.6.0.
+        assertEquals("9.9.0", AndroidGradleBuilder.requestedGradle9Version("9.9"));
+        assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6"));
+    }
+
+    @Test
+    void builtInKotlinKeepsItsCompilerUnlessANewerOneIsAskedFor() {
+        // Floors the bundled 2.2.10 already meets -- Health Connect's 1.9.x, legacy cn1lib
+        // values -- must not put an older kotlin-gradle-plugin beside AGP 9's.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(""));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(null));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.9.22"));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.7.22"));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(
+                AndroidGradleBuilder.AGP_9_BUILT_IN_KOTLIN_VERSION));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.2"));
+        // A newer Kotlin is exactly what the classpath entry is for.
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0"));
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.2.20"));
+        // Unreadable values are the author's to vouch for.
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0-Beta1"));
     }
 
     @Test
