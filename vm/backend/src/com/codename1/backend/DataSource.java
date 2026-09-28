@@ -373,8 +373,19 @@ public final class DataSource {
         if (joined != null) {
             // Already inside the thread's transaction, which every engine refuses
             // to nest: run as part of it, the way a joined @Transactional method
-            // does.
-            return body.run(joined);
+            // does -- including its failure. A body that throws leaves the whole
+            // transaction unable to commit, as it rolls back when it runs alone;
+            // otherwise a caller catching the exception would commit what the body
+            // wrote before failing.
+            try {
+                return body.run(joined);
+            } catch (Exception err) {
+                Transactions.markRollbackOnly(this);
+                throw err;
+            } catch (Error err) {
+                Transactions.markRollbackOnly(this);
+                throw err;
+            }
         }
         return withConnection(new TransactionWork(body));
     }

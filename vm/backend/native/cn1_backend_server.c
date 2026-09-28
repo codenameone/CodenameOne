@@ -1461,6 +1461,12 @@ JAVA_BOOLEAN com_codename1_backend_VirtualThread_isVirtualImpl___R_boolean(CODEN
     return cn1VirtualThreadCurrent() != 0 ? JAVA_TRUE : JAVA_FALSE;
 }
 
+/* The running virtual thread's handle -- the same pointer create() handed out --
+ * or 0 on a host or platform thread. A waiter gives it to its host to nap. */
+JAVA_LONG com_codename1_backend_VirtualThread_currentImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+    return (JAVA_LONG)(intptr_t)cn1VirtualThreadCurrent();
+}
+
 /*
  * Give up the host thread without waiting for anything.
  *

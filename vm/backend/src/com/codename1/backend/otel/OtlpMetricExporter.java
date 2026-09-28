@@ -152,6 +152,11 @@ public final class OtlpMetricExporter implements MetricReader {
     /// otherwise get a thread nothing ever stops, exporting after both servers
     /// are gone.
     void takeOver() {
+        takeOver(null);
+    }
+
+    /// [#takeOver()], its thread first waiting for `predecessor` to exit.
+    void takeOver(Thread predecessor) {
         synchronized (OPEN) {
             if (OPEN.isEmpty() || OPEN.get(0) != this) { //NOPMD CompareObjectsWithEquals - the exporter itself, by identity
                 return;
@@ -161,16 +166,28 @@ public final class OtlpMetricExporter implements MetricReader {
                     return;
                 }
             }
-            startExporting();
+            startExporting(predecessor);
         }
     }
 
     /// Starts this exporter's thread: it is the one exporting the process's metrics.
     private void startExporting() {
+        startExporting(null);
+    }
+
+    private void startExporting(final Thread predecessor) {
         final Run mine = new Run();
         Thread started = new Thread(new Runnable() {
             @Override
             public void run() {
+                if (predecessor != null) {
+                    try {
+                        predecessor.join();
+                    } catch (InterruptedException err) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
                 loop(mine);
             }
         }, "cn1-otel-metrics");
@@ -259,24 +276,25 @@ public final class OtlpMetricExporter implements MetricReader {
                 successor = (OtlpMetricExporter) OPEN.get(0);
             }
         }
+        Thread exporter = null;
+        synchronized (lock) {
+            if (run != null && !run.stopping) {
+                run.stopping = true;
+                // One last export, so the counts of the final minute are not lost
+                // -- made by the exporter thread, which is bounded by the join
+                // below rather than by the HTTP client's own timeouts.
+                run.finalExport = timeoutMillis > 0;
+                exporter = thread;
+                lock.notifyAll();
+            }
+        }
         if (successor != null) {
             // The one that waited behind this, with the same identity, exports
             // from now on; the process's metrics are not left unreported while
-            // another server is still running.
-            successor.takeOver();
-        }
-        Thread exporter;
-        synchronized (lock) {
-            if (run == null || run.stopping) {
-                return;
-            }
-            run.stopping = true;
-            // One last export, so the counts of the final minute are not lost --
-            // made by the exporter thread, which is bounded by the join below
-            // rather than by the HTTP client's own connect and read timeouts.
-            run.finalExport = timeoutMillis > 0;
-            exporter = thread;
-            lock.notifyAll();
+            // another server is still running. It starts only once THIS thread has
+            // exited -- its periodic or final export may still be in flight, and
+            // the two at once would send the process's stream twice.
+            successor.takeOver(exporter);
         }
         if (exporter != null && timeoutMillis > 0) {
             try {

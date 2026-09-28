@@ -637,6 +637,15 @@ public final class Transactions {
     /// Called by the session adapter when a session that joined this thread's
     /// transaction rolls back: the rows are not the session's to keep, so the
     /// transaction they are in cannot commit either.
+    /// Marks the calling thread's transaction, whatever pool it is on, as
+    /// unable to commit; nothing when there is none.
+    public static void markRollbackOnly() {
+        Physical p = used ? (Physical) CURRENT.get() : null;
+        if (p != null) {
+            p.rollbackOnly = true;
+        }
+    }
+
     public static void markRollbackOnly(DataSource pool) {
         Physical p = used ? (Physical) CURRENT.get() : null;
         if (p != null && (p.pool == null || p.pool == pool)) { //NOPMD CompareObjectsWithEquals - pools and connections are compared by identity

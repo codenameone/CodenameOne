@@ -219,12 +219,19 @@ public final class Tasks {
             } else if ("platform".equalsIgnoreCase(configured)) {
                 virtual = false;
             } else if (kind == AUTO) {
-                virtual = HttpServer.acceptsVirtualTasks();
+                // Decided per task by the executor, not here: this may run during
+                // start-up, before the server's hosts exist.
+                TaskExecutor created = new TaskExecutor(key, false, true, threads, registry);
+                if (configured == null) {
+                    registry.requestedKinds.put(key, Integer.valueOf(kind));
+                }
+                registry.executors.put(key, created);
                 if (!registry.reportedAuto) {
                     registry.reportedAuto = true;
-                    System.out.println("cn1: background tasks marked AUTO run on "
-                            + (virtual ? "virtual" : "platform") + " threads");
+                    System.out.println("cn1: background tasks marked AUTO run on virtual "
+                            + "threads where the server has them, platform threads otherwise");
                 }
+                return created;
             } else {
                 virtual = kind == VIRTUAL;
             }

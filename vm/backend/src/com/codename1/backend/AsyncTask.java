@@ -196,12 +196,21 @@ public abstract class AsyncTask implements Runnable, Future {
     /// #### Returns
     ///
     /// false when the deadline passed first
+    ///
+    /// Each check naps rather than yields: a plain yield put the waiter straight
+    /// back on its host's run ring, so the host polled with a zero timeout and
+    /// resumed it again at once -- a whole core spent re-checking for as long as a
+    /// slow task ran. The nap grows from a millisecond to 20, so a quick task is
+    /// still seen almost at once and a slow one costs a few wake-ups a second.
     private boolean awaitCooperatively(long deadline) {
+        long nap = 1;
         while (!isDone()) {
-            if (System.currentTimeMillis() >= deadline) {
+            long now = System.currentTimeMillis();
+            if (now >= deadline) {
                 return false;
             }
-            VirtualThread.yieldNow();
+            HttpServer.napUntil(Math.min(deadline, now + nap));
+            nap = Math.min(20, nap * 2);
         }
         return true;
     }

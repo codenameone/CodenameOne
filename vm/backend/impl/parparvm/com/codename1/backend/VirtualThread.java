@@ -99,6 +99,13 @@ public final class VirtualThread {
         yieldImpl();
     }
 
+    /// The handle of the virtual thread the caller runs on, or 0 on a host or
+    /// platform thread. What a waiter hands its host so it can nap rather than
+    /// be resumed again at once.
+    public static long current() {
+        return currentImpl();
+    }
+
     /// Whether the caller is running on a virtual thread rather than a host thread.
     public static boolean isVirtual() {
         return isVirtualImpl();
@@ -118,6 +125,7 @@ public final class VirtualThread {
     private static native int descriptorImpl(long handle);
     private static native void freeImpl(long handle);
     private static native boolean isVirtualImpl();
+    private static native long currentImpl();
     private static native boolean supportedImpl();
     private static native void yieldImpl();
     private static native void reportImpl();

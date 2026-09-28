@@ -59,6 +59,11 @@ public final class VirtualThread {
         return -1;
     }
 
+    /// Always 0: the JVM development runtime has no virtual threads of its own.
+    public static long current() {
+        return 0;
+    }
+
     public static boolean isVirtual() {
         return false;
     }

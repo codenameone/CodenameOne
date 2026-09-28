@@ -161,6 +161,27 @@ class TransactionsTest {
     }
 
     @Test
+    @DisplayName("a joined inTransaction body that fails dooms the outer transaction, even if caught")
+    void aFailedJoinedHelperMarksRollbackOnly() throws Exception {
+        Transactions.Transaction tx = Transactions.begin(Transactions.REQUIRED, false, -1);
+        insert("a");
+        try {
+            pool.inTransaction(new DataSource.Work() {
+                public Object run(Database db) throws Exception {
+                    db.execute("INSERT INTO t (v) VALUES ('b')", null);
+                    throw new IllegalStateException("the helper failed");
+                }
+            });
+        } catch (IllegalStateException caught) {
+            // the caller handles it, and would otherwise go on to commit
+        }
+        assertTrue(Transactions.isRollbackOnly(),
+                "a failed joined helper left the transaction free to commit its writes");
+        assertThrows(TransactionException.UnexpectedRollback.class, () -> Transactions.commit(tx));
+        assertEquals(0, rows());
+    }
+
+    @Test
     @DisplayName("a savepoint that cannot be set leaves the outer transaction unable to commit")
     void aFailedSavepointMarksTheOuterRollbackOnly() throws Exception {
         Transactions.Transaction outer = Transactions.begin(Transactions.REQUIRED, false, -1);

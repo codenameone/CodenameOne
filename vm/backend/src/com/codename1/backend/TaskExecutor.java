@@ -64,19 +64,33 @@ public final class TaskExecutor {
     private final Tasks.Registry registry;
 
     TaskExecutor(String name, boolean virtual, int size, Tasks.Registry registry) {
+        this(name, virtual, false, size, registry);
+    }
+
+    /// With `auto`, each submission tries a virtual thread and falls back
+    /// to the pool: decided when the task is submitted, not when the executor is
+    /// made, because an executor first asked for during start-up -- an @Async
+    /// call from a @PostConstruct -- exists before the server's hosts do, and
+    /// deciding then would keep it on platform threads for good.
+    TaskExecutor(String name, boolean virtual, boolean auto, int size,
+                 Tasks.Registry registry) {
         this.name = name;
         this.virtual = virtual;
+        this.auto = auto;
         this.size = size < 1 ? 1 : size;
         this.registry = registry;
     }
+
+    private final boolean auto;
 
     public String getName() {
         return name;
     }
 
-    /// Whether this executor asks for virtual threads.
+    /// Whether this executor's tasks go to virtual threads: always for a virtual
+    /// one, and for an AUTO one while its server has hosts to run them on.
     public boolean isVirtual() {
-        return virtual;
+        return virtual || (auto && HttpServer.acceptsVirtualTasks());
     }
 
     public int getSize() {
@@ -127,7 +141,7 @@ public final class TaskExecutor {
         if (task == null) {
             return;
         }
-        if (virtual) {
+        if (virtual || auto) {
             // Refused and counted BEFORE the hand-off, exactly like a pool task:
             // a submission after shutdown must fail rather than run on a server
             // that is stopping, and a task already handed to a host must hold

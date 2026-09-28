@@ -248,4 +248,53 @@ class OtlpMetricsProtoTest {
         Thread.sleep(200);
         assertEquals(0L, failures(successor), "a shut-down exporter was started and exports");
     }
+
+    @Test
+    @DisplayName("a successor starts exporting only once the old exporter's thread has exited")
+    void aSuccessorWaitsForTheOldExport() throws Exception {
+        final java.net.ServerSocket slow = new java.net.ServerSocket(0);
+        final java.util.List held = java.util.Collections.synchronizedList(
+                new java.util.ArrayList());
+        Thread acceptor = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    while(true) {
+                        held.add(slow.accept());           // accepted, never answered
+                    }
+                } catch (java.io.IOException closed) {
+                    // released
+                }
+            }
+        });
+        acceptor.setDaemon(true);
+        acceptor.start();
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty(OtlpMetricExporter.ENDPOINT, "http://127.0.0.1:" + slow.getLocalPort()
+                + "/v1/metrics");
+        p.setProperty(OtlpMetricExporter.INTERVAL, "20");
+        com.codename1.backend.Config config = com.codename1.backend.Config.of(p, "test");
+        OtlpMetricExporter first = new OtlpMetricExporter("handoff");
+        OtlpMetricExporter second = new OtlpMetricExporter("handoff");
+        first.open(config);
+        second.open(config);
+        try {
+            long deadline = System.currentTimeMillis() + 5000;
+            while(held.isEmpty() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);                // the first export is now stuck in flight
+            }
+            assertEquals(1, held.size());
+            first.shutdown(0);                   // hands over without waiting
+            Thread.sleep(300);
+            assertEquals(1, held.size(),
+                    "the successor exported while the old export was still in flight");
+        } finally {
+            slow.close();
+            synchronized (held) {
+                for(Object s : held) {
+                    ((java.net.Socket) s).close();
+                }
+            }
+            second.shutdown(0);
+        }
+    }
 }

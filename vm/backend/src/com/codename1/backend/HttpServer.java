@@ -2667,7 +2667,61 @@ public final class HttpServer {
             VirtualThread.free(handle);
             return;
         }
+        ringOrNap(me, handle);
+    }
+
+    /// Naps a virtual thread asked for, by handle, until when. Written by the
+    /// virtual thread just before it yields and read by its host just after,
+    /// on the same OS thread; a map because every host shares it.
+    private static final java.util.HashMap NAP_REQUESTS = new java.util.HashMap();
+
+    /// Yields the calling virtual thread until `untilMillis`, or thereabouts:
+    /// its host leaves it off the run ring until then. A plain yield when the
+    /// caller is not a virtual thread. For waiters -- an @Async Future polled
+    /// from a handler -- that would otherwise be resumed again immediately.
+    static void napUntil(long untilMillis) {
+        long self = VirtualThread.current();
+        if (self != 0) {
+            synchronized (NAP_REQUESTS) {
+                NAP_REQUESTS.put(Long.valueOf(self), Long.valueOf(untilMillis));
+            }
+        }
+        VirtualThread.yieldNow();
+    }
+
+    /// Puts a virtual thread that yielded back on the ring -- or, when it asked
+    /// to nap and the time is still ahead, on this host's nap table instead.
+    private void ringOrNap(VtHost me, long handle) {
+        Long until;
+        synchronized (NAP_REQUESTS) {
+            until = (Long) NAP_REQUESTS.remove(Long.valueOf(handle));
+        }
+        if (until != null && until.longValue() > System.currentTimeMillis()) {
+            me.napping.put(Long.valueOf(handle), until);
+            return;
+        }
         me.ringAdd(handle);
+    }
+
+    /// Moves the naps due by `now` back to the ring; answers the earliest
+    /// still ahead, or Long.MAX_VALUE for none.
+    private static long wakeNappers(VtHost me, long now) {
+        if (me.napping.isEmpty()) {
+            return Long.MAX_VALUE;
+        }
+        long earliest = Long.MAX_VALUE;
+        java.util.Iterator it = me.napping.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry e = (Map.Entry) it.next();
+            long until = ((Long) e.getValue()).longValue();
+            if (until <= now) {
+                it.remove();
+                me.ringAdd(((Long) e.getKey()).longValue());
+            } else if (until < earliest) {
+                earliest = until;
+            }
+        }
+        return earliest;
     }
 
     /// What a connection's virtual thread runs. Reached from native code only,
@@ -2751,6 +2805,11 @@ public final class HttpServer {
         /// so the abandon has to -- or the static map keeps the task, its
         /// arguments and the beans it captured for the life of the process.
         final java.util.HashMap taskTokens = new java.util.HashMap();
+        /// Virtual threads napping until a time, by handle, OFF the run ring: a
+        /// waiter that is resumed again at once only to find nothing done yet
+        /// keeps its host polling with a zero timeout, one core busy for as long
+        /// as it waits. Touched only by the host thread.
+        final java.util.HashMap napping = new java.util.HashMap();
 
         boolean hasQueuedTasks() {
             synchronized (inbox) {
@@ -3033,6 +3092,8 @@ public final class HttpServer {
         try {
             while (System.currentTimeMillis() < taskDrainDeadline) {
                 drainTaskInbox(me);
+                // Napping tasks are still running ones; the drain resumes them too.
+                wakeNappers(me, Long.MAX_VALUE);
                 int budget = me.ringCount;
                 int tasks = 0;
                 while (budget-- > 0 && !me.ringEmpty()) {
@@ -3058,6 +3119,7 @@ public final class HttpServer {
             // for the rest of the stop either way.
             int abandoned = 0;
             int overrunning = 0;
+            wakeNappers(me, Long.MAX_VALUE);
             int left = me.ringCount;
             while (left-- > 0 && !me.ringEmpty()) {
                 long handle = me.ringTake();
@@ -3102,7 +3164,12 @@ public final class HttpServer {
     /// one unwinds -- its finally blocks run, its monitors are released -- rather
     /// than having its stack freed from under it.
     private void finishOverrunningTasks(VtHost me) {
-        while (!me.ringEmpty()) {
+        while (true) {
+            // A napping task is a running one: back on the ring each pass.
+            wakeNappers(me, Long.MAX_VALUE);
+            if (me.ringEmpty()) {
+                return;
+            }
             int budget = me.ringCount;
             int tasks = 0;
             while (budget-- > 0 && !me.ringEmpty()) {
@@ -3179,9 +3246,18 @@ public final class HttpServer {
             // network, so polling before running them would delay them by the
             // whole poll timeout.
             boolean ranSome = drainRunnable(me);
+            long nextNap = wakeNappers(me, System.currentTimeMillis());
+            int timeout = 250;
+            if (ranSome || !me.ringEmpty()) {
+                timeout = 0;
+            } else if (nextNap != Long.MAX_VALUE) {
+                // Sleep in the poll until the earliest nap is due, not the full
+                // idle interval: the napper wakes on time, and nothing spins.
+                timeout = (int) Math.max(0, Math.min(250, nextNap - System.currentTimeMillis()));
+            }
             int n;
             try {
-                n = me.poller.await(ready, (ranSome || !me.ringEmpty()) ? 0 : 250);
+                n = me.poller.await(ready, timeout);
                 // On ELAPSED TIME, not on an idle poll. Sweeping only when a poll
                 // came back empty meant a host that always had at least one event
                 // never swept at all -- and a client can keep that true with a
@@ -3318,7 +3394,7 @@ public final class HttpServer {
             // disarming as it delivered.
             me.poller.remove(fd);
             me.setArmed(fd, false);
-            me.ringAdd(handle);
+            ringOrNap(me, handle);
             return;
         }
         // Parked on I/O: start its clock. Nothing else will, and without it a
