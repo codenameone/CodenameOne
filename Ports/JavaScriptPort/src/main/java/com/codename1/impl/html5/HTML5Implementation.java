@@ -5037,6 +5037,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return true;
     }
 
+    /// isDesktop() classifies by user agent, and iPadOS Safari reports a Mac one by default, as
+    /// does any tablet browser asked for the desktop site -- so a touch device answers "desktop"
+    /// there. The pointer is what decides whether a press-drag may select text (TextSelection's
+    /// trigger) without stealing the swipe that scrolls.
+    @Override
+    public boolean isPrimaryPointerMouse() {
+        return isDesktop() && !isIOS() && !matchesMediaQuery("(pointer: coarse)");
+    }
+
     private int isDesktop = -1;
 
     @Override

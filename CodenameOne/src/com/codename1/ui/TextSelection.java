@@ -510,7 +510,7 @@ public class TextSelection {
     ///
     /// The default trigger type for text selection.
     public static TextSelectionTrigger getDefaultTextSelectionTrigger() {
-        return Display.impl.isDesktop() ? TextSelectionTrigger.Press : TextSelectionTrigger.LongPress;
+        return Display.impl.isPrimaryPointerMouse() ? TextSelectionTrigger.Press : TextSelectionTrigger.LongPress;
     }
 
     private static int getX(Component cmp, Component relativeTo) {

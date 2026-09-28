@@ -6854,8 +6854,29 @@
   // browser's Save dialog as well. Only primary-modifier combinations are claimed, so ordinary
   // typing is never intercepted.
   function installMenuAccelerators() {
+    // The unshifted character on a physical key, for the keys whose typed character a modifier
+    // changes: Shift+1 reports e.key "!" and Option+S on a Mac reports "\u00df", while the
+    // command was configured with "1" and "s".
+    var CODE_KEYS = { Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Backquote: '`', Comma: ',', Period: '.', Slash: '/',
+      Backslash: '\\' };
+    function baseKey(code) {
+      if (!code) {
+        return '';
+      }
+      if (/^Key[A-Z]$/.test(code)) {
+        return code.charAt(3).toLowerCase();
+      }
+      if (/^(Digit|Numpad)[0-9]$/.test(code)) {
+        return code.charAt(code.length - 1);
+      }
+      return CODE_KEYS[code] || '';
+    }
+    function editable(t) {
+      return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+    }
     document.addEventListener('keydown', function(e) {
-      if (!(e.ctrlKey || e.metaKey) || e.repeat) {
+      if (!(e.ctrlKey || e.metaKey || e.altKey) || e.repeat) {
         return;
       }
       var chrome = document.getElementById('cn1-desktop-chrome');
@@ -6866,15 +6887,36 @@
       // displays it (the chrome's class names the OS). Accepting either would claim Ctrl+S on a
       // Mac, or Win+S on Windows, for a command shown as the other.
       var mac = (' ' + chrome.className + ' ').indexOf(' cn1-chrome-mac ') >= 0;
-      if (mac ? (!e.metaKey || e.ctrlKey) : (!e.ctrlKey || e.metaKey)) {
+      var primary = mac ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+      var altOnly = e.altKey && !e.ctrlKey && !e.metaKey;
+      if (!primary && !altOnly) {
         return;
       }
-      var key = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
-      if (!key || key === '"' || key === '\\') {
+      // Option is how a Mac keyboard types accented and special characters, so an Alt-only
+      // shortcut is left alone while the user is typing into a field there.
+      if (altOnly && mac && editable(e.target)) {
         return;
       }
-      var binding = 'primary' + (e.altKey ? '+alt' : '') + (e.shiftKey ? '+shift' : '') + '+' + key;
-      var item = chrome.querySelector('[data-cn1-accel="' + binding + '"]');
+      var prefix = (primary ? 'primary' + (e.altKey ? '+alt' : '') : 'alt') + (e.shiftKey ? '+shift' : '');
+      // The typed character first (it is what a non-QWERTY layout puts on the key), then the
+      // physical key's unshifted character for a modifier-transformed one.
+      var keys = [];
+      if (e.key && e.key.length === 1) {
+        keys.push(e.key.toLowerCase());
+      }
+      var base = baseKey(e.code);
+      if (base && keys.indexOf(base) < 0) {
+        keys.push(base);
+      }
+      var item = null;
+      for (var k = 0; k < keys.length && !item; k++) {
+        var binding = prefix + '+' + keys[k];
+        var sel = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(binding)
+            : (/["\\]/.test(binding) ? null : binding);
+        if (sel !== null) {
+          item = chrome.querySelector('[data-cn1-accel="' + sel + '"]');
+        }
+      }
       // Not rejected on aria-disabled: that marker is refreshed when the menu opens, so it can
       // be stale after Command.setEnabled(). dispatchNativeMenuCommand checks the command's
       // CURRENT state when the click arrives, which is the authority.

@@ -383,18 +383,22 @@ final class JavaScriptDesktopChrome {
         }
     }
 
-    /// The key binding browser_bridge.js matches, as `primary[+alt][+shift]+<key>` with the key in
-    /// lower case; null for a command without a primary-modifier shortcut, which a page cannot
-    /// claim without breaking ordinary typing.
+    /// The key binding browser_bridge.js matches, as `[primary][+alt][+shift]+<key>` with the key
+    /// in lower case, exactly as configured (a shifted digit stays the digit; the bridge matches
+    /// the physical key as well as the typed character). Null for a shortcut with neither the
+    /// primary modifier nor Alt: a bare or Shift-only key is ordinary typing, and claiming it
+    /// would swallow it.
     static String acceleratorBinding(Command c) {
         int key = c.getDesktopShortcutKeyChar();
         int mods = c.getDesktopShortcutModifiers();
-        if (key <= 0 || (mods & Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) == 0) {
+        boolean primary = (mods & Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY) != 0;
+        boolean alt = (mods & Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0;
+        if (key <= 0 || (!primary && !alt)) {
             return null;
         }
-        StringBuilder sb = new StringBuilder("primary");
-        if ((mods & Command.DESKTOP_SHORTCUT_MODIFIER_ALT) != 0) {
-            sb.append("+alt");
+        StringBuilder sb = new StringBuilder(primary ? "primary" : "");
+        if (alt) {
+            sb.append(primary ? "+alt" : "alt");
         }
         if ((mods & Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT) != 0) {
             sb.append("+shift");

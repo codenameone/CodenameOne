@@ -6705,6 +6705,18 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Whether the primary pointer is a mouse, so a press-drag can be claimed for selecting text
+    /// without taking the gesture that scrolls. Defaults to [#isDesktop()]; a port whose desktop
+    /// classification can include touch devices (a browser on a tablet that reports a desktop
+    /// user agent) answers from the pointer itself.
+    ///
+    /// #### Returns
+    ///
+    /// true when the primary pointer is a precise, mouse-like device
+    public boolean isPrimaryPointerMouse() {
+        return isDesktop();
+    }
+
     /// Indicates whether the application is running on a smartwatch form factor
     /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
     /// the device/skin metadata.

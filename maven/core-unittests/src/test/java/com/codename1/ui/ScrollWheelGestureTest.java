@@ -193,6 +193,23 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelOverTheTitleScrollsThePage() {
+        // The walk from the title area never passes through the content pane, so stopping at
+        // the form -- the fix for #5910 -- left a wheel over the Toolbar doing nothing while the
+        // page below it could still scroll. The form's content pane is scrolled in its place.
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        Component title = f.getTitleArea();
+        assertTrue(title.getHeight() > 0, "the form has a title area to put the pointer over");
+        assertFalse(page.contains(title), "and it lies outside the content pane");
+
+        wheel(title, 0, -px(20));
+
+        assertTrue(page.getScrollY() > 0, "a wheel over the title scrolls the page");
+        assertEquals(0, f.getScrollY(), "never the form itself");
+    }
+
+    @FormTest
     void aWheelOverAnEmbeddedFormStillMovesThePageAroundIt() {
         // The walk stops at the ROOT top level only. An embedded Form answers isScrollableY()
         // for its own content pane just like the root, so it must never be moved itself -- but

@@ -9589,11 +9589,18 @@ public final class Display extends CN1Constants {
         Component c = cmp;
         while (c != null) {
             // The walk ends at the top level. Form and Window answer isScrollableY() for their
-            // content pane, which the walk has already visited on the way up -- but applyScroll
-            // would move the top level's OWN scroll position, and that translates everything it
-            // paints: the Toolbar scrolled off with the content, and the space it left was blank
-            // (issue #5910). Reaching the top level means the page is already at its edge.
+            // content pane, but applyScroll on the top level would move its OWN scroll
+            // position, and that translates everything it paints: the Toolbar scrolled off
+            // with the content, and the space it left was blank (issue #5910). So the content
+            // pane is scrolled in its place -- unless the walk came up through it already,
+            // which means it is at the edge. A wheel over the Toolbar, the title or anything
+            // else outside the content pane never visited it, and still scrolls the page.
             if (c instanceof TopLevelContainer) {
+                Container pane = ((TopLevelContainer) c).getContentPane();
+                if (pane != null && pane != cmp && !pane.contains(cmp) //NOPMD CompareObjectsWithEquals
+                        && scrollOneForWheel(pane, vertical, delta)) {
+                    return true;
+                }
                 if (c.getParent() == null) {
                     return false;
                 }
@@ -9603,28 +9610,34 @@ public final class Display extends CN1Constants {
                 c = c.getParent();
                 continue;
             }
-            // A disabled component takes no wheel, exactly as it took no synthetic drag:
-            // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
-            // the wheel too. The walk continues, so an enabled ancestor still gets it.
-            if (c.isEnabled() && (vertical ? c.isScrollableY() : c.isScrollableX())) {
-                // Clamped here rather than left to setScrollY: that one only clamps for a
-                // component with tensile drag off, because a finger is allowed to overshoot
-                // and spring back. A wheel notch has nothing to spring back from.
-                // The vertical range includes what the virtual keyboard is covering, the
-                // same way the drag path and setScrollY compute it: a wheel that stopped at
-                // the keyboard could never bring the field behind it into view.
-                int max = vertical
-                        ? c.getScrollDimension().getHeight() - c.getHeight()
-                                + c.getInvisibleAreaUnderVKB()
-                        : c.getScrollDimension().getWidth() - c.getWidth();
-                int from = vertical ? c.getScrollY() : c.getScrollX();
-                if (applyScroll(c, vertical, from - delta, max)) {
-                    return true;
-                }
+            if (scrollOneForWheel(c, vertical, delta)) {
+                return true;
             }
             c = c.getParent();
         }
         return false;
+    }
+
+    /// Scrolls `c` itself by one wheel step if it can move on this axis; false when it cannot.
+    private boolean scrollOneForWheel(Component c, boolean vertical, int delta) {
+        // A disabled component takes no wheel, exactly as it took no synthetic drag:
+        // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
+        // the wheel too. The walk continues, so an enabled ancestor still gets it.
+        if (!c.isEnabled() || !(vertical ? c.isScrollableY() : c.isScrollableX())) {
+            return false;
+        }
+        // Clamped here rather than left to setScrollY: that one only clamps for a
+        // component with tensile drag off, because a finger is allowed to overshoot
+        // and spring back. A wheel notch has nothing to spring back from.
+        // The vertical range includes what the virtual keyboard is covering, the
+        // same way the drag path and setScrollY compute it: a wheel that stopped at
+        // the keyboard could never bring the field behind it into view.
+        int max = vertical
+                ? c.getScrollDimension().getHeight() - c.getHeight()
+                        + c.getInvisibleAreaUnderVKB()
+                : c.getScrollDimension().getWidth() - c.getWidth();
+        int from = vertical ? c.getScrollY() : c.getScrollX();
+        return applyScroll(c, vertical, from - delta, max);
     }
 
     /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
