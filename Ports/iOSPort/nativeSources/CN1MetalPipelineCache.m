@@ -211,15 +211,20 @@ static void configureStencilWriteOnly(MTLRenderPipelineColorAttachmentDescriptor
     if (pipeline < 0 || pipeline >= CN1MetalPipelineCount) return nil;
     if (_states[pipeline] != nil) return _states[pipeline];
 
+    extern void cn1StartupPhase(const char*);
     if (_library == nil) {
+        cn1StartupPhase("diag.library.enter");
         _library = [_device newDefaultLibrary];
+        cn1StartupPhase("diag.library.exit");
     }
     id<MTLLibrary> library = _library;
     if (library == nil) {
         NSLog(@"CN1MetalPipelineCache: device has no default.metallib — is CN1MetalShaders.metal in the Xcode project?");
         return nil;
     }
+    { char n[48]; snprintf(n, sizeof(n), "diag.pipeline.%ld.enter", (long)pipeline); cn1StartupPhase(n); }
     _states[pipeline] = [self buildPipeline:pipeline library:library];
+    cn1StartupPhase("diag.pipeline.exit");
     return _states[pipeline];
 }
 
