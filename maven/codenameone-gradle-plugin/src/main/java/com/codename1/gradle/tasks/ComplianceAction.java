@@ -61,7 +61,7 @@ public final class ComplianceAction implements Action<Task> {
     private final Provider<List<String>> artifacts;
     private final Map<String, String> projectProperties;
     private final List<File> siblingClassRoots = new ArrayList<File>();
-    private File pendingJavaSources;
+    private final List<File> pendingJavaSources = new ArrayList<File>();
 
     /// @param compileClasspath the classes the check resolves references against
     /// @param artifacts the same classpath's resolved dependencies, encoded as
@@ -92,8 +92,8 @@ public final class ComplianceAction implements Action<Task> {
 
     /// Declares the Java sources javac has not compiled yet, for the Kotlin pass,
     /// which runs first; see [BytecodeCompliance#pendingProjectClasses(Set)].
-    public ComplianceAction withPendingJavaSources(File javaSourceDir) {
-        this.pendingJavaSources = javaSourceDir;
+    public ComplianceAction withPendingJavaSources(java.util.Collection<File> javaSourceDirs) {
+        this.pendingJavaSources.addAll(javaSourceDirs);
         return this;
     }
 
@@ -122,15 +122,36 @@ public final class ComplianceAction implements Action<Task> {
     @Override
     public void execute(Task task) {
         List<String> encoded = artifacts.get();
+        // The check indexes dependencies from the resolved module artifacts, which a
+        // project(":shared") or files(...) dependency is not; those are on javac's
+        // classpath all the same, so they are indexed too, or a reference to one
+        // of their classes read as an unsupported API and failed a valid build.
+        Set<File> moduleFiles = new HashSet<File>();
+        for (String e : encoded) {
+            com.codename1.build.BuildArtifact a = GradleHostFactory.decode(e);
+            if (a != null && a.getFile() != null) {
+                moduleFiles.add(a.getFile().getAbsoluteFile());
+            }
+        }
+        List<File> siblings = new ArrayList<File>(siblingClassRoots);
+        for (File f : compileClasspath) {
+            if (!moduleFiles.contains(f.getAbsoluteFile())) {
+                siblings.add(f);
+            }
+        }
         final File buildDir = new File(projectDir, "build");
         ProjectHost host = GradleHostFactory.create(task, new GradleLog(task.getLogger()),
                 ProjectLayouts.of(BuildSystem.GRADLE, ProjectKind.APP, rootDir, projectDir), projectName, "",
                 projectProperties, Collections.<String, String>emptyMap(), compileClasspath,
                 Collections.<String>emptyList(), encoded, null, "");
         BytecodeCompliance check = new BytecodeCompliance(new ClassesDirHost(host, classesDir, buildDir))
-                .siblingClassRoots(siblingClassRoots);
-        if (pendingJavaSources != null) {
-            check.pendingProjectClasses(javaTypesUnder(pendingJavaSources));
+                .siblingClassRoots(siblings);
+        if (!pendingJavaSources.isEmpty()) {
+            Set<String> pending = new HashSet<String>();
+            for (File root : pendingJavaSources) {
+                pending.addAll(javaTypesUnder(root));
+            }
+            check.pendingProjectClasses(pending);
         }
         try {
             check.execute();

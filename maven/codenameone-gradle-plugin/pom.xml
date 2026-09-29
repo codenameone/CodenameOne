@@ -43,11 +43,22 @@
             <artifactId>codenameone-project-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The Gradle API, compiled against and supplied by Gradle at run time. Its
+             groovy-all dependency is left out: 21 artifacts (Swing, console, SQL,
+             test frameworks...) the plugin never touches, each one more download that
+             a Maven Central outage can fail the build on (as it did, on groovy-swing).
+             Core groovy stays, for the Closure types in the API's signatures. -->
         <dependency>
             <groupId>dev.gradleplugins</groupId>
             <artifactId>gradle-api</artifactId>
             <version>${gradle.api.version}</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.codehaus.groovy</groupId>
+                    <artifactId>groovy-all</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

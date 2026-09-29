@@ -201,7 +201,7 @@ final class AppSupport {
                     compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
                             layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
                             main.getCompileClasspath(), compileArtifacts, complianceProperties)
-                            .withPendingJavaSources(layout.javaSourceDir()));
+                            .withPendingJavaSources(main.getJava().getSrcDirs()));
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
                             layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties.get(),
                             main.getCompileClasspath()));

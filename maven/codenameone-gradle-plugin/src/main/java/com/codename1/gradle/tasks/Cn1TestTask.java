@@ -61,6 +61,17 @@ public abstract class Cn1TestTask extends Cn1Task {
 
     @TaskAction
     public void runTests() {
+        // Reports are this run's or none: with the last test removed, the previous
+        // run's TEST-*.xml would otherwise stay for a CI collector to publish as if
+        // those tests had just passed.
+        File reports = getReportsDirectory().get().getAsFile();
+        try {
+            if (reports.isDirectory()) {
+                org.apache.commons.io.FileUtils.cleanDirectory(reports);
+            }
+        } catch (java.io.IOException ex) {
+            throw new GradleException("Could not clear " + reports, ex);
+        }
         List<File> testDirs = new ArrayList<File>(getTestClassesDirectories().getFiles());
         if (testDirs.isEmpty()) {
             getLogger().lifecycle("No tests were found.");

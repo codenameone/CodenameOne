@@ -100,14 +100,24 @@ public final class BackendMainClass {
     }
 
     public String findMainClass(File classesDir) throws BuildFailureException {
+        return findMainClass(java.util.Collections.singletonList(classesDir));
+    }
+
+    /// The one class with a main method across `classesDirs` -- Gradle compiles
+    /// Java and Kotlin into separate directories, and a main in each is as
+    /// ambiguous as two in one.
+    public String findMainClass(List<File> classesDirs) throws BuildFailureException {
         List<String> found = new ArrayList<String>();
-        collectMainClasses(classesDir, classesDir, found);
+        for (File classesDir : classesDirs) {
+            collectMainClasses(classesDir, classesDir, found);
+        }
+        File classesDir = classesDirs.size() == 1 ? classesDirs.get(0) : null;
         if (found.size() == 1) {
             return found.get(0);
         }
         if (found.isEmpty()) {
             throw new BuildFailureException("No class with a main method under "
-                    + classesDir + "; set " + mainClassOption);
+                    + (classesDir != null ? classesDir : classesDirs) + "; set " + mainClassOption);
         }
         throw new BuildFailureException("Several classes have a main method ("
                 + join(found, ", ") + "); choose one with " + mainClassOption);

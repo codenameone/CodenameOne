@@ -105,6 +105,31 @@ public class GradleBuildEditorTest {
                 "dependencies {\n    implementation(\"com.example:library:1.2\")\n}\n", JAR));
     }
 
+    /// A declaration inside a named block is removed on its own; the block and its
+    /// other entries stay.
+    @Test
+    public void removesANestedDeclarationWithoutItsSiblings() {
+        String script = "dependencies {\n"
+                + "    constraints {\n"
+                + "        implementation(\"com.example:lib:1.2\")\n"
+                + "        implementation(\"com.example:other:1\")\n"
+                + "    }\n"
+                + "    implementation(\"com.example:keep:1\") {\n"
+                + "        exclude(group = \"com.example\", module = \"lib\")\n"
+                + "    }\n"
+                + "}\n";
+        assertTrue(GradleBuildEditor.containsDependency(script, JAR));
+        String updated = GradleBuildEditor.removeDependency(script, JAR);
+        assertEquals("dependencies {\n"
+                + "    constraints {\n"
+                + "        implementation(\"com.example:other:1\")\n"
+                + "    }\n"
+                + "    implementation(\"com.example:keep:1\") {\n"
+                + "        exclude(group = \"com.example\", module = \"lib\")\n"
+                + "    }\n"
+                + "}\n", updated);
+    }
+
     @Test
     public void removesOnlyTheSelectedDeclaration() {
         String script = "dependencies {\n"

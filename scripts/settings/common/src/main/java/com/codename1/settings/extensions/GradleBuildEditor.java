@@ -190,21 +190,86 @@ public final class GradleBuildEditor implements DependencyEditor {
         return sb.toString();
     }
 
-    /// {start, end} of the first statement in the top-level block declaring
-    /// `dependency`, or null.
+    /// {start, end} of the statement in the dependencies block declaring
+    /// `dependency`, or null. A declaration nested in a named block --
+    /// `constraints { implementation("g:a:1") }` -- is found inside it, so
+    /// removing it leaves the block's other entries alone.
     private static int[] findDeclaration(String script, MavenDependency dependency) {
         int[] block = dependenciesBlock(script);
-        if (block == null) {
-            return null;
-        }
-        for (int[] statement : statements(script, block)) {
-            for (String literal : stringLiterals(script, statement[0], statement[1])) {
+        return block == null ? null : findIn(script, block, dependency);
+    }
+
+    private static int[] findIn(String s, int[] block, MavenDependency dependency) {
+        for (int[] statement : statements(s, block)) {
+            int brace = headBrace(s, statement);
+            if (brace >= 0 && isIdentifier(s.substring(statement[0], brace).trim())) {
+                // A block of its own (constraints, a custom configuration's
+                // scope...): look for the declaration among its statements.
+                int close = matchingBrace(s, brace);
+                if (close > brace) {
+                    int[] nested = findIn(s, new int[]{brace, close}, dependency);
+                    if (nested != null) {
+                        return nested;
+                    }
+                }
+                continue;
+            }
+            // Only the declaration's own coordinate counts, not strings in its
+            // configuration block ({ exclude(...) }).
+            int headEnd = brace >= 0 ? brace : statement[1];
+            for (String literal : stringLiterals(s, statement[0], headEnd)) {
                 if (matches(literal, dependency)) {
                     return statement;
                 }
             }
         }
         return null;
+    }
+
+    /// Whether `head` is a bare (possibly dotted) name -- a block such as
+    /// `constraints`, not a declaration. By hand: this runs on the Codename One
+    /// runtime, which has neither String.matches nor Character.isLetter.
+    private static boolean isIdentifier(String head) {
+        if (head.isEmpty() || !isNameStart(head.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < head.length(); i++) {
+            char c = head.charAt(i);
+            if (!(isNameStart(c) || c >= '0' && c <= '9' || c == '.')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// ASCII only, by range: Gradle block names are, and the runtime has no
+    /// Character.isLetter.
+    private static boolean isNameStart(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
+    }
+
+    /// The first `{` in `statement` outside any parentheses, strings and
+    /// comments, or -1.
+    private static int headBrace(String s, int[] statement) {
+        int depth = 0;
+        int i = statement[0];
+        while (i < statement[1]) {
+            int skipped = skipCommentOrString(s, i);
+            if (skipped != i) {
+                i = skipped;
+                continue;
+            }
+            char c = s.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == '{' && depth <= 0) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
     }
 
     private static boolean matches(String coordinate, MavenDependency dependency) {

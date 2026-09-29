@@ -99,30 +99,9 @@ public abstract class RunBackendTask extends DefaultTask {
                 return generated;
             }
         }
-        if (dirs.size() == 1) {
-            return finder.findMainClass(dirs.get(0));
-        }
-        // Several directories and no generated entry point: the one directory
-        // holding a main method decides; more than one is ambiguous, as it is
-        // within a directory.
-        String found = null;
-        BuildFailureException last = null;
-        for (java.io.File dir : dirs) {
-            try {
-                String candidate = finder.findMainClass(dir);
-                if (found != null) {
-                    throw new BuildFailureException("Both " + found + " and " + candidate + " have a main method; "
-                            + "choose one with -Pcn1.backend.mainClass");
-                }
-                found = candidate;
-            } catch (BuildFailureException ex) {
-                last = ex;
-            }
-        }
-        if (found == null) {
-            throw last != null ? last : new BuildFailureException("No compiled classes to run");
-        }
-        return found;
+        // Across every directory at once, so a main in each -- or several in one
+        // -- is reported as ambiguous rather than one being picked.
+        return finder.findMainClass(dirs);
     }
 
     @TaskAction

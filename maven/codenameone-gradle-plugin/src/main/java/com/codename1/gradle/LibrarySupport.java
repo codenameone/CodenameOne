@@ -162,7 +162,7 @@ final class LibrarySupport {
                         compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
                                 new File(layout.buildDir(), "classes/kotlin/main"), name, main.getCompileClasspath(),
                                 compileArtifacts, Collections.<String, String>emptyMap())
-                                .withPendingJavaSources(layout.javaSourceDir()))));
+                                .withPendingJavaSources(main.getJava().getSrcDirs()))));
 
         // A library without CSS publishes no cn1css bundle and its -lib pom names
         // none: the Zip task would do nothing, and publishing then failed on the
