@@ -425,7 +425,8 @@ final class JavascriptBundleWriter {
         // screenshot runner (lambda2RunBridge:missingDispatch). Use the
         // regex-based quoted-token collector for those sources instead.
         java.util.Set<String> stringTokens = collectStringLiteralCn1Tokens(chunkStrings);
-        stringTokens.addAll(collectBridgeReferencedCn1Tokens());
+        java.util.Set<String> bridgeTokens = collectBridgeReferencedCn1Tokens();
+        stringTokens.addAll(bridgeTokens);
         // installNativeBindings overrides BOTH global[name] and the CONSTRUCTED
         // global[name + "__impl"] (the static-method body) -- see parparvm_runtime.js.
         // The "__impl" variant never appears as a literal string, so add it for every
@@ -464,8 +465,15 @@ final class JavascriptBundleWriter {
         // the screenshot runner's lambda stem, is 77 chars).
         final int MIN_PREFIX_PROTECT_LEN = 16;
         if (!defs.isEmpty()) {
+            // Stems come from the bridge sources only. The bundle's own cn1_ literals are
+            // complete names -- jvm.setMain's main method, and above all every instance
+            // field's property name in the f: lists -- and the exact-match protection above
+            // covers them. Used as stems they protected every method whose name extends a
+            // field's: a field ``strokeWidth`` protected ``strokeWidth_R_double`` and
+            // ``strokeWidth_double``, the getter and setter a transpiled Dart property
+            // always has, which left 5,211 functions of the Flutter gallery unminified.
             java.util.List<String> prefixTokens = new java.util.ArrayList<String>();
-            for (String t : stringTokens) {
+            for (String t : bridgeTokens) {
                 if (t.length() >= MIN_PREFIX_PROTECT_LEN) {
                     prefixTokens.add(t);
                 }
