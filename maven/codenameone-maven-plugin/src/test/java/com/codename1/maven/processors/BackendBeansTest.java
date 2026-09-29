@@ -1264,6 +1264,25 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aspectsOnInterfacesAreBuildErrors() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Ledger", PKG + "public interface Ledger {\n"
+                + "    @Transactional default void post() { }\n"
+                + "    @Timed void total();\n"
+                + "}\n");
+        s.put("com.example.Audit", PKG + "@Async public interface Audit {\n"
+                + "    void record();\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@Transactional on com.example.Ledger.post is not "
+                + "applied"));
+        assertTrue(errors, errors.contains("neither this default method"));
+        assertTrue(errors, errors.contains("@Timed on com.example.Ledger.total is not applied"));
+        assertTrue(errors, errors.contains("@Async on interface com.example.Audit is not "
+                + "applied"));
+    }
+
+    @Test
     public void aPrototypeWithJobsIsWarnedAbout() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Ticker", PKG + "@Component @Scope(\"prototype\") public class Ticker {\n"

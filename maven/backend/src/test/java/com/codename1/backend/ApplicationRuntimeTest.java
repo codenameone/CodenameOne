@@ -2419,6 +2419,52 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("request beans a @PreDestroy builds, however deep, are destroyed too")
+    void requestBeansBuiltDuringDestroyAreDrained() throws Exception {
+        final List ended = java.util.Collections.synchronizedList(new ArrayList());
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                request.scopedBeans(1)[0] = "a";
+                                return HttpServer.Response.text(200, "ok");
+                            }
+                        }};
+                    }
+
+                    public boolean tracksCurrentRequest() {
+                        return true;
+                    }
+
+                    public void requestEnded(Object[] beans) {
+                        String name = (String) beans[0];
+                        ended.add(name);
+                        // Its @PreDestroy uses a request bean nobody built yet.
+                        String next = "a".equals(name) ? "b" : "b".equals(name) ? "c"
+                                : "c".equals(name) ? "d" : null;
+                        if (next != null) {
+                            Backend.currentRequest().scopedBeans(1)[0] = next;
+                        }
+                    }
+                }).start();
+        try {
+            assertEquals("ok", read(open(port, "/x")));
+            long deadline = System.currentTimeMillis() + 5000;
+            while(ended.size() < 4 && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);
+            }
+            assertEquals("[a, b, c, d]", String.valueOf(ended),
+                    "a bean built while destroying another was never destroyed");
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a JSON body a request bean owns is written before the bean is destroyed")
     void deferredJsonIsWrittenBeforeRequestBeansEnd() throws Exception {
         int port = freePort();
@@ -2505,7 +2551,8 @@ class ApplicationRuntimeTest {
             assertTrue(rotated.await(10, TimeUnit.SECONDS));
             HttpURLConnection meanwhile = open(port, "/peek");   // the old cookie, mid-login
             meanwhile.setRequestProperty("Cookie", old);
-            read(meanwhile);
+            assertFalse("ada".equals(read(meanwhile)),
+                    "the old id reached the session the login was authenticating");
             release.countDown();
             login.join(10000);
             assertNotNull(loginCookie[0], "the login's rotation was undone: no new cookie");

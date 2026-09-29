@@ -793,6 +793,9 @@ public final class Backend {
             requestLog.record(request, 500, startedMillis, err);
         }
 
+        /// Destroy passes over request beans that destroying others created.
+        private static final int MAX_DESTROY_PASSES = 32;
+
         /// Destroys the request's scoped beans, once.
         private void endRequestBeans(HttpServer.Request request) {
             endRequestBeans(request, null);
@@ -809,11 +812,23 @@ public final class Backend {
                                      HttpServer.Response response) {
             if (app != null) {
                 Object[] beans = request.takeScopedBeans();
-                if (beans != null) {
-                    if (response != null) {
-                        response.serializeDeferredJson();
+                if (beans != null && response != null) {
+                    response.serializeDeferredJson();
+                }
+                // Until none are left: a @PreDestroy may use a request bean
+                // nobody had built yet, which builds it now -- and ITS destroy
+                // may build another. One extra pass left the last one's
+                // resources open. Bounded, so beans that keep building each
+                // other cannot hold the request for ever.
+                for (int pass = 0 ; beans != null ; pass++) {
+                    if (pass == MAX_DESTROY_PASSES) {
+                        System.err.println("cn1: request-scoped beans were still being "
+                                + "created by each other's @PreDestroy after "
+                                + MAX_DESTROY_PASSES + " passes; the rest are not destroyed");
+                        break;
                     }
                     app.requestEnded(beans);
+                    beans = request.takeScopedBeans();
                 }
             }
         }

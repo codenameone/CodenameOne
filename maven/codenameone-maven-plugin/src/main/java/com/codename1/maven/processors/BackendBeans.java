@@ -2170,6 +2170,35 @@ final class BackendBeans {
     /// inherited body lives in another class. Silence would let such a method
     /// run outside the transaction or on the caller's thread unnoticed, so the
     /// build names each one.
+    /// Refuses @Transactional, @Async, @Timed and @Counted on a project interface.
+    /// The build weaves classes, not interfaces, so such an annotation -- on a
+    /// default method, an abstract one, or the interface itself -- is applied to
+    /// nothing: a transactional default method committed each write on its own.
+    /// Spring's runtime proxies would honour it, so ignoring it silently is the
+    /// one answer that cannot be right.
+    private void refuseInterfaceAspects(AnnotatedClass cls) {
+        String[] names = {TRANSACTIONAL, ASYNC, TIMED, COUNTED};
+        String[] shown = {"@Transactional", "@Async", "@Timed", "@Counted"};
+        for (int i = 0; i < names.length; i++) {
+            if (cls.getClassAnnotation(names[i]) != null) {
+                ctx.error(cls, shown[i] + " on interface " + cls.getSourceName() + " is not "
+                        + "applied: the build weaves classes, not interfaces. Put it on the "
+                        + "implementing class.");
+            }
+        }
+        for (MethodInfo m : cls.getMethods()) {
+            for (int i = 0; i < names.length; i++) {
+                if (m.getAnnotation(names[i]) != null) {
+                    ctx.error(cls, shown[i] + " on " + cls.getSourceName() + "."
+                            + m.getName() + " is not applied: the build weaves classes, not "
+                            + "interfaces, so neither " + (m.isAbstract() ? "an implementation"
+                            : "this default method") + " would get it. Put it on the "
+                            + "implementing class's method.");
+                }
+            }
+        }
+    }
+
     private void warnInheritedOutsideClassAspect(AnnotatedClass cls, String what) {
         Set<String> declared = new HashSet<String>();
         for (MethodInfo m : cls.getMethods()) {
@@ -2307,7 +2336,11 @@ final class BackendBeans {
 
     private void collectAspects() {
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
-            if (!concerns(cls) || cls.isInterface()) {
+            if (concerns(cls) && cls.isInterface()) {
+                refuseInterfaceAspects(cls);
+                continue;
+            }
+            if (!concerns(cls)) {
                 continue;
             }
             AnnotationValues classTx = cls.getClassAnnotation(TRANSACTIONAL);

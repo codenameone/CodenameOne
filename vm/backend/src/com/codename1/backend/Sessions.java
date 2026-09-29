@@ -836,7 +836,17 @@ public final class Sessions {
 
         @Override
         public synchronized HttpSession load(String id) {
-            return (HttpSession) sessions.get(id);
+            HttpSession found = (HttpSession) sessions.get(id);
+            // Stored under the id it had; a login's changeSessionId() moves the
+            // key only when that request saves. Until then the OLD id -- the one
+            // an attacker may have planted -- must no longer find the session it
+            // just authenticated, as a servlet container's changeSessionId()
+            // retires it at once. A rotation that is undone restores the id, and
+            // the entry answers again.
+            if (found != null && !id.equals(found.getId())) {
+                return null;
+            }
+            return found;
         }
 
         @Override
