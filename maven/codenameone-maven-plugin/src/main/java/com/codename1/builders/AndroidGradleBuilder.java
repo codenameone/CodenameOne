@@ -86,6 +86,30 @@ public class AndroidGradleBuilder extends Executor {
     private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
+
+    // The opt-in Gradle 9 pairing, selected by android.gradleVersion=9 (or an explicit 9.x).
+    // Gradle 9 cannot run the 8.x Android Gradle plugin line at all, so choosing Gradle 9 means
+    // choosing AGP 9 too, and AGP 9 is a breaking release for the generated project: jcenter()
+    // is gone, dexOptions is gone, built-in Kotlin refuses the kotlin-android plugin,
+    // proguard-android.txt is refused, <uses-sdk> may no longer carry SDK versions, and the
+    // google-services plugin below 4.4 still uses the removed applicationVariants API. Each of
+    // those is handled where the file is written, keyed off useGradle9, so the default Gradle 8
+    // project is byte-identical to what it was. Measured: the hellocodenameone project (Kotlin
+    // sources, a Wear module, FCM) assembles debug and R8 release on this pairing.
+    static final String GRADLE_9_VERSION = "9.8.0";
+    static final String ANDROID_GRADLE_PLUGIN_9_VERSION = "9.4.1";
+    // VersionCheckPlugin.GRADLE_MIN_VERSION inside AGP 9.4.1: the plugin refuses to apply on
+    // anything older, so an explicit android.gradleVersion below this is refused up front
+    // instead of minutes into the build.
+    static final String GRADLE_9_MIN_VERSION = "9.6.0";
+    // The kotlin-gradle-plugin AGP 9.4.1 depends on (its POM): the compiler its built-in
+    // Kotlin runs and the kotlin-stdlib it adds.
+    static final String AGP_9_BUILT_IN_KOTLIN_VERSION = "2.2.10";
+    // 4.5.0 moved to the androidComponents API; 4.3.15 fails to apply on AGP 9 with "Could not
+    // get unknown property 'applicationVariants'".
+    static final String GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION = "4.5.0";
+    // The oldest google-services measured to apply on AGP 9.4.1.
+    static final String GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION = "4.4.0";
     // Four attempts with a GROWING wait -- 10s, 40s, 160s -- rather than three a couple
     // of seconds apart.
     //
@@ -125,6 +149,11 @@ public class AndroidGradleBuilder extends Executor {
     private boolean tapjackingGuard = false;
 
     private boolean useGradle8 = true;
+
+    // True when android.gradleVersion asked for Gradle 9 -- see GRADLE_9_VERSION. Implies
+    // useGradle8, which is what selects the modern scaffolding (namespace, AndroidX, desugaring)
+    // that AGP 9 needs as much as AGP 8 does.
+    private boolean useGradle9 = false;
 
     // Flag to indicate whether we should strip kotlin from user classes
     // Necessary for using gradle 8 because kotlin seems to be included by default,
@@ -1693,10 +1722,34 @@ public class AndroidGradleBuilder extends Executor {
                     + "renaming, but " + reason + ". Build a signed release variant with R8 enabled, set "
                     + "harden.rename=false, or set harden.level=off.");
         }
+        String requestedGradle9 = requestedGradle9Version(request.getArg("android.gradleVersion", ""));
+        useGradle9 = requestedGradle9 != null;
+        if (useGradle9 && !useGradle8) {
+            throw new BuildException("android.gradleVersion=" + request.getArg("android.gradleVersion", "")
+                    + " selects Gradle 9, which needs the modern Gradle project the builder generates"
+                    + " only with android.useGradle8=true. Remove android.useGradle8=false.");
+        }
+        String googleServicesRefusal = useGradle9
+                ? agp9GoogleServicesRefusal(request.getArg("android.topDependency", "")) : null;
+        if (googleServicesRefusal != null) {
+            throw new BuildException(googleServicesRefusal);
+        }
+        String maxSdkRefusal = useGradle9
+                ? agp9MaxSdkRefusal(request.getArg("android.xmanifest", "")) : null;
+        if (maxSdkRefusal != null) {
+            throw new BuildException(maxSdkRefusal);
+        }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             minimumGradleVersion = GRADLE_8_VERSION;
             gradleDistributionUrl = gradle8DistributionUrl;
+        }
+        if (useGradle9) {
+            // An exact version, not a floor like the Gradle 8 one -- see
+            // gradleVersionAcceptable.
+            minimumGradleVersion = requestedGradle9;
+            gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-"
+                    + requestedGradle9 + "-bin.zip";
         }
         if (newFirebaseMessaging && !useGradle8) {
             throw new BuildException("android.newFirebaseMessaging requires Gradle 8.13 or higher. Please remove the android.gradleVersion build hint");
@@ -2020,7 +2073,14 @@ public class AndroidGradleBuilder extends Executor {
             delTree(tmpFile);
         }
         tmpFile.mkdirs();
-        String gradleHomeVersion = useGradle8 ? "8" : "6_5";
+        // A home of its own for Gradle 9, so opting one project in does not replace the managed
+        // Gradle 8 every other project on the machine builds with (the version check below
+        // deletes and re-downloads a managed home that is older than the floor).
+        // Gradle 9 homes are per release as well: the version is exact there (see
+        // gradleVersionAcceptable), so one shared home would be deleted and re-downloaded
+        // every time two projects on the machine asked for different 9.x releases.
+        String gradleHomeVersion = useGradle9 ? minimumGradleVersion
+                : (useGradle8 ? "8" : "6_5");
         File managedGradleHome = new File(path(System.getProperty("user.home"), ".codenameone", "gradle" + gradleHomeVersion));
 
         String gradleHome = System.getenv("GRADLE_HOME");
@@ -2054,7 +2114,7 @@ public class AndroidGradleBuilder extends Executor {
         debug("FOUND gradleVersion "+gradleVersion);
         int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
         debug("Found gradleVersionInt="+gradleVersionInt);
-        if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+        if (!gradleVersionAcceptable(gradleVersion)) {
             // The minimum version is too low.
             if (managedGradleHome.exists()) {
                 gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
@@ -2066,7 +2126,7 @@ public class AndroidGradleBuilder extends Executor {
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
 
             }
-            if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+            if (!gradleVersionAcceptable(gradleVersion)) {
                 if (managedGradleHome.exists()) {
                     delTree(managedGradleHome);
                 }
@@ -2119,7 +2179,7 @@ public class AndroidGradleBuilder extends Executor {
                     throw new BuildException("Failed to get gradle version even after downloading it from "+gradleDistributionUrl+".  Something must have gone wrong with the gradle installation.");
                 }
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
-                if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+                if (!gradleVersionAcceptable(gradleVersion)) {
                     throw new BuildException("Required Gradle version is "+minimumGradleVersion+" but found version "+gradleVersion);
                 }
             }
@@ -2275,7 +2335,9 @@ public class AndroidGradleBuilder extends Executor {
                         name);
                 boolean arrImplementationLib = request.getArg("android.arrimplementation", "").contains(
                         name);
-                if(!arrCompileLib && (useArrImplementation || arrImplementationLib)) {
+                // Gradle 9 has no compile configuration, so android.arrcompile cannot be
+                // honoured there; the AAR is declared the only way AGP 9 accepts.
+                if(useGradle9 || (!arrCompileLib && (useArrImplementation || arrImplementationLib))) {
                     aarDependencies += "    implementation(name:'" + name + "', ext:'aar')\n";
                 } else {
                     aarDependencies += "    compile(name:'" + name + "', ext:'aar')\n";
@@ -3992,7 +4054,10 @@ public class AndroidGradleBuilder extends Executor {
         debug("-----USING PLAY SERVICES VERSION "+playServicesVersion+"----");
 
         String compile = "compile";
-        if (useAndroidX || useArrImplementation) {
+        // useGradle9 is already implied -- useArrImplementation is set for every Gradle 6 and
+        // newer when the version is resolved, long before this -- but Gradle 9 has no compile
+        // configuration at all, so it is named rather than left to that ordering.
+        if (useAndroidX || useArrImplementation || useGradle9) {
             compile = "implementation";
         }
         if (useFCM) {
@@ -4007,7 +4072,7 @@ public class AndroidGradleBuilder extends Executor {
 
             if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
                 if (gradleVersionInt >= 8) {
-                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:" + googleServicesPluginVersion() + "'\n");
                 } else {
                     request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
                 }
@@ -4096,7 +4161,7 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (!request.getArg("android.topDependency", "").contains("com.google.gms:google-services")) {
                 if (gradleVersionInt >= 8) {
-                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+                    request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:" + googleServicesPluginVersion() + "'\n");
                 } else {
                     request.putArgument("android.topDependency", request.getArg("android.topDependency", "") + "\n    classpath 'com.google.gms:google-services:4.0.1'\n");
                 }
@@ -6292,10 +6357,15 @@ public class AndroidGradleBuilder extends Executor {
                 + sharedUserId
                 + "      android:minSdkVersion=\"" + minSDK + "\"\n"
                 + "      android:installLocation=\"" + request.getArg("android.installLocation", "auto") + "\">\n"
-                + "    <uses-sdk android:minSdkVersion=\"" + minSDK + "\""
-                + targetSDKVersion
-                + request.getArg("android.xmanifest", "")
-                + " />\n"
+                // AGP 9's manifest merger fails the build on SDK versions in <uses-sdk>; build.gradle
+                // already declares both and always won the merge. What survives is
+                // android.xmanifest -- in practice tools:overrideLibrary, still permitted there --
+                // exactly as the Wear manifest does it.
+                + (useGradle9 ? agp9UsesSdk(request.getArg("android.xmanifest", ""))
+                        : "    <uses-sdk android:minSdkVersion=\"" + minSDK + "\""
+                        + targetSDKVersion
+                        + request.getArg("android.xmanifest", "")
+                        + " />\n")
                 + "    <supports-screens android:smallScreens=\"" + request.getArg("android.smallScreens", "true") + "\"\n"
                 + "          android:normalScreens=\"" + request.getArg("android.normalScreens", "true") + "\"\n"
                 + "          android:largeScreens=\"" + request.getArg("android.largeScreens", "true") + "\"\n"
@@ -7743,7 +7813,12 @@ public class AndroidGradleBuilder extends Executor {
 
             gradleObfuscate = "            minifyEnabled true\n"
                     + (request.getArg("android.shrinkResources", "false").equals("true") ? "            shrinkResources true\n" : "")
-                    + "            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard.cfg'\n";
+                    // AGP 9 refuses proguard-android.txt because it carries -dontoptimize. The
+                    // optimize variant is otherwise the same file, and the generated proguard.cfg
+                    // above says -dontoptimize itself, so R8 behaves exactly as it does on AGP 8.
+                    + "            proguardFiles getDefaultProguardFile('"
+                    + (useGradle9 ? "proguard-android-optimize.txt" : "proguard-android.txt")
+                    + "'), 'proguard.cfg'\n";
         }
 
         HashMap<String, String> env = new HashMap<String, String>();
@@ -7944,27 +8019,55 @@ public class AndroidGradleBuilder extends Executor {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:4.1.1'\n";
             } else {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:" +
-                        ANDROID_GRADLE_PLUGIN_8_VERSION + "'\n";
+                        (useGradle9 ? ANDROID_GRADLE_PLUGIN_9_VERSION
+                                : ANDROID_GRADLE_PLUGIN_8_VERSION) + "'\n";
             }
         }
         boolean hasKotlinSources = hasSourceFileWithExtension(new File(projectDir, "src/main/java"), ".kt");
         String kotlinVersion = request.getArg("requireKotlinStdlib", "").trim();
-        if (hasKotlinSources && kotlinVersion.length() == 0) {
+        // AGP 9 compiles Kotlin itself ("built-in Kotlin") and adds the matching kotlin-stdlib,
+        // and applying kotlin-android on top of it fails with "Cannot add extension with name
+        // 'kotlin'". So on Gradle 9 the builder writes nothing for Kotlin unless the project
+        // pinned a version with requireKotlinStdlib -- and then only the plugin classpath and
+        // the stdlib, which is how AGP 9 is told to use a newer Kotlin than its own.
+        boolean builtInKotlin = useGradle9;
+        if (builtInKotlin && !kotlinOverridesBuiltIn(kotlinVersion)) {
+            if (kotlinVersion.length() > 0) {
+                log("requireKotlinStdlib=" + kotlinVersion + " is not newer than Android Gradle"
+                        + " plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + "'s built-in Kotlin "
+                        + AGP_9_BUILT_IN_KOTLIN_VERSION + ", which this build uses instead.");
+            }
+            // A floor the built-in compiler already meets -- the Health Connect path above
+            // raises requireKotlinStdlib to 1.9.x, and cn1libs carry legacy values too.
+            // Gradle would resolve an older kotlin-gradle-plugin up to AGP 9's own anyway
+            // (see the topDependency note below), so writing it only states a version the
+            // build does not use; it is dropped and the bundled compiler is used as it is.
+            kotlinVersion = "";
+        }
+        if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
             kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
         }
         String kotlinPluginApply = "";
         String kotlinRuntimeDependency = "";
-        if (hasKotlinSources) {
+        if (hasKotlinSources && kotlinVersion.length() > 0) {
             if (!request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
                 gradleDependency += "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:" + kotlinVersion + "'\n";
             }
-            kotlinPluginApply = "apply plugin: 'kotlin-android'\n";
+            if (!builtInKotlin) {
+                kotlinPluginApply = "apply plugin: 'kotlin-android'\n";
+            }
             String gradleDeps = request.getArg("android.gradleDep", "");
             if (!additionalDependencies.contains("org.jetbrains.kotlin:kotlin-stdlib")
                     && !gradleDeps.contains("org.jetbrains.kotlin:kotlin-stdlib")) {
                 kotlinRuntimeDependency = "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:" + kotlinVersion + "'\n";
             }
         }
+        // Appended as written on Gradle 9 too, including a kotlin-gradle-plugin older than
+        // AGP 9's own. That is not a conflict: the buildscript classpath resolves one
+        // version per module, the highest, so AGP 9.4.1's dependency wins -- measured,
+        // buildEnvironment reports "kotlin-gradle-plugin:1.9.22 -> 2.2.10" and the Kotlin
+        // app assembles. Refusing such a pin would fail builds that succeed; it is
+        // requireKotlinStdlib above that the builder itself writes, and trims.
         gradleDependency += request.getArg("android.topDependency", "");
 
         String compileSdkVersion = "'android-21'";
@@ -8101,9 +8204,13 @@ public class AndroidGradleBuilder extends Executor {
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
         }
+        // Gradle 9 removed jcenter() outright ("Could not find method jcenter()"), and the
+        // repository has been read-only since 2021 -- everything it served is on Maven Central,
+        // which every repository block here also lists.
+        String jcenterRepo = useGradle9 ? "" : "    jcenter()\n";
         jcenter =
                 "      google()\n" +
-                        "     jcenter()\n" +
+                        (useGradle9 ? "" : "     jcenter()\n") +
                         "     mavenLocal()\n" +
                         "      mavenCentral()\n";
 
@@ -8212,16 +8319,24 @@ public class AndroidGradleBuilder extends Executor {
                 //+ "    buildToolsVersion " + quotedBuildToolsVersion + "\n"
                 + useLegacyApache
                 + "\n"
-                + "    dexOptions {\n"
+                // Obsolete (and ignored) since AGP 8, removed in AGP 9.
+                + (useGradle9 ? "" : "    dexOptions {\n"
                 + "        preDexLibraries = false\n"
                 + "        incremental false\n"
                 + "        jumboMode = true\n"
                 + "        javaMaxHeapSize \"3g\"\n"
-                + "    }\n"
+                + "    }\n")
                 + "    defaultConfig {\n"
                 + "        applicationId \"" + request.getPackageName() + "\"\n"
                 + "        minSdkVersion " + minSDK + "\n"
                 + "        targetSdkVersion " + targetNumber + "\n"
+                // The maxSdkVersion android.xmanifest put in <uses-sdk>, which AGP 9 no
+                // longer accepts there -- see agp9UsesSdk. Emitted only then, so every
+                // other build.gradle is unchanged.
+                + (useGradle9 && xmanifestMaxSdkVersion(request.getArg("android.xmanifest", "")) != null
+                        ? "        maxSdkVersion "
+                        + xmanifestMaxSdkVersion(request.getArg("android.xmanifest", "")) + "\n"
+                        : "")
                 + "        versionCode " + intVersion + "\n"
                 + "        versionName \"" + version + "\"\n"
                 + multidex
@@ -8234,12 +8349,20 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n"
                 + "    }\n"
                 + "\n"
-                + "    lintOptions {\n"
-                + "        lintOptions {\n"
-                + "        checkReleaseBuilds false\n"
-                + "        abortOnError false\n"
-                + "        }\n"
-                + "    }\n"
+                // lint, not lintOptions, on Gradle 9. AGP 9.4.1 still accepts lintOptions
+                // (measured), but it is the deprecated spelling, and the nested block with
+                // space-assigned properties is also Groovy syntax Gradle 10 removes.
+                + (useGradle9
+                        ? "    lint {\n"
+                        + "        checkReleaseBuilds = false\n"
+                        + "        abortOnError = false\n"
+                        + "    }\n"
+                        : "    lintOptions {\n"
+                        + "        lintOptions {\n"
+                        + "        checkReleaseBuilds false\n"
+                        + "        abortOnError false\n"
+                        + "        }\n"
+                        + "    }\n")
                 + "    signingConfigs {\n"
                 + "        release {\n"
                 + "            storeFile file(\"keyStore\")\n"
@@ -8264,7 +8387,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "\n"
                 + "repositories {\n"
                 + "    google()\n"
-                + "    jcenter()\n"
+                + jcenterRepo
                 + injectRepo
                 + "    flatDir{\n"
                 + "              dirs 'libs'\n"
@@ -8330,7 +8453,7 @@ public class AndroidGradleBuilder extends Executor {
                 "buildscript {\n" +
                 "    repositories {\n" +
                 "        google()\n" +
-                "        jcenter()\n" +
+                (useGradle9 ? "        mavenCentral()\n" : "        jcenter()\n") +
                 "    }\n" +
                 "    dependencies {\n" +
                 "        "+gradleDependency+
@@ -8343,7 +8466,7 @@ public class AndroidGradleBuilder extends Executor {
                 "allprojects {\n" +
                 "    repositories {\n" +
                 "        google()\n" +
-                "        jcenter()\n" +
+                (useGradle9 ? "        mavenCentral()\n" : "        jcenter()\n") +
                 "    }\n" +
                 "}\n" +
                 "\n" +
@@ -8384,7 +8507,9 @@ public class AndroidGradleBuilder extends Executor {
         String heapArgs = "-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8";
         if (useGradle8) {
             gradlePropertiesObject.setProperty("org.gradle.jvmargs", heapArgs);
-            gradleWrapperPropertiesObject.setProperty("distributionUrl", gradle8DistributionUrl);
+            // gradleDistributionUrl rather than the Gradle 8 constant: build() points it at
+            // the Gradle 8 distribution, or at the Gradle 9 one android.gradleVersion chose.
+            gradleWrapperPropertiesObject.setProperty("distributionUrl", gradleDistributionUrl);
         } else {
             gradlePropertiesObject.setProperty("org.gradle.jvmargs",
                     "-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8");
@@ -9101,6 +9226,89 @@ public class AndroidGradleBuilder extends Executor {
      * @param request the build being generated
      * @return the element, or an empty string
      */
+    /**
+     * The main and Wear manifests' {@code <uses-sdk>} on AGP 9: android.xmanifest with the
+     * SDK-version attributes taken out, or nothing when nothing else is left.
+     *
+     * <p>AGP 9's manifest merger fails the build on android:minSdkVersion,
+     * android:targetSdkVersion and android:maxSdkVersion in {@code <uses-sdk>} (measured on
+     * 9.4.1 for all three, including max) while still accepting tools:overrideLibrary there. A
+     * project that customised them through this unrestricted hint would otherwise hit exactly
+     * the failure the Gradle 9 path exists to avoid. Min and target lose nothing -- build.gradle
+     * declares both and always won the merge -- and maxSdkVersion is carried into defaultConfig
+     * instead (see {@link #xmanifestMaxSdkVersion}).</p>
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the element, or an empty string
+     */
+    static String agp9UsesSdk(String xmanifest) {
+        String attributes = stripSdkVersionAttributes(xmanifest);
+        if (attributes.length() == 0) {
+            return "";
+        }
+        return "    <uses-sdk " + attributes + " />\n";
+    }
+
+    static String stripSdkVersionAttributes(String xmanifest) {
+        if (xmanifest == null) {
+            return "";
+        }
+        return xmanifest.replaceAll(
+                "android:(minSdkVersion|targetSdkVersion|maxSdkVersion)\\s*=\\s*(\"[^\"]*\"|'[^']*')",
+                "").replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Why android.xmanifest's maxSdkVersion cannot be carried to Gradle 9, or null.
+     *
+     * <p>{@link #agp9UsesSdk} takes the attribute out of {@code <uses-sdk>}, where AGP 9 no
+     * longer accepts it, and {@link #xmanifestMaxSdkVersion} moves it into defaultConfig --
+     * which takes a number. A manifest placeholder such as {@code ${maxSdk}} has no number to
+     * move, and dropping it would let the app install on the very platforms the project set
+     * out to exclude, with nothing saying so. Refused instead, naming the fix.</p>
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the refusal message, or null
+     */
+    static String agp9MaxSdkRefusal(String xmanifest) {
+        if (xmanifest == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "android:maxSdkVersion\\s*=\\s*(\"([^\"]*)\"|'([^']*)')").matcher(xmanifest);
+        if (!m.find()) {
+            return null;
+        }
+        String value = m.group(2) != null ? m.group(2) : m.group(3);
+        if (value.trim().matches("[0-9]+")) {
+            return null;
+        }
+        return "android.xmanifest sets android:maxSdkVersion=\"" + value + "\" on <uses-sdk>, which"
+                + " Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " no longer accepts"
+                + " there. The build moves a literal value into build.gradle's defaultConfig, but"
+                + " this one is not a number. Write the number itself, or set it with"
+                + " android.xgradle_default_config (maxSdkVersion <n>) and remove it from"
+                + " android.xmanifest.";
+    }
+
+    /**
+     * The android:maxSdkVersion android.xmanifest declares, or null.
+     *
+     * @param xmanifest the android.xmanifest value
+     * @return the declared value, unquoted, or null when there is none
+     */
+    static String xmanifestMaxSdkVersion(String xmanifest) {
+        if (xmanifest == null) {
+            return null;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                // Whitespace inside the quotes allowed, by the same rule agp9MaxSdkRefusal
+                // accepts the value with: " 34 " passed that check and then failed to match
+                // here, so the attribute was stripped and nothing replaced it.
+                "android:maxSdkVersion\\s*=\\s*[\"']\\s*([0-9]+)\\s*[\"']").matcher(xmanifest);
+        return m.find() ? m.group(1) : null;
+    }
+
     static String wearUsesSdk(BuildRequest request) {
         String attributes = request.getArg("android.xmanifest", "");
         if (attributes == null || attributes.trim().length() == 0) {
@@ -9242,7 +9450,8 @@ public class AndroidGradleBuilder extends Executor {
     private void addWatchSurfaceDependencies(BuildRequest request) throws BuildException {
         // The same keyword the rest of the dependency block uses; AndroidX builds are
         // "implementation" and the legacy ones "compile".
-        String compile = useAndroidX ? "implementation" : "compile";
+        // Gradle 9 has no compile configuration at all, AndroidX or not.
+        String compile = useAndroidX || useGradle9 ? "implementation" : "compile";
         boolean anyTile = false;
         for (String[] kind : watchSurfaceKinds) {
             if (declaresTile(kind[2])) {
@@ -9375,7 +9584,7 @@ public class AndroidGradleBuilder extends Executor {
         log("[wearable] Wear module version code " + wearVersion + " (phone " + intVersion + ")");
 
         String wearGradle = deriveWearGradle(appGradle, intVersion, wearVersion,
-                watchSurfaceDependencies);
+                watchSurfaceDependencies, useGradle9);
         try {
             createFile(new File(wearDir, "build.gradle"),
                     wearGradle.getBytes(StandardCharsets.UTF_8));
@@ -9400,7 +9609,8 @@ public class AndroidGradleBuilder extends Executor {
                 // the phone module's dependency graph, so that same library manifest is merged
                 // into :wear as well, and without the override carried across the wear merge
                 // fails on exactly the conflict the phone build was told to allow.
-                + wearUsesSdk(request)
+                + (useGradle9 ? agp9UsesSdk(request.getArg("android.xmanifest", ""))
+                        : wearUsesSdk(request))
                 + sharedPermissions
                 // The package-visibility queries, for the same reason the permissions above are
                 // here: this manifest is selected outright rather than merged with the phone's,
@@ -9730,6 +9940,17 @@ public class AndroidGradleBuilder extends Executor {
 
     static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
             String wearDependencies) {
+        return deriveWearGradle(appGradle, intVersion, wearVersion, wearDependencies, false);
+    }
+
+    /**
+     * @param builtInKotlin true on AGP 9, whose built-in Kotlin compiles only the kotlin source
+     *     directories -- it does not follow java.srcDirs the way the kotlin-android plugin did, so
+     *     without its own entry the app module's .kt files vanished from the Wear build and the Java
+     *     that calls them failed with "cannot find symbol"
+     */
+    static String deriveWearGradle(String appGradle, int intVersion, int wearVersion,
+            String wearDependencies, boolean builtInKotlin) {
         String gradle = appGradle
                 // Libraries are shared from the app module rather than copied.
                 .replace("fileTree(dir: 'libs'", "fileTree(dir: '../app/libs'")
@@ -9753,6 +9974,8 @@ public class AndroidGradleBuilder extends Executor {
         gradle = insertAfterFirst(gradle, "android {\n",
                 "    sourceSets.main {\n"
                 + "        java.srcDirs = ['../app/src/main/java', 'src/main/java']\n"
+                + (builtInKotlin
+                        ? "        kotlin.srcDirs = ['../app/src/main/java', 'src/main/java']\n" : "")
                 // StubUtil comes from THIS module, not from the phone's tree. It is generated
                 // with the app stub's name substituted in, and the phone's copy names
                 // <Main>Stub -- a class this manifest does not declare as an activity. Push
@@ -11287,6 +11510,299 @@ public class AndroidGradleBuilder extends Executor {
                 // the BLE-only flow is documented to support.
                 || "com/codename1/health/HealthDataKind".equals(cls)
                 || "com/codename1/health/HealthUnitDimension".equals(cls);
+    }
+
+    /**
+     * The Gradle 9 distribution {@code android.gradleVersion} asks for, or null for the default
+     * Gradle 8 build.
+     *
+     * <p>{@code 9} alone means the measured pairing, {@link #GRADLE_9_VERSION}. An explicit 9.x is
+     * the exact release to build with, padded to three components (9.6 is 9.6.0, the name
+     * Gradle publishes it under), and is refused below {@link #GRADLE_9_MIN_VERSION},
+     * which the Android Gradle plugin would refuse anyway, only later. A value below 9 is
+     * ignored, as this builder always ignored the hint: its Gradle 8 line is not selectable.
+     * Gradle 10 and later are refused rather than attempted, because nothing here knows which
+     * Android Gradle plugin they need.</p>
+     *
+     * @param hint the raw android.gradleVersion value
+     * @return the Gradle 9 version to build with, or null
+     * @throws BuildException if the value is not a version, or names an unsupported one
+     */
+    static String requestedGradle9Version(String hint) throws BuildException {
+        String value = hint == null ? "" : hint.trim();
+        if (value.length() == 0) {
+            return null;
+        }
+        // The major first, the strict release format only for 9 and up. A value below 9 was
+        // always ignored here, qualified ones included -- 8.13-rc-1 in settings shared with a
+        // builder that reads it must not start failing an unchanged Gradle 8 build.
+        int digits = 0;
+        while (digits < value.length() && Character.isDigit(value.charAt(digits))) {
+            digits++;
+        }
+        if (digits == 0) {
+            throw new BuildException("android.gradleVersion=" + value + " is not a Gradle version."
+                    + " Use 9 for Gradle " + GRADLE_9_VERSION + ", or an explicit 9.x release.");
+        }
+        int major;
+        try {
+            major = Integer.parseInt(value.substring(0, digits));
+        } catch (NumberFormatException tooLarge) {
+            major = Integer.MAX_VALUE;
+        }
+        if (major < 9) {
+            return null;
+        }
+        if (major > 9) {
+            throw new BuildException("android.gradleVersion=" + value + " is not supported. The"
+                    + " newest supported Gradle line is 9, with Android Gradle plugin "
+                    + ANDROID_GRADLE_PLUGIN_9_VERSION + ". Use android.gradleVersion=9.");
+        }
+        if (!value.matches("[0-9]+(\\.[0-9]+){0,2}")) {
+            throw new BuildException("android.gradleVersion=" + value + " is not a Gradle 9"
+                    + " release. Use 9 for Gradle " + GRADLE_9_VERSION + ", or an explicit 9.x"
+                    + " release such as " + GRADLE_9_MIN_VERSION + ".");
+        }
+        int dot = value.indexOf('.');
+        if (dot < 0) {
+            return GRADLE_9_VERSION;
+        }
+        value = padGradleVersion(value);
+        if (compareVersions(value, GRADLE_9_MIN_VERSION) < 0) {
+            throw new BuildException("android.gradleVersion=" + value + " is older than Gradle "
+                    + GRADLE_9_MIN_VERSION + ", the oldest Android Gradle plugin "
+                    + ANDROID_GRADLE_PLUGIN_9_VERSION + " runs on. Use android.gradleVersion=9"
+                    + " for Gradle " + GRADLE_9_VERSION + ".");
+        }
+        return value;
+    }
+
+    /**
+     * The google-services Gradle plugin for a modern build. 4.3.15 reads the variant API AGP 9
+     * removed, so it fails to apply there; the Gradle 8 build keeps the version it was proven on.
+     */
+    private String googleServicesPluginVersion() {
+        return useGradle9 ? GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION : "4.3.15";
+    }
+
+    /**
+     * Whether a Gradle installation can run this build.
+     *
+     * <p>The Gradle 8 version is a floor: any newer 8.x runs AGP 8.13.2. A Gradle 9 version
+     * is exact, because android.gradleVersion names one -- the bare 9 means the measured
+     * 9.8.0 pairing and an explicit 9.x means that release -- and a floor let whatever newer
+     * release a GRADLE_HOME or an earlier build left behind stand in for it, so which Gradle
+     * ran depended on the machine's history rather than on the hint.</p>
+     */
+    private boolean gradleVersionAcceptable(String installedVersion) {
+        if (!useGradle9) {
+            return compareVersions(installedVersion, minimumGradleVersion) >= 0;
+        }
+        return installedVersion.matches("[0-9]+(\\.[0-9]+){0,2}")
+                && compareVersions(padGradleVersion(installedVersion), minimumGradleVersion) == 0;
+    }
+
+    /**
+     * A version padded to major.minor.patch, as every Gradle 9 release is numbered -- so a
+     * hint of 9.6 downloads gradle-9.6.0, which exists, rather than gradle-9.6, which does not.
+     *
+     * @param version one to three dot-separated numbers
+     * @return the same version with missing components written as 0
+     */
+    static String padGradleVersion(String version) {
+        String padded = version.trim();
+        int dots = padded.length() - padded.replace(".", "").length();
+        for (int i = dots; i < 2; i++) {
+            padded += ".0";
+        }
+        return padded;
+    }
+
+    /**
+     * Whether a requireKotlinStdlib value asks AGP 9 for a NEWER Kotlin than the one it
+     * bundles, which is the only thing that value can usefully mean on built-in Kotlin.
+     *
+     * <p>A qualified release is judged by its numeric part, so 1.9.22-RC2 is a legacy floor
+     * like 1.9.22 and 2.3.0-Beta1 is a newer compiler. A value with no number at all -- a
+     * Gradle variable such as $kotlinVersion -- is not an override either: the generator
+     * writes it into a single-quoted coordinate, which Groovy does not interpolate, so it
+     * could only ever resolve a literal "$kotlinVersion" artifact. The built-in compiler is
+     * used instead, and the build says so.</p>
+     *
+     * @param kotlinVersion the requireKotlinStdlib value, possibly empty
+     * @return true when it should be written into the generated project
+     */
+    static boolean kotlinOverridesBuiltIn(String kotlinVersion) {
+        String value = kotlinVersion == null ? "" : kotlinVersion.trim();
+        if (value.length() == 0) {
+            return false;
+        }
+        String numeric = HealthManifestFragments.numericVersionPrefix(value);
+        if (numeric == null) {
+            return false;
+        }
+        return compareVersions(padGradleVersion(numeric), AGP_9_BUILT_IN_KOTLIN_VERSION) > 0;
+    }
+
+    /**
+     * The version text of a Gradle declaration: what follows "group:artifact:" up to the
+     * closing quote. Ranges keep their brackets, parentheses and commas.
+     *
+     * @param afterCoordinate the text following "group:artifact:" in a Gradle declaration
+     * @return the version text, trimmed
+     */
+    static String versionToken(String afterCoordinate) {
+        int end = 0;
+        while (end < afterCoordinate.length()
+                && "'\"\r\n;".indexOf(afterCoordinate.charAt(end)) < 0) {
+            end++;
+        }
+        return afterCoordinate.substring(0, end).trim();
+    }
+
+    /**
+     * The numeric part of a dependency version that names one fixed release, or null when the
+     * version is resolved by Gradle rather than written down.
+     *
+     * @param afterCoordinate the text following "group:artifact:" in a Gradle declaration
+     * @return the numeric release, or null for a variable, a dynamic selector or a range
+     */
+    static String fixedVersionOrNull(String afterCoordinate) {
+        String token = versionToken(afterCoordinate);
+        if (token.length() == 0 || token.startsWith("latest")
+                || token.indexOf('+') >= 0 || token.indexOf('$') >= 0
+                || token.indexOf('[') >= 0 || token.indexOf(']') >= 0
+                || token.indexOf('(') >= 0 || token.indexOf(',') >= 0) {
+            return null;
+        }
+        return HealthManifestFragments.numericVersionPrefix(token);
+    }
+
+    /** What a google-services version selector says about AGP 9's floor. */
+    enum GoogleServicesBound {
+        /** Every release it can resolve to is below the floor. */
+        BELOW_FLOOR,
+        /** It can resolve to a release at or above the floor. */
+        CAN_REACH_FLOOR,
+        /** The text does not say (a Gradle variable, latest.release). */
+        UNKNOWN
+    }
+
+    /**
+     * Whether every release a google-services version can resolve to is below
+     * {@link #GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION}.
+     *
+     * <p>BELOW_FLOOR for a fixed release below it, a prefix selector confined below it (4.3.+, 3.+)
+     * and a range whose upper bound excludes it ([4.0,4.4), [4.0,4.3]). FALSE when the version
+     * can reach the floor: 4.+ and a bare + resolve to the newest release they match, and a
+     * range with a higher or open upper bound resolves to the newest one inside it. Null when
+     * the text says nothing about the version at all -- a Gradle variable, latest.release.</p>
+     *
+     * @param token the version text, as {@link #versionToken} returns it
+     * @return which of the three it is
+     */
+    static GoogleServicesBound googleServicesBelowAgp9Floor(String token) {
+        String floor = GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION;
+        if (token.length() == 0 || token.startsWith("latest") || token.indexOf('$') >= 0) {
+            return GoogleServicesBound.UNKNOWN;
+        }
+        if (token.endsWith("+")) {
+            String prefix = token.substring(0, token.length() - 1);
+            if (prefix.endsWith(".")) {
+                prefix = prefix.substring(0, prefix.length() - 1);
+            }
+            if (prefix.length() == 0) {
+                return GoogleServicesBound.CAN_REACH_FLOOR;
+            }
+            if (!prefix.matches("[0-9]+(\\.[0-9]+)*")) {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            // Compared on the prefix's own length: 4.3.+ is 4.3.x, below 4.4; 4.+ is 4.x,
+            // which is not below 4.
+            String[] floorParts = floor.split("\\.");
+            int components = prefix.split("\\.").length;
+            StringBuilder floorPrefix = new StringBuilder();
+            for (int i = 0; i < components; i++) {
+                if (i > 0) {
+                    floorPrefix.append('.');
+                }
+                floorPrefix.append(i < floorParts.length ? floorParts[i] : "0");
+            }
+            return (compareVersions(prefix, floorPrefix.toString()) < 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+        }
+        char first = token.charAt(0);
+        if (first == '[' || first == '(' || first == ']') {
+            char last = token.charAt(token.length() - 1);
+            if (last != ']' && last != ')' && last != '[') {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            String inner = token.substring(1, token.length() - 1);
+            int comma = inner.indexOf(',');
+            String upper = (comma < 0 ? inner : inner.substring(comma + 1)).trim();
+            if (upper.length() == 0) {
+                return GoogleServicesBound.CAN_REACH_FLOOR;
+            }
+            if (!upper.matches("[0-9]+(\\.[0-9]+)*")) {
+                return GoogleServicesBound.UNKNOWN;
+            }
+            int c = compareVersions(padGradleVersion(upper), floor);
+            // ] includes the bound; ) and [ exclude it.
+            return (last == ']' ? c < 0 : c <= 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+        }
+        String fixed = HealthManifestFragments.numericVersionPrefix(token);
+        if (fixed == null) {
+            return GoogleServicesBound.UNKNOWN;
+        }
+        return (compareVersions(padGradleVersion(fixed), floor) < 0) ? GoogleServicesBound.BELOW_FLOOR
+                    : GoogleServicesBound.CAN_REACH_FLOOR;
+    }
+
+    /**
+     * Why a google-services plugin pinned in android.topDependency cannot run on AGP 9, or
+     * null when it can (or when that cannot be told from the text).
+     *
+     * <p>The builder adds its own google-services classpath only when none is present, so a
+     * pin a project or cn1lib wrote -- 4.3.15 was the builder's own default until Gradle 9 --
+     * would be applied as it is and fail on AGP 9's removed applicationVariants API, minutes
+     * into the build, with nothing naming the hint. Measured: 4.3.15 fails, 4.4.0 and 4.5.0
+     * apply.</p>
+     *
+     * <p>Every declaration counts, not the first: merged hint values carry one per contributor
+     * (a cn1lib's 4.3.15 beside the project's 4.5.0), and Gradle resolves duplicate buildscript
+     * modules to the highest -- that build uses 4.5.0 and works. So it is refused only when
+     * EVERY declaration is confined below the floor, fixed or dynamic (4.3.+, [4.0,4.4)); one
+     * that can reach it (4.+) lets Gradle resolve past the rest, and one whose version cannot
+     * be read (a variable) leaves nothing to refuse on but a guess.</p>
+     *
+     * @param topDependency the android.topDependency value
+     * @return the refusal message, or null
+     */
+    static String agp9GoogleServicesRefusal(String topDependency) {
+        String marker = "com.google.gms:google-services:";
+        StringBuilder declared = new StringBuilder();
+        int at = topDependency == null ? -1 : topDependency.indexOf(marker);
+        while (at >= 0) {
+            String token = versionToken(topDependency.substring(at + marker.length()));
+            if (googleServicesBelowAgp9Floor(token) != GoogleServicesBound.BELOW_FLOOR) {
+                return null;
+            }
+            if (declared.length() > 0) {
+                declared.append(", ");
+            }
+            declared.append(token);
+            at = topDependency.indexOf(marker, at + marker.length());
+        }
+        if (declared.length() == 0) {
+            return null;
+        }
+        return "android.topDependency pins com.google.gms:google-services to " + declared
+                + ", which can only resolve below " + GOOGLE_SERVICES_PLUGIN_AGP_9_MIN_VERSION
+                + ". Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + " cannot apply"
+                + " those (they read the variant API that plugin removed). Raise it to "
+                + GOOGLE_SERVICES_PLUGIN_AGP_9_VERSION + ", or drop it and the build adds that"
+                + " version itself.";
     }
 
     static int compareVersions(String v1, String v2) {
