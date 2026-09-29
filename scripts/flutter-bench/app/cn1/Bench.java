@@ -40,7 +40,7 @@ import com.codename1.system.Lifecycle;
 public class Bench extends Lifecycle {
 
     /** See runApp: attribution costs real time, so it is not on by default. */
-    private static final boolean TRACE_STARTUP = false;
+    private static final boolean TRACE_STARTUP = true;
 
     /// Skips the Codename One theme that Lifecycle.init would load.
     ///

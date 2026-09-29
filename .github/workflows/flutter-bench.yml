@@ -346,6 +346,8 @@ jobs:
       # with no display at all and the adapter reported the platform
       # unavailable after both applications had built.
       - name: Measure
+        env:
+          CN1_STARTUP_PHASES: "1"
         if: ${{ matrix.platform != 'android' }}
         shell: bash
         run: |

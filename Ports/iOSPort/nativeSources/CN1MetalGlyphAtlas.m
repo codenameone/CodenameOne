@@ -182,6 +182,7 @@ static int cn1AtlasInitialDim(void) {
 }
 
 - (instancetype)initWithCTFont:(CTFontRef)ctFont key:(NSString *)key {
+    { extern void cn1StartupPhase(const char*); cn1StartupPhase("diag.glyphAtlas.new"); }
     self = [super init];
     if (self == nil) return nil;
     id<MTLDevice> device = CN1MetalDevice();

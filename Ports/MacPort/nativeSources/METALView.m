@@ -828,6 +828,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 
 - (void)setFramebuffer {
+    { extern void cn1StartupPhase(const char*); cn1StartupPhase("diag.setFramebuffer"); }
     // Tolerates being called more than once per frame, as the UIKit backend
     // does: creating a second encoder would discard everything queued against
     // the first. Only presentFramebuffer ends and commits.
@@ -955,6 +956,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 
 - (BOOL)presentFramebuffer {
+    { extern void cn1StartupPhase(const char*); cn1StartupPhase("diag.present"); }
     // Whatever happens below, this frame is over (see CN1MetalFrameFinished).
     CN1MetalFrameFinished();
     if (self.renderCommandEncoder == nil) {
