@@ -153,14 +153,32 @@ final class BackendSupport {
                 throw new GradleException("Could not create the backend", ex);
             }
             getLogger().lifecycle("Created " + backend + ". Run it with ./gradlew :backend:runBackend");
-            File settings = new File(getRootDirectory().get().getAsFile(), "settings.gradle.kts");
+            File root = getRootDirectory().get().getAsFile();
+            File kts = new File(root, "settings.gradle.kts");
+            File groovy = new File(root, "settings.gradle");
+            File settings = kts.isFile() || !groovy.isFile() ? kts : groovy;
             if (settings.isFile()) {
                 try {
                     String text = new String(Files.readAllBytes(settings.toPath()), StandardCharsets.UTF_8);
-                    if (!text.contains("com.codenameone") && !text.contains("include(\"backend\")")) {
-                        // The settings plugin includes backend/ by itself; a build that
-                        // applies the plugin only per project has to say so.
-                        write(settings, text + (text.endsWith("\n") ? "" : "\n") + "include(\"backend\")\n");
+                    if (!text.contains("com.codenameone")) {
+                        // The settings plugin includes backend/ and applies itself there.
+                        // A build that applies the plugin from the root build script has
+                        // neither, so the backend is included here and applies the plugin
+                        // in its own script -- without a version, since the root already
+                        // put the plugin on the classpath.
+                        boolean isKts = settings.getName().endsWith(".kts");
+                        if (!text.contains("include(\"backend\")") && !text.contains("include 'backend'")
+                                && !text.contains("include \"backend\"")) {
+                            write(settings, text + (text.endsWith("\n") ? "" : "\n")
+                                    + (isKts ? "include(\"backend\")\n" : "include 'backend'\n"));
+                        }
+                        File script = new File(backend, isKts ? "build.gradle.kts" : "build.gradle");
+                        if (!script.exists()) {
+                            write(script, isKts ? "plugins {\n    id(\"com.codenameone\")\n}\n\n"
+                                    + GradleProjectTemplate.text("backend/build.gradle.kts.txt").replace(
+                                            "// Optional: the plugin is applied from settings.gradle.kts.\n", "")
+                                    : "plugins {\n    id 'com.codenameone'\n}\n");
+                        }
                     }
                 } catch (IOException ex) {
                     throw new GradleException("Could not update " + settings, ex);

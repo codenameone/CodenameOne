@@ -126,6 +126,10 @@ public abstract class Cn1CssTask extends Cn1Task {
         CssCompiler compiler = new CssCompiler(log, ant,
                 () -> AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO));
         File l10n = layout().l10nDir();
+        // Every current theme is compiled below, so start empty: a deleted
+        // darktheme.css would otherwise leave darktheme.res in a directory that is
+        // packaged as a main resource.
+        clear(out);
         try {
             for (String prefix : CssCompiler.themePrefixes(cssDir)) {
                 // Gradle has already decided this task must run; a merged stylesheet

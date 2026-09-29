@@ -57,6 +57,19 @@ public abstract class GenerateGuiSourcesTask extends Cn1Task {
     @TaskAction
     public void generate() {
         ProjectLayout layout = layout();
+        // Every view is regenerated, so start empty: a deleted or renamed view
+        // would otherwise leave its Abstract*.java in a directory that is still a
+        // main source root, where it keeps compiling -- and can clash with its
+        // replacement. (This directory only; the legacy generator writes into
+        // src/main/java, which is the user's.)
+        File radOut = getRadOutputDirectory().get().getAsFile();
+        try {
+            if (radOut.isDirectory()) {
+                org.apache.commons.io.FileUtils.cleanDirectory(radOut);
+            }
+        } catch (java.io.IOException ex) {
+            throw new GradleException("Could not clear " + radOut, ex);
+        }
         GuiSourcesGenerator generator = new GuiSourcesGenerator(log(), layout.projectDir(), layout.radViewsDir(),
                 getRadOutputDirectory().get().getAsFile(), new File(layout.buildDir(), "generated-sources"));
         try {

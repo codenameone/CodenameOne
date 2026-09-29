@@ -43,11 +43,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GradleConversionTest {
-    private static final String UNTOUCHED_API = "package a.backend;\n"
-            + "@RestController public class Api {\n"
-            + "  @GetMapping(\"/healthz\") public String h() { return \"ok\"; }\n"
-            + "  @PostMapping(\"/echo\") public String e(String s) { return s; }\n"
-            + "}\n";
+    /// The backend Api the archetype and the Gradle template generate, in package
+    /// a.backend: the one a conversion may leave behind as untouched.
+    private static final String UNTOUCHED_API = template("backend/Api.java.txt")
+            .replace("${package}", "a.backend").replace("__BACKEND__", ":backend:");
+
+    private static String template(String path) {
+        try {
+            return GradleProjectTemplate.text(path);
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
 
     @TempDir
     Path tmp;
@@ -129,8 +136,8 @@ class GradleConversionTest {
                 + "<dependency><groupId>org.example</groupId><artifactId>payments</artifactId><version>3.1</version>"
                 + "</dependency>"
                 + "</dependencies></project>");
-        touch(mvn, "backend/application.properties", "cn1.server.port=8080\n");
-        touch(mvn, "backend/application-prod.properties", "cn1.server.port=80\n");
+        touch(mvn, "backend/application.properties", template("backend/application.properties.txt"));
+        touch(mvn, "backend/application-dev.properties", template("backend/application-dev.properties.txt"));
         touch(mvn, "backend/src/main/java/a/backend/Api.java", backendApi);
         return mvn;
     }
@@ -246,7 +253,9 @@ class GradleConversionTest {
         int end = UNTOUCHED_API.lastIndexOf('}');
         String api = UNTOUCHED_API.substring(0, end)
                 + "  @GetMapping(\"/orders\") public String o() { return \"\"; }\n}\n";
-        converter().convert(mavenApp(api), out, "1.0");
+        File mvn = mavenApp(api);
+        touch(mvn, "backend/application-prod.properties", "cn1.server.port=80\n");
+        converter().convert(mvn, out, "1.0");
         assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile());
         assertTrue(new File(out, "backend/application.properties").isFile());
         assertTrue(new File(out, "backend/application-prod.properties").isFile());
@@ -301,5 +310,57 @@ class GradleConversionTest {
         converter().convert(ant, converted, "1.0");
         assertThrows(BuildFailureException.class,
                 () -> converter().convert(converted, new File(tmp.toFile(), "again"), "1.0"));
+    }
+
+    /// The effective dependencies, as Maven sees them: inherited ones, the
+    /// exclusions, a system jar, the pom's repositories, and only the Kotlin
+    /// artifacts the Kotlin plugin supplies left out.
+    @Test
+    void dependenciesConvertAsMavenResolvesThem() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version><properties><maps.version>1.2</maps.version></properties>"
+                + "<repositories><repository><id>acme</id><url>https://maven.acme.example/releases</url>"
+                + "</repository><repository><id>central</id><url>https://repo.maven.apache.org/maven2</url>"
+                + "</repository></repositories>"
+                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>inherited</artifactId>"
+                + "<version>7</version></dependency></dependencies></project>");
+        touch(mvn, "common/lib/vendor.jar", "jar");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>heavy</artifactId><version>1</version>"
+                + "<exclusions><exclusion><groupId>commons-logging</groupId><artifactId>commons-logging</artifactId>"
+                + "</exclusion></exclusions></dependency>"
+                + "<dependency><groupId>com.vendor</groupId><artifactId>vendor</artifactId><version>1</version>"
+                + "<scope>system</scope><systemPath>${basedir}/lib/vendor.jar</systemPath></dependency>"
+                + "<dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-stdlib</artifactId>"
+                + "<version>2.0</version></dependency>"
+                + "<dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-reflect</artifactId>"
+                + "<version>2.0</version></dependency>"
+                + "</dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"org.example:inherited:7\")"), "inherited from the parent: " + build);
+        assertTrue(build.contains("implementation(\"org.example:heavy:1\") {\n"
+                + "        exclude(group = \"commons-logging\", module = \"commons-logging\")\n    }"), build);
+        assertTrue(build.contains("implementation(files(\"libs/vendor.jar\"))"), build);
+        assertTrue(new File(out, "libs/vendor.jar").isFile(), "the system jar is carried over");
+        assertTrue(build.contains("kotlin-reflect:2.0"), "kotlin-reflect is not the plugin's to supply: " + build);
+        assertFalse(build.contains("kotlin-stdlib"), build);
+        assertTrue(build.contains("maven(url = uri(\"https://maven.acme.example/releases\"))"), build);
+        assertFalse(build.contains("repo.maven.apache.org"), "Central needs no declaration: " + build);
+        assertTrue(build.indexOf("repositories {") < build.indexOf("dependencies {"), build);
+    }
+
+    /// Keeping the two generated routes is not the same as being untouched.
+    @Test
+    void aBackendWithCustomizedGeneratedRoutesIsKept() throws Exception {
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mavenApp(UNTOUCHED_API.replace("return \"ok\";", "return audit(\"ok\");")
+                .replace("public class Api {", "public class Api {\n  String audit(String s) { return s; }")), out,
+                "1.0");
+        assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile(),
+                "a changed route body is someone's work, and is converted");
     }
 }

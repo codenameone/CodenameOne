@@ -88,31 +88,73 @@ public final class GradleConversion {
     /// Whether `backend` is exactly the generated skeleton: one controller, the
     /// generated `Api` with its `/healthz` and `/echo` routes and nothing else.
     static boolean isUntouchedSkeleton(File backend) {
-        List<File> java = new ArrayList<File>();
-        collectJava(new File(backend, "src"), java);
-        if (java.size() != 1 || !"Api.java".equals(java.get(0).getName())) {
+        // The generated sources and nothing else: one Api.java, no Kotlin, no
+        // resources, no extra profiles.
+        List<File> sources = new ArrayList<File>();
+        collectFiles(new File(backend, "src"), sources);
+        if (sources.size() != 1 || !"Api.java".equals(sources.get(0).getName())) {
+            return false;
+        }
+        String[] profiles = backend.list((d, n) -> n.startsWith("application-") && n.endsWith(".properties")
+                && !"application-dev.properties".equals(n));
+        if (profiles != null && profiles.length > 0) {
             return false;
         }
         try {
-            String text = new String(Files.readAllBytes(java.get(0).toPath()), StandardCharsets.UTF_8);
-            int routes = text.split("@(Get|Post|Put|Delete|Patch|Request)Mapping", -1).length - 1;
-            return routes == 2 && text.contains("\"/healthz\"") && text.contains("\"/echo\"");
+            // Compared as code, not by counting routes: a backend that kept the two
+            // generated routes but changed what they do, secured them or added a
+            // helper is someone's work, and leaving it behind would lose it.
+            String api = new String(Files.readAllBytes(sources.get(0).toPath()), StandardCharsets.UTF_8);
+            if (!javaCode(api).equals(javaCode(GradleProjectTemplate.text("backend/Api.java.txt")))) {
+                return false;
+            }
+            return sameSettings(new File(backend, "application.properties"), "backend/application.properties.txt")
+                    && sameSettings(new File(backend, "application-dev.properties"),
+                            "backend/application-dev.properties.txt");
         } catch (IOException ex) {
             return false;
         }
     }
 
-    private static void collectJava(File dir, List<File> out) {
+    /// Java source reduced to its code: comments, whitespace, the package line
+    /// and the template placeholders gone, so the generated file and the
+    /// template compare equal whatever package they are in.
+    static String javaCode(String source) {
+        String t = source.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//[^\n]*", "");
+        t = t.replaceAll("(?m)^\\s*package\\s+[^;]+;", "").replace("__BACKEND__", "");
+        return t.replaceAll("\\s+", "");
+    }
+
+    /// Whether `file` holds the template's settings (comments and blank lines
+    /// aside). A missing file counts as unchanged.
+    private static boolean sameSettings(File file, String template) throws IOException {
+        if (!file.isFile()) {
+            return true;
+        }
+        return settingLines(new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8))
+                .equals(settingLines(GradleProjectTemplate.text(template)));
+    }
+
+    private static List<String> settingLines(String text) {
+        List<String> out = new ArrayList<String>();
+        for (String line : text.split("\\r?\\n")) {
+            String t = line.trim();
+            if (!t.isEmpty() && !t.startsWith("#") && !t.startsWith("!")) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    private static void collectFiles(File dir, List<File> out) {
         File[] children = dir.listFiles();
         if (children == null) {
             return;
         }
         for (File f : children) {
             if (f.isDirectory()) {
-                collectJava(f, out);
-            } else if (f.getName().endsWith(".java") || f.getName().endsWith(".kt")) {
-                // Kotlin counts: a backend whose additions are all Kotlin is not
-                // the untouched skeleton, and must not be left behind.
+                collectFiles(f, out);
+            } else if (!".gitignore".equals(f.getName())) {
                 out.add(f);
             }
         }
@@ -193,7 +235,8 @@ public final class GradleConversion {
                 File script = new File(target, "build.gradle.kts");
                 Files.write(script.toPath(), GradleProjectTemplate.text("backend/build.gradle.kts.txt")
                         .getBytes(StandardCharsets.UTF_8));
-                List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"));
+                List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"), target);
+                writeRepositories(script, repositoryUrls(new File(backend, "pom.xml")));
                 if (!backendDeps.isEmpty()) {
                     warnUnresolved(backendDeps, "backend/pom.xml");
                     writeDependencies(script, backendDeps, "backend/pom.xml");
@@ -209,7 +252,8 @@ public final class GradleConversion {
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,
                     GradleProjectTemplate.Shape.APP);
             if (from.buildSystem() == BuildSystem.MAVEN) {
-                List<String> deps = dependencyLines(from.dependencyFile());
+                List<String> deps = dependencyLines(from.dependencyFile(), targetDir);
+                writeRepositories(new File(targetDir, "build.gradle.kts"), repositoryUrls(from.dependencyFile()));
                 if (!deps.isEmpty()) {
                     warnUnresolved(deps, "common/pom.xml");
                     writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");
@@ -356,7 +400,8 @@ public final class GradleConversion {
         }
         String plugins = "plugins {\n    kotlin(\"jvm\")" + (withVersion ? " version \"" + KOTLIN_VERSION + "\"" : "")
                 + "\n}\n\n";
-        int deps = text.indexOf("dependencies {");
+        // Before the first block: plugins {} must lead the script.
+        int deps = firstOf(text, "repositories {", "dependencies {");
         String updated = deps < 0 ? plugins + text : text.substring(0, deps) + plugins + text.substring(deps);
         Files.write(buildScript.toPath(), updated.getBytes(StandardCharsets.UTF_8));
     }
@@ -393,56 +438,38 @@ public final class GradleConversion {
     /// type `pom` is a cn1lib; a test-scoped one is `testImplementation`. A version that is still a `${...}` expression is
     /// written as it stands, with a comment, rather than guessed.
     static List<String> dependencyLines(File pom) {
+        return dependencyLines(pom, null);
+    }
+
+    /// The Kotlin artifacts the Kotlin Gradle plugin supplies itself. Others in
+    /// the group (kotlin-reflect, and org.jetbrains:annotations) are ordinary
+    /// dependencies and are kept.
+    private static final java.util.Set<String> KOTLIN_SUPPLIED = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "kotlin-stdlib", "kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8", "kotlin-stdlib-common"));
+
+    /// As [#dependencyLines(File)], copying system-scoped jars into
+    /// `targetDir/libs` and declaring them as files; with a null `targetDir`
+    /// they are written commented out.
+    ///
+    /// The dependencies are the effective ones Maven sees without profiles: the
+    /// pom's own plus those its parents declare (nearest wins), with versions
+    /// from properties and `<dependencyManagement>`, and each dependency's
+    /// classifier, type and exclusions kept.
+    static List<String> dependencyLines(File pom, File targetDir) {
         List<String> out = new ArrayList<String>();
         if (pom == null || !pom.isFile()) {
             return out;
         }
         try {
-            Element project = parsePom(pom);
             java.util.Map<String, String> properties = pomProperties(pom, 0);
             java.util.Map<String, String> managed = managedVersions(pom, 0);
-            Element deps = child(project, "dependencies");
-            if (deps == null) {
-                return out;
-            }
-            for (Node n = deps.getFirstChild(); n != null; n = n.getNextSibling()) {
-                if (!(n instanceof Element) || !"dependency".equals(((Element) n).getTagName())) {
-                    continue;
+            java.util.Map<String, Element> declared = new java.util.LinkedHashMap<String, Element>();
+            collectDependencies(pom, 0, declared, properties);
+            for (Element d : declared.values()) {
+                String line = dependencyLine(d, properties, managed, pom.getParentFile(), targetDir);
+                if (line != null) {
+                    out.add(line);
                 }
-                Element d = (Element) n;
-                String g = interpolate(text(d, "groupId"), properties);
-                String a = interpolate(text(d, "artifactId"), properties);
-                String v = text(d, "version");
-                String scope = text(d, "scope");
-                String type = text(d, "type");
-                String classifier = interpolate(text(d, "classifier"), properties);
-                if (v == null && g != null && a != null) {
-                    // Left to <dependencyManagement> here or in a parent.
-                    v = managed.get(g + ":" + a);
-                }
-                if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)
-                        || "org.jetbrains.kotlin".equals(g) || "org.jetbrains".equals(g)) {
-                    continue;
-                }
-                if (v != null && v.contains("${")) {
-                    v = interpolate(v, properties);
-                }
-                // Test-scoped libraries go with the test sources the conversion copies,
-                // or those tests stop compiling.
-                String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
-                        : "provided".equals(scope) ? "compileOnly"
-                        : "runtime".equals(scope) ? "runtimeOnly" : "implementation";
-                if (v == null || v.contains("${")) {
-                    // Without a version Gradle cannot resolve it (only com.codenameone
-                    // modules get one from the plugin), and a ${...} left as it stands
-                    // would be a Kotlin string template naming a variable the script
-                    // lacks. Either way the line is written commented out.
-                    out.add("    // " + config + "(\"" + g + ":" + a + ":VERSION\") -- set the version; the pom "
-                            + (v == null ? "leaves it to dependency management it could not resolve (a BOM?)"
-                                    : "gave it as " + v + ", which no pom property defines"));
-                    continue;
-                }
-                out.add("    " + config + "(\"" + notation(g, a, v, classifier, type) + "\")");
             }
         } catch (Exception ex) {
             out.add("    // Could not read the dependencies of " + pom + ": " + ex.getMessage());
@@ -450,12 +477,178 @@ public final class GradleConversion {
         return out;
     }
 
+    /// The dependencies of `pom` and its parents on disk, keyed by
+    /// group:artifact:classifier:type; a child's replaces its parent's.
+    private static void collectDependencies(File pom, int depth, java.util.Map<String, Element> out,
+                                            java.util.Map<String, String> properties) throws Exception {
+        Element project = parsePom(pom);
+        Element parent = child(project, "parent");
+        if (parent != null && depth < 8) {
+            File parentPom = parentPom(pom, parent);
+            if (parentPom != null) {
+                collectDependencies(parentPom, depth + 1, out, properties);
+            }
+        }
+        Element deps = child(project, "dependencies");
+        if (deps == null) {
+            return;
+        }
+        for (Node n = deps.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && "dependency".equals(((Element) n).getTagName())) {
+                Element d = (Element) n;
+                String key = interpolate(text(d, "groupId"), properties) + ":"
+                        + interpolate(text(d, "artifactId"), properties) + ":" + text(d, "classifier") + ":"
+                        + text(d, "type");
+                out.remove(key);
+                out.put(key, d);
+            }
+        }
+    }
+
+    private static File parentPom(File pom, Element parent) {
+        String relative = text(parent, "relativePath");
+        File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
+        if (parentPom.isDirectory()) {
+            parentPom = new File(parentPom, "pom.xml");
+        }
+        return parentPom.isFile() ? parentPom : null;
+    }
+
+    private static String dependencyLine(Element d, java.util.Map<String, String> properties,
+                                         java.util.Map<String, String> managed, File pomDir, File targetDir)
+            throws IOException {
+        String g = interpolate(text(d, "groupId"), properties);
+        String a = interpolate(text(d, "artifactId"), properties);
+        String v = text(d, "version");
+        String scope = text(d, "scope");
+        String type = text(d, "type");
+        String classifier = interpolate(text(d, "classifier"), properties);
+        if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)
+                || "org.jetbrains.kotlin".equals(g) && KOTLIN_SUPPLIED.contains(a)) {
+            return null;
+        }
+        // Test-scoped libraries go with the test sources the conversion copies,
+        // or those tests stop compiling.
+        String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
+                : "provided".equals(scope) ? "compileOnly"
+                : "runtime".equals(scope) ? "runtimeOnly" : "implementation";
+        if ("system".equals(scope)) {
+            // A file on disk, usually because it is published nowhere: carried into
+            // libs/ and declared as a file, not as coordinates no repository has.
+            java.util.Map<String, String> withBase = new java.util.HashMap<String, String>(properties);
+            withBase.put("basedir", pomDir.getAbsolutePath());
+            withBase.put("project.basedir", pomDir.getAbsolutePath());
+            String path = interpolate(text(d, "systemPath"), withBase);
+            File jar = path == null ? null : new File(path);
+            if (jar == null || !jar.isFile() || targetDir == null) {
+                return "    // implementation(files(\"libs/" + (jar == null ? a + ".jar" : jar.getName())
+                        + "\")) -- add this file; the pom's system-scoped " + g + ":" + a + " points at " + path
+                        + ", which was not found";
+            }
+            copyTree(jar, new File(targetDir, "libs" + File.separator + jar.getName()));
+            return "    implementation(files(\"libs/" + jar.getName() + "\"))";
+        }
+        if (v == null) {
+            // Left to <dependencyManagement> here or in a parent.
+            v = managed.get(g + ":" + a);
+        }
+        if (v != null && v.contains("${")) {
+            v = interpolate(v, properties);
+        }
+        if (v == null || v.contains("${")) {
+            // Without a version Gradle cannot resolve it (only com.codenameone
+            // modules get one from the plugin), and a ${...} left as it stands
+            // would be a Kotlin string template naming a variable the script
+            // lacks. Either way the line is written commented out.
+            return "    // " + config + "(\"" + g + ":" + a + ":VERSION\") -- set the version; the pom "
+                    + (v == null ? "leaves it to dependency management it could not resolve (a BOM?)"
+                            : "gave it as " + v + ", which no pom property defines");
+        }
+        String line = "    " + config + "(\"" + notation(g, a, v, classifier, type) + "\")";
+        List<String> exclusions = exclusions(d, properties);
+        if (exclusions.isEmpty()) {
+            return line;
+        }
+        // Maven dropped these transitives on purpose; Gradle would bring them back.
+        StringBuilder sb = new StringBuilder(line).append(" {\n");
+        for (String e : exclusions) {
+            sb.append("        ").append(e).append('\n');
+        }
+        return sb.append("    }").toString();
+    }
+
+    /// Gradle statements for a dependency's `<exclusions>`.
+    private static List<String> exclusions(Element d, java.util.Map<String, String> properties) {
+        List<String> out = new ArrayList<String>();
+        Element list = child(d, "exclusions");
+        if (list == null) {
+            return out;
+        }
+        for (Node n = list.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (!(n instanceof Element) || !"exclusion".equals(((Element) n).getTagName())) {
+                continue;
+            }
+            String g = interpolate(text((Element) n, "groupId"), properties);
+            String a = interpolate(text((Element) n, "artifactId"), properties);
+            boolean anyGroup = g == null || "*".equals(g);
+            boolean anyArtifact = a == null || "*".equals(a);
+            if (anyGroup && anyArtifact) {
+                out.clear();
+                out.add("isTransitive = false");
+                return out;
+            }
+            out.add(anyArtifact ? "exclude(group = \"" + g + "\")"
+                    : anyGroup ? "exclude(module = \"" + a + "\")"
+                    : "exclude(group = \"" + g + "\", module = \"" + a + "\")");
+        }
+        return out;
+    }
+
+    /// The repositories the pom and its parents declare, other than Maven
+    /// Central and the Codename One repository, which the plugin adds.
+    static List<String> repositoryUrls(File pom) {
+        List<String> out = new ArrayList<String>();
+        collectRepositories(pom, 0, out);
+        return out;
+    }
+
+    private static void collectRepositories(File pom, int depth, List<String> out) {
+        Element project = parsePomOrNull(pom);
+        if (project == null) {
+            // Unreadable: it declares no repository this conversion can see, and
+            // reading its dependencies reports the same pom as unreadable.
+            return;
+        }
+        java.util.Map<String, String> properties = pomProperties(pom, 0);
+        Element repos = child(project, "repositories");
+        if (repos != null) {
+            for (Node n = repos.getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (n instanceof Element && "repository".equals(((Element) n).getTagName())) {
+                    String url = interpolate(text((Element) n, "url"), properties);
+                    if (url != null && !url.contains("${") && !url.contains("repo.maven.apache.org")
+                            && !url.contains("repo1.maven.org") && !url.contains("repo.codenameone.com")
+                            && !out.contains(url)) {
+                        out.add(url);
+                    }
+                }
+            }
+        }
+        Element parent = child(project, "parent");
+        if (parent != null && depth < 8) {
+            File parentPom = parentPom(pom, parent);
+            if (parentPom != null) {
+                collectRepositories(parentPom, depth + 1, out);
+            }
+        }
+    }
+
     /// Says which dependencies were written commented out for want of a version.
     private void warnUnresolved(List<String> lines, String from) {
         for (String line : lines) {
-            if (line.trim().startsWith("//") && line.contains("-- set the version")) {
-                log.warn("A dependency in " + from + " has a version no pom property defines; it is commented "
-                        + "out in the build script until you set one:" + line.trim().substring(2));
+            if (line.trim().startsWith("//") && (line.contains("-- set the version")
+                    || line.contains("-- add this file"))) {
+                log.warn("A dependency in " + from + " could not be converted as it stands; it is commented "
+                        + "out in the build script until you complete it:" + line.trim().substring(2));
             }
         }
     }
@@ -523,6 +716,14 @@ public final class GradleConversion {
         return out;
     }
 
+    private static Element parsePomOrNull(File pom) {
+        try {
+            return parsePom(pom);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     private static Element parsePom(File pom) throws Exception {
         DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
         f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -581,6 +782,35 @@ public final class GradleConversion {
 
     private static String interpolate(String value, java.util.Map<String, String> properties) {
         return Cn1libPomProfiles.interpolate(value, properties);
+    }
+
+    private static int firstOf(String text, String... markers) {
+        int best = -1;
+        for (String m : markers) {
+            int i = text.indexOf(m);
+            if (i >= 0 && (best < 0 || i < best)) {
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    /// Declares the pom's own repositories, which the dependencies may only be
+    /// found in, as a `repositories {}` block before `dependencies {}`.
+    private static void writeRepositories(File buildScript, List<String> urls) throws IOException {
+        if (urls.isEmpty() || !buildScript.isFile()) {
+            return;
+        }
+        String text = new String(Files.readAllBytes(buildScript.toPath()), StandardCharsets.UTF_8);
+        int deps = text.indexOf("dependencies {");
+        StringBuilder sb = new StringBuilder("// From the Maven project's <repositories>:\nrepositories {\n");
+        for (String url : urls) {
+            sb.append("    maven(url = uri(\"").append(url.replace("\\", "\\\\").replace("\"", "\\\"")
+                    .replace("$", "\\$")).append("\"))\n");
+        }
+        sb.append("}\n\n");
+        String updated = deps < 0 ? text + "\n" + sb : text.substring(0, deps) + sb + text.substring(deps);
+        Files.write(buildScript.toPath(), updated.getBytes(StandardCharsets.UTF_8));
     }
 
     private static void writeDependencies(File buildScript, List<String> lines, String from) throws IOException {

@@ -439,6 +439,16 @@ public class SourceChangeWatcher implements Runnable {
         StringBuilder classPath = new StringBuilder();
         File classDestination = layout.classesDir();
         classPath.append(classDestination.getAbsolutePath()).append(File.pathSeparator);
+        // Gradle compiles Kotlin into a directory of its own. It goes on the
+        // classpath -- Java calling Kotlin, or Kotlin calling another Kotlin class,
+        // otherwise recompiles against nothing -- and a recompiled Kotlin class
+        // goes back there, not beside Java's where it would shadow a stale copy.
+        File kotlinClasses = layout.buildSystem() == BuildSystem.GRADLE
+                ? new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main")
+                : null;
+        if (kotlinClasses != null) {
+            classPath.append(kotlinClasses.getAbsolutePath()).append(File.pathSeparator);
+        }
         classPath.append(System.getProperty("cn1.maven.compileClasspathElements", ""));
 
         boolean isKotlinFile = path.toFile().getName().endsWith(".kt");
@@ -478,7 +488,7 @@ public class SourceChangeWatcher implements Runnable {
             pb = new ProcessBuilder(
                     kotlinc.getAbsolutePath(),
                     "-classpath", classPath.toString(),
-                    "-d", classDestination.getAbsolutePath(),
+                    "-d", (kotlinClasses != null ? kotlinClasses : classDestination).getAbsolutePath(),
                     "-jvm-target", javaLevel(layout),
                     recompilingClass
             );

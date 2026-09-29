@@ -46,7 +46,9 @@ import org.gradle.api.tasks.TaskAction;
 import org.gradle.work.DisableCachingByDefault;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /// `backendPackage`: the backend translated to C and linked into one native
 /// binary, with no JVM beneath it. The same [BackendPackager] as
@@ -137,12 +139,23 @@ final class BackendPackageSupport {
         @OutputFile
         public abstract RegularFileProperty getBinary();
 
+        /// The source directories the packager compiles: the source set's own, as
+        /// the build script configured them, not only the conventional one -- a
+        /// directory added in `sourceSets` held controllers the binary then lacked.
+        private List<String> sourceRoots() {
+            List<String> roots = new ArrayList<String>();
+            for (File dir : getSources().getFiles()) {
+                roots.add(dir.getAbsolutePath());
+            }
+            return roots;
+        }
+
         @TaskAction
         public void build() {
             final ProjectLayout layout = layout();
             ProjectHost host = GradleHostFactory.create(this, log(), layout, layout.projectDir().getName(), "",
                     Collections.<String, String>emptyMap(), Collections.<String, String>emptyMap(),
-                    getCompileClasspath(), Collections.singletonList(layout.javaSourceDir().getAbsolutePath()),
+                    getCompileClasspath(), sourceRoots(),
                     getArtifacts().get(), null, getCodenameOneVersion().get());
             final java.util.Set<File> toolchain = getToolchain().getFiles();
             BackendPackager packager = new GradleBackendPackager(host, layout, toolchain);
