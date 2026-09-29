@@ -45,8 +45,9 @@
  * user's compiled bytecode for references to com.codename1.security.* and
  * flips the placeholders below to enable the matching code paths. Apps that
  * don't use the crypto API end up with no extra crypto symbols in the
- * binary -- in particular the AES-GCM SPI references stay completely out
- * unless the app opts into GCM via the ios.crypto.gcm build hint.
+ * binary. AES-GCM is compiled only for apps that use the vault or set the
+ * ios.crypto.gcm build hint; it is built from public CommonCrypto calls, see
+ * CN1Crypto.m.
  */
 //#define CN1_INCLUDE_CRYPTO
 //#define CN1_INCLUDE_CRYPTO_GCM

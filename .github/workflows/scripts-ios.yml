@@ -22,6 +22,7 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/check-ios-framework-links.py'
       - 'scripts/check-ios-sdk-deltas.py'
+      - 'scripts/check-ios-private-api.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
       # The iOS legs boot their simulator through this helper and read its
@@ -77,6 +78,7 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/check-ios-framework-links.py'
       - 'scripts/check-ios-sdk-deltas.py'
+      - 'scripts/check-ios-private-api.py'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-ui-tests.sh'
       # The iOS legs boot their simulator through this helper and read its
@@ -297,6 +299,25 @@ jobs:
             --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
+
+      # App Store Connect rejects an upload that imports any SDK symbol no public header
+      # declares ("Validation failed (409) The app references non-public symbols"), and
+      # nothing else here can see one: a private symbol compiles and links like any other.
+      # Customer uploads were rejected for CommonCrypto's private AES-GCM calls while every
+      # job stayed green, because the calls sat behind a feature gate this sample never
+      # turns on. So this compiles EVERY port native with EVERY gate on, from pristine
+      # sources, and fails on any import that is exported but undeclared. The linked
+      # binary is checked the same way in ios-packaging.yml.
+      - name: Check the port references no private Apple API
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          scripts/check-ios-private-api.py \
+            --developer-dir "$DEVELOPER_DIR" \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 15
 
       # Apple can deprecate an API, or change a behaviour for anything LINKED
       # against the new SDK, and nothing else here would notice: every other
@@ -685,6 +706,25 @@ jobs:
             --developer-dir "$DEVELOPER_DIR" \
             "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
         timeout-minutes: 10
+
+      # App Store Connect rejects an upload that imports any SDK symbol no public header
+      # declares ("Validation failed (409) The app references non-public symbols"), and
+      # nothing else here can see one: a private symbol compiles and links like any other.
+      # Customer uploads were rejected for CommonCrypto's private AES-GCM calls while every
+      # job stayed green, because the calls sat behind a feature gate this sample never
+      # turns on. So this compiles EVERY port native with EVERY gate on, from pristine
+      # sources, and fails on any import that is exported but undeclared. The linked
+      # binary is checked the same way in ios-packaging.yml.
+      - name: Check the port references no private Apple API
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          scripts/check-ios-private-api.py \
+            --developer-dir "$DEVELOPER_DIR" \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 15
 
       # Apple can deprecate an API, or change a behaviour for anything LINKED
       # against the new SDK, and nothing else here would notice: every other

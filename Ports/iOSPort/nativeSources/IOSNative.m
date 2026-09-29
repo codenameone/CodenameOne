@@ -12428,21 +12428,6 @@ void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_
 }
 
 /*
- * SQLCipher-compatible keying, declared here rather than taken from a header so this file
- * compiles unchanged whether or not the bundled engine was emitted.
- *
- * These are strong references and they stay strong on purpose: Apple's own libsqlite3 exports
- * them, so a build without the bundled engine still links. Verified against Xcode 26.2 rather
- * than assumed -- usr/lib/libsqlite3.tbd lists _sqlite3_key, _sqlite3_key_v2 and _sqlite3_rekey
- * in both the iPhoneOS and iPhoneSimulator SDKs, and a binary calling sqlite3_key links against
- * -lsqlite3 with no undefined symbol. What Apple's copy does NOT do is encrypt: it answers
- * SQLITE_MISUSE and leaves the file plaintext, which is why availability is decided by
- * cn1SqlCipherAvailable below and never by whether these symbols resolved.
- */
-extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
-extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
-
-/*
  * Whether this build can encrypt at all.
  *
  * Decided by the marker header the translator emits beside this file for an application that
@@ -12460,6 +12445,37 @@ extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
 #  if __has_include("cn1_sqlite3_cipher.h")
 #    define CN1_DB_CIPHER_PRESENT 1
 #  endif
+#endif
+
+/*
+ * SQLCipher-compatible keying, referenced ONLY when the bundled engine is compiled in.
+ *
+ * Apple's libsqlite3 exports sqlite3_key, sqlite3_key_v2 and sqlite3_rekey -- usr/lib/libsqlite3.tbd
+ * lists them and a call links with no undefined symbol -- but the SDK's sqlite3.h does not
+ * declare them. They are non-public symbols, and App Store Connect rejects an upload that
+ * imports one ("The app references non-public symbols"). These used to be strong externs in
+ * every build, so any application whose database code survived dead stripping imported them from
+ * the system library. scripts/check-ios-private-api.py now fails the build on that.
+ *
+ * With the bundled engine the names are defined inside the application, so nothing is imported.
+ * Without it Apple's copy would only have answered SQLITE_MISUSE and left the file plaintext --
+ * availability is decided by cn1SqlCipherAvailable, never by these calls -- so the stand-ins
+ * below answer exactly that, without naming the private symbol.
+ */
+#ifdef CN1_DB_CIPHER_PRESENT
+extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
+extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
+#define cn1SqlKey(db, key, len) sqlite3_key((db), (key), (len))
+#define cn1SqlRekey(db, key, len) sqlite3_rekey((db), (key), (len))
+#else
+static int cn1SqlKey(sqlite3 *db, const void *pKey, int nKey) {
+    (void)db; (void)pKey; (void)nKey;
+    return SQLITE_MISUSE;
+}
+static int cn1SqlRekey(sqlite3 *db, const void *pKey, int nKey) {
+    (void)db; (void)pKey; (void)nKey;
+    return SQLITE_MISUSE;
+}
 #endif
 
 static JAVA_BOOLEAN cn1SqlCipherAvailable(sqlite3* db) {
@@ -12538,7 +12554,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbApplyKey___long_java_lang_Str
     const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
     // sqlite3_key rather than PRAGMA key, so a passphrase containing a quote cannot break out of
     // the statement.
-    if (sqlite3_key(db, keyChars, (int)strlen(keyChars)) != SQLITE_OK) {
+    if (cn1SqlKey(db, keyChars, (int)strlen(keyChars)) != SQLITE_OK) {
         return JAVA_FALSE;
     }
     // Reports the probe result rather than a bare pass/fail, so the Java side can tell a key that
@@ -12553,7 +12569,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_S
         return SQLITE_ERROR;
     }
     const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
-    int rc = sqlite3_key(db, keyChars, (int)strlen(keyChars));
+    int rc = cn1SqlKey(db, keyChars, (int)strlen(keyChars));
     if (rc != SQLITE_OK) {
         return rc;
     }
@@ -12582,10 +12598,10 @@ void com_codename1_impl_ios_IOSNative_sqlDbRekey___long_java_lang_String(CN1_THR
     }
     int rc;
     if (key == JAVA_NULL) {
-        rc = sqlite3_rekey(db, NULL, 0);
+        rc = cn1SqlRekey(db, NULL, 0);
     } else {
         const char* keyChars = stringToUTF8(CN1_THREAD_STATE_PASS_ARG key);
-        rc = sqlite3_rekey(db, keyChars, (int)strlen(keyChars));
+        rc = cn1SqlRekey(db, keyChars, (int)strlen(keyChars));
     }
     if (rc != SQLITE_OK) {
         cn1ThrowSqlError(CN1_THREAD_STATE_PASS_ARG db, "Failed to change the database key");

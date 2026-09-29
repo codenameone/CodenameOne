@@ -4336,12 +4336,12 @@ public class IPhoneBuilder extends Executor {
                 dis.close();
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(appDelH.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
+                    str = replaceMarker(str, "//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
                     if (request.getArg("ios.notificationPermissionAtLaunch", "false").equalsIgnoreCase("true")) {
                         // Restore pre-#4876 behavior: prompt for notification permission
                         // in didFinishLaunchingWithOptions instead of on first registerPush /
                         // sendLocalNotification call.
-                        str = str.replace("//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
+                        str = replaceMarker(str, "//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
                     }
                     fios.write(str);
                 }
@@ -4353,7 +4353,7 @@ public class IPhoneBuilder extends Executor {
                 dis.close();
                 try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
+                    str = replaceMarker(str, "//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
                     fios.write(str);
                 }
             } catch (IOException ex) {
@@ -4384,7 +4384,7 @@ public class IPhoneBuilder extends Executor {
 
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(glAppDelegate.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("#define INCLUDE_CN1_PUSH", "");
+                    str = replaceMarker(str, "#define INCLUDE_CN1_PUSH", "");
                     fios.write(str);
                 }
 
@@ -4395,7 +4395,7 @@ public class IPhoneBuilder extends Executor {
                 }
                 try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
+                    str = replaceMarker(str, "#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
                     fios.write(str);
                 }
             } catch (IOException ex) {
