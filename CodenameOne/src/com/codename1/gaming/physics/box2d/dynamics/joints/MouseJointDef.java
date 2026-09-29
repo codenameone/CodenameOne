@@ -26,8 +26,6 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 import com.codename1.gaming.physics.box2d.common.Vec2;
 
 /// Mouse joint definition. This requires a world target point, tuning parameters, and the time step.
-///
-/// @author Daniel
 public class MouseJointDef extends JointDef {
   /// The initial world target point. This is assumed to coincide with the body anchor initially.
   public final Vec2 target = new Vec2();

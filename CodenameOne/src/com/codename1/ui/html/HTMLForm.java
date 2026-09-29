@@ -38,8 +38,6 @@ import java.util.Vector;
 
 /// HTMLForm is an object that holds all the data related to a form within HTML.
 /// Note that it is not related in any way to Codename One's Form.
-///
-/// @author Ofir Leitner
 class HTMLForm {
 
     /// The default text on forms' submit button
@@ -428,8 +426,6 @@ class HTMLForm {
     }
 
     /// A simple class adding the option to change the name of a command
-    ///
-    /// @author Ofir Leitner
     static class NamedCommand extends Command {
 
         HTMLForm htmlForm;

@@ -54,8 +54,6 @@ import javax.swing.SpinnerNumberModel;
 
 /**
  * UI for editing a multi-image type image
- *
- * @author Shai Almog
  */
 public class ImageMultiEditor extends BaseForm {
     private EditableResources res;

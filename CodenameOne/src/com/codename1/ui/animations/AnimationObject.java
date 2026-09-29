@@ -31,8 +31,6 @@ import com.codename1.ui.util.Resources;
 /// An animation object is an element within the timeline that has a visibility state
 /// for rendering at a given point in time. E.g. the object can be queried of its position
 /// and render itself for any time.
-///
-/// @author Shai Almog
 public final class AnimationObject {
     /// Used to define the motion type used when manipulating an animation property
     public static final int MOTION_TYPE_SPLINE = 2;

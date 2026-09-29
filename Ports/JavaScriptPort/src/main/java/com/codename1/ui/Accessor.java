@@ -23,10 +23,6 @@
 
 package com.codename1.ui;
 
-/**
- *
- * @author shannah
- */
 public class Accessor {
     public static int getActivePeerCount() {
         return Form.activePeerCount;

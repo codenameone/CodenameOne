@@ -83,8 +83,6 @@ import java.util.Vector;
 /// and higher, you will need to define the "android.webContentsDebuggingEnabled" display property in order for this to work.  You can define this inside your app's init() method:
 ///
 /// `````java Display.getInstance().setProperty("android.webContentsDebuggingEnabled", "true"); `````
-///
-/// @author Shai Almog
 public class BrowserComponent extends Container {
     /// Browser property key to control whether links with `target="_blank"` or `target="_new"`
     /// should be followed in the current browser view. Defaults to `true`.

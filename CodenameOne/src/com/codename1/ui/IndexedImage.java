@@ -38,8 +38,6 @@ import java.io.IOException;
 /// to use as little as one byte per pixel which can save up to 4 times of the memory
 /// overhead.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// This class should no longer be referenced directly. Use Image.createIndexed instead

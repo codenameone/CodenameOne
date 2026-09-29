@@ -80,8 +80,6 @@ import com.codename1.ui.util.EventDispatcher;
 ///     return starRank;
 /// }
 /// ```
-///
-/// @author Chen
 public class SwipeableContainer extends Container {
 
     private final EventDispatcher dispatcher = new EventDispatcher();

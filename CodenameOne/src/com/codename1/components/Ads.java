@@ -52,8 +52,6 @@ import java.util.Vector;
 /// please refer to
 /// http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
 ///
-/// @author Chen
-///
 /// @deprecated this legacy HTML banner component targets the defunct InnerActive
 /// network. Use [com.codename1.ads.BannerAd] from the modern advertising API
 /// (see [com.codename1.ads.AdManager]) instead.

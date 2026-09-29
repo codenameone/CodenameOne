@@ -25,7 +25,6 @@ package com.codename1.gaming.physics.box2d.pooling;
 
 /// Same functionality of a regular java.util stack.  Object
 /// return order does not matter.
-/// @author Daniel
 ///
 /// @param <E>
 public interface IDynamicStack<E> {

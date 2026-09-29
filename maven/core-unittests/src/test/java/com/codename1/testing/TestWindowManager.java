@@ -37,8 +37,6 @@ import java.util.List;
  * three monitor desktop at mixed scale factors and assert that a window picks up the
  * characteristics of the one it sits on, without needing a second physical
  * display.</p>
- *
- * @author Shai Almog
  */
 public class TestWindowManager extends WindowManager {
 

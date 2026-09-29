@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// The persistent discriminator for a concrete class in an entity hierarchy.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
+@com.codename1.impl.SharedWithBackend
 public @interface DiscriminatorValue {
     /// Names the unique discriminator stored for this concrete entity class.
     /// @return persistent discriminator value

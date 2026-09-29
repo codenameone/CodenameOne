@@ -45,13 +45,13 @@ public interface DataInput extends AutoCloseable {
     /// Reads some bytes from an input stream and stores them into the buffer array b. The number of bytes read is equal to the length of b.
     /// This method blocks until one of the following conditions occurs:
     /// b.length bytes of input data are available, in which case a normal return is made. End of file is detected, in which case an EOFException is thrown. An I/O error occurs, in which case an IOException other than EOFException is thrown.
-    /// If b is null, a NullPointerException is thrown. If b.length is zero, then no bytes are read. Otherwise, the first byte read is stored into element b[0], the next one into b[1], and so on. If an exception is thrown from this method, then it may be that some but not all bytes of b have been updated with data from the input stream.
+    /// If b is null, a NullPointerException is thrown. If b.length is zero, then no bytes are read. Otherwise, the first byte read is stored into element `b[0]`, the next one into `b[1]`, and so on. If an exception is thrown from this method, then it may be that some but not all bytes of b have been updated with data from the input stream.
     public abstract void readFully(byte[] b) throws java.io.IOException;
 
     /// Reads len bytes from an input stream.
     /// This method blocks until one of the following conditions occurs:
     /// len bytes of input data are available, in which case a normal return is made. End of file is detected, in which case an EOFException is thrown. An I/O error occurs, in which case an IOException other than EOFException is thrown.
-    /// If b is null, a NullPointerException is thrown. If off is negative, or len is negative, or off+len is greater than the length of the array b, then an IndexOutOfBoundsException is thrown. If len is zero, then no bytes are read. Otherwise, the first byte read is stored into element b[off], the next one into b[off+1], and so on. The number of bytes read is, at most, equal to len.
+    /// If b is null, a NullPointerException is thrown. If off is negative, or len is negative, or off+len is greater than the length of the array b, then an IndexOutOfBoundsException is thrown. If len is zero, then no bytes are read. Otherwise, the first byte read is stored into element `b[off]`, the next one into `b[off+1]`, and so on. The number of bytes read is, at most, equal to len.
     public abstract void readFully(byte[] b, int off, int len) throws java.io.IOException;
 
     /// Reads four input bytes and returns an int value. Let a be the first byte read, b be the second byte, c be the third byte, and d be the fourth byte. The value returned is:

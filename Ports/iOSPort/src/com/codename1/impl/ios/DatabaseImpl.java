@@ -35,8 +35,6 @@ import java.util.Vector;
 
 /**
  * Implementation of the database SQL API
- *
- * @author Shai Almog
  */
 class DatabaseImpl extends Database {
     private long peer;

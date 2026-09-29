@@ -36,8 +36,6 @@ import java.util.Map;
 
 /// Default implementation of the renderer based on a label see the `ListCellRenderer`
 /// for more information about the use and purpose of this class
-///
-/// @author Chen Fishbein
 public class DefaultListCellRenderer<T> extends Label implements ListCellRenderer<T>, CellRenderer<T> {
     private static boolean showNumbersDefault = true;
     private final Label focusComponent = new Label();

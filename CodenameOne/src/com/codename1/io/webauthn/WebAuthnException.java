@@ -54,8 +54,8 @@ public class WebAuthnException extends IOException {
     /// for the relying-party identifier in the options JSON.
     public static final String SECURITY_ERROR = "SecurityError";
 
-    /// The ceremony was cancelled by the caller (e.g. via
-    /// [WebAuthnClient#cancel()]).
+    /// The ceremony was aborted before it finished -- on Android, for
+    /// example, when the thread waiting on the platform is interrupted.
     public static final String ABORTED = "AbortError";
 
     /// One of the option constraints (resident key required, user verification

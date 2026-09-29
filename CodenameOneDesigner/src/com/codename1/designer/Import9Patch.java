@@ -44,10 +44,6 @@ import javax.swing.JOptionPane;
 import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 
-/**
- *
- * @author Shai Almog
- */
 public class Import9Patch extends javax.swing.JDialog {
     private EditableResources res;
     private String theme;

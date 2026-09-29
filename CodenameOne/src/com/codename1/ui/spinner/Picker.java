@@ -89,8 +89,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// hi.add(datePicker).add(dateTimePicker).add(timePicker).add(stringPicker);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class Picker extends Button {
 
     /// Whether useLightweightPopup should default to true, this can be set via

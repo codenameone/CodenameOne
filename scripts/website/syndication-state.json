@@ -2279,6 +2279,46 @@
         "url": "https://medium.com/p/c422f23fb3f4/edit",
         "syndicated_at": "2026-09-24T19:01:30+00:00"
       }
+    },
+    "why-another-java-server": {
+      "devto": {
+        "id": 4744396,
+        "url": "https://dev.to/codenameone/we-didnt-want-to-build-another-java-server-4a7e",
+        "syndicated_at": "2026-09-25T17:57:03+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/0eb6b7ea20b8/edit",
+        "syndicated_at": "2026-09-26T15:01:39+00:00"
+      }
+    },
+    "java-backend-shared-models": {
+      "devto": {
+        "id": 4751152,
+        "url": "https://dev.to/codenameone/one-java-model-from-the-app-to-postgresql-3oke",
+        "syndicated_at": "2026-09-26T17:08:05+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/20c35c2393b9/edit",
+        "syndicated_at": "2026-09-27T00:00:32+00:00"
+      }
+    },
+    "vault-encryption-browser-phone": {
+      "devto": {
+        "id": 4757181,
+        "url": "https://dev.to/codenameone/one-vault-from-your-phone-to-the-browser-1p84",
+        "syndicated_at": "2026-09-27T17:49:43+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/5379b1b7bc1c/edit",
+        "syndicated_at": "2026-09-27T19:01:19+00:00"
+      }
+    },
+    "invite-link-through-app-store": {
+      "devto": {
+        "id": 4766797,
+        "url": "https://dev.to/codenameone/the-hard-part-of-invite-a-friend-is-the-install-5a72",
+        "syndicated_at": "2026-09-28T20:07:10+00:00"
+      }
     }
   }
 }

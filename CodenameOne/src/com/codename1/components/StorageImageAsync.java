@@ -30,8 +30,6 @@ import com.codename1.ui.Image;
 
 /// Asynchronous storage image that loads in the background and not during the paint
 /// cycle effectively not blocking the EDT drawing speed.
-///
-/// @author Shai Almog
 public final class StorageImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;

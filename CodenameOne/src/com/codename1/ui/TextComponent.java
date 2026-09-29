@@ -79,8 +79,6 @@ import com.codename1.ui.layouts.LayeredLayout;
 ///
 /// f.show();
 /// ```
-///
-/// @author Shai Almog
 public class TextComponent extends InputComponent {
     private static final int animationSpeed = 100;
     private Container animationLayer;

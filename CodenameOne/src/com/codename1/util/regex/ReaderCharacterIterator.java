@@ -21,9 +21,6 @@ import java.io.IOException;
 import java.io.Reader;
 
 /// Encapsulates java.io.Reader as CharacterIterator
-///
-/// @author [Ales Novak](mailto:ales.novak@netbeans.com)
-/// @version CVS $Id: ReaderCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
 public final class ReaderCharacterIterator implements CharacterIterator {
     /// Underlying reader
     private final Reader reader;

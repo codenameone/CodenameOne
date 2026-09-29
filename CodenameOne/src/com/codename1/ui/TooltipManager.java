@@ -28,8 +28,6 @@ import com.codename1.ui.util.UITimer;
 
 /// Central management for tooltips, this class can be derived/customized
 /// to override the default tooltip behavior.
-///
-/// @author Shai Almog
 public class TooltipManager {
     private static TooltipManager instance;
 

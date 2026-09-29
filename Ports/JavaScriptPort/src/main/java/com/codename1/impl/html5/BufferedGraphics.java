@@ -58,10 +58,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 
-/**
- *
- * @author shannah
- */
 public class BufferedGraphics extends HTML5Graphics {
     ArrayList<ExecutableOp> upcoming = new ArrayList<ExecutableOp>();
     private Rectangle clipRect;
@@ -1019,6 +1015,19 @@ public class BufferedGraphics extends HTML5Graphics {
                 : null);
         addOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
                 magnify, aberration, tintColor, tintStrength));
+    }
+
+    @Override
+    public void colorMatrixRegion(int x, int y, int width, int height, float[] matrix,
+            HTML5Implementation.NativeImage mask, float cornerRadius, float amount) {
+        // The matrix recolours what is under it -- vibrant glyphs take their colour from the
+        // glass behind them. Promoted text is not under it, so it would keep its own colour
+        // over the effect instead of being recoloured with the rest. Back to the canvas.
+        noteAlphaIndependentRegion(x, y, width, height, cornerRadius > 0
+                ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
+                : null);
+        addOp(new com.codename1.impl.html5.graphics.ColorMatrixRegion(x, y, width, height,
+                matrix, mask, cornerRadius, amount));
     }
 
     @Override

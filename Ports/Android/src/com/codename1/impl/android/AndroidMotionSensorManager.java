@@ -37,8 +37,6 @@ import com.codename1.sensors.MotionSensorManager;
  * gravity vector and the magnetometer. Android already reports acceleration in
  * m/s^2, angular velocity in rad/s and the magnetic field in microtesla using
  * the same axis convention the API documents, so no unit conversion is needed.
- *
- * @author Codename One
  */
 public class AndroidMotionSensorManager extends MotionSensorManager {
     private static final int MAX_TYPE = 6;

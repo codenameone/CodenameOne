@@ -23,10 +23,6 @@
 
 package com.codename1.teavm.jso.util;
 
-/**
- *
- * @author shannah
- */
 public enum JSType {
     BOOLEAN,
     NUMBER,

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.io.Log;
 import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.animations.Animation;
@@ -63,8 +64,6 @@ import java.util.Set;
 /// `form.getContentPane().add(cmp)`. Normally this shouldn't matter, however in some cases such as
 /// animation we need to use the content pane directly e.g. `form.getContentPane().animateLayout(200)`
 /// will work whereas `form.animateLayout(200)` will fail.
-///
-/// @author Chen Fishbein
 public class Form extends Container implements TopLevelContainer {
     static int activePeerCount;
     static int rippleX;
@@ -3299,11 +3298,17 @@ public class Form extends Container implements TopLevelContainer {
         // an EmbeddedContainer -- would otherwise overwrite the real surface's native
         // menu bar with its own.
         if (getParent() == null) {
-            if (Display.getInstance().isNativeCommands()) {
-                Display.impl.setNativeCommands(menuBar.getCommands());
-            } else if (isDesktopNativeChrome() && toolbar != null) {
-                // bridge the (hidden) toolbar's commands to the native desktop menu bar
+            if (isDesktopNativeChrome() && toolbar != null) {
+                // bridge the (hidden) toolbar's commands to the native desktop menu bar.
+                // Checked BEFORE the native command behaviour: the desktop native themes declare
+                // commandBehavior Native, and with a Toolbar the commands live on the Toolbar
+                // rather than on this form's MenuBar -- publishing the MenuBar's list there
+                // handed the native menu bar nothing, so it came up empty while the Toolbar
+                // that held the commands was hidden. getAllNativeMenuCommands() includes the
+                // Toolbar's MenuBar, so nothing the other branch would publish is lost.
                 Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+            } else if (Display.getInstance().isNativeCommands()) {
+                Display.impl.setNativeCommands(menuBar.getCommands());
             }
         }
         if (getParent() != null) {
@@ -4945,6 +4950,50 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         return false;
+    }
+
+    /// Ends a gesture the platform abandoned, without the release it never sent: see
+    /// `Display#pointerCancelled(int, int)`. What the press left waiting for a release is
+    /// un-pressed without firing -- `setReleased()`, the same path a drag out of a button
+    /// takes -- and the component the gesture was dragging is ended through
+    /// `Component#pointerCancelledImpl(int, int)`: a scroll settles and a lightweight drag is
+    /// abandoned, with none of a release's callbacks.
+    void pointerCancelled(int x, int y) {
+        if (componentsAwaitingRelease != null) {
+            for (Component c : componentsAwaitingRelease) {
+                Component lead = LeadUtil.leadComponentImpl(c);
+                if (lead instanceof ReleasableComponent) {
+                    ((ReleasableComponent) lead).setReleased();
+                }
+            }
+            componentsAwaitingRelease = null;
+        }
+        Component scrolling = dragged;
+        dragged = null;
+        stickyDrag = null;
+        // Through the setters, as the release does: the press started a ripple animation, and
+        // leaving it set kept the form animating for good.
+        setRippleMotion(null);
+        setPressedCmp(null);
+        currentPointerPress = null;
+        if (scrolling != null) {
+            scrolling.pointerCancelledImpl(x, y);
+        }
+        // A material pull-to-refresh pulled far enough armed a release listener here and put its
+        // indicator in a layered pane. The cancel withdraws both: the refresh does not run, and
+        // the listener does not wait for the next release to run it -- and swallow that release.
+        Object pullRelease = getClientProperty(Component.PULL_TO_REFRESH_RELEASE);
+        if (pullRelease instanceof ActionListener) {
+            putClientProperty(Component.PULL_TO_REFRESH_RELEASE, null);
+            removePointerReleasedListener((ActionListener) pullRelease);
+            Container indicator = getLayeredPane(InfiniteProgress.class, true);
+            if (indicator.getComponentCount() > 0
+                    && !(indicator.getComponentAt(0) instanceof InfiniteProgress)) {
+                indicator.removeAll();
+                indicator.revalidate();
+            }
+        }
+        repaint();
     }
 
     /// {@inheritDoc}

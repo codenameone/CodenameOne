@@ -24,8 +24,6 @@
 package com.codename1.io.rest;
 
 /// A generic error callback interface for an error code returned from the server
-///
-/// @author Shai Almog
 public interface ErrorCodeHandler<T> {
     /// An error callback can be invoked with a different type from the success
     /// callback

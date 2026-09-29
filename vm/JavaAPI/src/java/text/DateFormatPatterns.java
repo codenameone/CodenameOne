@@ -24,9 +24,6 @@ package java.text;
 
 /**
  * Common patterns for dates, times, and timestamps.
- * 
- * @author Eric Coolman
- *
  */
 class DateFormatPatterns {
 	/**

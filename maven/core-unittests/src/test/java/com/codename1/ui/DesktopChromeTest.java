@@ -24,10 +24,12 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -136,6 +138,82 @@ class DesktopChromeTest extends UITestBase {
      * form takes when the application sets {@code Display.COMMAND_BEHAVIOR_NATIVE} directly
      * rather than through the desktop title-bar mode.
      */
+    /**
+     * The desktop native themes declare {@code commandBehavior: Native}. With a Toolbar the
+     * commands live on the Toolbar, not on the form's MenuBar, so publishing the MenuBar's list
+     * at show time handed the native menu bar nothing: the menu bar came up empty and the
+     * commands, whose Toolbar was hidden, could not be reached at all.
+     */
+    @FormTest
+    void nativeCommandBehaviourWithAToolbarPublishesTheToolbarsCommands() {
+        desktopMode("native");
+        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+        try {
+            Form f = new Form("My App");
+            Command save = Command.create("Save", null, null);
+            f.getToolbar().addCommandToOverflowMenu(save);
+            f.show();
+            DisplayTest.flushEdt();
+
+            Vector bridged = implementation.getLastNativeCommands();
+            assertNotNull(bridged, "commands must be bridged to the native menu bar");
+            assertTrue(bridged.contains(save), "the Toolbar's command must reach the native menu bar");
+        } finally {
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
+        }
+    }
+
+    @FormTest
+    void nativeModeToolbarBarAndOverflowCommandsAddedAfterShowReachTheNativeMenu() {
+        // Only the side-menu paths used to republish; a command added to the left bar, the right
+        // bar or the overflow after the form was shown had nowhere to appear while the Toolbar
+        // was hidden.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.show();
+        DisplayTest.flushEdt();
+
+        Command left = Command.create("Left", null, null);
+        Command right = Command.create("Right", null, null);
+        Command overflow = Command.create("Overflow", null, null);
+        f.getToolbar().addCommandToLeftBar(left);
+        f.getToolbar().addCommandToRightBar(right);
+        f.getToolbar().addCommandToOverflowMenu(overflow);
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(left), "left bar command published");
+        assertTrue(bridged.contains(right), "right bar command published");
+        assertTrue(bridged.contains(overflow), "overflow command published");
+
+        f.getToolbar().removeOverflowCommand(overflow);
+        f.getToolbar().removeCommand(right);
+        bridged = implementation.getLastNativeCommands();
+        assertFalse(bridged.contains(overflow), "a removed overflow command leaves the native menu");
+        assertFalse(bridged.contains(right), "a removed bar command leaves the native menu");
+    }
+
+    @FormTest
+    void nativeModeLeavesTheSearchCommandOutOfTheNativeMenu() {
+        // The search command opens a search bar inside the Toolbar, which native chrome hides;
+        // from the menu it threw instead of searching.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.getToolbar().addSearchCommand(null);
+        Command other = Command.create("Other", null, null);
+        f.getToolbar().addCommandToOverflowMenu(other);
+        f.show();
+        DisplayTest.flushEdt();
+
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(other), "ordinary commands are still published");
+        for (int i = 0; i < bridged.size(); i++) {
+            Command c = (Command) bridged.elementAt(i);
+            assertFalse(c.getMaterialIcon() == FontImage.MATERIAL_SEARCH && "".equals(c.getCommandName()),
+                    "the search command is not published");
+        }
+        f.getToolbar().showSearchBar(null);
+        DisplayTest.flushEdt();
+    }
+
     @FormTest
     void nativeCommandBehaviourStillDrawsSoftButtonsWithNoNativeMenuBar() {
         implementation.setDesktop(true);
@@ -155,6 +233,86 @@ class DesktopChromeTest extends UITestBase {
             Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
             Toolbar.setGlobalToolbar(true);
         }
+    }
+
+    /**
+     * The Initializr's barebones template does exactly this in {@code runApp()}. In native mode
+     * the side menu used to be built on {@code getComponentForm()}, which is null while the
+     * toolbar is detached, so the app died with a NullPointerException before its first form
+     * was shown -- a blank desktop window for every project generated with
+     * {@code desktop.titleBar=native}.
+     */
+    @FormTest
+    void nativeModeBridgesSideMenuCommandsInsteadOfBuildingASideMenu() {
+        desktopMode("native");
+
+        Form hi = new Form("Hi World", BoxLayout.y());
+        hi.add(new Button("Hello World"));
+        Command hello = hi.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                FontImage.MATERIAL_CHECK, 4, e -> { });
+        hi.show();
+        DisplayTest.flushEdt();
+
+        assertNull(hi.getToolbar().getParent(), "the toolbar stays detached in native mode");
+        Vector bridged = implementation.getLastNativeCommands();
+        assertNotNull(bridged, "commands must be bridged to the native menu bar");
+        assertTrue(bridged.contains(hello), "the side-menu command must reach the native menu bar");
+    }
+
+    /** The rest of the Toolbar API that assumed an attached form. */
+    @FormTest
+    void nativeModeToolbarCallsDoNotNeedAnAttachedForm() {
+        desktopMode("native");
+
+        Form f = new Form("Detached");
+        Toolbar tb = f.getToolbar();
+        Command item = new Command("Item");
+        tb.addComponentToSideMenu(new Label("Header"));
+        tb.addComponentToSideMenu(new Button("Row"), item);
+        tb.addComponentToRightSideMenu(new Label("Right header"));
+        Command back = new Command("Back");
+        tb.setBackCommand(back);
+        assertEquals(back, f.getBackCommand(), "the back command still reaches the form");
+        tb.hideToolbar();
+        tb.showToolbar();
+        tb.openSideMenu();
+        tb.openRightSideMenu();
+        f.show();
+        DisplayTest.flushEdt();
+
+        assertTrue(implementation.getLastNativeCommands().contains(item),
+                "a component row's command reaches the native menu bar");
+    }
+
+    @FormTest
+    void nativeModeRemovedSideMenuCommandLeavesTheNativeMenu() {
+        desktopMode("native");
+
+        Form f = new Form("Remove");
+        Command gone = new Command("Gone");
+        f.getToolbar().addCommandToSideMenu(gone);
+        f.getToolbar().removeCommand(gone);
+
+        assertFalse(f.getToolbar().getAllNativeMenuCommands().contains(gone),
+                "a removed command must not be bridged");
+    }
+
+    @FormTest
+    void nativeModeSideMenuCommandsChangedAfterShowReachTheNativeMenu() {
+        desktopMode("native");
+
+        Form f = new Form("Later");
+        f.show();
+        DisplayTest.flushEdt();
+
+        Command later = new Command("Later");
+        f.getToolbar().addCommandToSideMenu(later);
+        assertTrue(implementation.getLastNativeCommands().contains(later),
+                "a command added while the form is showing must be published");
+
+        f.getToolbar().removeCommand(later);
+        assertFalse(implementation.getLastNativeCommands().contains(later),
+                "and removing it must unpublish it");
     }
 
     private boolean hasButtonLabelled(Container root, String text) {

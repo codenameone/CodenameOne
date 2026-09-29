@@ -26,6 +26,7 @@ import java.lang.annotation.*;
 /// Join table and key column names for an owning to-many association.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface JoinTable {
     /// Names the table storing association membership.
     /// @return join table name

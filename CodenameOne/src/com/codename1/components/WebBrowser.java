@@ -57,8 +57,6 @@ import java.io.OutputStreamWriter;
 /// On Android this component might show a native progress indicator dialog. You can disable that functionality
 /// using `Display.getInstance().setProperty("WebLoadingHidden", "true");`.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// Use`com.codename1.ui.BrowserComponent` instead. The original purpose of this class was to work as an interim solution for platforms where `com.codename1.ui.BrowserComponent` isn't supported however all currently supported platforms work with `BrowserComponent` so there is no real reason to use this class

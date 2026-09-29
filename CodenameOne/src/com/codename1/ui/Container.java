@@ -85,8 +85,6 @@ import java.util.Vector;
 /// Container also provides the lead component functionality that allows treating an entire Container hierarchy
 /// as a single component. This is discussed in depth within the [developer guide](https://www.codenameone.com/manual/misc-features.html#_lead_component).
 ///
-/// @author Chen Fishbein
-///
 /// #### See also
 ///
 /// - com.codename1.ui.layouts
@@ -2531,6 +2529,15 @@ public class Container extends Component implements Iterable<Component> {
                 }
 
             }
+        }
+    }
+
+    /// Runs the layout-on-paint step of {@link #paint(Graphics)} for a subclass that
+    /// paints its children itself (the Tabs bar paints each tab twice for the
+    /// Liquid Glass selection) and so cannot call super.paint().
+    final void layoutForPaint() {
+        if (allowEnableLayoutOnPaint && enableLayoutOnPaint) {
+            layoutContainer();
         }
     }
 

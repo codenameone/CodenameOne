@@ -55,8 +55,6 @@ package com.codename1.location;
 /// }
 /// ```
 ///
-/// @author Chen
-///
 /// #### See also
 ///
 /// - LocationManager#isGeofenceSupported()

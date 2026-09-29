@@ -102,9 +102,6 @@ import javax.swing.Timer;
  *          name="JCollapsiblePane"
  *          shortDescription="A pane which hides its content with an animation."
  *          stopClass="java.awt.Component"
- *          
- * @author rbair (from the JDNC project)
- * @author <a href="mailto:fred@L2FProd.com">Frederic Lavigne</a>
  */
 public class JCollapsiblePane extends JPanel {
 
@@ -454,8 +451,6 @@ public class JCollapsiblePane extends JPanel {
    * fires off in response to scroll up/down requests. This listener is
    * responsible for modifying the size of the content container and causing it
    * to be repainted.
-   * 
-   * @author Richard Bair
    */
   private final class AnimationListener implements ActionListener {
     /**

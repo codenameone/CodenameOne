@@ -35,8 +35,6 @@ import java.io.InputStream;
 ///
 /// @deprecated the InnerActive ad network is defunct. Use the modern pluggable
 /// advertising API in [com.codename1.ads.AdManager] instead.
-///
-/// @author Chen
 @Deprecated
 public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField removed obsolete field
 

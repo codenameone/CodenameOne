@@ -32,8 +32,6 @@ import com.codename1.sensors.MotionSensorManager;
  * to m/s^2 and matches the axis convention documented by the API (at rest, face
  * up, z reports +9.81). Access to the motion hardware requires the build
  * argument {@code ios.NSMotionUsageDescription}.
- *
- * @author Codename One
  */
 public class IOSMotionSensorManager extends MotionSensorManager {
 

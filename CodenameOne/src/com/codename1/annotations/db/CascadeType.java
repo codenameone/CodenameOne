@@ -23,6 +23,7 @@
 package com.codename1.annotations.db;
 
 /// Operations propagated from an entity to its related entities.
+@com.codename1.impl.SharedWithBackend
 public enum CascadeType {
     /// Propagates all supported cascade operations.
     ALL,

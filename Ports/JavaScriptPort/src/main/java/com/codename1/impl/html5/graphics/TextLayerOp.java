@@ -45,8 +45,6 @@ import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
  *
  * <p>Only the recorder understands these ops. Executed against anything else -- an offscreen
  * surface's immediate context, which never carries promoted text -- it does nothing.</p>
- *
- * @author Codename One
  */
 public final class TextLayerOp implements ExecutableOp {
     private final int kind;

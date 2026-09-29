@@ -47,10 +47,6 @@ import com.codename1.html5.js.dom.NodeList;
 import org.w3c.dom.html.HTMLStyleElement;
 
 
-/**
- *
- * @author shannah
- */
 public class HTML5Peer extends PeerComponent {
     
     //HTMLElement el;

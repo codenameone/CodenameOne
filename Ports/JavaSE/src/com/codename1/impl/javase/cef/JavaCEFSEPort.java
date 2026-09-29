@@ -55,10 +55,6 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.JFrame;
 
-/**
- *
- * @author shannah
- */
 public class JavaCEFSEPort extends JavaSEPort {
     
     private static boolean cefExists;

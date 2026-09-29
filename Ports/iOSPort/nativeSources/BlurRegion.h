@@ -23,6 +23,8 @@
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
 
+@class GLUIImage;
+
 // Queued op for CSS backdrop-filter:blur on the LIVE screen (real "Liquid
 // Glass"). Enqueued in paint order; during the drain (after the backdrop ops,
 // before the glass component's foreground) it asks the METALView to blur the
@@ -52,6 +54,18 @@
     float aberration;
     int tintColor;
     float tintStrength;
+    // When colorMatrix is YES this op runs Graphics.colorMatrixRegion
+    // (colorMatrixScreenRegionX): each pixel becomes mix(p, clamp(M.p + off), k)
+    // with k = amount * shape coverage * mask alpha. matrix is row-major
+    // [r0 g0 b0 off0 | r1 g1 b1 off1 | r2 g2 b2 off2], maskImage may be nil.
+    BOOL colorMatrix;
+    float matrix[12];
+    GLUIImage* maskImage;
+    float amount;
+    // When glassLens is YES this op runs Graphics.glassLensRegion
+    // (glassLensScreenRegionX) with the GlassLensBlend parameters in optics.
+    BOOL glassLens;
+    float optics[16];
 }
 
 -(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h r:(float)r;
@@ -61,5 +75,10 @@
 -(id)initWithLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
          cornerRadius:(float)cr magnify:(float)mg aberration:(float)ab
             tintColor:(int)tc tintStrength:(float)ts;
+-(id)initWithGlassLensArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h cornerRadius:(float)cr
+                     optics:(const float*)o count:(int)count amount:(float)am;
+-(id)initWithColorMatrixArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h
+                      matrix:(const float*)m mask:(GLUIImage*)mask
+                cornerRadius:(float)cr amount:(float)am;
 
 @end

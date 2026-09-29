@@ -46,8 +46,6 @@ import java.io.IOException;
 /// it. That behaviour has since been fixed: the iOS port no longer closes SQLite handles from the
 /// garbage collector thread, and it opens each connection in serialised mode rather than trying to
 /// configure the whole process.
-///
-/// @author Shai Almog
 public class ThreadSafeDatabase extends Database {
     private final Database underlying;
     private final EasyThread et;

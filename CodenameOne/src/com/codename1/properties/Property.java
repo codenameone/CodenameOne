@@ -27,8 +27,6 @@ import com.codename1.compat.java.util.Objects;
 
 /// Base class for a property, it can store a generic value of any type and broadcast change events to
 /// external listeners
-///
-/// @author Shai Almog
 public class Property<T, K> extends PropertyBase<T, K> {
     private T value;
 

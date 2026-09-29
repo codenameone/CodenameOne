@@ -42,7 +42,6 @@ import javafx.stage.WindowEvent;
 
 /**
  * A Browser Window implementation that uses JavaFX components.
- * @author shannah
  * @since 7.0
  */
 public class FXBrowserWindowSE extends AbstractBrowserWindowSE {

@@ -25,8 +25,6 @@ package com.codename1.ui.plaf;
 
 /**
  * Allows placing cache data within a style object to make painting the style much faster
- *
- * @author Shai Almog
  */
 public class StyleAccessor {
     public static Object getCachedData(Style s) {

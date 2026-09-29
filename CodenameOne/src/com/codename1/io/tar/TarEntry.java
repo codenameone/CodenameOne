@@ -20,7 +20,6 @@ import com.codename1.io.FileSystemStorage;
 
 import java.util.Date;
 
-/// @author Kamran Zafar
 public class TarEntry {
     protected String file;
     protected TarHeader header;

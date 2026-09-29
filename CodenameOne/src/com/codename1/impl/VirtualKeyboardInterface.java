@@ -25,8 +25,6 @@ package com.codename1.impl;
 
 /// Virtual keyboards needs to implement this interface to be registered as a platform
 /// keyboard.
-///
-/// @author Chen Fishbein
 public interface VirtualKeyboardInterface {
 
     /// This can be used to indicate to the VirtualKeyboard what type of input

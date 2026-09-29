@@ -20,7 +20,7 @@ jobs:
   # contract's staleness window.
   publish-latest-port-reports:
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -30,7 +30,7 @@ jobs:
         run: scripts/hellocodenameone/conformance/backfill_port_status.sh
 
   build-javascript-app:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
@@ -63,7 +63,7 @@ jobs:
 
   browser-lifecycle:
     needs: build-javascript-app
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -114,7 +114,7 @@ jobs:
     # some later deployment. The two concerns are now separated.
     if: always()
     needs: [build-javascript-app, browser-lifecycle, publish-latest-port-reports]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4

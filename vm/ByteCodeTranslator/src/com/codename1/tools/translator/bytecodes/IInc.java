@@ -25,10 +25,6 @@ package com.codename1.tools.translator.bytecodes;
 
 import org.objectweb.asm.Opcodes;
 
-/**
- *
- * @author Shai Almog
- */
 public class IInc extends Instruction {
     private int var;
     private int num;

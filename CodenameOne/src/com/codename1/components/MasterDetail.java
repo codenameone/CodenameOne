@@ -37,8 +37,6 @@ import com.codename1.ui.layouts.BorderLayout;
 
 /// Master-detail utility class simplifying the process of defining a master/detail
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// this was a half baked idea that made it into the public API

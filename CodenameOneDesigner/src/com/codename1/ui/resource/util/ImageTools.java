@@ -32,8 +32,6 @@ import java.util.List;
 
 /**
  * Tools allowing us to support the indexed image API in the resource editor
- *
- * @author Shai Almog
  */
 public class ImageTools {
 

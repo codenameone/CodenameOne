@@ -34,7 +34,6 @@ import java.util.Properties;
 /**
  * A tool to import images into resources files.  Used for CSS projects, when adding images
  * via the GUI builder (i.e. the command line designer with -img or -mimg) options.
- * @author shannah
  */
 public class CSSImageImporter {
     

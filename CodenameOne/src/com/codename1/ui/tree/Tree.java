@@ -125,7 +125,6 @@ import java.util.Vector;
 ///         String n = (String)child;
 ///         int pos = n.lastIndexOf("/");
 ///         if(pos
-/// @author Shai Almog
 public class Tree extends Container {
     private static final String KEY_OBJECT = "TREE_OBJECT";
     private static final String KEY_PARENT = "TREE_PARENT";

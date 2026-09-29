@@ -28,8 +28,6 @@ package com.codename1.system;
 /// [quick "How Do I?" tutorial](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html).
 ///
 /// Alternatively you can dig deeper into [this tutorial for integrating 3rd party native libraries](https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html).
-///
-/// @author Shai Almog
 public interface NativeInterface {
     /// Indicates whether this native interface is supported on the current platform
     ///

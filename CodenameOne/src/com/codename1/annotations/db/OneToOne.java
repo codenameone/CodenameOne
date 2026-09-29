@@ -26,6 +26,7 @@ import java.lang.annotation.*;
 /// Maps a single related entity with a unique owning foreign key, or an inverse mappedBy field.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface OneToOne {
     /// Controls relationship initialization.
     /// @return fetch policy; EAGER for to-one and LAZY for collections by default

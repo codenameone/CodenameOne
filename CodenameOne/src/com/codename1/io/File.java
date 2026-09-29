@@ -35,8 +35,6 @@ import java.util.ArrayList;
 /// This class provides a similar API to `java.io.File` making it almost into a "drop in" replacement.
 /// It is placed in a different package because it is incompatible to `java.io.File` by definition.  It is useful
 /// in getting some simple code to work without too many changes
-///
-/// @author Shai Almog
 public class File {
     public static final char separatorChar = '/';
     public static final String separator = "/";

@@ -30,8 +30,6 @@ import java.util.Map;
 
 /// A date spinner allows selecting a date value within the given date range
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// use Picker instead

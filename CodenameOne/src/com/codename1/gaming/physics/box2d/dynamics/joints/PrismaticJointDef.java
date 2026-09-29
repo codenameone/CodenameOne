@@ -33,7 +33,6 @@ import com.codename1.gaming.physics.box2d.dynamics.Body;
 /// when the local anchor points coincide in world space. Using local
 /// anchors and a local axis helps when saving and loading a game.
 /// @warning at least one body should by dynamic with a non-fixed rotation.
-/// @author Daniel
 public class PrismaticJointDef extends JointDef {
 
 

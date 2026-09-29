@@ -26,8 +26,6 @@ package com.codename1.ui.plaf;
 
 /**
  * Allows us to derive and override the UIManager for the localization tool
- *
- * @author Shai Almog
  */
 public class ProtectedUIManager extends UIManager {
     public ProtectedUIManager() {}

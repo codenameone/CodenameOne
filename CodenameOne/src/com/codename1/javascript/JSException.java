@@ -31,8 +31,6 @@ package com.codename1.javascript;
 /// `BrowserComponent#executeAndWait(java.lang.String)`, etc.. as these
 /// work asynchronously (except in the XXXAndWait() variants, which use
 /// invokeAndBlock() to make the calls synchronously.
-///
-/// @author Steve Hannah
 class JSException extends RuntimeException {
     public JSException(String msg) {
         super(msg);

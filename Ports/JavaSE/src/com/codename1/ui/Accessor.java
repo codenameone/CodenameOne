@@ -25,8 +25,6 @@ package com.codename1.ui;
 
 /**
  * Allows access to package protected methods without exposing them thru official API
- * 
- * @author Shai Almog
  */
 public class Accessor {
     public static Object getNativeGraphics(Graphics g) {

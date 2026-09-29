@@ -24,8 +24,6 @@ package com.codename1.media;
 
 import com.codename1.ui.CN;
 
-/// @author shannah
-///
 /// #### Deprecated
 ///
 /// for internal use only.

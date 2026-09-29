@@ -23,10 +23,6 @@
 
 package com.codename1.ui.spinner;
 
-/**
- *
- * @author shannah
- */
 public class SpinnerAccessor {
      public static void setSuppressPaint(Picker picker, boolean suppress) {
         picker.setSuppressPaint(suppress);

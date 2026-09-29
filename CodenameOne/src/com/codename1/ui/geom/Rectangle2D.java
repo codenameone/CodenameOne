@@ -27,8 +27,6 @@ import com.codename1.ui.Transform;
 
 /// Represents a Rectangle position (x, y) and `Dimension` (width, height),
 /// this is useful for measuring coordinates within the application.
-///
-/// @author Chen Fishbein
 public class Rectangle2D implements Shape {
 
     private final Dimension2D size;

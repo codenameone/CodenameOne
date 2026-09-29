@@ -43,8 +43,6 @@ import java.util.HashMap;
 
 /// Abstracts the underlying platform images allowing us to treat them as a uniform
 /// object.
-///
-/// @author Chen Fishbein
 public class Image implements ActionSource {
     private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;

@@ -31,10 +31,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Properties;
 
-/**
- *
- * @author shai
- */
 public class SortedProperties extends Properties {
     private static final long serialVersionUID = 1L;
 

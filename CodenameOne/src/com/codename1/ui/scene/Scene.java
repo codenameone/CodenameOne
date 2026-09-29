@@ -28,8 +28,6 @@ import com.codename1.ui.Graphics;
 
 /// A scene graph.  Supports 3D on platforms where `com.codename1.ui.Transform#isPerspectiveSupported()` is true (iOS and Android currently).
 ///
-/// @author Steve Hannah
-///
 /// #### Deprecated
 ///
 /// For internal use only

@@ -106,10 +106,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.flute.parser.ParseException;
 
-/**
- *
- * @author shannah
- */
 public class CSSTheme {
     private boolean refreshImages;
     URL baseURL;
@@ -7018,11 +7014,16 @@ public class CSSTheme {
         // `updateResources()` only has to look in one place; emission to
         // the .res is gated on whether the resulting theme key is one of
         // the accent-bearing color outputs (fg/bg color today).
-        if (value instanceof ScaledUnit) {
-            String varName = ((ScaledUnit) value).bindingVarName;
-            if (varName != null && varName.length() > 0) {
-                style.bindings.put(property, varName);
-            }
+        String varName = value instanceof ScaledUnit ? ((ScaledUnit) value).bindingVarName : null;
+        if (varName != null && varName.length() > 0) {
+            style.bindings.put(property, varName);
+        } else if ("color".equals(property) || "background-color".equals(property)) {
+            // A later literal for the same property wins the cascade, so it must
+            // also drop an earlier var() binding: otherwise the runtime
+            // applyThemeBindings pass re-applies the variable and the override
+            // silently loses (a theme generation file overriding a
+            // `color: var(--accent-color-dark)` rule from the shared sheet).
+            style.bindings.remove(property);
         }
 
         switch (property) {

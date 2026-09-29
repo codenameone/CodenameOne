@@ -108,18 +108,13 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// See the [StatusBarDemo](https://github.com/codenameone/codenameone-demos/blob/master/ToastBarDemo/src/com/codename1/demos/status/ToastBarDemo.java)
 ///
-/// Screenshots
+/// Status with a progress bar:
 ///
-/// Status With Progress Bar
+/// ![A status message with a progress bar](https://www.codenameone.com/developer-guide/img/components-statusbar.png)
 ///
-/// Status With Multi-Line Message
+/// Status with a multi-line message:
 ///
-/// Video Demo
-///
-/// Note: the video above refers to the `ToastBar` based on its development name of StatusBar. This
-/// was changed to avoid confusion with the iOS StatusBar.
-///
-/// @author shannah
+/// ![A status message that wraps over several lines](https://www.codenameone.com/developer-guide/img/components-statusbar-multiline.png)
 public final class ToastBar {
 
     /// The default timeout for info/error messages

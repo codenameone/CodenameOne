@@ -44,3 +44,202 @@ CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman co
 CodenameOne/src/com/codename1/processing/TextEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/ContainsEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/XMLContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+vm/JavaAPI/src/java/util/AbstractCollection.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/AbstractList.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/AbstractSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/ArrayDeque.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/HashSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/LinkedHashSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Stack.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Vector.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/RayCastCallback.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/AABB.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/Collision.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/Distance.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/TimeOfImpact.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/broadphase/BroadPhaseStrategy.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/shapes/Shape.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/IViewportTransform.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Mat33.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Settings.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Sweep.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/Body.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/Fixture.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/World.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/FrictionJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/Joint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/util/MathUtil.java | Port of Sun Microsystems FDLIBM retaining its original freely-distributable notice
+# Pulled into the diff-scoped check by the repository-wide @author/@version removal:
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/ContactFilter.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/ContactImpulse.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/ContactListener.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/DebugDraw.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/DestructionListener.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/QueryCallback.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/TreeCallback.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/TreeRayCastCallback.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/DistanceOutput.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/WorldManifold.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/broadphase/BroadPhase.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/broadphase/DynamicTree.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/shapes/ChainShape.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/shapes/EdgeShape.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/collision/shapes/ShapeType.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Color3f.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/OBBViewportTransform.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Rot.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/common/Vec3.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/BodyDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/BodyType.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/ContactManager.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/Filter.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/FixtureDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/FixtureProxy.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/Island.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/contacts/Contact.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/contacts/ContactEdge.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/contacts/ContactSolver.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/FrictionJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/GearJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/GearJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/JointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/JointEdge.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/MouseJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/MouseJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/PrismaticJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/PrismaticJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/PulleyJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/PulleyJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/RevoluteJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/RopeJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause); upstream ships this file without a header
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/RopeJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause); upstream ships this file without a header
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/WeldJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/WeldJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/WheelJoint.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/dynamics/joints/WheelJointDef.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/IDynamicStack.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/IOrderedStack.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/IWorldPool.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/arrays/FloatArray.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/arrays/IntArray.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/arrays/Vec2Array.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/normal/DefaultWorldPool.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/gaming/physics/box2d/pooling/normal/OrderedStack.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
+CodenameOne/src/com/codename1/io/tar/Octal.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/io/tar/TarConstants.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/io/tar/TarEntry.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/io/tar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/io/tar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/io/tar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) port whose notice sits in the source comment as upstream wrote it
+CodenameOne/src/com/codename1/javascript/JSException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/javascript/JSFunction.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/javascript/JSObject.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/javascript/JavascriptContext.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/javascript/JavascriptEvent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/DateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/DateFormatPatterns.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/DateFormatSymbols.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/l10n/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/maps/BoundingBox.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/CacheProviderProxy.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/Coord.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/Mercator.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/PositionedTile.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/Projection.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/ProxyHttpTile.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/Tile.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/layers/AbstractLayer.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/layers/ArrowLinesLayer.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/layers/LinesLayer.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/layers/PointLayer.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/layers/PointsLayer.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/providers/MapProvider.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/providers/OpenStreetMapProvider.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/maps/providers/TiledProvider.java | Itiner.pl contribution retaining its original copyright line
+CodenameOne/src/com/codename1/processing/Evaluator.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/processing/EvaluatorFactory.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/processing/JSONContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/processing/PrettyPrinter.java | Sun Microsystems BSD-licensed source retaining its original notice
+CodenameOne/src/com/codename1/processing/StructuredContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+CodenameOne/src/com/codename1/ui/html/HTMLEventsListener.java | LWUIT (Oracle) source whose package siblings carry the Oracle header; it shipped without one, which is not ours to add
+CodenameOne/src/com/codename1/ui/layouts/GridBagConstraints.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/ui/layouts/Insets.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/CharacterArrayCharacterIterator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/CharacterIterator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/RE.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/RECharacter.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/RECompiler.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/REDebugCompiler.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/REProgram.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/RESyntaxException.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/REUtil.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/ReaderCharacterIterator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/StreamCharacterIterator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/StringCharacterIterator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/regex/StringReader.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+CodenameOneDesigner/src/com/l2fprod/common/Version.java | Generated by the JReleaseInfo Ant task for the vendored l2fprod components
+CodenameOneDesigner/src/com/l2fprod/common/swing/JCollapsiblePane.java | l2fprod common components, Apache-2.0, retaining the original notice
+CodenameOneDesigner/src/com/l2fprod/common/swing/plaf/AbstractComponentAddon.java | l2fprod common components, Apache-2.0, retaining the original notice
+CodenameOneDesigner/src/com/l2fprod/common/swing/plaf/ComponentAddon.java | l2fprod common components, Apache-2.0, retaining the original notice
+CodenameOneDesigner/src/com/l2fprod/common/swing/plaf/LookAndFeelAddons.java | l2fprod common components, Apache-2.0, retaining the original notice
+CodenameOneDesigner/src/com/l2fprod/common/swing/renderer/DateRenderer.java | l2fprod common components, Apache-2.0, retaining the original notice
+Ports/Android/src/com/codename1/impl/android/IntentIntegrator.java | ZXing source (Apache-2.0) retaining its original notice
+Ports/Android/src/com/codename1/impl/android/util/Base64DecoderException.java | Google source (2002) retaining its original notice
+Ports/CLDC11/src/java/io/StringWriter.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+Ports/CLDC11/src/java/net/URI.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/DateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/DateFormatPatterns.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/DateFormatSymbols.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+maven/cn1app-archetype/src/main/resources/archetype-resources/common/src/test/java/MyFirstTest.java | Archetype template copied into user projects, which carries no Codename One header by design
+maven/cn1lib-archetype/src/main/resources/archetype-resources/common/src/test/java/FilechooserTest.java | Archetype template copied into user projects, which carries no Codename One header by design
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomActivation.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomActivationProperty.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomBacked.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomBuild.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomConfiguration.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomDependencies.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomDependency.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomDependencyManagement.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomExtension.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomMavenCoordinate.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomModel.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomModelBase.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomModules.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomParent.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomPlugin.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomPluginManagement.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomProfile.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomProperties.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomReportPlugin.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomReporting.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/JDomScm.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/MavenCoordinate.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/JDomModelETL.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/JDomModelETLFactory.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/ModelETL.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/ModelETLFactory.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/etl/ModelETLRequest.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/apache/maven/model/jdom/util/JDomUtils.java | Fork of the Apache Maven JDom model (Apache-2.0); upstream notice kept below the package line
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/Octal.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarConstants.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarEntry.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarInputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarOutputStream.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+maven/codenameone-maven-plugin/src/main/java/org/xeustechnologies/jtar/TarUtils.java | jtar (Kamran Zafar, Apache-2.0) retaining its original notice
+scripts/cn1playground/common/src/main/java/bsh/BSHEnhancedForStatement.java | BeanShell source, Apache-2.0, retaining its original notice
+scripts/cn1playground/common/src/main/java/bsh/Primitive.java | BeanShell source, Apache-2.0, retaining its original notice
+vm/JavaAPI/src/java/net/URI.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/net/URIHelper.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/DateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/DateFormatPatterns.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/DateFormatSymbols.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written

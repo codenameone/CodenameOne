@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Stores an entity hierarchy in one table with an immutable discriminator.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
+@com.codename1.impl.SharedWithBackend
 public @interface Inheritance {
     /// Names the column distinguishing concrete classes in this single-table hierarchy.
     /// @return column name; entity_type by default

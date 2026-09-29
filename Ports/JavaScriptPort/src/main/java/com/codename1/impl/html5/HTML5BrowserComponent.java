@@ -58,10 +58,6 @@ import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.html5.js.dom.TextRectangle;
 
-/**
- *
- * @author shannah
- */
 public class HTML5BrowserComponent extends HTML5Peer {
 
     BrowserComponent parent;

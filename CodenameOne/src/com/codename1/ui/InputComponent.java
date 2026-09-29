@@ -82,8 +82,6 @@ import java.util.ArrayList;
 ///
 /// f.show();
 /// ```
-///
-/// @author Shai Almog
 public abstract class InputComponent extends Container {
     static Boolean guiBuilderMode;
     private static boolean multiLineErrorMessage;

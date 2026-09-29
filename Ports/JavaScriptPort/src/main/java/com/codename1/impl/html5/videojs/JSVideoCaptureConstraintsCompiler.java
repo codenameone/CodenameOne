@@ -26,10 +26,6 @@ package com.codename1.impl.html5.videojs;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.impl.html5.videojs.MediaTool.MediaResult;
 
-/**
- *
- * @author shannah
- */
 public class JSVideoCaptureConstraintsCompiler implements VideoCaptureConstraints.Compiler {
 
     @Override

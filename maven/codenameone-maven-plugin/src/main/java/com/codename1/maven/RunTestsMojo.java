@@ -48,7 +48,6 @@ import org.apache.tools.ant.types.Path;
 /**
  * This mojo runs tests in the Codename One Test Runner.  This goal should be used in place of
  * the surefire plugin.
- * @author shannah
  */
 @Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
 public class RunTestsMojo extends AbstractCN1Mojo {

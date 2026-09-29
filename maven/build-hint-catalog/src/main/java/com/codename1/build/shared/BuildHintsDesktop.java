@@ -65,6 +65,47 @@ final class BuildHintsDesktop {
                         + "bundle and configures the app to use it. Setting this to `false` disables both proxy "
                         + "generation and proxy URL injection."));
 
+        h.add(new Hint("javascript.allowBrowserTranslation")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("javascript")
+                .doc("true/false (defaults to `false`). By default the page opts out of browser "
+                        + "machine translation (`<meta name=\"google\" content=\"notranslate\">` and "
+                        + "`translate=\"no\"`), because a translator rewriting the page under the running "
+                        + "app, or loading it through a translation proxy, breaks it. Set to `true` to let "
+                        + "the browser offer translation."));
+
+        h.add(new Hint("javascript.darkreaderLock")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("javascript")
+                .doc("true/false (defaults to `true`). Emits `<meta name=\"darkreader-lock\">` so the "
+                        + "Dark Reader extension leaves the app's own colors alone. Dark Reader honours the "
+                        + "lock in its default Dynamic mode only; its Filter, Filter+ and Static modes "
+                        + "ignore it. Set to `false` to omit the tag."));
+
+        h.add(new Hint("javascript.desktopTheme")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("auto")
+                .valuePattern("auto|fluent|aqua|adwaita|none")
+                .platform("javascript")
+                .doc("The native theme a desktop browser gets. `auto` (default) picks Windows Fluent, "
+                        + "macOS Aqua or GNOME Adwaita from the browser's operating system when "
+                        + "`nativeTheme=native`; phones and tablets keep the iOS and Android themes. "
+                        + "`fluent`, `aqua` or `adwaita` pins one theme for every desktop browser, so "
+                        + "the bundle carries only that one. `none` keeps the mobile themes on the "
+                        + "desktop too."));
+
+        h.add(new Hint("javascript.native.theme")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("An explicit native theme resource, such as `/WindowsFluentTheme.res`, used in "
+                        + "every browser instead of the one the theme hints and the browser would pick."));
+
         h.add(new Hint("javascript.portSources")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
@@ -94,6 +135,38 @@ final class BuildHintsDesktop {
                 .doc("The URL of an existing proxy to use for network requests. Setting it suppresses "
                         + "generated proxy packaging unless `javascript.proxy.target` is also set. If "
                         + "`javascript.inject_proxy` is `false`, this build hint is ignored."));
+
+        h.add(new Hint("javascript.pruneThemes")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("javascript")
+                .doc("true/false (defaults to `true`). The build ships only the native themes the "
+                        + "application can reach from its theme hints, plus any theme its code names "
+                        + "as a string. Set to `false` for an application that loads a native theme by "
+                        + "a name it computes or reads from configuration, which no build can see."));
+
+        h.add(new Hint("javascript.textSelection")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("javascript")
+                .doc("true/false (defaults to `false`). Makes read-only text -- labels, span labels and "
+                        + "non-editable text areas -- selectable and copyable in every form, using the "
+                        + "framework's own text selection. A mouse selects by dragging; a touch screen "
+                        + "selects with a long press, so a swipe still scrolls."));
+
+        h.add(new Hint("javascript.titleBar")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("toolbar")
+                .valuePattern("toolbar|html")
+                .platform("javascript")
+                .doc("How a desktop native theme presents the form title and commands in a browser. "
+                        + "`toolbar` (default) keeps the Toolbar in the app, styled by the desktop theme. "
+                        + "`html` shows the title in an HTML title bar and the commands in an HTML menu "
+                        + "bar above the app, the way the native desktop ports use the window title and "
+                        + "the system menu bar."));
 
         h.add(new Hint("linux.arch")
                 .group(HintGroup.LINUX)

@@ -63,8 +63,6 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(left).add(right).add(bottom).add(top);
 /// hi.show();
 /// ```
-///
-/// @author Chen Fishbein
 public class Label extends Component implements IconHolder, TextHolder {
 
     private static int defaultGap = 2;
@@ -75,6 +73,9 @@ public class Label extends Component implements IconHolder, TextHolder {
     private String text = "";
     private TextSelectionSupport textSelectionSupport;
     private boolean textSelectionEnabled;
+    /// True once `#setTextSelectionEnabled(boolean)` decided; until then the label follows
+    /// `TextSelection#setDefaultSelectable(boolean)`.
+    private boolean textSelectionExplicit;
     private Image icon;
     private final ActionListener iconChangeListener = new ActionListener() {
         @Override
@@ -1499,7 +1500,11 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// - #setTextSelectionEnabled(boolean)
     public boolean isTextSelectionEnabled() {
-        return textSelectionEnabled;
+        if (textSelectionExplicit) {
+            return textSelectionEnabled;
+        }
+        // A Button's press is its action, so it never takes the selectable default.
+        return !(this instanceof Button) && TextSelection.isSelectableByDefault(this);
     }
 
     /// Enables text selection on this label.  Text selection must also be enabled on the Form in order to
@@ -1518,6 +1523,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// - TextSelection#setEnabled(boolean)
     public void setTextSelectionEnabled(boolean enabled) {
         this.textSelectionEnabled = enabled;
+        this.textSelectionExplicit = true;
         if (enabled) {
             setCursor(Component.TEXT_CURSOR);
         }
@@ -1543,12 +1549,12 @@ public class Label extends Component implements IconHolder, TextHolder {
 
                 @Override
                 public boolean isTextSelectionEnabled(TextSelection sel) {
-                    return textSelectionEnabled;
+                    return Label.this.isTextSelectionEnabled();
                 }
 
                 @Override
                 public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
-                    return textSelectionEnabled;
+                    return Label.this.isTextSelectionEnabled();
                 }
 
                 @Override

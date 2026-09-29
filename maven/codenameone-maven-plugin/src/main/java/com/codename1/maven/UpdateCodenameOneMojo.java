@@ -47,7 +47,6 @@ import java.net.URLConnection;
 
 /**
  * A mojo that updates Codename One.
- * @author shannah
  */
 @Mojo(name = "update")
 public class UpdateCodenameOneMojo extends AbstractCN1Mojo {

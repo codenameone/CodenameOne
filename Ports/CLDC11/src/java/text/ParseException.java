@@ -23,8 +23,6 @@
 package java.text;
 
 /// An error occurred during parsing.
-///
-/// @author Eric Coolman
 public class ParseException extends Exception {
 	private int errorOffset;
 	private Throwable causedBy;

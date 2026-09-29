@@ -45,10 +45,6 @@ import org.apache.tools.ant.taskdefs.Java;
 import org.apache.tools.ant.types.Commandline.Argument;
 import org.apache.tools.ant.types.Path;
 
-/**
- *
- * @author shannah
- */
 public class CN1CSSCompileTask extends Task {
 
     @Override

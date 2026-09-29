@@ -24,8 +24,6 @@ package com.codename1.ui;
 
 /// Encapsulates the stroke used for drawing paths.
 ///
-/// @author Steve Hannah
-///
 /// #### See also
 ///
 /// - Graphics#setStroke

@@ -26,6 +26,7 @@ import java.lang.annotation.*;
 /// Foreign key column on the owning table.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface JoinColumn {
     /// Names the foreign key column on the owning table.
     /// @return column name; empty derives it from the relationship name

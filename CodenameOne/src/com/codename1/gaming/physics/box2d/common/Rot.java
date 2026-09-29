@@ -25,8 +25,6 @@ package com.codename1.gaming.physics.box2d.common;
 
 
 /// Represents a rotation
-///
-/// @author Daniel
 public class Rot {
 
   public float s, c; // sin and cos

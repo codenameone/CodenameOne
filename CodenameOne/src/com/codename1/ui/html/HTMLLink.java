@@ -35,8 +35,6 @@ import java.util.Vector;
 /// Since a link can be split on several lines, the concept of parent and child links is introduced here. A parent link is the first segment of the link
 /// while the children are all the other segments. Only the parent is focusable (so multiple focuses on the same links will be avoided).
 /// When the parent is focused, all the children get setFocus(true). Note that for pointer events, the children are also active.
-///
-/// @author Ofir Leitner
 class HTMLLink extends Button implements ActionListener {
 
     String link;

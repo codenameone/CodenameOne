@@ -39,8 +39,6 @@ import javax.swing.JTextField;
 /**
  * UI for editing arrays used by the UI Builder. Subclasses of this allow customizing
  * the type of entry within the array to commands etc.
- *
- * @author Shai Almog
  */
 public class ArrayEditor extends javax.swing.JPanel {
 

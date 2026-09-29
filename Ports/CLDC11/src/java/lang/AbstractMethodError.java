@@ -23,7 +23,6 @@
 package java.lang;
 
 /// Exception thrown when an attempt is made to call an abstract method.
-/// @author shannah
 public class AbstractMethodError extends Error {
     AbstractMethodError() {
         

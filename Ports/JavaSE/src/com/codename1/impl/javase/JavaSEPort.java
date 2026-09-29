@@ -218,8 +218,6 @@ import static com.codename1.impl.javase.util.MavenUtils.isRunningInMaven;
 
 /**
  * An implementation of Codename One based on Java SE
- *
- * @author Shai Almog
  */
 public class JavaSEPort extends CodenameOneImplementation {
 
@@ -21098,7 +21096,204 @@ public class JavaSEPort extends CodenameOneImplementation {
             int[] src = dest.getRGB(rx, ry, rw, rh, null, 0, rw);
             int[] out = new int[rw * rh];
             applyLensBuffer(src, out, rw, rh, cornerRadius * scale, magnify, aberration, tintColor, tintStrength);
-            dest.setRGB(rx, ry, rw, rh, out, 0, rw);
+            writeClipped(graphics, dest, rx, ry, rw, rh, out);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isGlassLensRegionSupported(Object graphics) {
+        return isColorMatrixRegionSupported(graphics);
+    }
+
+    /// Graphics.glassLensRegion over the simulator's backing buffer, through the
+    /// core reference (GlassLensBlend) so the simulator and the devices agree.
+    @Override
+    public boolean glassLensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float[] optics, float amount) {
+        if (width <= 0 || height <= 0 || optics == null || optics.length < com.codename1.ui.plaf.GlassLensBlend.COUNT) {
+            return true;
+        }
+        try {
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);
+                scale = 1.0;
+            } else {
+                return false;
+            }
+            float[] o = new float[optics.length];
+            for (int i = 0; i < optics.length; i++) {
+                o[i] = optics[i];
+            }
+            // Lengths scale with the buffer; levels (brightness, strengths) do not.
+            int[] lengths = {com.codename1.ui.plaf.GlassLensBlend.BEVEL, com.codename1.ui.plaf.GlassLensBlend.MAX_SHIFT,
+                com.codename1.ui.plaf.GlassLensBlend.OUTLINE_WIDTH, com.codename1.ui.plaf.GlassLensBlend.RIM_WIDTH,
+                com.codename1.ui.plaf.GlassLensBlend.END_SHADE_WIDTH, com.codename1.ui.plaf.GlassLensBlend.SHADOW_WIDTH};
+            for (int i : lengths) {
+                o[i] = (float) (optics[i] * scale);
+            }
+            float lx = (float) (x * scale);
+            float ly = (float) (y * scale);
+            float lw = (float) (width * scale);
+            float lh = (float) (height * scale);
+            float cr = cornerRadius < 0 ? cornerRadius : (float) (cornerRadius * scale);
+            int margin = com.codename1.ui.plaf.GlassLensBlend.margin(o);
+            int reach = com.codename1.ui.plaf.GlassLensBlend.reach(o) + margin;
+            int dw = dest.getWidth();
+            int dh = dest.getHeight();
+            int sx0 = Math.max(0, (int) Math.floor(lx) - reach);
+            int sy0 = Math.max(0, (int) Math.floor(ly) - reach);
+            int sx1 = Math.min(dw, (int) Math.ceil(lx + lw) + reach);
+            int sy1 = Math.min(dh, (int) Math.ceil(ly + lh) + reach);
+            int ox0 = Math.max(0, (int) Math.floor(lx) - margin);
+            int oy0 = Math.max(0, (int) Math.floor(ly) - margin);
+            int ox1 = Math.min(dw, (int) Math.ceil(lx + lw) + margin);
+            int oy1 = Math.min(dh, (int) Math.ceil(ly + lh) + margin);
+            if (sx1 <= sx0 || sy1 <= sy0 || ox1 <= ox0 || oy1 <= oy0) {
+                return true;
+            }
+            int sw = sx1 - sx0;
+            int sh = sy1 - sy0;
+            int[] src = dest.getRGB(sx0, sy0, sw, sh, null, 0, sw);
+            int ow = ox1 - ox0;
+            int oh = oy1 - oy0;
+            int[] out = new int[ow * oh];
+            com.codename1.ui.plaf.GlassLensBlend.apply(src, sw, sh, out, ox0 - sx0, oy0 - sy0, ow, oh,
+                    lx - sx0, ly - sy0, lw, lh, cr, o, amount);
+            writeClipped(graphics, dest, ox0, oy0, ow, oh, out);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// Writes the `w` x `h` pixels of `out` into `dest` at (`dx`, `dy`) (buffer
+    /// pixels), but only inside `graphics`' clip. The region ops read and write the
+    /// buffer directly, and a raw setRGB bypasses the Graphics2D clip that keeps a
+    /// component's painting off its siblings; the Metal and JavaScript paths clip.
+    private void writeClipped(Object graphics, BufferedImage dest, int dx, int dy, int w, int h, int[] out) {
+        int x0 = Math.max(0, dx);
+        int y0 = Math.max(0, dy);
+        int x1 = Math.min(dest.getWidth(), dx + w);
+        int y1 = Math.min(dest.getHeight(), dy + h);
+        Graphics2D g2 = getGraphics(graphics);
+        java.awt.Shape clip = g2.getClip();
+        if (clip != null) {
+            // The clip is in the graphics' user space; the buffer is in device pixels
+            // (the simulator zoom and any user transform in between).
+            java.awt.Rectangle c = g2.getTransform().createTransformedShape(clip).getBounds();
+            x0 = Math.max(x0, c.x);
+            y0 = Math.max(y0, c.y);
+            x1 = Math.min(x1, c.x + c.width);
+            y1 = Math.min(y1, c.y + c.height);
+        }
+        if (x1 <= x0 || y1 <= y0) {
+            return;
+        }
+        dest.setRGB(x0, y0, x1 - x0, y1 - y0, out, (y0 - dy) * w + (x0 - dx), w);
+    }
+
+    @Override
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        if (graphics instanceof NativeScreenGraphics) {
+            NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+            return ng.sourceImage != null || (canvas != null && canvas.edtBuffer != null);
+        }
+        return mutableImageGraphics.containsKey(graphics);
+    }
+
+    /// Graphics.colorMatrixRegion over the simulator's backing buffer (or an
+    /// off-screen mutable image), through the core reference implementation so the
+    /// simulator and the devices agree. The mask is sampled at the buffer's zoom.
+    @Override
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            com.codename1.ui.Image mask, float cornerRadius, float amount) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        try {
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);
+                scale = 1.0;
+            } else {
+                return false;
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            // Clip to the buffer, remembering where the clipped rect sits inside the
+            // full region so the shape and the mask stay anchored to the region.
+            int ox = 0;
+            int oy = 0;
+            int fullW = rw;
+            int fullH = rh;
+            if (rx < 0) {
+                ox = -rx;
+                rw += rx;
+                rx = 0;
+            }
+            if (ry < 0) {
+                oy = -ry;
+                rh += ry;
+                ry = 0;
+            }
+            if (rx + rw > dest.getWidth()) {
+                rw = dest.getWidth() - rx;
+            }
+            if (ry + rh > dest.getHeight()) {
+                rh = dest.getHeight() - ry;
+            }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            int[] full = new int[fullW * fullH];
+            int[] part = dest.getRGB(rx, ry, rw, rh, null, 0, rw);
+            for (int yy = 0; yy < rh; yy++) {
+                System.arraycopy(part, yy * rw, full, (yy + oy) * fullW + ox, rw);
+            }
+            int[] maskPixels = null;
+            int mw = 0;
+            int mh = 0;
+            if (mask != null) {
+                maskPixels = mask.getRGB();
+                mw = mask.getWidth();
+                mh = mask.getHeight();
+            }
+            float cr = cornerRadius < 0 ? cornerRadius : (float) (cornerRadius * scale);
+            com.codename1.ui.plaf.ColorMatrixBlend.apply(full, fullW, fullH, matrix, maskPixels, mw, mh, cr, amount);
+            for (int yy = 0; yy < rh; yy++) {
+                System.arraycopy(full, (yy + oy) * fullW + ox, part, yy * rw, rw);
+            }
+            writeClipped(graphics, dest, rx, ry, rw, rh, part);
             return true;
         } catch (Throwable t) {
             return false;

@@ -25,8 +25,6 @@
 package com.codename1.io;
 
 /// Callback for IO updates from a buffered input/output stream
-///
-/// @author Shai Almog
 public interface IOProgressListener {
     /// Indicates the number of bytes that were read/written to/from the source stream
     ///

@@ -22,10 +22,6 @@
  */
 package com.codename1.impl.ios;
 
-/**
- *
- * @author Shai Almog
- */
 public class Lifecycle {
     /**
      * Sent when the application is about to move from active to inactive state. 

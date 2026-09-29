@@ -282,8 +282,8 @@ JAVA_LONG com_codename1_maps_MapProviderImpl_nativeAddMarker___int_double_double
 
 static void cn1Coords(JAVA_OBJECT lats, JAVA_OBJECT lons, CLLocationCoordinate2D **out, int *count) {
     int n = (int)((JAVA_ARRAY)lats)->length;
-    JAVA_ARRAY_DOUBLE *la = (JAVA_ARRAY_DOUBLE*)((JAVA_ARRAY)lats)->data;
-    JAVA_ARRAY_DOUBLE *lo = (JAVA_ARRAY_DOUBLE*)((JAVA_ARRAY)lons)->data;
+    JAVA_ARRAY_DOUBLE *la = (JAVA_ARRAY_DOUBLE*)CN1_ARRAY_DATA(lats);
+    JAVA_ARRAY_DOUBLE *lo = (JAVA_ARRAY_DOUBLE*)CN1_ARRAY_DATA(lons);
     CLLocationCoordinate2D *c = malloc(sizeof(CLLocationCoordinate2D) * (n > 0 ? n : 1));
     for (int i = 0; i < n; i++) {
         c[i] = CLLocationCoordinate2DMake(la[i], lo[i]);

@@ -51,10 +51,6 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- *
- * @author shannah
- */
 public class SourceChangeWatcher implements Runnable {
     private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private WatchService watchService;

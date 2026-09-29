@@ -63,6 +63,17 @@ import javax.lang.model.util.Types;
  */
 final class Refs {
 
+    /**
+     * The site path every generated URL starts with.
+     *
+     * <p>{@code /javadoc/} for the client API, which is where every existing link
+     * points, and {@code /backend/javadoc/} for the backend runtime. Static
+     * because the URL helpers below are static and called from everywhere; the
+     * doclet sets it once at the start of a run, before anything is rendered, and
+     * javadoc runs one doclet per invocation.
+     */
+    private static String root = "/javadoc/";
+
     private final Types types;
 
     Refs(Types types) {
@@ -139,14 +150,52 @@ final class Refs {
      * assumed; see scripts/website/check-javadoc-urls.sh.
      */
     static String typeUrl(TypeElement type) {
+        return typeUrl(root, type);
+    }
+
+    /** The same path under another reference's root: the counterpart of a shared type. */
+    static String typeUrl(String base, TypeElement type) {
         PackageElement pkg = packageOf(type);
         String dir = pkg.isUnnamed() ? "" : pkg.getQualifiedName().toString().replace('.', '/') + "/";
-        return "/javadoc/" + dir + fileName(type) + "/";
+        return base + dir + fileName(type) + "/";
     }
 
     /** The site path of a package's summary page, in the same directory form. */
     static String packageUrl(PackageElement pkg) {
-        return "/javadoc/" + pkg.getQualifiedName().toString().replace('.', '/') + "/package-summary/";
+        return packageUrl(root, pkg);
+    }
+
+    /** The same package summary under another reference's root. */
+    static String packageUrl(String base, PackageElement pkg) {
+        return base + pkg.getQualifiedName().toString().replace('.', '/') + "/package-summary/";
+    }
+
+    /** The root every URL of this run starts with, always with both slashes. */
+    static String root() {
+        return root;
+    }
+
+    /**
+     * Sets the root for this run.
+     *
+     * <p>Normalized to a leading and a trailing slash, because every caller
+     * concatenates onto it and a root written as {@code backend/javadoc} would
+     * otherwise produce relative links that resolve against whatever page they
+     * appear on.
+     */
+    static void setRoot(String value) {
+        root = normalizeRoot(value);
+    }
+
+    static String normalizeRoot(String value) {
+        String out = value.strip();
+        if (!out.startsWith("/")) {
+            out = "/" + out;
+        }
+        if (!out.endsWith("/")) {
+            out = out + "/";
+        }
+        return out;
     }
 
     /** The content file a type's page is generated into, relative to the content root. */

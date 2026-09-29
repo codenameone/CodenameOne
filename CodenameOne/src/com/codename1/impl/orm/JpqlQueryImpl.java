@@ -36,6 +36,7 @@ import java.util.Map;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQuery<T> {
     private final SessionImpl session;
     private final Class<T> resultType;

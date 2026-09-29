@@ -77,6 +77,8 @@ function extractSurfTable() {
 
 const calls = [];
 const ctx = {
+  // The self-region ops only run on a context that has a canvas.
+  canvas: { width: 100, height: 100 },
   save() { calls.push(['save']); },
   restore() { calls.push(['restore']); },
   fillRect(...a) { calls.push(['fillRect', ...a]); },
@@ -101,6 +103,15 @@ const sandbox = {
   resolveHostRef: (m) => m,
   applyBlurSelfRegion() { throw new Error('unexpected blur op'); },
   applyLensSelfRegion() { throw new Error('unexpected lens op'); },
+  // The colour-matrix op is driven below, so these record instead of throwing.
+  // A mask whose `readable` is false stands for one the host cannot read yet.
+  colorMatrixMaskAlpha(source) {
+    return source && source.readable ? { alpha: 'mask:' + source.id, w: 1, h: 1 } : null;
+  },
+  applyColorMatrixSelfRegion(c, x, y, w, h, matrix, mask, cornerRadius, amount) {
+    calls.push(['colorMatrix', x, y, w, h, matrix.join(' '), mask ? mask.alpha : 'none',
+      cornerRadius, amount]);
+  },
   surfaceTable: {},
   global: {},
 };
@@ -169,6 +180,42 @@ check('a drawable source still draws, with its arguments',
   calls.length === 1 && calls[0].join(',') === 'drawImage,plain,11,12',
   JSON.stringify(calls));
 check('a drawable source counts no drop', sandbox.surfaceDrawImageDropped === 0);
+
+// Graphics.colorMatrixRegion: 20 nums and ALWAYS 1 obj, whichever mask kind.
+// The op behind it must get its own arguments in every case, including when the
+// colour matrix itself is skipped because its mask cannot be read yet.
+console.log('surface replay: the colour-matrix op keeps the cursors aligned');
+function colorMatrixNums(maskKind, maskSurface) {
+  return [1, 2, 30, 40, /* corner */ -1, /* amount */ 0.5,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, maskKind, maskSurface];
+}
+function runColorMatrix(label, maskKind, maskSurface, maskObj, expectApplied, expectMask) {
+  calls.length = 0;
+  sandbox.surfaceTable = { 5: { canvas: { id: 'surface5', readable: true } } };
+  sandbox.replaySurfaceCommands(ctx, [SURF.COLOR_MATRIX_SELF_REGION, SURF.FILL_RECT, SURF.DRAW_IMAGE_XY], 3,
+    colorMatrixNums(maskKind, maskSurface).concat([7, 8, 9, 10, 11, 12]),
+    [maskObj, { id: 'after', width: 4, height: 4 }]);
+  const applied = calls.filter((c) => c[0] === 'colorMatrix');
+  const filled = calls.filter((c) => c[0] === 'fillRect');
+  const drew = calls.filter((c) => c[0] === 'drawImage');
+  if (expectApplied) {
+    check(label + ': applied with its own arguments',
+      applied.length === 1 && applied[0].slice(1).join(',')
+        === ['1', '2', '30', '40', '0 1 2 3 4 5 6 7 8 9 10 11', expectMask, '-1', '0.5'].join(','),
+      JSON.stringify(applied));
+  } else {
+    check(label + ': skipped', applied.length === 0, JSON.stringify(applied));
+  }
+  check(label + ': the next num op gets ITS OWN arguments',
+    filled.length === 1 && filled[0].slice(1).join(',') === '7,8,9,10', JSON.stringify(filled));
+  check(label + ': the next obj op gets ITS OWN source',
+    drew.length === 1 && drew[0].join(',') === 'drawImage,after,11,12', JSON.stringify(drew));
+}
+runColorMatrix('colour matrix, no mask', 0, 0, null, true, 'none');
+runColorMatrix('colour matrix, image mask', 1, 0, { id: 'img', readable: true }, true, 'mask:img');
+runColorMatrix('colour matrix, surface mask', 2, 5, null, true, 'mask:surface5');
+runColorMatrix('colour matrix, unreadable image mask', 1, 0, { id: 'img', readable: false }, false);
+runColorMatrix('colour matrix, missing surface mask', 2, 99, null, false);
 
 if (failures.length) {
   console.error('\nFAILED: ' + failures.length + ' assertion(s)');

@@ -6,6 +6,7 @@
 # by .github/workflows/windows-tooling.yml:
 #   - the maven/ reactor installed to the local repo (JDK 8 build)
 #   - the scripts/settings tool installed to the local repo (JDK 17 build)
+#   - the scripts/certificatewizard tool installed to the local repo (JDK 17 build)
 #   - JAVA_HOME pointing at JDK 17 for the runtime below
 #
 # Coverage:
@@ -200,6 +201,93 @@ if [ ${#MATRIX_FAILURES[@]} -gt 0 ]; then
   exit 1
 fi
 wt_log "Settings render matrix passed"
+
+# ---------------------------------------------------------------------------
+# 1c. Certificate Wizard render matrix.
+#     Same idea as 1b for the other desktop tool on the native desktop themes.
+#     The mock signing service stands in for an Apple account, so the pages
+#     render with real rows in them rather than an empty state.
+# ---------------------------------------------------------------------------
+WIZARD_CP_DIR="$TEMP_BASE/cn1-windows-wizard-cp"
+mkdir -p "$WIZARD_CP_DIR"
+cat > "$WIZARD_CP_DIR/cp-pom.xml" <<EOF
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.codename1.demos</groupId>
+  <artifactId>windows-wizard-classpath</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-certificatewizard</artifactId>
+      <version>$CN1_VERSION</version>
+    </dependency>
+    <!-- test scope in the wizard's own POM, so a resolved classpath does not
+         carry the port; the executable jar ships it in libs/ instead. -->
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-javase</artifactId>
+      <version>$CN1_VERSION</version>
+    </dependency>
+  </dependencies>
+</project>
+EOF
+mvn -B -q -f "$(winpath "$WIZARD_CP_DIR/cp-pom.xml")" dependency:build-classpath \
+  "-Dmdep.outputFile=$(winpath "$WIZARD_CP_DIR/cp.txt")"
+WIZARD_CP="$(cat "$WIZARD_CP_DIR/cp.txt")"
+
+WIZARD_BINDING="$WIZARD_CP_DIR/certificatewizard.input"
+cat > "$WIZARD_BINDING" <<EOF
+projectDir=$WORK_DIR_W
+settings=$WORK_DIR_W\\codenameone_settings.properties
+outputDir=$WORK_DIR_W\\iosCerts
+user=ci@example.com
+EOF
+
+WIZARD_FAILURES=()
+
+# run_wizard_scenario <name> [extra jvm args...]
+run_wizard_scenario() {
+  local name="$1"; shift
+  local png="$ARTIFACTS_DIR/certificatewizard-$name.png"
+  wt_log "Certificate Wizard render scenario: $name ($*)"
+  if ! "$JAVA_BIN" "$@" \
+      -Djava.awt.headless=false \
+      "-Dcertificatewizard.input=$(winpath "$WIZARD_BINDING")" \
+      -Dcertificatewizard.mock=true \
+      "-Dcertificatewizard.screenshot=$(winpath "$png")" \
+      -Dcertificatewizard.screenshot.delay=8000 \
+      -cp "$WIZARD_CP" \
+      com.codename1.certificatewizard.CertificateWizardLauncher \
+      > "$ARTIFACTS_DIR/certificatewizard-$name.log" 2>&1; then
+    wt_log "  scenario $name: launcher exited non-zero"
+    WIZARD_FAILURES+=("$name (launcher)")
+    return 0
+  fi
+  # The on-screen grab is the gate, as in the Settings matrix: the offscreen paint can
+  # look healthy while the visible window is black (#5443).
+  local gate="$ARTIFACTS_DIR/certificatewizard-$name.onscreen.png"
+  if [ ! -s "$gate" ]; then
+    wt_log "  scenario $name: no on-screen capture, falling back to offscreen paint"
+    gate="$png"
+  fi
+  if ! "$JAVA_BIN" "$SANITY_SRC_W" "$(winpath "$gate")" 300 200; then
+    WIZARD_FAILURES+=("$name")
+  fi
+}
+
+run_wizard_scenario baseline -Dcertificatewizard.darkMode=false
+run_wizard_scenario dark -Dcertificatewizard.darkMode=true -Dcertificatewizard.section=certificates
+run_wizard_scenario hidpi150 -Dsun.java2d.uiScale=1.5 -Dcertificatewizard.section=profiles
+run_wizard_scenario theme-aqua -Dcodename1.arg.desktop.themeMode=aqua -Dcertificatewizard.darkMode=false
+run_wizard_scenario theme-adwaita-dark -Dcodename1.arg.desktop.themeMode=adwaita -Dcertificatewizard.darkMode=true
+
+if [ ${#WIZARD_FAILURES[@]} -gt 0 ]; then
+  wt_log "Certificate Wizard render matrix failed for: ${WIZARD_FAILURES[*]}" >&2
+  exit 1
+fi
+wt_log "Certificate Wizard render matrix passed"
 
 # ---------------------------------------------------------------------------
 # 2. JavaSE simulator smoke via the shared verifier harness.

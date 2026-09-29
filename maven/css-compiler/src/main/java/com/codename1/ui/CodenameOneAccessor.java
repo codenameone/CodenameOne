@@ -26,8 +26,6 @@ package com.codename1.ui;
 
 /**
  * Utility to access package protected Codename One classes and attributes
- *
- * @author Shai Almog
  */
 public class CodenameOneAccessor {
     public static com.codename1.ui.Image getImage(com.codename1.ui.Font f) {

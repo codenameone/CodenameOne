@@ -26,8 +26,6 @@ import java.util.Hashtable;
 
 /// This class represents a Facebook Page object
 /// https://developers.facebook.com/docs/reference/api/page/
-///
-/// @author Chen Fishbein
 public class Page extends FBObject {
 
     private String about;

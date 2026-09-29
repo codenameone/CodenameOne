@@ -33,33 +33,31 @@ import com.codename1.backend.Base64;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Tcp;
 
-/**
- * A PostgreSQL client speaking the v3 frontend/backend protocol directly.
- *
- * Written rather than wrapped because there is nothing to wrap: JDBC needs a
- * driver manager, a class loader and reflection, none of which a translated
- * server binary has. The protocol is small, stable (v3 has been the wire format
- * since 7.4) and documented, so the honest option is to speak it. The same source
- * runs on both targets because it is built on {@link Tcp}, which each target
- * implements.
- *
- * Three decisions worth stating:
- *
- * - **The extended query protocol, always.** Simple Query would be fewer round
- *   trips, but it has no parameters, and a client with no way to bind a value is
- *   a client whose users concatenate SQL. Parse/Bind/Execute is what makes
- *   `query(sql, params)` safe by construction.
- * - **Text format for parameters and results.** The binary format saves parsing
- *   at the cost of a per-type encoder on both sides, and gets subtly wrong for
- *   the types nobody tested. Text is what psql sends.
- * - **SCRAM-SHA-256 is verified in both directions.** The server's final message
- *   proves it knew the stored key; skipping that check (which a client can do and
- *   still connect successfully) leaves the handshake open to a server that only
- *   pretends to be PostgreSQL.
- */
+/// A PostgreSQL client speaking the v3 frontend/backend protocol directly.
+///
+/// Written rather than wrapped because there is nothing to wrap: JDBC needs a
+/// driver manager, a class loader and reflection, none of which a translated
+/// server binary has. The protocol is small, stable (v3 has been the wire format
+/// since 7.4) and documented, so the honest option is to speak it. The same source
+/// runs on both targets because it is built on [Tcp], which each target
+/// implements.
+///
+/// Three decisions worth stating:
+///
+/// - **The extended query protocol, always.** Simple Query would be fewer round
+/// trips, but it has no parameters, and a client with no way to bind a value is
+/// a client whose users concatenate SQL. Parse/Bind/Execute is what makes
+/// `query(sql, params)` safe by construction.
+/// - **Text format for parameters and results.** The binary format saves parsing
+/// at the cost of a per-type encoder on both sides, and gets subtly wrong for
+/// the types nobody tested. Text is what psql sends.
+/// - **SCRAM-SHA-256 is verified in both directions.** The server's final message
+/// proves it knew the stored key; skipping that check (which a client can do and
+/// still connect successfully) leaves the handshake open to a server that only
+/// pretends to be PostgreSQL.
 public final class Postgres {
-    /** Message types the backend sends that this client acts on. */
-    /** See where it is enforced, in the SCRAM exchange, for why this value. */
+    // Message types the backend sends that this client acts on.
+    /// See where it is enforced, in the SCRAM exchange, for why this value.
     private static final int MAX_SCRAM_ITERATIONS = 1000000;
 
     private static final int AUTHENTICATION = 'R';
@@ -72,19 +70,15 @@ public final class Postgres {
     private final Wire wire;
     private final String user;
     private final String password;
-    /**
-     * VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
-     * session -- a pool, a health check -- and that caller does not hold the
-     * monitor close() publishes under. See Database.sqliteClosed.
-     */
-    private volatile boolean closed;
+    /// VOLATILE: isClosed() is read by whoever is deciding whether to reuse this
+    /// session -- a pool, a health check -- and that caller does not hold the
+    /// monitor close() publishes under. See Database.sqliteClosed.
+    private volatile boolean closed; //NOPMD AvoidUsingVolatile - read by a pool's thread, see above
 
-    /**
-     * @param passwordMayCrossInTheClear whether this connection is entitled to
-     *        hand over the password itself. True only when TLS is up, or when the
-     *        caller wrote sslmode=disable and therefore chose a clear channel
-     *        knowingly.
-     */
+    /// @param passwordMayCrossInTheClear whether this connection is entitled to
+    /// hand over the password itself. True only when TLS is up, or when the
+    /// caller wrote sslmode=disable and therefore chose a clear channel
+    /// knowingly.
     private Postgres(Wire wire, String user, String password,
             boolean passwordMayCrossInTheClear) {
         this.wire = wire;
@@ -95,15 +89,13 @@ public final class Postgres {
 
     private final boolean passwordMayCrossInTheClear;
 
-    /**
-     * Connects, negotiates TLS when asked, authenticates, and returns a session
-     * ready for queries.
-     *
-     * `sslMode` is "require", "prefer" or "disable". "prefer" exists because it is
-     * what a local development database usually needs and a managed one usually
-     * forbids; "require" fails rather than falling back, which is the only setting
-     * that means anything against an attacker.
-     */
+    /// Connects, negotiates TLS when asked, authenticates, and returns a session
+    /// ready for queries.
+    ///
+    /// `sslMode` is "require", "prefer" or "disable". "prefer" exists because it is
+    /// what a local development database usually needs and a managed one usually
+    /// forbids; "require" fails rather than falling back, which is the only setting
+    /// that means anything against an attacker.
     public static Postgres connect(String host, int port, String database, String user,
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
@@ -115,26 +107,26 @@ public final class Postgres {
         // governs the conversation, which is where a peer can stall a worker.
         // A TLS upgrade replaces the Java SE socket, and Tcp.rebind carries the
         // deadline across, so this is set once and stays set.
-        if(socketTimeoutMillis > 0) {
+        if (socketTimeoutMillis > 0) {
             connection.setReadTimeout(socketTimeoutMillis);
         }
         try {
             Wire wire = new Wire(connection);
             boolean plaintextByChoice = "disable".equals(sslMode);
             boolean secured = false;
-            if(!plaintextByChoice) {
+            if (!plaintextByChoice) {
                 boolean offered = requestTls(wire);
                 boolean required = "require".equals(sslMode);
-                if(!offered && required) {
+                if (!offered && required) {
                     throw new IOException("The server at " + host
                             + " refused TLS and sslmode=require");
                 }
-                if(offered) {
+                if (offered) {
                     try {
                         connection.startTls(host, caFile);
                         secured = true;
                     } catch (IOException err) {
-                        if(required) {
+                        if (required) {
                             throw err;
                         }
                         // sslmode=prefer, so this falls back -- but it says so.
@@ -145,7 +137,7 @@ public final class Postgres {
                                 + "verified (" + err.getMessage() + "). Point "
                                 + "sslrootcert at the server's CA, or set "
                                 + "sslmode=disable to connect in the clear "
-                                + "deliberately.");
+                                + "deliberately.", err);
                     }
                 }
             }
@@ -161,20 +153,18 @@ public final class Postgres {
         }
     }
 
-    /**
-     * The SSLRequest packet. It is not a normal message -- no type byte, and the
-     * reply is a single character rather than a framed message -- because it is
-     * sent before the protocol proper begins.
-     */
+    /// The SSLRequest packet. It is not a normal message -- no type byte, and the
+    /// reply is a single character rather than a framed message -- because it is
+    /// sent before the protocol proper begins.
     private static boolean requestTls(Wire wire) throws IOException {
         wire.writeIntBE(8);
         wire.writeIntBE(80877103); // 1234 << 16 | 5679
         wire.flush();   // static, pre-session: connect() closes the socket on failure
         int answer = wire.read();
-        if(answer == 'S') {
+        if (answer == 'S') {
             return true;
         }
-        if(answer == 'N') {
+        if (answer == 'N') {
             return false;
         }
         throw new IOException("The server did not answer the TLS request (got " + answer + ")");
@@ -185,7 +175,7 @@ public final class Postgres {
         writeInt(body, 196608); // protocol 3.0
         writeCString(body, "user");
         writeCString(body, user);
-        if(database != null && database.length() > 0) {
+        if (database != null && database.length() > 0) {
             writeCString(body, "database");
             writeCString(body, database);
         }
@@ -205,14 +195,14 @@ public final class Postgres {
     }
 
     private void authenticate() throws IOException {
-        while(true) {
+        while (true) {
             Message message = readMessage();
-            if(message.type == ERROR_RESPONSE) {
+            if (message.type == ERROR_RESPONSE) {
                 throw errorFrom(message);
             }
-            if(message.type != AUTHENTICATION) {
+            if (message.type != AUTHENTICATION) {
                 throw new IOException("Expected an authentication message, got '"
-                        + (char)message.type + "'");
+                        + (char) message.type + "'");
             }
             // THE METHOD CODE ITSELF is four bytes the peer sends. sslmode=prefer
             // lets whoever answers decline TLS, so an unauthenticated peer can send
@@ -221,10 +211,10 @@ public final class Postgres {
             // than refused.
             requireBytes(message.body, 0, 4);
             int method = intAt(message.body, 0);
-            if(method == 0) {
+            if (method == 0) {
                 return; // authentication complete
             }
-            if(method == 3) {
+            if (method == 3) {
                 // AuthenticationCleartextPassword sends the password AS ITSELF. On
                 // a clear socket that is the credential, readable by anyone on the
                 // path -- and with the default sslmode=prefer the socket is clear
@@ -236,7 +226,7 @@ public final class Postgres {
                 // is them choosing a clear channel rather than an attacker choosing
                 // it for them. The other methods are not this: 5 is a salted digest
                 // and 10 is SCRAM, so neither hands over the password outright.
-                if(!passwordMayCrossInTheClear) {
+                if (!passwordMayCrossInTheClear) {
                     throw new IOException("the server asked for a cleartext password "
                             + "on a connection that is not encrypted. TLS was not "
                             + "established -- with sslmode=prefer the server can "
@@ -247,14 +237,14 @@ public final class Postgres {
                 sendPasswordMessage(Wire.utf8(password == null ? "" : password));
                 continue;
             }
-            if(method == 5) {
+            if (method == 5) {
                 // MD5 is a salted digest, so a clear socket leaks something
                 // crackable rather than the password -- weaker than SCRAM and not
                 // the outright disclosure method 3 is. Said out loud rather than
                 // refused: many servers still ask for it, and refusing would turn a
                 // working deployment into a broken one over a weakness the operator
                 // may already have accepted.
-                if(!passwordMayCrossInTheClear) {
+                if (!passwordMayCrossInTheClear) {
                     System.err.println("warning: md5 authentication over an "
                             + "unencrypted connection; the digest is offline "
                             + "crackable. Prefer sslmode=require, or a server "
@@ -266,7 +256,7 @@ public final class Postgres {
                 sendPasswordMessage(Wire.utf8(md5Password(user, password, salt)));
                 continue;
             }
-            if(method == 10) {
+            if (method == 10) {
                 scram(message);
                 continue;
             }
@@ -275,27 +265,23 @@ public final class Postgres {
         }
     }
 
-    /**
-     * PostgreSQL's md5 method: md5(md5(password + user) as hex, then salted).
-     * Deprecated by PostgreSQL itself, and supported here only because servers
-     * configured for it are still deployed.
-     */
+    /// PostgreSQL's md5 method: md5(md5(password + user) as hex, then salted).
+    /// Deprecated by PostgreSQL itself, and supported here only because servers
+    /// configured for it are still deployed.
     private static String md5Password(String user, String password, byte[] salt) {
         String inner = hex(Crypto.md5(Wire.utf8((password == null ? "" : password) + user)));
         byte[] withSalt = concat(Wire.utf8(inner), salt);
         return "md5" + hex(Crypto.md5(withSalt));
     }
 
-    /**
-     * SCRAM-SHA-256 (RFC 7677), the default since PostgreSQL 10 and the only
-     * method a managed instance normally offers.
-     *
-     * The server's final message is checked. A client that skips it authenticates
-     * itself TO the server and learns nothing about who it is talking to, which
-     * defeats the mutual half of the mechanism.
-     */
+    /// SCRAM-SHA-256 (RFC 7677), the default since PostgreSQL 10 and the only
+    /// method a managed instance normally offers.
+    ///
+    /// The server's final message is checked. A client that skips it authenticates
+    /// itself TO the server and learns nothing about who it is talking to, which
+    /// defeats the mutual half of the mechanism.
     private void scram(Message advertised) throws IOException {
-        if(!mechanismsInclude(advertised.body, "SCRAM-SHA-256")) {
+        if (!mechanismsInclude(advertised.body, "SCRAM-SHA-256")) {
             throw new IOException("The server offers no SCRAM-SHA-256; this client "
                     + "does not implement the channel-binding variants");
         }
@@ -310,13 +296,13 @@ public final class Postgres {
         sendMessage('p', body.toByteArray());
 
         Message serverFirstMessage = readMessage();
-        if(serverFirstMessage.type == ERROR_RESPONSE) {
+        if (serverFirstMessage.type == ERROR_RESPONSE) {
             throw errorFrom(serverFirstMessage);
         }
         // Four for the code, and the payload is what follows it: a body shorter
         // than that made the length below negative.
         requireBytes(serverFirstMessage.body, 0, 4);
-        if(serverFirstMessage.type != AUTHENTICATION || intAt(serverFirstMessage.body, 0) != 11) {
+        if (serverFirstMessage.type != AUTHENTICATION || intAt(serverFirstMessage.body, 0) != 11) {
             throw new IOException("Expected a SASL continue message");
         }
         String serverFirst = Wire.fromUtf8(serverFirstMessage.body, 4,
@@ -324,18 +310,18 @@ public final class Postgres {
         String nonce = field(serverFirst, 'r');
         String saltText = field(serverFirst, 's');
         String iterationText = field(serverFirst, 'i');
-        if(nonce == null || saltText == null || iterationText == null
+        if (nonce == null || saltText == null || iterationText == null
                 || !nonce.startsWith(clientNonce)) {
             // A nonce that does not extend ours means the exchange was replayed or
             // rewritten; there is nothing to continue.
             throw new IOException("The server's SCRAM message is malformed or replayed");
         }
         byte[] salt = Base64.decode(saltText);
-        if(salt == null) {
+        if (salt == null) {
             throw new IOException("The server's SCRAM salt is not base64");
         }
         int iterations = parseInt(iterationText, -1);
-        if(iterations < 1) {
+        if (iterations < 1) {
             throw new IOException("The server's SCRAM iteration count is not a number");
         }
         // AND AN UPPER BOUND, because that count is the peer's and it multiplies
@@ -355,7 +341,7 @@ public final class Postgres {
         // that raises it on purpose, while bounding the work at a fraction of a
         // second. A server beyond that is refused rather than served slowly, because
         // the alternative is letting the peer choose how long we compute.
-        if(iterations > MAX_SCRAM_ITERATIONS) {
+        if (iterations > MAX_SCRAM_ITERATIONS) {
             throw new IOException("The server asked for " + iterations
                     + " SCRAM iterations, past the " + MAX_SCRAM_ITERATIONS
                     + " this client computes");
@@ -390,7 +376,7 @@ public final class Postgres {
         // still fails as an authentication error. That is the residue, and it is
         // smaller than the sentence it replaces implied.
         int prepared = saslprepWouldMap(password);
-        if(prepared >= 0) {
+        if (prepared >= 0) {
             throw new IOException("The password's character at index " + prepared
                     + " is one SASLprep (RFC 4013) rewrites before the server "
                     + "builds its verifier, and this runtime has no Normalizer to "
@@ -407,17 +393,17 @@ public final class Postgres {
                 + clientFinalWithoutProof);
         byte[] clientSignature = Crypto.hmacSha256(storedKey, authMessage);
         byte[] proof = new byte[clientKey.length];
-        for(int iter = 0 ; iter < proof.length ; iter++) {
-            proof[iter] = (byte)(clientKey[iter] ^ clientSignature[iter]);
+        for (int iter = 0 ; iter < proof.length ; iter++) {
+            proof[iter] = (byte) (clientKey[iter] ^ clientSignature[iter]);
         }
         sendMessage('p', Wire.utf8(clientFinalWithoutProof + ",p=" + Base64.encode(proof)));
 
         Message finalMessage = readMessage();
-        if(finalMessage.type == ERROR_RESPONSE) {
+        if (finalMessage.type == ERROR_RESPONSE) {
             throw errorFrom(finalMessage);
         }
         requireBytes(finalMessage.body, 0, 4);
-        if(finalMessage.type != AUTHENTICATION || intAt(finalMessage.body, 0) != 12) {
+        if (finalMessage.type != AUTHENTICATION || intAt(finalMessage.body, 0) != 12) {
             throw new IOException("Expected the SASL final message");
         }
         String serverFinal = Wire.fromUtf8(finalMessage.body, 4, finalMessage.body.length - 4);
@@ -425,7 +411,7 @@ public final class Postgres {
         byte[] serverKey = Crypto.hmacSha256(saltedPassword, Wire.utf8("Server Key"));
         byte[] expected = Crypto.hmacSha256(serverKey, authMessage);
         byte[] actual = signatureText == null ? null : Base64.decode(signatureText);
-        if(actual == null || !Crypto.equalsConstantTime(expected, actual)) {
+        if (actual == null || !Crypto.equalsConstantTime(expected, actual)) {
             throw new IOException("The server failed the SCRAM signature check; it does "
                     + "not hold the credentials it claims to");
         }
@@ -433,15 +419,15 @@ public final class Postgres {
 
     private static boolean mechanismsInclude(byte[] body, String wanted) {
         int at = 4;
-        while(at < body.length) {
+        while (at < body.length) {
             int end = at;
-            while(end < body.length && body[end] != 0) {
+            while (end < body.length && body[end] != 0) {
                 end++;
             }
-            if(end == at) {
+            if (end == at) {
                 return false; // the empty string terminates the list
             }
-            if(wanted.equals(Wire.fromUtf8(body, at, end - at))) {
+            if (wanted.equals(Wire.fromUtf8(body, at, end - at))) {
                 return true;
             }
             at = end + 1;
@@ -449,15 +435,15 @@ public final class Postgres {
         return false;
     }
 
-    /** One `k=value` field out of a SCRAM message. */
+    /// One `k=value` field out of a SCRAM message.
     private static String field(String message, char key) {
         int at = 0;
-        while(at < message.length()) {
+        while (at < message.length()) {
             int end = message.indexOf(',', at);
-            if(end < 0) {
+            if (end < 0) {
                 end = message.length();
             }
-            if(end - at > 2 && message.charAt(at) == key && message.charAt(at + 1) == '=') {
+            if (end - at > 2 && message.charAt(at) == key && message.charAt(at + 1) == '=') {
                 return message.substring(at + 2, end);
             }
             at = end + 1;
@@ -465,39 +451,37 @@ public final class Postgres {
         return null;
     }
 
-    /**
-     * The index of the first character SASLprep would MAP, or -1 when there is
-     * none this runtime can recognise.
-     *
-     * <p>RFC 4013 maps two sets and this checks both: RFC 3454 table B.1, the
-     * characters commonly mapped to nothing, and table C.1.2, the non-ASCII
-     * spaces it maps to a plain space. Both are small, closed and entirely in
-     * the basic plane, so they are matched by value -- there is no Unicode table
-     * on this platform to look them up in, which is the whole reason the
-     * password is not prepared in the first place.
-     *
-     * <p>The prohibited tables are deliberately NOT here. SASLprep FAILS on
-     * those rather than mapping them, and PostgreSQL then stores a verifier
-     * built from the raw password -- the same bytes this client sends -- so
-     * refusing them would break an account that authenticates today.
-     */
+    /// The index of the first character SASLprep would MAP, or -1 when there is
+    /// none this runtime can recognise.
+    ///
+    /// RFC 4013 maps two sets and this checks both: RFC 3454 table B.1, the
+    /// characters commonly mapped to nothing, and table C.1.2, the non-ASCII
+    /// spaces it maps to a plain space. Both are small, closed and entirely in
+    /// the basic plane, so they are matched by value -- there is no Unicode table
+    /// on this platform to look them up in, which is the whole reason the
+    /// password is not prepared in the first place.
+    ///
+    /// The prohibited tables are deliberately NOT here. SASLprep FAILS on
+    /// those rather than mapping them, and PostgreSQL then stores a verifier
+    /// built from the raw password -- the same bytes this client sends -- so
+    /// refusing them would break an account that authenticates today.
     private static int saslprepWouldMap(String password) {
-        if(password == null) {
+        if (password == null) {
             return -1;
         }
-        for(int iter = 0 ; iter < password.length() ; iter++) {
+        for (int iter = 0 ; iter < password.length() ; iter++) {
             char c = password.charAt(iter);
-            if(c < 0x80) {
+            if (c < 0x80) {
                 continue;
             }
             // C.1.2, non-ASCII space.
-            if(c == 0x00a0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200a)
+            if (c == 0x00a0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200a)
                     || c == 0x2028 || c == 0x2029 || c == 0x202f || c == 0x205f
                     || c == 0x3000) {
                 return iter;
             }
             // B.1, commonly mapped to nothing.
-            if(c == 0x00ad || c == 0x034f || c == 0x1806
+            if (c == 0x00ad || c == 0x034f || c == 0x1806
                     || (c >= 0x180b && c <= 0x180d)
                     || (c >= 0x200b && c <= 0x200d) || c == 0x2060
                     || (c >= 0xfe00 && c <= 0xfe0f) || c == 0xfeff) {
@@ -515,17 +499,14 @@ public final class Postgres {
 
     // ---------------- queries ----------------
 
-    /** Runs a statement that returns no rows, and returns the number affected. */
+    /// Runs a statement that returns no rows, and returns the number affected.
     public int execute(String sql, Object[] params) throws IOException {
-        Result result = run(sql, params);
-        return result.affected;
+        return run(sql, params).affected;
     }
 
-    /**
-     * Runs a query and returns each row as a column-name to value map, with the
-     * SAME value types the SQLite path produces: Long, Double, String, byte[] or
-     * null. A handler must not be able to tell which engine answered it.
-     */
+    /// Runs a query and returns each row as a column-name to value map, with the
+    /// SAME value types the SQLite path produces: Long, Double, String, byte\[\] or
+    /// null. A handler must not be able to tell which engine answered it.
     public List query(String sql, Object[] params) throws IOException {
         return run(sql, params).rows;
     }
@@ -546,9 +527,9 @@ public final class Postgres {
         writeShort(bind, 0);     // parameter formats: none given, so all text
         int count = params == null ? 0 : params.length;
         writeShort(bind, count);
-        for(int iter = 0 ; iter < count ; iter++) {
+        for (int iter = 0 ; iter < count ; iter++) {
             byte[] encoded = encodeParameter(params[iter]);
-            if(encoded == null) {
+            if (encoded == null) {
                 writeInt(bind, -1); // SQL NULL, which is not the empty string
             } else {
                 writeInt(bind, encoded.length);
@@ -574,27 +555,25 @@ public final class Postgres {
         return collect(sql);
     }
 
-    /**
-     * A frame is only as long as it says it is, checked BEFORE it is indexed.
-     *
-     * <p>intAt and shortAt index raw, and the row frames walk offsets the PEER
-     * chose. A truncated RowDescription, a column name with no terminator, or a
-     * row claiming more columns than its body holds therefore ran off the end,
-     * and what came back was ArrayIndexOutOfBoundsException -- not an IOException.
-     * It left collect() without draining ReadyForQuery and without closing, so
-     * the session went back to the pool with the rest of the exchange still on
-     * the wire, and the next borrower read that as its own answer. The default
-     * sslmode=prefer falls back to plaintext, so the peer doing it need not be
-     * the server.
-     *
-     * <p>Closing is not optional here for the same reason the size ceiling closes:
-     * a frame we could not parse leaves an unknown number of bytes unread, and
-     * nothing in this protocol resynchronises.
-     */
+    /// A frame is only as long as it says it is, checked BEFORE it is indexed.
+    ///
+    /// intAt and shortAt index raw, and the row frames walk offsets the PEER
+    /// chose. A truncated RowDescription, a column name with no terminator, or a
+    /// row claiming more columns than its body holds therefore ran off the end,
+    /// and what came back was ArrayIndexOutOfBoundsException -- not an IOException.
+    /// It left collect() without draining ReadyForQuery and without closing, so
+    /// the session went back to the pool with the rest of the exchange still on
+    /// the wire, and the next borrower read that as its own answer. The default
+    /// sslmode=prefer falls back to plaintext, so the peer doing it need not be
+    /// the server.
+    ///
+    /// Closing is not optional here for the same reason the size ceiling closes:
+    /// a frame we could not parse leaves an unknown number of bytes unread, and
+    /// nothing in this protocol resynchronises.
     private void requireBytes(byte[] body, int offset, int count) throws IOException {
         // offset > length - count rather than offset + count > length, which
         // overflows for the lengths a hostile peer is free to name.
-        if(offset < 0 || count < 0 || offset > body.length - count) {
+        if (offset < 0 || count < 0 || offset > body.length - count) {
             close();
             throw new IOException("A PostgreSQL frame is shorter than it claims");
         }
@@ -605,18 +584,18 @@ public final class Postgres {
         String[] names = null;
         int[] types = null;
         IOException failure = null;
-        while(true) {
+        while (true) {
             Message message = readMessage();
-            switch(message.type) {
+            switch (message.type) {
                 case ROW_DESCRIPTION: {
                     requireBytes(message.body, 0, 2);
                     int columns = shortAt(message.body, 0);
                     names = new String[columns];
                     types = new int[columns];
                     int at = 2;
-                    for(int iter = 0 ; iter < columns ; iter++) {
+                    for (int iter = 0 ; iter < columns ; iter++) {
                         int end = at;
-                        while(end < message.body.length && message.body[end] != 0) {
+                        while (end < message.body.length && message.body[end] != 0) {
                             end++;
                         }
                         // TERMINATED, not merely run to the end of the frame: a name
@@ -644,21 +623,21 @@ public final class Postgres {
                     // fields, so a peer can delete columns from an answer without
                     // anything failing. Under the default sslmode=prefer that peer
                     // need not be the server.
-                    if(names != null && columns != names.length) {
+                    if (names != null && columns != names.length) {
                         close();        // desynchronised; see requireBytes
                         throw new IOException("A PostgreSQL row has " + columns
                                 + " columns where its description had " + names.length);
                     }
                     Map row = new LinkedHashMap();
                     int at = 2;
-                    for(int iter = 0 ; iter < columns ; iter++) {
+                    for (int iter = 0 ; iter < columns ; iter++) {
                         requireBytes(message.body, at, 4);
                         int length = intAt(message.body, at);
                         at += 4;
                         Object value;
-                        if(length == -1) {
+                        if (length == -1) {
                             value = null;           // the only negative there is
-                        } else if(length < 0) {
+                        } else if (length < 0) {
                             // -1 IS THE WHOLE OF IT. The wire protocol gives one
                             // negative length a meaning and leaves the rest
                             // undefined, so reading any of them as NULL answered a
@@ -694,7 +673,7 @@ public final class Postgres {
                     // the transaction is discarded, and reading only the row
                     // count out of this reports that as a successful commit and
                     // hands the caller the body's result.
-                    if("ROLLBACK".equals(tag) && "COMMIT".equalsIgnoreCase(sql.trim())) {
+                    if ("ROLLBACK".equals(tag) && "COMMIT".equalsIgnoreCase(sql.trim())) {
                         failure = new IOException("COMMIT rolled the transaction back: the "
                                 + "server had already marked it aborted, so nothing in it "
                                 + "was applied");
@@ -708,7 +687,7 @@ public final class Postgres {
                     failure = errorFrom(message, sql);
                     break;
                 case READY_FOR_QUERY:
-                    if(failure != null) {
+                    if (failure != null) {
                         throw failure;
                     }
                     return result;
@@ -718,40 +697,34 @@ public final class Postgres {
         }
     }
 
-    /**
-     * "INSERT 0 3", "UPDATE 2", "DELETE 1", "SELECT 7": the count is the last
-     * word, and INSERT is the one with an oid before it.
-     */
+    /// "INSERT 0 3", "UPDATE 2", "DELETE 1", "SELECT 7": the count is the last
+    /// word, and INSERT is the one with an oid before it.
     private static int affectedFrom(String tag) {
         int space = tag.lastIndexOf(' ');
         return space < 0 ? 0 : parseInt(tag.substring(space + 1), 0);
     }
 
-    /**
-     * Parameters go out as text, so this is a rendering rather than an encoding.
-     * A byte[] becomes a bytea hex literal, which is what the server expects in
-     * text format; everything else is its ordinary string form.
-     */
+    /// Parameters go out as text, so this is a rendering rather than an encoding.
+    /// A byte\[\] becomes a bytea hex literal, which is what the server expects in
+    /// text format; everything else is its ordinary string form.
     private static byte[] encodeParameter(Object value) {
-        if(value == null) {
+        if (value == null) {
             return null;
         }
-        if(value instanceof byte[]) {
-            return Wire.utf8("\\x" + hex((byte[])value));
+        if (value instanceof byte[]) {
+            return Wire.utf8("\\x" + hex((byte[]) value));
         }
-        if(value instanceof Boolean) {
-            return Wire.utf8(((Boolean)value).booleanValue() ? "t" : "f");
+        if (value instanceof Boolean) {
+            return Wire.utf8(((Boolean) value).booleanValue() ? "t" : "f");
         }
         return Wire.utf8(String.valueOf(value));
     }
 
-    /**
-     * Maps a text-format value to the same Java types the SQLite path returns.
-     * The OIDs are the stable built-in ones from pg_type; a type this does not
-     * know stays a String, which is what the server sent.
-     */
+    /// Maps a text-format value to the same Java types the SQLite path returns.
+    /// The OIDs are the stable built-in ones from pg_type; a type this does not
+    /// know stays a String, which is what the server sent.
     private static Object decode(String text, int typeOid) {
-        switch(typeOid) {
+        switch (typeOid) {
             case 16: // bool
                 return Long.valueOf("t".equals(text) ? 1 : 0);
             case 20: // int8
@@ -781,9 +754,9 @@ public final class Postgres {
                 // on the MySQL path, which is the same kind of column.
                 return text;
             case 17: { // bytea, sent as \x48656c6c6f
-                if(text.length() >= 2 && text.charAt(0) == '\\' && text.charAt(1) == 'x') {
+                if (text.length() >= 2 && text.charAt(0) == '\\' && text.charAt(1) == 'x') {
                     byte[] out = unhex(text.substring(2));
-                    if(out != null) {
+                    if (out != null) {
                         return out;
                     }
                 }
@@ -797,7 +770,7 @@ public final class Postgres {
     // ---------------- plumbing ----------------
 
     public void close() {
-        if(closed) {
+        if (closed) {
             return;
         }
         closed = true;
@@ -817,18 +790,18 @@ public final class Postgres {
     }
 
     private void checkOpen() throws IOException {
-        if(closed) {
+        if (closed) {
             throw new IOException("The PostgreSQL connection is closed");
         }
     }
 
     private void readUntilReady() throws IOException {
-        while(true) {
+        while (true) {
             Message message = readMessage();
-            if(message.type == ERROR_RESPONSE) {
+            if (message.type == ERROR_RESPONSE) {
                 throw errorFrom(message);
             }
-            if(message.type == READY_FOR_QUERY) {
+            if (message.type == READY_FOR_QUERY) {
                 return;
             }
         }
@@ -845,19 +818,17 @@ public final class Postgres {
         flushOrClose();
     }
 
-    /**
-     * Sends what is staged, and ends the session if it cannot.
-     *
-     * <p>The read side closes on any failure; this is the same rule for the other
-     * direction, which it did not have. take() clears the staged frame before the
-     * write is attempted, so a peer that resets mid-write leaves a connection that
-     * has had part of a protocol frame written to it and no record of the rest --
-     * and `closed` stayed false, so isOpen() called it reusable and the pool
-     * handed it out.
-     *
-     * <p>close() sends its own terminate through wire.flush() directly rather than
-     * through here, which is also what keeps this from recursing.
-     */
+    /// Sends what is staged, and ends the session if it cannot.
+    ///
+    /// The read side closes on any failure; this is the same rule for the other
+    /// direction, which it did not have. take() clears the staged frame before the
+    /// write is attempted, so a peer that resets mid-write leaves a connection that
+    /// has had part of a protocol frame written to it and no record of the rest --
+    /// and `closed` stayed false, so isOpen() called it reusable and the pool
+    /// handed it out.
+    ///
+    /// close() sends its own terminate through wire.flush() directly rather than
+    /// through here, which is also what keeps this from recursing.
     private void flushOrClose() throws IOException {
         try {
             wire.flush();
@@ -886,11 +857,11 @@ public final class Postgres {
 
     private Message readMessageFrame() throws IOException {
         int type = wire.read();
-        if(type < 0) {
+        if (type < 0) {
             throw new IOException("The PostgreSQL connection closed unexpectedly");
         }
         int length = wire.readIntBE();
-        if(length < 4) {
+        if (length < 4) {
             // CLOSED, not merely refused. A length this code will not honour leaves
             // the message still on the wire, so the connection is desynchronised
             // from here on -- and DbPool returns a released connection to the idle
@@ -909,7 +880,7 @@ public final class Postgres {
         // OutOfMemoryError that follows is not an IOException: it unwinds past
         // every catch here and takes the process with it, before a single
         // authentication message has been exchanged.
-        if(length - 4 > SqlLimits.maxMessageBytes()) {
+        if (length - 4 > SqlLimits.maxMessageBytes()) {
             close();                    // desynchronised; see the branch above
             throw new IOException("A PostgreSQL message claims " + (length - 4)
                     + " bytes, past the " + SqlLimits.maxMessageBytes()
@@ -925,25 +896,23 @@ public final class Postgres {
         return errorFrom(message, null);
     }
 
-    /**
-     * An ErrorResponse is a set of typed fields; 'M' is the human message, 'C' the
-     * SQLSTATE. Both go into the exception, because the SQLSTATE is what tells a
-     * caller apart a unique-violation from a syntax error.
-     */
+    /// An ErrorResponse is a set of typed fields; 'M' is the human message, 'C' the
+    /// SQLSTATE. Both go into the exception, because the SQLSTATE is what tells a
+    /// caller apart a unique-violation from a syntax error.
     private static IOException errorFrom(Message message, String sql) {
         String detail = null;
         String state = null;
         int at = 0;
-        while(at < message.body.length && message.body[at] != 0) {
+        while (at < message.body.length && message.body[at] != 0) {
             int field = message.body[at];
             int end = at + 1;
-            while(end < message.body.length && message.body[end] != 0) {
+            while (end < message.body.length && message.body[end] != 0) {
                 end++;
             }
             String value = Wire.fromUtf8(message.body, at + 1, end - at - 1);
-            if(field == 'M') {
+            if (field == 'M') {
                 detail = value;
-            } else if(field == 'C') {
+            } else if (field == 'C') {
                 state = value;
             }
             at = end + 1;
@@ -985,24 +954,22 @@ public final class Postgres {
         out.write(value & 0xff);
     }
 
-    /**
-     * A field the protocol ends with a NUL, so the value cannot contain one.
-     *
-     * <p>the startup packet is a run of NUL-terminated fields, which means a NUL inside a value does not truncate
-     * it -- it ENDS that field and what follows becomes the NEXT one. A database
-     * name of "admin", a NUL, "application_name", a NUL and "allowed.tenant"
-     * selects the admin database and sets a startup parameter nobody asked for,
-     * while the string as a whole still passes an application's suffix check on
-     * the name it thought it was connecting to. A URL carrying %00 decodes to
-     * exactly that.
-     *
-     * <p>Checked HERE rather than at the two fields a review named: this is the
-     * one place every such field is written, so a field added later is covered
-     * without anyone remembering to.
-     */
+    /// A field the protocol ends with a NUL, so the value cannot contain one.
+    ///
+    /// the startup packet is a run of NUL-terminated fields, which means a NUL inside a value does not truncate
+    /// it -- it ENDS that field and what follows becomes the NEXT one. A database
+    /// name of "admin", a NUL, "application_name", a NUL and "allowed.tenant"
+    /// selects the admin database and sets a startup parameter nobody asked for,
+    /// while the string as a whole still passes an application's suffix check on
+    /// the name it thought it was connecting to. A URL carrying %00 decodes to
+    /// exactly that.
+    ///
+    /// Checked HERE rather than at the two fields a review named: this is the
+    /// one place every such field is written, so a field added later is covered
+    /// without anyone remembering to.
     private static void writeCString(ByteArrayOutputStream out, String value)
             throws IOException {
-        if(value != null && value.indexOf(0) >= 0) {
+        if (value != null && value.indexOf(0) >= 0) {
             throw new IOException("A connection field cannot hold a NUL: the "
                     + "protocol ends the field there and reads the rest as "
                     + "another one");
@@ -1023,36 +990,36 @@ public final class Postgres {
 
     static String hex(byte[] data) {
         StringBuilder out = new StringBuilder(data.length * 2);
-        for(int iter = 0 ; iter < data.length ; iter++) {
-            out.append(HEX[(data[iter] >> 4) & 0xf]).append(HEX[data[iter] & 0xf]);
+        for (byte b : data) {
+            out.append(HEX[(b >> 4) & 0xf]).append(HEX[b & 0xf]);
         }
         return out.toString();
     }
 
     private static byte[] unhex(String text) {
-        if((text.length() % 2) != 0) {
+        if ((text.length() % 2) != 0) {
             return null;
         }
         byte[] out = new byte[text.length() / 2];
-        for(int iter = 0 ; iter < out.length ; iter++) {
+        for (int iter = 0 ; iter < out.length ; iter++) {
             int high = digit(text.charAt(iter * 2));
             int low = digit(text.charAt(iter * 2 + 1));
-            if(high < 0 || low < 0) {
+            if (high < 0 || low < 0) {
                 return null;
             }
-            out[iter] = (byte)((high << 4) | low);
+            out[iter] = (byte) ((high << 4) | low);
         }
         return out;
     }
 
     private static int digit(char c) {
-        if(c >= '0' && c <= '9') {
+        if (c >= '0' && c <= '9') {
             return c - '0';
         }
-        if(c >= 'a' && c <= 'f') {
+        if (c >= 'a' && c <= 'f') {
             return c - 'a' + 10;
         }
-        if(c >= 'A' && c <= 'F') {
+        if (c >= 'A' && c <= 'F') {
             return c - 'A' + 10;
         }
         return -1;

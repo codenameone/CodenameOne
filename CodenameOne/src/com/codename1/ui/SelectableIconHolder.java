@@ -25,9 +25,6 @@ package com.codename1.ui;
 /// An interface that is implemented by "selectable" components that hold icons, such as `Button`,
 /// `SpanButton`, `MultiButton`, etc...  This interface includes
 /// methods for managing different icons for different component states (e.g. pressed, disabled, etc..).
-///
-/// @author shannah
-///
 public interface SelectableIconHolder extends IconHolder {
 
     /// Indicates the icon that is displayed on the button when the button is in

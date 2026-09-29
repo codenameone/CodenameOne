@@ -28,8 +28,6 @@ import com.codename1.util.AsyncResource;
 /// contains the app if it is published using the Javascript port); or whose destination is
 /// outside the app.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Display#postMessage(com.codename1.ui.events.MessageEvent)

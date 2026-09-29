@@ -23,8 +23,6 @@
 package com.codename1.l10n;
 
 /// Common patterns for dates, times, and timestamps.
-///
-/// @author Eric Coolman
 public class DateFormatPatterns {
     /// Pattern for parsing/formatting RFC-2822 timestamp.
     public static final String RFC2822 = "EEE, dd MMM yyyy HH:mm:ss Z";

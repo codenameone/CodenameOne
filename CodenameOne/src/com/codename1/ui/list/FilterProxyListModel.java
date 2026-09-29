@@ -31,8 +31,6 @@ import java.util.ArrayList;
 import java.util.Map;
 
 /// This class allows filtering/sorting a list model dynamically using a text field
-///
-/// @author Shai Almog
 public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListener {
     private final ListModel<T> underlying;
     private final ArrayList<DataChangedListener> listeners = new ArrayList<DataChangedListener>();

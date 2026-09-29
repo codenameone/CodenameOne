@@ -56,10 +56,6 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import java.io.IOException;
 import java.util.ArrayList;
 
-/**
- *
- * @author Chen
- */
 public class AndroidLocationPlayServiceManager extends com.codename1.location.LocationManager implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,

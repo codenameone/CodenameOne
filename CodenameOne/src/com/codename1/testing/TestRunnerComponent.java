@@ -49,9 +49,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// runner.add(new ElementSelectorTest());
 /// runner.showForm();
 /// ```
-///
-/// @author Steve Hannah
-///
 public class TestRunnerComponent extends Container {
     private final ArrayList<AbstractTest> tests = new ArrayList<AbstractTest>();
     private final Container resultsPane = new Container(BoxLayout.y());

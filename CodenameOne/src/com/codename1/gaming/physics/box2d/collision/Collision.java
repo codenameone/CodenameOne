@@ -37,10 +37,8 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
 /// Functions used for computing contact points, distance queries, and TOI queries. Collision methods
-/// are non-static for pooling speed, retrieve a collision object from the {@link SingletonPool}.
+/// are non-static for pooling speed, retrieve a collision object from [IWorldPool#getCollision()][com.codename1.gaming.physics.box2d.pooling.IWorldPool#getCollision()].
 /// Should not be finalructed.
-///
-/// @author Daniel Murphy
 public class Collision {
   public static final int NULL_FEATURE = Integer.MAX_VALUE;
 
@@ -493,12 +491,11 @@ public class Collision {
 
   /// Find the max separation between poly1 and poly2 using edge normals from poly1.
   ///
-  /// @param edgeIndex
-  /// @param poly1
-  /// @param xf1
-  /// @param poly2
-  /// @param xf2
-  /// @return
+  /// @param results receives the index of the separating edge and the separation
+  /// @param poly1 the first polygon
+  /// @param xf1 the transform of the first polygon
+  /// @param poly2 the second polygon
+  /// @param xf2 the transform of the second polygon
   public final void findMaxSeparation(EdgeResults results, final PolygonShape poly1,
       final Transform xf1, final PolygonShape poly2, final Transform xf2) {
     int count1 = poly1.m_count;
@@ -671,11 +668,11 @@ public class Collision {
 
   /// Compute the collision manifold between two polygons.
   ///
-  /// @param manifold
-  /// @param polygon1
-  /// @param xf1
-  /// @param polygon2
-  /// @param xf2
+  /// @param manifold receives the contact manifold
+  /// @param polyA the first polygon
+  /// @param xfA the transform of the first polygon
+  /// @param polyB the second polygon
+  /// @param xfB the transform of the second polygon
   public final void collidePolygons(Manifold manifold, final PolygonShape polyA,
       final Transform xfA, final PolygonShape polyB, final Transform xfB) {
     // Find edge normal of max separation on A - return if separating axis is found
@@ -993,8 +990,6 @@ public class Collision {
   }
 
   /// This is used for determining the state of contact points.
-  ///
-  /// @author Daniel Murphy
   public static enum PointState {
     /// point does not exist
     NULL_STATE,

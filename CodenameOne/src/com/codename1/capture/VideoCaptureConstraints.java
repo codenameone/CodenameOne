@@ -78,8 +78,6 @@ package com.codename1.capture;
 /// **Javascript** supports ....
 /// TODO  Add support for javascript and others
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints)

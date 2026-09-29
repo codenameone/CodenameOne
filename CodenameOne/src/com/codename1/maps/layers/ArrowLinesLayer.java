@@ -29,8 +29,6 @@ import com.codename1.util.MathUtil;
 
 /// This class is responsible for painting arrows that indicates direction
 /// of walk on map.
-///
-/// @author Michal Koperski
 public class ArrowLinesLayer extends LinesLayer {
 
     private static final int minArrowSementLength = 20;

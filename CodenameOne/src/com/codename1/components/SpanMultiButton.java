@@ -99,8 +99,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// hi.show();
 /// ```
 ///
-/// @author Francesco Galgani
-///
 /// #### See also
 ///
 /// - MultiButton

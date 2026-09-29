@@ -40,8 +40,6 @@ package com.codename1.ui;
 /// Note that unless specified otherwise most methods inherited from Image will
 /// fail when invoked on this subclass often with a NullPointerException. This
 /// image can be drawn on graphics as usual
-///
-/// @author Shai Almog
 public class RGBImage extends Image {
     private int width;
     private int height;

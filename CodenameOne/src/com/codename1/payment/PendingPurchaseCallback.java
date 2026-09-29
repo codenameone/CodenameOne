@@ -29,9 +29,6 @@ package com.codename1.payment;
 /// is completed, the app will call the `PurchaseCallback#itemPurchased(String)` callback.
 ///
 /// Currently only supported on Android.
-///
-/// @author Steve Hannah
-///
 public interface PendingPurchaseCallback extends PurchaseCallback {
     void itemPurchasePending(String sku);
 }

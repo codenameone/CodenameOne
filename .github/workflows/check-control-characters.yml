@@ -24,7 +24,7 @@ on:
 
 jobs:
   check-control-characters:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 

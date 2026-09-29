@@ -34,8 +34,6 @@ import java.util.Vector;
 /// The CSSElement class defines a single CSS element with its attributes and children.
 /// It extends Element and adds to it certain CSS-specific methods.
 /// Each CSSElement object is in fact a CSS selector.
-///
-/// @author Ofir Leitner
 class CSSElement extends HTMLElement {
 
     /// A constant representing both the attribute value of 'font-variant' and the font name that should be given to small-caps fonts
@@ -1188,8 +1186,6 @@ class CSSElement extends HTMLElement {
     }
 
     /// Simple data class to hold a data to be used for attribute selections
-    ///
-    /// @author Ofir Leitner
     static class AttString {
 
         static final int EQUALS = 0;

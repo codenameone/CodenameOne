@@ -31,9 +31,6 @@ import java.util.Iterator;
  * Implementation of the enhanced for(:) statement.
  *  This statement uses Iterator to support iteration over a wide variety
  *  of iterable types.
- *
- * @author Daniel Leuck
- * @author Pat Niemeyer
  */
 class BSHEnhancedForStatement extends SimpleNode implements ParserConstants {
 

@@ -31,6 +31,7 @@ import java.util.Map;
 ///
 /// Internal ORM runtime; not an application API.
 /// @hidden
+@com.codename1.impl.SharedWithBackend
 public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
     final SessionImpl session;
     final EntityModel<T> model;

@@ -70,7 +70,6 @@ import java.util.zip.ZipInputStream;
  * will only run once.. The second run you can view it like a NOP).  If JavaFX is not loaded, it will download it (if necessary), add it to the classpath, 
  * and re-run your main method using this new ClassLoader which includes JavafX.
  * </p>
- * @author Steve Hannah
  */
 public class JavaFXLoader {
     private static String OS = System.getProperty("os.name").toLowerCase();

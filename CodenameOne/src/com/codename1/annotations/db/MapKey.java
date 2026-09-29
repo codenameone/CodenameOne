@@ -25,6 +25,7 @@ import java.lang.annotation.*;
 /// Uses a target attribute as the key of an entity relationship Map.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
+@com.codename1.impl.SharedWithBackend
 public @interface MapKey {
     /// Selects the target entity attribute used as keys in a relationship Map.
     /// @return Java attribute name

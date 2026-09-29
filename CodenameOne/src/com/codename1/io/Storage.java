@@ -96,8 +96,6 @@ import java.io.OutputStream;
 ///    hi.add(content);
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class Storage {
     private static Storage INSTANCE;
     private final CacheMap cache = new CacheMap();

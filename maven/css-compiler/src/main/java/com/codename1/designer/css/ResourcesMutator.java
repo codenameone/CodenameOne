@@ -55,10 +55,6 @@ import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 
 
-/**
- *
- * @author shannah
- */
 public class ResourcesMutator {
     private boolean multiImage = true;
     private final EditableResources res;

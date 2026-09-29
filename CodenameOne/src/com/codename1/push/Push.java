@@ -36,8 +36,6 @@ import java.util.Map;
 
 /// Utility class for sending a push message to a different device
 /// through the Codename One push servers.
-///
-/// @author Shai Almog
 public class Push {
 
     /// Key for the hashtable argument when pushing to the google play store

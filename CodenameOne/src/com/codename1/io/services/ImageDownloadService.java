@@ -57,8 +57,6 @@ import java.util.Map;
 /// or the renderer must register itself as a listener and update the data when
 /// the response arrives.
 ///
-/// @author Shai Almog
-///
 /// #### Deprecated
 ///
 /// @deprecated this class uses an unconventional storage mechanism and has many issues, we recommend

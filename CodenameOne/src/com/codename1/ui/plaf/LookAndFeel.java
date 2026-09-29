@@ -51,8 +51,6 @@ import com.codename1.ui.list.ListCellRenderer;
 /// Allows a UI developer to completely customize the look of the application by
 /// overriding drawing/sizing methods appropriately.
 ///
-/// @author Chen Fishbein
-///
 /// #### Deprecated
 ///
 /// @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate

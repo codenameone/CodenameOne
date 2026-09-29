@@ -44,8 +44,6 @@ import java.util.Vector;
 /// This is Menu Bar that displays it's commands on a side bar navigation similar
 /// to Google+/Facbook apps navigation
 ///
-/// @author Chen
-///
 /// #### Deprecated
 ///
 /// @deprecated this class is still used internally but code should be migrated to use the

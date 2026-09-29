@@ -34,8 +34,6 @@ import com.codename1.ui.events.ActionEvent;
 /// This class was created so developers will avoid pitfalls of HTMLCallback, as using the wrong return values.
 ///
 /// Note that in any case an HTMLComponent doesn't have to use an HTMLCallback.
-///
-/// @author Ofir Leitner
 public class DefaultHTMLCallback implements HTMLCallback {
 
     /// {{@inheritDoc}}

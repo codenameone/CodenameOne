@@ -43,8 +43,6 @@ import java.util.Hashtable;
 /// `#getWindows()` returns an empty array, `#getMonitors()` returns a single monitor
 /// describing the main display, and `#getFocusedWindow()` returns null. Only
 /// constructing a `Window` throws.
-///
-/// @author Shai Almog
 public final class Desktop {
 
     private static final Desktop INSTANCE = new Desktop();

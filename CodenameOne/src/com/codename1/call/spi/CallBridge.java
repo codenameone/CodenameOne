@@ -94,7 +94,7 @@ public interface CallBridge {
     /// travels system to app and has no app-initiated counterpart, and
     /// Telecom conferences self-managed calls only through a
     /// `ConnectionService` conference this port does not build. So
-    /// [CallSession#groupWith] always answers NOT_SUPPORTED. The constant is
+    /// [CallSession#groupWith][com.codename1.call.session.CallSession#groupWith] always answers NOT_SUPPORTED. The constant is
     /// kept so the bit values do not shift if that changes.
     int CAPABILITY_GROUPING = 32;
 

@@ -28,10 +28,6 @@ import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.JSObject;
 
-/**
- *
- * @author shannah
- */
 public class SetTransform implements ExecutableOp {
     
     private final JSAffineTransform t;

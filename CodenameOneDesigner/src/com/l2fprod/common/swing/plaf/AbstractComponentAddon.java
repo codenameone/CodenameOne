@@ -33,8 +33,6 @@ import javax.swing.UIManager;
 
 /**
  * Ease the work of creating an addon for a component.<br>
- * 
- * @author Frederic Lavigne
  */
 public abstract class AbstractComponentAddon implements ComponentAddon {
 

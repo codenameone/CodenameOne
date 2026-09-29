@@ -30,8 +30,6 @@ import com.codename1.ui.plaf.UIManager;
 /// This class represents a single tile on a map.
 /// a map is been constructed from a few tiles that are been tiled on next to the
 /// other.
-///
-/// @author Roman Kamyk
 public class Tile {
 
     private static final Font f = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);

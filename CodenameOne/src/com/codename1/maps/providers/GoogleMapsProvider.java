@@ -31,8 +31,6 @@ import com.codename1.maps.Tile;
 import com.codename1.ui.geom.Dimension;
 
 /// This is a GoogleMaps Provider https://developers.google.com/maps/documentation/staticmaps/
-///
-/// @author Chen
 public class GoogleMapsProvider extends TiledProvider {
 
     /// This is a regular road map

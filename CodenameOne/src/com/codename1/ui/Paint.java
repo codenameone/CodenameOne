@@ -26,8 +26,6 @@ import com.codename1.ui.geom.Rectangle2D;
 
 /// An interface for providing custom painting such as gradients.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Graphics#setColor(com.codename1.ui.Paint)

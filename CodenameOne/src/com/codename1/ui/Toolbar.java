@@ -191,8 +191,6 @@ import java.util.Vector;
 /// hi.getAnimationManager().onTitleScrollAnimation(title);
 /// hi.show();
 /// ```
-///
-/// @author Chen, Francesco Galgani
 public class Toolbar extends Container {
 
     /// Enables/Disables the side menu bar swipe, defaults to true
@@ -227,6 +225,10 @@ public class Toolbar extends Container {
     private boolean rightSideMenuCmdsAlignedToLeft = false;
     private Container permanentSideMenuContainer;
     private Container permanentRightSideMenuContainer;
+    /// The form of a toolbar the desktop {@code native} title-bar mode keeps detached, null otherwise
+    private Form desktopHiddenHost;
+    /// Side menu commands added while detached, only bridged to the native menu bar
+    private Vector<Command> desktopHiddenSideMenuCommands;
     private Command searchCommand;
     /// Component placed on the bottom (south) portion of the permanent/on-top
     /// side menu.
@@ -414,6 +416,9 @@ public class Toolbar extends Container {
     /// for cases where we want to place the menu button in a "creative way" in
     /// which case we can bind the side menu to this
     public void openSideMenu() {
+        if (isDesktopHidden()) {
+            return;
+        }
         if (onTopSideMenu) {
             showOnTopSidemenu(-1, false);
         } else {
@@ -432,6 +437,9 @@ public class Toolbar extends Container {
     /// for cases where we want to place the menu button in a "creative way" in
     /// which case we can bind the side menu to this
     public void openRightSideMenu() {
+        if (isDesktopHidden()) {
+            return;
+        }
         if (onTopSideMenu) {
             showOnTopRightSidemenu(-1, false);
         }
@@ -735,7 +743,7 @@ public class Toolbar extends Container {
         if (iconSize < 0) {
             iconSize = 3;
         }
-        getComponentForm().setBackCommand(cmd);
+        getHostForm().setBackCommand(cmd);
         switch (policy) {
             case ALWAYS:
                 if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
@@ -900,8 +908,13 @@ public class Toolbar extends Container {
     ///
     /// - `callback`: gets the search string callbacks
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
-        SearchBar s = new CallbackSearchBar(this, callback);
         Form f = getComponentForm();
+        if (f == null) {
+            // Detached -- the desktop chrome hides the Toolbar in native title-bar mode -- so
+            // there is no Toolbar on screen for the search bar to replace.
+            return;
+        }
+        SearchBar s = new CallbackSearchBar(this, callback);
         setHidden(true);
         f.removeComponentFromForm(this);
         f.setToolbar(s);
@@ -1009,6 +1022,7 @@ public class Toolbar extends Container {
         }
         overflowCommands.add(cmd);
         sideMenu.installRightCommands();
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Returns the commands within the overflow menu which can be useful for
@@ -1447,8 +1461,52 @@ public class Toolbar extends Container {
         addCommandToSideMenu(cmd, false);
     }
 
+    private boolean isDesktopHidden() {
+        return desktopHiddenHost != null && getComponentForm() == null;
+    }
+
+    private Form getHostForm() {
+        Form f = getComponentForm();
+        if (f != null) {
+            return f;
+        }
+        return desktopHiddenHost;
+    }
+
+    private boolean addDesktopHiddenSideMenuCommand(Command cmd) {
+        if (!isDesktopHidden()) {
+            return false;
+        }
+        if (cmd != null) {
+            if (desktopHiddenSideMenuCommands == null) {
+                desktopHiddenSideMenuCommands = new Vector<Command>();
+            }
+            if (!desktopHiddenSideMenuCommands.contains(cmd)) {
+                desktopHiddenSideMenuCommands.add(cmd);
+                refreshDesktopHiddenNativeCommands();
+            }
+        }
+        return true;
+    }
+
+    /// `Form.initComponentImpl` publishes the commands when the form is shown, this covers later changes.
+    /// Every mutation of the Toolbar's command lists calls it -- the left and right bars and the
+    /// overflow as well as the side menu -- because with the Toolbar hidden by the desktop chrome
+    /// the native menu is the only place those commands can be reached. A no-op unless this
+    /// Toolbar's hidden host form is the one on screen.
+    private void refreshDesktopHiddenNativeCommands() {
+        Form host = desktopHiddenHost;
+        if (host != null && host.isInitialized() && host.getParent() == null
+                && Display.getInstance().getCurrent() == host) { //NOPMD CompareObjectsWithEquals
+            Display.impl.setNativeCommands(getAllNativeMenuCommands());
+        }
+    }
+
     private void addCommandToSideMenu(Command cmd, boolean isLeft) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             if (isLeft) {
                 constructPermanentSideMenu();
@@ -2271,6 +2329,9 @@ public class Toolbar extends Container {
     /// - `cmd`: a Command to handle the events
     public void addComponentToLeftSideMenu(Component cmp, Command cmd) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentSideMenu();
             Container cnt = new Container(new BorderLayout());
@@ -2309,6 +2370,9 @@ public class Toolbar extends Container {
     /// - `cmd`: a Command to handle the events
     public void addComponentToRightSideMenu(Component cmp, Command cmd) {
         checkIfInitialized();
+        if (addDesktopHiddenSideMenuCommand(cmd)) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentRightSideMenu();
             Container cnt = new Container(new BorderLayout());
@@ -2339,6 +2403,9 @@ public class Toolbar extends Container {
     /// - `cmp`: c Component to be added to the menu
     public void addComponentToLeftSideMenu(Component cmp) {
         checkIfInitialized();
+        if (isDesktopHidden()) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentSideMenu();
             addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);
@@ -2364,6 +2431,9 @@ public class Toolbar extends Container {
     /// - `cmp`: c Component to be added to the menu
     public void addComponentToRightSideMenu(Component cmp) {
         checkIfInitialized();
+        if (isDesktopHidden()) {
+            return;
+        }
         if (permanentSideMenu) {
             constructPermanentRightSideMenu();
             addComponentToRightSideMenu(permanentRightSideMenuContainer, cmp);
@@ -2454,7 +2524,13 @@ public class Toolbar extends Container {
     ///
     /// - `cmd`: Command to remove
     public void removeCommand(Command cmd) {
+        if (desktopHiddenSideMenuCommands != null) {
+            desktopHiddenSideMenuCommands.remove(cmd);
+        }
         getMenuBar().removeCommand(cmd);
+        // After the removal, not before: the published set is read back from the Toolbar, and
+        // a command in the left or right bar leaves through the MenuBar above.
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Adds a Command to the TitleArea on the right side.
@@ -2467,6 +2543,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", null);
         sideMenu.addCommand(cmd, 0);
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Adds a Command to the TitleArea on the left side.
@@ -2498,6 +2575,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Returns the commands within the right bar section which can be useful for
@@ -2575,6 +2653,13 @@ public class Toolbar extends Container {
                     }
                 }
             }
+        }
+        addUniqueCommands(all, desktopHiddenSideMenuCommands);
+        // The search command opens a search bar IN the Toolbar, which is exactly what native
+        // chrome detaches; from a native menu it would have nothing to open. Leaving it out keeps
+        // the menu to commands that work there.
+        if (searchCommand != null) {
+            all.removeElement(searchCommand);
         }
         return all;
     }
@@ -2836,7 +2921,7 @@ public class Toolbar extends Container {
     /// Hide the Toolbar if it is currently showing
     public void hideToolbar() {
         showing = false;
-        if (Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
+        if (getComponentForm() == null || Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
             setVisible(false);
             setHidden(true);
             return;
@@ -2855,14 +2940,20 @@ public class Toolbar extends Container {
     /// Show the Toolbar if it is currently not showing
     public void showToolbar() {
         showing = true;
+        Form f = getComponentForm();
+        if (f == null) {
+            setVisible(true);
+            setHidden(false);
+            return;
+        }
         if (!isVisible()) {
             setVisible(true);
             setHidden(false);
-            getComponentForm().animateLayout(200);
+            f.animateLayout(200);
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
-        getComponentForm().registerAnimated(this);
+        f.registerAnimated(this);
         hideShowMotion.start();
     }
 
@@ -3139,7 +3230,10 @@ public class Toolbar extends Container {
     ///
     /// - `cmd`: the command to remove from the overflow
     public void removeOverflowCommand(Command cmd) {
-        overflowCommands.remove(cmd);
+        if (overflowCommands != null) {
+            overflowCommands.remove(cmd);
+        }
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Normally on a right side menu the alignment should be "mirrored" in
@@ -3244,12 +3338,14 @@ public class Toolbar extends Container {
                 // desktop "native" mode: keep the Toolbar object (so the command API and command
                 // harvesting work) but never attach it to the form, so no title strip is painted.
                 // The title goes to the OS window and commands go to the native menu bar.
+                desktopHiddenHost = parent;
                 initialized = true;
                 setTitle(parent.getTitle());
                 parent.revalidate();
                 initTitleBarStatus();
                 return;
             }
+            desktopHiddenHost = null;
             if (layered) {
                 Container layeredPane = parent.getLayeredPane();
                 Container p = layeredPane.getParent();

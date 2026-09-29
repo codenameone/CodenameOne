@@ -536,7 +536,7 @@ void CN1MacOpenStringPicker(JAVA_OBJECT stringArray, int selection, int x, int y
     NSMutableArray<NSString *> *choices = [NSMutableArray array];
     if (stringArray != JAVA_NULL) {
         JAVA_ARRAY arr = (JAVA_ARRAY)stringArray;
-        JAVA_OBJECT *items = (JAVA_OBJECT *)arr->data;
+        JAVA_OBJECT *items = (JAVA_OBJECT *)CN1_ARRAY_DATA(arr);
         for (int i = 0; i < arr->length; i++) {
             NSString *s = items[i] == JAVA_NULL
                 ? @""

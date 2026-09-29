@@ -43,8 +43,6 @@ import java.util.Arrays;
 /// facebook.appId=YourAppId in your build arguments. In order to obtain the app
 /// ID you need to create a native Android/iOS application and generate the right
 /// app id.
-///
-/// @author Shai Almog
 @SuppressWarnings("deprecation")
 public class FacebookConnect extends Login {
 

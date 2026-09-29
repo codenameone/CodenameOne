@@ -31,7 +31,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 import com.codename1.gaming.physics.box2d.dynamics.SolverData;
 import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
 
-/// @author Daniel Murphy
 public class FrictionJoint extends Joint {
 
   private final Vec2 m_localAnchorA;
@@ -111,7 +110,7 @@ public class FrictionJoint extends Joint {
     return m_maxTorque;
   }
 
-  /// @see com.codename1.gaming.physics.box2d.dynamics.joints.Joint#initVelocityConstraints(com.codename1.gaming.physics.box2d.dynamics.TimeStep)
+  /// @see Joint#initVelocityConstraints(com.codename1.gaming.physics.box2d.dynamics.SolverData)
   public void initVelocityConstraints(final SolverData data) {
     m_indexA = m_bodyA.m_islandIndex;
     m_indexB = m_bodyB.m_islandIndex;

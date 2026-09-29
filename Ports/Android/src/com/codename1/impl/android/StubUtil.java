@@ -32,7 +32,6 @@ package com.codename1.impl.android;
  * 
  * The build server will replace all instances of "//!" (without quotes) with "" (without quotes).
  * And  "{{Stub}}" (without quotes) with the fully qualified class name of the app stub.
- * @author shannah
  */
 public class StubUtil {
 

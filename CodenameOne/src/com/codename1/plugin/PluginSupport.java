@@ -29,9 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Support class for implementing plugins in codename one.
-///
-/// @author Steve Hannah
-///
 public class PluginSupport {
     private final List<Plugin> plugins = new ArrayList<Plugin>();
 

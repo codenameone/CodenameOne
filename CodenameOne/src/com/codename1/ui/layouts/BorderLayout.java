@@ -83,8 +83,6 @@ import java.util.HashMap;
 /// EAST and WEST values are implicitly reversed as shown in this image:
 ///
 /// You can read further in the [BorderLayout section in the developer guide](https://www.codenameone.com/manual/basics.html#_border_layout).
-///
-/// @author Nir Shabi, Shai Almog
 public class BorderLayout extends Layout {
     /// Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
     public static final int CENTER_BEHAVIOR_SCALE = 0;

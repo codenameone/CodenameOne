@@ -27,10 +27,6 @@ import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.spinner.Picker;
 
-/**
- *
- * @author shannah
- */
 public class TestRotation extends AbstractTest {
 
     @Override

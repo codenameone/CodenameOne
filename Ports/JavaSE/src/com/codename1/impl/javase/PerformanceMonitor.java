@@ -71,8 +71,6 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 
 /**
  * The Codename One performance monitor shows you how long (in nano-seconds) it took to paint a specific
- *
- * @author Shai Almog
  */
 public class PerformanceMonitor extends javax.swing.JFrame {
     private int componentId = 0;

@@ -37,8 +37,6 @@ import java.util.HashMap;
 
 /**
  * This is a utility class for common native usages
- * 
- * @author Chen
  */
 public class AndroidNativeUtil {
     private static ArrayList<LifecycleListener> listeners;

@@ -30,10 +30,6 @@ import com.codename1.html5.js.JSFunctor;
 import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.JSProperty;
 
-/**
- *
- * @author shannah
- */
 public class MediaTool {
     public static interface MediaResult extends JSObject{
         @JSProperty

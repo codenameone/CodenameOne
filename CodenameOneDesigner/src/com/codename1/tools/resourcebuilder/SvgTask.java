@@ -33,8 +33,6 @@ import java.io.IOException;
 
 /**
  * Allows us to define an SVG file as an image resource
- *
- * @author Shai Almog
  */
 public class SvgTask extends ResourceTask {
     private File file;

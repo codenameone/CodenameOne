@@ -22,15 +22,17 @@
  */
 package com.codename1.impl.orm;
 
+import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.sql.Dialect;
+import com.codename1.orm.session.LockMode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Connection borrowing and transaction pinning for a single managed session. */
+/// Connection borrowing and transaction pinning for a single managed session.
 /// Internal connection adapter; not an application API.
 /// @hidden
 public final class BackendSqlAccess implements SqlAccess {
@@ -38,137 +40,279 @@ public final class BackendSqlAccess implements SqlAccess {
     private final Database supplied;
     private final Dialect dialect;
     private Database transaction;
-    public BackendSqlAccess(DataSource pool,Database supplied,Dialect dialect) {
-        this.pool=pool; this.supplied=supplied; this.dialect=dialect;
+
+    public BackendSqlAccess(DataSource pool, Database supplied, Dialect dialect) {
+        this.pool = pool;
+        this.supplied = supplied;
+        this.dialect = dialect;
     }
-    public String dialect() { return dialect.getName(); }
+
+    @Override
+    public String dialect() {
+        return dialect.getName();
+    }
+
+    @Override
     public List<Object[]> describe(String table) throws IOException {
-        if("sqlite".equals(dialect())) {
-            List<Object[]> raw=query("PRAGMA table_info("+quote(table)+")",new Object[0],new int[6]);
-            List<Object[]> result=new ArrayList<Object[]>();
-            for(Object[] row:raw) result.add(new Object[]{row[1],row[2],row[3],row[5]});
+        if ("sqlite".equals(dialect())) {
+            List<Object[]> raw = query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]);
+            List<Object[]> result = new ArrayList<Object[]>();
+            for (Object[] row : raw) {
+                result.add(new Object[]{row[1], row[2], row[3], row[5]});
+            }
             return result;
         }
-        String schema="mysql".equals(dialect())?"DATABASE()":"current_schema()";
-        String statement="SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key "
-            +"FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
-            +"ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema="+schema+" AND c.table_name=? ORDER BY c.ordinal_position";
-        return query(statement,new Object[]{table},new int[4]);
+        String schema = "mysql".equals(dialect()) ? "DATABASE()" : "current_schema()";
+        String statement = "SELECT c.column_name,c.data_type,CASE WHEN c.is_nullable = 'NO' THEN 1 ELSE 0 END AS required, CASE WHEN k.column_name IS NULL THEN 0 ELSE 1 END AS primary_key "
+                + "FROM information_schema.columns c LEFT JOIN (SELECT u.table_schema,u.table_name,u.column_name FROM information_schema.key_column_usage u INNER JOIN information_schema.table_constraints t ON t.constraint_schema=u.constraint_schema AND t.table_name=u.table_name AND t.constraint_name=u.constraint_name WHERE t.constraint_type='PRIMARY KEY') k "
+                + "ON c.table_schema=k.table_schema AND c.table_name=k.table_name AND c.column_name=k.column_name WHERE c.table_schema=" + schema + " AND c.table_name=? ORDER BY c.ordinal_position";
+        return query(statement, new Object[]{table}, new int[4]);
     }
-    public String quote(String name) { return dialect.quote(name); }
-    public String columnType(int kind) { return dialect.columnType(kind); }
-    public String generatedKeyColumn(int kind,String name) { return dialect.generatedKeyColumn(kind,name); }
-    public String assignedKeyColumn(int kind) { return dialect.assignedKeyColumn(kind); }
-    public String insertDefaults(String table) { return dialect.insertDefaults(table); }
+
+    @Override
+    public String quote(String name) {
+        return dialect.quote(name);
+    }
+
+    @Override
+    public String columnType(int kind) {
+        return dialect.columnType(kind);
+    }
+
+    @Override
+    public String generatedKeyColumn(int kind, String name) {
+        return dialect.generatedKeyColumn(kind, name);
+    }
+
+    @Override
+    public String assignedKeyColumn(int kind) {
+        return dialect.assignedKeyColumn(kind);
+    }
+
+    @Override
+    public String insertDefaults(String table) {
+        return dialect.insertDefaults(table);
+    }
+
+    @Override
     public String likeOperator(boolean escaped) {
         return escaped && !"sqlite".equals(dialect()) ? " LIKE ? ESCAPE '!'" : dialect.likeOperator();
     }
-    public String likePattern(String pattern,String escape) {
-        return escape==null ? dialect.likePattern(pattern) : SqlPatterns.normalize(pattern,escape,"sqlite".equals(dialect()));
+
+    @Override
+    public String likePattern(String pattern, String escape) {
+        return escape == null ? dialect.likePattern(pattern) : SqlPatterns.normalize(pattern, escape, "sqlite".equals(dialect()));
     }
+
+    @Override
     public String likeExpression(String expression) {
         return "sqlite".equals(dialect()) ? SqlPatterns.globExpression(expression) : expression;
     }
-    public String lockClause(com.codename1.orm.session.LockMode mode) {
-        if(mode==com.codename1.orm.session.LockMode.NONE) return "";
-        if("sqlite".equals(dialect.getName())) throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
-        if(mode==com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE) return " FOR UPDATE";
-        return "mysql".equals(dialect.getName())?" LOCK IN SHARE MODE":" FOR SHARE";
+
+    @Override
+    public String lockClause(LockMode mode) {
+        if (mode == LockMode.NONE) {
+            return "";
+        }
+        if ("sqlite".equals(dialect.getName())) {
+            throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
+        }
+        if (mode == LockMode.PESSIMISTIC_WRITE) {
+            return " FOR UPDATE";
+        }
+        return "mysql".equals(dialect.getName()) ? " LOCK IN SHARE MODE" : " FOR SHARE";
     }
-    public String orderValue(String expression,int kind) {
-        return dialect.comparison(expression,kind==Attribute.TEXT);
+
+    @Override
+    public String orderValue(String expression, int kind) {
+        return dialect.comparison(expression, kind == Attribute.TEXT);
     }
-    public String orderBy(String expression,boolean ascending,int kind) {
-        return dialect.orderBy(expression,ascending,kind==Attribute.TEXT);
+
+    @Override
+    public String orderBy(String expression, boolean ascending, int kind) {
+        return dialect.orderBy(expression, ascending, kind == Attribute.TEXT);
     }
-    public String limit(int count,int offset) { return dialect.limit(count,offset); }
+
+    @Override
+    public String limit(int count, int offset) {
+        return dialect.limit(count, offset);
+    }
+
+    // Connections are compared by IDENTITY throughout: the question is always
+    // whether this is the very connection the session pinned or was handed, and
+    // two distinct connections are never interchangeable.
     private Database connection() throws IOException {
-        Database db=transaction!=null?transaction:supplied!=null?supplied:pool.borrow();
-        if(db!=transaction && db.isInTransaction()) {
-            if(db!=supplied) { db.close();pool.release(db); }
+        Database db = transaction != null ? transaction : supplied != null ? supplied : pool.borrow();
+        if (db != transaction && db.isInTransaction()) { //NOPMD CompareObjectsWithEquals - connection identity
+            if (db != supplied) { //NOPMD CompareObjectsWithEquals - connection identity
+                db.close();
+                pool.release(db);
+            }
             throw new IOException("Database is in another transaction");
         }
-        if("sqlite".equals(dialect()) && !db.isInTransaction()) db.execute("PRAGMA foreign_keys = ON",new Object[0]);
+        if ("sqlite".equals(dialect()) && !db.isInTransaction()) {
+            db.execute("PRAGMA foreign_keys = ON", new Object[0]);
+        }
         return db;
     }
-    private void release(Database db) { if(db!=transaction && db!=supplied) pool.release(db); }
-    public List<Object[]> query(String sql,Object[] params,int[] kinds) throws IOException {
-        Database db=connection();
+
+    private void release(Database db) {
+        if (db != transaction && db != supplied) { //NOPMD CompareObjectsWithEquals - connection identity
+            pool.release(db);
+        }
+    }
+
+    @Override
+    public List<Object[]> query(String sql, Object[] params, int[] kinds) throws IOException {
+        Database db = connection();
         try {
-            List rows=db.query(sql,params); List<Object[]> result=new ArrayList<Object[]>(rows.size());
-            for(Object item:rows) {
-                Map row=(Map)item;
-                Object[] values=row.values().toArray();
-                if(values.length!=kinds.length) throw new IOException("Unexpected SQL projection width");
-                for(int i=0;i<values.length;i++) {
-                    if(kinds[i]==Attribute.REAL && values[i] instanceof Number) values[i]=Double.valueOf(((Number)values[i]).doubleValue());
+            List rows = db.query(sql, params);
+            List<Object[]> result = new ArrayList<Object[]>(rows.size());
+            for (Object item : rows) {
+                Map row = (Map) item;
+                Object[] values = row.values().toArray();
+                if (values.length != kinds.length) {
+                    throw new IOException("Unexpected SQL projection width");
+                }
+                for (int i = 0; i < values.length; i++) {
+                    if (kinds[i] == Attribute.REAL && values[i] instanceof Number) {
+                        values[i] = Double.valueOf(((Number) values[i]).doubleValue());
+                    }
                 }
                 result.add(values);
             }
             return result;
-        } finally { release(db); }
-    }
-    public int execute(String sql,Object[] params) throws IOException {
-        Database db=connection(); try { return db.execute(sql,params); } finally { release(db); }
-    }
-    public long insert(String sql,Object[] params,String keyColumn) throws IOException {
-        Database db=connection(); try { return db.insert(sql,params,keyColumn); } finally { release(db); }
-    }
-    public void prepareGenerator(int strategy,String name) throws IOException {
-        if(strategy==1) return;
-        if(strategy==2 && "postgresql".equals(dialect.getName())) {
-            execute("CREATE SEQUENCE IF NOT EXISTS "+quote(name)+" START WITH 1",new Object[0]);return;
+        } finally {
+            release(db);
         }
-        execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name "+dialect.assignedKeyColumn(Dialect.TEXT)+", next_value "+dialect.columnType(Dialect.BIGINT)+" NOT NULL)",new Object[0]);
-        String sql="INSERT "+("mysql".equals(dialect.getName())?"IGNORE ":"")+"INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)";
-        if(!"mysql".equals(dialect.getName())) sql+=" ON CONFLICT (sequence_name) DO NOTHING";
-        execute(sql,new Object[]{name});
     }
-    public Object nextIdentifier(int strategy,String name,int kind) throws IOException {
-        if(strategy==1) {
-            byte[] bytes=com.codename1.backend.Crypto.randomBytes(16);
-            bytes[6]=(byte)((bytes[6]&15)|64);bytes[8]=(byte)((bytes[8]&63)|128);
-            String hex="0123456789abcdef";StringBuilder value=new StringBuilder();
-            for(int i=0;i<bytes.length;i++) {
-                if(i==4 || i==6 || i==8 || i==10) value.append('-');
-                value.append(hex.charAt((bytes[i]>>>4)&15)).append(hex.charAt(bytes[i]&15));
+
+    @Override
+    public int execute(String sql, Object[] params) throws IOException {
+        Database db = connection();
+        try {
+            return db.execute(sql, params);
+        } finally {
+            release(db);
+        }
+    }
+
+    @Override
+    public long insert(String sql, Object[] params, String keyColumn) throws IOException {
+        Database db = connection();
+        try {
+            return db.insert(sql, params, keyColumn);
+        } finally {
+            release(db);
+        }
+    }
+
+    @Override
+    public void prepareGenerator(int strategy, String name) throws IOException {
+        if (strategy == 1) {
+            return;
+        }
+        if (strategy == 2 && "postgresql".equals(dialect.getName())) {
+            execute("CREATE SEQUENCE IF NOT EXISTS " + quote(name) + " START WITH 1", new Object[0]);
+            return;
+        }
+        execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name " + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value " + dialect.columnType(Dialect.BIGINT) + " NOT NULL)", new Object[0]);
+        String sql = "INSERT " + ("mysql".equals(dialect.getName()) ? "IGNORE " : "") + "INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)";
+        if (!"mysql".equals(dialect.getName())) {
+            sql += " ON CONFLICT (sequence_name) DO NOTHING";
+        }
+        execute(sql, new Object[]{name});
+    }
+
+    @Override
+    public Object nextIdentifier(int strategy, String name, int kind) throws IOException {
+        if (strategy == 1) {
+            byte[] bytes = Crypto.randomBytes(16);
+            bytes[6] = (byte) ((bytes[6] & 15) | 64);
+            bytes[8] = (byte) ((bytes[8] & 63) | 128);
+            String hex = "0123456789abcdef";
+            StringBuilder value = new StringBuilder();
+            for (int i = 0; i < bytes.length; i++) {
+                if (i == 4 || i == 6 || i == 8 || i == 10) {
+                    value.append('-');
+                }
+                value.append(hex.charAt((bytes[i] >>> 4) & 15)).append(hex.charAt(bytes[i] & 15));
             }
             return value.toString();
         }
-        if(strategy==2 && "postgresql".equals(dialect.getName()))
-            return query("SELECT nextval(CAST(? AS regclass))",new Object[]{quote(name)},new int[]{Dialect.BIGINT}).get(0)[0];
-        long max=kind==Dialect.INTEGER?Integer.MAX_VALUE:Long.MAX_VALUE;
-        if(execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?",new Object[]{name,Long.valueOf(max)})!=1)
-            throw new IOException("Identifier generator is missing or exhausted: "+name);
-        return query("SELECT next_value FROM cn1_orm_sequences WHERE sequence_name = ?",new Object[]{name},new int[]{Dialect.BIGINT}).get(0)[0];
+        if (strategy == 2 && "postgresql".equals(dialect.getName())) {
+            return query("SELECT nextval(CAST(? AS regclass))", new Object[]{quote(name)}, new int[]{Dialect.BIGINT}).get(0)[0];
+        }
+        long max = kind == Dialect.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
+        if (execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?", new Object[]{name, Long.valueOf(max)}) != 1) {
+            throw new IOException("Identifier generator is missing or exhausted: " + name);
+        }
+        return query("SELECT next_value FROM cn1_orm_sequences WHERE sequence_name = ?", new Object[]{name}, new int[]{Dialect.BIGINT}).get(0)[0];
     }
+
+    @Override
     public void begin() throws IOException {
-        if(transaction!=null) throw new IOException("Transaction already active");
-        Database db=supplied!=null?supplied:pool.borrow();
+        if (transaction != null) {
+            throw new IOException("Transaction already active");
+        }
+        Database db = supplied != null ? supplied : pool.borrow();
         try {
-            if("sqlite".equals(dialect())) db.execute("PRAGMA foreign_keys = ON",new Object[0]);
-            db.beginExclusiveTransaction(); transaction=db;
-        } finally { release(db); }
+            if ("sqlite".equals(dialect())) {
+                db.execute("PRAGMA foreign_keys = ON", new Object[0]);
+            }
+            db.beginExclusiveTransaction();
+            transaction = db;
+        } finally {
+            release(db);
+        }
     }
-    public boolean isTransactionActive() { return transaction!=null && transaction.isInTransaction(); }
+
+    @Override
+    public boolean isTransactionActive() {
+        return transaction != null && transaction.isInTransaction();
+    }
+
+    @Override
     public void commit() throws IOException {
-        if(transaction==null) throw new IOException("No transaction");
-        transaction.commitTransaction(); unpin();
+        if (transaction == null) {
+            throw new IOException("No transaction");
+        }
+        transaction.commitTransaction();
+        unpin();
     }
+
+    @Override
     public void rollback() throws IOException {
-        if(transaction==null) throw new IOException("No transaction");
-        transaction.rollbackTransaction(); unpin();
+        if (transaction == null) {
+            throw new IOException("No transaction");
+        }
+        transaction.rollbackTransaction();
+        unpin();
     }
-    private void unpin() { Database db=transaction; transaction=null; release(db); }
+
+    private void unpin() {
+        Database db = transaction;
+        transaction = null;
+        release(db);
+    }
+
+    @Override
     public void close() throws IOException {
-        if(transaction!=null) {
-            boolean rolledBack=false;
-            try { transaction.rollbackTransaction();rolledBack=true; }
-            finally {
+        if (transaction != null) {
+            boolean rolledBack = false;
+            try {
+                transaction.rollbackTransaction();
+                rolledBack = true;
+            } finally {
                 // A failed rollback may leave both a transaction and its thread
                 // reservation active. Close it before the pool can reuse it.
-                try { if(!rolledBack) transaction.close(); }
-                finally { unpin(); }
+                try {
+                    if (!rolledBack) {
+                        transaction.close();
+                    }
+                } finally {
+                    unpin();
+                }
             }
         }
     }

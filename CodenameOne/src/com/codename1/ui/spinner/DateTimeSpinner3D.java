@@ -39,8 +39,6 @@ import static com.codename1.ui.CN.convertToPixels;
 /// The date and time spinner extends the time spinner by allowing to pick a specific day as well
 ///
 /// Used by Picker in lightweight mode.
-///
-/// @author Steve Hannah
 class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private final Date today = new Date();
     private final int off;

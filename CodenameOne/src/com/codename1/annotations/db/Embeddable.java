@@ -25,5 +25,6 @@ import java.lang.annotation.*;
 /// A reusable value object whose scalar fields are stored in its owner table.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
+@com.codename1.impl.SharedWithBackend
 public @interface Embeddable {
 }

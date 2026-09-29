@@ -25,7 +25,6 @@ package com.codename1.tools.translator.bytecodes;
 /**
  * Interface for an instruction that can be replaced by an expression and assigned
  * to a variable.  
- * @author shannah
  */
 public interface AssignableExpression {
     

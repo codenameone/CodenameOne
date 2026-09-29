@@ -27,10 +27,6 @@ import java.io.InputStream;
 import org.cef.callback.CefCallback;
 import org.cef.network.CefRequest;
 
-/**
- *
- * @author shannah
- */
 public class StreamWrapper {
 
     public StreamWrapper(InputStream fis, String mimetype, long length) {

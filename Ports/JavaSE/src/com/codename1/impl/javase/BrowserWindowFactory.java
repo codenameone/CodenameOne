@@ -24,7 +24,6 @@ package com.codename1.impl.javase;
 
 /**
  * A factory used to create a BrowserWindow.
- * @author shannah
  * @since 7.0
  */
 public interface BrowserWindowFactory {

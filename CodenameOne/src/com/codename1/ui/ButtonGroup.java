@@ -55,8 +55,6 @@ import java.util.ArrayList;
 /// hi.add(cb1).add(cb2).add(cb3).add(cb4).add(rb1).add(rb2).add(rb3);
 /// hi.show();
 /// ```
-///
-/// @author Nir Shabi
 public class ButtonGroup implements ActionSource<ActionEvent> {
 
 

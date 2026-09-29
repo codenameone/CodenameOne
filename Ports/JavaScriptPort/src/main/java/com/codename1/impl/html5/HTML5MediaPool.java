@@ -31,10 +31,6 @@ import com.codename1.html5.js.JSBody;
 import com.codename1.html5.js.browser.Window;
 import com.codename1.html5.js.dom.HTMLElement;
 
-/**
- *
- * @author shannah
- */
 public class HTML5MediaPool {
     private static int nextIndex=1;
     private final Window window = Window.current();

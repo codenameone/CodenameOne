@@ -26,7 +26,6 @@ package com.codename1.gaming.physics.box2d.dynamics.joints;
 import com.codename1.gaming.physics.box2d.dynamics.Body;
 
 /// Joint definitions are used to construct joints.
-/// @author Daniel Murphy
 public class JointDef {
 
 	public JointDef(){

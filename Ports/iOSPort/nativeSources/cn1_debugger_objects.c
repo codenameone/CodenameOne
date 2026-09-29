@@ -130,10 +130,16 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
     if (CN1_IS_TAGGED(obj)) {
         return CN1_CLASS_OF(obj);
     }
-    struct clazz* cls = NULL;
-    if (!cn1_debugger_safe_read(&obj->__codenameOneParentClsReference, &cls, sizeof(cls))) {
+    // The header holds a class INDEX into cn1ClazzById, not a pointer. The object is
+    // untrusted, so the index is read safely and bounds-checked before it is used.
+    uint16_t classIndex = 0;
+    if (!cn1_debugger_safe_read(&obj->__cn1ClassId, &classIndex, sizeof(classIndex))) {
         return NULL;
     }
+    // Compared as int: the count can be 65536 (a full 16-bit index space), which a
+    // uint16_t cast would turn into 0 and so reject every object.
+    if (classIndex == 0 || (int)classIndex >= cn1ClazzByIdCount) return NULL;
+    struct clazz* cls = __atomic_load_n(&cn1ClazzById[classIndex], __ATOMIC_RELAXED);
     if (cls == NULL) return NULL;
     // Copied into raw bytes rather than a "struct clazz" local because the
     // struct has const-qualified members, which a local cannot be filled in

@@ -29,8 +29,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /// A cookie for an HTTP request
-///
-/// @author Shai Almog
 public class Cookie implements Externalizable {
     public static final String STORAGE_NAME = "Cookies";
     private static boolean autoStored = true;

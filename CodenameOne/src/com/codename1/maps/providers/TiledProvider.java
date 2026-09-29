@@ -28,8 +28,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Point;
 
 /// This is a tiled map provider
-///
-/// @author Roman Kamyk
 public abstract class TiledProvider extends MapProvider {
 
     protected final String _url;

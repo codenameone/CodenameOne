@@ -42,6 +42,8 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <backend.dir>${project.basedir}/../../vm/backend</backend.dir>
+        <core.src.dir>${project.basedir}/../../CodenameOne/src</core.src.dir>
+        <backend.shared.dir>${project.build.directory}/generated-sources/backend-shared</backend.shared.dir>
     </properties>
 
     <dependencies>
@@ -138,6 +140,7 @@
                         <configuration>
                             <sources>
                                 <source>${backend.dir}/impl/javase</source>
+                                <source>${backend.shared.dir}</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -147,6 +150,63 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <!--
+                             The classes the app and the server share (the ORM,
+                             the entity annotations) have ONE copy, in
+                             CodenameOne/src, marked with
+                             @com.codename1.impl.SharedWithBackend on a line of its
+                             own. They are copied out of the core here rather than
+                             kept under vm/backend, which is what they used to be:
+                             sixty hand-synchronised duplicates.
+
+                             vm/backend/shared-sources.sh is the same selection for
+                             the shell builds; the line match below and its grep
+                             must agree. Both refuse a backend source that shadows
+                             a core one, so a copy cannot creep back in.
+                        -->
+                        <id>copy-shared-core-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <fail message="A source under vm/backend has the same package and class name as one in CodenameOne/src. Delete the backend copy and mark the core class @com.codename1.impl.SharedWithBackend, or give server-only behaviour a different class name. vm/backend/shared-sources.sh names the file.">
+                                    <condition>
+                                        <resourcecount when="greater" count="0">
+                                            <union>
+                                                <fileset dir="${backend.dir}/src" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                                <fileset dir="${backend.dir}/impl/javase" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                                <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                            </union>
+                                        </resourcecount>
+                                    </condition>
+                                </fail>
+                                <!-- Cleared first, so a class whose marker was
+                                     removed does not linger from an earlier run. -->
+                                <delete dir="${backend.shared.dir}"/>
+                                <copy todir="${backend.shared.dir}">
+                                    <fileset dir="${core.src.dir}" includes="**/*.java">
+                                        <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
+                                    </fileset>
+                                </copy>
+                                <fail message="No core source is marked @com.codename1.impl.SharedWithBackend; the backend cannot compile without the shared ORM classes.">
+                                    <condition>
+                                        <resourcecount when="equal" count="0">
+                                            <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
+                                        </resourcecount>
+                                    </condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>parparvm-sources-jar</id>
                         <phase>package</phase>
@@ -163,11 +223,112 @@
                                 <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
                                     <fileset dir="${backend.dir}/src" includes="**/*.java"/>
                                     <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java"/>
+                                    <fileset dir="${backend.shared.dir}" includes="**/*.java"/>
                                     <zipfileset dir="${backend.dir}/native" includes="*.c"
                                                 prefix="cn1-native"/>
                                 </jar>
                             </target>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                 The same static analysis gates as the core, because this is
+                 published API too and ParparVM translates it the same way.
+                 PR CI (.github/workflows/pr.yml, Java 8 leg) runs `verify` here and
+                 .github/scripts/generate-quality-report.py enforces the reports:
+                 SpotBugs has to come out empty, and the PMD and Checkstyle rules
+                 it forbids for the core are forbidden here too.
+
+                 The rulesets are the core's own files rather than copies, so the
+                 two cannot drift apart. Only the SpotBugs exclusions are this
+                 module's, because an exclusion is scoped to the class it excuses.
+
+                 The shared core sources copied into generated-sources are left
+                 out of PMD and Checkstyle: core-unittests analyses them where they
+                 live, and a finding in them is the core's to fix. SpotBugs works
+                 on bytecode and sees them regardless, which is harmless: the
+                 core's gate already holds them at zero.
+            -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>true</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.21.0</version>
+                <configuration>
+                    <failOnViolation>false</failOnViolation>
+                    <printFailingErrors>false</printFailingErrors>
+                    <targetJdk>1.8</targetJdk>
+                    <rulesets>
+                        <ruleset>${project.basedir}/../core-unittests/pmd.xml</ruleset>
+                    </rulesets>
+                    <!-- The production impl/parparvm tree is analysed by
+                         maven/backend-parparvm, which compiles it. It cannot be
+                         added here: PMD reads the project's compile source roots,
+                         a read-only parameter, and making impl/parparvm one would
+                         compile both twins of every per-target class at once. -->
+                    <excludeRoots>
+                        <excludeRoot>${backend.shared.dir}</excludeRoot>
+                    </excludeRoots>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>pmd</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>pmd</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <configLocation>${project.basedir}/../core-unittests/checkstyle.xml</configLocation>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <consoleOutput>false</consoleOutput>
+                    <failsOnError>false</failsOnError>
+                    <linkXRef>false</linkXRef>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                    <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                    <outputFileFormat>xml</outputFileFormat>
+                    <sourceDirectories>
+                        <sourceDirectory>${backend.dir}/src</sourceDirectory>
+                        <sourceDirectory>${backend.dir}/impl/javase</sourceDirectory>
+                        <sourceDirectory>${backend.dir}/impl/parparvm</sourceDirectory>
+                    </sourceDirectories>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>checkstyle</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -195,4 +356,87 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            The same opt-in Error Prone pass the core gets (see maven/core/pom.xml
+            and .github/workflows/errorprone.yml), over the backend runtime.
+
+            BanClassForName applies here for the same reason it applies there:
+            the backend is translated by ParparVM, which cannot resolve a class by
+            its name at run time, so a Class.forName that works on the JVM arm is
+            a server binary that fails in production. It covers the Java SE
+            implementation too, which is what the JVM arm compiles, because a
+            behaviour that exists only there is exactly the drift parity-check.sh
+            is written to catch.
+        -->
+        <profile>
+            <id>errorprone</id>
+            <properties>
+                <errorprone.version>2.27.1</errorprone.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>1.8</source>
+                            <target>1.8</target>
+                            <encoding>UTF-8</encoding>
+                            <showWarnings>true</showWarnings>
+                            <!--
+                                Fork the compiler so the -J flags below
+                                reach a fresh javac JVM. Without forking,
+                                javac runs in the Maven process and the
+                                module exports never apply, leaving
+                                Error Prone's BaseErrorProneJavaCompiler
+                                unable to access jdk.compiler internals.
+                            -->
+                            <fork>true</fork>
+                            <compilerArgs combine.children="append">
+                                <arg>-XDcompilePolicy=simple</arg>
+                                <!--
+                                    -XepDisableAllChecks turns off Error
+                                    Prone's built-in rules so only the
+                                    checks we explicitly enable run. The
+                                    framework targets Java 1.5/1.8 idioms
+                                    and many built-in checks would fire on
+                                    legacy code we have no intention of
+                                    rewriting today.
+                                -->
+                                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:BanClassForName:ERROR</arg>
+                                <!-- JDK 16+ closes javac internals; Error
+                                     Prone needs these to introspect the
+                                     AST. The -J prefix routes each flag to
+                                     the forked javac JVM. -->
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                            </compilerArgs>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>com.google.errorprone</groupId>
+                                    <artifactId>error_prone_core</artifactId>
+                                    <version>${errorprone.version}</version>
+                                </path>
+                                <path>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>errorprone-checks</artifactId>
+                                    <version>${project.version}</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -29,10 +29,6 @@ import com.codename1.html5.js.JSObject;
 import com.codename1.html5.js.JSProperty;
 import com.codename1.html5.js.dom.EventListener;
 
-/**
- *
- * @author shannah
- */
 public interface FileReader extends JSObject {
 
     public static final int EMPTY = 0;

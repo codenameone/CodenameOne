@@ -36,8 +36,6 @@ import java.util.Vector;
 
 /// A parser for CSS segments or files.
 /// Note that this class is not derived from XMLParser or HTMLParser as CSS format is significantly different than XML/HTML
-///
-/// @author Ofir Leitner
 class CSSParser {
 
     /// The supported CSS media types, this is relevant for CSS at-rules (i.e. @import and @media)
@@ -805,8 +803,6 @@ class CSSParser {
 
     /// A decorator for Reader that adds the ability to "unread" a character
     /// This makes parsing easier, and is used for CSS parsing.
-    ///
-    /// @author Ofir Leitner
     static class ExtInputStreamReader {
 
         char lastCharRead = (char) -1;

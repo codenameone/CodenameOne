@@ -29,115 +29,110 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-/**
- * Where a server's settings come from, in one resolution order.
- *
- * <p>The shape is the one a Spring Boot developer already knows, because the
- * problem is the same one: the SAME code has to run against a SQLite file on a
- * laptop and a managed PostgreSQL in production, and the difference between those
- * two cannot live in the source. It lives here.
- *
- * <pre>
- *   # application.properties, committed
- *   cn1.datasource.url=${DATABASE_URL}
- *   cn1.server.port=8080
- *
- *   # application-dev.properties, also committed
- *   cn1.datasource.url=:memory:
- * </pre>
- *
- * <pre>
- *   CN1_PROFILE=dev ./server                       # SQLite, nothing installed
- *   DATABASE_URL=postgres://user:pw@db/app ./server # production
- * </pre>
- *
- * A key is looked for in this order, and the first layer that has it wins:
- *
- * <ol>
- *   <li>a system property of exactly that name ({@code -Dcn1.server.port=9000}),
- *       which only the local JVM loop can set;</li>
- *   <li>an environment variable of the name in upper case with dots as
- *       underscores ({@code CN1_SERVER_PORT}), which is how a container sets
- *       one;</li>
- *   <li>the environment variable a platform already sets for it, where one
- *       exists: {@code PORT} and {@code DATABASE_URL} are set for you by every
- *       PaaS worth the name, and a server that ignored them would need a
- *       wrapper script to start at all;</li>
- *   <li>{@code application-<profile>.properties};</li>
- *   <li>{@code application.properties};</li>
- *   <li>the default the caller passed in.</li>
- * </ol>
- *
- * <p>A value may reference an environment variable as {@code ${NAME}} or
- * {@code ${NAME:fallback}}. That resolution happens when the value is READ
- * rather than when the file is loaded, which is what lets a committed
- * application.properties name a variable that only production sets: the dev
- * profile overrides the key, so the unset variable is never looked at. A
- * reference that IS read and cannot be resolved is an error rather than a value
- * with a dollar sign in it -- the alternative is a server that tries to open a
- * SQLite file named "${DATABASE_URL}".
- *
- * <p>Nothing here is required. A binary with no properties file beside it reads
- * its whole configuration from the environment, which is the normal shape for a
- * container built FROM SCRATCH: there is no file next to the binary because there
- * is nothing next to the binary.
- */
+/// Where a server's settings come from, in one resolution order.
+///
+/// The shape is the one a Spring Boot developer already knows, because the
+/// problem is the same one: the SAME code has to run against a SQLite file on a
+/// laptop and a managed PostgreSQL in production, and the difference between those
+/// two cannot live in the source. It lives here.
+///
+/// ```
+/// # application.properties, committed
+/// cn1.datasource.url=${DATABASE_URL}
+/// cn1.server.port=8080
+///
+/// # application-dev.properties, also committed
+/// cn1.datasource.url=:memory:
+/// ```
+///
+/// ```
+/// CN1_PROFILE=dev ./server                       # SQLite, nothing installed
+/// DATABASE_URL=postgres://user:pw@db/app ./server # production
+/// ```
+///
+/// A key is looked for in this order, and the first layer that has it wins:
+///
+/// 1. a system property of exactly that name (`-Dcn1.server.port=9000`),
+///   which only the local JVM loop can set;
+///
+/// 2. an environment variable of the name in upper case with dots as
+///   underscores (`CN1_SERVER_PORT`), which is how a container sets
+///   one;
+///
+/// 3. the environment variable a platform already sets for it, where one
+///   exists: `PORT` and `DATABASE_URL` are set for you by every
+///   PaaS worth the name, and a server that ignored them would need a
+///   wrapper script to start at all;
+///
+/// 4. `application-<profile>.properties`;
+///
+/// 5. `application.properties`;
+///
+/// 6. the default the caller passed in.
+///
+/// A value may reference an environment variable as `${NAME}` or
+/// `${NAME:fallback}`. That resolution happens when the value is READ
+/// rather than when the file is loaded, which is what lets a committed
+/// application.properties name a variable that only production sets: the dev
+/// profile overrides the key, so the unset variable is never looked at. A
+/// reference that IS read and cannot be resolved is an error rather than a value
+/// with a dollar sign in it -- the alternative is a server that tries to open a
+/// SQLite file named "${DATABASE_URL}".
+///
+/// Nothing here is required. A binary with no properties file beside it reads
+/// its whole configuration from the environment, which is the normal shape for a
+/// container built FROM SCRATCH: there is no file next to the binary because there
+/// is nothing next to the binary.
 public final class Config {
-    /** Which profile is active. Defaults to "default". */
+    /// Which profile is active. Defaults to "default".
     public static final String PROFILE = "cn1.profile";
-    /** The directory the properties files are read from. Defaults to ".". */
+    /// The directory the properties files are read from. Defaults to ".".
     public static final String LOCATION = "cn1.config.location";
 
-    /** The port to listen on. Also read from PORT. */
+    /// The port to listen on. Also read from PORT.
     public static final String SERVER_PORT = "cn1.server.port";
-    /** The listen backlog. */
+    /// The listen backlog.
     public static final String SERVER_BACKLOG = "cn1.server.backlog";
-    /** The size of the request thread pool. */
+    /// The size of the request thread pool.
     public static final String SERVER_WORKERS = "cn1.server.workers";
-    /** How long a stop waits for requests in flight, in milliseconds. */
+    /// How long a stop waits for requests in flight, in milliseconds.
     public static final String SERVER_SHUTDOWN_MILLIS = "cn1.server.shutdownTimeoutMillis";
-    /** A PEM certificate chain to terminate TLS with. */
+    /// A PEM certificate chain to terminate TLS with.
     public static final String TLS_CERTIFICATE = "cn1.server.tls.certificate";
-    /** The private key for {@link #TLS_CERTIFICATE}. */
+    /// The private key for [#TLS_CERTIFICATE].
     public static final String TLS_KEY = "cn1.server.tls.key";
-    /** Whether to offer HTTP/2 through ALPN when TLS is terminated here. */
+    /// Whether to offer HTTP/2 through ALPN when TLS is terminated here.
     public static final String TLS_HTTP2 = "cn1.server.tls.http2";
 
-    /** A directory to serve static files from. */
+    /// A directory to serve static files from.
     public static final String STATIC_ROOT = "cn1.static.root";
-    /** The path prefix those files are served under. Defaults to /static. */
+    /// The path prefix those files are served under. Defaults to /static.
     public static final String STATIC_PREFIX = "cn1.static.prefix";
-    /** The file a directory request is answered with. Defaults to index.html. */
+    /// The file a directory request is answered with. Defaults to index.html.
     public static final String STATIC_INDEX = "cn1.static.index";
-    /** The Cache-Control header those files carry. */
+    /// The Cache-Control header those files carry.
     public static final String STATIC_CACHE_CONTROL = "cn1.static.cacheControl";
 
-    /**
-     * The database, as a SQLite path or a PostgreSQL or MySQL URL. Also read from
-     * DATABASE_URL.
-     */
+    /// The database, as a SQLite path or a PostgreSQL or MySQL URL. Also read from
+    /// DATABASE_URL.
     public static final String DATASOURCE_URL = "cn1.datasource.url";
-    /** How many connections the pool holds. */
+    /// How many connections the pool holds.
     public static final String DATASOURCE_POOL_SIZE = "cn1.datasource.pool.size";
-    /** How long a borrow waits for a free connection, in milliseconds. */
+    /// How long a borrow waits for a free connection, in milliseconds.
     public static final String DATASOURCE_BORROW_MILLIS = "cn1.datasource.pool.borrowTimeoutMillis";
-    /** How long SQLite waits on a locked database, in milliseconds. */
+    /// How long SQLite waits on a locked database, in milliseconds.
     public static final String DATASOURCE_BUSY_MILLIS = "cn1.datasource.busyTimeoutMillis";
-    /**
-     * Whether the generated daos create their tables at start-up. Defaults to
-     * true on a development profile and false everywhere else: a laptop wants a
-     * schema without being asked, and production wants its migrations run by
-     * whatever runs migrations.
-     */
+    /// Whether the generated daos create their tables at start-up. Defaults to
+    /// true on a development profile and false everywhere else: a laptop wants a
+    /// schema without being asked, and production wants its migrations run by
+    /// whatever runs migrations.
     public static final String ORM_CREATE_TABLES = "cn1.orm.createTables";
 
-    /** The profiles that mean "this is somebody's laptop or a test". */
+    /// The profiles that mean "this is somebody's laptop or a test".
     private static final String[] DEVELOPMENT_PROFILES = {"dev", "development", "test", "local"};
 
-    /**
-     * The environment variables a platform sets whether or not it has heard of
-     * Codename One. Pairs of key then variable.
-     */
+    /// The environment variables a platform sets whether or not it has heard of
+    /// Codename One. Pairs of key then variable.
     private static final String[] WELL_KNOWN_ENVIRONMENT = {
         SERVER_PORT, "PORT",
         DATASOURCE_URL, "DATABASE_URL",
@@ -173,16 +168,14 @@ public final class Config {
         this.loadedFrom = loadedFrom;
     }
 
-    /**
-     * Reads the configuration for this process: the active profile, then the two
-     * properties files, from {@link #LOCATION} or the working directory.
-     */
+    /// Reads the configuration for this process: the active profile, then the two
+    /// properties files, from [#LOCATION] or the working directory.
     public static Config load() throws IOException {
         String location = fromProcess(LOCATION);
         return load(location == null ? "." : location);
     }
 
-    /** Reads the configuration from properties files in {@code directory}. */
+    /// Reads the configuration from properties files in `directory`.
     public static Config load(String directory) throws IOException {
         List loadedFrom = new ArrayList();
         Properties base = read(directory, "application.properties", loadedFrom);
@@ -190,9 +183,9 @@ public final class Config {
         // file gets a vote: a project whose default is development says so once,
         // in the file, rather than in every developer's shell.
         String profile = fromProcess(PROFILE);
-        if(profile == null) {
+        if (profile == null) {
             profile = base.getProperty(PROFILE);
-            if(profile != null) {
+            if (profile != null) {
                 // EXPANDED, like every other value read from a file. Without
                 // this, "cn1.profile=${CN1_DEFAULT_PROFILE:dev}" made the
                 // literal text the profile name: the server looked for
@@ -209,7 +202,7 @@ public final class Config {
                         .expand(profile, PROFILE, 0);
             }
         }
-        if(profile == null || profile.length() == 0) {
+        if (profile == null || profile.length() == 0) {
             profile = "default";
         }
         Properties profileFile = read(directory, "application-" + profile + ".properties",
@@ -217,11 +210,9 @@ public final class Config {
         return new Config(base, profileFile, profile, loadedFrom);
     }
 
-    /**
-     * A configuration with no files behind it, holding exactly what it is given.
-     * The process environment still wins over it, for the same reason it wins
-     * over a file: the deployment has the last word.
-     */
+    /// A configuration with no files behind it, holding exactly what it is given.
+    /// The process environment still wins over it, for the same reason it wins
+    /// over a file: the deployment has the last word.
     public static Config of(Properties values, String profile) {
         Properties empty = new Properties();
         return new Config(values == null ? empty : values, empty,
@@ -229,126 +220,118 @@ public final class Config {
                 new ArrayList());
     }
 
-    /** The active profile: "default" unless something named another. */
+    /// The active profile: "default" unless something named another.
     public String getProfile() {
         return profile;
     }
 
-    /**
-     * Whether the active profile is a development one -- dev, development, test
-     * or local.
-     *
-     * <p>This decides two defaults and nothing else: an unconfigured database
-     * becomes an in-memory SQLite one rather than a refusal, and the ORM creates
-     * its tables. Both are wrong in production and right on a laptop, and both
-     * are overridable by naming the key.
-     */
+    /// Whether the active profile is a development one -- dev, development, test
+    /// or local.
+    ///
+    /// This decides two defaults and nothing else: an unconfigured database
+    /// becomes an in-memory SQLite one rather than a refusal, and the ORM creates
+    /// its tables. Both are wrong in production and right on a laptop, and both
+    /// are overridable by naming the key.
     public boolean isDevelopmentProfile() {
-        for(int iter = 0 ; iter < DEVELOPMENT_PROFILES.length ; iter++) {
-            if(DEVELOPMENT_PROFILES[iter].equalsIgnoreCase(profile)) {
+        for (String development : DEVELOPMENT_PROFILES) {
+            if (development.equalsIgnoreCase(profile)) {
                 return true;
             }
         }
         return false;
     }
 
-    /** The value for {@code key}, or null when no layer has one. */
+    /// The value for `key`, or null when no layer has one.
     public String get(String key) throws IOException {
         return get(key, null);
     }
 
-    /** The value for {@code key}, or {@code fallback} when no layer has one. */
+    /// The value for `key`, or `fallback` when no layer has one.
     public String get(String key, String fallback) throws IOException {
         String raw = raw(key);
-        if(raw == null) {
+        if (raw == null) {
             return fallback;
         }
         return expand(raw, key, 0);
     }
 
-    /** The value for {@code key} as a number, or {@code fallback}. */
+    /// The value for `key` as a number, or `fallback`.
     public int getInt(String key, int fallback) throws IOException {
         String value = get(key);
-        if(value == null || value.length() == 0) {
+        if (value == null || value.length() == 0) {
             return fallback;
         }
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException err) {
-            throw new IOException(key + " must be a number and is '" + value + "'");
+            throw new IOException(key + " must be a number and is '" + value + "'", err);
         }
     }
 
-    /**
-     * The value for {@code key} as a flag, or {@code fallback}.
-     *
-     * <p>"true", "yes", "on" and "1" are true; "false", "no", "off" and "0" are
-     * false; anything else is an error rather than false. A setting the operator
-     * spelled "ture" is a setting they believe is on.
-     */
+    /// The value for `key` as a flag, or `fallback`.
+    ///
+    /// "true", "yes", "on" and "1" are true; "false", "no", "off" and "0" are
+    /// false; anything else is an error rather than false. A setting the operator
+    /// spelled "ture" is a setting they believe is on.
     public boolean getBoolean(String key, boolean fallback) throws IOException {
         String value = get(key);
-        if(value == null || value.length() == 0) {
+        if (value == null || value.length() == 0) {
             return fallback;
         }
         String trimmed = value.trim();
-        if(trimmed.equalsIgnoreCase("true") || trimmed.equalsIgnoreCase("yes")
-                || trimmed.equalsIgnoreCase("on") || "1".equals(trimmed)) {
+        if ("true".equalsIgnoreCase(trimmed) || "yes".equalsIgnoreCase(trimmed)
+                || "on".equalsIgnoreCase(trimmed) || "1".equals(trimmed)) {
             return true;
         }
-        if(trimmed.equalsIgnoreCase("false") || trimmed.equalsIgnoreCase("no")
-                || trimmed.equalsIgnoreCase("off") || "0".equals(trimmed)) {
+        if ("false".equalsIgnoreCase(trimmed) || "no".equalsIgnoreCase(trimmed)
+                || "off".equalsIgnoreCase(trimmed) || "0".equals(trimmed)) {
             return false;
         }
         throw new IOException(key + " must be true or false and is '" + value + "'");
     }
 
-    /**
-     * What was read, for a start-up line. NEVER any value: the datasource URL
-     * holds a password, and a configuration dump is how it reaches a log.
-     */
+    /// What was read, for a start-up line. NEVER any value: the datasource URL
+    /// holds a password, and a configuration dump is how it reaches a log.
     public String describe() {
         StringBuilder out = new StringBuilder("profile=");
         out.append(profile);
-        if(loadedFrom.isEmpty()) {
+        if (loadedFrom.isEmpty()) {
             out.append(", no properties file, configured from the environment");
             return out.toString();
         }
-        for(int iter = 0 ; iter < loadedFrom.size() ; iter++) {
+        for (int iter = 0 ; iter < loadedFrom.size() ; iter++) {
             out.append(iter == 0 ? ", read " : ", ").append(loadedFrom.get(iter));
         }
         return out.toString();
     }
 
-    /** The value as written, before any ${} in it is resolved. */
+    /// The value as written, before any ${} in it is resolved.
     private String raw(String key) {
         String value = fromProcess(key);
-        if(value != null) {
+        if (value != null) {
             return value;
         }
-        for(int iter = 0 ; iter < WELL_KNOWN_ENVIRONMENT.length ; iter += 2) {
-            if(WELL_KNOWN_ENVIRONMENT[iter].equals(key)) {
+        for (int iter = 0 ; iter < WELL_KNOWN_ENVIRONMENT.length ; iter += 2) {
+            if (WELL_KNOWN_ENVIRONMENT[iter].equals(key)) {
                 value = environment(WELL_KNOWN_ENVIRONMENT[iter + 1]);
-                if(value != null) {
+                if (value != null) {
                     return value;
                 }
             }
         }
         value = profileFile.getProperty(key);
-        if(value != null) {
+        if (value != null) {
             return value;
         }
         return baseFile.getProperty(key);
     }
 
-    /**
-     * A system property of that name, then the environment variable it maps to.
-     * The mapping is the conventional one -- upper case, dots and dashes to
-     * underscores -- so cn1.datasource.url is CN1_DATASOURCE_URL.
-     */
+    /// A system property of that name, then the environment variable it maps to.
+    /// The mapping is the conventional one -- upper case, dots and dashes to
+    /// underscores -- so cn1.datasource.url is CN1_DATASOURCE_URL.
     private static String fromProcess(String key) {
         String value = System.getProperty(key);
-        if(value != null && value.length() > 0) {
+        if (value != null && value.length() > 0) {
             return value;
         }
         return environment(environmentName(key));
@@ -359,22 +342,20 @@ public final class Config {
         return value == null || value.length() == 0 ? null : value;
     }
 
-    /**
-     * The environment variable name for a key.
-     *
-     * <p>Hand-folded rather than String.toUpperCase, which is locale sensitive:
-     * on a Turkish device the i of "cn1" folds to a dotted capital I and the
-     * variable the deployment set is never found. The runtime has no Locale to
-     * ask for the root one, so the fold is written out.
-     */
+    /// The environment variable name for a key.
+    ///
+    /// Hand-folded rather than String.toUpperCase, which is locale sensitive:
+    /// on a Turkish device the i of "cn1" folds to a dotted capital I and the
+    /// variable the deployment set is never found. The runtime has no Locale to
+    /// ask for the root one, so the fold is written out.
     static String environmentName(String key) {
         StringBuilder out = new StringBuilder(key.length());
-        for(int iter = 0 ; iter < key.length() ; iter++) {
+        for (int iter = 0 ; iter < key.length() ; iter++) {
             char c = key.charAt(iter);
-            if(c == '.' || c == '-') {
+            if (c == '.' || c == '-') {
                 out.append('_');
-            } else if(c >= 'a' && c <= 'z') {
-                out.append((char)(c - 'a' + 'A'));
+            } else if (c >= 'a' && c <= 'z') {
+                out.append((char) (c - 'a' + 'A'));
             } else {
                 out.append(c);
             }
@@ -382,29 +363,27 @@ public final class Config {
         return out.toString();
     }
 
-    /**
-     * {@code value} with every ${NAME} and ${NAME:fallback} resolved against the
-     * process environment, then against system properties, then against this
-     * configuration's own keys.
-     *
-     * <p>Depth is bounded because a value may reference a key that references it
-     * back, and the failure of an unbounded expansion is a stack overflow at
-     * start-up rather than a message naming the two keys.
-     */
+    /// `value` with every ${NAME} and ${NAME:fallback} resolved against the
+    /// process environment, then against system properties, then against this
+    /// configuration's own keys.
+    ///
+    /// Depth is bounded because a value may reference a key that references it
+    /// back, and the failure of an unbounded expansion is a stack overflow at
+    /// start-up rather than a message naming the two keys.
     private String expand(String value, String key, int depth) throws IOException {
         int at = value.indexOf("${");
-        if(at < 0) {
+        if (at < 0) {
             return value;
         }
-        if(depth > 8) {
+        if (depth > 8) {
             throw new IOException(key + " expands through more than eight references, "
                     + "so two of them refer to each other");
         }
         StringBuilder out = new StringBuilder(value.length() + 16);
         int from = 0;
-        while(at >= 0) {
+        while (at >= 0) {
             int end = value.indexOf('}', at + 2);
-            if(end < 0) {
+            if (end < 0) {
                 // THE KEY AND THE POSITION, NEVER THE VALUE. This one is reached
                 // with cn1.datasource.url in hand more often than with anything
                 // else, and that value carries a password: an uncaught start-up
@@ -423,20 +402,20 @@ public final class Config {
             String reference = value.substring(at + 2, end);
             String fallback = null;
             int colon = reference.indexOf(':');
-            if(colon >= 0) {
+            if (colon >= 0) {
                 fallback = reference.substring(colon + 1);
                 reference = reference.substring(0, colon);
             }
             String resolved = environment(reference);
-            if(resolved == null) {
+            if (resolved == null) {
                 resolved = System.getProperty(reference);
             }
-            if(resolved == null || resolved.length() == 0) {
+            if (resolved == null || resolved.length() == 0) {
                 String nested = raw(reference);
                 resolved = nested == null ? null : expand(nested, reference, depth + 1);
             }
-            if(resolved == null) {
-                if(fallback == null) {
+            if (resolved == null) {
+                if (fallback == null) {
                     // LOUDLY. Left alone, the caller opens a database named
                     // "${DATABASE_URL}" -- or, worse, a SQLite file by that name,
                     // which succeeds and is empty.
@@ -454,18 +433,16 @@ public final class Config {
         return out.toString();
     }
 
-    /**
-     * One properties file, or an empty set when it is not there. Read through
-     * {@link FileIo} rather than java.io, because that is the file reader this
-     * runtime implements on both arms.
-     */
+    /// One properties file, or an empty set when it is not there. Read through
+    /// [FileIo] rather than java.io, because that is the file reader this
+    /// runtime implements on both arms.
     private static Properties read(String directory, String name, List loadedFrom)
             throws IOException {
         Properties out = new Properties();
         String path = directory == null || directory.length() == 0 || ".".equals(directory)
                 ? name : directory + "/" + name;
         byte[] content = readFile(path);
-        if(content == null) {
+        if (content == null) {
             return out;
         }
         // Through a Reader with the encoding named, on both arms. The two
@@ -478,10 +455,10 @@ public final class Config {
         return out;
     }
 
-    /** A whole file as bytes, or null when it cannot be opened. */
+    /// A whole file as bytes, or null when it cannot be opened.
     private static byte[] readFile(String path) throws IOException {
         int fd = FileIo.openRead(path);
-        if(fd == FileIo.OPEN_FAILED) {
+        if (fd == FileIo.OPEN_FAILED) {
             // NOT THE SAME AS ABSENT. Every setting this file carries would fall
             // back to an environment variable or a default, and the ones that
             // have no default are the ones that matter: a deployment naming its
@@ -493,7 +470,7 @@ public final class Config {
                     + "file that is present must be readable: every setting in it would "
                     + "otherwise fall back to a default, silently.");
         }
-        if(fd < 0) {
+        if (fd < 0) {
             return null;
         }
         try {
@@ -503,7 +480,7 @@ public final class Config {
             // before-identity at 0 against a real after-identity and refuse every
             // configuration file there is.
             long[] info = new long[4];
-            if(info.length >= 3 && FileIo.stat(fd, info) >= 0 && info[2] == 1) {
+            if (info.length >= 3 && FileIo.stat(fd, info) >= 0 && info[2] == 1) {
                 // A DIRECTORY IS NOT AN ABSENT FILE. openRead gives a descriptor
                 // for one -- StaticFiles needs that, to stat it and retry at the
                 // index -- so a bad ConfigMap or volume mount that put a
@@ -516,7 +493,7 @@ public final class Config {
                         + "every setting in it would otherwise fall back to a default, "
                         + "silently.");
             }
-            if(FileIo.stat(fd, info) < 0) {
+            if (FileIo.stat(fd, info) < 0) {
                 // NOT ABSENT EITHER. The descriptor is already OPEN, so the file
                 // exists and this is the filesystem failing to describe it -- an
                 // I/O error, or a stale handle on a network or container mount
@@ -547,20 +524,20 @@ public final class Config {
             // size comes from the filesystem and this allocates it: a device node
             // or a truncated-then-growing file should fail with a message rather
             // than an OutOfMemoryError.
-            if(size > 1024L * 1024L) {
+            if (size > 1024L * 1024L) {
                 throw new IOException(path + " is " + size + " bytes, which is far larger "
                         + "than a properties file; refusing to read it");
             }
-            byte[] out = new byte[(int)size];
+            byte[] out = new byte[(int) size];
             int filled = 0;
-            while(filled < out.length) {
+            while (filled < out.length) {
                 int read = FileIo.read(fd, out, filled, out.length - filled);
-                if(read <= 0) {
+                if (read <= 0) {
                     break;
                 }
                 filled += read;
             }
-            if(filled == out.length) {
+            if (filled == out.length) {
                 // AND NOTHING BEYOND IT. The size came from the stat, and a file
                 // rewritten in place while this runs is longer by the time the
                 // read reaches the end -- so filling the buffer proves only that
@@ -580,7 +557,7 @@ public final class Config {
                 // ConfigTest case goes through this line -- so the guard cannot
                 // be refusing everything.
                 byte[] beyond = new byte[1];
-                if(FileIo.read(fd, beyond, 0, 1) > 0) {
+                if (FileIo.read(fd, beyond, 0, 1) > 0) {
                     throw new IOException(path + " grew while it was being read, so what "
                             + "was loaded is the first " + out.length + " bytes of a file "
                             + "that is now longer. It is being rewritten underneath this "
@@ -626,7 +603,7 @@ public final class Config {
                 // the new one (changed=true), and after a replace-by-rename the
                 // identity moved too.
                 long[] after = new long[4];
-                if(FileIo.statFresh(fd, after) < 0) {
+                if (FileIo.statFresh(fd, after) < 0) {
                     throw new IOException(path + " was read but could not be checked for "
                             + "a rewrite: its size and modification time are no longer "
                             + "readable through the open descriptor. What was loaded "
@@ -645,7 +622,7 @@ public final class Config {
                 // mtime check below is the one that catches the corrupting case
                 // -- an in-place rewrite of the same length -- and it works on
                 // both.
-                if(after[3] != identityBefore) {
+                if (after[3] != identityBefore) {
                     throw new IOException(path + " was REPLACED while it was being "
                             + "read: the name now refers to a different file than the "
                             + "one these bytes came from. What was loaded is a whole "
@@ -653,7 +630,7 @@ public final class Config {
                             + "this process was told to use; start again once the "
                             + "deployment has settled.");
                 }
-                if(after[1] != modifiedBefore) {
+                if (after[1] != modifiedBefore) {
                     throw new IOException(path + " was rewritten while it was being "
                             + "read, so what was loaded may be part of the old file and "
                             + "part of the new. It is the same length either way, which "

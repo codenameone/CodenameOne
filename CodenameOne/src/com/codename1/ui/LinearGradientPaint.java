@@ -29,8 +29,6 @@ import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;
 
 /// LinearGradientPaint provides a way to fill a `Shape` with a linear gradient.
 ///
-/// @author shannah
-///
 /// #### See also
 ///
 /// - Graphics#setColor(com.codename1.ui.Paint)

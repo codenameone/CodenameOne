@@ -24,8 +24,6 @@
 package com.codename1.util;
 
 /// Adapter for the {Callback} interface.
-///
-/// @author shannah
 public class CallbackAdapter<T> implements Callback<T> {
 
     /// {@inheritDoc}

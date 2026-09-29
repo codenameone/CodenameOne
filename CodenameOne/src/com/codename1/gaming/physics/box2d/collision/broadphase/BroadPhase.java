@@ -36,8 +36,6 @@ import com.codename1.gaming.physics.box2d.common.Vec2;
 /// The broad-phase is used for computing pairs and performing volume queries and ray casts. This
 /// broad-phase does not persist pairs. Instead, this reports potentially new pairs. It is up to the
 /// client to consume the new pairs and to track subsequent overlap.
-///
-/// @author Daniel Murphy
 public class BroadPhase implements TreeCallback {
 
   public static final int NULL_PROXY = -1;

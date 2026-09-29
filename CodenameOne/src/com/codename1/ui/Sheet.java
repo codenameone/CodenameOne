@@ -111,9 +111,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// View source for this sample [here](https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/SheetSample).
 /// This sample can be run directly in the [SampleRunner](https://github.com/codenameone/CodenameOne/tree/master/Samples/).
-///
-/// @author shannah
-///
 public class Sheet extends Container {
     private static Rectangle[] sheetBoundsList = new Rectangle[0];
     private static final int N = 0;

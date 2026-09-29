@@ -28,7 +28,6 @@ package com.codename1.gaming.physics.box2d.common;
 // updated to rev 100
 /// This is the viewport transform used from drawing.
 /// Use yFlip if you are drawing from the top-left corner.
-/// @author daniel
 public interface IViewportTransform {
 	
 	/// @return if the transform flips the y axis
@@ -79,15 +78,15 @@ public interface IViewportTransform {
 	
 	/// Transforms the given directional vector by the
 	/// viewport transform (not positional)
-	/// @param argVec
-	/// @param argOut
+	/// @param argWorld the world direction to transform
+	/// @param argScreen receives the screen direction
 	public void getWorldVectorToScreen(Vec2 argWorld, Vec2 argScreen);
 	
 	
 	/// Transforms the given directional screen vector back to
 	/// the world direction.
-	/// @param argVec
-	/// @param argOut
+	/// @param argScreen the screen direction to transform
+	/// @param argWorld receives the world direction
 	public void getScreenVectorToWorld(Vec2 argScreen, Vec2 argWorld);
 	
 	

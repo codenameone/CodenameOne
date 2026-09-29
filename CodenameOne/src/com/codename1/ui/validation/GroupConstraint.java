@@ -23,8 +23,6 @@
 package com.codename1.ui.validation;
 
 /// Groups several constraints as if they are one constraint
-///
-/// @author Shai Almog
 public class GroupConstraint implements Constraint {
     private final Constraint[] group;
     private String failMessage = null;

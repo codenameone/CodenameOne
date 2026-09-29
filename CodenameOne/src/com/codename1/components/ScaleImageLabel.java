@@ -51,8 +51,6 @@ import com.codename1.ui.TopLevelContainer;
 ///         add(fillButton);
 /// hi.show();
 /// ```
-///
-/// @author Shai Almog
 public class ScaleImageLabel extends Label {
 
     private int preferredH = -1;

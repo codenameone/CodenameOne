@@ -5,6 +5,10 @@ on:
     paths:
       - 'CodenameOne/src/**/*.java'
       - 'Ports/**/src/**/*.java'
+      # The backend API reference is built by the same script, from these.
+      - 'vm/backend/src/**/*.java'
+      - 'vm/backend/impl/**/*.java'
+      - 'vm/backend/shared-sources.sh'
       - 'maven/**/src/main/java/**/*.java'
       - '.github/scripts/build_javadocs.sh'
       - 'scripts/check-package-info.sh'
@@ -20,7 +24,7 @@ on:
 
 jobs:
   build-javadocs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -37,13 +41,20 @@ jobs:
         run: echo "JDK_25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
 
       - name: Verify every documented package has a package-info.java
-        run: scripts/check-package-info.sh
+        run: |
+          scripts/check-package-info.sh
+          # The backend reference is published the same way, so its packages
+          # need a description too. impl/ adds classes to com.codename1.backend
+          # only, whose package-info lives in src/.
+          scripts/check-package-info.sh vm/backend/src
 
       - name: Build JavaDocs
         run: ./.github/scripts/build_javadocs.sh
 
       - name: Verify JavaDocs archive
-        run: test -f CodenameOne/javadocs.zip
+        run: |
+          test -f CodenameOne/javadocs.zip
+          test -f CodenameOne/backend-javadocs.zip
 
       - name: Upload JavaDocs artifact
         uses: actions/upload-artifact@v7
@@ -51,10 +62,17 @@ jobs:
           name: CodenameOne-javadocs
           path: CodenameOne/javadocs.zip
 
+      - name: Upload backend JavaDocs artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: CodenameOne-backend-javadocs
+          path: CodenameOne/backend-javadocs.zip
+
       - name: Attach JavaDocs to release
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
         uses: softprops/action-gh-release@v1
         with:
           files: |
             CodenameOne/javadocs.zip
+            CodenameOne/backend-javadocs.zip
 

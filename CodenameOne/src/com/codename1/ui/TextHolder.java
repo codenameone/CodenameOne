@@ -25,9 +25,6 @@ package com.codename1.ui;
 /// An interface implemented by `Component` classes that can support
 /// setting/getting text.  E.g. `Label`, `TextArea`,
 /// `SpanLabel`, `SpanButton`, etc..
-///
-/// @author Shai Almog
-///
 public interface TextHolder {
     /// The text of the component
     ///

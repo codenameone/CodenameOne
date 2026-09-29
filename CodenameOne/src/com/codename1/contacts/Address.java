@@ -23,8 +23,6 @@
 package com.codename1.contacts;
 
 /// This class represents a Contact Address
-///
-/// @author Chen
 public class Address {
 
     private String streetAddress;

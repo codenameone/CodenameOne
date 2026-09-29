@@ -107,6 +107,48 @@ public class CSSDarkModeMediaQueryTest {
         }
     }
 
+    /**
+     * A later literal colour must cancel an earlier var() binding for the same
+     * property. Theme generation files are concatenated after the shared sheet
+     * and override its rules; without this the runtime applyThemeBindings pass
+     * re-applied the shared sheet's `var(--accent-color-dark)` over the override.
+     */
+    @Test
+    void testLaterLiteralColourDropsVarBinding() throws Exception {
+        Path cssFile = Files.createTempFile("cn1-binding-override", ".css");
+        Path resFile = Files.createTempFile("cn1-binding-override", ".res");
+        try {
+            String css = "#Constants { --accent-color: #007aff; --accent-color-dark: #0a84ff; }"
+                    + "Tab.pressed { color: var(--accent-color, #007aff); }"
+                    + "Tab.selected { color: var(--accent-color, #007aff); }"
+                    + "@media (prefers-color-scheme: dark) {"
+                    + "  Tab.pressed { color: var(--accent-color-dark, #0a84ff); }"
+                    + "}"
+                    + "Tab.pressed { color: #0065d1; }"
+                    + "@media (prefers-color-scheme: dark) {"
+                    + "  Tab.pressed { color: #5eefff; }"
+                    + "}";
+            Files.write(cssFile, css.getBytes(StandardCharsets.UTF_8));
+
+            CSSTheme theme = CSSTheme.load(cssFile.toUri().toURL());
+            theme.resourceFile = resFile.toFile();
+            theme.res = new com.codename1.ui.util.EditableResourcesForCSS(resFile.toFile());
+            theme.res.setTheme("Theme", new Hashtable());
+            theme.updateResources();
+
+            Hashtable themeProps = theme.res.getTheme("Theme");
+            assertEquals("0065D1", themeProps.get("Tab.press#fgColor"), "overridden light colour");
+            assertEquals("5EEFFF", themeProps.get("$DarkTab.press#fgColor"), "overridden dark colour");
+            assertNull(themeProps.get("@cn1-bind:Tab.press#fgColor"), "light binding survived the override");
+            assertNull(themeProps.get("@cn1-bind:$DarkTab.press#fgColor"), "dark binding survived the override");
+            // An untouched var() colour keeps its binding.
+            assertNotNull(themeProps.get("@cn1-bind:Tab.sel#fgColor"), "unrelated binding lost");
+        } finally {
+            deleteIfExists(cssFile);
+            deleteIfExists(resFile);
+        }
+    }
+
     private static void deleteIfExists(Path path) {
         try {
             Files.deleteIfExists(path);
@@ -117,6 +159,18 @@ public class CSSDarkModeMediaQueryTest {
     private static void assertEquals(Object expected, Object actual, String message) {
         if (expected == null ? actual != null : !expected.equals(actual)) {
             throw new AssertionError(message + " expected=" + expected + " actual=" + actual);
+        }
+    }
+
+    private static void assertNull(Object actual, String message) {
+        if (actual != null) {
+            throw new AssertionError(message + " actual=" + actual);
+        }
+    }
+
+    private static void assertNotNull(Object actual, String message) {
+        if (actual == null) {
+            throw new AssertionError(message);
         }
     }
 }

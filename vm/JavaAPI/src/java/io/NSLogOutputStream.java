@@ -23,10 +23,6 @@
 
 package java.io;
 
-/**
- *
- * @author Shai Almog
- */
 public class NSLogOutputStream extends OutputStream {
 
     @Override

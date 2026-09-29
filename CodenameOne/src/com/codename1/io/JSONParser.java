@@ -186,8 +186,6 @@ import java.util.Vector;
 ///     }
 /// }
 /// ```
-///
-/// @author Shai Almog
 public class JSONParser implements JSONParseCallback {
 
     private static boolean useLongsDefault;

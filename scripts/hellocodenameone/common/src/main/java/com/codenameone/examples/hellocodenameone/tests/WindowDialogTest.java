@@ -43,8 +43,6 @@ import com.codename1.ui.layouts.BoxLayout;
  *
  * <p>Three sizes, because this case is about reflow. The deliberately wide one catches a
  * dialog still measuring {@code Display.getDisplayWidth()} rather than its own host.</p>
- *
- * @author Shai Almog
  */
 public class WindowDialogTest extends WindowHostTest {
 

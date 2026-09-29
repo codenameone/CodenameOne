@@ -34,7 +34,6 @@ import org.apache.maven.plugins.annotations.Parameter;
 
 /**
  * A goal to generate a GUI form.
- * @author shannah
  */
 @Mojo(name = "create-gui-form")
 public class CreateGuiFormMojo extends AbstractCN1Mojo {

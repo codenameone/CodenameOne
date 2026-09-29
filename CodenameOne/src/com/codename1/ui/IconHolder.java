@@ -23,9 +23,6 @@
 package com.codename1.ui;
 
 /// An interface implemented by `Component` classes that can display an icon.  E.g. `Label`, `SpanLabel`, `SpanButton`, etc..
-///
-/// @author shannah
-///
 public interface IconHolder {
 
     /// Returns the labels icon

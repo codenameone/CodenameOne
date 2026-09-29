@@ -39,8 +39,6 @@ package com.codename1.impl.ios;
 /// A window is addressed by the slot returned from `#macWindowCreate`. The
 /// windowId passed in is the framework's own id, stored natively and echoed back
 /// on every callback so events route without a lookup.
-///
-/// @author Shai Almog
 class CatalystWindowNative {
     // ---- Mac Catalyst desktop windows (CN1MacWindows.m) ---------------------
     //

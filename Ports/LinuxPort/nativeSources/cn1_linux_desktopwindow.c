@@ -1141,7 +1141,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowGetBounds___int_int_
     memset(&op, 0, sizeof(op));
     op.slot = slot;
     cn1LinuxRunOnMainAndWait(cn1DesktopGetBoundsOnMain, &op);
-    arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
+    arr = (JAVA_INT*) CN1_ARRAY_DATA(out);
     if ((int) (*(JAVA_ARRAY) out).length >= 4) {
         arr[0] = op.out[0];
         arr[1] = op.out[1];
@@ -1173,7 +1173,7 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_mainWindowGetBounds___int_1ARR
     if (!op.a) {
         return JAVA_FALSE;
     }
-    arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
+    arr = (JAVA_INT*) CN1_ARRAY_DATA(out);
     arr[0] = op.out[0];
     arr[1] = op.out[1];
     arr[2] = op.out[2];
@@ -1418,7 +1418,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_monitorBounds___int_boolean_int_1
     if (!op.result) {
         return;
     }
-    arr = (JAVA_INT*) (*(JAVA_ARRAY) out).data;
+    arr = (JAVA_INT*) CN1_ARRAY_DATA(out);
     if ((int) (*(JAVA_ARRAY) out).length >= 4) {
         arr[0] = op.x;
         arr[1] = op.y;
