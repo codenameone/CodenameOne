@@ -717,6 +717,15 @@ final class BackendBeans {
                     + " must be an instance method that takes no arguments.");
             return false;
         }
+        if (returnsFuture(m)) {
+            // Spring ignores a lifecycle method's return value, and so does this --
+            // but a Future means work still running when the call returns.
+            ctx.getLog().warn("cn1: " + what + " method " + cls.getSourceName() + "."
+                    + m.getName() + " returns a Future, which is ignored: the server goes "
+                    + "on -- " + ("@PostConstruct".equals(what) ? "to serve requests"
+                    : "to tear down beans and close the database") + " -- when the method "
+                    + "returns, not when that work finishes.");
+        }
         return true;
     }
 
@@ -775,6 +784,19 @@ final class BackendBeans {
             List<String> values = strings(profile.get("value"));
             if (values.isEmpty()) {
                 ctx.error(where, "@Profile on " + bean.name + " names no profile.");
+            }
+            for (String v : values) {
+                String name = v.trim();
+                if (name.startsWith("!")) {
+                    name = name.substring(1).trim();
+                }
+                if (name.length() == 0) {
+                    // "!" negates nothing: compared with the active profile, the
+                    // empty name never matches, so the bean was on under EVERY
+                    // profile, production included.
+                    ctx.error(where, "@Profile on " + bean.name + " has \"" + v
+                            + "\", which names no profile.");
+                }
             }
             bean.profiles.add(values.toArray(new String[values.size()]));
         }

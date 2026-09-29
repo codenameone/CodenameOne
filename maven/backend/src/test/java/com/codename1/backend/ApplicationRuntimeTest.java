@@ -2364,6 +2364,41 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("request beans are destroyed even when the JSON body fails to serialise")
+    void requestBeansEndWhenSerialisationFails() throws Exception {
+        final List ended = java.util.Collections.synchronizedList(new ArrayList());
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                request.scopedBeans(1)[0] = "bean";
+                                return request.respondJson(200, new Json.Writable() {
+                                    public void writeTo(ByteSink out) {
+                                        throw new IllegalStateException("cannot write");
+                                    }
+                                });
+                            }
+                        }};
+                    }
+
+                    public void requestEnded(Object[] beans) {
+                        ended.add(beans[0]);
+                    }
+                }).start();
+        try {
+            assertEquals(500, open(port, "/x").getResponseCode());
+            assertEquals("[bean]", String.valueOf(ended),
+                    "a failed serialisation left the request's beans undestroyed");
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("a JSON body a request bean owns is written before the bean is destroyed")
     void deferredJsonIsWrittenBeforeRequestBeansEnd() throws Exception {
         int port = freePort();

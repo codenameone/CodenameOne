@@ -550,6 +550,20 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void emptyNegatedProfilesAndFutureLifecyclesAreCaught() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Everywhere", PKG + "@Component @Profile(\"!\") public class Everywhere {\n"
+                + "}\n");
+        s.put("com.example.Starter", PKG + "@Component public class Starter {\n"
+                + "    @PostConstruct public Future warm() { return AsyncResult.of(\"x\"); }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("has \"!\", which names no profile"));
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("@PostConstruct method com.example.Starter.warm returns a Future"));
+    }
+
+    @Test
     public void anAsyncLifecycleMethodRunsSynchronously() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Warm", PKG + "@Component public class Warm {\n"

@@ -550,25 +550,48 @@ class GcSteadyStateIntegrationTest {
         // ---- 4. proof that scenario 3 can fail ---------------------------------
         Path noReserve = build(legacyDist, tempDirs, "noreserve",
                 "-DCN1_GC_CONFORM -DCN1_PACING_NO_RESERVE");
-        Run unbounded = run(noReserve, legacyDist, ceiling);
-        assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build", javaResult);
-        long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
-        assertTrue(unboundedHeadroomMb >= 0,
-                "No [PACING] report from the no-reserve build. Output: " + tail(unbounded.output));
-        // The fault twin, and what keeps scenario 3 non-vacuous: with the bound compiled
-        // out the process must end up on the bare admission margin. If it does not, the
-        // environment is not pressuring it at all and scenario 3's "never entered the
-        // reserve" branch would be passing for the wrong reason.
-        assertTrue(unboundedHeadroomMb < HEADROOM_THRESHOLD_MB,
-                "Compiling the reserve out did NOT put the process back on the admission "
-                        + "margin (smallest headroom " + unboundedHeadroomMb + "MB), so the "
-                        + "ceiling is not pressuring this workload and scenario 3 proved "
-                        + "nothing." + evidence(unbounded));
-        assertEquals(0, pacingCounter(unbounded.output, "volumeParks="),
-                "The reserve was compiled out, so nothing may have parked on it."
-                        + evidence(unbounded));
-        System.err.println("[GcSteadyState] ceiling/no-reserve: smallestHeadroom="
-                + unboundedHeadroomMb + "MB");
+        Run unbounded = run(noReserve, legacyDist, ceiling, true);
+        if (unbounded.exit == WEDGED) {
+            // The fault twin can wedge instead of finishing: with the reserve compiled
+            // out it rides the budget to the admission margin, where every mutator
+            // parks on the exhausted budget and a cycle can stop being owed. That IS
+            // the failure scenario 3 guards against, not a broken gate -- but it leaves
+            // no [PACING] report, which is written at exit. The per-second probe says
+            // the same things: the footprint it reached, and whether the reserve bound
+            // (compiled out) ever parked anyone. A shipped build never runs this path;
+            // requiring the deliberately broken one to finish made the gate fail on
+            // whichever runner happened to be slow enough to wedge.
+            long wedgedHeadroomMb = CEILING_MB - maxProbe(unbounded.output, "[GCPROBE-T]",
+                    "fpKb=") / 1024;
+            assertTrue(wedgedHeadroomMb < HEADROOM_THRESHOLD_MB,
+                    "The no-reserve build stopped finishing WITHOUT reaching the admission "
+                            + "margin (headroom " + wedgedHeadroomMb + "MB), so it is stuck "
+                            + "for some other reason." + evidence(unbounded));
+            assertEquals(0, maxProbe(unbounded.output, "[GCSTALL-T]", "volume="),
+                    "The reserve was compiled out, so nothing may have parked on it."
+                            + evidence(unbounded));
+            System.err.println("[GcSteadyState] ceiling/no-reserve: wedged on the margin, "
+                    + "smallestHeadroom=" + wedgedHeadroomMb + "MB");
+        } else {
+            assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build", javaResult);
+            long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
+            assertTrue(unboundedHeadroomMb >= 0,
+                    "No [PACING] report from the no-reserve build. Output: " + tail(unbounded.output));
+            // The fault twin, and what keeps scenario 3 non-vacuous: with the bound compiled
+            // out the process must end up on the bare admission margin. If it does not, the
+            // environment is not pressuring it at all and scenario 3's "never entered the
+            // reserve" branch would be passing for the wrong reason.
+            assertTrue(unboundedHeadroomMb < HEADROOM_THRESHOLD_MB,
+                    "Compiling the reserve out did NOT put the process back on the admission "
+                            + "margin (smallest headroom " + unboundedHeadroomMb + "MB), so the "
+                            + "ceiling is not pressuring this workload and scenario 3 proved "
+                            + "nothing." + evidence(unbounded));
+            assertEquals(0, pacingCounter(unbounded.output, "volumeParks="),
+                    "The reserve was compiled out, so nothing may have parked on it."
+                            + evidence(unbounded));
+            System.err.println("[GcSteadyState] ceiling/no-reserve: smallestHeadroom="
+                    + unboundedHeadroomMb + "MB");
+        }
 
         // ---- 5. the mutator must be RUNNING, not waiting on the collector -------
         // The four scenarios above all measure memory, and the reporter's build passed
@@ -1100,7 +1123,36 @@ class GcSteadyStateIntegrationTest {
         return run(executable, workingDir, new HashMap<String, String>());
     }
 
+    /** The exit code of a run that never finished; see run(..., mayWedge). */
+    private static final int WEDGED = Integer.MIN_VALUE;
+
+    /** The largest value of `key` on the probe lines starting with `prefix`, or 0. */
+    private static long maxProbe(String output, String prefix, String key) {
+        long max = 0;
+        for (String line : output.split("\\R")) {
+            int at = line.indexOf(key);
+            if (!line.startsWith(prefix) || at < 0) {
+                continue;
+            }
+            int end = at + key.length();
+            while (end < line.length() && Character.isDigit(line.charAt(end))) {
+                end++;
+            }
+            if (end > at + key.length()) {
+                max = Math.max(max, Long.parseLong(line.substring(at + key.length(), end)));
+            }
+        }
+        return max;
+    }
+
     private Run run(Path executable, Path workingDir, Map<String, String> env) throws Exception {
+        return run(executable, workingDir, env, false);
+    }
+
+    /// `mayWedge`: a run that does not finish is returned with exit WEDGED rather than
+    /// failed, for a fault twin whose not finishing is itself the demonstration.
+    private Run run(Path executable, Path workingDir, Map<String, String> env,
+                    boolean mayWedge) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toString());
         builder.directory(workingDir.toFile());
         // A developer debugging the collector has CN1_* knobs exported, and several of them
@@ -1147,6 +1199,9 @@ class GcSteadyStateIntegrationTest {
         String output;
         synchronized (captured) {
             output = captured.toString();
+        }
+        if (!exited && mayWedge) {
+            return new Run(WEDGED, output);
         }
         assertTrue(exited,
                 "The workload did not finish within " + VM_RUN_TIMEOUT_SECONDS + "s (env "
