@@ -1448,13 +1448,33 @@ public class ByteCodeTranslator {
             // geomean within 2%; -Os reached a similar size but lost 9% on compute
             // (it disables loop vectorization). The Xcode templates carry the same flag on
             // their Release configurations, compile and LTO link. Clang only: gcc has no
-            // -mllvm, and clang-cl takes it through /clang:. SHELL: keeps the two words
-            // one option -- CMake de-duplicates repeated options, which would otherwise
-            // be free to drop the second -mllvm of a pair.
-            writer.append("if(MSVC)\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE \"$<$<CONFIG:Release>:SHELL:/clang:-mllvm /clang:-inline-threshold=50>\")\n");
-            writer.append("elseif(CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n");
-            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE \"$<$<CONFIG:Release>:SHELL:-mllvm -inline-threshold=50>\")\n");
+            // -mllvm, and clang-cl takes it through /clang:.
+            //
+            // GENERATED SOURCES ONLY. The runtime's hand-written C -- the allocator, the
+            // collector, the write barriers, nativeMethods.c -- stays at the compiler's
+            // default: it is five files of a few thousand, so it is not where the size is,
+            // and it is where a lost inline costs time on every allocation. Applied to the
+            // whole target, the Windows x64 gate's objectAllocation rose 33% in time and
+            // 23% in peak memory. The translator already records which sources it
+            // generated in cn1-source-manifest.txt beside this file, so CMake reads that
+            // at configure time rather than guessing from file names (java_io_File_runtime.c
+            // is hand-written and named like a class). A source COMPILE_OPTIONS list rather
+            // than SHELL:, which the per-source property does not accept; the two words are
+            // the only -mllvm in a file's options, so de-duplication cannot split them.
+            writer.append("set(CN1_MANIFEST \"${CMAKE_CURRENT_SOURCE_DIR}/cn1-source-manifest.txt\")\n");
+            writer.append("if(EXISTS \"${CN1_MANIFEST}\" AND (MSVC OR CMAKE_C_COMPILER_ID MATCHES \"Clang\"))\n");
+            writer.append("    if(MSVC)\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:/clang:-mllvm>;$<$<CONFIG:Release>:/clang:-inline-threshold=50>\")\n");
+            writer.append("    else()\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-mllvm>;$<$<CONFIG:Release>:-inline-threshold=50>\")\n");
+            writer.append("    endif()\n");
+            writer.append("    file(STRINGS \"${CN1_MANIFEST}\" CN1_GENERATED_LINES REGEX \"^[^#|]+\\\\.c\\\\|generated\\\\|\")\n");
+            writer.append("    set(CN1_GENERATED_SOURCES \"\")\n");
+            writer.append("    foreach(CN1_LINE IN LISTS CN1_GENERATED_LINES)\n");
+            writer.append("        string(REGEX REPLACE \"\\\\|.*$\" \"\" CN1_NAME \"${CN1_LINE}\")\n");
+            writer.append("        list(APPEND CN1_GENERATED_SOURCES \"${CN1_APP_SOURCE_ROOT}/${CN1_NAME}\")\n");
+            writer.append("    endforeach()\n");
+            writer.append("    set_source_files_properties(${CN1_GENERATED_SOURCES} PROPERTIES COMPILE_OPTIONS \"${CN1_SIZE_OPTIONS}\")\n");
             writer.append("endif()\n");
             if (executable && !windows) {
                 // ThinLTO for the Release Linux executable: the translator emits one
