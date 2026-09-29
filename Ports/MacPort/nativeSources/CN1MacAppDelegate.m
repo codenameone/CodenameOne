@@ -965,6 +965,14 @@ extern void CN1MacRefreshModifiers(void);
 
 @end
 
+/// Builds the main window on the main thread before [NSApp run], called from the
+/// generated main right after it has dispatched the VM boot. The queued build in
+/// CN1MacInstallAppDelegate then finds the window already there.
+void CN1MacBuildMainWindowBeforeRun(void) {
+    cn1StartupPhase("buildWindowBeforeRun");
+    (void)[CN1MacHost sharedHost].renderingView;
+}
+
 /// Installs the delegate and the menu bar. Called from the generated main,
 /// before [NSApp run].
 void CN1MacInstallAppDelegate(void) {
