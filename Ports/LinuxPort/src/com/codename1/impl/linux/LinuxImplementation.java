@@ -1946,6 +1946,25 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.drawImage(peer(graphics), peer(img), x, y);
     }
 
+    /// Cairo scales while it paints (drawImageScaled: the same cairo_scale and
+    /// default filter a pre-scaled copy would have been made with), so this port
+    /// can draw an image at any size directly. It used to answer the inherited
+    /// false, and Graphics.drawImage(img, x, y, w, h) then scaled the picture
+    /// first -- which for an EncodedImage means EncodedImage.scaled: decode,
+    /// scale, RE-ENCODE to PNG (or lossy JPEG for an opaque picture), decode
+    /// again. On every paint, since nothing kept the result: the transpiled
+    /// Flutter gallery ran 13 PNG encodes before its first frame, all from
+    /// scaled draws of its cards, icons and logo.
+    @Override
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    @Override
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        LinuxNative.drawImageScaled(peer(graphics), peer(img), x, y, w, h);
+    }
+
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
         LinuxNative.drawRGB(peer(graphics), rgbData, offset, x, y, w, h, processAlpha);
