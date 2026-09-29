@@ -708,6 +708,38 @@ final class JavascriptMethodGenerator {
      * calls that implementation directly, so a signature-wide "suspending"
      * would put ``yield*`` in front of a plain function.
      */
+    /// A virtual call site's direct target, as {function id, "1" if it suspends}, or null.
+    ///
+    /// monomorphicDispatch only devirtualizes a signature declared ONCE in the whole
+    /// program, which almost nothing is: Integer.intValue() shares its signature with
+    /// every Number, HashMap.get(Object) with every Map. Every such call went through
+    /// cn1_ivResolve -- a methods-map probe per call -- even where the receiver's type
+    /// leaves one possible body: a final class, or a cone in which RTA sees one
+    /// instantiated implementation. This asks the suspension analysis's own dispatch
+    /// model for that body (DispatchModel.directTarget), so the direct call and the
+    /// site's classification come from one answer. The m: entry stays: only
+    /// monomorphicDispatch prunes it, and the bridge can still dispatch through it.
+    /// Kill switch: -Dparparvm.js.sitedevirt.off.
+    private static String[] siteDirectTarget(Invoke invoke) {
+        if (invoke == null || System.getProperty("parparvm.js.sitedevirt.off") != null) {
+            return null;
+        }
+        JavascriptSuspensionAnalysis.DispatchModel model = JavascriptSuspensionAnalysis.exportedDispatchModel;
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (model == null || idx == null) {
+            return null;
+        }
+        BytecodeMethod m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        if (m == null) {
+            return null;
+        }
+        ByteCodeClass c = idx.get(m.getClsName());
+        if (c == null || isJsoBridgeType(c, idx)) {
+            return null;
+        }
+        return new String[]{jsMethodIdentifier(c, m), m.isJavascriptSuspending() ? "1" : "0"};
+    }
+
     private static boolean isDevirtualizedInvokeSuspending(String dispatchId, boolean signatureAnswer) {
         java.util.Map<String, Boolean> known = monomorphicSuspending;
         if (known == null) {
@@ -5412,6 +5444,13 @@ final class JavascriptMethodGenerator {
                     // A devirtualized site follows its TARGET, not the signature.
                     boolean devSuspending = monoImpl != null
                             ? isDevirtualizedInvokeSuspending(dispatchId, suspending) : suspending;
+                    if (monoImpl == null) {
+                        String[] direct = siteDirectTarget(invoke);
+                        if (direct != null) {
+                            monoImpl = direct[0];
+                            devSuspending = "1".equals(direct[1]);
+                        }
+                    }
                     String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
@@ -5434,12 +5473,12 @@ final class JavascriptMethodGenerator {
                     out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
                 } else {
                     out.append("  {\n");
-                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending);
+                    appendCompactVirtualDispatch(out, "    ", dispatchId, argValues.length, true, target, false, argValues, suspending, invoke);
                     out.append("    ").append(ctx.push("__result")).append(";\n");
                     out.append("  }\n");
                 }
             } else {
-                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending);
+                appendCompactVirtualDispatch(out, "  ", dispatchId, argValues.length, false, target, false, argValues, suspending, invoke);
             }
             return true;
         }
@@ -7375,6 +7414,12 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // synchronously at precisely the sites this map exists for.
             if (monoImpl != null) {
                 susp = isDevirtualizedInvokeSuspending(dispatchId, susp);
+            } else {
+                String[] direct = siteDirectTarget(invoke);
+                if (direct != null) {
+                    monoImpl = direct[0];
+                    susp = "1".equals(direct[1]);
+                }
             }
             String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
@@ -7613,6 +7658,13 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
             int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
             boolean suspending) {
+        appendCompactVirtualDispatch(out, indent, methodId, argCount, hasReturn, targetExpr, argsFromStack,
+                argExpressions, suspending, null);
+    }
+
+    private static void appendCompactVirtualDispatch(StringBuilder out, String indent, String methodId,
+            int argCount, boolean hasReturn, String targetExpr, boolean argsFromStack, String[] argExpressions,
+            boolean suspending, Invoke invoke) {
         // Monomorphic devirtualization: a dispatch id with exactly one
         // concrete impl resolves to that body for any receiver, so call
         // it directly through the ``_dv*`` / ``_dw*`` family (impl
@@ -7626,6 +7678,12 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         // signature's -- see isDevirtualizedInvokeSuspending.
         if (monoImpl != null) {
             suspending = isDevirtualizedInvokeSuspending(methodId, suspending);
+        } else {
+            String[] direct = siteDirectTarget(invoke);
+            if (direct != null) {
+                monoImpl = direct[0];
+                suspending = "1".equals(direct[1]);
+            }
         }
         String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
         // The second helper argument: bareword impl fn for devirt, else

@@ -161,6 +161,34 @@ final class JavascriptSuspensionAnalysis {
             return target == null || target.isJavascriptSuspending();
         }
 
+        /// The one body a virtual call on this receiver type can reach, or null. Answered
+        /// from the same receiver-type cone isDispatchSuspending classifies the site by, so
+        /// a site the emitter calls directly suspends exactly as the analysis recorded:
+        /// null for a JSO / bridge signature (host-dispatched, never through the cone),
+        /// for a cone RTA could not resolve, for more than one body, and for an abstract
+        /// one.
+        BytecodeMethod directTarget(String owner, String name, String desc) {
+            String sig = name + desc;
+            if (rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
+                    jsoClasses, owner, sig)) {
+                return null;
+            }
+            List<BytecodeMethod> impls = rta.resolveImpls(owner, name, desc);
+            if (impls == null || impls.size() != 1) {
+                return null;
+            }
+            BytecodeMethod m = impls.get(0);
+            if (m.isAbstract() || m.isEliminated() || m.isStatic()) {
+                return null;
+            }
+            // A native qualifies too. Its class's m: entry names the same global
+            // identifier the direct call does (appendPrimaryRegistration), and the
+            // runtime's bindNative replaces that global and the m: entry together, so
+            // the direct call reaches exactly what dispatch would. Its suspension is
+            // the binding's (isSyncNativeBinding), which is what the call site uses.
+            return m;
+        }
+
         boolean isDispatchSuspending(String owner, String name, String desc) {
             String sig = name + desc;
             if (rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
