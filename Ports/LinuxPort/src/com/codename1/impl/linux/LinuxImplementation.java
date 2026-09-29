@@ -218,9 +218,29 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     private static LinuxImplementation mainLoopInstance;
 
+    /// The size the main window opens at, before the user or the window manager
+    /// changes it. Set by the generated bootstrap stub from the `desktop.width` and
+    /// `desktop.height` build hints, BEFORE Display.init: init creates the window,
+    /// and a resize afterwards would lay the first form out twice.
+    private static int defaultWindowWidth = 800;
+    private static int defaultWindowHeight = 600;
+
+    /// Called by the generated bootstrap stub only; see defaultWindowWidth.
+    ///
+    /// @param width the window's initial content width in pixels; ignored unless positive
+    /// @param height the window's initial content height in pixels; ignored unless positive
+    public static void setDefaultWindowSize(int width, int height) {
+        if (width > 0) {
+            defaultWindowWidth = width;
+        }
+        if (height > 0) {
+            defaultWindowHeight = height;
+        }
+    }
+
     @Override
     public void init(Object m) {
-        LinuxNative.initDisplay("Codename One", 800, 600);
+        LinuxNative.initDisplay("Codename One", defaultWindowWidth, defaultWindowHeight);
         windowGraphicsPeer = LinuxNative.getWindowGraphics();
         windowGraphics = Long.valueOf(windowGraphicsPeer);
         defaultFont = Long.valueOf(LinuxNative.getDefaultFont());

@@ -173,9 +173,15 @@ case "$PLATFORM" in
     #
     # Nothing here is distributed, so there is nothing to sign FOR: the binary
     # is measured and thrown away. Flutter's side is unsigned too.
+    # The SAME SURFACE SIZE as Flutter (benchlib's first rule): the Flutter template's
+    # MainMenu.xib opens an 800x600 content area, and Codename One's native macOS
+    # default is 1024x685 -- 1.46x the pixels, in every window-sized buffer that
+    # memory at rest is mostly made of. fixedWindowSize is the one size hint this
+    # port reads.
     cn1_build ios local-mac-device \
         -Dcodename1.arg.macos.signingIdentity.appStore=none \
-        -Dcodename1.arg.macos.signingIdentity.developerID=none
+        -Dcodename1.arg.macos.signingIdentity.developerID=none \
+        -Dcodename1.arg.macos.fixedWindowSize=800x600
     emit flutter "$FL/build/macos/Build/Products/Release/gallery.app"
     # What the builder reports, not a search: the app is six levels down, and
     # a four-level search found nothing and left the platform "not measured".
@@ -261,7 +267,11 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # runner; without them the Codename One half fails loudly rather than
     # falling back to a JVM build that would not be comparable.
     ( cd "$FL" && flutter build linux --release -t "$FLUTTER_ENTRY" )
-    cn1_build linux local-linux-device
+    # Flutter's Linux template opens 1280x720 (my_application.cc); Codename One's
+    # native Linux default is 800x600. Same surface size on both sides -- see the
+    # macOS case.
+    cn1_build linux local-linux-device \
+        -Dcodename1.arg.desktop.width=1280 -Dcodename1.arg.desktop.height=720
     emit flutter "$FL/build/linux/x64/release/bundle"
     # The result DIRECTORY: the executable plus the libraries it ships beside
     # itself, which count toward both installed and code size.
@@ -272,7 +282,9 @@ print(name if name in targets else (targets[0] if targets else ""))' )"
     # ParparVM to a native binary through clang-cl, built here rather than
     # submitted.
     ( cd "$FL" && flutter build windows --release -t "$FLUTTER_ENTRY" )
-    cn1_build win local-windows-device
+    # Flutter's Windows template opens 1280x720 (runner/main.cpp); Codename One's
+    # native Windows default is 800x600. Same surface size -- see the macOS case.
+    cn1_build win local-windows-device -Dcodename1.arg.desktop.width=1280 -Dcodename1.arg.desktop.height=720
     emit flutter "$FL/build/windows/x64/runner/Release"
     emit cn1 "$(dirname "$(cn1_reported 'Built native Windows executable:')")"
     ;;

@@ -694,6 +694,9 @@ public class LinuxNativeBuilder extends Executor {
         // clients and @OpenTelemetry all compiled here and did nothing at run time.
         src.append(routeDispatcherInstallSource(classesDir, "        "));
         src.append(annotationFrameworksInstallSource(classesDir, "        "));
+        // desktop.width/height: before init, which creates the window. See
+        // Executor.desktopWindowSizeStubCall.
+        src.append(desktopWindowSizeStubCall(request, "com.codename1.impl.linux.LinuxImplementation"));
         src.append("        Display.init(null);\n");
         // The application's identity, which nothing else gives this platform. The stub passes
         // null to Display.init, so the implementation never derives a package from an object, and
