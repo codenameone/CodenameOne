@@ -805,6 +805,9 @@ const jvm = {
   remappedMethodIdCache: Object.create(null),
   resolvedVirtualCache: Object.create(null),
   nextIdentity: 1,
+  // Bumped by defineClass; newObject's cached per-class layouts carry the value
+  // they were built at (see instanceLayout).
+  __layoutEpoch: 0,
   nextThreadId: 1,
   nextHostCallId: 1,
   // Registry of worker-side JS functions that can be invoked from the main
@@ -969,6 +972,7 @@ const jvm = {
       cn1_staticFields: def.staticFields
     };
     this.classes[def.name] = def;
+    this.__layoutEpoch++;
     // ``def.c`` — inline clinit attachment. Replaces the old
     // separate ``jvm.classes["cls"].clinit = $fn`` statement that
     // used to follow ``_Z`` in the translated output.
@@ -1251,11 +1255,82 @@ const jvm = {
     cls.initialized = true;
   },
   newObject(className) {
-    this.ensureClassInitialized(className);
-    const classDef = this.classes[className];
-    const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: this.createMonitor() };
-    this.initInstanceFields(obj, className);
-    this.initFieldAliases(obj, className);
+    // Every ``new`` in translated code lands here, so the per-allocation work is
+    // kept to building the object. What used to be redone for every instance --
+    // walking the class chain to collect field defaults, re-parsing each field's
+    // descriptor, and a breadth-first ancestor search to decide whether the class
+    // is a Throwable (whose NEGATIVE answer was never cached, so every ordinary
+    // object paid for the search) -- is computed once per class by
+    // instanceLayout() below. The monitor is left null: every monitor user
+    // attaches one on first use (see the per-monitor state notes above), and a
+    // monitor plus its two arrays was three extra allocations on every object.
+    // Measured on the flutter-bench compute workloads under node: allocation-heavy
+    // loops (valueEscape, objectAllocation) spent ~80% of their time in this path.
+    let classDef = this.classes[className];
+    if (!classDef || !(classDef.initialized || classDef.initializing)) {
+      this.ensureClassInitialized(className);
+      classDef = this.classes[className];
+    }
+    const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: null };
+    let layout = classDef.__layout;
+    if (layout === undefined || layout.epoch !== this.__layoutEpoch) {
+      layout = this.instanceLayout(classDef, className);
+    }
+    const inits = layout.inits;
+    for (let i = 0; i < inits.length; i += 2) {
+      obj[inits[i]] = inits[i + 1];
+    }
+    if (layout.throwable) {
+      this.captureThrowableStack(obj);
+    }
+    return obj;
+  },
+  /**
+   * Field defaults and the Throwable flag for {@code className}, cached on its
+   * classDef. The fields are listed base class first, the order
+   * initInstanceFields always used, so every instance of a class is built with
+   * the same property order and V8 gives them one shape.
+   *
+   * Only cached when every class on the chain is registered: an answer taken
+   * while an ancestor was still missing could change once it arrives. The
+   * epoch drops every cache when defineClass (re)registers a class, because a
+   * subclass's list embeds its ancestors' fields.
+   */
+  instanceLayout(classDef, className) {
+    const inits = [];
+    const chain = [];
+    let complete = true;
+    for (let name = className; name; ) {
+      const cls = this.classes[name];
+      if (!cls) {
+        complete = false;
+        break;
+      }
+      chain.push(cls);
+      name = cls.baseClass;
+    }
+    for (let c = chain.length - 1; c >= 0; c--) {
+      const fields = chain[c].instanceFields;
+      for (let i = 0; i < fields.length; i++) {
+        inits.push(fields[i][0], this.isPrimitiveFieldDescriptor(fields[i][1]) ? 0 : null);
+      }
+    }
+    let throwable = false;
+    if (classDef.assignableTo) {
+      if (classDef.assignableTo["java_lang_Throwable"]) {
+        throwable = true;
+      } else if (this.assignableViaAncestors(className, "java_lang_Throwable")) {
+        throwable = true;
+        classDef.assignableTo["java_lang_Throwable"] = 1;
+      }
+    }
+    const layout = { epoch: this.__layoutEpoch, inits: inits, throwable: throwable };
+    if (complete) {
+      classDef.__layout = layout;
+    }
+    return layout;
+  },
+  captureThrowableStack(obj) {
     // If this object is a Throwable, capture ``new Error().stack`` into
     // ``Throwable.stack`` right away. The Codename One ``Throwable``
     // constructors don't invoke ``fillInStack`` themselves (every other
@@ -1279,28 +1354,18 @@ const jvm = {
     // ``assignableViaAncestors``, which walks the baseClass chain at
     // query time when every ancestor is guaranteed to be registered,
     // and cache the answer on the classDef so subsequent throws of
-    // the same exception type stay O(1).
-    let isThrowable = false;
-    if (classDef && classDef.assignableTo) {
-      if (classDef.assignableTo["java_lang_Throwable"]) {
-        isThrowable = true;
-      } else if (this.assignableViaAncestors(className, "java_lang_Throwable")) {
-        isThrowable = true;
-        classDef.assignableTo["java_lang_Throwable"] = 1;
-      }
+    // the same exception type stay O(1). instanceLayout() makes that
+    // decision once per class and newObject() calls this only for a
+    // Throwable.
+    try {
+      const prevLimit = Error.stackTraceLimit;
+      try { Error.stackTraceLimit = 200; } catch (_l) {}
+      const stack = new Error().stack || "";
+      try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
+      obj[CN1_THROWABLE_STACK] = createJavaString(stack);
+    } catch (_err) {
+      // Best effort; an empty stack field is fine.
     }
-    if (isThrowable) {
-      try {
-        const prevLimit = Error.stackTraceLimit;
-        try { Error.stackTraceLimit = 200; } catch (_l) {}
-        const stack = new Error().stack || "";
-        try { Error.stackTraceLimit = prevLimit; } catch (_l) {}
-        obj[CN1_THROWABLE_STACK] = createJavaString(stack);
-      } catch (_err) {
-        // Best effort; an empty stack field is fine.
-      }
-    }
-    return obj;
   },
   initInstanceFields(obj, className) {
     const cls = this.classes[className];
