@@ -1643,6 +1643,10 @@ final class JavascriptMethodGenerator {
             s = s.replaceAll(
                     dvPattern.replace("yield\\* _dv", "_dw"),
                     dvReplacement.replace("yield* _dv", "_dw"));
+            // _dn is _dw without the generator drive; same argument shape.
+            s = s.replaceAll(
+                    dvPattern.replace("yield\\* _dv", "_dn"),
+                    dvReplacement.replace("yield* _dv", "_dn"));
         }
         return s;
     }
@@ -5451,7 +5455,9 @@ final class JavascriptMethodGenerator {
                             devSuspending = "1".equals(direct[1]);
                         }
                     }
-                    String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+                    // _dn: a direct call to a synchronous body needs no generator
+                    // drive (see _dn0 in parparvm_runtime.js).
+                    String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
                     callExpr.append(devSuspending ? "(yield* " : "(").append(devBase)
@@ -7421,7 +7427,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                     susp = "1".equals(direct[1]);
                 }
             }
-            String iv = monoImpl != null ? (susp ? "_dv" : "_dw") : (susp ? "_v" : "_w");
+            String iv = monoImpl != null ? (susp ? "_dv" : "_dn") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
@@ -7685,7 +7691,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 suspending = "1".equals(direct[1]);
             }
         }
-        String base = monoImpl != null ? (suspending ? "_dv" : "_dw") : (suspending ? "_v" : "_w");
+        String base = monoImpl != null ? (suspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
         // The second helper argument: bareword impl fn for devirt, else
         // the quoted dispatch-id string.
         String secondArg = monoImpl != null ? monoImpl : ("\"" + methodId + "\"");
@@ -11210,7 +11216,9 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         return true;
     }
 
-    /// Emits the allocation function of every class newObjectExpression handed out. Runs
+    /// Emits the allocation function of every class newObjectExpression handed out. The
+    /// identity comes from the runtime's cn1Ids counter, not jvm.nextIdentity: see the note
+    /// on cn1Ids in parparvm_runtime.js. Runs
     /// after every class has been generated, and its output goes after every class
     /// registration, so each function can capture its classDef once at load.
     ///
@@ -11238,7 +11246,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             out.append("const ").append(defVar).append(" = _Od(\"").append(className).append("\");\n");
             out.append("function ").append(allocationFunctionName(className)).append("(){\n");
             out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar)
-                    .append(", __id: jvm.nextIdentity++, __monitor: null");
+                    .append(", __id: cn1Ids.n++, __monitor: null");
             java.util.Set<String> refs = referencedInstanceFields;
             for (ByteCodeClass c : chain) {
                 for (ByteCodeField field : c.getFields()) {

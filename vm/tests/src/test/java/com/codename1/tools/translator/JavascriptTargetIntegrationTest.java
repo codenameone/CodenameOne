@@ -594,8 +594,14 @@ class JavascriptTargetIntegrationTest {
                         || methodBody.contains("_dw2(")
                         || methodBody.contains("_dw3(")
                         || methodBody.contains("_dw4(")
-                        || methodBody.contains("_dwN("),
-                "Virtual dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw* helper family");
+                        || methodBody.contains("_dwN(")
+                        || methodBody.contains("_dn0(")
+                        || methodBody.contains("_dn1(")
+                        || methodBody.contains("_dn2(")
+                        || methodBody.contains("_dn3(")
+                        || methodBody.contains("_dn4(")
+                        || methodBody.contains("_dnN("),
+                "Virtual dispatch should route through the cn1_iv*/_v*/_w*/_dv*/_dw*/_dn* helper family");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {

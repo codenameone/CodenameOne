@@ -576,7 +576,7 @@ function identityHash(obj) {
       return existing | 0;
     }
   }
-  const id = jvm.nextIdentity++ | 0;
+  const id = cn1Ids.n++ | 0;
   if (Object.isExtensible && Object.isExtensible(obj)) {
     try {
       obj.__id = id;
@@ -796,6 +796,16 @@ function threadDebugLabel(threadObject) {
 //     edits to the source file require ``mvn install`` on
 //     vm/ByteCodeTranslator before downstream tests pick them up.
 // ============================================================================
+// The identity counter every allocation increments. It lives on its own
+// one-field object rather than on jvm: jvm carries hundreds of properties, so
+// V8 keeps it in dictionary mode and ``jvm.nextIdentity++`` was a hashed load
+// and store on every allocation -- which also kept V8 from removing an
+// allocation that never escapes (flutter-bench valueEscape, node: 50ms with
+// the counter on jvm, 14ms on this object). jvm.nextIdentity remains, as an
+// accessor onto it.
+const cn1Ids = { n: 1 };
+// Published for the translator's allocation functions (cn1_<class>___NEW__).
+global.cn1Ids = cn1Ids;
 const jvm = {
   classes: {},
   nativeMethods: Object.create(null),
@@ -804,7 +814,8 @@ const jvm = {
   methodTailCache: Object.create(null),
   remappedMethodIdCache: Object.create(null),
   resolvedVirtualCache: Object.create(null),
-  nextIdentity: 1,
+  get nextIdentity() { return cn1Ids.n; },
+  set nextIdentity(v) { cn1Ids.n = v; },
   // Bumped by defineClass; newObject's cached per-class layouts carry the value
   // they were built at (see instanceLayout).
   __layoutEpoch: 0,
@@ -1273,7 +1284,7 @@ const jvm = {
       this.ensureClassInitialized(className);
       classDef = this.classes[className];
     }
-    const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: null };
+    const obj = { __class: className, __classDef: classDef, __id: cn1Ids.n++, __monitor: null };
     let layout = classDef.__layout;
     if (layout === undefined || layout.epoch !== this.__layoutEpoch) {
       layout = this.instanceLayout(classDef, className);
@@ -1454,7 +1465,7 @@ const jvm = {
     const cls = this.arrayClassFor(componentClass, dimensions);
     array.__class = cls.name;
     array.__classDef = cls;
-    array.__id = this.nextIdentity++;
+    array.__id = cn1Ids.n++;
     array.__dimensions = dimensions;
     array.__array = true;
     array.__monitor = null;
@@ -2457,7 +2468,7 @@ const jvm = {
       __class: resolvedClass,
       __classDef: classDef,
       __jsValue: value,
-      __id: this.nextIdentity++,
+      __id: cn1Ids.n++,
       __monitor: this.createMonitor()
     };
     // Several @JSBody natives (EventUtil._addEventListener,
@@ -5030,6 +5041,25 @@ global._dv0 = _dv0; global._dv1 = _dv1; global._dv2 = _dv2;
 global._dv3 = _dv3; global._dv4 = _dv4; global._dvN = _dvN;
 global._dw0 = _dw0; global._dw1 = _dw1; global._dw2 = _dw2;
 global._dw3 = _dw3; global._dw4 = _dw4; global._dwN = _dwN;
+// A direct call to a body the analysis classified SYNCHRONOUS: the null check
+// and the call, nothing else. _dw* also runs the result through cn1_ivsDrive,
+// whose ``typeof r.next`` test is a property load on whatever the method
+// returned -- numbers, strings, every class of object -- at every call site
+// of every direct call, so megamorphic everywhere. It guards against a
+// generator reaching a synchronous caller, which a target classified
+// synchronous cannot produce: a sync native is one whose binding is a plain
+// function (isSyncNativeBinding), and a method the bridge replaces is seeded
+// suspending. The emitter uses these for exactly those targets; _dw* stays for
+// anything emitted before them. The arguments are evaluated before the null
+// check, as Java evaluates them before the invoke.
+function _dn0(t, fn) { if (t == null) { cn1_ivsNpe(); } return fn(t); }
+function _dn1(t, fn, a0) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0); }
+function _dn2(t, fn, a0, a1) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1); }
+function _dn3(t, fn, a0, a1, a2) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2); }
+function _dn4(t, fn, a0, a1, a2, a3) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2, a3); }
+function _dnN(t, fn, args) { if (t == null) { cn1_ivsNpe(); } return fn.apply(null, [t].concat(args)); }
+global._dn0 = _dn0; global._dn1 = _dn1; global._dn2 = _dn2;
+global._dn3 = _dn3; global._dn4 = _dn4; global._dnN = _dnN;
 
 // Two/three-char aliases for the dispatch family: the helper name appears
 // at every INVOKEVIRTUAL / INVOKEINTERFACE call site (~42k in a real app),
