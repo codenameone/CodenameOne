@@ -217,6 +217,8 @@ public final class Display extends CN1Constants {
     private static final int POINTER_PRESSED_MULTI = 21;
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
+    /// The platform abandoned the gesture in progress; see `#pointerCancelled(int, int)`.
+    private static final int POINTER_CANCELLED = 24;
     private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
     private static final int[] xArray1 = new int[1];
     private static final int[] yArray1 = new int[1];
@@ -2634,6 +2636,7 @@ public final class Display extends CN1Constants {
     private static boolean isTerminationEvent(int packedType) {
         int type = packedType & 0xFF;
         return type == POINTER_RELEASED || type == POINTER_RELEASED_MULTI
+                || type == POINTER_CANCELLED
                 || type == POINTER_HOVER_RELEASED || type == KEY_RELEASED
                 || type == SIZE_CHANGED;
     }
@@ -3163,6 +3166,26 @@ public final class Display extends CN1Constants {
             return;
         }
         pointerReleasedImpl(0, x, y);
+    }
+
+    /// Tells Codename One that the platform abandoned the pointer gesture in progress on the
+    /// main surface -- a touch the system cancelled (palm rejection, the window losing focus,
+    /// the OS claiming the gesture) -- which delivers no release. Unlike a release it fires
+    /// nothing: what the press left pressed is un-pressed, a scroll the gesture was dragging is
+    /// settled, and the gesture's bookkeeping is dropped. Queued behind the press it cancels,
+    /// so a press still on its way is cancelled too rather than left pressed after it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer's last x position
+    ///
+    /// - `y`: the pointer's last y position
+    public void pointerCancelled(int x, int y) {
+        cancelLongPress(0);
+        if (impl.getCurrentForm() == null) {
+            return;
+        }
+        addPointerEvent(POINTER_CANCELLED, x, y);
     }
 
     void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
@@ -3889,6 +3912,19 @@ public final class Display extends CN1Constants {
                     // dispatches a fresh press, and that press records a target. Freeing
                     // the ring then would strip the replacement gesture of its velocity.
                     break;
+                case POINTER_CANCELLED: {
+                    clearSelectionPressed(windowId);
+                    Container cancelled = takePointerPressTarget(windowId);
+                    int cancelledX = inputEventStackTmp[offset];
+                    offset++;
+                    int cancelledY = inputEventStackTmp[offset];
+                    offset++;
+                    if (cancelled instanceof Form) {
+                        ((Form) cancelled).pointerCancelled(cancelledX, cancelledY);
+                    }
+                    NativeDragAndDrop.gestureCancelled();
+                    break;
+                }
                 case POINTER_RELEASED_MULTI:
                     recursivePointerReleaseA = true;
                     clearSelectionPressed(windowId);
@@ -4032,6 +4068,7 @@ public final class Display extends CN1Constants {
                 return offset + 1;
             case POINTER_PRESSED:
             case POINTER_RELEASED:
+            case POINTER_CANCELLED:
             case POINTER_HOVER_RELEASED:
             case POINTER_HOVER_PRESSED:
             case SIZE_CHANGED:
@@ -9586,28 +9623,56 @@ public final class Display extends CN1Constants {
     private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
         Component c = cmp;
         while (c != null) {
-            // A disabled component takes no wheel, exactly as it took no synthetic drag:
-            // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
-            // the wheel too. The walk continues, so an enabled ancestor still gets it.
-            if (c.isEnabled() && (vertical ? c.isScrollableY() : c.isScrollableX())) {
-                // Clamped here rather than left to setScrollY: that one only clamps for a
-                // component with tensile drag off, because a finger is allowed to overshoot
-                // and spring back. A wheel notch has nothing to spring back from.
-                // The vertical range includes what the virtual keyboard is covering, the
-                // same way the drag path and setScrollY compute it: a wheel that stopped at
-                // the keyboard could never bring the field behind it into view.
-                int max = vertical
-                        ? c.getScrollDimension().getHeight() - c.getHeight()
-                                + c.getInvisibleAreaUnderVKB()
-                        : c.getScrollDimension().getWidth() - c.getWidth();
-                int from = vertical ? c.getScrollY() : c.getScrollX();
-                if (applyScroll(c, vertical, from - delta, max)) {
+            // The walk ends at the top level. Form and Window answer isScrollableY() for their
+            // content pane, but applyScroll on the top level would move its OWN scroll
+            // position, and that translates everything it paints: the Toolbar scrolled off
+            // with the content, and the space it left was blank (issue #5910). So the content
+            // pane is scrolled in its place -- unless the walk came up through it already,
+            // which means it is at the edge. A wheel over the Toolbar, the title or anything
+            // else outside the content pane never visited it, and still scrolls the page.
+            if (c instanceof TopLevelContainer) {
+                Container pane = ((TopLevelContainer) c).getContentPane();
+                if (pane != null && pane != cmp && !pane.contains(cmp) //NOPMD CompareObjectsWithEquals
+                        && scrollOneForWheel(pane, vertical, delta)) {
                     return true;
                 }
+                if (c.getParent() == null) {
+                    return false;
+                }
+                // An embedded Form -- in a Window's layered pane, in an EmbeddedContainer --
+                // has the same delegating isScrollableY() and must not be moved either, but a
+                // scrollable host above it can still take the wheel.
+                c = c.getParent();
+                continue;
+            }
+            if (scrollOneForWheel(c, vertical, delta)) {
+                return true;
             }
             c = c.getParent();
         }
         return false;
+    }
+
+    /// Scrolls `c` itself by one wheel step if it can move on this axis; false when it cannot.
+    private boolean scrollOneForWheel(Component c, boolean vertical, int delta) {
+        // A disabled component takes no wheel, exactly as it took no synthetic drag:
+        // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
+        // the wheel too. The walk continues, so an enabled ancestor still gets it.
+        if (!c.isEnabled() || !(vertical ? c.isScrollableY() : c.isScrollableX())) {
+            return false;
+        }
+        // Clamped here rather than left to setScrollY: that one only clamps for a
+        // component with tensile drag off, because a finger is allowed to overshoot
+        // and spring back. A wheel notch has nothing to spring back from.
+        // The vertical range includes what the virtual keyboard is covering, the
+        // same way the drag path and setScrollY compute it: a wheel that stopped at
+        // the keyboard could never bring the field behind it into view.
+        int max = vertical
+                ? c.getScrollDimension().getHeight() - c.getHeight()
+                        + c.getInvisibleAreaUnderVKB()
+                : c.getScrollDimension().getWidth() - c.getWidth();
+        int from = vertical ? c.getScrollY() : c.getScrollX();
+        return applyScroll(c, vertical, from - delta, max);
     }
 
     /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the

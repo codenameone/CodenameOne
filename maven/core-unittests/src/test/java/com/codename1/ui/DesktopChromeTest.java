@@ -138,6 +138,82 @@ class DesktopChromeTest extends UITestBase {
      * form takes when the application sets {@code Display.COMMAND_BEHAVIOR_NATIVE} directly
      * rather than through the desktop title-bar mode.
      */
+    /**
+     * The desktop native themes declare {@code commandBehavior: Native}. With a Toolbar the
+     * commands live on the Toolbar, not on the form's MenuBar, so publishing the MenuBar's list
+     * at show time handed the native menu bar nothing: the menu bar came up empty and the
+     * commands, whose Toolbar was hidden, could not be reached at all.
+     */
+    @FormTest
+    void nativeCommandBehaviourWithAToolbarPublishesTheToolbarsCommands() {
+        desktopMode("native");
+        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
+        try {
+            Form f = new Form("My App");
+            Command save = Command.create("Save", null, null);
+            f.getToolbar().addCommandToOverflowMenu(save);
+            f.show();
+            DisplayTest.flushEdt();
+
+            Vector bridged = implementation.getLastNativeCommands();
+            assertNotNull(bridged, "commands must be bridged to the native menu bar");
+            assertTrue(bridged.contains(save), "the Toolbar's command must reach the native menu bar");
+        } finally {
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
+        }
+    }
+
+    @FormTest
+    void nativeModeToolbarBarAndOverflowCommandsAddedAfterShowReachTheNativeMenu() {
+        // Only the side-menu paths used to republish; a command added to the left bar, the right
+        // bar or the overflow after the form was shown had nowhere to appear while the Toolbar
+        // was hidden.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.show();
+        DisplayTest.flushEdt();
+
+        Command left = Command.create("Left", null, null);
+        Command right = Command.create("Right", null, null);
+        Command overflow = Command.create("Overflow", null, null);
+        f.getToolbar().addCommandToLeftBar(left);
+        f.getToolbar().addCommandToRightBar(right);
+        f.getToolbar().addCommandToOverflowMenu(overflow);
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(left), "left bar command published");
+        assertTrue(bridged.contains(right), "right bar command published");
+        assertTrue(bridged.contains(overflow), "overflow command published");
+
+        f.getToolbar().removeOverflowCommand(overflow);
+        f.getToolbar().removeCommand(right);
+        bridged = implementation.getLastNativeCommands();
+        assertFalse(bridged.contains(overflow), "a removed overflow command leaves the native menu");
+        assertFalse(bridged.contains(right), "a removed bar command leaves the native menu");
+    }
+
+    @FormTest
+    void nativeModeLeavesTheSearchCommandOutOfTheNativeMenu() {
+        // The search command opens a search bar inside the Toolbar, which native chrome hides;
+        // from the menu it threw instead of searching.
+        desktopMode("native");
+        Form f = new Form("My App");
+        f.getToolbar().addSearchCommand(null);
+        Command other = Command.create("Other", null, null);
+        f.getToolbar().addCommandToOverflowMenu(other);
+        f.show();
+        DisplayTest.flushEdt();
+
+        Vector bridged = implementation.getLastNativeCommands();
+        assertTrue(bridged.contains(other), "ordinary commands are still published");
+        for (int i = 0; i < bridged.size(); i++) {
+            Command c = (Command) bridged.elementAt(i);
+            assertFalse(c.getMaterialIcon() == FontImage.MATERIAL_SEARCH && "".equals(c.getCommandName()),
+                    "the search command is not published");
+        }
+        f.getToolbar().showSearchBar(null);
+        DisplayTest.flushEdt();
+    }
+
     @FormTest
     void nativeCommandBehaviourStillDrawsSoftButtonsWithNoNativeMenuBar() {
         implementation.setDesktop(true);

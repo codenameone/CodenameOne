@@ -165,30 +165,44 @@ pom for one test is not worth it. Its generator also hardcoded `ICONST_1`, so a 
 Framework and JavaAPI code is not scanned by that mojo at all; there is no `synchronized` on
 a boxed value anywhere in `CodenameOne/src`, `vm/JavaAPI/src` or `Ports` today.
 
-### The nursery guard belongs in cn1InNursery, and -DCN1_NURSERY did not compile
+### Generational collection: measured here, and it loses on both axes
 
-Every caller of `cn1InNursery` dereferences the header the instant it answers true --
-`cn1InNursery(o) && o->__heapPosition == -1` is the shape at all six sites, in the minor
-collection's stack-root scan, its `currentThreadObject` and `exception` roots, the promote
-path and the write barrier. A tagged `Double` carries a raw IEEE pattern and a tagged `Long`
-a shifted payload, either of which can land inside the arena range by coincidence, and the
-read that follows is an unaligned load off a word with no header. The guard therefore lives
-in `cn1InNursery` itself; guarding only the write barrier -- which is what the first version
-of this work did -- left the other five exposed.
+A complete thread-local young generation lived under `CN1_NURSERY` -- bump-allocated 64KB
+blocks in an arena, minor collection, promote-on-escape (so no card table and no remembered
+set), an adaptive survival-based bypass. **It is gone**, and this note exists so it is not
+re-proposed on the strength of the number that motivated it.
 
-**Reachable by construction, not observed.** Instrumenting the range check to count tagged
-values that fall inside the arena gives **0** on `BoxEdge`, `GcStress` and `MtStress`: a
-tagged Long is `v << 3` and a tagged Double's bit pattern is astronomically larger than a
-heap address, so the overlap needs an unusual value. Real, narrow, and cheap to exclude.
+Nothing ever built it. There was no `#define CN1_NURSERY` anywhere, and no workflow, script,
+pom or test passed `-DCN1_NURSERY`. It was repaired over several rounds -- dropped promotions
+(the conservative-resolve guard in `gcMarkObject` rejected every nursery object before the
+promotion branch), a missing tag guard, a young-root scan that raced -- and then measured.
+Against a 1.00s / 1093MB default on the self-hosting corpus:
 
-**`-DCN1_NURSERY` had not compiled for as long as the bulk SATB barrier has existed.** The
-`cn1SatbBulkBegin` / `cn1SatbEnqueueRangeLocked` / `cn1SatbBulkEnd` declarations sat inside
-the no-nursery `#else` while `nativeMethods.m` calls all three unconditionally from
-`java_lang_System_arraycopy`, so the build died on three implicit declarations. The functions
-were always defined; only the declarations were misplaced. That silently retired an ablation
-arm this file documents, and it is the reason the missing tag guard could not be caught by
-building the configuration it affects. Hoisted above the split, and the configuration now
-builds and runs `BoxEdge` byte-identically plus `GcStress`/`MtStress` clean.
+| arm | wall | peak |
+|---|---|---|
+| nursery, 8MB trigger / 64MB arena | 6.62s | 1321MB |
+| nursery, 64MB trigger / 256MB arena | 6.62-8.56s | 1464-1600MB |
+| nursery, static scan skipped | 5.97-8.56s | 1464-1474MB |
+
+**The survival figure that justified it was an artefact.** 14-23% was measured while
+promotions were being silently dropped; true minor-collection survival is **51-57%**. That
+inverts the argument: roughly half of all small objects survive, and promotion moves them out
+of BiBOP -- page-based, with O(1) reclaim of an all-dead page -- into the LEGACY heap, which
+is table-based with a per-object malloc/free. **BiBOP already is the fast young-object path.**
+What this VM needed was not a fourth heap but a collector that keeps up with the one it has,
+which is what parallel marking and the mark worklist delivered. The same conclusion from the
+other side: with the nursery on, `hashMapChurn` went 32x to 43x, because a young generation
+pays for survivors and a map that holds its entries makes everything survive.
+
+Two lessons that outlive the code. **An unbuilt configuration rots silently**: `-DCN1_NURSERY`
+had not compiled for as long as the bulk SATB barrier had existed (three
+`cn1SatbBulkBegin`/`cn1SatbEnqueueRangeLocked`/`cn1SatbBulkEnd` declarations sat inside the
+no-nursery `#else` while `nativeMethods.m` called all three unconditionally), which retired the
+one arm that could have caught the missing tag guard. And **a nursery pointer test must not
+dereference**: every caller of `cn1InNursery` read the header the instant it answered true, so
+a tagged `Double` -- a raw IEEE pattern -- landing inside the arena range by coincidence was an
+unaligned load off a word with no header. If a young generation is ever attempted again, the
+range test owns that guard, not its callers.
 
 ### The gate has to be in CI, and it has to know which arm it ran
 
@@ -258,6 +272,70 @@ used `ptr | 2`, which is now a valid tagged `Long`, so it uses the reserved code
 `NativeDebuggerHarness` stubbed `cn1TaggedProxy` as all zeros, which -- now that
 `cn1_debugger_class_of` resolves through `CN1_CLASS_OF` -- would have made every tagged
 assertion an assertion about nothing.
+
+## The self-hosting benchmark measures the translator, so it can be optimized instead of the VM
+
+The self-hosting benchmark times the translator translating a corpus. The program
+being measured is therefore **the translator's own Java source**, which gives two
+completely different ways to make the number go down:
+
+1. Make the **VM** faster -- better generated C, a better runtime, a better
+   `vm/JavaAPI`. This is the goal, and it moves the ParparVM arm only.
+2. Make the **translator's Java** faster -- a cheaper collection, a cached string, a
+   tighter loop in the translator itself. This moves **both** arms, because the JDK
+   arm runs that same Java. It cannot close the gap against HotSpot, and it silently
+   changes the benchmark so absolute numbers stop comparing to earlier sessions.
+
+Both look identical in a "parpar got faster" measurement, and the second is the
+easier one to find -- the translator has plenty of ordinary inefficiency in it. Six
+such edits were made and measured as a ~2% win: a `Hashtable` swapped for a
+`HashMap`, a cached lookup signature, `contains`-before-`add` removed, a one-pass
+class-file read, an inverted `@Concrete` scan, a cached name mangling. The ratio never
+moved, because the JDK arm got the same ~2%.
+
+```bash
+source tools/env.sh
+vm/selfhost/build-selfhost.sh -O3
+vm/selfhost/check-workload-neutral.sh origin/master   # or a prebuilt classes dir
+```
+
+**The check is deterministic, and deliberately does not measure time.** The obvious
+test is "did the JDK arm get faster", and it was tried first and does not work here:
+the mistake was worth ~2% and this harness's run-to-run spread on a shared machine is
+4-9%, so the signal sits under the noise -- an early timing version of the gate failed
+on two *identical* class trees. Instead it translates one fixed corpus with the base
+translator and with this one, and asks:
+
+- **generated classes differ** -> codegen change, this reaches the VM;
+- **generated classes identical, copied C runtime differs** -> VM runtime change
+  (`cn1_globals.*`, `nativeMethods.*`, `cn1_intrinsics.h`, `cn1_collections.h`), this
+  reaches the VM. These files are *excluded* by `verify-output-neutral.sh`, correctly
+  for its purpose, which is why this check separates them rather than reusing it;
+- **`vm/JavaAPI` changed** -> VM change. Note `vm/JavaAPI` is both the VM's library
+  *and* part of the corpus, so it perturbs both arms' absolute times; only the ratio
+  is honest across such a change;
+- **nothing differs** -> workload-only. Not necessarily a bad change, but not a VM
+  change, and it must not be measured or reported as one.
+
+Proven in both directions rather than assumed: an allocating slowdown injected into
+`ByteCodeClass.findDeclaredMethod` is reported WORKLOAD-ONLY with 0 of 5,663 emitted
+files differing, and the real VM work of the same session is reported CODEGEN CHANGE
+with 2,828 generated classes and 5 runtime files differing. Note the first probe
+attempt -- a dead arithmetic loop -- moved nothing at all, because HotSpot eliminates
+it; a probe for this has to allocate or otherwise resist the JIT.
+
+Two corollaries worth keeping in mind while reading any perf number here:
+
+- `perf-guard.sh` runs the **hello** corpus, whose input is `javaapi-classes` plus
+  the app, and the translator corpus, whose input includes `target/classes` -- the
+  translator's own classes. On the translator corpus a translator source edit changes
+  the *input* as well as the translating program.
+- A sampling profile cannot substitute for this. At `-O3` with ThinLTO identical
+  functions are folded and symbol names stop meaning anything (`markDependent`
+  measured 21% of main-thread self time in a phase that takes 2.3% of the run), and
+  at `-O1` nothing is inlined so the shape is not the shipping one. Phase timing
+  inside the translator, reported from both arms, is the instrument that survives
+  both.
 
 ## Narrowing a float to an int is SATURATING, and C's cast is not
 
@@ -980,13 +1058,10 @@ sound; holding the freeze through the drain instead drags `markStatics` (force-m
 which mallocs through the force-visited table) and `gcMarkDrainParallel` (lazy
 `pthread_create`) inside it, which is a wedge in the middle of the fix for a wedge.
 
-A thread inside its own **nursery minor collection** is never frozen either.
-`cn1NurseryWriteBarrier` raises `nurseryPromoting` and leaves `threadActive` TRUE for the
-duration, so it is a prime escalation candidate -- and the root scans mark through the
-TARGET's thread state, where that flag makes `gcMarkObject` promote-or-return without
-marking anything. Freezing one would hand the sweep a thread whose roots were all silently
-skipped. The check runs AFTER the stop, because a flag read while the thread is still
-running can be raised in the window before the signal lands.
+A carve-out that used to sit here went with the nursery, and the rule behind it is worth
+keeping: **a thread that is mid-way through a collection of its own must not be frozen**, and
+the check has to run AFTER the stop rather than before, because a flag read while the thread
+is still running can be raised in the window before the signal lands.
 The proper long-term answer is a back-edge poll in the translator; it costs throughput in
 every loop the VM ever runs, and this makes the pathological case survivable without paying
 that everywhere.

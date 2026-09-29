@@ -243,7 +243,13 @@ public class CompilerHelper {
         List<String> args = new ArrayList<>();
         if (isWindows()) {
             args.addAll(Arrays.asList("-G", "Ninja",
-                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"));
+                    "-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl",
+                    // A .pdb beside every test executable, so the runtime's crash
+                    // report can name the faulting function instead of an offset.
+                    // Through the RELEASE variables, because CMAKE_C_FLAGS belongs to
+                    // extraCFlags and a later -D of it would replace this one.
+                    "-DCMAKE_C_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /Zi",
+                    "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /OPT:REF /OPT:ICF"));
         } else {
             args.addAll(Arrays.asList("-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++",
                     "-DCMAKE_OBJC_COMPILER=clang"));

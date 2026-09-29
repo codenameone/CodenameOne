@@ -3724,6 +3724,20 @@ public abstract class CodenameOneImplementation {
         Display.getInstance().pointerPressed(x, y);
     }
 
+    /// Subclasses invoke this when the platform abandons the pointer gesture in progress without
+    /// a release -- a cancelled touch. It fires nothing; see `Display#pointerCancelled(int, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the pointer's last x position
+    ///
+    /// - `y`: the pointer's last y position
+    protected void pointerCancelled(int x, int y) {
+        dragStarted = false;
+        dragActivationCounter = 0;
+        Display.getInstance().pointerCancelled(x, y);
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
@@ -4098,6 +4112,91 @@ public abstract class CodenameOneImplementation {
     /// implemented them renders exactly as it did before they existed.
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
         return glassRegion(graphics, x, y, width, height, radius, cornerRadius, sat, scale, offset, refract, specular);
+    }
+
+    /// True when `#colorMatrixRegion` works on this graphics context. Ports override.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the native graphics
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isColorMatrixRegionSupported(Object graphics) {
+        return false;
+    }
+
+    /// Recolours the painted region through a colour matrix; see
+    /// `com.codename1.ui.Graphics#colorMatrixRegion`. Ports override; the default does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the native graphics
+    ///
+    /// - `x`: region x
+    ///
+    /// - `y`: region y
+    ///
+    /// - `width`: region width
+    ///
+    /// - `height`: region height
+    ///
+    /// - `matrix`: 12-float colour matrix
+    ///
+    /// - `mask`: optional coverage mask
+    ///
+    /// - `cornerRadius`: corner radius, negative for a capsule
+    ///
+    /// - `amount`: strength 0..1
+    ///
+    /// #### Returns
+    ///
+    /// false when unsupported
+    public boolean colorMatrixRegion(Object graphics, int x, int y, int width, int height, float[] matrix,
+            Image mask, float cornerRadius, float amount) {
+        return false;
+    }
+
+    /// True when `glassLensRegion` works on this graphics context.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isGlassLensRegionSupported(Object graphics) {
+        return false;
+    }
+
+    /// See Graphics.glassLensRegion; the default does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `x`: lens left edge (translated)
+    ///
+    /// - `y`: lens top edge (translated)
+    ///
+    /// - `width`: lens width
+    ///
+    /// - `height`: lens height
+    ///
+    /// - `cornerRadius`: corner radius, negative for a capsule
+    ///
+    /// - `optics`: the GlassLensBlend parameters
+    ///
+    /// - `amount`: overall strength 0..1
+    ///
+    /// #### Returns
+    ///
+    /// false when unsupported
+    public boolean glassLensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float[] optics, float amount) {
+        return false;
     }
 
     /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
@@ -6701,6 +6800,18 @@ public abstract class CodenameOneImplementation {
     /// true if this is a desktop application
     public boolean isDesktop() {
         return false;
+    }
+
+    /// Whether the primary pointer is a mouse, so a press-drag can be claimed for selecting text
+    /// without taking the gesture that scrolls. Defaults to [#isDesktop()]; a port whose desktop
+    /// classification can include touch devices (a browser on a tablet that reports a desktop
+    /// user agent) answers from the pointer itself.
+    ///
+    /// #### Returns
+    ///
+    /// true when the primary pointer is a precise, mouse-like device
+    public boolean isPrimaryPointerMouse() {
+        return isDesktop();
     }
 
     /// Indicates whether the application is running on a smartwatch form factor

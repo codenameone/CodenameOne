@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AndroidGradleBuilderVersionTest {
@@ -35,6 +37,181 @@ class AndroidGradleBuilderVersionTest {
         assertTrue(AndroidGradleBuilder.compareVersions("8.1", "8.13") < 0);
         assertEquals(0, AndroidGradleBuilder.compareVersions("8.13", "8.13"));
         assertTrue(AndroidGradleBuilder.compareVersions("8.13.2", "8.13") > 0);
+    }
+
+    @Test
+    void gradleVersionHintSelectsGradle9OnlyFromNineUp() throws Exception {
+        // Absent, blank or below 9: the default Gradle 8 build, as before the hint was read.
+        assertNull(AndroidGradleBuilder.requestedGradle9Version(null));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version(""));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("  "));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.1"));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("6.5"));
+        // The bare major is the measured pairing; an explicit release is honoured as given.
+        assertEquals(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.requestedGradle9Version("9"));
+        assertEquals(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.requestedGradle9Version(" 9 "));
+        assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6.0"));
+        // Padded: Gradle 9 publishes every release as major.minor.patch, and 9.6 is the floor
+        // itself rather than something below 9.6.0.
+        assertEquals("9.9.0", AndroidGradleBuilder.requestedGradle9Version("9.9"));
+        assertEquals("9.6.0", AndroidGradleBuilder.requestedGradle9Version("9.6"));
+        // Below 9 is ignored whatever its shape: qualified pre-9 values in shared settings
+        // must not start failing an unchanged Gradle 8 build.
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.13-rc-1"));
+        assertNull(AndroidGradleBuilder.requestedGradle9Version("8.14.4-milestone-2"));
+    }
+
+    @Test
+    void aQualifiedGradle9ValueIsRefusedNotGuessed() {
+        BuildException rc = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("9.7.0-rc-1"));
+        assertTrue(rc.getMessage().contains("not a Gradle 9 release"), rc.getMessage());
+        BuildException ten = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("10-rc-1"));
+        assertTrue(ten.getMessage().contains("not supported"), ten.getMessage());
+    }
+
+    @Test
+    void builtInKotlinKeepsItsCompilerUnlessANewerOneIsAskedFor() {
+        // Floors the bundled 2.2.10 already meets -- Health Connect's 1.9.x, legacy cn1lib
+        // values -- must not put an older kotlin-gradle-plugin beside AGP 9's.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(""));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(null));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.9.22"));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.7.22"));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn(
+                AndroidGradleBuilder.AGP_9_BUILT_IN_KOTLIN_VERSION));
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.2"));
+        // A newer Kotlin is exactly what the classpath entry is for.
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0"));
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.2.20"));
+        // A qualified release is judged by its numeric part: an old RC is still a legacy
+        // floor, a newer beta is still a newer compiler.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("1.9.22-RC2"));
+        assertTrue(AndroidGradleBuilder.kotlinOverridesBuiltIn("2.3.0-Beta1"));
+        // A Gradle variable lands in a single-quoted coordinate Groovy never interpolates, so
+        // it is not an override: the built-in compiler is used.
+        assertFalse(AndroidGradleBuilder.kotlinOverridesBuiltIn("$kotlinVersion"));
+    }
+
+    @Test
+    void agp9UsesSdkKeepsOnlyWhatTheMergerStillAccepts() {
+        // AGP 9 fails the merge on all three SDK versions in <uses-sdk>, max included.
+        String hint = "tools:overrideLibrary=\"androidx.car.app\" android:minSdkVersion=\"21\""
+                + " android:targetSdkVersion='35' android:maxSdkVersion = \"34\"";
+        assertEquals("    <uses-sdk tools:overrideLibrary=\"androidx.car.app\" />\n",
+                AndroidGradleBuilder.agp9UsesSdk(hint));
+        // Nothing left means no element at all.
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk("android:minSdkVersion=\"21\""));
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk(""));
+        assertEquals("", AndroidGradleBuilder.agp9UsesSdk(null));
+        // maxSdkVersion moves to defaultConfig rather than vanishing.
+        assertEquals("34", AndroidGradleBuilder.xmanifestMaxSdkVersion(hint));
+        // Padded exactly as agp9MaxSdkRefusal accepts it, so it moves rather than vanishing.
+        assertEquals("34", AndroidGradleBuilder.xmanifestMaxSdkVersion("android:maxSdkVersion=\" 34 \""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion=\" 34 \""));
+        assertNull(AndroidGradleBuilder.xmanifestMaxSdkVersion("tools:overrideLibrary=\"x\""));
+    }
+
+    @Test
+    void aMaxSdkVersionWithNoNumberToMoveIsRefusedNotDropped() {
+        String placeholder = AndroidGradleBuilder.agp9MaxSdkRefusal(
+                "tools:overrideLibrary=\"x\" android:maxSdkVersion=\"${maxSdk}\"");
+        assertTrue(placeholder != null && placeholder.contains("${maxSdk}"), String.valueOf(placeholder));
+        assertTrue(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion='@integer/max'") != null);
+        // A literal moves to defaultConfig; no attribute means nothing to refuse.
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("android:maxSdkVersion = \"34\""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal("tools:overrideLibrary=\"x\""));
+        assertNull(AndroidGradleBuilder.agp9MaxSdkRefusal(null));
+    }
+
+    @Test
+    void aGoogleServicesPinAgp9CannotApplyIsRefusedByName() {
+        String old = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "\n    classpath 'com.google.gms:google-services:4.3.15'\n");
+        assertTrue(old != null && old.contains("4.3.15"), String.valueOf(old));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.4.0'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.5.0'"));
+        // Gradle resolves duplicates to the highest, so a cn1lib's old pin beside the
+        // project's new one is fine; two old ones are not.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.5.0'"));
+        String twoOld = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.3.10'");
+        assertTrue(twoOld != null && twoOld.contains("4.3.15"), String.valueOf(twoOld));
+        // Nothing pinned, or nothing readable: nothing to refuse.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(""));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(null));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath \"com.google.gms:google-services:$gsVersion\""));
+        // Dynamic selectors resolve to a release this cannot see: 4.+ is the newest 4.x, not
+        // 4.0.0, and a range or latest.release is no more knowable. Never refused on a guess.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.+'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,5.0)'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:latest.release'"));
+        // ...and an unknowable one beside an old fixed pin leaves the result unknowable too.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.+'"));
+        // ...but a selector confined below the floor is as incompatible as a fixed pin, and
+        // it still stops the builder adding 4.5.0 itself, so it is refused.
+        String prefix = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.+'");
+        assertTrue(prefix != null && prefix.contains("4.3.+"), String.valueOf(prefix));
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:3.+'") != null);
+        String range = AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,4.4)'");
+        assertTrue(range != null && range.contains("[4.0,4.4)"), String.valueOf(range));
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0, 4.3.15]'") != null);
+        // A bound that admits the floor, or no upper bound, can resolve to a working release.
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,4.4]'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:[4.0,)'"));
+        assertNull(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:+'"));
+        // Two confined declarations are refused together; one open one lets Gradle past both.
+        assertTrue(AndroidGradleBuilder.agp9GoogleServicesRefusal(
+                "classpath 'com.google.gms:google-services:4.3.15'\n"
+                + "classpath 'com.google.gms:google-services:4.3.+'") != null);
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.CAN_REACH_FLOOR, AndroidGradleBuilder.googleServicesBelowAgp9Floor("4.+"));
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.BELOW_FLOOR, AndroidGradleBuilder.googleServicesBelowAgp9Floor("4.3.+"));
+        assertEquals(AndroidGradleBuilder.GoogleServicesBound.UNKNOWN,
+                AndroidGradleBuilder.googleServicesBelowAgp9Floor("latest.release"));
+        assertEquals("4.3.15", AndroidGradleBuilder.fixedVersionOrNull("4.3.15'\n"));
+        assertEquals("4.4.0", AndroidGradleBuilder.fixedVersionOrNull("4.4.0-alpha01\")"));
+    }
+
+    @Test
+    void gradleVersionHintRefusesWhatTheAndroidGradlePluginCannotRunOn() {
+        // Below AGP 9.4.1's own floor: refused before the build instead of inside Gradle.
+        BuildException old = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("9.1.0"));
+        assertTrue(old.getMessage().contains(AndroidGradleBuilder.GRADLE_9_MIN_VERSION),
+                old.getMessage());
+        BuildException future = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("10.0"));
+        assertTrue(future.getMessage().contains("not supported"), future.getMessage());
+        BuildException garbage = assertThrows(BuildException.class,
+                () -> AndroidGradleBuilder.requestedGradle9Version("latest"));
+        assertTrue(garbage.getMessage().contains("not a Gradle version"), garbage.getMessage());
+    }
+
+    @Test
+    void theGradle9FloorIsNotAboveTheDefaultPairing() {
+        assertTrue(AndroidGradleBuilder.compareVersions(AndroidGradleBuilder.GRADLE_9_VERSION,
+                AndroidGradleBuilder.GRADLE_9_MIN_VERSION) >= 0);
     }
 
     @Test

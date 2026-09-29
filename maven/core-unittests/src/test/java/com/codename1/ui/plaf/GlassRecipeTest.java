@@ -155,7 +155,10 @@ public class GlassRecipeTest extends UITestBase {
         // rather than a drive-by.
         assertSameMaterial(GlassRecipe.liquidChrome(false), GlassRecipe.liquidChrome27(false),
                 "light chrome");
-        assertSameMaterial(GlassRecipe.liquidPill(false), GlassRecipe.liquidPill27(false),
+        // The light PILL is no longer shared: measured directly against a known
+        // backdrop on a controller-managed tab bar it is a far lower-contrast
+        // material than the iOS 26 constants (see liquidPill27).
+        assertDifferentMaterial(GlassRecipe.liquidPill(false), GlassRecipe.liquidPill27(false),
                 "light pill");
     }
 
@@ -172,9 +175,9 @@ public class GlassRecipeTest extends UITestBase {
     }
 
     @Test
-    public void onlyIOS27DarkChromeAndPillAreCurved() {
-        // The curve term is what distinguishes iOS 27's dark chrome and pill,
-        // whose measured residual against the best affine fit is a parabola in
+    public void onlyIOS27DarkChromeIsCurved() {
+        // The curve term is what distinguishes iOS 27's dark chrome, whose
+        // measured residual against the best affine fit is a parabola in
         // backdrop luma. Everywhere else the material is affine and the recipe must
         // say so exactly -- including the dark panel, where the curve was measured
         // on device and made every affected tile worse (see liquidPanel27).
@@ -189,7 +192,9 @@ public class GlassRecipeTest extends UITestBase {
         assertEquals(0f, GlassRecipe.liquidPill27(false).getCurve(), 0f, "light pill27 curve");
         assertEquals(0f, GlassRecipe.liquidPanel27(false).getCurve(), 0f, "light panel27 curve");
         assertTrue(GlassRecipe.liquidChrome27(true).getCurve() != 0f, "dark chrome27 lost its curve");
-        assertTrue(GlassRecipe.liquidPill27(true).getCurve() != 0f, "dark pill27 lost its curve");
+        // Measured directly against a known backdrop the dark pill is affine: a
+        // curve term did not reduce the residual (see liquidPill27).
+        assertEquals(0f, GlassRecipe.liquidPill27(true).getCurve(), 0f, "dark pill27 curve");
         assertEquals(0f, GlassRecipe.liquidPanel27(true).getCurve(), 0f, "dark panel27 curve");
     }
 

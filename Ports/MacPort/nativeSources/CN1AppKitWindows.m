@@ -875,7 +875,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowGetBounds___int_int_1ARRAY(C
         b.width = (int)(topLeft.size.width * scale);
         b.height = (int)(topLeft.size.height * scale);
     });
-    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(arr);
     data[0] = b.x;
     data[1] = b.y;
     data[2] = b.width;
@@ -915,7 +915,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macMainWindowGetBounds___int_1ARRA
     if (!ok) {
         return JAVA_FALSE;
     }
-    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(arr);
     data[0] = b.x;
     data[1] = b.y;
     data[2] = b.width;
@@ -1410,7 +1410,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetIcon___int_int_1ARRAY_int
         if (arr->length < width * height) {
             return;
         }
-        image = CN1AppKitNSImageFromARGB((unsigned int *)arr->data, width, height);
+        image = CN1AppKitNSImageFromARGB((unsigned int *)CN1_ARRAY_DATA(arr), width, height);
         if (image == nil) {
             return;
         }
@@ -1480,7 +1480,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_
     // asynchronous, AVPlayerView has none), so a correct composite is a change of
     // its own rather than a line here. Documented as a limitation in
     // Desktop-Windows.asciidoc rather than left for someone to discover.
-    return [rec.view readbackInto:(unsigned int *)arr->data width:width height:height]
+    return [rec.view readbackInto:(unsigned int *)CN1_ARRAY_DATA(arr) width:width height:height]
         ? JAVA_TRUE : JAVA_FALSE;
 }
 
@@ -1732,7 +1732,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macMonitorBounds___int_boolean_int_1A
     if (!found) {
         return;
     }
-    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)CN1_ARRAY_DATA(arr);
     data[0] = x;
     data[1] = y;
     data[2] = w;

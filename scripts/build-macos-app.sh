@@ -194,6 +194,15 @@ if [ -f "$ARTIFACTS_DIR/macos-builder-stats.txt" ]; then
     fi
 fi
 
+# The ParparVM performance gate (parparvm-perf.yml) needs only the classes the
+# builder staged under dist/macos-build -- the application's input to the
+# translator -- not the Xcode build that follows, which is most of this script's
+# time and all of its Metal toolchain requirement.
+if [ "${CN1_MACOS_STOP_AFTER_TRANSLATION:-0}" = "1" ]; then
+  bma_log "CN1_MACOS_STOP_AFTER_TRANSLATION=1: stopping before the Xcode build"
+  exit 0
+fi
+
 # The AppKit port has its own maven module, unlike Mac Catalyst, which builds
 # from ios/ because it is a variant of the iOS build.
 MAC_TARGET_DIR="$APP_DIR/mac/target"

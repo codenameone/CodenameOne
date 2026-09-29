@@ -219,6 +219,23 @@ class FidelitySpecTest(unittest.TestCase):
                 self.assertTrue(any("DesktopButton maps to" in e for e in validator.ERRORS))
                 path.write_text(original)
 
+    def test_golden_sets_and_motion_checks_are_validated(self):
+        original = validator.SPEC.read_text()
+        self.assertIn("golden_sets: ios-27-metal", original)
+        self.assertIn("motion_checks: distinct", original)
+        cases = (("    golden_sets: ios-27-metal", "    golden_sets: ios-72-metal", "unknown golden set"),
+                 ("    motion_checks: distinct", "    motion_checks: sometimes", "unknown motion_checks"))
+        for old, new, message in cases:
+            with self.subTest(value=new):
+                validator.SPEC.write_text(original.replace(old, new, 1))
+                self.assertEqual(1, self.check())
+                self.assertTrue(any(message in error for error in validator.ERRORS))
+        # Both keys only mean something on a frames row.
+        validator.SPEC.write_text(original.replace("  - id: Button\n",
+                                                   "  - id: Button\n    golden_sets: ios-27-metal\n", 1))
+        self.assertEqual(1, self.check())
+        self.assertTrue(any("only applies to a frames row" in error for error in validator.ERRORS))
+
     def test_comments_do_not_mask_a_wrong_label(self):
         path = validator.NATIVE_REF_SOURCES["windows"]
         path.write_text(path.read_text().replace('Content = "Button"', '/* Content = "Button" */ Content = "Option"', 1))

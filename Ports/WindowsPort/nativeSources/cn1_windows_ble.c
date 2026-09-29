@@ -282,7 +282,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsBleBridge_write___long_java_lang_Str
     const unsigned char* bytes = 0;
     int len = 0;
     if (value != JAVA_NULL) {
-        bytes = (const unsigned char*) (*(JAVA_ARRAY) value).data;
+        bytes = (const unsigned char*) CN1_ARRAY_DATA(value);
         len = (int) (*(JAVA_ARRAY) value).length;
     }
     /* The engine copies the bytes synchronously within this call (no parking),
@@ -323,7 +323,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsBleBridge_writeDescriptor___long_jav
     const unsigned char* bytes = 0;
     int len = 0;
     if (value != JAVA_NULL) {
-        bytes = (const unsigned char*) (*(JAVA_ARRAY) value).data;
+        bytes = (const unsigned char*) CN1_ARRAY_DATA(value);
         len = (int) (*(JAVA_ARRAY) value).length;
     }
     cn1ble_write_descriptor((long) id, a, s, c, d, bytes, len);

@@ -89,7 +89,7 @@ static const unsigned char* cn1Bytes(JAVA_OBJECT array, int* length) {
         return 0;
     }
     *length = (int) (*(JAVA_ARRAY) array).length;
-    return (const unsigned char*) (*(JAVA_ARRAY) array).data;
+    return (const unsigned char*) CN1_ARRAY_DATA(array);
 }
 
 /* ------------------------------------------------------------ random */

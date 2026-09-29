@@ -908,8 +908,13 @@ public class Toolbar extends Container {
     ///
     /// - `callback`: gets the search string callbacks
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
-        SearchBar s = new CallbackSearchBar(this, callback);
         Form f = getComponentForm();
+        if (f == null) {
+            // Detached -- the desktop chrome hides the Toolbar in native title-bar mode -- so
+            // there is no Toolbar on screen for the search bar to replace.
+            return;
+        }
+        SearchBar s = new CallbackSearchBar(this, callback);
         setHidden(true);
         f.removeComponentFromForm(this);
         f.setToolbar(s);
@@ -1017,6 +1022,7 @@ public class Toolbar extends Container {
         }
         overflowCommands.add(cmd);
         sideMenu.installRightCommands();
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Returns the commands within the overflow menu which can be useful for
@@ -1483,7 +1489,11 @@ public class Toolbar extends Container {
         return true;
     }
 
-    /// `Form.initComponentImpl` publishes the commands when the form is shown, this covers later changes
+    /// `Form.initComponentImpl` publishes the commands when the form is shown, this covers later changes.
+    /// Every mutation of the Toolbar's command lists calls it -- the left and right bars and the
+    /// overflow as well as the side menu -- because with the Toolbar hidden by the desktop chrome
+    /// the native menu is the only place those commands can be reached. A no-op unless this
+    /// Toolbar's hidden host form is the one on screen.
     private void refreshDesktopHiddenNativeCommands() {
         Form host = desktopHiddenHost;
         if (host != null && host.isInitialized() && host.getParent() == null
@@ -2514,10 +2524,13 @@ public class Toolbar extends Container {
     ///
     /// - `cmd`: Command to remove
     public void removeCommand(Command cmd) {
-        if (desktopHiddenSideMenuCommands != null && desktopHiddenSideMenuCommands.remove(cmd)) {
-            refreshDesktopHiddenNativeCommands();
+        if (desktopHiddenSideMenuCommands != null) {
+            desktopHiddenSideMenuCommands.remove(cmd);
         }
         getMenuBar().removeCommand(cmd);
+        // After the removal, not before: the published set is read back from the Toolbar, and
+        // a command in the left or right bar leaves through the MenuBar above.
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Adds a Command to the TitleArea on the right side.
@@ -2530,6 +2543,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", null);
         sideMenu.addCommand(cmd, 0);
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Adds a Command to the TitleArea on the left side.
@@ -2561,6 +2575,7 @@ public class Toolbar extends Container {
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Returns the commands within the right bar section which can be useful for
@@ -2640,6 +2655,12 @@ public class Toolbar extends Container {
             }
         }
         addUniqueCommands(all, desktopHiddenSideMenuCommands);
+        // The search command opens a search bar IN the Toolbar, which is exactly what native
+        // chrome detaches; from a native menu it would have nothing to open. Leaving it out keeps
+        // the menu to commands that work there.
+        if (searchCommand != null) {
+            all.removeElement(searchCommand);
+        }
         return all;
     }
 
@@ -3209,7 +3230,10 @@ public class Toolbar extends Container {
     ///
     /// - `cmd`: the command to remove from the overflow
     public void removeOverflowCommand(Command cmd) {
-        overflowCommands.remove(cmd);
+        if (overflowCommands != null) {
+            overflowCommands.remove(cmd);
+        }
+        refreshDesktopHiddenNativeCommands();
     }
 
     /// Normally on a right side menu the alignment should be "mirrored" in

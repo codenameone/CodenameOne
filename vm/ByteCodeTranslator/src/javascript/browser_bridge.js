@@ -1771,6 +1771,26 @@
   // without losing information. We extend this as more event types show
   // up in real user code; the bulk (mouse/key/wheel/resize/popstate) is
   // covered below.
+  function serializeTouchList(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i] || (typeof list.item === 'function' ? list.item(i) : null);
+      if (!t) {
+        continue;
+      }
+      out.push({
+        identifier: t.identifier | 0,
+        clientX: +t.clientX || 0,
+        clientY: +t.clientY || 0,
+        pageX: +t.pageX || 0,
+        pageY: +t.pageY || 0,
+        screenX: +t.screenX || 0,
+        screenY: +t.screenY || 0
+      });
+    }
+    return out;
+  }
+
   function serializeEventForWorker(evt) {
     if (evt == null || typeof evt !== 'object') {
       return evt;
@@ -1789,6 +1809,8 @@
     if ('pageY'   in evt) out.pageY   = +evt.pageY   || 0;
     if ('screenX' in evt) out.screenX = +evt.screenX || 0;
     if ('screenY' in evt) out.screenY = +evt.screenY || 0;
+    if ('pointerType' in evt) out.pointerType = evt.pointerType == null ? '' : String(evt.pointerType);
+    if ('pointerId' in evt) out.pointerId = evt.pointerId | 0;
     if ('button'  in evt) out.button  = evt.button  | 0;
     if ('buttons' in evt) out.buttons = evt.buttons | 0;
     if ('detail'  in evt) out.detail  = evt.detail  | 0;
@@ -1848,12 +1870,22 @@
     if (evt.source && typeof storeHostRef === 'function') out.source = storeHostRef(evt.source);
     // preventDefault / stopPropagation are fire-and-forget from the worker
     // side (we eagerly call them on the main-thread event just in case).
-    // touches arrays are serialised shallow — most user code reads the
-    // first touch's clientX/Y which is the same as the top-level fields
-    // except on real multi-touch, but the port.js shims use the flat
-    // fields already.
+    //
+    // A TouchEvent has no clientX/clientY of its own: its coordinates live
+    // only in the three touch lists, so those are copied point by point.
+    // They used to be left out on the theory that the flat fields covered
+    // them, and they do not exist on a touch event -- the port's touch
+    // handlers read getTargetTouches(), got null and threw on every touch,
+    // so a phone could neither scroll nor reliably tap (issue #5912).
+    if (evt.touches) out.touches = serializeTouchList(evt.touches);
+    if (evt.targetTouches) out.targetTouches = serializeTouchList(evt.targetTouches);
+    if (evt.changedTouches) out.changedTouches = serializeTouchList(evt.changedTouches);
     if (evt.target && typeof storeHostRef === 'function') {
       out.target = storeHostRef(evt.target);
+    }
+    if (evt.type === 'copy' && evt.target && typeof evt.target.getAttribute === 'function'
+        && evt.target.getAttribute('data-cn1-self-copy') === '1') {
+      out.cn1SelfCopy = true;
     }
     if (evt.currentTarget && typeof storeHostRef === 'function') {
       out.currentTarget = storeHostRef(evt.currentTarget);
@@ -2328,6 +2360,7 @@
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
     BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82,
+    COLOR_MATRIX_SELF_REGION: 83,
     // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
     // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
     TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
@@ -2939,6 +2972,168 @@
     }
   }
 
+  // Graphics.colorMatrixRegion. colorMatrixBlendInPlace is a line-for-line
+  // mirror of com.codename1.ui.plaf.ColorMatrixBlend.apply (the reference every
+  // port matches) over RGBA ImageData instead of packed ARGB. Every float
+  // operation is Math.fround-ed in Java's evaluation order so the result is
+  // bit-identical to the Java reference, not merely close; the parity gate in
+  // scripts/verify-javascript-lens-parity.mjs pins that with checksums.
+  // maskAlpha is one byte per mask pixel (the mask's alpha), or null.
+  function colorMatrixBlendInPlace(data, w, h, matrix, maskAlpha, maskW, maskH,
+                                   cornerRadius, amount) {
+    var f = Math.fround;
+    amount = f(amount);
+    cornerRadius = f(cornerRadius);
+    if (amount <= 0 || w <= 0 || h <= 0) {
+      return;
+    }
+    var m = [];
+    for (var mi = 0; mi < 12; mi++) {
+      m.push(f(matrix[mi]));
+    }
+    var hw = f(w / 2);
+    var hh = f(h / 2);
+    var r = 0;
+    if (cornerRadius !== 0) {
+      r = cornerRadius < 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+    }
+    var inset = f(0.5);
+    var hwr = f(hw - r), hhr = f(hh - r);
+    for (var y = 0; y < h; y++) {
+      var py = f(f(y + inset) - hh);
+      for (var x = 0; x < w; x++) {
+        var k = amount;
+        if (r > 0) {
+          var px = f(f(x + inset) - hw);
+          var dx = f(Math.abs(px) - hwr);
+          var dy = f(Math.abs(py) - hhr);
+          var ax = dx > 0 ? dx : 0;
+          var ay = dy > 0 ? dy : 0;
+          var sdf = f(f(f(Math.sqrt(f(f(ax * ax) + f(ay * ay))))
+                        + Math.min(Math.max(dx, dy), 0)) - r);
+          var cov = f(inset - sdf);
+          k = f(k * (cov < 0 ? 0 : (cov > 1 ? 1 : cov)));
+        }
+        if (maskAlpha) {
+          var mx = Math.floor(x * maskW / w);
+          var my = Math.floor(y * maskH / h);
+          k = f(k * f(maskAlpha[my * maskW + mx] / 255));
+        }
+        if (k <= 0) {
+          continue;
+        }
+        var i = (y * w + x) * 4;
+        var pr = f(data[i] / 255);
+        var pg = f(data[i + 1] / 255);
+        var pb = f(data[i + 2] / 255);
+        for (var row = 0; row < 3; row++) {
+          var o4 = row * 4;
+          var v = f(f(f(f(m[o4] * pr) + f(m[o4 + 1] * pg)) + f(m[o4 + 2] * pb)) + m[o4 + 3]);
+          v = v < 0 ? 0 : (v > 1 ? 1 : v);
+          var src = row === 0 ? pr : (row === 1 ? pg : pb);
+          var o = f(src + f(f(v - src) * k));
+          data[i + row] = Math.round(f(o * 255));
+        }
+        // data[i + 3], the destination alpha, is kept.
+      }
+    }
+  }
+
+  // The alpha channel of a colorMatrixRegion mask at its own pixel size, or
+  // null when the source cannot be read (not decoded yet, zero sized, or a
+  // cross-origin image that taints the scratch canvas).
+  function colorMatrixMaskAlpha(source) {
+    if (!drawableImageSource(source)) {
+      return null;
+    }
+    var mw = (typeof source.naturalWidth === 'number' ? source.naturalWidth : source.width) | 0;
+    var mh = (typeof source.naturalHeight === 'number' ? source.naturalHeight : source.height) | 0;
+    if (mw <= 0 || mh <= 0) {
+      return null;
+    }
+    var scratch = createGlassScratchCanvas(mw, mh);
+    var scratchContext = scratch && scratch.getContext('2d');
+    if (!scratchContext) {
+      return null;
+    }
+    scratchContext.drawImage(source, 0, 0, mw, mh);
+    var rgba = scratchContext.getImageData(0, 0, mw, mh).data;
+    var alpha = new Uint8ClampedArray(mw * mh);
+    for (var ai = 0; ai < alpha.length; ai++) {
+      alpha[ai] = rgba[ai * 4 + 3];
+    }
+    return { alpha: alpha, w: mw, h: mh };
+  }
+
+  // In-place colour matrix over this surface's own pixels. The region is in
+  // device pixels as given: Graphics.colorMatrixRegion does not apply the
+  // current transform (core has already added its translation, and callers such
+  // as Tabs scale the region themselves), so the context transform -- the user
+  // transform -- is ignored here, as on iOS and JavaSE. Pixels off
+  // the canvas are left out but the shape and the mask stay anchored to the
+  // FULL region (as JavaSEPort.colorMatrixRegion does), so a region that is
+  // partly scrolled off does not squeeze its rounded corners or its glyphs.
+  // The result is drawn back through clearRect + drawImage rather than
+  // putImageData so the current clip is honoured (putImageData ignores it),
+  // matching the Metal draw on iOS.
+  // mask: null, or { alpha, w, h } from colorMatrixMaskAlpha.
+  function applyColorMatrixSelfRegion(ctx, x, y, width, height, matrix, mask,
+                                      cornerRadius, amount) {
+    if (!ctx.canvas || width <= 0 || height <= 0 || amount <= 0) {
+      return;
+    }
+    var rect = { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    if (rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var fullW = rect.w, fullH = rect.h;
+    var rx = rect.x, ry = rect.y, rw = fullW, rh = fullH, ox = 0, oy = 0;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { ox = -rx; rw += rx; rx = 0; }
+    if (ry < 0) { oy = -ry; rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+    var part = ctx.getImageData(rx, ry, rw, rh).data;
+    var full = new Uint8ClampedArray(fullW * fullH * 4);
+    var row;
+    for (row = 0; row < rh; row++) {
+      full.set(part.subarray(row * rw * 4, (row + 1) * rw * 4), ((row + oy) * fullW + ox) * 4);
+    }
+    var scaledCorner = cornerRadius < 0 ? cornerRadius : Math.fround(cornerRadius * rect.scale);
+    colorMatrixBlendInPlace(full, fullW, fullH, matrix, mask ? mask.alpha : null,
+                            mask ? mask.w : 0, mask ? mask.h : 0, scaledCorner, amount);
+    var outputCanvas = createGlassScratchCanvas(rw, rh);
+    var outputContext = outputCanvas && outputCanvas.getContext('2d');
+    if (!outputContext) {
+      return;
+    }
+    var result = outputContext.createImageData(rw, rh);
+    for (row = 0; row < rh; row++) {
+      var from = ((row + oy) * fullW + ox) * 4;
+      result.data.set(full.subarray(from, from + rw * 4), row * rw * 4);
+    }
+    outputContext.putImageData(result, 0, 0);
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      try { ctx.filter = 'none'; } catch (_ecf) {}
+      ctx.shadowColor = 'rgba(0,0,0,0)';
+      // Clear first: the output keeps the destination alpha, and drawing a
+      // translucent pixel source-over would blend it with the original
+      // instead of replacing it. Both calls are clipped, so pixels outside the
+      // clip are untouched.
+      ctx.clearRect(rx, ry, rw, rh);
+      ctx.drawImage(outputCanvas, rx, ry);
+    } finally {
+      ctx.restore();
+    }
+  }
+
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
   function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
     var ni = 0; // num cursor
@@ -3097,6 +3292,41 @@
                                    _gsat, _gscale, _goffset, _grefract, _gspecular,
                                    _gcurve, _gcurveMid, _goutline);
             } catch (_egr) {
+            }
+          }
+          break;
+        }
+        case SURF.COLOR_MATRIX_SELF_REGION: {
+          // Graphics.colorMatrixRegion. 20 nums: x, y, w, h, cornerRadius,
+          // amount, the 12 matrix floats, maskKind (0 none, 1 image in the obj
+          // slot, 2 surface), maskSurfaceId. Always 1 obj: the image marker, or
+          // null. Every argument is consumed before anything can fail, so a
+          // skipped op never desyncs the ops behind it.
+          var _cx = nums[ni++], _cy = nums[ni++], _cw = nums[ni++], _ch = nums[ni++];
+          var _ccr = nums[ni++], _camount = nums[ni++];
+          var _cmatrix = [];
+          for (var _cmi = 0; _cmi < 12; _cmi++) {
+            _cmatrix.push(nums[ni++]);
+          }
+          var _cmaskKind = nums[ni++] | 0, _cmaskSurface = nums[ni++] | 0;
+          var _cmaskImage = objs[oi++];
+          if (_cw > 0 && _ch > 0 && _camount > 0 && ctx.canvas) {
+            try {
+              var _cmask = null;
+              var _cmaskOk = true;
+              if (_cmaskKind === 1 || _cmaskKind === 2) {
+                var _cmsrc = _cmaskKind === 1 ? surfaceImageSource(_cmaskImage)
+                    : (surfaceTable[_cmaskSurface] ? surfaceTable[_cmaskSurface].canvas : null);
+                _cmask = colorMatrixMaskAlpha(_cmsrc);
+                // A mask that cannot be read yet paints nothing: applying the
+                // matrix unmasked would recolour the whole region.
+                _cmaskOk = _cmask != null;
+              }
+              if (_cmaskOk) {
+                applyColorMatrixSelfRegion(ctx, _cx, _cy, _cw, _ch, _cmatrix, _cmask,
+                                           _ccr, _camount);
+              }
+            } catch (_ecm) {
             }
           }
           break;
@@ -3667,6 +3897,10 @@
     }
     var textArea = doc.createElement('textarea');
     textArea.setAttribute('readonly', '');
+    // Marks the copy event execCommand raises below as ours: serializeEventForWorker reports it
+    // as cn1SelfCopy, and the port's document copy listener leaves it alone instead of copying
+    // again -- which would fall back here again and cycle.
+    textArea.setAttribute('data-cn1-self-copy', '1');
     textArea.style.position = 'fixed';
     textArea.style.top = '-1000px';
     textArea.style.left = '0';
@@ -6809,6 +7043,180 @@
     window.addEventListener('pointerdown', evaluate, true);
   }
   try { installPeerPointerToggle(); } catch (e) { /* non-fatal */ }
+
+  // Keyboard accelerators of the HTML menu bar (javascript.titleBar=html). The menu items carry
+  // data-cn1-accel ("primary[+alt][+shift]+<key>"); a matching key press activates the item with
+  // a click, which reaches the app through the item's ordinary listener. Matched HERE, on the main
+  // thread and in the capture phase, because only here can the default be prevented: the worker
+  // sees the event after the browser has acted on it, so Ctrl/Cmd+S would have opened the
+  // browser's Save dialog as well. Only primary-modifier combinations are claimed, so ordinary
+  // typing is never intercepted.
+  function installMenuAccelerators() {
+    // The unshifted character on a physical key, for the keys whose typed character a modifier
+    // changes: Shift+1 reports e.key "!" and Option+S on a Mac reports "\u00df", while the
+    // command was configured with "1" and "s".
+    var CODE_KEYS = { Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Backquote: '`', Comma: ',', Period: '.', Slash: '/',
+      Backslash: '\\' };
+    function baseKey(code) {
+      if (!code) {
+        return '';
+      }
+      if (/^Key[A-Z]$/.test(code)) {
+        return code.charAt(3).toLowerCase();
+      }
+      if (/^(Digit|Numpad)[0-9]$/.test(code)) {
+        return code.charAt(code.length - 1);
+      }
+      return CODE_KEYS[code] || '';
+    }
+    function editable(t) {
+      return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''));
+    }
+    document.addEventListener('keydown', function(e) {
+      if (!(e.ctrlKey || e.metaKey || e.altKey) || e.repeat) {
+        return;
+      }
+      // AltGr is how many layouts type characters (@ is AltGr+Q on a German keyboard), and on
+      // Windows and Linux it reports ctrlKey AND altKey -- a Ctrl+Alt shortcut to everything
+      // below. A key typed with it is text, never a command.
+      if (e.getModifierState && e.getModifierState('AltGraph')) {
+        return;
+      }
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      // The primary modifier is Command on a Mac and Control everywhere else, as the menu
+      // displays it (the chrome's class names the OS). Accepting either would claim Ctrl+S on a
+      // Mac, or Win+S on Windows, for a command shown as the other.
+      var mac = (' ' + chrome.className + ' ').indexOf(' cn1-chrome-mac ') >= 0;
+      var primary = mac ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+      var altOnly = e.altKey && !e.ctrlKey && !e.metaKey;
+      if (!primary && !altOnly) {
+        return;
+      }
+      // Option is how a Mac keyboard types accented and special characters, so an Alt-only
+      // shortcut is left alone while the user is typing into a field there.
+      if (altOnly && mac && editable(e.target)) {
+        return;
+      }
+      var prefix = (primary ? 'primary' + (e.altKey ? '+alt' : '') : 'alt') + (e.shiftKey ? '+shift' : '');
+      // The typed character is the key: it is what the user's layout puts there, and on AZERTY
+      // the key typing "a" reports code "KeyQ". The physical key's US character is only a
+      // fallback when the typed character cannot be what the command was configured with:
+      // Shift or Alt turned it into something that is not a letter or a digit ("!" for
+      // Shift+1, a symbol for Option+S), or the layout is not Latin (Ctrl+S types a Cyrillic
+      // letter on a Russian layout, where desktop apps fall back to the key's Latin letter).
+      // Never for a Latin layout difference, where it would run the Ctrl+Q command for a
+      // press of Ctrl+A.
+      var keys = [];
+      var typed = e.key && e.key.length === 1 ? e.key.toLowerCase() : '';
+      if (typed) {
+        keys.push(typed);
+      }
+      if (!/^[a-z0-9]$/.test(typed)
+          && (e.shiftKey || e.altKey || !/^[\x20-\x7e]$/.test(typed))) {
+        var base = baseKey(e.code);
+        if (base && base !== typed) {
+          keys.push(base);
+        }
+      }
+      var item = null;
+      for (var k = 0; k < keys.length && !item; k++) {
+        var binding = prefix + '+' + keys[k];
+        var sel = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(binding)
+            : (/["\\]/.test(binding) ? null : binding);
+        if (sel !== null) {
+          item = chrome.querySelector('[data-cn1-accel="' + sel + '"]');
+        }
+      }
+      // Not rejected on aria-disabled: that marker is refreshed when the menu opens, so it can
+      // be stale after Command.setEnabled(). dispatchNativeMenuCommand checks the command's
+      // CURRENT state when the click arrives, which is the authority.
+      if (!item) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      item.click();
+    }, true);
+  }
+  try { installMenuAccelerators(); } catch (e) { /* non-fatal */ }
+
+  // An open HTML menu closes on a press anywhere else -- the app's canvas, the title bar, a
+  // native text field, a DOM peer such as a BrowserComponent. Listening on the canvas alone
+  // missed all but the first: peer routing sets the canvas to pointer-events: none over peers,
+  // and the rest are not the canvas at all. Main thread and capture phase, so nothing the app
+  // does with the press can stop it; closing a <details> fires its toggle, which is how the
+  // port's menu state follows.
+  function installMenuDismissal() {
+    document.addEventListener('pointerdown', function(e) {
+      var chrome = document.getElementById('cn1-desktop-chrome');
+      if (!chrome) {
+        return;
+      }
+      var open = chrome.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        if (!open[i].contains(e.target)) {
+          open[i].removeAttribute('open');
+        }
+      }
+    }, true);
+    // An opened panel starts under its menu title; one that would cross the window's right
+    // edge is shifted left until it fits (or reaches the left edge, where max-width keeps it
+    // inside). Measured here, on the main thread, because that is where layout is.
+    document.addEventListener('toggle', function(e) {
+      var details = e.target;
+      if (!details || !details.open || !details.classList
+          || !details.classList.contains('cn1-chrome-menu')) {
+        return;
+      }
+      var panel = details.querySelector('.cn1-chrome-menu-items');
+      if (!panel) {
+        return;
+      }
+      // The panel is fixed-positioned (the menu bar scrolls, and would clip one hanging off
+      // its menu), so it is put under its title here, from where that title is right now.
+      var summary = details.querySelector('summary');
+      var anchor = (summary || details).getBoundingClientRect();
+      panel.style.top = anchor.bottom + 'px';
+      panel.style.left = anchor.left + 'px';
+      var rect = panel.getBoundingClientRect();
+      var limit = document.documentElement.clientWidth - 4;
+      if (rect.right > limit) {
+        panel.style.left = Math.max(4, anchor.left - (rect.right - limit)) + 'px';
+      }
+    }, true);
+    // The menu bar scrolls sideways when its titles do not fit. A mouse wheel only scrolls
+    // vertically, so over the bar it is turned into the sideways scroll -- otherwise the titles
+    // past the edge would need a trackpad or Shift+wheel to reach. And since an open panel was
+    // placed under where its title was, scrolling the bar closes it rather than leaving it
+    // under some other title.
+    document.addEventListener('wheel', function(e) {
+      var bar = e.target && e.target.closest ? e.target.closest('.cn1-chrome-menubar') : null;
+      if (!bar || bar.scrollWidth <= bar.clientWidth) {
+        return;
+      }
+      var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (e.deltaMode === 1) {
+        delta *= 16;
+      }
+      bar.scrollLeft += delta;
+      e.preventDefault();
+    }, { capture: true, passive: false });
+    document.addEventListener('scroll', function(e) {
+      var bar = e.target;
+      if (!bar || !bar.classList || !bar.classList.contains('cn1-chrome-menubar')) {
+        return;
+      }
+      var open = bar.querySelectorAll('details[open]');
+      for (var i = 0; i < open.length; i++) {
+        open[i].removeAttribute('open');
+      }
+    }, true);
+  }
+  try { installMenuDismissal(); } catch (e) { /* non-fatal */ }
 
   global.startParparVmApp = function() {
     log('startParparVmApp');

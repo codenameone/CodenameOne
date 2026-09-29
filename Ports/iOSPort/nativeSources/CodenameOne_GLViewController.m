@@ -1919,7 +1919,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OB
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int len = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)points);
     int len = ((JAVA_ARRAY)points)->length;
 #endif
     //CN1Log(@"Len is %d", len);
@@ -2091,8 +2091,8 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
     org_xmlvm_runtime_XMLVMArray* floatArray = commandsArr;
     JAVA_ARRAY_FLOAT* points = (JAVA_ARRAY_FLOAT*)floatArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
-    JAVA_ARRAY_BYTE* commands = (JAVA_BYTE*)((JAVA_ARRAY)commandsArr)->data;
-    JAVA_ARRAY_FLOAT* points = (JAVA_FLOAT*)((JAVA_ARRAY)pointsArr)->data;
+    JAVA_ARRAY_BYTE* commands = (JAVA_BYTE*)CN1_ARRAY_DATA((JAVA_ARRAY)commandsArr);
+    JAVA_ARRAY_FLOAT* points = (JAVA_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)pointsArr);
 #endif
     
     
@@ -2545,7 +2545,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int bufferLen = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)points);
     int bufferLen = ((JAVA_ARRAY)points)->length;
 #endif
     // Use the Java-passed `numPoints` (the actual used float count from
@@ -2619,7 +2619,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     int len = pArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
 #else
-    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
+    JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA((JAVA_ARRAY)points);
     int len = ((JAVA_ARRAY)points)->length;
 #endif
     //CN1Log(@"Len is %d", len);
@@ -2712,6 +2712,34 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl
     BlurRegion* f = [[BlurRegion alloc] initWithLensArgs:x ypos:y w:width h:height
                                             cornerRadius:cornerRadius magnify:magnify
                                               aberration:aberration tintColor:tintColor tintStrength:tintStrength];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassLensScreenRegionImpl
+(int x, int y, int width, int height, float cornerRadius, const float* optics, int count, float amount) {
+    BlurRegion* f = [[BlurRegion alloc] initWithGlassLensArgs:x ypos:y w:width h:height cornerRadius:cornerRadius
+                                                       optics:optics count:count amount:amount];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+// Defined further down; declared here for the mask hand-off below.
+void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeColorMatrixScreenRegionImpl
+(int x, int y, int width, int height, const float* matrix, void* maskPeer, float cornerRadius, float amount) {
+    if (maskPeer != NULL && ((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == maskPeer) {
+        // The mask is still being drawn into; close it so its texture is complete.
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+    BlurRegion* f = [[BlurRegion alloc] initWithColorMatrixArgs:x ypos:y w:width h:height matrix:matrix
+                                                           mask:(BRIDGE_CAST GLUIImage*)maskPeer
+                                                   cornerRadius:cornerRadius amount:amount];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -5962,7 +5990,7 @@ extern JAVA_OBJECT productsArrayPending;
         JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
 #else
         JAVA_ARRAY pArray = (JAVA_ARRAY)productsArrayPending;
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pArray->data;
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(pArray);
 #endif
         NSArray* arr = response.products;
         int count = arr.count;
@@ -6441,7 +6469,7 @@ UIPopoverController* popoverControllerInstance;
     return toNSString(data[row]);
 #else
     JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
-    JAVA_ARRAY_OBJECT* o = (JAVA_ARRAY_OBJECT*)arr->data;
+    JAVA_ARRAY_OBJECT* o = (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(arr);
     return toNSString(CN1_THREAD_GET_STATE_PASS_ARG o[row]);
 #endif
 #endif

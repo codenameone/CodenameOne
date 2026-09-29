@@ -177,6 +177,9 @@ public class Component implements Animation, StyleListener, Editable {
     /// is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
     /// Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
     static int restoreDragPercentage = -1;
+    /// Client property on the top level holding the release listener a material pull-to-refresh
+    /// armed; see `#updateMaterialPullToRefresh`.
+    static final String PULL_TO_REFRESH_RELEASE = "cn1$pullToRefreshRelease";
     /// A flag to dictate whether style changes should trigger a revalidate() call
     /// on the component's parent.  Eventually we would like to phase this to be false
     /// but for now, we'll leave it as true.
@@ -3078,29 +3081,39 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
-    void internalPaintImpl(Graphics g, boolean paintIntersects) {
-        g.clipRect(getX(), getY(), getWidth(), getHeight());
-        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
-        // already been painted behind this component (the clip confines it to our
-        // bounds) BEFORE our own translucent background and content paint on top. This
-        // runs regardless of opacity, since a glass surface is by definition
-        // translucent (opaque would be false and skip paintComponentBackground). The
-        // port blurs the destination region in place; an unsupported port returns
-        // false and the component simply paints without the blur.
-        // COST/CACHING POLICY (per paint path):
-        //  * A glass surface only pays when it repaints; static chrome over static
-        //    content costs nothing between repaints.
-        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
-        //    frame's own command buffer -- no sync, no readback, no cache needed.
-        //  * iOS live screen, glass material: the backdrop readback is required
-        //    (the material is a function of the pixels behind the glass), but the
-        //    composed patch is CACHED per rect+params+backdrop-hash in the port
-        //    (METALView glass patch cache), so a repaint over an unchanged
-        //    backdrop skips the colour transform + blur + optics; scrolling
-        //    content under the glass recomposes that frame from the real bytes.
-        //  * Offscreen mutable images (capture tooling) and the desktop simulator
-        //    blur per paint -- capture renders once, and the simulator is not a
-        //    shipping surface.
+    /// Paints the backdrop material (the CSS `backdrop-filter` glass or blur) and the
+    /// style background. Called by the paint pipeline right after the component clip
+    /// is set; a component whose visible surface is not its bounds (the Tabs bar,
+    /// whose glass pill scales inside reserved slack) overrides this and calls
+    /// {@link #paintBackgroundLayerAt}.
+    void paintBackgroundLayer(Graphics g) {
+        paintBackgroundLayerImpl(g);
+    }
+
+    /// Paints {@link #paintBackgroundLayer} into the given rect (parent coordinates,
+    /// like getX()/getY()) instead of the bounds. The bounds are swapped on the raw
+    /// rectangle so nothing observes the change: setX()/setWidth() would fire
+    /// accessibility bounds events on every animation frame.
+    final void paintBackgroundLayerAt(Graphics g, int x, int y, int w, int h) {
+        int ox = bounds.getX();
+        int oy = bounds.getY();
+        int ow = bounds.getSize().getWidth();
+        int oh = bounds.getSize().getHeight();
+        bounds.setX(x);
+        bounds.setY(y);
+        bounds.getSize().setWidth(w);
+        bounds.getSize().setHeight(h);
+        try {
+            paintBackgroundLayerImpl(g);
+        } finally {
+            bounds.setX(ox);
+            bounds.setY(oy);
+            bounds.getSize().setWidth(ow);
+            bounds.getSize().setHeight(oh);
+        }
+    }
+
+    private void paintBackgroundLayerImpl(Graphics g) {
         float backdropBlur = getStyle().getBackdropFilterBlurRadius();
         if (backdropBlur > 0) {
             // The glass surface's material INTENT comes from a typed, named
@@ -3143,6 +3156,32 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         paintComponentBackground(g);
+    }
+
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        g.clipRect(getX(), getY(), getWidth(), getHeight());
+        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
+        // already been painted behind this component (the clip confines it to our
+        // bounds) BEFORE our own translucent background and content paint on top. This
+        // runs regardless of opacity, since a glass surface is by definition
+        // translucent (opaque would be false and skip paintComponentBackground). The
+        // port blurs the destination region in place; an unsupported port returns
+        // false and the component simply paints without the blur.
+        // COST/CACHING POLICY (per paint path):
+        //  * A glass surface only pays when it repaints; static chrome over static
+        //    content costs nothing between repaints.
+        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
+        //    frame's own command buffer -- no sync, no readback, no cache needed.
+        //  * iOS live screen, glass material: the backdrop readback is required
+        //    (the material is a function of the pixels behind the glass), but the
+        //    composed patch is CACHED per rect+params+backdrop-hash in the port
+        //    (METALView glass patch cache), so a repaint over an unchanged
+        //    backdrop skips the colour transform + blur + optics; scrolling
+        //    content under the glass recomposes that frame from the real bytes.
+        //  * Offscreen mutable images (capture tooling) and the desktop simulator
+        //    blur per paint -- capture renders once, and the simulator is not a
+        //    shipping surface.
+        paintBackgroundLayer(g);
 
         if (isScrollable()) {
             if (refreshTask != null && !InfiniteProgress.isDefaultMaterialDesignMode() &&
@@ -5687,14 +5726,20 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
                     final Container pc = p.asContainer();
-                    pc.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                    ActionListener<ActionEvent> onRelease = new ActionListener<ActionEvent>() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
+                            pc.putClientProperty(PULL_TO_REFRESH_RELEASE, null);
                             pointerReleaseMaterialPullToRefresh();
                             pc.removePointerReleasedListener(this);
                             evt.consume();
                         }
-                    });
+                    };
+                    // Recorded so a cancelled gesture can withdraw it (Form#pointerCancelled):
+                    // left in place it would run the refresh on the next, unrelated release --
+                    // and consume that release.
+                    pc.putClientProperty(PULL_TO_REFRESH_RELEASE, onRelease);
+                    pc.addPointerReleasedListener(onRelease);
                 } else {
                     Component cc = c.getComponentAt(0);
                     if (cc instanceof InfiniteProgress) {
@@ -7509,6 +7554,45 @@ public class Component implements Animation, StyleListener, Editable {
         if (pointerDraggedListeners != null) {
             pointerDraggedListeners.removeListener(l);
         }
+    }
+
+    /// Ends a gesture on this component that the platform cancelled (see
+    /// `Form#pointerCancelled(int, int)`), without anything a release would report: no
+    /// pointer-released listeners, no drop. A lightweight drag-and-drop is abandoned, the source
+    /// shown again; a scroll the gesture was dragging is settled -- its tensile snap-back or
+    /// momentum -- exactly as the release's own handling would, minus the callbacks.
+    void pointerCancelledImpl(int x, int y) {
+        // The press lowered the drag threshold for a draggable component; only the release path
+        // put it back, so after a cancelled drag the next gesture became a drag or a scroll from
+        // a movement of a few pixels.
+        if (restoreDragPercentage > -1) {
+            Display.getInstance().setDragStartPercentage(restoreDragPercentage);
+        }
+        Component leadParent = LeadUtil.leadParentImpl(this);
+        if (leadParent.dragAndDropInitialized) {
+            cancelLightweightDrag();
+            return;
+        }
+        leadParent.inPinch = false;
+        // A pull-to-refresh pulled past its threshold is armed by the release and run when it
+        // settles. A cancelled pull only settles back: the marker is cleared and the content
+        // returns to the top, so a palm or a focus change never triggers the refresh.
+        if (leadParent.refreshTask != null && leadParent.dragActivated
+                && leadParent.isScrollableY() && leadParent.scrollY < 0) {
+            leadParent.putClientProperty("$pullToRelease", null);
+            leadParent.dragActivated = false;
+            leadParent.startTensile(leadParent.scrollY, 0, true);
+            return;
+        }
+        if (leadParent.draggingScrollThumbY || leadParent.draggingScrollThumbX) {
+            leadParent.draggingScrollThumbY = false;
+            leadParent.draggingScrollThumbX = false;
+            leadParent.dragActivated = false;
+            leadParent.repaint();
+            return;
+        }
+        pointerReleaseImpl(x, y);
+        leadParent.scrollOpacity = 0xff;
     }
 
     private void pointerReleaseImpl(int x, int y) {

@@ -40,6 +40,14 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesNativeCollectionStorageInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsNativeCollectionStorageApp.java", "JsNativeCollectionStorageApp");
+        assertEquals(511, result.result, "Native storage handles, compact builders and the native HashSet must preserve JS semantics: " + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesArrayCovarianceInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsArrayCovarianceApp.java", "JsArrayCovarianceApp");
 
@@ -81,6 +89,21 @@ class JavascriptRuntimeSemanticsTest {
 
         assertEquals(255, result.result,
                 "Translated runtime should use Java scientific notation thresholds and preserve PrintStream output. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void keepsTheMethodsOfAClassCreatedByNameThroughReflection(CompilerHelper.CompilerConfig config) throws Exception {
+        // Issue #5774: RTA never saw a NEW for a class built by Class.forName(name).newInstance(),
+        // kept the class and culled its methods, and the call through its interface failed with
+        // "Missing virtual method".
+        WorkerRunResult result = translateAndRunFixture(config,
+                "JsReflectiveInstanceApp.java", "JsReflectiveInstanceApp");
+
+        assertEquals(42, result.result,
+                "a class named in a string and created by reflection keeps its methods. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }

@@ -981,7 +981,7 @@ JAVA_INT com_codename1_backend_Http2_receiveImpl___long_byte_1ARRAY_int_int_R_in
     if(s == NULL || buffer == JAVA_NULL) {
         return -1;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     n = nghttp2_session_mem_recv(s->session, (const uint8_t*)&data[offset], (size_t)length);
     return n < 0 ? -1 : (JAVA_INT)n;
 }
@@ -1067,7 +1067,7 @@ JAVA_OBJECT com_codename1_backend_Http2_closedStreamsImpl___long_R_int_1ARRAY(CO
     }
     arr = allocArray(threadStateData, s->closedPairs * 2, &class_array1__JAVA_INT,
                      sizeof(JAVA_ARRAY_INT), 1);
-    memcpy((JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data, s->closed,
+    memcpy((JAVA_ARRAY_INT*)CN1_ARRAY_DATA(arr), s->closed,
            (size_t)s->closedPairs * 2 * sizeof(JAVA_ARRAY_INT));
     s->closedPairs = 0;
     return arr;
@@ -1081,7 +1081,7 @@ JAVA_OBJECT com_codename1_backend_Http2_drainImpl___long_R_byte_1ARRAY(CODENAME_
     }
     arr = allocArray(threadStateData, (int)s->outLength, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(s->outLength > 0) {
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, s->out, s->outLength);
+        memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), s->out, s->outLength);
         s->outLength = 0;
     }
     /* Give the CAPACITY back too, not just the length. A session that once sent
@@ -1218,7 +1218,7 @@ JAVA_OBJECT com_codename1_backend_Http2_bodyImpl___long_R_byte_1ARRAY(CODENAME_O
     length = s->current->bodyLength;
     arr = allocArray(threadStateData, (int)length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(length > 0) {
-        memcpy((JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data, s->current->body, length);
+        memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), s->current->body, length);
     }
     return arr;
 }
@@ -1321,7 +1321,7 @@ static long cn1H2BuildHeaders(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT status,
         if(headerLength > 0) {
             headerCopy = (char*)malloc((size_t)headerLength + 1);
             if(headerCopy != NULL) {
-                memcpy(headerCopy, (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)headerLines)->data,
+                memcpy(headerCopy, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(headerLines),
                        (size_t)headerLength);
                 /* Terminated because the parsing below walks a C string. Nothing
                    in the block can be a NUL: the validation refuses every
@@ -1474,7 +1474,7 @@ JAVA_INT com_codename1_backend_Http2_respondImpl___long_int_java_lang_String_byt
                 free(pending);
                 pending = NULL;
             } else {
-                memcpy(pending->data, (JAVA_ARRAY_BYTE*)arr->data, (size_t)arr->length);
+                memcpy(pending->data, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), (size_t)arr->length);
                 pending->streamId = streamId;
                 pending->fd = -1;
                 pending->fileOffset = 0;
