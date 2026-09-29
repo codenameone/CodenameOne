@@ -160,6 +160,20 @@ final class BackendSupport {
             File kts = new File(root, "settings.gradle.kts");
             File groovy = new File(root, "settings.gradle");
             File settings = kts.isFile() || !groovy.isFile() ? kts : groovy;
+            if (!kts.isFile() && !groovy.isFile()) {
+                // A project that applies the plugin from its build script needs no
+                // settings script until it has a second project; this is that moment.
+                // In the build script's language, naming the root as Gradle did.
+                boolean groovyBuild = new File(root, "build.gradle").isFile()
+                        && !new File(root, "build.gradle.kts").isFile();
+                settings = groovyBuild ? groovy : kts;
+                try {
+                    write(settings, groovyBuild ? "rootProject.name = '" + root.getName() + "'\n"
+                            : "rootProject.name = \"" + root.getName() + "\"\n");
+                } catch (IOException ex) {
+                    throw new GradleException("Could not create " + settings, ex);
+                }
+            }
             if (settings.isFile()) {
                 try {
                     String text = new String(Files.readAllBytes(settings.toPath()), StandardCharsets.UTF_8);

@@ -471,8 +471,10 @@ public class Initializr extends Lifecycle {
         Container types = new Container(new GridLayout(3, 1));
         types.setUIID("InitializrChoicesGrid");
         ButtonGroup typeGroup = new ButtonGroup();
+        final RadioButton[] typeButtons = new RadioButton[ProjectOptions.ProjectType.values().length];
         for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
             RadioButton button = new RadioButton(type.label);
+            typeButtons[type.ordinal()] = button;
             button.setToggle(true);
             button.setUIID("InitializrChoice");
             typeGroup.add(button);
@@ -520,6 +522,13 @@ public class Initializr extends Lifecycle {
                 }
                 if (javaButtons[1] != null) {
                     javaButtons[1].setEnabled(!gradle);
+                }
+                if (!gradle && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                    // Maven has no backend-only project, and the type is hidden
+                    // now, so a stale choice would fail generation with no way to
+                    // correct it. Every Maven project carries the backend anyway.
+                    projectType[0] = ProjectOptions.ProjectType.APP;
+                    typeGroup.setSelected(typeButtons[ProjectOptions.ProjectType.APP.ordinal()]);
                 }
                 onSelectionChanged.run();
             });

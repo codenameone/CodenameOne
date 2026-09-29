@@ -132,7 +132,10 @@ final class AppSupport {
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setDescription("Compiles src/main/css into theme.res");
-            t.getSources().from(layout.cssDir(), layout.l10nDir(), layout.settingsFile());
+            // i18n too: the CSS compiler bundles whichever of the two exists, as the
+            // Maven build does (CssCompiler.localizationSibling).
+            t.getSources().from(layout.cssDir(), layout.l10nDir(),
+                    new File(layout.l10nDir().getParentFile(), "i18n"), layout.settingsFile());
             t.getCompilerClasspath().from(cssCompiler);
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-css"));
             t.getWorkDirectory().set(cssWorkDir(layout));
@@ -389,7 +392,11 @@ final class AppSupport {
                     nativeCommon(t, project, layout, ext, userProperties, main);
                     t.setGroup(null);
                     t.setDescription("Checks every NativeInterface is implemented for " + name);
-                    t.getVerifyPlatform().set(platformProvider.map(AppSupport::nativePlatformOf));
+                    // Never absent: an absent platform means "generate" to this task, and
+                    // cn1Build without -Pcodename1.platform must not write stubs into
+                    // src/<platform> before it fails for the missing platform. An empty
+                    // one names no platform, so nothing is checked.
+                    t.getVerifyPlatform().set(platformProvider.map(AppSupport::nativePlatformOf).orElse(""));
                     t.getSwift().set(false);
                     t.getKotlin().set(false);
                     t.getOverwrite().set(false);
@@ -399,7 +406,11 @@ final class AppSupport {
             common(t, project, layout, ext, userProperties);
             t.setGroup(BUILD_GROUP);
             t.setDescription(description);
-            t.dependsOn(main.getClassesTaskName(), javase.getClassesTaskName(), verify);
+            // The simulator code only for a JVM target, which is the only upload
+            // that carries it: a broken src/javase must not stop an iOS build.
+            t.dependsOn(main.getClassesTaskName(), verify, platformProvider.<Object>map(
+                    p -> "javase".equals(p) ? javase.getClassesTaskName() : Collections.emptyList())
+                    .orElse(Collections.emptyList()));
             t.usesService(queue);
             t.getPlatform().set(platformProvider);
             t.getBuildTarget().set(targetProvider);

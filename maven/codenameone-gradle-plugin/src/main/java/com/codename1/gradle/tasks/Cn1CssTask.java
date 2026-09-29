@@ -144,7 +144,7 @@ public abstract class Cn1CssTask extends Cn1Task {
         final Project ant = AntSupport.newProject(layout().projectDir());
         CssCompiler compiler = new CssCompiler(log, ant,
                 () -> AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO));
-        File l10n = layout().l10nDir();
+        File l10n = CssCompiler.localizationSibling(layout().l10nDir().getParentFile());
         // Every current theme is compiled below, so start empty: a deleted
         // darktheme.css would otherwise leave darktheme.res in a directory that is
         // packaged as a main resource.
@@ -159,7 +159,7 @@ public abstract class Cn1CssTask extends Cn1Task {
                 }
                 // Gradle decides whether this task is up to date, so the
                 // compiler's own timestamp check is told everything changed.
-                compiler.compile(prefix, cssDir, out, work, libraries, l10n.isDirectory() ? l10n : null,
+                compiler.compile(prefix, cssDir, out, work, libraries, l10n != null && l10n.isDirectory() ? l10n : null,
                         getCompilerClasspath().getAsPath(), layout().projectDir(), Long.MAX_VALUE);
             }
             // After the compile, which extracted every bundle the list names.

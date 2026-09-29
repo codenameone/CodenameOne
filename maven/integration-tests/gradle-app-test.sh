@@ -83,7 +83,22 @@ if run_gradle "$APP" buildIos -Pcodename1.stageOnly=true > "$WORKDIR/verify.log"
   fail "buildIos succeeded without an iOS implementation of Greeter"
 fi
 grep -q "GreeterImpl" "$WORKDIR/verify.log" || { cat "$WORKDIR/verify.log"; fail "the failure does not name the missing file"; }
+# cn1Build with no platform fails for that, without first writing stubs into
+# src/<platform> (an absent platform used to mean "generate" to its check).
+if run_gradle "$APP" cn1Build -Pcodename1.stageOnly=true > "$WORKDIR/no-platform.log" 2>&1; then
+  cat "$WORKDIR/no-platform.log"
+  fail "cn1Build succeeded without a platform"
+fi
+[ ! -e "$IOS_IMPL" ] || fail "cn1Build without a platform generated native stubs"
 mv "$WORKDIR/GreeterImpl.m.bak" "$IOS_IMPL"
+
+# The simulator's code rides only a JVM target's upload, so a broken
+# src/javase must not stop a device build.
+BROKEN="$APP/src/javase/java/$PKG_PATH/Broken.java"
+echo "this does not compile" > "$BROKEN"
+run_gradle "$APP" buildIos -Pcodename1.stageOnly=true > "$WORKDIR/broken-javase.log" 2>&1 \
+  || { cat "$WORKDIR/broken-javase.log"; fail "a broken src/javase stopped buildIos"; }
+rm -f "$BROKEN"
 
 echo "== staged upload jars"
 staged_jar() {
