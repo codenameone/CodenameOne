@@ -29,6 +29,7 @@
 #import "CN1Metalcompat.h"
 #include <stdatomic.h>
 #import <IOSurface/IOSurface.h>
+#include <os/lock.h>
 
 /// Three, not two. The window server is not asked when it has finished reading a
 /// surface -- there is no such callback -- so the only safe surface to draw into
@@ -199,6 +200,34 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// surface under the layer is never a legal target no matter who owns it,
     /// and it stops being current the moment a later frame replaces it.
     _Atomic int cn1PresentCurrent;
+
+    /// Whether each surface is currently marked purgeable (volatile).
+    ///
+    /// Memory at rest. Three full-window surfaces exist so a frame always has one
+    /// the window server is not reading, but once the application is idle only
+    /// the surface under the layer is ever looked at again. The other two stay
+    /// allocated, and each is a whole window of BGRA -- two thirds of what this
+    /// path holds, counted in the process footprint for as long as the window is
+    /// open. A volatile surface is not counted, and the kernel may reclaim its
+    /// pages under pressure. Nothing is lost if it does: every frame blits the
+    /// entire framebuffer into the surface it picks, so a surface's previous
+    /// contents are never read. A surface is made non-volatile again before that
+    /// blit, under cn1PresentLock, so it cannot be purged while it is written.
+    BOOL cn1PresentVolatile[CN1_PRESENT_SURFACE_COUNT];
+
+    /// Guards cn1PresentVolatile and the choice of a surface against the idle
+    /// sweep that marks surfaces volatile (cn1RetireIdleSurfaces, on the main
+    /// queue) and against the rebuild that releases them. Without it the sweep
+    /// could mark a surface volatile between the render thread choosing it and
+    /// the blit, or touch a surface the rebuild has just released. Native-side
+    /// state only; held for a handful of flag reads and at most three
+    /// IOSurfaceSetPurgeable calls.
+    os_unfair_lock cn1PresentLock;
+
+    /// Consecutive sweeps that found a released surface still held by the window
+    /// server. Bounds the retries, so a surface that stays in use (it should not)
+    /// cannot keep a timer alive forever.
+    int cn1PresentSweepRetries;
 }
 
 @synthesize commandQueue;
@@ -521,7 +550,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.layer.contentsScale = CN1AppKitBackingScale(self);
 
     // The surface the window server reads. Replaced rather than resized: an
-    // IOSurface is fixed at its creation size.
+    // IOSurface is fixed at its creation size. Under cn1PresentLock, so the idle
+    // sweep never touches a surface while it is being released or replaced.
+    os_unfair_lock_lock(&cn1PresentLock);
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        cn1PresentVolatile[i] = NO;
+    }
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         if (cn1PresentTextures[i] != nil) {
             [cn1PresentTextures[i] release];
@@ -578,6 +612,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         [CATransaction commit];
         atomic_store_explicit(&cn1PresentCurrent, 0, memory_order_release);
     }
+    os_unfair_lock_unlock(&cn1PresentLock);
 
     // The persistent target. Codename One only queues the operations that
     // changed since the previous frame, so it has to survive between them; a
@@ -745,6 +780,39 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// Clears the owed flag first and only acts if it was set, so the two callers --
 /// a GPU completion that freed a surface, and the timer below for when no GPU
 /// work is outstanding -- cannot both ask for the same frame.
+/// Marks every surface nobody is reading volatile, so an idle window counts one
+/// surface in the footprint rather than three (see cn1PresentVolatile).
+///
+/// Main queue only. A surface is left alone while it is under the layer, while a
+/// blit into it is in flight, or while the window server still holds it; the
+/// last of those clears on its own a composite later, so the sweep retries a
+/// bounded number of times instead of leaving that surface resident.
+- (void)cn1RetireIdleSurfaces {
+    BOOL held = NO;
+    os_unfair_lock_lock(&cn1PresentLock);
+    int current = atomic_load_explicit(&cn1PresentCurrent, memory_order_acquire);
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        if (i == current || cn1PresentSurfaces[i] == NULL || cn1PresentVolatile[i]
+                || atomic_load_explicit(&cn1PresentInFlight[i], memory_order_acquire)) {
+            continue;
+        }
+        if (IOSurfaceIsInUse(cn1PresentSurfaces[i])) {
+            held = YES;
+            continue;
+        }
+        IOSurfaceSetPurgeable(cn1PresentSurfaces[i], kIOSurfacePurgeableVolatile, NULL);
+        cn1PresentVolatile[i] = YES;
+    }
+    os_unfair_lock_unlock(&cn1PresentLock);
+    if (held && cn1PresentSweepRetries++ < 40) {
+        METALView *sweepView = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 20)),
+                       dispatch_get_main_queue(), ^{
+            [sweepView cn1RetireIdleSurfaces];
+        });
+    }
+}
+
 - (void)cn1PayDeferredPresent {
     // Readiness FIRST, and only then clear the flag. Clearing it and then
     // discovering there is nobody to ask would drop the frame on the floor with
@@ -832,6 +900,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // The search starts at the slot after the one used last, so a surface is not
     // immediately reused while its own completion handler is still pending.
     int presentIdx = -1;
+    // Choosing, reserving and making the surface non-volatile happen together
+    // under the lock: see cn1PresentVolatile.
+    os_unfair_lock_lock(&cn1PresentLock);
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         int candidate = (cn1PresentIndex + i) % CN1_PRESENT_SURFACE_COUNT;
         if (cn1PresentSurfaces[candidate] != NULL
@@ -847,6 +918,19 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             break;
         }
     }
+    if (presentIdx >= 0) {
+        // Reserved here rather than after the blit is encoded, so the sweep cannot
+        // see it as idle in between.
+        atomic_store_explicit(&cn1PresentInFlight[presentIdx], 1, memory_order_release);
+        if (cn1PresentVolatile[presentIdx]) {
+            // Whatever the kernel did with the old pages does not matter: the blit
+            // below overwrites the whole surface.
+            IOSurfaceSetPurgeable(cn1PresentSurfaces[presentIdx],
+                                  kIOSurfacePurgeableNonVolatile, NULL);
+            cn1PresentVolatile[presentIdx] = NO;
+        }
+    }
+    os_unfair_lock_unlock(&cn1PresentLock);
     if (presentIdx < 0) {
         // Every surface is still held. Overwriting one anyway would undo the
         // check just made, so drop the frame instead: the command buffer is
@@ -869,6 +953,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         // Selection excludes these now, so this is belt and braces -- but it
         // gives up the same way everything else does rather than losing the
         // frame, which is what it used to do.
+        atomic_store_explicit(&cn1PresentInFlight[presentIdx], 0, memory_order_release);
         return [self cn1DeferFrameAndCommit];
     }
     id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
@@ -959,6 +1044,14 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
             dispatch_async(dispatch_get_main_queue(), ^{
                 [presentView cn1PayDeferredPresent];
             });
+            // The surface this replaced is idle now, or will be once the window
+            // server lets go of it. Shortly after, not immediately: the server
+            // still holds it until its next composite.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC / 20)),
+                           dispatch_get_main_queue(), ^{
+                presentView->cn1PresentSweepRetries = 0;
+                [presentView cn1RetireIdleSurfaces];
+            });
         }
         CFRelease(presented);
     }];
@@ -1005,6 +1098,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 - (void)deleteFramebuffer {
     self.screenTexture = nil;
     self.stencilTexture = nil;
+    os_unfair_lock_lock(&cn1PresentLock);
+    for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
+        cn1PresentVolatile[i] = NO;
+    }
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
         if (cn1PresentTextures[i] != nil) {
             [cn1PresentTextures[i] release];
@@ -1026,6 +1123,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     atomic_store_explicit(&cn1PresentDeferred, 0, memory_order_release);
     // Nothing is under the layer any more either; the surface it named is gone.
     atomic_store_explicit(&cn1PresentCurrent, -1, memory_order_release);
+    os_unfair_lock_unlock(&cn1PresentLock);
     framebufferWidth = 0;
     framebufferHeight = 0;
 }
