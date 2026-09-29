@@ -340,7 +340,10 @@ final class JavascriptSuspensionAnalysis {
                 // report can name the rule. The disjunction is unchanged --
                 // order decides only which label wins, never the outcome.
                 String seed = null;
-                if (m.isNative() && !isSyncNativeBinding(cls, m)) {
+                if (m.isNative() && !isSyncNativeBinding(cls, m)
+                        // A translator-emitted delegate is classified by the
+                        // edge to its twin in propagate, not seeded here.
+                        && JavascriptNativeRegistry.translatedDelegateTwin(cls.getClsName(), m) == null) {
                     seed = "native";
                 } else if (m.isSynchronizedMethod()) {
                     seed = "synchronized";
@@ -516,6 +519,30 @@ final class JavascriptSuspensionAnalysis {
         for (ByteCodeClass cls : classes) {
             for (BytecodeMethod caller : cls.getMethods()) {
                 if (caller.isEliminated() || caller.isAbstract()) {
+                    continue;
+                }
+                // A native the translator emits as a call to its pure-Java twin
+                // (JavascriptNativeRegistry.TRANSLATED_DELEGATES) has no
+                // instructions to scan; its one call is recorded here, so it
+                // suspends exactly when the twin does. JavascriptMethodGenerator
+                // .appendTranslatedDelegate emits it from the same answer.
+                String delegateTwin = JavascriptNativeRegistry.translatedDelegateTwin(cls.getClsName(), caller);
+                if (delegateTwin != null) {
+                    BytecodeMethod twin = null;
+                    for (BytecodeMethod candidate : cls.getMethods()) {
+                        if (!candidate.isEliminated() && !candidate.isNative()
+                                && delegateTwin.equals(candidate.getMethodName())
+                                && caller.getSignature().equals(candidate.getSignature())
+                                && caller.isStatic() == candidate.isStatic()) {
+                            twin = candidate;
+                            break;
+                        }
+                    }
+                    if (twin == null) {
+                        markSuspending(caller, "delegate-missing:" + delegateTwin);
+                    } else {
+                        addCaller(callersOf, twin, caller);
+                    }
                     continue;
                 }
                 List<Instruction> instructions = caller.getInstructions();

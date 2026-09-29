@@ -1101,7 +1101,9 @@ final class JavascriptMethodGenerator {
             String nativeId = jsMethodIdentifier(cls, method);
             NATIVE_METHOD_IDENTIFIERS.add(nativeId);
             NATIVE_METHOD_IDENTIFIERS.add(nativeId + "__impl");
-            appendNativeStubIfNeeded(methodsOut, cls, method);
+            if (!appendTranslatedDelegate(methodsOut, cls, method)) {
+                appendNativeStubIfNeeded(methodsOut, cls, method);
+            }
             if (!method.isStatic() && !method.isConstructor()) {
                 String jsMethodName = jsMethodIdentifier(cls, method);
                 String dispatchId = JavascriptNameUtil.dispatchMethodIdentifier(method.getMethodName(), method.getSignature());
@@ -5886,6 +5888,52 @@ final class JavascriptMethodGenerator {
 
     private static String jsStaticMethodBodyIdentifier(String owner, String name, String desc) {
         return JavascriptNameUtil.methodIdentifier(owner, name, desc) + "__impl";
+    }
+
+/// Emits a native the JavaScript target implements by calling its pure-Java twin
+/// (JavascriptNativeRegistry.TRANSLATED_DELEGATES), and answers whether it did. The
+/// native is a plain function exactly when the twin is: the suspension analysis
+/// records the call as an edge, so a suspending twin always makes the native
+/// suspending. The reverse cannot be emitted -- a synchronous body cannot yield*
+/// into a generator -- and would mean the analysis and the emitter disagree, so it
+/// fails the translation rather than producing a native that returns a generator.
+private static boolean appendTranslatedDelegate(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+        String twinName = JavascriptNativeRegistry.translatedDelegateTwin(cls.getClsName(), method);
+        if (twinName == null) {
+            return false;
+        }
+        BytecodeMethod twin = null;
+        for (BytecodeMethod candidate : cls.getMethods()) {
+            if (!candidate.isEliminated() && !candidate.isNative()
+                    && twinName.equals(candidate.getMethodName())
+                    && method.getSignature().equals(candidate.getSignature())
+                    && method.isStatic() == candidate.isStatic()) {
+                twin = candidate;
+                break;
+            }
+        }
+        if (twin == null) {
+            throw new IllegalStateException("JavaScript delegate twin " + cls.getClsName() + "." + twinName
+                    + method.getSignature() + " of native " + method.getMethodName() + " is missing");
+        }
+        boolean suspending = method.isJavascriptSuspending();
+        boolean twinSuspending = twin.isJavascriptSuspending();
+        if (twinSuspending && !suspending) {
+            throw new IllegalStateException("native " + cls.getClsName() + "." + method.getMethodName()
+                    + " was classified synchronous but its twin " + twinName + " suspends");
+        }
+        String twinFn = twin.isStatic() && !shouldEmitStaticWrapper(twin)
+                ? jsMethodBodyIdentifier(cls, twin) : jsMethodIdentifier(cls, twin);
+        out.append(suspending ? "function* " : "function ").append(jsMethodIdentifier(cls, method)).append("(");
+        appendMethodParameters(out, method);
+        out.append("){\n");
+        if (twin.isStatic() && !shouldEmitStaticWrapper(twin) && classNeedsInitialization(cls.getClsName())) {
+            out.append(classInitGuard(cls.getClsName(), suspending, "  "));
+        }
+        out.append("  return ").append(twinSuspending ? "yield* " : "").append(twinFn).append("(");
+        appendMethodParameters(out, method);
+        out.append(");\n}\n");
+        return true;
     }
 
 private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {

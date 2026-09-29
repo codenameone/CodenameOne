@@ -5626,9 +5626,14 @@ bindNative([
   "cn1_java_lang_Object_getClass___R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl_R_java_lang_Class",
   "cn1_java_lang_Object_getClassImpl___R_java_lang_Class"
-], function*(__cn1ThisObject) {
+], function(__cn1ThisObject) {
+  // A plain function, not a generator: a generator binding makes the native
+  // suspending, and getClass is what every boxed type's equals calls, so that
+  // one yield-free native made Object.equals -- and through it every HashMap
+  // lookup -- suspend. cn1_ivsNpe throws the same NullPointerException the
+  // generator form threw, synchronously.
   if (__cn1ThisObject == null) {
-    yield* throwNullPointerException();
+    cn1_ivsNpe();
   }
   if (__cn1ThisObject.__classDef) {
     return __cn1ThisObject.__classDef.classObject;
@@ -5751,46 +5756,30 @@ bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_S
 // collector that does nothing.
 bindNative(["cn1_java_lang_System_gcIdleWaitMillis_R_int", "cn1_java_lang_System_gcIdleWaitMillis___R_int"], function() { return 30000; });
 // Tagged-immediate Integer natives (C-side poor-man's-Valhalla). The JS port
-// has no tagged pointers: cn1Value reads the heap field, valueOf delegates to
-// the pure-Java cache twin (valueOfHeap).
+// has no tagged pointers: cn1Value reads the heap field, and valueOf is emitted
+// by the translator as a call to the pure-Java cache twin (valueOfHeap), see
+// JavascriptNativeRegistry.TRANSLATED_DELEGATES.
 bindNative(["cn1_java_lang_Integer_cn1Value_R_int"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Integer_value | 0;
 });
-bindNative(["cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer"], function*(i) {
-  return yield* adaptVirtualResult(cn1_java_lang_Integer_valueOfHeap_int_R_java_lang_Integer(i));
-});
-// The same pair for the other five tagged boxes. Every native the C runtime gains for this
+// cn1Value for the other five tagged boxes (their valueOf, like Integer's, is a
+// translator-emitted delegate). Every other native the C runtime gains for this
 // scheme needs a binding here or the JS port fails at run time on a missing symbol, and
 // JavascriptNativeAuditTest does not catch an omission -- these are checked by hand.
 bindNative(["cn1_java_lang_Long_cn1Value_R_long"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Long_value;
 });
-bindNative(["cn1_java_lang_Long_valueOf_long_R_java_lang_Long"], function*(i) {
-  return yield* adaptVirtualResult(cn1_java_lang_Long_valueOfHeap_long_R_java_lang_Long(i));
-});
 bindNative(["cn1_java_lang_Double_cn1Value_R_double"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Double_value;
-});
-bindNative(["cn1_java_lang_Double_valueOf_double_R_java_lang_Double"], function*(d) {
-  return yield* adaptVirtualResult(cn1_java_lang_Double_valueOfHeap_double_R_java_lang_Double(d));
 });
 bindNative(["cn1_java_lang_Float_cn1Value_R_float"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Float_value;
 });
-bindNative(["cn1_java_lang_Float_valueOf_float_R_java_lang_Float"], function*(f) {
-  return yield* adaptVirtualResult(cn1_java_lang_Float_valueOfHeap_float_R_java_lang_Float(f));
-});
 bindNative(["cn1_java_lang_Character_cn1Value_R_char"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Character_value | 0;
 });
-bindNative(["cn1_java_lang_Character_valueOf_char_R_java_lang_Character"], function*(c) {
-  return yield* adaptVirtualResult(cn1_java_lang_Character_valueOfHeap_char_R_java_lang_Character(c));
-});
 bindNative(["cn1_java_lang_Short_cn1Value_R_short"], function(__cn1ThisObject) {
   return __cn1ThisObject.cn1_java_lang_Short_value | 0;
-});
-bindNative(["cn1_java_lang_Short_valueOf_short_R_java_lang_Short"], function*(v) {
-  return yield* adaptVirtualResult(cn1_java_lang_Short_valueOfHeap_short_R_java_lang_Short(v));
 });
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
@@ -6231,24 +6220,6 @@ bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuff
   }
   return formatted;
 });
-bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean"], function*(key1, key2) {
-  if (key1 === key2) {
-    return 1;
-  }
-  if (key1 == null || key2 == null) {
-    return 0;
-  }
-  if (areStringLikeEqual(key1, key2)) {
-    return 1;
-  }
-  if (!key1.__class) {
-    return 0;
-  }
-  // Shared dispatch id — see the equivalent change in
-  // ``cn1_java_lang_Object_equals_java_lang_Object_R_boolean`` above.
-  const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
-  return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
-});
 // A private long handle carries its backing store on JS. It is never used in
 // arithmetic; _Lc preserves the handle object. No global table retains dead buffers.
 // The Java fallback preserves custom collection semantics on this target.
@@ -6329,47 +6300,11 @@ bindNative(["cn1_java_util_NativeStorage_rehash_long_long_long_long_int_long_lon
   }
   return tail;
 });
-// COMPACT HashMap natives: the C implementations are hand-tuned probe loops;
-// on the JS backend every one of them simply delegates to the pure-Java *Impl
-// twin (the semantic source of truth) that the translator compiled to JS.
-bindNative(["cn1_java_util_HashMap_get_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_getImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_put_java_lang_Object_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key, value) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_putImpl_java_lang_Object_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key, value));
-});
-bindNative(["cn1_java_util_HashMap_remove_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_removeImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], function*(__cn1ThisObject, key) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_containsKeyImpl_java_lang_Object_R_boolean(__cn1ThisObject, key));
-});
-bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
-});
-// HashSet keeps its table natively on the C targets; here each native delegates to
-// the pure-Java twin in HashSet.java, exactly as HashMap's do above.
-bindNative(["cn1_java_util_HashSet_cn1AddNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1AddImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1ContainsNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ContainsImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1RemoveNative_java_lang_Object_R_boolean"], function*(__cn1ThisObject, element) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveImpl_java_lang_Object_R_boolean(__cn1ThisObject, element));
-});
-bindNative(["cn1_java_util_HashSet_cn1ClearNative"], function*(__cn1ThisObject) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ClearImpl(__cn1ThisObject));
-});
-bindNative(["cn1_java_util_HashSet_cn1NextOccupied_int_R_int"], function*(__cn1ThisObject, from) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1NextOccupiedImpl_int_R_int(__cn1ThisObject, from));
-});
-bindNative(["cn1_java_util_HashSet_cn1ElementAt_int_R_java_lang_Object"], function*(__cn1ThisObject, index) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1ElementAtImpl_int_R_java_lang_Object(__cn1ThisObject, index));
-});
-bindNative(["cn1_java_util_HashSet_cn1RemoveSlot_int"], function*(__cn1ThisObject, index) {
-  return yield* adaptVirtualResult(cn1_java_util_HashSet_cn1RemoveSlotImpl_int(__cn1ThisObject, index));
-});
+// COMPACT HashMap and HashSet natives, and the boxed types' valueOf: the C
+// implementations are hand-tuned probe loops and tagged immediates. On the JS
+// backend each simply calls its pure-Java twin, so the TRANSLATOR emits it
+// (JavascriptNativeRegistry.TRANSLATED_DELEGATES) as a plain function wherever
+// the twin is one. A binding here would replace that function with a generator.
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));
   jvm.log(nativeStringFromCharArray(chars));
