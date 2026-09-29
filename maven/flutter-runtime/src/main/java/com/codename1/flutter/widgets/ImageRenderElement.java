@@ -611,18 +611,21 @@ public class ImageRenderElement extends RenderElement {
         fittedH = bh;
         fittedFit = fit;
         fittedRadius = radius;
-        // A fit that OVERFLOWS the box cannot be rounded by rounding what is
-        // DRAWN: `cover` paints a rectangle larger than the component, so its
-        // rounded corners fall outside the clip and what shows is square. This
-        // only bites where the platform rounds in hardware, which is iOS and not
-        // the simulator -- the desktop builds a rounded copy and looks right --
-        // so the gallery's carousel cards were square on device and round in
-        // every sweep. Send an overflowing fit through the copy below, which
-        // scales to the BOX first and rounds that.
-        double[] drawn = fittedSize(fit, bw, bh, iw, ih);
-        boolean overflowsBox = drawn[0] > bw + 0.5 || drawn[1] > bh + 0.5;
-        if ((radius <= 0 || (FittedImage.roundsInHardware() && !overflowsBox))
-                && l instanceof FittedImage) {
+        // A fit that OVERFLOWS the box cannot be rounded by rounding the whole
+        // picture: `cover` paints a rectangle larger than the component, so the
+        // picture's rounded corners fall outside the clip and what shows is
+        // square -- the gallery's carousel cards were once square on device and
+        // round in every sweep for exactly this reason. FittedImage.paint rounds
+        // at the BOX instead, drawing only the part of the picture inside it
+        // (Graphics.drawImageRegionRounded), so where the platform rounds, an
+        // overflowing fit takes the no-copy path too.
+        //
+        // It used to go through the copy below, and the copy held every card
+        // twice more -- a full ARGB bitmap on the CPU and a second texture on the
+        // GPU, beside the decoded original: about 2MB a card on a Retina Mac, and
+        // the largest single item in the gallery's memory at rest. The copy
+        // remains the path where the platform cannot round.
+        if ((radius <= 0 || FittedImage.roundsInHardware()) && l instanceof FittedImage) {
             // NO COPY. The component draws the decoded source into its own box
             // under the fit rule, the way Flutter draws one texture through a
             // transform. Materialising a scaled bitmap per image and handing it
@@ -895,7 +898,27 @@ public class ImageRenderElement extends RenderElement {
             // any scrolling content and so is not repainted as the list moves.
             int[] clip = g.getClip();
             g.clipRect(getX(), getY(), bw, bh);
-            if (radius > 0) {
+            boolean overflows = dw > bw + 0.5 || dh > bh + 0.5;
+            if (radius > 0 && overflows) {
+                // Rounded AT THE BOX, not at the picture: the picture overflows,
+                // so its own corners are outside the box and would be clipped
+                // away square. Draw just the part inside the box, with the box's
+                // corners rounded -- the platform samples that region of the one
+                // texture it already has, so no cropped or rounded copy exists.
+                int vx = Math.max(dx, getX());
+                int vy = Math.max(dy, getY());
+                int vw = Math.min(dx + (int) Math.round(dw), getX() + bw) - vx;
+                int vh = Math.min(dy + (int) Math.round(dh), getY() + bh) - vy;
+                if (vw > 0 && vh > 0) {
+                    int sw = s.getWidth();
+                    int sh = s.getHeight();
+                    int sx = (int) Math.round((vx - dx) * sw / dw);
+                    int sy = (int) Math.round((vy - dy) * sh / dh);
+                    int srw = Math.max(1, Math.min(sw - sx, (int) Math.round(vw * sw / dw)));
+                    int srh = Math.max(1, Math.min(sh - sy, (int) Math.round(vh * sh / dh)));
+                    g.drawImageRegionRounded(s, sx, sy, srw, srh, vx, vy, vw, vh, radius);
+                }
+            } else if (radius > 0) {
                 g.drawImageRounded(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh), radius);
             } else {
                 g.drawImage(s, dx, dy, (int) Math.round(dw), (int) Math.round(dh));

@@ -1174,6 +1174,56 @@ public abstract class CodenameOneImplementation {
         drawImage(graphics, img, x, y, w, h);
     }
 
+    /// Draws the region (u0, v0, du, dv) of an image -- normalised, 0,0 being its
+    /// top left and 1,1 its bottom right -- scaled into the destination, with the
+    /// DESTINATION's corners rounded. Only called when
+    /// `isRoundedImageDrawSupported()` answers true.
+    ///
+    /// The default draws the region square: the whole image placed so the region
+    /// lands on the destination, clipped to it. A port that rounds should override
+    /// it; one that does not never reaches it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the image
+    ///
+    /// - `x`: destination x
+    ///
+    /// - `y`: destination y
+    ///
+    /// - `w`: destination width
+    ///
+    /// - `h`: destination height
+    ///
+    /// - `cornerRadius`: radius in destination pixels
+    ///
+    /// - `u0`: left of the region, normalised
+    ///
+    /// - `v0`: top of the region, normalised
+    ///
+    /// - `du`: width of the region, normalised
+    ///
+    /// - `dv`: height of the region, normalised
+    public void drawImageRegionRounded(Object graphics, Object img, int x, int y, int w, int h,
+                                       float cornerRadius, float u0, float v0, float du, float dv) {
+        if (du <= 0 || dv <= 0) {
+            return;
+        }
+        int fw = (int) Math.round(w / (double) du);
+        int fh = (int) Math.round(h / (double) dv);
+        int fx = x - (int) Math.round(u0 * (double) fw);
+        int fy = y - (int) Math.round(v0 * (double) fh);
+        int cx = getClipX(graphics);
+        int cy = getClipY(graphics);
+        int cw = getClipWidth(graphics);
+        int ch = getClipHeight(graphics);
+        clipRect(graphics, x, y, w, h);
+        drawImage(graphics, img, fx, fy, fw, fh);
+        setClip(graphics, cx, cy, cw, ch);
+    }
+
 
     /// Returns the width of a native image
     ///

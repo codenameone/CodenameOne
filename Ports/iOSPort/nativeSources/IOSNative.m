@@ -2723,19 +2723,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRoundedImageDrawSupported___R_bo
     return Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSupportedImpl();
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedGlobal___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+// u0, v0, du, dv: the part of the picture shown, normalised; du or dv <= 0 means all of
+// it. See CN1MetalDrawImageRegionRounded.
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedGlobal___long_int_int_int_int_int_int_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius, JAVA_FLOAT u0, JAVA_FLOAT v0, JAVA_FLOAT du, JAVA_FLOAT dv)
 {
     POOL_BEGIN();
-    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl(void*, int, int, int, int, int, int, float);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl(void*, int, int, int, int, int, int, float, float, float, float, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius, u0, v0, du, dv);
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedMutable___long_int_int_int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius)
+void com_codename1_impl_ios_IOSNative_nativeDrawImageRoundedMutable___long_int_int_int_int_int_int_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints, JAVA_FLOAT cornerRadius, JAVA_FLOAT u0, JAVA_FLOAT v0, JAVA_FLOAT du, JAVA_FLOAT dv)
 {
     POOL_BEGIN();
-    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl(void*, int, int, int, int, int, int, float);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius);
+    extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl(void*, int, int, int, int, int, int, float, float, float, float, float);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl((void *)n1, alpha, n2, n3, n4, n5, renderingHints, cornerRadius, u0, v0, du, dv);
     POOL_END();
 }
 

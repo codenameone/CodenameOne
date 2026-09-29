@@ -3121,7 +3121,8 @@ JAVA_BOOLEAN Java_com_codename1_impl_ios_IOSImplementation_isRoundedImageDrawSup
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalImpl
-(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius,
+ float u0, float v0, float du, float dv) {
 #ifdef CN1_USE_METAL
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
@@ -3129,6 +3130,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalI
     DrawImage* f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
     [f setRenderingHints:renderingHints];
     [f setCornerRadius:cornerRadius];
+    [f setRegionX:u0 y:v0 w:du h:dv];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -3139,13 +3141,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedGlobalI
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageRoundedMutableImpl
-(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+(void* peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius,
+ float u0, float v0, float du, float dv) {
 #ifdef CN1_USE_METAL
     GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
     if (target == nil) return;
     DrawImage *f = [[DrawImage alloc] initWithArgs:alpha xpos:x ypos:y i:(BRIDGE_CAST GLUIImage*)peer w:width h:height];
     [f setRenderingHints:renderingHints];
     [f setCornerRadius:cornerRadius];
+    [f setRegionX:u0 y:v0 w:du h:dv];
     [f setTarget:target];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC

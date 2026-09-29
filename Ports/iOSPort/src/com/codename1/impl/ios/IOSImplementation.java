@@ -5077,12 +5077,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
         nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
     }
-    private void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
-        nativeInstance.nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    private void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv) {
+        nativeInstance.nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
     }
 
-    private void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
-        nativeInstance.nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    private void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius, float u0, float v0, float du, float dv) {
+        nativeInstance.nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
     }
 
     private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
@@ -8087,8 +8087,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
         }
 
-        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
-            nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius, float u0, float v0, float du, float dv) {
+            nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
         }
         
         
@@ -8772,8 +8772,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         @Override
-        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
-            nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius, float u0, float v0, float du, float dv) {
+            nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius, u0, v0, du, dv);
         }
 
         @Override
@@ -10579,7 +10579,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyTransform();
         ng.applyClip();
         NativeImage nm = (NativeImage)img;
-        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius);
+        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius, 0, 0, 0, 0);
+    }
+
+    @Override
+    public void drawImageRegionRounded(Object graphics, Object img, int x, int y, int w, int h,
+                                       float cornerRadius, float u0, float v0, float du, float dv) {
+        if (img == null) return;
+        if (!isRoundedImageDrawSupported()) {
+            super.drawImageRegionRounded(graphics, img, x, y, w, h, cornerRadius, u0, v0, du, dv);
+            return;
+        }
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        NativeImage nm = (NativeImage)img;
+        // The corner radius may be zero here: the Metal pipeline then draws the
+        // region square, which is still the region and not the whole picture.
+        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius > 0 ? cornerRadius : 0,
+                u0, v0, du, dv);
     }
 
     @Override
