@@ -425,11 +425,12 @@ public final class VectorMapEngine {
                     g.drawImage(img, left, top, right - left, bottom - top);
                 }
                 // An overzoomed tile shows part of a deeper-level tile, whose
-                // labels cover all of its pieces: collect them once.
+                // labels (styled for this zoom) cover all of its pieces:
+                // collect them once.
                 String labelKey = key;
                 if (source.isVector() && z > sourceMax) {
                     int depth = z - sourceMax;
-                    labelKey = TileUtil.key(sourceMax, wrappedTx >> depth, ty >> depth);
+                    labelKey = overzoomLabelKey(z, TileUtil.key(sourceMax, wrappedTx >> depth, ty >> depth));
                 }
                 List tileLabels = labelKeys.add(labelKey) ? (List) labels.get(labelKey) : null;
                 if (tileLabels != null) {
@@ -714,7 +715,6 @@ public final class VectorMapEngine {
         waiters = new ArrayList();
         waiters.add(address);
         parentWaiters.put(parentKey, waiters);
-        final MapStyle requestStyle = style;
         source.fetchTile(parentZ, px, py, new TileCallback() {
             @Override
             public void tileLoaded(int tz, int tx, int ty, final byte[] data) {
@@ -722,20 +722,16 @@ public final class VectorMapEngine {
                     @Override
                     public void run() {
                         VectorTile decoded;
-                        List decodedLabels = null;
                         try {
                             decoded = MvtDecoder.decode(data);
-                            decodedLabels = TileRenderer.extractLabels(decoded, requestStyle, parentZ,
-                                    px, py, tileSize);
                         } catch (Throwable t) {
                             decoded = null;
                         }
                         final VectorTile tile = decoded;
-                        final List tileLabels = decodedLabels;
                         MapTileWorker.callSerially(new Runnable() {
                             @Override
                             public void run() {
-                                applyParent(parentKey, parentZ, tile, tileLabels, requestGeneration);
+                                applyParent(parentKey, parentZ, tile, requestGeneration);
                             }
                         });
                     }
@@ -744,13 +740,12 @@ public final class VectorMapEngine {
 
             @Override
             public void tileFailed(int tz, int tx, int ty) {
-                applyParent(parentKey, parentZ, null, null, requestGeneration);
+                applyParent(parentKey, parentZ, null, requestGeneration);
             }
         });
     }
 
-    private void applyParent(String parentKey, int parentZ, VectorTile tile, List tileLabels,
-                             int requestGeneration) {
+    private void applyParent(String parentKey, int parentZ, VectorTile tile, int requestGeneration) {
         // A reset since the request already dropped its waiters, and the key
         // may belong to a newer request by now.
         if (requestGeneration != generation) {
@@ -768,9 +763,6 @@ public final class VectorMapEngine {
             return;
         }
         decodedParents.put(parentKey, tile);
-        if (tileLabels != null) {
-            labels.put(parentKey, tileLabels);
-        }
         for (Object w : waiters) {
             renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
         }
@@ -788,9 +780,25 @@ public final class VectorMapEngine {
             Image buffer = Image.createImage(size, size, 0);
             TileRenderer.renderTile(buffer.getGraphics(), parent, style, address[0], size, subX, subY, depth);
             rendered.put(key, buffer);
+            // The parent's labels, styled for the zoom actually shown: a symbol
+            // layer's minzoom/maxzoom and text size are judged at this zoom,
+            // not at the source's deepest one, while the anchors stay in the
+            // parent's world pixels. Once per zoom, shared by every piece.
+            String labelKey = overzoomLabelKey(address[0], TileUtil.key(parentZ, address[1] >> depth,
+                    address[2] >> depth));
+            if (!labels.containsKey(labelKey)) {
+                labels.put(labelKey, TileRenderer.extractLabels(parent, style, address[0], parentZ,
+                        address[1] >> depth, address[2] >> depth, tileSize));
+            }
         } catch (Throwable t) {
             failed.put(key, Boolean.TRUE);
         }
+    }
+
+    // Overzoomed labels are keyed by the zoom they were styled for as well as
+    // the parent tile they come from.
+    private static String overzoomLabelKey(int displayZoom, String parentKey) {
+        return displayZoom + ">" + parentKey;
     }
 
     private void finishFailed(String key, int requestGeneration) {

@@ -159,6 +159,14 @@ final class TileRenderer {
     /// `tileX`/`tileY` are the tile's slippy coordinates at integer `zoom`.
     static List extractLabels(VectorTile tile, MapStyle style, int zoom,
                               int tileX, int tileY, int tileSize) {
+        return extractLabels(tile, style, zoom, zoom, tileX, tileY, tileSize);
+    }
+
+    /// As above for a tile shown at another zoom than its own (overzoom):
+    /// visibility and text size follow `styleZoom`, the zoom on screen, while
+    /// anchors and paths are in world pixels of the tile's own `zoom`.
+    static List extractLabels(VectorTile tile, MapStyle style, int styleZoom, int zoom,
+                              int tileX, int tileY, int tileSize) {
         List out = new ArrayList();
         List styleLayers = style.getLayers();
         for (Object slObj : styleLayers) {
@@ -166,7 +174,7 @@ final class TileRenderer {
             if (sl.getType() != StyleLayer.TYPE_SYMBOL || sl.getSourceLayer() == null) {
                 continue;
             }
-            if (!sl.visibleAt(zoom)) {
+            if (!sl.visibleAt(styleZoom)) {
                 continue;
             }
             VectorLayer vl = tile.getLayer(sl.getSourceLayer());
@@ -215,7 +223,7 @@ final class TileRenderer {
                     }
                 }
                 out.add(new LabelCandidate(String.valueOf(value), worldX, worldY, zoom,
-                        sl.getTextColor(), sl.getTextHaloColor(), sl.textSizeAt(zoom), path));
+                        sl.getTextColor(), sl.getTextHaloColor(), sl.textSizeAt(styleZoom), path));
             }
         }
         return out;

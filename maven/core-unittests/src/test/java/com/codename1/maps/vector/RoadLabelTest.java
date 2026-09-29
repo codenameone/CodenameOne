@@ -186,6 +186,96 @@ class RoadLabelTest extends UITestBase {
     }
 
     @FormTest
+    void scriptsThatNeedShapingAreDrawnWholeOnACurve() {
+        String[] shaped = {
+            "\u0634\u0627\u0631\u0639 \u0627\u0644\u0645\u0644\u0643",  // Arabic: letters join
+            "\u05e8\u05d7\u05d5\u05d1 \u05d4\u05e8\u05e6\u05dc",        // Hebrew: right to left
+            "Cafe\u0301 Street Upper",                                 // combining acute accent
+            "Street \ud835\udc00 North"                                // a surrogate pair
+        };
+        for (String name : shaped) {
+            assertFalse(LabelEngine.drawsCharByChar(name), name);
+            Graphics g = graphics(true);
+            assertTrue(new LabelEngine().placeAlongLine(g, name, 13, TEXT, HALO, gentleArc(), 5000,
+                    0, 0, 800, 800), name);
+            // One shaped string (text plus its four halo passes), never a lone char.
+            verify(drawing, times(5)).drawString(any(), eq(name), anyInt(), anyInt());
+            ArgumentCaptor<String> drawn = ArgumentCaptor.forClass(String.class);
+            verify(drawing, times(5)).drawString(any(), drawn.capture(), anyInt(), anyInt());
+            for (String s : drawn.getAllValues()) {
+                assertEquals(name, s);
+            }
+        }
+    }
+
+    @FormTest
+    void aShapedNameIsDroppedWhereTheRoadBendsAwayFromIt() {
+        Graphics g = graphics(true);
+        // A tight arc: the chord across the name leaves the road by more than
+        // half a line, so drawing it whole would put it beside the road.
+        double[] road = arc(40, 60, Math.PI / 2);
+        String name = "\u0634\u0627\u0631\u0639 \u0627\u0644\u0645\u0644\u0643";
+        assertFalse(new LabelEngine().placeAlongLine(g, name, 13, TEXT, HALO, road, 5000,
+                0, 0, 800, 800));
+        verify(drawing, never()).drawString(any(), anyString(), anyInt(), anyInt());
+    }
+
+    @FormTest
+    void plainScriptsStillFollowTheCurveGlyphByGlyph() {
+        String[] plain = {"Curved Road Name", "Stra\u00dfe", "\u0443\u043b\u0438\u0446\u0430",
+            "\u9280\u5ea7\u901a\u308a"};
+        for (String name : plain) {
+            assertTrue(LabelEngine.drawsCharByChar(name), name);
+        }
+    }
+
+    @FormTest
+    void overzoomedLabelsFollowTheZoomOnScreen() {
+        MapStyle style = MapStyle.fromJson("{\"layers\":["
+                + "{\"type\":\"symbol\",\"source-layer\":\"poi\",\"minzoom\":16,"
+                + "\"layout\":{\"text-field\":\"{name}\"}},"
+                + "{\"type\":\"symbol\",\"source-layer\":\"place\",\"maxzoom\":14,"
+                + "\"layout\":{\"text-field\":\"{name}\"}}]}");
+        VectorTile tile = new VectorTile(Arrays.asList(
+                layer("poi", named("Cafe", VectorFeature.GEOM_POINT, new int[]{160, 320})),
+                layer("place", named("Town", VectorFeature.GEOM_POINT, new int[]{800, 800}))));
+        // Shown at the source's own zoom 14: the place, not the zoom-16 poi.
+        assertEquals(Arrays.asList("Town"), texts(TileRenderer.extractLabels(tile, style, 14, 14, 2, 3, 256)));
+        // Overzoomed to 16 from that same zoom-14 tile: the poi appears, the
+        // place that ends at 14 does not, and the anchor stays in zoom-14 pixels.
+        List shown = TileRenderer.extractLabels(tile, style, 16, 14, 2, 3, 256);
+        assertEquals(Arrays.asList("Cafe"), texts(shown));
+        LabelCandidate cafe = (LabelCandidate) shown.get(0);
+        assertEquals(14, cafe.tileZoom);
+        assertEquals(2 * 256 + 10, cafe.worldX, 1e-9);
+        assertEquals(3 * 256 + 20, cafe.worldY, 1e-9);
+    }
+
+    private static List texts(List labels) {
+        List out = new ArrayList();
+        for (Object o : labels) {
+            out.add(((LabelCandidate) o).text);
+        }
+        return out;
+    }
+
+    // Bends ~23 degrees over 400px: a curve, but one a whole name can follow
+    // without leaving the road by more than half a line.
+    private static double[] gentleArc() {
+        return arc(1000, 100, 0.4);
+    }
+
+    private static double[] arc(double radius, double offset, double sweep) {
+        double[] road = new double[42];
+        for (int i = 0; i <= 20; i++) {
+            double a = sweep * i / 20;
+            road[i * 2] = offset + radius * Math.sin(a);
+            road[i * 2 + 1] = 100 + radius * (1 - Math.cos(a));
+        }
+        return road;
+    }
+
+    @FormTest
     void ferryRoutesAreNotLabelledBecauseTheirLinesAreNotDrawn() {
         VectorFeature ferry = named("Sausalito - San Francisco Ferry Building",
                 VectorFeature.GEOM_LINESTRING, new int[]{100, 100, 3000, 3000});

@@ -97,14 +97,28 @@ final class LabelEngine {
             return place(g, text, sizePx, textColor, haloColor, round(p[0]), round(p[1]));
         }
         Font font = fontFor(sizePx);
-        int len = text.length();
-        int[] widths = new int[len];
-        int textW = 0;
-        for (int i = 0; i < len; i++) {
-            widths[i] = font.charWidth(text.charAt(i));
-            textW += widths[i];
-        }
         int h = font.getHeight();
+        boolean perGlyph = drawsCharByChar(text);
+        int[] widths;
+        int textW;
+        if (perGlyph) {
+            int len = text.length();
+            widths = new int[len];
+            textW = 0;
+            for (int i = 0; i < len; i++) {
+                widths[i] = font.charWidth(text.charAt(i));
+                textW += widths[i];
+            }
+        } else {
+            // Shaped text is measured and drawn whole. The cells only sample
+            // the road under it, for the bend check and the collision boxes.
+            textW = font.stringWidth(text);
+            int cells = Math.max(1, (textW + h - 1) / Math.max(1, h));
+            widths = new int[cells];
+            for (int i = 0; i < cells; i++) {
+                widths[i] = textW * (i + 1) / cells - textW * i / cells;
+            }
+        }
         if (textW <= 0 || total < textW + h) {
             return false;
         }
@@ -121,8 +135,8 @@ final class LabelEngine {
                 if (d - textW / 2.0 < 0 || d + textW / 2.0 > total) {
                     continue;
                 }
-                if (placeCopy(g, text, font, widths, textW, h, textColor, haloColor, pts, cum, d,
-                        repeat, left, top, right, bottom)) {
+                if (placeCopy(g, text, font, widths, textW, h, perGlyph, textColor, haloColor, pts,
+                        cum, d, repeat, left, top, right, bottom)) {
                     placedAny = true;
                 }
             }
@@ -131,8 +145,9 @@ final class LabelEngine {
     }
 
     private boolean placeCopy(Graphics g, String text, Font font, int[] widths, int textW, int h,
-                              int textColor, int haloColor, double[] pts, double[] cum, double d,
-                              double repeat, int left, int top, int right, int bottom) {
+                              boolean perGlyph, int textColor, int haloColor, double[] pts,
+                              double[] cum, double d, double repeat, int left, int top, int right,
+                              int bottom) {
         double[] center = pointAt(pts, cum, d);
         if (center[0] < left || center[0] > right || center[1] < top || center[1] > bottom) {
             return false;
@@ -187,6 +202,23 @@ final class LabelEngine {
             }
             boxes[i] = box;
         }
+        // Drawn whole, the text is a straight line from its first cell to its
+        // last; keep it only where the road stays within half a line of that,
+        // or the name would leave the road on a bend.
+        double chordX = reverse ? start[0] - end[0] : end[0] - start[0];
+        double chordY = reverse ? start[1] - end[1] : end[1] - start[1];
+        double chordLen = Math.sqrt(chordX * chordX + chordY * chordY);
+        if (!perGlyph) {
+            if (chordLen <= 0) {
+                return false;
+            }
+            for (int i = 0; i < len; i++) {
+                double off = ((gx[i] - start[0]) * chordY - (gy[i] - start[1]) * chordX) / chordLen;
+                if (Math.abs(off) > h / 2.0) {
+                    return false;
+                }
+            }
+        }
         for (int[] box : boxes) {
             occupied.add(box);
         }
@@ -195,39 +227,84 @@ final class LabelEngine {
             placedAnchors.put(text, anchors);
         }
         anchors.add(new double[]{center[0], center[1]});
-        drawAlong(g, text, font, widths, h, textColor, haloColor, center, gx, gy, ga);
+        if (perGlyph) {
+            drawAlong(g, text, font, widths, h, textColor, haloColor, center, gx, gy, ga);
+        } else {
+            drawRotated(g, text, font, h, textColor, haloColor, (start[0] + end[0]) / 2,
+                    (start[1] + end[1]) / 2, MathUtil.atan2(chordY, chordX));
+        }
         return true;
     }
 
-    private void drawAlong(Graphics g, String text, Font font, int[] widths, int h, int textColor,
-                           int haloColor, double[] center, double[] gx, double[] gy, double[] ga) {
+    // Whether each char of `text` renders the same drawn on its own, which
+    // laying glyphs one by one along a bend requires. That holds for Latin,
+    // Greek, Cyrillic and CJK without combining marks. It does not hold for
+    // scripts whose letters join or reorder (Arabic, Hebrew, the Indic
+    // scripts), for combining marks, which would detach from their base, or
+    // for surrogate pairs, which would split into two invalid halves -- such
+    // names are drawn whole, where the platform shapes them.
+    static boolean drawsCharByChar(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            boolean safe = c < 0x0300
+                    || (c >= 0x0370 && c <= 0x0482)
+                    || (c >= 0x048A && c <= 0x052F)
+                    || (c >= 0x1E00 && c <= 0x1FFF)
+                    || (c >= 0x2010 && c <= 0x2027)
+                    || (c >= 0x2030 && c <= 0x205E)
+                    || (c >= 0x3000 && c <= 0x9FFF)
+                    || (c >= 0xAC00 && c <= 0xD7A3)
+                    || (c >= 0xFF01 && c <= 0xFFEF);
+            if (!safe) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void drawRotated(Graphics g, String text, Font font, int h, int textColor, int haloColor,
+                             double centerX, double centerY, double angle) {
         Transform saved = g.getTransform();
         if (scratch == null) {
             scratch = Transform.makeIdentity();
         }
         g.setFont(font);
+        int cx = round(centerX);
+        int cy = round(centerY);
+        try {
+            scratch.setTransform(saved);
+            scratch.rotate((float) angle, cx, cy);
+            g.setTransform(scratch);
+            draw(g, text, font, textColor, haloColor, cx - font.stringWidth(text) / 2, cy - h / 2);
+        } finally {
+            g.setTransform(saved);
+        }
+    }
+
+    private void drawAlong(Graphics g, String text, Font font, int[] widths, int h, int textColor,
+                           int haloColor, double[] center, double[] gx, double[] gy, double[] ga) {
         boolean straight = true;
         for (int i = 1; i < ga.length && straight; i++) {
             straight = Math.abs(normalize(ga[i] - ga[0])) <= STRAIGHT_TOLERANCE;
         }
+        if (straight) {
+            drawRotated(g, text, font, h, textColor, haloColor, center[0], center[1], meanAngle(ga));
+            return;
+        }
+        Transform saved = g.getTransform();
+        if (scratch == null) {
+            scratch = Transform.makeIdentity();
+        }
+        g.setFont(font);
         try {
-            if (straight) {
-                int cx = round(center[0]);
-                int cy = round(center[1]);
+            for (int i = 0; i < ga.length; i++) {
+                int px = round(gx[i]);
+                int py = round(gy[i]);
                 scratch.setTransform(saved);
-                scratch.rotate((float) meanAngle(ga), cx, cy);
+                scratch.rotate((float) ga[i], px, py);
                 g.setTransform(scratch);
-                draw(g, text, font, textColor, haloColor, cx - font.stringWidth(text) / 2, cy - h / 2);
-            } else {
-                for (int i = 0; i < ga.length; i++) {
-                    int px = round(gx[i]);
-                    int py = round(gy[i]);
-                    scratch.setTransform(saved);
-                    scratch.rotate((float) ga[i], px, py);
-                    g.setTransform(scratch);
-                    draw(g, String.valueOf(text.charAt(i)), font, textColor, haloColor,
-                            px - widths[i] / 2, py - h / 2);
-                }
+                draw(g, String.valueOf(text.charAt(i)), font, textColor, haloColor,
+                        px - widths[i] / 2, py - h / 2);
             }
         } finally {
             g.setTransform(saved);
