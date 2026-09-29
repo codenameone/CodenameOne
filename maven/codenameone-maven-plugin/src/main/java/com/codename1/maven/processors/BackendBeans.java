@@ -2720,9 +2720,13 @@ final class BackendBeans {
 
     /// A class's name within its package with `$` turned into `_`: the base the
     /// generated classes beside it are named from.
+    /// The class's name in its package, as a Java identifier for the support
+    /// classes named after it. Injective: `_` is doubled before `$` becomes
+    /// `_`, so Outer_Inner and the nested Outer$Inner, which folded to one name,
+    /// get two -- one helper silently replaced the other before.
     static String baseName(String internal) {
         int slash = internal.lastIndexOf('/');
-        return internal.substring(slash + 1).replace('$', '_');
+        return internal.substring(slash + 1).replace("_", "__").replace('$', '_');
     }
 
     static String qualify(String pkg, String simple) {

@@ -970,6 +970,16 @@ public final class HttpServer {
             this.extraHeaders = null;
         }
 
+        /// Closes the file this response would have sent, for one that will never
+        /// be written: the writer is what normally closes it, and a response
+        /// replaced by a 500 never reaches the writer.
+        void discard() {
+            if (fileFd >= 0) {
+                StaticFiles.closeFile(fileFd);
+                fileFd = -1;
+            }
+        }
+
         /// Serialises a deferred JSON body now, into an ordinary one, so the
         /// object graph may change after this without changing the response.
         void serializeDeferredJson() {
@@ -2594,7 +2604,10 @@ public final class HttpServer {
         synchronized (VIRTUAL_TASKS) {
             token = ++nextVirtualTask;
             VIRTUAL_TASKS.put(Long.valueOf(token), task);
-            int index = nextTaskHost;
+            // Reduced to THIS server's hosts: the cursor is static and survives a
+            // restart, and a server started again with fewer hosts indexed past
+            // the end of its array with the old one's.
+            int index = nextTaskHost % hosts.length;
             nextTaskHost = index + 1 >= hosts.length ? 0 : index + 1;
             host = hosts[index];
             if (host != null) {

@@ -878,6 +878,79 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a file response replaced by a 500 when the session cannot be stored is closed")
+    void fileResponseClosedWhenTheSessionFails(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        final java.io.File file = new java.io.File(dir, "body.txt");
+        java.nio.file.Files.write(file.toPath(), "hello".getBytes("UTF-8"));
+        final SessionStore inner = new Sessions().getStore();
+        SessionStore failing = new SessionStore() {
+            public HttpSession load(String id) throws IOException {
+                return inner.load(id);
+            }
+
+            public void save(HttpSession session, String previousId) throws IOException {
+                throw new IOException("the store is down");
+            }
+
+            public void delete(String id) throws IOException {
+                inner.delete(id);
+            }
+
+            public int purgeExpired(long now) throws IOException {
+                return inner.purgeExpired(now);
+            }
+
+            public int size() {
+                return inner.size();
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .sessionStore(failing)
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                request.getSession(true).setAttribute("seen", "yes");
+                                int fd = StaticFiles.trackFile(
+                                        FileIo.openRead(file.getAbsolutePath()));
+                                return HttpServer.Response.file(200, "text/plain", fd, 0,
+                                        file.length(), null);
+                            }
+                        }};
+                    }
+                }).start();
+        try {
+            int before = StaticFiles.openFileCount();
+            assertEquals(500, open(port, "/file").getResponseCode());
+            assertEquals(before, StaticFiles.openFileCount(),
+                    "the discarded file response's descriptor was never closed");
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a stopped backend no longer holds the process slot")
+    void stoppedBackendReleasesTheSlot() throws Exception {
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        backend.stop();
+        java.lang.reflect.Field slot = Backend.class.getDeclaredField("processLive");
+        slot.setAccessible(true);
+        assertNull(slot.get(null), "the stopped backend is still reachable from the slot");
+    }
+
+    @Test
     @DisplayName("awaitTermination waits for the teardown a handler's stop() deferred")
     void awaitTerminationWaitsForTheDeferredTeardown() throws Exception {
         final Backend[] running = new Backend[1];

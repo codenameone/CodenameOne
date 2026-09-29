@@ -79,7 +79,11 @@ final class BackendWeaver {
     /// super.foo() entered the base stub only to run the subclass body again,
     /// recursing until the stack ran out.
     static String bodyName(String ownerInternalName, String method) {
-        return method + BODY_SUFFIX + Integer.toHexString(ownerInternalName.hashCode());
+        // The class's own name, not a hash of it: only a same-package class can
+        // override a package-private body, and within a package the name is
+        // unique, where two names can share a hash (p/Aa and p/BB).
+        return method + BODY_SUFFIX + "_"
+                + BackendBeans.baseName(ownerInternalName);
     }
 
     /// Whether `name` is a moved body's.

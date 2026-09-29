@@ -550,6 +550,41 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void supportNamesStayDistinct() throws Exception {
+        // Aa and BB share a Java hash; Outer_Inner and Outer$Inner folded alike.
+        assertEquals("Aa".hashCode(), "BB".hashCode());
+        assertNotEquals(BackendWeaver.bodyName("p/Aa", "work"),
+                BackendWeaver.bodyName("p/BB", "work"));
+        assertNotEquals(BackendBeans.baseName("p/Outer_Inner"),
+                BackendBeans.baseName("p/Outer$Inner"));
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Aa", PKG + "public class Aa {\n"
+                + "    @Timed(\"aa.work\") public String work() { return \"base\"; }\n"
+                + "}\n");
+        s.put("com.example.BB", PKG + "public class BB extends Aa {\n"
+                + "    @Timed(\"bb.work\") public String work() { return \"sub+\" + super.work(); }\n"
+                + "}\n");
+        s.put("com.example.Outer_Inner", PKG + "public class Outer_Inner {\n"
+                + "    @Timed(\"flat.work\") public String work() { return \"flat\"; }\n"
+                + "}\n");
+        s.put("com.example.Outer", PKG + "public class Outer {\n"
+                + "    public static class Inner {\n"
+                + "        @Timed(\"nested.work\") public String work() { return \"nested\"; }\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Object sub = loader.loadClass("com.example.BB").newInstance();
+        assertEquals("sub+base", sub.getClass().getMethod("work").invoke(sub));
+        Object flat = loader.loadClass("com.example.Outer_Inner").newInstance();
+        assertEquals("flat", flat.getClass().getMethod("work").invoke(flat));
+        Object nested = loader.loadClass("com.example.Outer$Inner").newInstance();
+        assertEquals("nested", nested.getClass().getMethod("work").invoke(nested));
+    }
+
+    @Test
     public void aWovenOverrideCallingSuperRunsTheBaseBody() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Base", PKG + "public class Base {\n"

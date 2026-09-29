@@ -328,10 +328,23 @@ public final class Backend {
         }
     }
 
-    private synchronized void markStopped() {
-        stopping = false;
-        stopped = true;
-        notifyAll();
+    private void markStopped() {
+        synchronized (this) {
+            stopping = false;
+            stopped = true;
+            notifyAll();
+        }
+        // Outside this object's lock: claimProcessSlot holds the class lock and
+        // then asks this object, so taking them the other way round deadlocks.
+        releaseProcessSlot(this);
+    }
+
+    /// Frees the process slot `stopped` holds, so a stopped Backend -- its
+    /// destroyed beans, its sessions -- is not kept reachable until the next start.
+    private static synchronized void releaseProcessSlot(Backend stopped) {
+        if (processLive == stopped) { //NOPMD CompareObjectsWithEquals - the backend itself, by identity
+            processLive = null;
+        }
     }
 
     /// The one Backend this process runs, until it stops.
@@ -982,9 +995,17 @@ public final class Backend {
                         }
                     }
                 } catch (Exception err) {
+                    // The handler's response is replaced by a 500; a
+                    // file it carried is closed here or never.
+                    if (response != null) {
+                        response.discard();
+                    }
                     failed(request, attempted, startedMillis, err);
                     throw err;
                 } catch (Error err) {
+                    if (response != null) {
+                        response.discard();
+                    }
                     // The same clean-up: an invalidated session
                     // must still be deleted, or the client's old
                     // cookie keeps its signed-in state.
