@@ -126,6 +126,33 @@ final class JavascriptReachability {
         }
     }
 
+    /**
+     * Read-only: when set, the analysis never un-eliminates a method. The C targets use
+     * RTA only to learn which classes are instantiated ({@link #instantiatedClasses}), and
+     * a method resurrected there would be emitted while the callees the conservative pass
+     * culled with it are not, which does not compile.
+     */
+    private boolean analysisOnly;
+
+    /**
+     * The classes RTA finds instantiated, without eliminating or resurrecting anything.
+     * For targets other than JavaScript, where the answer is used only to decide which
+     * receivers get a direct arm in a dispatch switch, so an under-approximation costs a
+     * fast path and never correctness.
+     *
+     * @param classes the surviving classes
+     * @param nativeSources the native sources, for their roots
+     * @return the instantiated class names
+     */
+    static Set<String> instantiatedClasses(List<ByteCodeClass> classes, String[] nativeSources) {
+        JavascriptReachability rta = new JavascriptReachability();
+        rta.analysisOnly = true;
+        rta.index(classes);
+        rta.seedRoots(classes, nativeSources);
+        rta.propagate();
+        return rta.allocated;
+    }
+
     static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
             String[] nativeSources) {
         JavascriptReachability rta = new JavascriptReachability();
@@ -511,12 +538,12 @@ final class JavascriptReachability {
                 // touched; seed it when we see the class.
             }
             if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Used) {
-                markClassInstantiated(cls.getClsName());
+                markAllocated(cls.getClsName());
             }
         }
         // Runtime roots that the translator always keeps alive.
         for (String root : RUNTIME_ROOT_CLASSES) {
-            markClassInstantiated(root);
+            markAllocated(root);
         }
         // Thread.start() is a native stub that goes through ``jvm.spawn``
         // on the JS runtime side. The runtime drives ``Thread.run()`` as
@@ -547,7 +574,7 @@ final class JavascriptReachability {
         // receiver is a Java object, not a JS handler.
         seedJsoBridgeInterfaceMethods(classes);
         // The runtime's bindNative fast paths for the native HashMap /
-        // StringBuilder / Integer methods DELEGATE to pure-Java *Impl twins
+        // Integer methods DELEGATE to pure-Java *Impl twins
         // (cn1_java_util_HashMap_getImpl_... etc.) straight from
         // parparvm_runtime.js -- edges invisible to bytecode-only RTA. Without
         // these seeds the twins are culled and the delegation throws
@@ -557,7 +584,13 @@ final class JavascriptReachability {
         seedRuntimeDispatched("java_util_HashMap", "removeImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
         seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
         seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
-        seedRuntimeDispatched("java_lang_StringBuilder", "toStringImpl", "()Ljava/lang/String;");
+        seedRuntimeDispatched("java_util_HashSet", "cn1AddImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ContainsImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ClearImpl", "()V");
+        seedRuntimeDispatched("java_util_HashSet", "cn1NextOccupiedImpl", "(I)I");
+        seedRuntimeDispatched("java_util_HashSet", "cn1ElementAtImpl", "(I)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashSet", "cn1RemoveSlotImpl", "(I)V");
         // valueOfHeap is STATIC: virtual seeding does not resolve it. One per tagged box --
         // every type whose valueOf became a native to return an immediate on the C targets
         // delegates to its heap twin here, and the JS port has no immediates so it ALWAYS
@@ -654,7 +687,7 @@ final class JavascriptReachability {
      * (Thread.run, etc.) that bytecode analysis cannot see.
      */
     private void seedRuntimeDispatched(String owner, String methodName, String desc) {
-        markClassInstantiated(owner);
+        markAllocated(owner);
         VirtualCall call = new VirtualCall(owner, methodName, desc, false);
         recordPending(call);
         dispatchVirtualFromInstantiated(call);
@@ -667,6 +700,34 @@ final class JavascriptReachability {
         worklist.add(method);
     }
 
+    /**
+     * ALLOCATED, AS OPPOSED TO INSTANTIATED. {@link #instantiated} also takes every class a
+     * static call, a static field access or any visited method merely touches -- which the
+     * JavaScript culler needs, since touching a class runs its initializer, but which is
+     * not the same as an object of that class existing. In {@link #analysisOnly} mode
+     * virtual calls resolve only against classes an allocation site actually creates: a
+     * NEW, a NativeLookup registration, a class natives use, a runtime root. That is the
+     * set the C targets' dispatch switches ask for, and resolving against the wider set
+     * made every class with a reachable static method a receiver, with all its overrides
+     * and whatever THEY allocate.
+     */
+    private final Set<String> allocated = new HashSet<String>();
+
+    private boolean isReceiver(String cls) {
+        return analysisOnly ? allocated.contains(cls) : instantiated.contains(cls);
+    }
+
+    private void markAllocated(String clsName) {
+        markClassInstantiated(clsName);
+        if (analysisOnly && clsName != null && allocated.add(clsName)) {
+            Set<String> ancestorChain = new HashSet<String>();
+            collectTransitiveAncestors(clsName, ancestorChain);
+            for (String ancestor : ancestorChain) {
+                resolvePendingFor(ancestor, clsName);
+            }
+        }
+    }
+
     private void markClassInstantiated(String clsName) {
         if (clsName == null || !instantiated.add(clsName)) {
             return;
@@ -675,7 +736,9 @@ final class JavascriptReachability {
         if (cls == null) {
             return;
         }
-        cls.restoreEliminatedClass();
+        if (!analysisOnly) {
+            cls.restoreEliminatedClass();
+        }
         // Static-initialiser fires implicitly on first touch.
         for (BytecodeMethod m : cls.getMethods()) {
             if ("__CLINIT__".equals(m.getMethodName())) {
@@ -683,7 +746,8 @@ final class JavascriptReachability {
             }
         }
         // Walk the supertype chain so instance method dispatch can
-        // land on any of them. Instantiating Foo implicitly touches
+        // land on any of them. (In analysisOnly mode dispatch lands only on ALLOCATED
+        // classes -- see markAllocated -- so this walk only initializes.) Instantiating Foo implicitly touches
         // Foo's base classes too (they don't get their own "new", but
         // Foo's ctor calls super() etc.).
         String base = cls.getBaseClass();
@@ -714,10 +778,13 @@ final class JavascriptReachability {
         // interfaces) on every instantiation re-resolves every pending
         // receiver type that the new class transitively satisfies, so
         // late-arriving subtypes pick up the existing pending calls.
+        if (analysisOnly) {
+            return;
+        }
         Set<String> ancestorChain = new HashSet<String>();
         collectTransitiveAncestors(clsName, ancestorChain);
         for (String ancestor : ancestorChain) {
-            resolvePendingFor(ancestor);
+            resolvePendingFor(ancestor, clsName);
         }
     }
 
@@ -741,7 +808,20 @@ final class JavascriptReachability {
         }
     }
 
-    private void resolvePendingFor(String receiverType) {
+    /**
+     * Resolves the calls pending on {@code receiverType} against ONE newly instantiated
+     * class, {@code newlyInstantiated}.
+     *
+     * Only that class is new. Every other instantiated subtype of the receiver was already
+     * resolved against each of these calls: either when the call was first seen
+     * (dispatchVirtualFromInstantiated walks the whole subtree once) or when that subtype
+     * was itself instantiated, through this same method. Re-walking the receiver's entire
+     * subtree here, as this used to, gave the same answer at a cost of subtree size times
+     * pending calls on every instantiation -- quadratic on a C corpus, where Object and the
+     * collection interfaces have thousands of subtypes and the analysis ran for tens of
+     * minutes.
+     */
+    private void resolvePendingFor(String receiverType, String newlyInstantiated) {
         List<VirtualCall> pending = pendingByReceiver.get(receiverType);
         if (pending == null) {
             return;
@@ -749,7 +829,7 @@ final class JavascriptReachability {
         // Snapshot so re-entrant adds don't break iteration.
         VirtualCall[] snapshot = pending.toArray(new VirtualCall[0]);
         for (VirtualCall call : snapshot) {
-            dispatchVirtualFromInstantiated(call);
+            enqueueResolved(newlyInstantiated, call.methodName, call.desc, false);
         }
     }
 
@@ -774,7 +854,7 @@ final class JavascriptReachability {
                 if (op == Opcodes.NEW) {
                     String type = ((TypeInstruction) instr).getTypeName();
                     if (type != null) {
-                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(type));
+                        markAllocated(JavascriptNameUtil.sanitizeClassName(type));
                     }
                 }
                 // ANEWARRAY doesn't create instances of the component type
@@ -801,7 +881,7 @@ final class JavascriptReachability {
                     // has existed and other things may depend on that.
                     String rawOwner = JavascriptNameUtil.sanitizeClassName(f.getOwner());
                     markClassInstantiated(rawOwner);
-                    String declaringOwner = JavascriptMethodGenerator.resolveStaticFieldOwner(
+                    String declaringOwner = JavascriptNameUtil.resolveStaticFieldOwner(
                             f.getOwner(), f.getFieldName(), byName);
                     if (declaringOwner != null && !declaringOwner.equals(rawOwner)) {
                         markClassInstantiated(declaringOwner);
@@ -879,7 +959,7 @@ final class JavascriptReachability {
                 if (cst instanceof Type) {
                     Type t = (Type) cst;
                     if (t.getSort() == Type.OBJECT) {
-                        markClassInstantiated(JavascriptNameUtil.sanitizeClassName(t.getInternalName()));
+                        markAllocated(JavascriptNameUtil.sanitizeClassName(t.getInternalName()));
                         needed--;
                     }
                 }
@@ -902,8 +982,12 @@ final class JavascriptReachability {
             case Opcodes.INVOKEINTERFACE: {
                 VirtualCall call = new VirtualCall(owner, inv.getName(), inv.getDesc(),
                         inv.getOpcode() == Opcodes.INVOKEINTERFACE);
-                recordPending(call);
-                dispatchVirtualFromInstantiated(call);
+                // A call already recorded is already resolved against every
+                // instantiated subtype and will be against every later one, since
+                // resolution reads only receiver, name and descriptor.
+                if (recordPending(call)) {
+                    dispatchVirtualFromInstantiated(call);
+                }
                 break;
             }
             default:
@@ -911,26 +995,33 @@ final class JavascriptReachability {
         }
     }
 
-    private void recordPending(VirtualCall call) {
+    private final Set<String> pendingKeys = new HashSet<String>();
+
+    /** @return true when the call is new, false when an identical one is already pending */
+    private boolean recordPending(VirtualCall call) {
+        if (!pendingKeys.add(call.receiver + '#' + call.methodName + call.desc)) {
+            return false;
+        }
         List<VirtualCall> list = pendingByReceiver.get(call.receiver);
         if (list == null) {
             list = new ArrayList<VirtualCall>();
             pendingByReceiver.put(call.receiver, list);
         }
         list.add(call);
+        return true;
     }
 
     private void dispatchVirtualFromInstantiated(VirtualCall call) {
         // If the static receiver type is itself instantiated, dispatch
         // to it first (covers the trivial case where no subtype has
         // been seen yet but the receiver's own method is reachable).
-        if (instantiated.contains(call.receiver)) {
+        if (isReceiver(call.receiver)) {
             enqueueResolved(call.receiver, call.methodName, call.desc, false);
         }
         Set<String> subtypes = subclassesOf.get(call.receiver);
         if (subtypes != null) {
             for (String sub : subtypes) {
-                if (instantiated.contains(sub)) {
+                if (isReceiver(sub)) {
                     enqueueResolved(sub, call.methodName, call.desc, false);
                 }
                 // Transitively walk further subtypes too.
@@ -945,7 +1036,7 @@ final class JavascriptReachability {
             return;
         }
         for (String sub : further) {
-            if (instantiated.contains(sub)) {
+            if (isReceiver(sub)) {
                 enqueueResolved(sub, call.methodName, call.desc, false);
             }
             dispatchVirtualSubtree(sub, call);
@@ -1012,7 +1103,7 @@ final class JavascriptReachability {
                 // dropped, ``done.notifyAll()`` never fires, and the
                 // calling Java thread waits on ``done.wait()``
                 // forever.
-                if (m.isEliminated()) {
+                if (m.isEliminated() && !analysisOnly) {
                     m.setEliminated(false);
                 }
                 enqueue(m);

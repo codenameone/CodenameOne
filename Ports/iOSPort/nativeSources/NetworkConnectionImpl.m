@@ -479,13 +479,13 @@ extern void connectionError(void* peer, NSString* message);
     
     while (toFill > 0) {
         if ([data length] - pendingDataPos >= toFill) {
-            [data getBytes:((JAVA_ARRAY)buffer)->data+offset+count range:NSMakeRange(pendingDataPos, toFill)];
+            [data getBytes:CN1_ARRAY_DATA((JAVA_ARRAY)buffer)+offset+count range:NSMakeRange(pendingDataPos, toFill)];
             count += toFill;
             pendingDataPos += toFill;
             toFill = 0;
             return count;
         } else {
-            [data getBytes:((JAVA_ARRAY)buffer)->data+offset+count range:NSMakeRange(pendingDataPos, [data length] - pendingDataPos)];
+            [data getBytes:CN1_ARRAY_DATA((JAVA_ARRAY)buffer)+offset+count range:NSMakeRange(pendingDataPos, [data length] - pendingDataPos)];
             count += ([data length] - pendingDataPos);
             
             toFill -= ([data length]- pendingDataPos);

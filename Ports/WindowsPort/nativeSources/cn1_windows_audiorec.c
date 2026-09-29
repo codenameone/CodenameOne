@@ -192,7 +192,11 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_audioRecStop___long(
     InterlockedExchange(&r->recording, 0);
     SetEvent(r->event);
     if (r->thread != NULL) {
+        /* Parked for the wait: Windows cannot force-stop a thread, so a collection would
+           otherwise wait out the whole two seconds for this one. */
+        CN1_YIELD_THREAD;
         WaitForSingleObject(r->thread, 2000);
+        CN1_RESUME_THREAD;
         CloseHandle(r->thread);
     }
     waveInStop(r->hwi);

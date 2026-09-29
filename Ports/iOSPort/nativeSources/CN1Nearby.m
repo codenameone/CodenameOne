@@ -101,7 +101,7 @@ static NSData *cn1nbDataFromJavaArray(JAVA_OBJECT arr) {
     if (a->length <= 0) {
         return [NSData data];
     }
-    return [NSData dataWithBytes:a->data length:a->length];
+    return [NSData dataWithBytes:CN1_ARRAY_DATA(a) length:a->length];
 }
 
 /// Replaces the characters a tab-delimited record cannot carry, exactly as

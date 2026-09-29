@@ -221,6 +221,14 @@ public class GcSteadyStateApp {
                 chain = mv;
             }
             int v = search(child, depth - 1, seed + b + chain.to);
+            // Read back every field of the chain. The translator removes an instance
+            // field nothing reads (DeadFieldElimination), and a Move whose board and next
+            // were write-only would stop carrying references -- the one property this
+            // workload exists for. The checks cannot fail and do not change RESULT.
+            if (chain.board != child || chain.score != seed + MOVES_PER_NODE - 1
+                    || (chain.next != null && chain.next.board != child)) {
+                throw new IllegalStateException();
+            }
             if (v > best) {
                 best = v;
             }

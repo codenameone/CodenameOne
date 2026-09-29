@@ -60,8 +60,8 @@ import org.objectweb.asm.Opcodes;
  *
  * GC: at the new-site the object is already a GC root (it sits on the operand stack),
  * and the bump/calloc zeroed its reference fields, so storing into them via the
- * existing {@code set_field_*} accessors (which carry the VM's write barrier, a no-op
- * unless the nursery is enabled) is exactly what the out-of-line ctor would do. The
+ * existing {@code set_field_*} accessors (which carry the VM's write barrier, i.e. the
+ * SATB insertion half) is exactly what the out-of-line ctor would do. The
  * straight-line field stores contain no safepoint, so no GC can interleave the
  * partially-constructed object.
  */
@@ -115,7 +115,9 @@ public final class InlinableConstructor {
             // build cannot inline -- the very call Lever B exists to remove). The
             // struct type obj__<owner> is already complete in this TU (the new-site
             // references it). Object stores carry CN1_WRITE_BARRIER, exactly as the
-            // accessor does (a no-op unless the nursery is enabled).
+            // accessor does. That barrier is the SATB insertion half and is NOT
+            // optional: omitting it on a field store is a live mark-completeness hole,
+            // which is what FusedFieldInit was fixed for.
             String lhs = "((struct obj__" + s.cOwner + "*)(" + objExpr + "))->" + s.cOwner + "_" + s.fieldName;
             b.append("    ");
             if (s.fieldCat == 'o') {
@@ -188,8 +190,16 @@ public final class InlinableConstructor {
      *                     (published via {@code SP[-k].data.o})
      * @param pop          number of stack slots to pop (receiver + on-stack args)
      */
+    /// @param deadGuardId the frame-exit retire guard THIS call site writes, or -1.
+    ///     The NEW this replaces only emits a NULL placeholder, so the guard is written at
+    ///     the publish line, where __ibp is fully constructed. A parameter, not a field:
+    ///     this plan is cached on the constructor and shared by every call site of it, so
+    ///     a field set by one site was emitted by the next -- Invoke never set it, and
+    ///     inherited whatever guard the last CustomInvoke left, into a method that
+    ///     declared no guard at all (an undeclared __cn1dead_N on the macOS build).
     public void appendInitBeforePublish(StringBuilder b, String cType, String[] argExprs,
-                                        char[] argCats, int survivorSlot, int pop) {
+                                        char[] argCats, int survivorSlot, int pop,
+                                        int deadGuardId) {
         b.append("    {\n");
         if (argCats != null) {
             argExprs = appendArgTemps(b, argExprs, argCats);
@@ -207,9 +217,19 @@ public final class InlinableConstructor {
                 if (written.contains(f.getFieldName())) {
                     continue;
                 }
+                // A field the struct only declares on some targets cannot be zeroed
+                // unconditionally here; see ByteCodeClass.targetGuardFor.
+                String zeroGuard = com.codename1.tools.translator.ByteCodeClass.targetGuardFor(
+                        f.getClsName().replace('/', '_').replace('$', '_'), f.getFieldName());
+                if (zeroGuard != null) {
+                    b.append("#if ").append(zeroGuard).append("\n");
+                }
                 b.append("    ((struct obj__").append(f.getClsName()).append("*)(__ibp))->")
                  .append(f.getClsName()).append("_").append(f.getFieldName())
                  .append(" = ").append(f.isObjectType() ? "JAVA_NULL" : "0").append(";\n");
+                if (zeroGuard != null) {
+                    b.append("#endif\n");
+                }
             }
         }
         // parentCls was left 0 by cn1BibopFastAllocNoZero so that a signal-stopped
@@ -217,9 +237,52 @@ public final class InlinableConstructor {
         // guards on parentCls==0). Set it only now, with every field written: from
         // this store on the object is safely traceable. (The __NEW_X slow-path
         // fallback already set it -- rewriting the same value is harmless.)
-        b.append("    __ibp->__codenameOneParentClsReference = &class__").append(cType).append(";\n");
+        b.append("    CN1_OBJ_SET_CLASS(__ibp, &class__").append(cType).append(");\n");
         // publish: the object becomes a GC root only now, fully constructed.
         b.append("    SP[-").append(survivorSlot).append("].data.o = __ibp;\n");
+        if(deadGuardId >= 0) {
+            // Same moment as publication: the object is complete, and the guard is the
+            // only other thing that will ever hold this reference.
+            b.append("    __cn1dead_").append(deadGuardId).append(" = __ibp; /* frame-exit retired */\n");
+            // ALLOCATE BLACK.
+            //
+            // A fresh object (mark -1) is traced by the grace pass AS A ROOT, subtree and
+            // all -- the single largest item in a mark, and on an allocation-heavy loop it
+            // is every object the loop makes. Publishing at the CURRENT epoch instead
+            // means the grace pass skips it (mark is not -1) while the sweep still keeps
+            // it for this cycle, which is the same conservatism grace was providing.
+            //
+            // Blanket allocate-black is unsafe, and that is why it was declined before:
+            // grace traces a fresh object's subtree because an OLDER object reachable
+            // only through it would otherwise be swept. Here the cluster analysis has
+            // established that every reference this object holds is another member of
+            // the same frame-local cluster -- so there is no older object hanging off it,
+            // and nothing is lost by not tracing. That is the whole point of proving the
+            // CLUSTER rather than the object.
+            //
+            // A reachable object is never endangered either way: the mark reaches it from
+            // the frame's conservatively scanned locals and refreshes the epoch.
+            // ALLOCATE-BLACK WAS TRIED HERE AND WITHDRAWN. Publishing a cluster member
+            // at the current epoch instead of -1 makes the grace pass skip it, and that
+            // is worth 14-17% on objectAllocation (22.2ms vs 25.7ms, 5/5 interleaved
+            // rounds). It is also WRONG, and the wrongness is not the obvious window:
+            //
+            //   unguarded                  MtStress: live holder -> FREED slot
+            //   guarded on !gcSatbActive   MtStress: live holder -> FREED slot (same)
+            //
+            // GraceAudit passes ~240 verify passes in both arms; only the multi-mutator
+            // driver reproduces it, so one mutator keeps the window too narrow to see.
+            // Guarding on "no mark in progress" does NOT close it, which rules out the
+            // explanation that looked obvious -- an object created after its own thread's
+            // stack was scanned. Whatever the mechanism is, it was not established here,
+            // and #5609 declined the blanket form for a reason that still stands.
+            //
+            // The safe form is also pointless on this shape: guarded, it measures 25.95ms
+            // against a 25.70ms control, because an allocation loop keeps a mark running
+            // almost continuously so the cheap path almost never fires. Do not re-add it
+            // without a mechanism that survives MtStress -- the benchmark will look
+            // excellent and the gate is the only thing that objects.
+        }
         b.append("    SP -= ").append(pop).append("; }\n");
     }
 
