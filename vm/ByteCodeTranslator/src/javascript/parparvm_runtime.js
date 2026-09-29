@@ -796,6 +796,47 @@ function threadDebugLabel(threadObject) {
 //     edits to the source file require ``mvn install`` on
 //     vm/ByteCodeTranslator before downstream tests pick them up.
 // ============================================================================
+// The backing store of a Java array, one ``new Array`` site per element family.
+// V8 records on each allocation site the most general elements kind an array it
+// made ever transitioned to, and starts every later array from that site in that
+// kind. With a single site for all arrays, the first Object[] turned every int[]
+// made after it into a generic ELEMENTS array holding a boxed HeapNumber for each
+// element outside the small-integer range -- the transpiled Flutter gallery's
+// 8M-element int[] in arraySequential was HOLEY_ELEMENTS, and every load chased a
+// pointer while every store allocated. Separate sites keep the families from
+// teaching each other: int[] stays SMI or DOUBLE, char/byte/short SMI, floating
+// DOUBLE. boolean and long get their own too, since what the translator stores in
+// them (JS booleans, long records) is not a plain number.
+function cn1IntElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1SmallIntElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1BooleanElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1FloatingElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1LongElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = 0;
+  return a;
+}
+function cn1ReferenceElements(n) {
+  const a = new Array(n);
+  for (let i = 0; i < n; i++) a[i] = null;
+  return a;
+}
 // The identity counter every allocation increments. It lives on its own
 // one-field object rather than on jvm: jvm carries hundreds of properties, so
 // V8 keeps it in dictionary mode and ``jvm.nextIdentity++`` was a hashed load
@@ -1433,28 +1474,36 @@ const jvm = {
     if (size < 0) {
       throw new Error("Negative array size");
     }
-    const array = new Array(size);
     // Primitive leaf arrays use Java's zero defaults. Reference arrays and
-    // unallocated outer dimensions remain null.
-    let defaultValue = null;
+    // unallocated outer dimensions remain null. Each family is built at its own
+    // ``new Array`` site: see cn1IntElements.
+    let array;
     if (dimensions === 1) {
       switch (componentClass) {
-        case "JAVA_BOOLEAN":
+        case "JAVA_INT":
+          array = cn1IntElements(size);
+          break;
         case "JAVA_BYTE":
         case "JAVA_CHAR":
         case "JAVA_SHORT":
-        case "JAVA_INT":
+          array = cn1SmallIntElements(size);
+          break;
+        case "JAVA_BOOLEAN":
+          array = cn1BooleanElements(size);
+          break;
         case "JAVA_FLOAT":
         case "JAVA_DOUBLE":
-          defaultValue = 0;
+          array = cn1FloatingElements(size);
           break;
         case "JAVA_LONG":
-          defaultValue = _L0;
+          array = cn1LongElements(size);
+          break;
+        default:
+          array = cn1ReferenceElements(size);
           break;
       }
-    }
-    for (let i = 0; i < size; i++) {
-      array[i] = defaultValue;
+    } else {
+      array = cn1ReferenceElements(size);
     }
     // The array class is looked up once per (component, dimensions) and the
     // monitor is left for the first monitorEnter to attach, as newObject does.

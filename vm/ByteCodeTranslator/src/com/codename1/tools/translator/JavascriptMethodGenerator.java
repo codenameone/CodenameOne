@@ -5055,6 +5055,24 @@ final class JavascriptMethodGenerator {
             case Opcodes.SALOAD: {
                 String idx = ctx.pop();
                 String arr = ctx.pop();
+                java.util.Set<Instruction> hotArraySites = currentLoopNewSites;
+                if (hotArraySites != null && hotArraySites.contains(instruction)
+                        && isPureOperand(arr) && isPureOperand(idx)) {
+                    // The bounds test as a statement and the load as a plain element read.
+                    // Through _A the load is one site shared by every array access in the
+                    // program -- int, double and reference arrays alike -- so its feedback
+                    // is megamorphic in any real application. The failing case still goes
+                    // through _A, which throws exactly what it always did (a null array is
+                    // a NullPointerException, a bad index ArrayIndexOutOfBoundsException).
+                    // A statement rather than `ok ? a[i] : _A(a, i)`: the conditional merges
+                    // an unboxed element with _A's tagged result and boxes every load. In
+                    // headless Chrome on an 8M-element int reduction: shared _A 98ms, the
+                    // conditional 212ms, this form 38ms, a bare `a[i]` 27ms.
+                    out.append("  if(").append(arr).append("==null||").append(idx).append(">>>0>=")
+                            .append(arr).append(".length)_A(").append(arr).append(",").append(idx).append(");\n");
+                    out.append("  ").append(ctx.push(arr + "[" + idx + "]")).append(";\n");
+                    return true;
+                }
                 out.append("  ").append(ctx.push("_A(" + arr + ", " + idx + ")")).append(";\n");
                 return true;
             }
@@ -5069,6 +5087,17 @@ final class JavascriptMethodGenerator {
                 String value = ctx.pop();
                 String idx = ctx.pop();
                 String arr = ctx.pop();
+                java.util.Set<Instruction> hotArraySites = currentLoopNewSites;
+                if (hotArraySites != null && hotArraySites.contains(instruction)
+                        && isPureOperand(arr) && isPureOperand(idx)) {
+                    // As for the loads above, inside loops only. The value is evaluated once on either branch,
+                    // after the array and index, as Java evaluates it.
+                    out.append("  if(").append(arr).append("==null||").append(idx).append(">>>0>=")
+                            .append(arr).append(".length)_T(").append(arr).append(",").append(idx).append(",")
+                            .append(value).append(");else ").append(arr).append("[").append(idx).append("]=")
+                            .append(value).append(";\n");
+                    return true;
+                }
                 out.append("  _T(").append(arr).append(", ").append(idx).append(", ").append(value).append(");\n");
                 return true;
             }
@@ -7761,6 +7790,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 helper = base + "N";
                 variadic = true;
                 break;
+        }
+        if ("_dn".equals(base) && !argsFromStack && argsArePure(argExpressions == null ? new String[0] : argExpressions)) {
+            // The site-visible direct call, as in the straight-line invoke: see the
+            // comment there.
+            out.append(indent);
+            if (hasReturn) {
+                out.append("let __result = ");
+            }
+            out.append(monoImpl).append("(_nn(").append(targetExpr).append(")");
+            for (int i = 0; i < argCount; i++) {
+                out.append(", ").append(argExpressions[i]);
+            }
+            out.append(");\n");
+            return;
         }
         out.append(indent);
         if (hasReturn && argsFromStack) {
@@ -11237,7 +11280,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         return allocationFunctionName(typeName) + "()";
     }
 
-    /// The NEW instructions of the method being emitted that sit inside a loop -- between a
+    /// The NEW, array load and array store instructions of the method being emitted that sit
+    /// inside a loop -- between a
     /// backward branch and its target -- or null. Only those get an allocation function.
     /// The function's win is V8 removing, or at least cheaply building, an allocation it
     /// sees many times; a ``new`` that runs once per call -- a listener, a UI component, a
@@ -11257,6 +11301,11 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             }
         }
         return true;
+    }
+
+    /// A local, a stack slot or a literal: re-reading it costs nothing and cannot throw.
+    private static boolean isPureOperand(String expr) {
+        return StraightLineContext.isDeferrable(expr) || isStackSlotName(expr);
     }
 
     private static boolean isStackSlotName(String expr) {
@@ -11406,7 +11455,16 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         }
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
-            if (inLoop[i] && in instanceof TypeInstruction && in.getOpcode() == Opcodes.NEW) {
+            if (!inLoop[i]) {
+                continue;
+            }
+            int op = in.getOpcode();
+            // NEW for allocation functions; the array loads and stores for the inline
+            // bounds test (appendStraightLine's xALOAD / xASTORE), which costs ~30 bytes a
+            // site and so is spent only where it repeats.
+            if ((in instanceof TypeInstruction && op == Opcodes.NEW)
+                    || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
+                    || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)) {
                 out.add(in);
             }
         }
