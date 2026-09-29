@@ -808,6 +808,8 @@ const jvm = {
   // Bumped by defineClass; newObject's cached per-class layouts carry the value
   // they were built at (see instanceLayout).
   __layoutEpoch: 0,
+  // componentClass -> [dimensions] -> array classDef; see arrayClassFor.
+  __arrayClassCache: Object.create(null),
   nextThreadId: 1,
   nextHostCallId: 1,
   // Registry of worker-side JS functions that can be invoked from the main
@@ -1443,13 +1445,33 @@ const jvm = {
     for (let i = 0; i < size; i++) {
       array[i] = defaultValue;
     }
-    array.__class = this.arrayClassName(componentClass, dimensions);
-    array.__classDef = this.getArrayClass(componentClass, dimensions);
+    // The array class is looked up once per (component, dimensions) and the
+    // monitor is left for the first monitorEnter to attach, as newObject does.
+    // Every allocation used to build the class name twice by concatenation,
+    // probe the class table, and allocate a monitor with two arrays -- most of
+    // the cost of a small array (a char[] for each String, a StringBuilder
+    // growing).
+    const cls = this.arrayClassFor(componentClass, dimensions);
+    array.__class = cls.name;
+    array.__classDef = cls;
     array.__id = this.nextIdentity++;
     array.__dimensions = dimensions;
     array.__array = true;
-    array.__monitor = this.createMonitor();
+    array.__monitor = null;
     return array;
+  },
+  arrayClassFor(componentClass, dimensions) {
+    let byComponent = this.__arrayClassCache[componentClass];
+    if (byComponent === undefined) {
+      byComponent = this.__arrayClassCache[componentClass] = [];
+    }
+    let cls = byComponent[dimensions];
+    // getArrayClass registers the def in this.classes; re-check it is still the
+    // registered one, since defineClass may replace an entry.
+    if (cls === undefined || this.classes[cls.name] !== cls) {
+      cls = byComponent[dimensions] = this.getArrayClass(componentClass, dimensions);
+    }
+    return cls;
   },
   newMultiArray(sizes, componentClass, dimensions, depth) {
     const level = depth || 0;
@@ -2249,20 +2271,35 @@ const jvm = {
     }
     return null;
   },
+  // A Java String literal: interned, one object per distinct value for the
+  // program's lifetime, as JLS 3.10.5 requires. Only literals come here -- see
+  // newJavaString for every string the runtime builds.
   createStringLiteral(value) {
-    if (!this.literalStrings[value]) {
-      const chars = this.newArray(value.length, "JAVA_CHAR", 1);
-      for (let i = 0; i < value.length; i++) {
-        chars[i] = value.charCodeAt(i);
-      }
-      const str = this.newObject("java_lang_String");
-      str[CN1_STRING_VALUE] = chars;
-      str[CN1_STRING_COUNT] = value.length;
-      str[CN1_STRING_HASH] = 0;
-      str.__nativeString = value;
-      this.literalStrings[value] = str;
+    const cached = this.literalStrings[value];
+    if (cached !== undefined) {
+      return cached;
     }
-    return this.literalStrings[value];
+    const str = this.newJavaString(value);
+    this.literalStrings[value] = str;
+    return str;
+  },
+  // A new java.lang.String holding the JS string's chars. Every runtime-built
+  // string (a concatenation, Integer.toString, StringBuilder.toString, a
+  // stack trace) used to go through createStringLiteral, so the table above
+  // kept every string the program ever built alive for good, and two
+  // separately built equal strings were the same object, which Java forbids
+  // (new String(s) != s; String.intern() has its own pool in the Java code).
+  newJavaString(value) {
+    const chars = this.newArray(value.length, "JAVA_CHAR", 1);
+    for (let i = 0; i < value.length; i++) {
+      chars[i] = value.charCodeAt(i);
+    }
+    const str = this.newObject("java_lang_String");
+    str[CN1_STRING_VALUE] = chars;
+    str[CN1_STRING_COUNT] = value.length;
+    str[CN1_STRING_HASH] = 0;
+    str.__nativeString = value;
+    return str;
   },
   toNativeString(value) {
     if (value == null) {
@@ -4001,7 +4038,19 @@ global._Yv = _Yv;
 // ``jvm.aN``/``jvm.fr`` definitions above — an earlier placement
 // silently captured ``undefined`` because those assignments hadn't
 // run yet.
-global._I = (n) => jvm.ensureClassInitialized(n);
+// The class-initialization guard runs before every static call, static field
+// access and NEW on a class with an initializer -- in a hot loop, on every
+// iteration -- and the class is initialized on all but the first. So the
+// already-initialized answer is decided here, small enough for V8 to inline,
+// and only the first call (or a re-entrant one, which ensureClassInitialized
+// handles) goes through the full function. Measured on the flutter-bench
+// hashMapChurn workload: the unconditional call was 42% of its time.
+global._I = (n) => {
+  const cls = jvm.classes[n];
+  if (cls === undefined || cls.initialized !== true) {
+    jvm.ensureClassInitialized(n);
+  }
+};
 // Suspending class-init guard. The emitter uses this instead of ``_I`` at a
 // guard whose <clinit> chain contains a SUSPENDING initializer -- exactly where
 // driving the clinit synchronously would swallow a HOST_CALL and hand the
@@ -5021,7 +5070,7 @@ function lowerFirst(value) {
 }
 function createJavaString(value) {
   value = value == null ? "" : String(value);
-  return jvm.createStringLiteral(value);
+  return jvm.newJavaString(value);
 }
 function javaClassName(className) {
   if (PRIMITIVE_INFO[className]) {
@@ -5160,8 +5209,11 @@ function runtimeBoxedPrimitiveValue(value) {
       return null;
   }
 }
+// The byte[] class name, built once: this test runs per character in the
+// append and toString loops, and used to concatenate the name on every call.
+const SB_LATIN1_CLASS = "JAVA_BYTE[]";
 function sbIsLatin1(data) {
-  return data && data.__class === jvm.arrayClassName("JAVA_BYTE", 1);
+  return data && data.__class === SB_LATIN1_CLASS;
 }
 function sbResize(sb, capacity, wide) {
   const data = sb[CN1_SB_VALUE];
@@ -5186,9 +5238,10 @@ function sbAppendNativeString(sb, value) {
   let wide = false;
   for (let i = 0; i < value.length; i++) if (value.charCodeAt(i) > 255) { wide = true; break; }
   const data = sbEnsureCapacity(sb, count + value.length, wide);
-  for (let i = 0; i < value.length; i++) {
-    const ch = value.charCodeAt(i);
-    data[count + i] = sbIsLatin1(data) ? (ch << 24) >> 24 : ch;
+  if (sbIsLatin1(data)) {
+    for (let i = 0; i < value.length; i++) data[count + i] = (value.charCodeAt(i) << 24) >> 24;
+  } else {
+    for (let i = 0; i < value.length; i++) data[count + i] = value.charCodeAt(i);
   }
   sb[CN1_SB_COUNT] = count + value.length;
   return sb;
@@ -5974,8 +6027,10 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
   const data = __cn1ThisObject[CN1_SB_VALUE];
   let out = "";
-  for (let i = 0; i < count; i++) {
-    out += String.fromCharCode(sbIsLatin1(data) ? data[i] & 255 : data[i] | 0);
+  if (sbIsLatin1(data)) {
+    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] & 255);
+  } else {
+    for (let i = 0; i < count; i++) out += String.fromCharCode(data[i] | 0);
   }
   return createJavaString(out);
 });
