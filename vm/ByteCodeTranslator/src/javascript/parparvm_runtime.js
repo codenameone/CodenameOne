@@ -4051,59 +4051,65 @@ global._F = jvm.fr;
 // truncated to 32 bits. BigInt is exact but ~10-50x slower and hung the
 // animation/timing hot paths.
 //
-// A long is therefore held in one of two CANONICAL forms, chosen by magnitude:
+// A long is therefore held in one of two forms:
 //
-//   * a plain JS number when the value is a safe integer, |v| < 2^53. That is
-//     every counter, index, checksum, timestamp and nanoTime a program holds,
-//     and arithmetic on it is ordinary Number arithmetic with no allocation;
-//   * a {__l: 1, l, h} hi/lo record otherwise (the goog.math.Long layout:
-//     l = low 32 bits, h = high 32 bits, both signed int32).
+//   * a plain JS number, which is always a safe integer (|v| < 2^53) and never
+//     -0. That is every counter, index, checksum, timestamp and nanoTime a
+//     program holds, and arithmetic on it is ordinary Number arithmetic with no
+//     allocation;
+//   * a {__l: 1, l, h} hi/lo record (the goog.math.Long layout: l = low 32
+//     bits, h = high 32 bits, both signed int32), which any value may use and
+//     every value outside the safe range must.
 //
-// Every helper below returns the canonical form, so a value never has two
-// representations and a number/number fast path is exact: the sum, difference
-// or product of two safe integers is computed exactly by IEEE arithmetic
-// whenever the TRUE result is itself a safe integer, and a true result outside
-// that range can never round back inside it (rounding is monotonic and 2^53 is
-// representable). Anything that misses the fast path takes the exact hi/lo
-// path and is normalized on the way out, which is also where 64-bit
-// wrap-around happens.
+// The two helpers that decide the form are deliberately asymmetric:
+//
+//   * the number/number FAST PATH of add, subtract and multiply returns a
+//     number whenever the result is a safe integer. It is exact: IEEE
+//     arithmetic on safe integers is exact whenever the TRUE result is itself
+//     safe, and a true result outside that range can never round back inside
+//     it (rounding is monotonic and 2^53 is representable);
+//   * a SLOW PATH -- a record operand, or a result past 2^53, which is also
+//     where 64-bit wrap-around happens -- returns a number only for an int32
+//     result (_LL / _Lnorm below) and a record otherwise.
+//
+// So a value between int32 and 2^53 can be in either form, and nothing may
+// depend on the form: every helper here reads a value through _LwL/_LwH or its
+// own typeof test, and Java code only compares longs through _Lcmp. Normalizing
+// every slow-path result to a number, when the value allowed it, measured 0.70x
+// on a full 64-bit workload (vm/benchmarks longArithmetic) against the
+// all-record representation: a 40-60 bit result came back from a helper as a
+// double, which V8 boxes on return, and the next 64-bit operation took it apart
+// again, so values flipped form on almost every operation. An int32 result is
+// the case that matters for leaving the record form -- a mask, a low-bits
+// extraction, a checksum's increment -- and V8 returns it unboxed.
 //
 // Every long used to be a record, and every long operation allocated one. On
 // the flutter-bench compute workloads under node that was the cost of any loop
 // with a long in it: a ``long sum += a[i]`` reduction, a recursive function
 // returning long, a long checksum.
 //
-// ``_Lc`` still converts anything entering a slow path into a record: a record
-// (passthrough), a number (an int sharing the long value space, a canonical
-// small long, or a leaked double), or null (an uninitialised slot).
+// ``_Lc`` converts anything entering the record-only helpers into a record: a
+// record (passthrough), a number, or null / a legacy value (an uninitialised
+// slot, a leaked double).
 const _TWO_PWR_32 = 4294967296;
 const _TWO_PWR_53 = 9007199254740992;
 const _LPOW2 = [];
 for (let i = 0; i < 64; i++) { _LPOW2.push(Math.pow(2, i)); }
-// A raw hi/lo record. Only the slow paths build one directly; nothing they
-// return escapes without going through _LL / _Lnorm.
+// A raw hi/lo record. The record-only helpers build one directly.
 function _LO(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
-// The canonical long for a hi/lo pair: a number when it is a safe integer.
-// A hi/lo pair is a safe integer exactly when -2^21 < high < 2^21, or when high
-// is -2^21 and the low word is not zero (high = -2^21, low = 0 is -2^53 itself).
-// Tested on the words, in integer compares, rather than by building the double
-// first: this runs on every slow-path result.
+// A slow-path result from its words: the int32 as a number when the high word
+// is just the sign extension of the low one, a record otherwise.
 function _LL(low, high) {
   low = low | 0;
   high = high | 0;
-  if ((high < 2097152 && high > -2097152) || (high === -2097152 && low !== 0)) {
-    return high * _TWO_PWR_32 + (low >>> 0);
-  }
+  if (high === (low >> 31)) return low;
   return { __l: 1, l: low, h: high };
 }
-// Canonical form of a record an *O helper returned. Records are never mutated,
-// so an out-of-range one is returned as is rather than copied.
+// The same decision for a record a record-only helper returned. Records are
+// never mutated, so it is returned as is rather than copied.
 function _Lnorm(o) {
-  const high = o.h;
-  if ((high < 2097152 && high > -2097152) || (high === -2097152 && o.l !== 0)) {
-    return high * _TWO_PWR_32 + (o.l >>> 0);
-  }
-  return o;
+  const low = o.l;
+  return o.h === (low >> 31) ? low : o;
 }
 const _L0 = 0;
 const _L1 = 1;
@@ -4141,6 +4147,26 @@ function _Lc(x) {
   if (typeof x === 'bigint') return _LfromNumberO(Number(x)); // defensive legacy
   return _LO0;
 }
+// The low and high 32-bit words of a long in either form, without
+// building a record -- the slow paths used to convert every number operand
+// through _Lc, an allocation per operand, and a 64-bit expression flips between
+// the two forms constantly (x >>> 11 of a 64-bit x is a safe number, and the
+// next add takes it back to a record). An int32 is the common number operand
+// (a mask, a shift result, a small constant): x | 0 and x >> 31. Any other safe
+// number splits exactly: x | 0 is its low word (ToInt32 is exact modulo 2^32 for
+// an integer-valued double) and Math.floor(x / 2^32) its signed high word.
+// Anything else -- null, a leaked non-integer -- goes through _Lc.
+function _LwL(x) {
+  if (typeof x === "number") return x | 0;
+  return x !== null && x !== undefined && x.__l === 1 ? x.l : _Lc(x).l;
+}
+function _LwH(x) {
+  if (typeof x === "number") {
+    if ((x | 0) === x) return x >> 31;
+    return x === Math.floor(x) ? Math.floor(x / _TWO_PWR_32) | 0 : _Lc(x).h;
+  }
+  return x !== null && x !== undefined && x.__l === 1 ? x.h : _Lc(x).h;
+}
 function _LtoNum(x) { // Long|Number -> Number
   if (typeof x === "number") return x;
   return (x && x.__l === 1) ? _LtoNumber(x) : Number(x);
@@ -4149,9 +4175,9 @@ function _LisZero(a) { return a.h === 0 && a.l === 0; }
 function _LisNeg(a) { return a.h < 0; }
 function _Leq(a, b) { return a.h === b.h && a.l === b.l; }
 // --- hi/lo record arithmetic: records in, records out ------------------------
-function _LaddC(a, b) {
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+function _LaddW(al, ah, bl, bh) {
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const b48 = bh >>> 16, b32 = bh & 0xFFFF, b16 = bl >>> 16, b00 = bl & 0xFFFF;
   let c00 = a00 + b00, c16 = 0, c32 = 0, c48 = 0;
   c16 += c00 >>> 16; c00 &= 0xFFFF;
   c16 += a16 + b16; c32 += c16 >>> 16; c16 &= 0xFFFF;
@@ -4159,12 +4185,13 @@ function _LaddC(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
+function _LaddC(a, b) { return _LaddW(a.l, a.h, b.l, b.h); }
 function _LaddO(a, b) { return _Lc(_LaddC(a, b)); }
 function _LnegO(a) { return _Leq(a, _LMIN) ? _LMIN : _LaddO(_LO(~a.l, ~a.h), _LO1); }
-function _LsubC(a, b) {
+function _LsubW(al, ah, bl, bh) {
   // a - b = a + ~b + 1, inlined as a single 16-bit add chain.
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const nl = ~b.l, nh = ~b.h;
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const nl = ~bl, nh = ~bh;
   const b48 = nh >>> 16, b32 = nh & 0xFFFF, b16 = nl >>> 16, b00 = nl & 0xFFFF;
   let c00 = a00 + b00 + 1, c16 = 0, c32 = 0, c48 = 0; // +1 = the two's-complement carry-in
   c16 += c00 >>> 16; c00 &= 0xFFFF;
@@ -4173,10 +4200,11 @@ function _LsubC(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
+function _LsubC(a, b) { return _LsubW(a.l, a.h, b.l, b.h); }
 function _LsubO(a, b) { return _Lc(_LsubC(a, b)); }
-function _LmulC(a, b) {
-  const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
-  const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
+function _LmulW(al, ah, bl, bh) {
+  const a48 = ah >>> 16, a32 = ah & 0xFFFF, a16 = al >>> 16, a00 = al & 0xFFFF;
+  const b48 = bh >>> 16, b32 = bh & 0xFFFF, b16 = bl >>> 16, b00 = bl & 0xFFFF;
   let c00 = 0, c16 = 0, c32 = 0, c48 = 0;
   c00 += a00 * b00; c16 += c00 >>> 16; c00 &= 0xFFFF;
   c16 += a16 * b00; c32 += c16 >>> 16; c16 &= 0xFFFF;
@@ -4187,6 +4215,7 @@ function _LmulC(a, b) {
   c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
+function _LmulC(a, b) { return _LmulW(a.l, a.h, b.l, b.h); }
 function _LmulO(a, b) { return _Lc(_LmulC(a, b)); }
 function _LcmpO(a, b) {
   // The high word is signed, so it orders the full value; on a tie compare the
@@ -4194,6 +4223,22 @@ function _LcmpO(a, b) {
   if (a.h !== b.h) return a.h < b.h ? -1 : 1;
   const al = a.l >>> 0, bl = b.l >>> 0;
   return al === bl ? 0 : (al < bl ? -1 : 1);
+}
+function _LshlW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL(l << n, (h << n) | (l >>> (32 - n)));
+  return _LL(0, l << (n - 32));
+}
+function _LshrW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL((l >>> n) | (h << (32 - n)), h >> n);
+  return _LL(h >> (n - 32), h >= 0 ? 0 : -1);
+}
+function _LushrW(l, h, n) {
+  if (n === 0) return _LL(l, h);
+  if (n < 32) return _LL((l >>> n) | (h << (32 - n)), h >>> n);
+  if (n === 32) return _LL(h, 0);
+  return _LL(h >>> (n - 32), 0);
 }
 function _LshlC(a, n) {
   if (n === 0) return _Lnorm(a);
@@ -4246,8 +4291,8 @@ function _LdivO(a, b) {
   }
   return res;
 }
-// --- the helpers translated code calls: canonical in, canonical out ----------
-function _LaddS(a, b) { return _LaddC(_Lc(a), _Lc(b)); }
+// --- the helpers translated code calls: either form in, see above for out ---
+function _LaddS(a, b) { return _LaddW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
 function _Ladd(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     const r = a + b;
@@ -4255,7 +4300,7 @@ function _Ladd(a, b) {
   }
   return _LaddS(a, b);
 }
-function _LsubS(a, b) { return _LsubC(_Lc(a), _Lc(b)); }
+function _LsubS(a, b) { return _LsubW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
 function _Lsub(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     const r = a - b;
@@ -4263,7 +4308,7 @@ function _Lsub(a, b) {
   }
   return _LsubS(a, b);
 }
-function _LmulS(a, b) { return _LmulC(_Lc(a), _Lc(b)); }
+function _LmulS(a, b) { return _LmulW(_LwL(a), _LwH(a), _LwL(b), _LwH(b)); }
 function _Lmul(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     const r = a * b;
@@ -4277,7 +4322,10 @@ function _Lneg(a) {
 }
 function _Lcmp(a, b) {
   if (typeof a === "number" && typeof b === "number") return a < b ? -1 : (a > b ? 1 : 0);
-  return _LcmpO(_Lc(a), _Lc(b));
+  const ah = _LwH(a), bh = _LwH(b);
+  if (ah !== bh) return ah < bh ? -1 : 1;
+  const al = _LwL(a) >>> 0, bl = _LwL(b) >>> 0;
+  return al === bl ? 0 : (al < bl ? -1 : 1);
 }
 function _Ldiv(a, b) {
   if (typeof a === "number" && typeof b === "number") {
@@ -4305,24 +4353,21 @@ function _Land(a, b) {
     if ((a | 0) === a && (b | 0) === b) return a & b;
     return _LL((a | 0) & (b | 0), Math.floor(a / _TWO_PWR_32) & Math.floor(b / _TWO_PWR_32));
   }
-  a = _Lc(a); b = _Lc(b);
-  return _LL(a.l & b.l, a.h & b.h);
+  return _LL(_LwL(a) & _LwL(b), _LwH(a) & _LwH(b));
 }
 function _Lor(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     if ((a | 0) === a && (b | 0) === b) return a | b;
     return _LL((a | 0) | (b | 0), Math.floor(a / _TWO_PWR_32) | Math.floor(b / _TWO_PWR_32));
   }
-  a = _Lc(a); b = _Lc(b);
-  return _LL(a.l | b.l, a.h | b.h);
+  return _LL(_LwL(a) | _LwL(b), _LwH(a) | _LwH(b));
 }
 function _Lxor(a, b) {
   if (typeof a === "number" && typeof b === "number") {
     if ((a | 0) === a && (b | 0) === b) return a ^ b;
     return _LL((a | 0) ^ (b | 0), Math.floor(a / _TWO_PWR_32) ^ Math.floor(b / _TWO_PWR_32));
   }
-  a = _Lc(a); b = _Lc(b);
-  return _LL(a.l ^ b.l, a.h ^ b.h);
+  return _LL(_LwL(a) ^ _LwL(b), _LwH(a) ^ _LwH(b));
 }
 function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
   n = (_LtoNum(n) | 0) & 63;
@@ -4330,21 +4375,21 @@ function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits us
     const r = a * _LPOW2[n];
     if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r + 0;
   }
-  return _LshlC(_Lc(a), n);
+  return _LshlW(_LwL(a), _LwH(a), n);
 }
 function _Lshr(a, n) { // arithmetic right shift
   n = (_LtoNum(n) | 0) & 63;
   // Division by a power of two is exact and floor rounds toward -infinity,
   // which is what an arithmetic shift does to a negative value.
   if (typeof a === "number") return Math.floor(a / _LPOW2[n]) + 0;
-  return _LshrC(_Lc(a), n);
+  return _LshrW(_LwL(a), _LwH(a), n);
 }
 function _Lushr(a, n) { // logical right shift
   n = (_LtoNum(n) | 0) & 63;
   if (typeof a === "number" && (a >= 0 || n === 0)) return Math.floor(a / _LPOW2[n]) + 0;
-  return _LushrC(_Lc(a), n);
+  return _LushrW(_LwL(a), _LwH(a), n);
 }
-function _Ll2i(x) { return typeof x === "number" ? x | 0 : _Lc(x).l | 0; } // low 32 bits as signed int
+function _Ll2i(x) { return _LwL(x) | 0; } // low 32 bits as signed int
 function _LtoStrO(a, radix) {
   if (_LisZero(a)) return "0";
   if (_LisNeg(a)) {
@@ -6236,9 +6281,9 @@ function cn1StorageAllocate(capacity, references) {
   if (capacity === 0) return _L0;
   // The handle is a long the Java side only stores, passes back and tests
   // against 0, and the storage hangs off it -- so it must be an OBJECT, the
-  // hi/lo record form, even though its value would be a plain number in
-  // canonical form. Every long helper takes the exact slow path for a record, so
-  // it still compares and converts correctly; it just can never be a number.
+  // hi/lo record form, even though a value that small is usually a number.
+  // Every long helper takes the exact slow path for a record, so it still
+  // compares and converts correctly; it just can never be a number.
   const handle = _LO(cn1StorageId++, 0);
   handle.storage = references ? new Array(capacity).fill(null) : new Int32Array(capacity);
   return handle;
