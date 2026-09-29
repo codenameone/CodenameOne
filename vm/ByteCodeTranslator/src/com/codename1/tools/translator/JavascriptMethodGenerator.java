@@ -5180,7 +5180,18 @@ final class JavascriptMethodGenerator {
     private static boolean appendStraightLineLdcInstruction(StringBuilder out, Ldc instruction, StraightLineContext ctx) {
         Object value = instruction.getValue();
         if (value instanceof String) {
-            out.append("  ").append(ctx.push("_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
+            String literal = "_L(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")";
+            java.util.Set<Instruction> loopSites = currentLoopNewSites;
+            if (loopSites != null && loopSites.contains(instruction)) {
+                // A literal read in a loop keeps its String in a slot of its own. _L looks
+                // the text up in the literal table on every read -- a dictionary lookup
+                // over every literal in the program (4,675 in the transpiled gallery),
+                // repeated per iteration. Outside loops the lookup runs once and the
+                // slot's ~20 bytes would not pay for themselves.
+                String slot = "_Lc[" + literalCacheSlot((String) value) + "]";
+                literal = "(" + slot + "||(" + slot + "=" + literal + "))";
+            }
+            out.append("  ").append(ctx.push(literal)).append(";\n");
             return true;
         }
         if (value instanceof Long) {
@@ -11320,6 +11331,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         return true;
     }
 
+    private static final Map<String, Integer> LITERAL_CACHE_SLOTS = new HashMap<String, Integer>();
+
+    /// The `_Lc` index of a string literal read inside a loop: one slot per distinct text.
+    private static synchronized int literalCacheSlot(String text) {
+        Integer slot = LITERAL_CACHE_SLOTS.get(text);
+        if (slot == null) {
+            slot = Integer.valueOf(LITERAL_CACHE_SLOTS.size());
+            LITERAL_CACHE_SLOTS.put(text, slot);
+        }
+        return slot.intValue();
+    }
+
     /// Local slots of the method being emitted whose class is known exactly, or null.
     private static Map<Integer, String> currentExactLocals;
 
@@ -11463,6 +11486,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // bounds test (appendStraightLine's xALOAD / xASTORE), which costs ~30 bytes a
             // site and so is spent only where it repeats.
             if ((in instanceof TypeInstruction && op == Opcodes.NEW)
+                    || (in instanceof Ldc && ((Ldc) in).getValue() instanceof String)
                     || (op >= Opcodes.IALOAD && op <= Opcodes.SALOAD)
                     || (op >= Opcodes.IASTORE && op <= Opcodes.SASTORE)) {
                 out.add(in);

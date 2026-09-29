@@ -4141,6 +4141,9 @@ global._Ig = (n) => {
   return jvm.ensureClassInitializedSuspending(n);
 };
 global._L = (v) => jvm.createStringLiteral(v);
+// Per-literal slots for string literals read inside loops; the translator
+// writes `(_Lc[n]||(_Lc[n]=_L("...")))` there (appendStraightLineLdcInstruction).
+global._Lc = [];
 // Primitive class literals (``int.class`` etc.) -> interned primitive
 // ``Class`` object (carries ``isPrimitive=true``). Emitted by the translator
 // for ``getstatic <Wrapper>.TYPE`` (see JavascriptMethodGenerator
