@@ -1488,6 +1488,17 @@ public class ByteCodeTranslator {
             writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:--param=max-inline-insns-single=20>\")\n");
             writer.append("    else()\n");
             writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-mllvm>;$<$<CONFIG:Release>:-inline-threshold=50>\")\n");
+            // -O2 rather than CMake's Release -O3 for the generated sources, when there is
+            // no LTO (the default; zig cc on Linux). Measured with clang on the gallery's
+            // generated objects at threshold 50: .text 22.43MB -> 21.49MB (-4.2%), and
+            // the vm/benchmarks compute geomean went 59.44 -> 57.58ms -- faster, not
+            // slower, recursion most of all (161 -> 118ms), since -O3's extra cloning
+            // and unrolling of small translated functions costs i-cache here. Placed
+            // after CMAKE_C_FLAGS_RELEASE on the command line, so it wins. Not with LTO,
+            // which was not measured this way, and not for MSVC: clang-cl is already /O2.
+            writer.append("        if(NOT CN1_ENABLE_LTO)\n");
+            writer.append("            list(APPEND CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-O2>\")\n");
+            writer.append("        endif()\n");
             writer.append("    endif()\n");
             writer.append("    file(STRINGS \"${CN1_MANIFEST}\" CN1_GENERATED_LINES REGEX \"^[^#|]+\\\\.c\\\\|generated\\\\|\")\n");
             writer.append("    set(CN1_GENERATED_SOURCES \"\")\n");

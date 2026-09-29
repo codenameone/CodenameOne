@@ -56,6 +56,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  # A method the translator culled as unreachable is still emitted as a stub,
+  # because dispatch tables name it. With this on, the stub aborts with the
+  # method's name instead of returning 0, so a wrong cull fails the suite that
+  # reached it rather than shipping a silent null. Ours to enforce, like
+  # CN1_NATIVE_VERIFY: customer builds keep the plain stub. See
+  # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
+  # binaries should be the ones customers get.
+  CN1_CULL_TRAP: '1'
+
 jobs:
   cross-build:
     name: cross-build suite exe (Linux, x64 + WebView2)
