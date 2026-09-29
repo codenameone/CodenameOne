@@ -720,7 +720,7 @@ final class JavascriptMethodGenerator {
     /// site's classification come from one answer. The m: entry stays: only
     /// monomorphicDispatch prunes it, and the bridge can still dispatch through it.
     /// Kill switch: -Dparparvm.js.sitedevirt.off.
-    private static String[] siteDirectTarget(Invoke invoke) {
+    private static String[] siteDirectTarget(Invoke invoke, String receiver) {
         if (invoke == null || System.getProperty("parparvm.js.sitedevirt.off") != null) {
             return null;
         }
@@ -729,7 +729,19 @@ final class JavascriptMethodGenerator {
         if (model == null || idx == null) {
             return null;
         }
-        BytecodeMethod m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        BytecodeMethod m = null;
+        String exactOwner = exactLocalType(receiver);
+        if (exactOwner != null) {
+            m = model.exactTarget(exactOwner, invoke.getName(), invoke.getDesc());
+            // The site was classified from the declared type's cone, which holds this
+            // body; a generator body at a site classified synchronous would need a drive.
+            if (m != null && m.isJavascriptSuspending() && !isInvokeSuspending(invoke)) {
+                m = null;
+            }
+        }
+        if (m == null) {
+            m = model.directTarget(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        }
         if (m == null) {
             return null;
         }
@@ -2878,6 +2890,7 @@ final class JavascriptMethodGenerator {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
         currentLoopNewSites = loopNewSites(instructions, labelToIndex);
+        currentExactLocals = exactLocals(method, instructions);
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
@@ -5450,15 +5463,21 @@ final class JavascriptMethodGenerator {
                     boolean devSuspending = monoImpl != null
                             ? isDevirtualizedInvokeSuspending(dispatchId, suspending) : suspending;
                     if (monoImpl == null) {
-                        String[] direct = siteDirectTarget(invoke);
+                        String[] direct = siteDirectTarget(invoke, target);
                         if (direct != null) {
                             monoImpl = direct[0];
                             devSuspending = "1".equals(direct[1]);
                         }
                     }
+                    // A generator target at a site classified synchronous (see
+                    // JavascriptSuspensionAnalysis.isDrivenSignature) is driven.
+                    boolean devDriven = monoImpl != null && devSuspending && !suspending;
+                    if (devDriven) {
+                        devSuspending = false;
+                    }
                     // _dn: a direct call to a synchronous body needs no generator
                     // drive (see _dn0 in parparvm_runtime.js).
-                    String devBase = monoImpl != null ? (devSuspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
+                    String devBase = monoImpl != null ? (devDriven ? "_dw" : devSuspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
                     callExpr.append(devSuspending ? "(yield* " : "(").append(devBase)
@@ -7419,16 +7438,21 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             // one emitted through the interpreter rather than structured --
             // could still ``yield*`` a plain function or drive a generator
             // synchronously at precisely the sites this map exists for.
+            boolean siteSusp = susp;
             if (monoImpl != null) {
                 susp = isDevirtualizedInvokeSuspending(dispatchId, susp);
             } else {
-                String[] direct = siteDirectTarget(invoke);
+                String[] direct = siteDirectTarget(invoke, null);
                 if (direct != null) {
                     monoImpl = direct[0];
                     susp = "1".equals(direct[1]);
                 }
             }
-            String iv = monoImpl != null ? (susp ? "_dv" : "_dn") : (susp ? "_v" : "_w");
+            boolean driven = monoImpl != null && susp && !siteSusp;
+            if (driven) {
+                susp = false;
+            }
+            String iv = monoImpl != null ? (driven ? "_dw" : susp ? "_dv" : "_dn") : (susp ? "_v" : "_w");
             String ivSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
             String yk = susp ? "yield* " : "";
             // Fast path for 0-arg virtual dispatch: inline the
@@ -7683,16 +7707,21 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         String monoImpl = mono == null ? null : mono.get(methodId);
         // Devirtualized: follow the TARGET's suspending-ness, not the
         // signature's -- see isDevirtualizedInvokeSuspending.
+        boolean siteSuspending = suspending;
         if (monoImpl != null) {
             suspending = isDevirtualizedInvokeSuspending(methodId, suspending);
         } else {
-            String[] direct = siteDirectTarget(invoke);
+            String[] direct = siteDirectTarget(invoke, targetExpr);
             if (direct != null) {
                 monoImpl = direct[0];
                 suspending = "1".equals(direct[1]);
             }
         }
-        String base = monoImpl != null ? (suspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
+        boolean driven = monoImpl != null && suspending && !siteSuspending;
+        if (driven) {
+            suspending = false;
+        }
+        String base = monoImpl != null ? (driven ? "_dw" : suspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
         // The second helper argument: bareword impl fn for devirt, else
         // the quoted dispatch-id string.
         String secondArg = monoImpl != null ? monoImpl : ("\"" + methodId + "\"");
@@ -11194,6 +11223,93 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     /// from a loop only through a call (Integer.valueOf's ``new Integer``) is not
     /// covered; that is the price of keeping the bundle size.
     private static java.util.Set<Instruction> currentLoopNewSites;
+
+    /// Local slots of the method being emitted whose class is known exactly, or null.
+    private static Map<Integer, String> currentExactLocals;
+
+    /// The slots every store to which is ``new X(...)`` -- an ASTORE right after the
+    /// ``X.<init>`` call -- mapped to X; parameters, whose first value comes from the
+    /// caller, never qualify. A virtual call on such a local reaches X's own body however
+    /// many overrides the declared type has elsewhere in the program: a ``new HashMap()``
+    /// in an application that also has a LinkedHashMap. CHA answers that site with a
+    /// lookup by name on every call; this answers it with a direct call.
+    ///
+    /// The ASTORE must follow the ``<init>`` with nothing between them but line and
+    /// variable metadata. A label would mean another path reaches the store, and the value
+    /// that path brings is unknown.
+    private static Map<Integer, String> exactLocals(BytecodeMethod method, List<Instruction> instructions) {
+        if (System.getProperty("parparvm.js.exactlocals.off") != null) {
+            return null;
+        }
+        int firstLocal = method.isStatic() ? 0 : 1;
+        for (ByteCodeMethodArg arg : method.getArguments()) {
+            char q = arg.getQualifier();
+            firstLocal += (q == 'l' || q == 'd') ? 2 : 1;
+        }
+        Map<Integer, String> exact = null;
+        java.util.Set<Integer> rejected = null;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction ins = instructions.get(i);
+            if (!(ins instanceof VarOp)) {
+                continue;
+            }
+            int op = ins.getOpcode();
+            if (op < Opcodes.ISTORE || op > Opcodes.ASTORE) {
+                continue;
+            }
+            Integer slot = Integer.valueOf(((VarOp) ins).getIndex());
+            String type = null;
+            if (op == Opcodes.ASTORE && slot.intValue() >= firstLocal) {
+                int p = i - 1;
+                while (p >= 0 && (instructions.get(p) instanceof LineNumber
+                        || instructions.get(p) instanceof LocalVariable)) {
+                    p--;
+                }
+                if (p >= 0 && instructions.get(p) instanceof Invoke) {
+                    Invoke init = (Invoke) instructions.get(p);
+                    if (init.getOpcode() == Opcodes.INVOKESPECIAL && "<init>".equals(init.getName())) {
+                        type = init.getOwner();
+                    }
+                }
+            }
+            if (rejected != null && rejected.contains(slot)) {
+                continue;
+            }
+            String known = exact == null ? null : exact.get(slot);
+            if (type == null || (known != null && !known.equals(type))) {
+                if (rejected == null) {
+                    rejected = new HashSet<Integer>();
+                }
+                rejected.add(slot);
+                if (exact != null) {
+                    exact.remove(slot);
+                }
+                continue;
+            }
+            if (exact == null) {
+                exact = new HashMap<Integer, String>();
+            }
+            exact.put(slot, type);
+        }
+        return exact == null || exact.isEmpty() ? null : exact;
+    }
+
+    /// The exact class of a receiver expression that is a plain local read, or null.
+    private static String exactLocalType(String receiver) {
+        Map<Integer, String> exact = currentExactLocals;
+        if (exact == null || receiver == null || receiver.length() < 2 || receiver.charAt(0) != 'l') {
+            return null;
+        }
+        int slot = 0;
+        for (int i = 1; i < receiver.length(); i++) {
+            char c = receiver.charAt(i);
+            if (c < '0' || c > '9' || i > 6) {
+                return null;
+            }
+            slot = slot * 10 + (c - '0');
+        }
+        return exact.get(Integer.valueOf(slot));
+    }
 
     /// The boxed types. Their instances are allocated in their own valueOf factories, never
     /// in the loop that autoboxes, so the in-loop rule never sees them -- yet boxing is the

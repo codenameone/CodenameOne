@@ -181,6 +181,11 @@ final class JavascriptSuspensionAnalysis {
             if (m.isAbstract() || m.isEliminated() || m.isStatic()) {
                 return null;
             }
+            if (isDrivenSignature(sig) && m.isJavascriptSuspending()) {
+                // Classified synchronous at the site, so a generator body must be
+                // driven (_w* / _dw*) rather than called directly.
+                return null;
+            }
             // A native qualifies too. Its class's m: entry names the same global
             // identifier the direct call does (appendPrimaryRegistration), and the
             // runtime's bindNative replaces that global and the m: entry together, so
@@ -189,11 +194,29 @@ final class JavascriptSuspensionAnalysis {
             return m;
         }
 
+        /// The body a virtual call reaches on a receiver whose class is exactly
+        /// `exactOwner` (it was just built with `new`), or null. A JSO or bridge
+        /// signature is host-dispatched and never answered here.
+        BytecodeMethod exactTarget(String exactOwner, String name, String desc) {
+            String sig = name + desc;
+            if (bridgeSigs.contains(sig) || jsoSigs.contains(sig)) {
+                return null;
+            }
+            BytecodeMethod m = analysis.resolveTarget(exactOwner, name, desc);
+            if (m == null || m.isAbstract() || m.isEliminated() || m.isStatic()) {
+                return null;
+            }
+            return m;
+        }
+
         boolean isDispatchSuspending(String owner, String name, String desc) {
             String sig = name + desc;
             if (rta == null || isUnconditionallySuspendingDispatch(rta, jsoSigs, bridgeSigs,
                     jsoClasses, owner, sig)) {
                 return rta == null ? suspendingSigs.contains(sig) : true;
+            }
+            if (isDrivenSignature(sig)) {
+                return false;
             }
             List<BytecodeMethod> impls = rta.resolveImpls(owner, name, desc);
             if (impls == null) {
@@ -670,9 +693,16 @@ final class JavascriptSuspensionAnalysis {
                         // resolves gives us exact per-impl edges, so a
                         // blocking ``run()V`` somewhere else in the program
                         // no longer reaches this caller at all.
-                        List<BytecodeMethod> impls = rta == null
-                                || isUnconditionallySuspendingDispatch(rta, jsoDeclaredSigs,
-                                        bridgeDispatchSigs, jsoBridgeClasses, inv.getOwner(), sig)
+                        boolean unconditional = rta != null
+                                && isUnconditionallySuspendingDispatch(rta, jsoDeclaredSigs,
+                                        bridgeDispatchSigs, jsoBridgeClasses, inv.getOwner(), sig);
+                        if (!unconditional && !bridgeDispatchSigs.contains(sig) && isDrivenSignature(sig)) {
+                            // Driven: the site is synchronous whatever its impls are; a
+                            // generator impl is run to completion by the dispatcher. See
+                            // isDrivenSignature.
+                            continue;
+                        }
+                        List<BytecodeMethod> impls = rta == null || unconditional
                                 ? null
                                 : rta.resolveImpls(inv.getOwner(), inv.getName(), inv.getDesc());
                         if (impls != null) {
@@ -767,6 +797,35 @@ final class JavascriptSuspensionAnalysis {
      * An unresolvable cone (array owner, class we did not index) answers true,
      * because "we do not know" has to mean "assume the bridge can reach it".
      */
+    /// True for the signatures whose virtual call sites are classified synchronous
+    /// regardless of their implementations: `hashCode()` and `equals(Object)`.
+    ///
+    /// Signature suspension is a fixpoint over the whole program, and these two are
+    /// where it collapses. A handful of genuinely blocking bodies (`Vector`,
+    /// `Hashtable` and the `Collections.synchronized*` wrappers are `synchronized`)
+    /// make every `hashCode()` and `equals()` site that can reach them a suspension
+    /// point; that makes `HashMap.get`/`put`/`remove` generators, which makes every
+    /// caller of a map a generator, and so on around the cycle (a Dart object's
+    /// `hashCode` hashes its fields). In the transpiled Flutter gallery the whole
+    /// `java.util.HashMap` API was suspending and `hashMapChurn` ran 6x slower
+    /// than the same code in a small application, where the cycle never closes.
+    ///
+    /// The site is emitted as a synchronous dispatch (`_w*` / `_dw*`) and a
+    /// generator implementation is driven to completion by `cn1_ivsDrive`, which
+    /// steps through time-slice yields. A body that really blocks there -- a
+    /// `synchronized` hashCode whose monitor another green thread holds across a
+    /// suspension -- cannot wait, and the driver fails with a named error. Neither
+    /// method is a place a program blocks, and every synchronous-dispatch site
+    /// already carried that contract for its CHA gaps.
+    ///
+    /// Kill switch: -Dparparvm.js.drivensigs.off.
+    static boolean isDrivenSignature(String sig) {
+        if (System.getProperty("parparvm.js.drivensigs.off") != null) {
+            return false;
+        }
+        return "hashCode()I".equals(sig) || "equals(Ljava/lang/Object;)Z".equals(sig);
+    }
+
     private static boolean isUnconditionallySuspendingDispatch(JavascriptReachability.Model rta,
             Set<String> jsoSigs, Set<String> bridgeSigs, Set<String> jsoClasses,
             String owner, String sig) {

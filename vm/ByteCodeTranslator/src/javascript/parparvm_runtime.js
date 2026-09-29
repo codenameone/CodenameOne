@@ -4912,11 +4912,26 @@ function* cn1_ivN(target, mid, args) {
 // a NAMED error rather than letting a raw generator object leak
 // downstream as the "result" (the silent-corruption failure mode of the
 // three earlier sync-dispatcher attempts).
+//
+// A time-slice yield (_Yv) is not a suspension, it is the budget check at a
+// generator's entry, so it is stepped through: hashCode() and equals() sites are
+// synchronous by design and drive their generator implementations here (see
+// JavascriptSuspensionAnalysis.isDrivenSignature). A contended monitor withdraws
+// its entrant before failing, so the monitor's queue is left as it was.
 function cn1_ivsDrive(r, mid) {
   if (r && typeof r.next === "function") {
-    const step = r.next();
+    let step = r.next();
+    while (!step.done && step.value === _Yv) {
+      step = r.next();
+    }
     if (!step.done) {
-      throw new Error("cn1_ivs: sync virtual dispatch reached a yielding method (CHA unsound): " + mid);
+      const op = step.value;
+      if (op && op.op === "monitor_enter" && op.monitor && op.monitor.__monitor) {
+        const q = op.monitor.__monitor.entrants;
+        const at = q.indexOf(op.entrant);
+        if (at >= 0) q.splice(at, 1);
+      }
+      throw new Error("cn1_ivs: sync virtual dispatch reached a blocking method: " + mid);
     }
     return step.value;
   }
