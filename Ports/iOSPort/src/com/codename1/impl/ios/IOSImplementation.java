@@ -5387,6 +5387,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (superVal == null && !"".equals(Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, ""))) {
                 String backgroundLocationListenerClassName = Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, "");
                 try {
+                    // ReachabilityCull (FOR_NAME_SITES) keeps only LocationListener
+                    // implementations for this forName.
                     Class backgroundLocationListenerClass = (Class)Class.forName(backgroundLocationListenerClassName);
                     super.setBackgroundLocationListener(backgroundLocationListenerClass);
                 } catch (Throwable t) {}
@@ -5512,7 +5514,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (geofenceListeners().containsKey(id)) {
                 Class cls = null;
                 try {
-                    cls = Class.forName(geofenceListeners.get(id)); 
+                    // ReachabilityCull (FOR_NAME_SITES) keeps only GeofenceListener
+                    // implementations for this forName.
+                    cls = Class.forName(geofenceListeners.get(id));
                     if (cls == null) {
                         return null;
                     }
@@ -15470,6 +15474,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         try {
+            // ReachabilityCull (FOR_NAME_SITES) keeps only BackgroundWorker
+            // implementations for this forName.
             Class<?> cls = Class.forName(workerClass);
             BackgroundWorker worker = (BackgroundWorker) cls.newInstance();
             java.util.Map<String, String> input = new java.util.HashMap<String, String>();

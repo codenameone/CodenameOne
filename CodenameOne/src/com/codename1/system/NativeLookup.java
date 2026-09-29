@@ -80,7 +80,9 @@ public final class NativeLookup {
             if (cls != null) {
                 return (T) cls.newInstance();
             }
-            // special case for JavaSE native interfaces
+            // special case for JavaSE native interfaces. ParparVM's ReachabilityCull
+            // (FOR_NAME_SITES) keeps only NativeInterface implementations for this
+            // forName; a name of any other type here must be added there.
             return (T) Class.forName(c.getName() + "Impl").newInstance();
         } catch (Throwable ex) {
             if (verbose) {

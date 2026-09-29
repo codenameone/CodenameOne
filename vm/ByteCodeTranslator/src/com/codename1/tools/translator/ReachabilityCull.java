@@ -157,6 +157,7 @@ final class ReachabilityCull {
             BytecodeMethod caller = work.poll();
             if (alloc != null) {
                 alloc.scan(caller);
+                alloc.scanForName(caller, graph.getCalls(caller));
             }
             for (String sig : graph.getCalls(caller)) {
                 List<BytecodeMethod> targets = bySignature.get(sig);
@@ -180,8 +181,14 @@ final class ReachabilityCull {
         if (alloc != null && ByteCodeTranslator.verbose) {
             System.out.println("reachability cull: " + alloc.allocated.size() + " classes allocated, "
                     + alloc.parked + " instance methods held for a class nothing allocates"
-                    + (alloc.reflectiveOnly < 0 ? ", Class.newInstance not reachable"
-                            : ", " + alloc.reflectiveOnly + " allocated when Class.newInstance became reachable"));
+                    + ", " + alloc.reflectiveOnly + " of them only by what Class.forName may name");
+        }
+        // Always printed: it is what decides whether the reflection seed is narrow, and
+        // TypeAwareCullIntegrationTest reads it.
+        if (alloc != null && !alloc.unnarrowedForName.isEmpty()) {
+            System.out.println("reachability cull: Class.forName in " + alloc.unnarrowedForName
+                    + " is not narrowed, so every concrete class with a no-argument constructor"
+                    + " counts as allocated");
         }
         if (via != null) {
             // Tokenised by hand: the translator also runs translated on its own JavaAPI
@@ -319,12 +326,43 @@ final class ReachabilityCull {
     /// - the runtime roots the C side creates without naming them in any file scanned here;
     /// - every class a live method with a fused or custom instruction depends on, since a
     ///   rewritten instruction can hide its allocation from the scan;
-    /// - once Class.newInstance is live, every concrete class with a no-argument
-    ///   constructor: Class.forName takes names built at run time (NativeLookup appends
-    ///   "Impl", UIBuilder reads them from a resource file, geofence and background
-    ///   listeners are stored as strings), and newInstance can only run a no-arg
-    ///   constructor, so this bounds everything reflection can create.
+    /// - what Class.forName can hand to Class.newInstance, once both are live -- see
+    ///   FOR_NAME_SITES.
+    ///
+    /// REFLECTION. newInstance can only instantiate a Class object the program holds, and
+    /// there are three ways to hold one: a class literal (allocated above), getClass() on
+    /// an instance (its class is allocated already -- it made the instance) and
+    /// Class.forName, which takes a string built at run time. getSuperclass() yields an
+    /// ancestor of an allocated class, whose methods are already admitted through the
+    /// subtree. So only forName needs a seed, and each live method that calls it gets one:
+    /// a known site gets every concrete no-arg class assignable to the one type its result
+    /// is used as, and any other caller -- an app's, a cn1lib's -- gets every concrete
+    /// no-arg class, since nothing bounds its names.
     static final class Allocation {
+        /// {class, method, type}: a live forName call in that method only ever feeds a
+        /// newInstance whose result is used as that type. Each is also named at the call
+        /// site, so an edit there can see this table. A method missing from here is not
+        /// unsafe, only unnarrowed: it falls back to every concrete no-arg class.
+        private static final String[][] FOR_NAME_SITES = {
+            // NativeLookup.create: forName(c.getName() + "Impl"), c a NativeInterface.
+            {"com_codename1_system_NativeLookup", "create", "com_codename1_system_NativeInterface"},
+            // GeofenceManager.getListenerClass: the persisted listener class name.
+            {"com_codename1_location_GeofenceManager", "getListenerClass", "com_codename1_location_GeofenceListener"},
+            // DeviceRunner.runTest: the test class the device-side runner is handed.
+            {"com_codename1_testing_DeviceRunner", "runTest", "com_codename1_testing_UnitTest"},
+            // IOSImplementation.Loc: the persisted background location listener, and the
+            // per-region geofence listener names.
+            {"com_codename1_impl_ios_IOSImplementation_Loc", "getBackgroundLocationListener",
+                    "com_codename1_location_LocationListener"},
+            {"com_codename1_impl_ios_IOSImplementation_Loc", "getGeofenceListener",
+                    "com_codename1_location_GeofenceListener"},
+            // IOSImplementation.runBackgroundProcessing: the persisted BackgroundWorker.
+            {"com_codename1_impl_ios_IOSImplementation", "runBackgroundProcessing",
+                    "com_codename1_background_BackgroundWorker"},
+        };
+        private static final String FOR_NAME = "(Ljava/lang/String;)Ljava/lang/Class;.forName";
+        private static final String FOR_NAME_3 = "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;.forName";
+
         private static final String[] RUNTIME_ROOTS = {
             "java_lang_Object", "java_lang_Class", "java_lang_String", "java_lang_Boolean",
             "java_lang_Integer", "java_lang_Byte", "java_lang_Short", "java_lang_Character",
@@ -346,9 +384,13 @@ final class ReachabilityCull {
         private final Map<ByteCodeClass, Set<BytecodeMethod>> held =
                 new IdentityHashMap<ByteCodeClass, Set<BytecodeMethod>>();
         int parked;
-        /// Classes nothing but the Class.newInstance seed allocated (at the time it fired).
-        int reflectiveOnly = -1;
+        /// Classes the forName seeds allocated that nothing had allocated before them.
+        int reflectiveOnly;
+        /// Live methods calling Class.forName that FOR_NAME_SITES does not narrow.
+        final List<String> unnarrowedForName = new ArrayList<String>();
         private boolean reflective;
+        private boolean everything;
+        private final List<BytecodeMethod> forNameSites = new ArrayList<BytecodeMethod>();
         private final Map<ByteCodeClass, List<ByteCodeClass>> children;
         private final Set<BytecodeMethod> called;
         private final Set<BytecodeMethod> live;
@@ -449,9 +491,9 @@ final class ReachabilityCull {
             if (!reflective && "java_lang_Class".equals(m.getClsName())
                     && "newInstance".equals(m.getMethodName())) {
                 reflective = true;
-                int before = allocated.size();
-                allocateReflectivelyCreatable();
-                reflectiveOnly = allocated.size() - before;
+                for (BytecodeMethod site : forNameSites) {
+                    seedForNameSite(site);
+                }
             }
             List<com.codename1.tools.translator.bytecodes.Instruction> ins = m.getInstructions();
             if (ins == null) {
@@ -502,19 +544,80 @@ final class ReachabilityCull {
             }
         }
 
-        private void allocateReflectivelyCreatable() {
+        /// Records a live method that calls Class.forName, and seeds it once newInstance
+        /// is live too. Class's own overloads delegate to each other and are skipped: their
+        /// callers are the sites.
+        void scanForName(BytecodeMethod m, Set<String> calls) {
+            if ("java_lang_Class".equals(m.getClsName())
+                    || !(calls.contains(FOR_NAME) || calls.contains(FOR_NAME_3))) {
+                return;
+            }
+            forNameSites.add(m);
+            if (reflective) {
+                seedForNameSite(m);
+            }
+        }
+
+        private void seedForNameSite(BytecodeMethod site) {
+            String type = null;
+            for (String[] s : FOR_NAME_SITES) {
+                if (s[0].equals(site.getClsName()) && s[1].equals(site.getMethodName())) {
+                    type = s[2];
+                    break;
+                }
+            }
+            if (type == null) {
+                unnarrowedForName.add(site.getClsName() + "." + site.getMethodName());
+            }
+            if (everything) {
+                return;
+            }
+            everything = type == null;
+            int before = allocated.size();
             for (ByteCodeClass c : byName.values().toArray(new ByteCodeClass[0])) {
-                if (c.isIsInterface() || c.isIsAbstract()) {
+                if (c.isIsInterface() || c.isIsAbstract() || !hasNoArgConstructor(c)) {
                     continue;
                 }
-                for (BytecodeMethod m : c.getMethods()) {
-                    if (!m.isEliminated() && "__INIT__".equals(m.getMethodName())
-                            && "()V".equals(m.getSignature())) {
-                        allocate(c.getClsName());
-                        break;
+                if (type == null || isAssignable(c, type)) {
+                    allocate(c.getClsName());
+                }
+            }
+            reflectiveOnly += allocated.size() - before;
+        }
+
+        private static boolean hasNoArgConstructor(ByteCodeClass c) {
+            for (BytecodeMethod m : c.getMethods()) {
+                if (!m.isEliminated() && "__INIT__".equals(m.getMethodName())
+                        && "()V".equals(m.getSignature())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// Whether {@code c} is, extends or implements the class named {@code type}.
+        private static boolean isAssignable(ByteCodeClass c, String type) {
+            ArrayDeque<ByteCodeClass> up = new ArrayDeque<ByteCodeClass>();
+            Set<ByteCodeClass> seen = Collections.newSetFromMap(new IdentityHashMap<ByteCodeClass, Boolean>());
+            up.add(c);
+            while (!up.isEmpty()) {
+                ByteCodeClass a = up.poll();
+                if (!seen.add(a)) {
+                    continue;
+                }
+                if (type.equals(a.getClsName())) {
+                    return true;
+                }
+                if (a.getBaseClassObject() != null) {
+                    up.add(a.getBaseClassObject());
+                }
+                if (a.getBaseInterfacesObject() != null) {
+                    for (ByteCodeClass i : a.getBaseInterfacesObject()) {
+                        up.add(i);
                     }
                 }
             }
+            return false;
         }
 
         /// "a/b/C$D" or "a.b.C$D" -> "a_b_C_D", the translator's class naming.
