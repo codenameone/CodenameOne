@@ -4045,54 +4045,111 @@ global._A = jvm.aL;
 global._T = jvm.aS;
 global._N = jvm.aN;
 global._F = jvm.fr;
-// === Exact 64-bit Java long arithmetic (long == {__l, l, h} hi/lo pair) =======
+// === Exact 64-bit Java long arithmetic =======================================
 // The JS port historically modelled ``long`` as a double (53-bit), so 64-bit
 // math (SHA-384/512, bit twiddling) lost precision and bitwise long ops
 // truncated to 32 bits. BigInt is exact but ~10-50x slower and hung the
-// animation/timing hot paths, so longs are a single {__l, l, h} object instead
-// (the goog.math.Long representation: l = low 32 bits, h = high 32 bits, both
-// signed int32). One object = one value, preserving the one-slot model, and all
-// math is plain Number arithmetic. ``_Lc`` coerces anything entering a long op
-// to a Long: an existing Long (passthrough), a Number (int sharing the long
-// value space, or a leaked double), or null (uninitialised long[]/field).
+// animation/timing hot paths.
+//
+// A long is therefore held in one of two CANONICAL forms, chosen by magnitude:
+//
+//   * a plain JS number when the value is a safe integer, |v| < 2^53. That is
+//     every counter, index, checksum, timestamp and nanoTime a program holds,
+//     and arithmetic on it is ordinary Number arithmetic with no allocation;
+//   * a {__l: 1, l, h} hi/lo record otherwise (the goog.math.Long layout:
+//     l = low 32 bits, h = high 32 bits, both signed int32).
+//
+// Every helper below returns the canonical form, so a value never has two
+// representations and a number/number fast path is exact: the sum, difference
+// or product of two safe integers is computed exactly by IEEE arithmetic
+// whenever the TRUE result is itself a safe integer, and a true result outside
+// that range can never round back inside it (rounding is monotonic and 2^53 is
+// representable). Anything that misses the fast path takes the exact hi/lo
+// path and is normalized on the way out, which is also where 64-bit
+// wrap-around happens.
+//
+// Every long used to be a record, and every long operation allocated one. On
+// the flutter-bench compute workloads under node that was the cost of any loop
+// with a long in it: a ``long sum += a[i]`` reduction, a recursive function
+// returning long, a long checksum.
+//
+// ``_Lc`` still converts anything entering a slow path into a record: a record
+// (passthrough), a number (an int sharing the long value space, a canonical
+// small long, or a leaked double), or null (an uninitialised slot).
 const _TWO_PWR_32 = 4294967296;
-function _LL(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
-const _L0 = _LL(0, 0);
-const _L1 = _LL(1, 0);
-const _LMIN = _LL(0, -2147483648);          // 0x8000000000000000
-const _LMAX = _LL(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
-const _LintCache = new Array(384); // cache small int->long (-128..255) to cut hot-path allocation
-function _LfromInt(v) {
-  v = v | 0;
-  if (v >= -128 && v <= 255) {
-    let c = _LintCache[v + 128];
-    if (c === undefined) { c = _LintCache[v + 128] = _LL(v, v < 0 ? -1 : 0); }
-    return c;
+const _TWO_PWR_53 = 9007199254740992;
+const _LPOW2 = [];
+for (let i = 0; i < 64; i++) { _LPOW2.push(Math.pow(2, i)); }
+// A raw hi/lo record. Only the slow paths build one directly; nothing they
+// return escapes without going through _LL / _Lnorm.
+function _LO(low, high) { return { __l: 1, l: low | 0, h: high | 0 }; }
+// The canonical long for a hi/lo pair: a number when it is a safe integer.
+// A hi/lo pair is a safe integer exactly when -2^21 < high < 2^21, or when high
+// is -2^21 and the low word is not zero (high = -2^21, low = 0 is -2^53 itself).
+// Tested on the words, in integer compares, rather than by building the double
+// first: this runs on every slow-path result.
+function _LL(low, high) {
+  low = low | 0;
+  high = high | 0;
+  if ((high < 2097152 && high > -2097152) || (high === -2097152 && low !== 0)) {
+    return high * _TWO_PWR_32 + (low >>> 0);
   }
-  return _LL(v, v < 0 ? -1 : 0);
+  return { __l: 1, l: low, h: high };
 }
-function _LfromNumber(v) {
+// Canonical form of a record an *O helper returned. Records are never mutated,
+// so an out-of-range one is returned as is rather than copied.
+function _Lnorm(o) {
+  const high = o.h;
+  if ((high < 2097152 && high > -2097152) || (high === -2097152 && o.l !== 0)) {
+    return high * _TWO_PWR_32 + (o.l >>> 0);
+  }
+  return o;
+}
+const _L0 = 0;
+const _L1 = 1;
+const _LO0 = _LO(0, 0);
+const _LO1 = _LO(1, 0);
+const _LOM1 = _LO(-1, -1);
+const _LMIN = _LO(0, -2147483648);          // 0x8000000000000000
+const _LMAX = _LO(-1, 2147483647);           // 0x7FFFFFFFFFFFFFFF
+function _LfromInt(v) { return v | 0; }
+// Java's double/float -> long conversion (JLS 5.1.3): NaN is 0, out of range
+// saturates, everything else truncates toward zero. Returns a record.
+function _LfromNumberO(v) {
   v = Number(v);
-  if (isNaN(v)) return _L0;
+  if (isNaN(v)) return _LO0;
   if (v <= -9223372036854775808) return _LMIN;
   if (v + 1 >= 9223372036854775808) return _LMAX;
-  if (v < 0) return _Lneg(_LfromNumber(-v));
-  return _LL((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
+  if (v < 0) return _LnegO(_LfromNumberO(-v));
+  return _LO((v % _TWO_PWR_32) | 0, (v / _TWO_PWR_32) | 0);
 }
-function _LtoNumber(a) { return a.h * _TWO_PWR_32 + (a.l >>> 0); }
+function _LfromNumber(v) {
+  const t = Math.trunc(Number(v));
+  // NaN fails both comparisons and takes the slow path, which answers 0.
+  if (t > -_TWO_PWR_53 && t < _TWO_PWR_53) return t + 0; // + 0 folds -0 into 0
+  return _Lnorm(_LfromNumberO(v));
+}
+function _LtoNumber(a) { return typeof a === "number" ? a : a.h * _TWO_PWR_32 + (a.l >>> 0); }
 function _Lc(x) {
+  if (typeof x === "number") {
+    if (x > -_TWO_PWR_53 && x < _TWO_PWR_53 && x === Math.floor(x)) {
+      return _LO(x | 0, Math.floor(x / _TWO_PWR_32));
+    }
+    return _LfromNumberO(x);
+  }
   if (x && x.__l === 1) return x;
-  if (x == null) return _L0;
-  if (typeof x === 'number') return _LfromNumber(x);
-  if (typeof x === 'bigint') return _LfromNumber(Number(x)); // defensive legacy
-  return _L0;
+  if (typeof x === 'bigint') return _LfromNumberO(Number(x)); // defensive legacy
+  return _LO0;
 }
-function _LtoNum(x) { return (x && x.__l === 1) ? _LtoNumber(x) : Number(x); } // Long|Number -> Number
+function _LtoNum(x) { // Long|Number -> Number
+  if (typeof x === "number") return x;
+  return (x && x.__l === 1) ? _LtoNumber(x) : Number(x);
+}
 function _LisZero(a) { return a.h === 0 && a.l === 0; }
 function _LisNeg(a) { return a.h < 0; }
 function _Leq(a, b) { return a.h === b.h && a.l === b.l; }
-function _Ladd(a, b) {
-  a = _Lc(a); b = _Lc(b);
+// --- hi/lo record arithmetic: records in, records out ------------------------
+function _LaddC(a, b) {
   const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
   const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
   let c00 = a00 + b00, c16 = 0, c32 = 0, c48 = 0;
@@ -4102,11 +4159,10 @@ function _Ladd(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lneg(a) { a = _Lc(a); return _Leq(a, _LMIN) ? _LMIN : _Ladd(_LL(~a.l, ~a.h), _L1); }
-function _Lsub(a, b) {
-  // a - b = a + ~b + 1, inlined as a single 16-bit add chain (one allocation
-  // instead of _Lneg+_Ladd's two) -- LSUB is hot in timing/loops.
-  a = _Lc(a); b = _Lc(b);
+function _LaddO(a, b) { return _Lc(_LaddC(a, b)); }
+function _LnegO(a) { return _Leq(a, _LMIN) ? _LMIN : _LaddO(_LO(~a.l, ~a.h), _LO1); }
+function _LsubC(a, b) {
+  // a - b = a + ~b + 1, inlined as a single 16-bit add chain.
   const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
   const nl = ~b.l, nh = ~b.h;
   const b48 = nh >>> 16, b32 = nh & 0xFFFF, b16 = nl >>> 16, b00 = nl & 0xFFFF;
@@ -4117,8 +4173,8 @@ function _Lsub(a, b) {
   c48 += a48 + b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lmul(a, b) {
-  a = _Lc(a); b = _Lc(b);
+function _LsubO(a, b) { return _Lc(_LsubC(a, b)); }
+function _LmulC(a, b) {
   const a48 = a.h >>> 16, a32 = a.h & 0xFFFF, a16 = a.l >>> 16, a00 = a.l & 0xFFFF;
   const b48 = b.h >>> 16, b32 = b.h & 0xFFFF, b16 = b.l >>> 16, b00 = b.l & 0xFFFF;
   let c00 = 0, c16 = 0, c32 = 0, c48 = 0;
@@ -4131,86 +4187,180 @@ function _Lmul(a, b) {
   c48 += a48 * b00 + a32 * b16 + a16 * b32 + a00 * b48; c48 &= 0xFFFF;
   return _LL((c16 << 16) | c00, (c48 << 16) | c32);
 }
-function _Lcmp(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  // Allocation-free: the high word is signed, so it orders the full value; on a
-  // tie compare the low words as unsigned. Comparisons dominate loops/timing, so
-  // avoiding the _Lsub object churn here is the main hi/lo perf win.
+function _LmulO(a, b) { return _Lc(_LmulC(a, b)); }
+function _LcmpO(a, b) {
+  // The high word is signed, so it orders the full value; on a tie compare the
+  // low words as unsigned.
   if (a.h !== b.h) return a.h < b.h ? -1 : 1;
   const al = a.l >>> 0, bl = b.l >>> 0;
   return al === bl ? 0 : (al < bl ? -1 : 1);
 }
-function _Ldiv(a, b) {
-  a = _Lc(a); b = _Lc(b);
-  if (_LisZero(b)) { throw new Error("/ by zero"); }
-  if (_LisZero(a)) return _L0;
-  if (_Leq(a, _LMIN)) {
-    if (_Leq(b, _L1) || _Leq(b, _LL(-1, -1))) return _LMIN;
-    if (_Leq(b, _LMIN)) return _L1;
-    const approx = _Lshl(_Ldiv(_Lshr(a, 1), b), 1);
-    if (_LisZero(approx)) return _LisNeg(b) ? _L1 : _LL(-1, -1);
-    const rem = _Lsub(a, _Lmul(b, approx));
-    return _Ladd(approx, _Ldiv(rem, b));
-  }
-  if (_Leq(b, _LMIN)) return _L0;
-  if (_LisNeg(a)) return _LisNeg(b) ? _Ldiv(_Lneg(a), _Lneg(b)) : _Lneg(_Ldiv(_Lneg(a), b));
-  if (_LisNeg(b)) return _Lneg(_Ldiv(a, _Lneg(b)));
-  let res = _L0, rem = a;
-  while (_Lcmp(rem, b) >= 0) {
-    let approx = Math.max(1, Math.floor(_LtoNumber(rem) / _LtoNumber(b)));
-    const log2 = Math.ceil(Math.log(approx) / Math.LN2);
-    const delta = (log2 <= 48) ? 1 : Math.pow(2, log2 - 48);
-    let approxRes = _LfromNumber(approx);
-    let approxRem = _Lmul(approxRes, b);
-    while (_LisNeg(approxRem) || _Lcmp(approxRem, rem) > 0) {
-      approx -= delta;
-      approxRes = _LfromNumber(approx);
-      approxRem = _Lmul(approxRes, b);
-    }
-    if (_LisZero(approxRes)) approxRes = _L1;
-    res = _Ladd(res, approxRes);
-    rem = _Lsub(rem, approxRem);
-  }
-  return res;
-}
-function _Lrem(a, b) { a = _Lc(a); b = _Lc(b); return _Lsub(a, _Lmul(_Ldiv(a, b), b)); }
-function _Land(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l & b.l, a.h & b.h); }
-function _Lor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l | b.l, a.h | b.h); }
-function _Lxor(a, b) { a = _Lc(a); b = _Lc(b); return _LL(a.l ^ b.l, a.h ^ b.h); }
-function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshlC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL(a.l << n, (a.h << n) | (a.l >>> (32 - n)));
   return _LL(0, a.l << (n - 32));
 }
-function _Lshr(a, n) { // arithmetic right shift
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshlO(a, n) { return _Lc(_LshlC(a, n)); }
+function _LshrC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >> n);
   return _LL(a.h >> (n - 32), a.h >= 0 ? 0 : -1);
 }
-function _Lushr(a, n) { // logical right shift
-  a = _Lc(a); n = (_LtoNum(n) | 0) & 63; if (n === 0) return a;
+function _LshrO(a, n) { return _Lc(_LshrC(a, n)); }
+function _LushrC(a, n) {
+  if (n === 0) return _Lnorm(a);
   if (n < 32) return _LL((a.l >>> n) | (a.h << (32 - n)), a.h >>> n);
   if (n === 32) return _LL(a.h, 0);
   return _LL(a.h >>> (n - 32), 0);
 }
-function _Ll2i(x) { return _Lc(x).l | 0; } // low 32 bits as signed int (Number)
-function _LtoStr(a, radix) {
-  a = _Lc(a); radix = (radix | 0) || 10;
+function _LushrO(a, n) { return _Lc(_LushrC(a, n)); }
+function _LdivO(a, b) {
+  if (_LisZero(b)) { throw new Error("/ by zero"); }
+  if (_LisZero(a)) return _LO0;
+  if (_Leq(a, _LMIN)) {
+    if (_Leq(b, _LO1) || _Leq(b, _LOM1)) return _LMIN;
+    if (_Leq(b, _LMIN)) return _LO1;
+    const approx = _LshlO(_LdivO(_LshrO(a, 1), b), 1);
+    if (_LisZero(approx)) return _LisNeg(b) ? _LO1 : _LOM1;
+    const rem = _LsubO(a, _LmulO(b, approx));
+    return _LaddO(approx, _LdivO(rem, b));
+  }
+  if (_Leq(b, _LMIN)) return _LO0;
+  if (_LisNeg(a)) return _LisNeg(b) ? _LdivO(_LnegO(a), _LnegO(b)) : _LnegO(_LdivO(_LnegO(a), b));
+  if (_LisNeg(b)) return _LnegO(_LdivO(a, _LnegO(b)));
+  let res = _LO0, rem = a;
+  while (_LcmpO(rem, b) >= 0) {
+    let approx = Math.max(1, Math.floor(_LtoNumber(rem) / _LtoNumber(b)));
+    const log2 = Math.ceil(Math.log(approx) / Math.LN2);
+    const delta = (log2 <= 48) ? 1 : Math.pow(2, log2 - 48);
+    let approxRes = _LfromNumberO(approx);
+    let approxRem = _LmulO(approxRes, b);
+    while (_LisNeg(approxRem) || _LcmpO(approxRem, rem) > 0) {
+      approx -= delta;
+      approxRes = _LfromNumberO(approx);
+      approxRem = _LmulO(approxRes, b);
+    }
+    if (_LisZero(approxRes)) approxRes = _LO1;
+    res = _LaddO(res, approxRes);
+    rem = _LsubO(rem, approxRem);
+  }
+  return res;
+}
+// --- the helpers translated code calls: canonical in, canonical out ----------
+function _LaddS(a, b) { return _LaddC(_Lc(a), _Lc(b)); }
+function _Ladd(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a + b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r;
+  }
+  return _LaddS(a, b);
+}
+function _LsubS(a, b) { return _LsubC(_Lc(a), _Lc(b)); }
+function _Lsub(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a - b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r;
+  }
+  return _LsubS(a, b);
+}
+function _LmulS(a, b) { return _LmulC(_Lc(a), _Lc(b)); }
+function _Lmul(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    const r = a * b;
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r + 0; // 0 * -n is -0
+  }
+  return _LmulS(a, b);
+}
+function _Lneg(a) {
+  if (typeof a === "number") return 0 - a; // the safe range is symmetric
+  return _Lnorm(_LnegO(_Lc(a)));
+}
+function _Lcmp(a, b) {
+  if (typeof a === "number" && typeof b === "number") return a < b ? -1 : (a > b ? 1 : 0);
+  return _LcmpO(_Lc(a), _Lc(b));
+}
+function _Ldiv(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if (b === 0) { throw new Error("/ by zero"); }
+    // % is exact on doubles, so a - r is an exact multiple of b and the
+    // division is exact: truncating division without trusting a rounded a / b.
+    const r = a % b;
+    return (a - r) / b + 0;
+  }
+  return _Lnorm(_LdivO(_Lc(a), _Lc(b)));
+}
+function _Lrem(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if (b === 0) { throw new Error("/ by zero"); }
+    return a % b + 0; // the sign follows the dividend, as in Java
+  }
+  a = _Lc(a); b = _Lc(b);
+  return _Lnorm(_LsubO(a, _LmulO(_LdivO(a, b), b)));
+}
+// For a number, x | 0 is its low 32 bits (ToInt32 is exact modulo 2^32 for any
+// integer-valued double) and Math.floor(x / 2^32) its signed high word, so the
+// bitwise operators never need a record for a safe operand.
+function _Land(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a & b;
+    return _LL((a | 0) & (b | 0), Math.floor(a / _TWO_PWR_32) & Math.floor(b / _TWO_PWR_32));
+  }
+  a = _Lc(a); b = _Lc(b);
+  return _LL(a.l & b.l, a.h & b.h);
+}
+function _Lor(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a | b;
+    return _LL((a | 0) | (b | 0), Math.floor(a / _TWO_PWR_32) | Math.floor(b / _TWO_PWR_32));
+  }
+  a = _Lc(a); b = _Lc(b);
+  return _LL(a.l | b.l, a.h | b.h);
+}
+function _Lxor(a, b) {
+  if (typeof a === "number" && typeof b === "number") {
+    if ((a | 0) === a && (b | 0) === b) return a ^ b;
+    return _LL((a | 0) ^ (b | 0), Math.floor(a / _TWO_PWR_32) ^ Math.floor(b / _TWO_PWR_32));
+  }
+  a = _Lc(a); b = _Lc(b);
+  return _LL(a.l ^ b.l, a.h ^ b.h);
+}
+function _Lshl(a, n) { // shift count is a Java int (Number); only low 6 bits used
+  n = (_LtoNum(n) | 0) & 63;
+  if (typeof a === "number") {
+    const r = a * _LPOW2[n];
+    if (r > -_TWO_PWR_53 && r < _TWO_PWR_53) return r + 0;
+  }
+  return _LshlC(_Lc(a), n);
+}
+function _Lshr(a, n) { // arithmetic right shift
+  n = (_LtoNum(n) | 0) & 63;
+  // Division by a power of two is exact and floor rounds toward -infinity,
+  // which is what an arithmetic shift does to a negative value.
+  if (typeof a === "number") return Math.floor(a / _LPOW2[n]) + 0;
+  return _LshrC(_Lc(a), n);
+}
+function _Lushr(a, n) { // logical right shift
+  n = (_LtoNum(n) | 0) & 63;
+  if (typeof a === "number" && (a >= 0 || n === 0)) return Math.floor(a / _LPOW2[n]) + 0;
+  return _LushrC(_Lc(a), n);
+}
+function _Ll2i(x) { return typeof x === "number" ? x | 0 : _Lc(x).l | 0; } // low 32 bits as signed int
+function _LtoStrO(a, radix) {
   if (_LisZero(a)) return "0";
   if (_LisNeg(a)) {
     if (_Leq(a, _LMIN)) {
-      const r = _LfromInt(radix);
-      const div = _Ldiv(a, r);
-      const rem = _Lsub(_Lmul(div, r), a);
-      return _LtoStr(div, radix) + (_Ll2i(rem) >>> 0).toString(radix);
+      const r = _LO(radix, 0);
+      const div = _LdivO(a, r);
+      const rem = _LsubO(_LmulO(div, r), a);
+      return _LtoStrO(div, radix) + ((rem.l | 0) >>> 0).toString(radix);
     }
-    return "-" + _LtoStr(_Lneg(a), radix);
+    return "-" + _LtoStrO(_LnegO(a), radix);
   }
   let rem = a, result = "";
-  const radixToPower = _LfromNumber(Math.pow(radix, 6));
+  const radixToPower = _LfromNumberO(Math.pow(radix, 6));
   for (;;) {
-    const remDiv = _Ldiv(rem, radixToPower);
-    const intval = (_Ll2i(_Lsub(rem, _Lmul(remDiv, radixToPower)))) >>> 0;
+    const remDiv = _LdivO(rem, radixToPower);
+    const intval = (_LsubO(rem, _LmulO(remDiv, radixToPower)).l | 0) >>> 0;
     let digits = intval.toString(radix);
     rem = remDiv;
     if (_LisZero(rem)) return digits + result;
@@ -4218,9 +4368,17 @@ function _LtoStr(a, radix) {
     result = digits + result;
   }
 }
+function _LtoStr(a, radix) {
+  radix = (radix | 0) || 10;
+  // Number.prototype.toString is exact for a safe integer and writes a negative
+  // value as "-" and the magnitude's digits, which is Long.toString's format.
+  if (typeof a === "number") return a.toString(radix);
+  return _LtoStrO(_Lc(a), radix);
+}
 global._Lc = _Lc;
 global._LtoNum = _LtoNum;
 global._LtoStr = _LtoStr;
+// True for the hi/lo record form only; a long within the safe range is a number.
 global._LisLong = (x) => !!(x && x.__l === 1);
 global._L0 = _L0;
 global._L1 = _L1;
@@ -4239,9 +4397,9 @@ global._Lshl = _Lshl;
 global._Lshr = _Lshr;
 global._Lushr = _Lushr;
 global._Lcmp = _Lcmp;
-global._Li2l = (x) => _LfromInt(x | 0);      // int -> long
+global._Li2l = (x) => x | 0;                 // int -> long
 global._Ll2i = _Ll2i;                        // long -> int
-global._Ll2d = (x) => _LtoNumber(_Lc(x));    // long -> float/double
+global._Ll2d = (x) => typeof x === "number" ? x : _LtoNumber(_Lc(x)); // long -> float/double
 global._Ld2l = (x) => _LfromNumber(x);       // float/double -> long
 // Class-registration aliases: ``_Z`` for defineClass (1592 calls, 15-char
 // prefix savings each) and ``_M`` for the methods-map registration
@@ -5648,7 +5806,11 @@ bindNative(["cn1_java_lang_Throwable_getStack_R_java_lang_String"], function(__c
 bindNative(["cn1_java_lang_Math_abs_double_R_double"], function(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_float_R_float"], function(v) { return Math.abs(v); });
 bindNative(["cn1_java_lang_Math_abs_int_R_int"], function(v) { return Math.abs(v | 0); });
-bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) { const x = _Lc(v); return x.h < 0 ? _Lneg(x) : x; });
+bindNative(["cn1_java_lang_Math_abs_long_R_long"], function(v) {
+  if (typeof v === "number") return v < 0 ? 0 - v : v;
+  const x = _Lc(v);
+  return x.h < 0 ? _Lneg(x) : _Lnorm(x);
+});
 bindNative(["cn1_java_lang_Math_ceil_double_R_double"], function(v) { return Math.ceil(v); });
 bindNative(["cn1_java_lang_Math_floor_double_R_double"], function(v) { return Math.floor(v); });
 bindNative(["cn1_java_lang_Math_max_double_double_R_double"], function(a, b) { return Math.max(a, b); });
@@ -6101,7 +6263,12 @@ let cn1StorageId = 1;
 function cn1StorageAbsent(b) { return b == null || typeof b === "number" || _LisZero(b); }
 function cn1StorageAllocate(capacity, references) {
   if (capacity === 0) return _L0;
-  const handle = _LfromNumber(cn1StorageId++);
+  // The handle is a long the Java side only stores, passes back and tests
+  // against 0, and the storage hangs off it -- so it must be an OBJECT, the
+  // hi/lo record form, even though its value would be a plain number in
+  // canonical form. Every long helper takes the exact slow path for a record, so
+  // it still compares and converts correctly; it just can never be a number.
+  const handle = _LO(cn1StorageId++, 0);
   handle.storage = references ? new Array(capacity).fill(null) : new Int32Array(capacity);
   return handle;
 }

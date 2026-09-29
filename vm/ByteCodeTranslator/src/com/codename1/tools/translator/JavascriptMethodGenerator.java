@@ -1474,9 +1474,7 @@ final class JavascriptMethodGenerator {
             return ((Boolean) value).booleanValue() ? "1" : "0";
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            return "_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")";
+            return javascriptLongLiteral((Long) value);
         }
         if (value instanceof Number) {
             return value.toString();
@@ -5099,9 +5097,7 @@ final class JavascriptMethodGenerator {
             return true;
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            out.append("  ").append(ctx.push("_Llit(" + ((int) lv) + ", " + ((int) (lv >>> 32)) + ")")).append(";\n");
+            out.append("  ").append(ctx.push(javascriptLongLiteral((Long) value))).append(";\n");
             return true;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
@@ -7007,10 +7003,8 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return;
         }
         if (value instanceof Long) {
-            // Java long == hi/lo Long object: emit _Llit(lowInt, highInt).
-            long lv = (Long) value;
-            out.append("        stack.p(_Llit(").append((int) lv).append(", ").append((int) (lv >>> 32))
-                    .append(")); pc = ").append(index + 1).append("; break;\n");
+            out.append("        stack.p(").append(javascriptLongLiteral((Long) value))
+                    .append("); pc = ").append(index + 1).append("; break;\n");
             return;
         }
         if (value instanceof Integer || value instanceof Float || value instanceof Double) {
@@ -11020,4 +11014,18 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         depthHolder[0]++;
         return true;
     }
+    /// The JavaScript expression for a long constant, in the runtime's canonical form
+    /// (see the long section of parparvm_runtime.js): a plain number literal when the
+    /// value is a safe integer, which is what the runtime's own helpers return for it,
+    /// and an _Llit(lowInt, highInt) record otherwise. Emitting _Llit for every
+    /// constant cost a call per evaluation, inside loops included. A negative number
+    /// is parenthesized so it cannot merge with an operator it is spliced after.
+    static String javascriptLongLiteral(long value) {
+        final long maxSafe = 9007199254740991L;
+        if (value >= -maxSafe && value <= maxSafe) {
+            return value < 0 ? "(" + value + ")" : Long.toString(value);
+        }
+        return "_Llit(" + ((int) value) + ", " + ((int) (value >>> 32)) + ")";
+    }
+
 }

@@ -428,7 +428,9 @@ class JavascriptRuntimeSemanticsTest {
                 + "  if (array[0] !== 0 || array[1] !== 0) failures.push(type + '=' + String(array[0]));\n"
                 + "}\n"
                 + "const longs = jvm.newArray(2, 'JAVA_LONG', 1);\n"
-                + "if (!longs[0] || longs[0].__l !== 1 || longs[0].l !== 0 || longs[0].h !== 0) failures.push('JAVA_LONG');\n"
+                // A long within the safe-integer range is a plain number in the runtime's
+                // canonical form, so the default element is the number 0, not a record.
+                + "if (longs[0] !== 0 || longs[1] !== 0 || Object.is(longs[0], -0)) failures.push('JAVA_LONG=' + JSON.stringify(longs[0]));\n"
                 + "const references = jvm.newArray(2, 'java_lang_String', 1);\n"
                 + "if (references[0] !== null || references[1] !== null) failures.push('reference');\n"
                 + "const jagged = jvm.newArray(2, 'JAVA_INT[]', 1);\n"
