@@ -2877,6 +2877,7 @@ final class JavascriptMethodGenerator {
     private static void appendMethodImpl(StringBuilder out, StringBuilder regs, ByteCodeClass cls, BytecodeMethod method) {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
+        currentLoopNewSites = loopNewSites(instructions, labelToIndex);
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
@@ -5209,7 +5210,7 @@ final class JavascriptMethodGenerator {
                 // suspending <clinit> runs on the trampoline; ``_O``'s own
                 // call then finds the class initialized and returns. (#5774)
                 appendStraightLineEnsureClassInitialized(out, ctx, typeName);
-                out.append("  ").append(ctx.push(newObjectExpression(typeName))).append(";\n");
+                out.append("  ").append(ctx.push(newObjectExpression(typeName, instruction))).append(";\n");
                 return true;
             case Opcodes.ANEWARRAY: {
                 String size = ctx.pop();
@@ -7127,7 +7128,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 // See the straight-line NEW case: ``_O`` only ever drives a
                 // clinit synchronously, so the guard goes first. (#5774)
                 appendInterpreterEnsureClassInitialized(out, typeName, false);
-                out.append("        stack.p(").append(newObjectExpression(typeName)).append("); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(").append(newObjectExpression(typeName, instruction)).append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ANEWARRAY:
                 out.append("        stack.p(_j(stack.q(), \"").append(typeName)
@@ -11174,12 +11175,79 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     /// only where they appear as quoted strings. The class-initialization guard the NEW
     /// site already emits (appendStraightLineEnsureClassInitialized) is what runs a
     /// static initializer; newObject's own check only mattered for a class without one.
-    static String newObjectExpression(String typeName) {
-        if (!allocationFunctionEligible(typeName)) {
+    static String newObjectExpression(String typeName, Instruction site) {
+        java.util.Set<Instruction> loopSites = currentLoopNewSites;
+        boolean hot = BOXED_TYPES.contains(typeName) || (loopSites != null && loopSites.contains(site));
+        if (!hot || !allocationFunctionEligible(typeName)) {
             return "_O(\"" + typeName + "\")";
         }
         ALLOCATION_FUNCTION_CLASSES.add(typeName);
         return allocationFunctionName(typeName) + "()";
+    }
+
+    /// The NEW instructions of the method being emitted that sit inside a loop -- between a
+    /// backward branch and its target -- or null. Only those get an allocation function.
+    /// The function's win is V8 removing, or at least cheaply building, an allocation it
+    /// sees many times; a ``new`` that runs once per call -- a listener, a UI component, a
+    /// lambda -- gains nothing from it, and on the transpiled Flutter gallery giving every
+    /// ``new`` one cost ~1MB of executable code (2,979 functions). An allocation reached
+    /// from a loop only through a call (Integer.valueOf's ``new Integer``) is not
+    /// covered; that is the price of keeping the bundle size.
+    private static java.util.Set<Instruction> currentLoopNewSites;
+
+    /// The boxed types. Their instances are allocated in their own valueOf factories, never
+    /// in the loop that autoboxes, so the in-loop rule never sees them -- yet boxing is the
+    /// commonest allocation a loop does (hashMapChurn spent 21% of its time building
+    /// Integers through jvm.newObject). Eight one-field classes, so the cost is a few hundred
+    /// bytes in any bundle.
+    private static final java.util.Set<String> BOXED_TYPES = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "java_lang_Integer", "java_lang_Long", "java_lang_Double", "java_lang_Float",
+            "java_lang_Short", "java_lang_Character", "java_lang_Byte", "java_lang_Boolean"));
+
+    private static java.util.Set<Instruction> loopNewSites(List<Instruction> instructions,
+            Map<Label, Integer> labelToIndex) {
+        java.util.Set<Instruction> out = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Instruction, Boolean>());
+        if (instructions == null) {
+            return out;
+        }
+        boolean[] inLoop = null;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            java.util.List<Label> targets = new java.util.ArrayList<Label>(2);
+            if (in instanceof Jump) {
+                targets.add(((Jump) in).getLabel());
+            } else if (in instanceof com.codename1.tools.translator.bytecodes.CustomJump) {
+                targets.add(((com.codename1.tools.translator.bytecodes.CustomJump) in).getLabel());
+            } else if (in instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) in;
+                targets.add(sw.getDefaultLabel());
+                if (sw.getLabels() != null) {
+                    targets.addAll(java.util.Arrays.asList(sw.getLabels()));
+                }
+            }
+            for (Label target : targets) {
+                Integer t = target == null ? null : labelToIndex.get(target);
+                if (t != null && t.intValue() <= i) {
+                    if (inLoop == null) {
+                        inLoop = new boolean[instructions.size()];
+                    }
+                    for (int k = t.intValue(); k <= i; k++) {
+                        inLoop[k] = true;
+                    }
+                }
+            }
+        }
+        if (inLoop == null) {
+            return out;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (inLoop[i] && in instanceof TypeInstruction && in.getOpcode() == Opcodes.NEW) {
+                out.add(in);
+            }
+        }
+        return out;
     }
 
     static String allocationFunctionName(String className) {
@@ -11200,8 +11268,19 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return false;
         }
         java.util.Set<String> seen = new java.util.HashSet<String>();
+        java.util.Set<String> refs = referencedInstanceFields;
+        int fields = 0;
         for (ByteCodeClass c = cls; c != null; ) {
             if (!seen.add(c.getClsName()) || "java_lang_Throwable".equals(c.getClsName())) {
+                return false;
+            }
+            for (ByteCodeField field : c.getFields()) {
+                if (!field.isStaticField()
+                        && (refs == null || refs.contains(c.getClsName() + "\0" + field.getFieldName()))) {
+                    fields++;
+                }
+            }
+            if (fields > ALLOCATION_FUNCTION_MAX_FIELDS) {
                 return false;
             }
             String base = c.getBaseClass();
@@ -11216,11 +11295,20 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
         return true;
     }
 
-    /// Emits the allocation function of every class newObjectExpression handed out. The
-    /// identity comes from the runtime's cn1Ids counter, not jvm.nextIdentity: see the note
-    /// on cn1Ids in parparvm_runtime.js. Runs
+    /// The widest class that gets an allocation function. A literal lists every
+    /// inherited field, so its size grows with the class hierarchy, and the win it buys
+    /// -- V8 removing an allocation that never escapes -- is for small value objects in
+    /// loops, not a UI component with sixty inherited fields, whose construction is
+    /// dominated by its constructor anyway. On the transpiled Flutter gallery, 63 classes
+    /// with 64 or more fields were a third of the functions' 1.8MB; nothing measured here
+    /// allocates a class wider than eight.
+    static final int ALLOCATION_FUNCTION_MAX_FIELDS = 16;
+
+    /// Emits the allocation function of every class newObjectExpression handed out. Runs
     /// after every class has been generated, and its output goes after every class
-    /// registration, so each function can capture its classDef once at load.
+    /// registration, so each function can capture its classDef once at load. The identity
+    /// comes from the runtime's cn1Ids counter, not jvm.nextIdentity: see the note on
+    /// cn1Ids in parparvm_runtime.js.
     ///
     /// The property order is newObject's -- __class, __classDef, __id, __monitor, then the
     /// instance fields base class first, each class's in declaration order, filtered by the
@@ -11233,6 +11321,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return;
         }
         Map<String, ByteCodeClass> idx = classIndex;
+        int ordinal = 0;
         for (String className : ALLOCATION_FUNCTION_CLASSES) {
             java.util.List<ByteCodeClass> chain = new java.util.ArrayList<ByteCodeClass>();
             for (ByteCodeClass c = idx.get(className); c != null; ) {
@@ -11240,9 +11329,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 String base = c.getBaseClass();
                 c = base == null ? null : idx.get(JavascriptNameUtil.sanitizeClassName(base));
             }
-            // Not a cn1_ name: every pass that rewrites cn1_ tokens would have to be
-            // taught about it, and it is referenced once, in its own function.
-            String defVar = "$Ad_" + className;
+            // Numbered, not named after the class: the name is written twice per class,
+            // and a fully qualified one is ~60 bytes the minifier never touches (it only
+            // renames cn1_ tokens). $Ad is a prefix nothing else emits.
+            String defVar = "$Ad" + Integer.toString(ordinal++, 36);
             out.append("const ").append(defVar).append(" = _Od(\"").append(className).append("\");\n");
             out.append("function ").append(allocationFunctionName(className)).append("(){\n");
             out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar)
