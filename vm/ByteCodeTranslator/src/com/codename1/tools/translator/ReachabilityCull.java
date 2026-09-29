@@ -163,7 +163,18 @@ final class ReachabilityCull {
             }
         }
         if (via != null) {
-            for (String w : why.split(",")) {
+            // Tokenised by hand: the translator also runs translated on its own JavaAPI
+            // (the self-hosting check), whose String has no split().
+            List<String> prefixes = new ArrayList<String>();
+            for (int from = 0; from <= why.length(); ) {
+                int comma = why.indexOf(',', from);
+                int end = comma < 0 ? why.length() : comma;
+                if (end > from) {
+                    prefixes.add(why.substring(from, end));
+                }
+                from = end + 1;
+            }
+            for (String w : prefixes) {
                 int shown = 0;
                 for (BytecodeMethod m : live) {
                     if (!m.getClsName().startsWith(w) || shown++ > 3) {

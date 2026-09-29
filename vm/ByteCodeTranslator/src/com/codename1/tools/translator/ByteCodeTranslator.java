@@ -1476,7 +1476,14 @@ public class ByteCodeTranslator {
                 // by the clang driver (it warns "argument unused"); -plugin-opt=-<opt> is
                 // the spelling both the LLVM gold plugin (under GNU ld or gold) and lld
                 // hand to LLVM as a command-line option.
-                writer.append("    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-Wl,-plugin-opt=-inline-threshold=50>)\n");
+                //
+                // Not under zig cc (the musl and cross-arch toolchain): it identifies as
+                // Clang, but its linker driver accepts a fixed set of arguments and fails
+                // the link with "unsupported linker arg: -plugin-opt". Those builds keep
+                // the compile-side threshold above and LLVM's default at link time.
+                writer.append("    if(NOT CMAKE_C_COMPILER MATCHES \"zig\")\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-Wl,-plugin-opt=-inline-threshold=50>)\n");
+                writer.append("    endif()\n");
                 writer.append("endif()\n");
             }
 
