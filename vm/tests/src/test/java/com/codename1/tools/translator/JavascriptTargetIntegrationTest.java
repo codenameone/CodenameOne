@@ -596,6 +596,7 @@ class JavascriptTargetIntegrationTest {
                         || methodBody.contains("_dw4(")
                         || methodBody.contains("_dwN(")
                         || methodBody.contains("_dn0(")
+                        || methodBody.contains("(_nn(")
                         || methodBody.contains("_dn1(")
                         || methodBody.contains("_dn2(")
                         || methodBody.contains("_dn3(")

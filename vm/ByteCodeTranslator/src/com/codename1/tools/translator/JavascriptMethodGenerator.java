@@ -4739,11 +4739,17 @@ final class JavascriptMethodGenerator {
             case Opcodes.ICONST_5:
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getOpcode() - Opcodes.ICONST_0))).append(";\n");
                 return true;
+            // A long in the safe range is a plain number, so 0L and 1L are the literals
+            // rather than the runtime's _L0/_L1 constants. Reading a top-level const is a
+            // context-slot load V8 does not fold here: an accumulator seeded from one
+            // (`long s = 0; for (...) s += a[i];`) is typed as any number and every
+            // _Ladd in the loop keeps its type tests -- 2.5x slower in node on
+            // arraySequential's reduction than the same loop seeded with 0.
             case Opcodes.LCONST_0:
-                out.append("  ").append(ctx.push("_L0")).append(";\n");
+                out.append("  ").append(ctx.push("0")).append(";\n");
                 return true;
             case Opcodes.LCONST_1:
-                out.append("  ").append(ctx.push("_L1")).append(";\n");
+                out.append("  ").append(ctx.push("1")).append(";\n");
                 return true;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -5480,6 +5486,23 @@ final class JavascriptMethodGenerator {
                     String devBase = monoImpl != null ? (devDriven ? "_dw" : devSuspending ? "_dv" : "_dn") : (suspending ? "_v" : "_w");
                     String devSecond = monoImpl != null ? monoImpl : ("\"" + dispatchId + "\"");
                     StringBuilder callExpr = new StringBuilder();
+                    if ("_dn".equals(devBase) && argsArePure(argValues)) {
+                        // A direct call V8 can see at the site: `impl(_nn(t), ...)`. Through
+                        // _dn* the body is a parameter of a helper every direct call in the
+                        // program shares, so the inner call's feedback is megamorphic, the
+                        // body is not inlined, and the receiver escapes into it -- a `new`
+                        // whose fields are read through getters is allocated for real. On
+                        // valueEscape's shape that is 7ms against 107ms in node. The null
+                        // check moves ahead of the arguments, which is only unobservable
+                        // when they are pure (locals and constants), so only then.
+                        callExpr.append("(").append(monoImpl).append("(_nn(").append(target).append(")");
+                        for (int ai = 0; ai < argValues.length; ai++) {
+                            callExpr.append(", ").append(argValues[ai]);
+                        }
+                        callExpr.append("))");
+                        out.append("  ").append(ctx.pushComposite(callExpr.toString(), false)).append(";\n");
+                        return true;
+                    }
                     callExpr.append(devSuspending ? "(yield* " : "(").append(devBase)
                             .append(argValues.length <= 4 ? String.valueOf(argValues.length) : "N")
                             .append("(").append(target).append(", ").append(devSecond);
@@ -6793,10 +6816,10 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                         .append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_0:
-                out.append("        stack.p(_L0); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(0); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LCONST_1:
-                out.append("        stack.p(_L1); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(1); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.FCONST_0:
             case Opcodes.DCONST_0:
@@ -11223,6 +11246,30 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
     /// from a loop only through a call (Integer.valueOf's ``new Integer``) is not
     /// covered; that is the price of keeping the bundle size.
     private static java.util.Set<Instruction> currentLoopNewSites;
+
+    /// True when evaluating every argument can neither throw nor have an effect -- local
+    /// reads and literals -- so a null check may run before them without changing what
+    /// a program can observe.
+    private static boolean argsArePure(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (!StraightLineContext.isDeferrable(args[i]) && !isStackSlotName(args[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isStackSlotName(String expr) {
+        if (expr == null || expr.length() < 2 || expr.charAt(0) != 's') {
+            return false;
+        }
+        for (int i = 1; i < expr.length(); i++) {
+            if (!Character.isDigit(expr.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /// Local slots of the method being emitted whose class is known exactly, or null.
     private static Map<Integer, String> currentExactLocals;

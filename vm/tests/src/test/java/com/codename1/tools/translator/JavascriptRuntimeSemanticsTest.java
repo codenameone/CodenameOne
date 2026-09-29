@@ -187,6 +187,25 @@ class JavascriptRuntimeSemanticsTest {
     }
 
     /**
+     * Pins the one way a synchronous hashCode()/equals() site can fail. Those sites
+     * drive a generator implementation to completion instead of suspending, so a
+     * synchronized hashCode() whose monitor another green thread holds cannot wait:
+     * it must throw the driver's named error rather than run unlocked or hash wrong,
+     * and it must leave the monitor's entrant queue as it found it.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void contendedHashCodeAtSynchronousSiteFailsWithNamedError(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsDrivenHashContentionApp.java", "JsDrivenHashContentionApp");
+
+        assertEquals(15, result.result,
+                "a blocked hashCode() at a synchronous site must throw 'sync virtual dispatch reached a blocking"
+                        + " method' and leave the monitor usable (bits: 1 threw, 2 message, 4 map works after,"
+                        + " 8 lock free). raw=" + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    /**
      * Pins synchronized re-entrancy. A thread that already owns a
      * monitor must take the fast ``count++`` path on a nested entry
      * (otherwise it would park itself on its own monitor and

@@ -155,6 +155,7 @@ class JavascriptOpcodeCoverageTest {
                         || translatedApp.contains("_dw4(")
                         || translatedApp.contains("_dwN(")
                         || translatedApp.contains("_dn0(")
+                        || translatedApp.contains("(_nn(")
                         || translatedApp.contains("_dn1(")
                         || translatedApp.contains("_dn2(")
                         || translatedApp.contains("_dn3(")

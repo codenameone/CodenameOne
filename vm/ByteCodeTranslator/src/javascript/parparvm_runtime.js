@@ -5073,6 +5073,11 @@ function _dn2(t, fn, a0, a1) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0,
 function _dn3(t, fn, a0, a1, a2) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2); }
 function _dn4(t, fn, a0, a1, a2, a3) { if (t == null) { cn1_ivsNpe(); } return fn(t, a0, a1, a2, a3); }
 function _dnN(t, fn, args) { if (t == null) { cn1_ivsNpe(); } return fn.apply(null, [t].concat(args)); }
+// The receiver of a direct call written at the site, `impl(_nn(t), ...)`: the
+// null check alone, so the call itself is the site's own and V8 can inline the
+// body (see JavascriptMethodGenerator's straight-line invoke).
+function _nn(t) { if (t == null) { cn1_ivsNpe(); } return t; }
+global._nn = _nn;
 global._dn0 = _dn0; global._dn1 = _dn1; global._dn2 = _dn2;
 global._dn3 = _dn3; global._dn4 = _dn4; global._dnN = _dnN;
 
@@ -5591,29 +5596,33 @@ function installNativeBindings() {
     // own implementation. So override the dispatch id ONLY on the
     // exact class extracted from the bindNative name; everywhere else
     // the existing emitted entry stays intact.
+    // Both lookups used to scan every class for every native -- a string
+    // concatenation per class to find the owner, then a hasOwnProperty per class
+    // for the key -- which on the transpiled Flutter gallery (thousands of
+    // classes, hundreds of natives) was 9% of the worker's whole CPU profile at
+    // start-up and deoptimized this function 808 times on methods maps of
+    // different shapes. The owner is now found by trying each underscore
+    // boundary against the class table, longest wins as before, and the classes
+    // holding a key come from an index built once over every methods map.
+    // Overriding only replaces a key that is already there, so the index stays
+    // exact while the loop below runs.
     let dispatchId = null;
     let targetClassName = null;
     if (name.indexOf("cn1_") === 0 && name.indexOf("cn1_s_") !== 0) {
-      let bestPrefix = null;
-      for (let i = 0; i < classNames.length; i++) {
-        const prefix = "cn1_" + classNames[i] + "_";
-        if (name.indexOf(prefix) === 0
-                && (bestPrefix == null || prefix.length > bestPrefix.length)) {
-          bestPrefix = prefix;
-          targetClassName = classNames[i];
+      for (let p = name.indexOf("_", 4); p > 4; p = name.indexOf("_", p + 1)) {
+        const candidate = name.substring(4, p);
+        if (Object.prototype.hasOwnProperty.call(classes, candidate)) {
+          targetClassName = candidate;
         }
       }
-      if (bestPrefix != null) {
-        dispatchId = "cn1_s_" + name.substring(bestPrefix.length);
+      if (targetClassName != null) {
+        dispatchId = "cn1_s_" + name.substring(targetClassName.length + 5);
       }
     }
-    for (let i = 0; i < classNames.length; i++) {
-      const cls = classes[classNames[i]];
-      if (!cls || !cls.methods) {
-        continue;
-      }
-      if (Object.prototype.hasOwnProperty.call(cls.methods, name)) {
-        cls.methods[name] = fn;
+    const holders = methodKeyIndex().get(name);
+    if (holders) {
+      for (let i = 0; i < holders.length; i++) {
+        holders[i].methods[name] = fn;
       }
     }
     if (targetClassName && dispatchId) {
@@ -5623,6 +5632,29 @@ function installNativeBindings() {
         targetCls.methods[dispatchId] = fn;
       }
     }
+  }
+  let keyIndex = null;
+  function methodKeyIndex() {
+    if (keyIndex) {
+      return keyIndex;
+    }
+    keyIndex = new Map();
+    for (let i = 0; i < classNames.length; i++) {
+      const cls = classes[classNames[i]];
+      if (!cls || !cls.methods) {
+        continue;
+      }
+      const keys = Object.keys(cls.methods);
+      for (let k = 0; k < keys.length; k++) {
+        let list = keyIndex.get(keys[k]);
+        if (!list) {
+          list = [];
+          keyIndex.set(keys[k], list);
+        }
+        list.push(cls);
+      }
+    }
+    return keyIndex;
   }
   const names = Object.keys(jvm.nativeMethods || {});
   for (let i = 0; i < names.length; i++) {
