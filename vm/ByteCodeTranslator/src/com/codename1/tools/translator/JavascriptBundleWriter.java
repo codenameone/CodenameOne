@@ -294,6 +294,7 @@ final class JavascriptBundleWriter {
         List<StringBuilder> chunks = new ArrayList<StringBuilder>();
         StringBuilder current = new StringBuilder();
         chunks.add(current);
+        JavascriptMethodGenerator.resetAllocationFunctions();
         for (ByteCodeClass cls : sorted) {
             String code = cls.generateJavascriptCode(classes);
             if (current.length() > 0 && current.length() + code.length() > CLASS_CHUNK_MAX_BYTES) {
@@ -304,6 +305,10 @@ final class JavascriptBundleWriter {
         }
 
         StringBuilder tail = chunks.get(chunks.size() - 1);
+        // After every class registration (this is the last chunk, and it loads last), so
+        // each allocation function can capture its classDef at load; see
+        // JavascriptMethodGenerator.newObjectExpression.
+        JavascriptMethodGenerator.appendAllocationFunctions(tail);
         ByteCodeClass mainClass = ByteCodeClass.getMainClass();
         if (mainClass != null) {
             tail.append("jvm.setMain(\"").append(mainClass.getClsName()).append("\", \"")
@@ -437,6 +442,8 @@ final class JavascriptBundleWriter {
         // (getImpl/valueOfHeap/...) as BARE identifiers -- invisible to the
         // string-literal scans above -- so protect them from renaming explicitly.
         excluded.addAll(JavascriptMethodGenerator.RUNTIME_DELEGATE_IDENTIFIERS);
+        // Field names the allocation functions write as bare keys: renaming is whole-token.
+        excluded.addAll(JavascriptMethodGenerator.ALLOCATION_FUNCTION_KEYS);
         defs.removeAll(excluded);
         // Prefix protection: some bridge names are CONSTRUCTED at runtime by string
         // concatenation, so the full identifier never appears as a literal -- only

@@ -4039,6 +4039,17 @@ global._L = (v) => jvm.createStringLiteral(v);
 // ``TYPE = int.class`` would otherwise leave the field null.
 global._primClass = (n) => classObjectForName(n);
 global._O = (c) => jvm.newObject(c);
+// The classDef a translator-emitted allocation function (cn1_<class>___NEW__)
+// captures once at load. It is emitted after every class registration, so a
+// missing class is a translator bug; say so rather than building objects whose
+// __classDef is undefined, which would only fail at the first virtual call.
+global._Od = (c) => {
+  const def = jvm.classes[c];
+  if (!def) {
+    throw new Error("allocation function for unregistered class " + c);
+  }
+  return def;
+};
 global._C = jvm.cC;
 global._D = jvm.iO;
 global._A = jvm.aL;

@@ -5173,7 +5173,7 @@ final class JavascriptMethodGenerator {
                 // suspending <clinit> runs on the trampoline; ``_O``'s own
                 // call then finds the class initialized and returns. (#5774)
                 appendStraightLineEnsureClassInitialized(out, ctx, typeName);
-                out.append("  ").append(ctx.push("_O(\"" + typeName + "\")")).append(";\n");
+                out.append("  ").append(ctx.push(newObjectExpression(typeName))).append(";\n");
                 return true;
             case Opcodes.ANEWARRAY: {
                 String size = ctx.pop();
@@ -7082,7 +7082,7 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 // See the straight-line NEW case: ``_O`` only ever drives a
                 // clinit synchronously, so the guard goes first. (#5774)
                 appendInterpreterEnsureClassInitialized(out, typeName, false);
-                out.append("        stack.p(_O(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
+                out.append("        stack.p(").append(newObjectExpression(typeName)).append("); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ANEWARRAY:
                 out.append("        stack.p(_j(stack.q(), \"").append(typeName)
@@ -11074,6 +11074,131 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
             return value < 0 ? "(" + value + ")" : Long.toString(value);
         }
         return "_Llit(" + ((int) value) + ", " + ((int) (value >>> 32)) + ")";
+    }
+
+    /// Classes a translated ``new`` allocates through a per-class allocation function
+    /// (see newObjectExpression), in first-use order; appendAllocationFunctions emits them.
+    static final java.util.LinkedHashSet<String> ALLOCATION_FUNCTION_CLASSES = new java.util.LinkedHashSet<String>();
+
+    /// Field property names written as bare object-literal keys by the allocation
+    /// functions. JavascriptBundleWriter.minifyGeneratedIdentifiers renames whole tokens,
+    /// so one of these that happened to spell a generated function name (a field
+    /// ``done`` beside a method ``void done()``) would be renamed with it; it excludes them.
+    static final java.util.Set<String> ALLOCATION_FUNCTION_KEYS = new java.util.HashSet<String>();
+
+    static void resetAllocationFunctions() {
+        ALLOCATION_FUNCTION_CLASSES.clear();
+        ALLOCATION_FUNCTION_KEYS.clear();
+    }
+
+    /// The expression a translated ``new typeName`` allocates with.
+    ///
+    /// jvm.newObject builds an object by walking a cached field list and assigning each
+    /// default through a computed key. V8 cannot see through that: the allocation is a
+    /// call it will not inline and the stores are keyed, so every ``new`` in a loop
+    /// allocates for real. Measured in node on the valueEscape shape (allocate, read two
+    /// fields, drop), 8M iterations: 220-250ms through the generic path, 14ms for a
+    /// function returning a literal with the field names as literal keys -- V8 inlines it
+    /// and removes the allocation, as it does for dart2js's own output -- and ~80ms with
+    /// the same keys computed.
+    ///
+    /// So a class gets its own allocation function returning exactly that literal. Not
+    /// for a Throwable, whose construction has to capture the stack (jvm.newObject does);
+    /// not for an abstract class or an interface, which bytecode cannot instantiate; not
+    /// when any class on the chain is unknown here, since the field list would be
+    /// incomplete; and not under -Dparparvm.js.manglefields=1, which renames field names
+    /// only where they appear as quoted strings. The class-initialization guard the NEW
+    /// site already emits (appendStraightLineEnsureClassInitialized) is what runs a
+    /// static initializer; newObject's own check only mattered for a class without one.
+    static String newObjectExpression(String typeName) {
+        if (!allocationFunctionEligible(typeName)) {
+            return "_O(\"" + typeName + "\")";
+        }
+        ALLOCATION_FUNCTION_CLASSES.add(typeName);
+        return allocationFunctionName(typeName) + "()";
+    }
+
+    static String allocationFunctionName(String className) {
+        return "cn1_" + className + "___NEW__";
+    }
+
+    private static boolean allocationFunctionEligible(String typeName) {
+        if ("1".equals(System.getProperty("parparvm.js.manglefields"))
+                || System.getProperty("parparvm.js.allocfn.off") != null) {
+            return false;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        if (idx == null) {
+            return false;
+        }
+        ByteCodeClass cls = idx.get(typeName);
+        if (cls == null || cls.isIsAbstract() || cls.isIsInterface()) {
+            return false;
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (ByteCodeClass c = cls; c != null; ) {
+            if (!seen.add(c.getClsName()) || "java_lang_Throwable".equals(c.getClsName())) {
+                return false;
+            }
+            String base = c.getBaseClass();
+            if (base == null) {
+                return true;
+            }
+            c = idx.get(JavascriptNameUtil.sanitizeClassName(base));
+            if (c == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Emits the allocation function of every class newObjectExpression handed out. Runs
+    /// after every class has been generated, and its output goes after every class
+    /// registration, so each function can capture its classDef once at load.
+    ///
+    /// The property order is newObject's -- __class, __classDef, __id, __monitor, then the
+    /// instance fields base class first, each class's in declaration order, filtered by the
+    /// same field-level RTA the class's ``f:`` list uses -- so an object built by either
+    /// path has the same shape. Keys are bare identifiers, each after a comma AND a space:
+    /// the bundle writer's string hoisting rewrites a ``,KEY:`` with no space into a
+    /// computed ``,[alias]:`` key, which is the slow case measured above.
+    static void appendAllocationFunctions(StringBuilder out) {
+        if (ALLOCATION_FUNCTION_CLASSES.isEmpty()) {
+            return;
+        }
+        Map<String, ByteCodeClass> idx = classIndex;
+        for (String className : ALLOCATION_FUNCTION_CLASSES) {
+            java.util.List<ByteCodeClass> chain = new java.util.ArrayList<ByteCodeClass>();
+            for (ByteCodeClass c = idx.get(className); c != null; ) {
+                chain.add(0, c);
+                String base = c.getBaseClass();
+                c = base == null ? null : idx.get(JavascriptNameUtil.sanitizeClassName(base));
+            }
+            // Not a cn1_ name: every pass that rewrites cn1_ tokens would have to be
+            // taught about it, and it is referenced once, in its own function.
+            String defVar = "$Ad_" + className;
+            out.append("const ").append(defVar).append(" = _Od(\"").append(className).append("\");\n");
+            out.append("function ").append(allocationFunctionName(className)).append("(){\n");
+            out.append("return {__class: \"").append(className).append("\", __classDef: ").append(defVar)
+                    .append(", __id: jvm.nextIdentity++, __monitor: null");
+            java.util.Set<String> refs = referencedInstanceFields;
+            for (ByteCodeClass c : chain) {
+                for (ByteCodeField field : c.getFields()) {
+                    if (field.isStaticField()) {
+                        continue;
+                    }
+                    if (refs != null && !refs.contains(c.getClsName() + "\0" + field.getFieldName())) {
+                        continue;
+                    }
+                    String prop = JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName());
+                    ALLOCATION_FUNCTION_KEYS.add(prop);
+                    String desc = field.getRuntimeDescriptor();
+                    boolean primitive = desc != null && !desc.isEmpty() && isPrimitiveDescriptor(desc);
+                    out.append(", ").append(prop).append(": ").append(primitive ? "0" : "null");
+                }
+            }
+            out.append("};\n}\n");
+        }
     }
 
 }
