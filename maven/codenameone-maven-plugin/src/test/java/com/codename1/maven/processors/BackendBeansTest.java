@@ -780,6 +780,13 @@ public class BackendBeansTest {
                 + "}\n");
         errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("Metric jobs is a"));
+        // Two names that fold to one Prometheus name clash as surely.
+        s.put("com.example.Work", PKG + "@Component public class Work {\n"
+                + "    @Timed(\"latency.ms\") public void a() { }\n"
+                + "    @Timed(\"latency_ms\") public void b() { }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("would be exported to Prometheus as latency_ms"));
         s.put("com.example.Work", PKG + "@Component public class Work {\n"
                 + "    @Timed(\"jobs.time\") @Counted(\"jobs\") public void a() { }\n"
                 + "    @Counted(\"jobs\") public void b() { }\n"
@@ -1254,6 +1261,19 @@ public class BackendBeansTest {
         } finally {
             backend.stop();
         }
+    }
+
+    @Test
+    public void aPrototypeWithJobsIsWarnedAbout() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Ticker", PKG + "@Component @Scope(\"prototype\") public class Ticker {\n"
+                + "    @Scheduled(fixedRate = 60000) public void tick() { }\n"
+                + "}\n");
+        // Built, as Spring runs it; but said, since it behaves as a singleton.
+        assertNoErrors(process(compile(s)));
+        String warned = String.valueOf(warnings);
+        assertTrue(warned, warned.contains("ticker (com.example.Ticker) has @Scheduled methods "
+                + "but is prototype-scoped"));
     }
 
     @Test

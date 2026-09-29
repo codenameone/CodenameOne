@@ -324,6 +324,8 @@ final class BackendBeans {
     /// Metric name -> "histogram" or "counter", with where it was declared, for
     /// the @Timed and @Counted instruments the woven code registers.
     private final Map<String, String[]> aspectMetrics = new LinkedHashMap<String, String[]>();
+    /// Prometheus series name -> the aspect metric exporting it, and where.
+    private final Map<String, String[]> aspectSeries = new LinkedHashMap<String, String[]>();
     final Map<String, BackendWeaver.Plan> plans = new TreeMap<String, BackendWeaver.Plan>();
     /// Eager singletons (and the prototypes they need) in construction order.
     final List<Bean> order = new ArrayList<Bean>();
@@ -1690,6 +1692,18 @@ final class BackendBeans {
                 ctx.error(b.cls, b.describe() + " has @Scheduled methods but is " + b.scope
                         + "-scoped; a job runs outside any request.");
             }
+            if (!b.jobs.isEmpty() && PROTOTYPE.equals(b.scope)) {
+                // A warning, as Spring runs it: its post-processor schedules the
+                // instance it is given and never destroys a prototype either. But
+                // not silent -- the one instance built for the jobs runs them for
+                // the life of the server, like a singleton, and its @PreDestroy or
+                // destroy method is never called.
+                ctx.getLog().warn("cn1: " + b.describe() + " has @Scheduled methods but is "
+                        + "prototype-scoped. One instance is built to run its jobs and keeps "
+                        + "running them for the life of the server, and a prototype is never "
+                        + "destroyed, so its @PreDestroy never runs. Make it a singleton if "
+                        + "that is what it is.");
+            }
         }
         // Every candidate is resolved now, so what runs outside any HTTP request
         // can be checked through the whole graph: a websocket callback, a
@@ -2248,15 +2262,47 @@ final class BackendBeans {
 
     private void claimAspectMetric(AnnotatedClass cls, String name, String kind, String by) {
         String[] earlier = aspectMetrics.get(name);
-        if (earlier == null) {
-            aspectMetrics.put(name, new String[] {kind, by});
+        if (earlier != null) {
+            if (!earlier[0].equals(kind)) {
+                ctx.error(cls, "Metric " + name + " is a " + kind + " for " + by + " and a "
+                        + earlier[0] + " for " + earlier[1] + ". One name cannot be both: "
+                        + "give one of them another name.");
+            }
             return;
         }
-        if (!earlier[0].equals(kind)) {
-            ctx.error(cls, "Metric " + name + " is a " + kind + " for " + by + " and a "
-                    + earlier[0] + " for " + earlier[1] + ". One name cannot be both: give "
-                    + "one of them another name.");
+        aspectMetrics.put(name, new String[] {kind, by});
+        // And the Prometheus series it exports, as Metrics.claimPrometheusNames
+        // claims them at run time: two DIFFERENT names that fold alike --
+        // latency.ms and latency_ms, or a counter's _total and a histogram's
+        // series -- are refused there, in the woven finally, after the body ran.
+        String base = promName(name);
+        String[] series = "counter".equals(kind) ? new String[] {base + "_total"}
+                : new String[] {base, base + "_bucket", base + "_sum", base + "_count"};
+        for (String element : series) {
+            String[] owner = aspectSeries.get(element);
+            if (owner != null && !owner[0].equals(name)) {
+                ctx.error(cls, "Metric " + name + " (" + by + ") would be exported to "
+                        + "Prometheus as " + element + ", which metric " + owner[0] + " ("
+                        + owner[1] + ") already is; rename one.");
+                return;
+            }
         }
+        for (String element : series) {
+            aspectSeries.put(element, new String[] {name, by});
+        }
+    }
+
+    /// A metric name in Prometheus's alphabet -- the same fold Metrics.promName
+    /// applies at run time, which this must match exactly.
+    static String promName(String name) {
+        StringBuilder sb = new StringBuilder(name.length());
+        for (int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+                    || c == ':' || (iter > 0 && c >= '0' && c <= '9');
+            sb.append(ok ? c : '_');
+        }
+        return sb.toString();
     }
 
     private void collectAspects() {

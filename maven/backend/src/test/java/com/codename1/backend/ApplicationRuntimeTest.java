@@ -269,6 +269,27 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a gauge replacing a shared one survives the old source's removal")
+    void replacedSharedGaugeSurvives() {
+        com.codename1.backend.metrics.Gauge.Source old =
+                new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        return 1;
+                    }
+                };
+        Metrics.addSource("test.shared.replace", "", "", old);
+        com.codename1.backend.metrics.Gauge replacement = Metrics.gauge("test.shared.replace",
+                "", "", new com.codename1.backend.metrics.Gauge.Source() {
+                    public double read() {
+                        return 2;
+                    }
+                });
+        Metrics.removeSource("test.shared.replace", old);    // the old server stops
+        assertTrue(Metrics.get("test.shared.replace") == replacement,
+                "removing the replaced source deleted the application's gauge");
+    }
+
+    @Test
     @DisplayName("label values that print alike are one histogram series, as Prometheus sees them")
     void labelValuesThatPrintAlikeShareASeries() {
         Histogram h = Metrics.histogram("test.labels.text", "", "ms", null,

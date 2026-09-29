@@ -103,7 +103,7 @@ public final class Metrics {
     public static Gauge gauge(String name, String description, String unit,
                               Gauge.Source source) {
         Gauge g = new Gauge(name, description, unit, source);
-        replaceGauge(g);
+        replaceGauge(g, false);
         return g;
     }
 
@@ -111,11 +111,13 @@ public final class Metrics {
     public static Gauge gauge(String name, String description, String unit,
                               Gauge.MultiSource source) {
         Gauge g = new Gauge(name, description, unit, source);
-        replaceGauge(g);
+        replaceGauge(g, false);
         return g;
     }
 
-    private static synchronized void replaceGauge(Gauge g) {
+    /// Registers `g`, replacing a gauge of the same name. `shared` is true
+    /// only for addSource()'s aggregate.
+    private static synchronized void replaceGauge(Gauge g, boolean shared) {
         if (g.getName() == null || g.getName().length() == 0) {
             // As counters and histograms refuse it: a nameless gauge renders as a
             // blank Prometheus name, and the scraper rejects the whole exposition.
@@ -128,6 +130,13 @@ public final class Metrics {
         }
         claimPrometheusNames(g.getName(), Instrument.GAUGE);
         INSTRUMENTS.put(g.getName(), g);
+        if (!shared) {
+            // An application's gauge replacing one addSource() built: the sources
+            // behind the old one are no longer read, and their registration goes
+            // with it. Left behind, the last server to remove its source deleted
+            // THIS gauge by name, and it vanished from management and exports.
+            SHARED.remove(g.getName());
+        }
     }
 
     /// Prometheus series name -> the instrument name that renders it.
@@ -300,7 +309,7 @@ public final class Metrics {
                     }
                     return any ? sum : Double.NaN;
                 }
-            }));
+            }), true);
             SHARED.put(name, all);
         }
         sources.add(source);
