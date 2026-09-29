@@ -245,9 +245,12 @@ key count as a match, and several keys in `value` must all match. `prefix` is pu
 in front of each key with a dot.
 
 Both are evaluated once, at start-up, as one `if` around the bean's construction.
-Because the build sees both branches, it also checks both: every bean that needs a
-conditional one must be covered whichever way the condition goes, by another bean
-of the same type under the other condition or by being conditional itself.
+Which beans are on depends on the deployment's configuration, so it's the start that
+checks it, as Spring's does: a bean that requires one whose conditions are all off
+under the running configuration stops the server from starting, with an error
+naming the injection point. Cover the other case with a bean of the same type under
+the opposite condition, make the dependency optional, or give the dependent bean
+the same condition.
 
 `@ConditionalOnMissingBean` is the one condition decided entirely at build time.
 It marks a default that steps aside when the application declares another bean it

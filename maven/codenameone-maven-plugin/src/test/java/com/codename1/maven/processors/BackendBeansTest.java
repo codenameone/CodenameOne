@@ -1283,6 +1283,18 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aScheduledFutureIsWarnedAbout() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Sync", PKG + "@Component public class Sync {\n"
+                + "    @Scheduled(fixedRate = 60000)\n"
+                + "    public Future run() { return AsyncResult.of(\"x\"); }\n"
+                + "}\n");
+        assertNoErrors(process(compile(s)));
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("@Scheduled method com.example.Sync.run returns a Future"));
+    }
+
+    @Test
     public void aPrototypeWithJobsIsWarnedAbout() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Ticker", PKG + "@Component @Scope(\"prototype\") public class Ticker {\n"

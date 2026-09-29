@@ -878,6 +878,35 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("one process runs one backend: a second start is refused, a restart is not")
+    void oneBackendPerProcess() throws Exception {
+        final HttpServer.Handler none = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;
+            }
+        };
+        Properties first = new Properties();
+        first.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend running = Backend.builder(Config.of(first, "test")).quiet().handler(none).start();
+        try {
+            final Properties second = new Properties();
+            second.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+            IllegalStateException refused = assertThrows(IllegalStateException.class,
+                    () -> Backend.builder(Config.of(second, "test")).quiet().handler(none)
+                            .start());
+            assertTrue(refused.getMessage().contains("one process runs one backend"),
+                    refused.getMessage());
+        } finally {
+            running.stop();
+        }
+        Properties again = new Properties();
+        again.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
+        Backend restarted = Backend.builder(Config.of(again, "test")).quiet().handler(none)
+                .start();
+        restarted.stop();
+    }
+
+    @Test
     @DisplayName("an Error from the application's stopping hook does not abandon the shutdown")
     void stopSurvivesAnError() throws Exception {
         int port = freePort();
@@ -939,50 +968,6 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("one exporter given to a second server is refused without touching the first")
-    void sharedExporterSurvivesARefusedSecondServer() throws Exception {
-        ServerSocket probe = new ServerSocket(0);
-        int closed = probe.getLocalPort();
-        probe.close();
-        final com.codename1.backend.otel.OtlpMetricExporter exporter =
-                new com.codename1.backend.otel.OtlpMetricExporter("shared");
-        Properties first = new Properties();
-        first.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
-        first.setProperty(com.codename1.backend.otel.OtlpMetricExporter.ENDPOINT,
-                "http://127.0.0.1:" + closed + "/v1/metrics");
-        first.setProperty(com.codename1.backend.otel.OtlpMetricExporter.INTERVAL, "20");
-        final HttpServer.Handler none = new HttpServer.Handler() {
-            public HttpServer.Response handle(HttpServer.Request request) {
-                return null;
-            }
-        };
-        Backend running = Backend.builder(Config.of(first, "test")).quiet().metrics(exporter)
-                .handler(none).start();
-        try {
-            final Properties second = new Properties();
-            second.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
-            second.setProperty(com.codename1.backend.otel.OtlpMetricExporter.ENDPOINT,
-                    "http://127.0.0.1:9/elsewhere");
-            assertThrows(Exception.class, () -> Backend.builder(Config.of(second, "test"))
-                    .quiet().metrics(exporter).handler(none).start());
-            assertEquals("http://127.0.0.1:" + closed + "/v1/metrics",
-                    exporter.status().get("endpoint"),
-                    "the refused server reconfigured the running exporter");
-            // Still running: failures keep being counted against the first endpoint.
-            long before = ((Number) exporter.status().get("failures")).longValue();
-            long deadline = System.currentTimeMillis() + 5000;
-            while(System.currentTimeMillis() < deadline
-                    && ((Number) exporter.status().get("failures")).longValue() < before + 2) {
-                Thread.sleep(20);
-            }
-            assertTrue(((Number) exporter.status().get("failures")).longValue() >= before + 2,
-                    "the refused server stopped the running exporter");
-        } finally {
-            running.stop();
-        }
-    }
-
-    @Test
     @DisplayName("a metric reader that declines to open is never shut down")
     void declinedMetricReaderIsNotStopped() throws Exception {
         int port = freePort();
@@ -1026,61 +1011,6 @@ class ApplicationRuntimeTest {
                     () -> Tasks.executor(mine, "shared", Tasks.PLATFORM));
         } finally {
             Tasks.shutdown(mine, 0);
-        }
-    }
-
-    @Test
-    @DisplayName("the task queue gauge leaves out a server that does not measure")
-    void queueGaugeSkipsUnmeasuredServers() throws Exception {
-        Properties measuredSettings = new Properties();
-        measuredSettings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
-        Backend measured = Backend.builder(Config.of(measuredSettings, "dev")).quiet()
-                .handler(new HttpServer.Handler() {
-                    public HttpServer.Response handle(HttpServer.Request request) {
-                        return null;
-                    }
-                }).start();
-        final CountDownLatch release = new CountDownLatch(1);
-        int port = freePort();
-        Properties quietSettings = new Properties();
-        quietSettings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        quietSettings.setProperty("cn1.task.executor.unmeasured.threads", "1");
-        // A development profile turns the management endpoints, and with them
-        // measuring, on by default.
-        quietSettings.setProperty(Management.ENABLED, "false");
-        Backend unmeasured = Backend.builder(Config.of(quietSettings, "test")).quiet()
-                .handler(new HttpServer.Handler() {
-                    public HttpServer.Response handle(HttpServer.Request request) {
-                        // On this server's thread, so on its executors: one task
-                        // holds the only thread and the next one waits.
-                        TaskExecutor e = Tasks.executor("unmeasured", Tasks.PLATFORM);
-                        Runnable wait = new Runnable() {
-                            public void run() {
-                                try {
-                                    release.await(10, TimeUnit.SECONDS);
-                                } catch (InterruptedException err) {
-                                    Thread.currentThread().interrupt();
-                                }
-                            }
-                        };
-                        e.execute(wait);
-                        e.execute(wait);
-                        return HttpServer.Response.text(200, "queued");
-                    }
-                }).start();
-        try {
-            assertTrue(measured.isMeasured());
-            assertFalse(unmeasured.isMeasured());
-            assertEquals("queued", read(open(port, "/fill")));
-            com.codename1.backend.metrics.Instrument gauge = Metrics.get("cn1.task.queue_depth");
-            assertNotNull(gauge);
-            String points = String.valueOf(gauge.points());
-            assertFalse(points.contains("unmeasured"),
-                    "a server with metrics off reported its queue: " + points);
-        } finally {
-            release.countDown();
-            unmeasured.stop();
-            measured.stop();
         }
     }
 
@@ -1154,38 +1084,6 @@ class ApplicationRuntimeTest {
         assertEquals("cart", second.scopedBeans(2)[0]);
     }
 
-    @Test
-    @DisplayName("the built-in server gauges add up every running server, and drop a stopped one")
-    void serverGaugesAggregate() throws Exception {
-        Backend[] servers = new Backend[2];
-        int[] ports = {freePort(), freePort()};
-        for(int i = 0 ; i < 2 ; i++) {
-            Properties settings = new Properties();
-            settings.setProperty(Config.SERVER_PORT, String.valueOf(ports[i]));
-            servers[i] = Backend.builder(Config.of(settings, "dev")).quiet()
-                    .handler(new HttpServer.Handler() {
-                        public HttpServer.Response handle(HttpServer.Request request)
-                                throws Exception {
-                            return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
-                        }
-                    }).start();
-        }
-        try {
-            read(open(ports[0], "/x"));
-            read(open(ports[1], "/x"));
-            read(open(ports[1], "/x"));
-            double both = served();
-            double expected = number(servers[0]) + number(servers[1]);
-            assertEquals(expected, both, 0.0, "the gauge reported one server, not the sum");
-            servers[1].stop();
-            assertEquals(number(servers[0]), served(), 0.0,
-                    "a stopped server was still counted");
-        } finally {
-            servers[0].stop();
-            servers[1].stop();
-        }
-    }
-
     private static double served() {
         Map point = (Map)Metrics.get("cn1.server.requests_served").points().get(0);
         return ((Number)point.get("value")).doubleValue();
@@ -1255,34 +1153,6 @@ class ApplicationRuntimeTest {
         return c.getResponseCode();
     }
 
-    @Test
-    @DisplayName("a server that does not measure keeps its requests out of another's histogram")
-    void uninstrumentedServerIsNotMeasured() throws Exception {
-        int[] ports = {freePort(), freePort()};
-        Properties measured = new Properties();
-        measured.setProperty(Config.SERVER_PORT, String.valueOf(ports[0]));
-        Properties plain = new Properties();
-        plain.setProperty(Config.SERVER_PORT, String.valueOf(ports[1]));
-        HttpServer.Handler ok = new HttpServer.Handler() {
-            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-                return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
-            }
-        };
-        Backend a = Backend.builder(Config.of(measured, "dev")).quiet().handler(ok).start();
-        Backend b = Backend.builder(Config.of(plain, "prod")).quiet().handler(ok).start();
-        try {
-            read(open(ports[0], "/a"));
-            long before = requestCount();
-            read(open(ports[1], "/b"));
-            read(open(ports[1], "/b"));
-            assertEquals(before, requestCount(),
-                    "requests to a server without metrics were recorded");
-        } finally {
-            a.stop();
-            b.stop();
-        }
-    }
-
     private static long requestCount() {
         long n = 0;
         List points = Metrics.get("http.server.request.duration").points();
@@ -1317,46 +1187,6 @@ class ApplicationRuntimeTest {
                     && cookie.contains("SameSite=Strict"), String.valueOf(cookie));
         } finally {
             backend.stop();
-        }
-    }
-
-    @Test
-    @DisplayName("each server has its own executors, and stopping one leaves the other's running")
-    void executorsArePerServer() throws Exception {
-        final TaskExecutor[] seen = new TaskExecutor[2];
-        Backend[] servers = new Backend[2];
-        int[] ports = {freePort(), freePort()};
-        for(int i = 0 ; i < 2 ; i++) {
-            final int index = i;
-            Properties settings = new Properties();
-            settings.setProperty(Config.SERVER_PORT, String.valueOf(ports[i]));
-            servers[i] = Backend.builder(Config.of(settings, "test")).quiet()
-                    .handler(new HttpServer.Handler() {
-                        public HttpServer.Response handle(HttpServer.Request request)
-                                throws Exception {
-                            seen[index] = Tasks.executor("jobs", Tasks.PLATFORM);
-                            return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
-                        }
-                    }).start();
-        }
-        try {
-            assertEquals("ok", read(open(ports[0], "/")));
-            assertEquals("ok", read(open(ports[1], "/")));
-            assertTrue(seen[0] != null && seen[1] != null && seen[0] != seen[1],
-                    "two servers shared one executor");
-            servers[1].stop();
-            assertTrue(seen[1].isShutdown());
-            assertFalse(seen[0].isShutdown(), "stopping one server shut the other's executor");
-            final CountDownLatch ran = new CountDownLatch(1);
-            seen[0].execute(new Runnable() {
-                public void run() {
-                    ran.countDown();
-                }
-            });
-            assertTrue(ran.await(5, TimeUnit.SECONDS));
-        } finally {
-            servers[0].stop();
-            servers[1].stop();
         }
     }
 
@@ -2059,45 +1889,6 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("a server with tracing off stays untraced when another server installs a tracer")
-    void anUntracedServerIsNotClaimed() throws Exception {
-        final List started = new ArrayList();
-        Tracer other = new QuietTracer() {
-            public Span startSpan(String name, int kind, Span parent, String traceparent,
-                                  String tracestate) {
-                started.add(name);
-                return null;
-            }
-        };
-        int port = freePort();
-        Properties settings = new Properties();
-        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
-                .application(new EmptyApplication())
-                .handler(new HttpServer.Handler() {
-                    public HttpServer.Response handle(HttpServer.Request request)
-                            throws Exception {
-                        // A span of the application's own, inside the request.
-                        Tracing.startSpan("custom").end();
-                        return request.respond(200, "text/plain", "ok".getBytes("UTF-8"));
-                    }
-                }).start();
-        Tracing.install(other);                       // another server, started after
-        try {
-            assertEquals("ok", read(open(port, "/")));
-            assertTrue(started.isEmpty(),
-                    "the untraced server's work went to another server's tracer: " + started);
-            // The fallback itself is unchanged: with no owner, the installed one.
-            Tracing.startServer(new HttpServer.Request("GET", "/", "HTTP/1.1",
-                    new LinkedHashMap(), null), false, null);
-            assertEquals(1, started.size());
-        } finally {
-            Tracing.install(null);
-            backend.stop();
-        }
-    }
-
-    @Test
     @DisplayName("a tokenless MCP endpoint binds loopback, and refuses an explicit public address")
     void tokenlessMcpStaysOnLoopback() throws Exception {
         Properties settings = new Properties();
@@ -2649,89 +2440,6 @@ class ApplicationRuntimeTest {
     }
 
     @Test
-    @DisplayName("a retired session's beans are destroyed with their own server's executors")
-    void retiredSessionTeardownKeepsItsServer() throws Exception {
-        final TaskExecutor[] mine = new TaskExecutor[1];
-        final TaskExecutor[] atDestroy = new TaskExecutor[1];
-        final CountDownLatch holding = new CountDownLatch(1);
-        final CountDownLatch release = new CountDownLatch(1);
-        int port = freePort();
-        Properties settings = new Properties();
-        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
-        Backend backend = Backend.builder(Config.of(settings, "test")).quiet()
-                .application(new EmptyApplication() {
-                    public HttpServer.Handler[] create(Backend.Environment environment) {
-                        return new HttpServer.Handler[] {new HttpServer.Handler() {
-                            public HttpServer.Response handle(HttpServer.Request request)
-                                    throws Exception {
-                                String t = request.getTarget();
-                                if (t.startsWith("/in")) {
-                                    request.getSession(true).scopedBeans(1)[0] = "cart";
-                                    return HttpServer.Response.text(200, "in");
-                                }
-                                if (t.startsWith("/hold")) {
-                                    request.getSession(false).scopedBeans(1);
-                                    mine[0] = Tasks.executor("probe", Tasks.PLATFORM);
-                                    holding.countDown();
-                                    release.await(10, TimeUnit.SECONDS);
-                                    return HttpServer.Response.text(200, "held");
-                                }
-                                request.getSession(false).invalidate();
-                                return HttpServer.Response.text(200, "out");
-                            }
-                        }};
-                    }
-
-                    public void sessionEnded(Object[] beans) {
-                        atDestroy[0] = Tasks.executor("probe", Tasks.PLATFORM);
-                    }
-                }).start();
-        // Newer, so it is what a thread with no server of its own falls back to.
-        Properties otherSettings = new Properties();
-        otherSettings.setProperty(Config.SERVER_PORT, String.valueOf(freePort()));
-        Backend other = Backend.builder(Config.of(otherSettings, "test")).quiet()
-                .handler(new HttpServer.Handler() {
-                    public HttpServer.Response handle(HttpServer.Request request) {
-                        return null;
-                    }
-                }).start();
-        try {
-            HttpURLConnection in = open(port, "/in");
-            assertEquals("in", read(in));
-            String cookie = in.getHeaderField("Set-Cookie");
-            final String pair = cookie.substring(0, cookie.indexOf(';'));
-            final int p = port;
-            final String[] held = new String[1];
-            Thread holder = new Thread(new Runnable() {
-                public void run() {
-                    try {
-                        HttpURLConnection h = open(p, "/hold");
-                        h.setRequestProperty("Cookie", pair);
-                        held[0] = read(h);
-                    } catch (IOException err) {
-                        held[0] = String.valueOf(err);
-                    }
-                }
-            });
-            holder.start();
-            assertTrue(holding.await(10, TimeUnit.SECONDS));
-            HttpURLConnection out = open(port, "/out");
-            out.setRequestProperty("Cookie", pair);
-            assertEquals("out", read(out));
-            release.countDown();
-            holder.join(10000);
-            assertEquals("held", held[0]);
-            assertNotNull(atDestroy[0], "the retired beans were never destroyed");
-            assertTrue(atDestroy[0] == mine[0],
-                    "a retired session's @PreDestroy ran with another server's executors");
-        } finally {
-            release.countDown();
-            other.stop();
-            backend.stop();
-        }
-    }
-
-    @Test
     @DisplayName("an invalidated session's beans outlive the invalidating request while another uses them")
     void invalidatedBeansWaitForOtherUsers(@org.junit.jupiter.api.io.TempDir java.io.File dir)
             throws Exception {
@@ -2975,33 +2683,6 @@ class ApplicationRuntimeTest {
         manage.setProperty(Management.PATH, "/%6danage");
         assertEquals("/manage", Config.of(manage, "dev").getRoutePath(Management.PATH,
                 "/manage"));
-    }
-
-    @Test
-    @DisplayName("one DevTools given to two servers answers each from its own server")
-    void devToolsStayWithTheirServer() throws Exception {
-        com.codename1.backend.mcp.DevTools shared = new com.codename1.backend.mcp.DevTools();
-        int portA = freePort();
-        int portB = freePort();
-        Backend a = startAnswering(portA, "from A", shared);
-        Backend b = startAnswering(portB, "from B", shared);
-        try {
-            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + portA
-                    + "/mcp").openConnection();
-            c.setRequestMethod("POST");
-            c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/json");
-            c.setRequestProperty("Accept", "application/json, text/event-stream");
-            c.getOutputStream().write(("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":"
-                    + "\"tools/call\",\"params\":{\"name\":\"backend_call\",\"arguments\":"
-                    + "{\"method\":\"GET\",\"path\":\"/x\"}}}").getBytes("UTF-8"));
-            String answer = read(c);
-            assertTrue(answer.contains("from A"), "server A's tool reached another server: "
-                    + answer);
-        } finally {
-            b.stop();
-            a.stop();
-        }
     }
 
     private static Backend startAnswering(int port, final String text,

@@ -167,6 +167,11 @@ what the build decided about the beans without reading bytecode, ask a running
 development server: the `backend_beans` tool described in <<backend-mcp>> lists
 every bean, its scope and what was injected into it.
 
+A process runs one backend. Starting a second while the first is running fails
+with an error; starting again after it has stopped is fine. To scale out, run more
+processes: keep sessions in the database store and give scheduled jobs a lock, so
+the instances share them.
+
 === Virtual threads and the request loop
 
 The concurrency model is the part most worth understanding, because it's what

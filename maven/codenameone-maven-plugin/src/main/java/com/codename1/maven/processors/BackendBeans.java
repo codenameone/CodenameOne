@@ -1323,6 +1323,14 @@ final class BackendBeans {
                         + "@Async and pick the thread with @Scheduled(thread = ...).");
                 continue;
             }
+            if (returnsFuture(m)) {
+                // Spring ignores a scheduled method's return value, and so does
+                // this -- but a Future means work that outlives the run, so the
+                // run ends, and its lock is released, while that work goes on.
+                ctx.getLog().warn("cn1: @Scheduled method " + where + " returns a Future, "
+                        + "which is ignored: the run ends -- and its lock is released -- "
+                        + "when the method returns, not when that work does.");
+            }
             Job job = new Job(m, RestClientAnnotationProcessor.simpleName(
                     cls.getBinaryName().replace('$', '.')) + "." + m.getName());
             job.ownerBinary = cls.getBinaryName();
@@ -1953,6 +1961,12 @@ final class BackendBeans {
                 p.choice = true;
             }
         }
+        // Candidates that are all conditional are accepted here and checked at
+        // START, as Spring checks them: whether @Profile or @ConditionalOnProperty
+        // holds is a fact of the deployment, not of the build, and
+        // Wiring.single() refuses the start naming this injection point when none
+        // is on. Proving at build time that every combination of profiles and
+        // properties is covered is not attempted -- Spring does not either.
         p.candidates.addAll(matches);
     }
 

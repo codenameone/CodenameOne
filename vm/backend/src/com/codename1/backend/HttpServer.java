@@ -2003,6 +2003,9 @@ public final class HttpServer {
         out.put("openStaticFiles", Integer.valueOf(StaticFiles.openFileCount()));
         // Only when tracing is on, so a server that does not trace reports
         // exactly what it always has.
+        // The process's tracer: one process runs one Backend (Backend.claimProcess),
+        // so it is this server's. Two servers with different tracers in one JVM
+        // is not a supported shape and is refused at start.
         Tracing.metrics(out);
         return out;
     }

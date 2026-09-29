@@ -320,6 +320,68 @@ public final class Backend {
         notifyAll();
     }
 
+    /// The one Backend this process runs, until it stops.
+    private static Backend processLive;
+    /// Whether a start is under way, which holds the slot until it settles.
+    private static boolean processStarting;
+
+    /// ONE Backend per process. Scaling out is more processes -- sessions in the
+    /// JDBC store, scheduler locks in the database -- never more servers in one
+    /// JVM, and the runtime keeps process-wide state that assumes it: the
+    /// installed tracer, the metrics registry and its exporter, the default task
+    /// executors, the virtual-thread hosts. A second server beside the first
+    /// would share or fight over each of them, so it is refused outright rather
+    /// than half supported. Starting again after stop() has finished is fine.
+    static void claimProcess() {
+        // One stopping -- a stop() from a handler finishes its teardown after the
+        // handler returns -- is waited for: stop-then-start works either way.
+        Backend previous;
+        synchronized (Backend.class) {
+            previous = processLive;
+        }
+        if (previous != null) {
+            previous.awaitStopIfStopping();
+        }
+        claimProcessSlot();
+    }
+
+    private static synchronized void claimProcessSlot() {
+        if (processStarting) {
+            throw new IllegalStateException("A backend is already starting in this process; "
+                    + "one process runs one backend");
+        }
+        if (processLive != null && !processLive.isStopped()) {
+            throw new IllegalStateException("A backend is already running in this process; "
+                    + "stop it before starting another -- one process runs one backend");
+        }
+        processStarting = true;
+    }
+
+    /// Ends a start: `started` holds the slot until it stops, or null when the
+    /// start failed and the slot is free again.
+    static synchronized void settleProcess(Backend started) {
+        processStarting = false;
+        processLive = started;
+    }
+
+    /// Waits, up to its shutdown timeout and a little over, for a stop already
+    /// under way to finish; returns at once when none is.
+    synchronized void awaitStopIfStopping() {
+        long deadline = System.currentTimeMillis() + Math.max(0, shutdownMillis) + 5000;
+        while (stopping && !stopped) {
+            long left = deadline - System.currentTimeMillis();
+            if (left <= 0) {
+                return;
+            }
+            try {
+                wait(left);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     /// Whether [#stop] has finished: the beans are destroyed and the pool closed.
     public synchronized boolean isStopped() {
         return stopped;
@@ -1371,34 +1433,14 @@ public final class Backend {
         /// Starts the server and returns, without installing a signal handler or
         /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
-            claimStart();
+            claimProcess();
+            Backend running = null;
             try {
-                Backend running = startOnce();
-                synchronized (this) {
-                    live = running;
-                }
+                running = startOnce();
                 return running;
             } finally {
-                synchronized (this) {
-                    starting = false;
-                }
+                settleProcess(running);
             }
-        }
-
-        /// The Backend this builder last started, until it stops.
-        private Backend live;
-        private boolean starting;
-
-        /// One live Backend per builder. The generated application is one object,
-        /// and a second create() replaces its beans and scheduler: stopping the
-        /// first server would then destroy what the second still uses. A builder
-        /// may start again once its previous server has stopped.
-        private synchronized void claimStart() {
-            if (starting || (live != null && !live.isStopped())) {
-                throw new IllegalStateException("This builder's server is still running; "
-                        + "stop it before starting it again, or use another builder");
-            }
-            starting = true;
         }
 
         private Backend startOnce() throws Exception {
