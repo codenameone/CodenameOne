@@ -372,7 +372,15 @@ def parse_compute_line(line):
     return match.group(1), match.group(2), int(match.group(3))
 
 
-def compute_verdict(ours, theirs):
+# What a side's result on one workload was, when it was not a comparable timing.
+# "wrong result" and "did not run" name the side that failed; the geometric mean
+# is still taken over the workloads both sides got right, so a failure is shown,
+# never scored as a timing.
+FAILED_WRONG = "wrong result"
+FAILED_NOT_RUN = "did not run"
+
+
+def compute_verdict(ours, theirs, reference=None):
     """Per-workload ratios and their geometric mean.
 
     `ours` and `theirs` map a workload to (checksum, ms). The ratio is
@@ -381,21 +389,64 @@ def compute_verdict(ours, theirs):
     A workload is only compared when both checksums are identical: a different
     checksum means the two sides did not do the same computation -- on the web,
     for one, JavaScript numbers cannot hold a 64-bit integer -- and a ratio
-    between two different computations is not a measurement. It is reported as
-    such and left out of the mean rather than dropped silently.
+    between two different computations is not a measurement.
+
+    `reference` maps a workload to the checksum a host JVM computes from the same
+    source (reference_checksums). With it, a disagreement or a missing result is
+    attributed: the row says WHICH side got a wrong result or did not run, and
+    `failures` lists them, instead of both collapsing into "checksum mismatch" or
+    "not measured". Before this, Flutter web returning a wrong intArithmetic and
+    no longArithmetic at all simply removed those workloads from the web leg --
+    including ones Codename One wins -- and a Codename One failure would have
+    vanished the same way. The reference only arbitrates a DISAGREEMENT: two sides
+    that agree are compared whatever the JVM says, because a transcendental
+    workload may legitimately differ from a desktop JVM's libm in the last bit on
+    both.
     """
     rows = []
     ratios = []
+    failures = []
+    reference = reference or {}
     for name in COMPUTE_WORKLOADS:
         a = (ours or {}).get(name)
         b = (theirs or {}).get(name)
+        expected = reference.get(name)
         if a is None or b is None:
-            rows.append({"name": name, "status": "not measured"})
+            row = {"name": name, "status": "not measured"}
+            failed = []
+            if a is None and b is not None:
+                failed = [("codenameone", FAILED_NOT_RUN)]
+            elif b is None and a is not None:
+                failed = [("flutter", FAILED_NOT_RUN)]
+            if expected is not None:
+                # The side that did run can still be wrong.
+                if a is not None and a[0] != expected:
+                    failed.append(("codenameone", FAILED_WRONG))
+                if b is not None and b[0] != expected:
+                    failed.append(("flutter", FAILED_WRONG))
+            if failed:
+                row["failed"] = [{"side": side, "how": how} for side, how in failed]
+                failures.extend({"name": name, "side": side, "how": how} for side, how in failed)
+            if a is not None:
+                row["codenameone"] = a[1]
+            if b is not None:
+                row["flutter"] = b[1]
+            rows.append(row)
             continue
         if a[0] != b[0]:
-            rows.append({"name": name, "status": "checksum mismatch",
-                         "codenameone": a[1], "flutter": b[1],
-                         "checksums": [a[0], b[0]]})
+            row = {"name": name, "status": "checksum mismatch",
+                   "codenameone": a[1], "flutter": b[1],
+                   "checksums": [a[0], b[0]]}
+            if expected is not None:
+                failed = []
+                if a[0] != expected:
+                    failed.append("codenameone")
+                if b[0] != expected:
+                    failed.append("flutter")
+                if len(failed) == 1:
+                    row["failed"] = [{"side": failed[0], "how": FAILED_WRONG}]
+                    failures.append({"name": name, "side": failed[0], "how": FAILED_WRONG})
+            rows.append(row)
             continue
         if a[1] <= 0 or b[1] <= 0:
             rows.append({"name": name, "status": "too fast to time",
@@ -405,13 +456,79 @@ def compute_verdict(ours, theirs):
         ratios.append(ratio)
         rows.append({"name": name, "status": "measured", "codenameone": a[1],
                      "flutter": b[1], "ratio": round(ratio, 3)})
-    out = {"workloads": rows, "compared": len(ratios)}
+    out = {"workloads": rows, "compared": len(ratios), "failures": failures}
     if ratios:
         product = 1.0
         for r in ratios:
             product *= r
         out["geomean"] = round(product ** (1.0 / len(ratios)), 3)
     return out
+
+
+_REFERENCE_DRIVER = """
+public class RefDriver {
+    public static void main(String[] a) {
+        String[] names = {%s};
+        for (String n : names) {
+            long c;
+            try {
+                c = (Long) com.bench.CommonWorkloads.class.getMethod(n).invoke(null);
+            } catch (Exception e) {
+                throw new RuntimeException(n, e);
+            }
+            System.out.println("REF " + n + " " + c);
+        }
+    }
+}
+"""
+
+
+def reference_checksums(repo_root, workdir, java_home=None):
+    """The checksum each compute workload produces on the host JVM, or None.
+
+    Compiled and run from vm/benchmarks' CommonWorkloads.java -- the very file
+    prepare.sh copies into the Codename One app -- so it cannot drift from what
+    the apps run. None (and the verdict falls back to unattributed mismatches)
+    when no JDK is on hand; that is reported, never guessed.
+    """
+    source = os.path.join(repo_root, "vm", "benchmarks", "common", "src", "main",
+                          "java", "com", "bench", "CommonWorkloads.java")
+    if not os.path.isfile(source):
+        return None
+    java_home = java_home or os.environ.get("JAVA_HOME")
+    def tool(name):
+        if java_home:
+            for candidate in (name, name + ".exe"):
+                path = os.path.join(java_home, "bin", candidate)
+                if os.path.isfile(path):
+                    return path
+        return name
+    out_dir = os.path.join(workdir, "compute-reference")
+    src_dir = os.path.join(out_dir, "src")
+    os.makedirs(os.path.join(src_dir, "com", "bench"), exist_ok=True)
+    with open(source, "rb") as fin, open(os.path.join(src_dir, "com", "bench",
+                                                       "CommonWorkloads.java"), "wb") as fout:
+        fout.write(fin.read())
+    names = ", ".join('"%s"' % n for n in COMPUTE_WORKLOADS)
+    with open(os.path.join(src_dir, "RefDriver.java"), "w") as f:
+        f.write(_REFERENCE_DRIVER % names)
+    classes = os.path.join(out_dir, "classes")
+    os.makedirs(classes, exist_ok=True)
+    try:
+        subprocess.run([tool("javac"), "-d", classes,
+                        os.path.join(src_dir, "com", "bench", "CommonWorkloads.java"),
+                        os.path.join(src_dir, "RefDriver.java")],
+                       check=True, capture_output=True, timeout=300)
+        result = subprocess.run([tool("java"), "-cp", classes, "RefDriver"],
+                                check=True, capture_output=True, text=True, timeout=900)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    refs = {}
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == "REF":
+            refs[parts[1]] = parts[2]
+    return refs or None
 
 
 def render_compute(report):
@@ -431,7 +548,19 @@ def render_compute(report):
     lines.append("| Workload | Codename One | Flutter | Ratio |")
     lines.append("| --- | ---: | ---: | ---: |")
     for row in verdict["workloads"]:
-        if row["status"] == "measured":
+        if row.get("failed"):
+            # Attributed: say which side failed, and show whatever timing the
+            # other side has. Not part of the mean.
+            def cell(side):
+                for f in row["failed"]:
+                    if f["side"] == side:
+                        return f["how"]
+                return "%d ms" % row[side] if side in row else "--"
+            lines.append("| %s | %s | %s | %s |" % (
+                row["name"], cell("codenameone"), cell("flutter"),
+                "; ".join("%s: %s" % ("Codename One" if f["side"] == "codenameone"
+                                      else "Flutter", f["how"]) for f in row["failed"])))
+        elif row["status"] == "measured":
             lines.append("| %s | %d ms | %d ms | %.2fx |" % (
                 row["name"], row["codenameone"], row["flutter"], row["ratio"]))
         elif row["status"] == "not measured":
@@ -678,6 +807,20 @@ def check_behind(report):
     """
     findings = []
     compute = report.get("compute") or {}
+    # A workload Codename One got wrong or did not run, where the reference says
+    # which side failed, fails the gate on its own: attributing Flutter's failures
+    # is only honest if ours are held to the same standard.
+    for failure in (compute.get("verdict") or {}).get("failures", []):
+        if failure["side"] == "codenameone":
+            findings.append({
+                "metric": COMPUTE_METRIC,
+                "label": "%s: %s (%s)" % (COMPUTE_LABEL, failure["name"], failure["how"]),
+                "codenameone": None,
+                "flutter": None,
+                "ratio": 0.0,
+                "behind": True,
+                "failed": failure,
+            })
     geomean = (compute.get("verdict") or {}).get("geomean")
     if compute.get("status") == "measured" and geomean is not None and geomean < 1.0:
         findings.append({
@@ -786,6 +929,13 @@ def render_gate(report):
 def render_regressions(platform_id, findings):
     lines = []
     for item in findings:
+        if item.get("failed"):
+            lines.append("%s: Codename One %s on compute workload %s (checked against the host JVM)"
+                         % (platform_id,
+                            "gave a wrong result" if item["failed"]["how"] == FAILED_WRONG
+                            else "did not run",
+                            item["failed"]["name"]))
+            continue
         if item.get("behind") and item["metric"] == COMPUTE_METRIC:
             lines.append("%s: %s is %.2fx (the gate requires 1.00x or better)"
                          % (platform_id, item["label"], item["ratio"]))

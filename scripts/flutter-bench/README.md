@@ -158,11 +158,18 @@ bit-identical checksums between the two languages.
 - **Scoring.** Each app runs every workload twice to warm up and five times
   timed, and prints the best. The ratio is Flutter's time over ours, and the
   headline is the geometric mean. A workload whose checksums differ is shown and
-  left out of the mean -- two different computations have no ratio. On the web
-  that is expected for the 64-bit workloads, since a JavaScript number cannot
-  hold one.
+  left out of the mean -- two different computations have no ratio.
+- **Attributed.** Each leg also runs the same `CommonWorkloads.java` on the host
+  JVM. When the two apps disagree, or one prints nothing for a workload, that
+  reference says which side failed, and the table shows "wrong result" or "did
+  not run" against that side instead of dropping the row. On the web, Flutter
+  gets `intArithmetic` and `arrayRandom` wrong (Dart compiled to JavaScript does
+  integer arithmetic in doubles) and produces nothing for the 64-bit workloads.
+  Two apps that agree are compared whatever the JVM says, since a transcendental
+  workload may differ from a desktop libm in the last bit on both.
 - **Gated.** A geometric mean under 1.00x fails the platform's leg, like any
-  other metric Codename One loses.
+  other metric Codename One loses, and so does any workload Codename One gets
+  wrong or does not run.
 - **iOS is not measured**: a device build needs signed hardware, and on the
   simulator Flutter runs its JIT debug engine. The macOS row runs the same two
   compilers on the same Apple silicon.

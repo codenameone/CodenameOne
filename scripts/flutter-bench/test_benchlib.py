@@ -134,6 +134,62 @@ class ComputeTest(unittest.TestCase):
         self.assertIn("| recursion | 50 ms | 100 ms | 2.00x |", body)
         self.assertIn("**Geometric mean**", body)
 
+    def test_the_reference_names_the_side_with_the_wrong_result(self):
+        # Flutter web's intArithmetic: a result, but not Java's.
+        v = benchlib.compute_verdict({"intArithmetic": ("5", 300), "recursion": ("2", 10)},
+                                     {"intArithmetic": ("7", 500), "recursion": ("2", 20)},
+                                     {"intArithmetic": "5", "recursion": "2"})
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["intArithmetic"]["failed"],
+                         [{"side": "flutter", "how": benchlib.FAILED_WRONG}])
+        self.assertEqual(v["failures"], [{"name": "intArithmetic", "side": "flutter",
+                                          "how": benchlib.FAILED_WRONG}])
+        self.assertEqual(v["geomean"], 2.0, "a failed workload is shown, not averaged")
+
+    def test_a_side_that_produced_nothing_did_not_run(self):
+        v = benchlib.compute_verdict({"longArithmetic": ("9", 40)}, {},
+                                     {"longArithmetic": "9"})
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["longArithmetic"]["failed"],
+                         [{"side": "flutter", "how": benchlib.FAILED_NOT_RUN}])
+
+    def test_sides_that_agree_are_compared_whatever_the_jvm_says(self):
+        # A transcendental workload may differ from the host JVM's libm on both.
+        v = benchlib.compute_verdict({"mathTranscendental": ("4", 50)},
+                                     {"mathTranscendental": ("4", 100)},
+                                     {"mathTranscendental": "3"})
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["mathTranscendental"]["status"], "measured")
+        self.assertEqual(v["failures"], [])
+
+    def test_without_a_reference_a_disagreement_stays_unattributed(self):
+        v = benchlib.compute_verdict({"recursion": ("1", 10)}, {"recursion": ("2", 10)})
+        rows = dict((r["name"], r) for r in v["workloads"])
+        self.assertEqual(rows["recursion"]["status"], "checksum mismatch")
+        self.assertNotIn("failed", rows["recursion"])
+
+    def test_our_wrong_result_fails_the_gate_and_theirs_does_not(self):
+        ref = {"intArithmetic": "5", "recursion": "2"}
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report["compute"] = {"status": "measured", "verdict": benchlib.compute_verdict(
+            {"intArithmetic": ("5", 10), "recursion": ("8", 10)},
+            {"intArithmetic": ("7", 20), "recursion": ("2", 20)}, ref)}
+        found = benchlib.check_behind(report)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["failed"]["name"], "recursion")
+        self.assertIn("Codename One gave a wrong result on compute workload recursion",
+                      benchlib.render_regressions("javascript", found)[0])
+
+    def test_the_table_says_who_failed(self):
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report.update(platform="javascript", runs=5)
+        report["compute"] = {"status": "measured", "verdict": benchlib.compute_verdict(
+            {"intArithmetic": ("5", 300), "longArithmetic": ("9", 40)},
+            {"intArithmetic": ("7", 500)}, {"intArithmetic": "5", "longArithmetic": "9"})}
+        body = benchlib.render_markdown([report])
+        self.assertIn("| intArithmetic | 300 ms | wrong result | Flutter: wrong result |", body)
+        self.assertIn("| longArithmetic | 40 ms | did not run | Flutter: did not run |", body)
+
     def test_an_unmeasured_compute_run_says_why(self):
         report = _report({"install_bytes": 50}, {"install_bytes": 100})
         report.update(platform="ios", runs=5)

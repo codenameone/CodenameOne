@@ -109,7 +109,7 @@ def measure(adapter, runs, workdir):
     return sides, notes
 
 
-def measure_compute(adapter):
+def measure_compute(adapter, workdir=None):
     """One compute-mode launch per side, scored by benchlib.compute_verdict.
 
     Each app repeats every workload itself (warm-ups, then the best of five),
@@ -124,11 +124,21 @@ def measure_compute(adapter):
         except platforms.Unavailable as err:
             return {"status": "not measured", "reason": str(err)}
         print("  compute %-12s %d workloads" % (side, len(results[side])), flush=True)
+    # Which side is right when they disagree, or when one produced nothing:
+    # the same source on the host JVM. See benchlib.compute_verdict.
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    reference = benchlib.reference_checksums(
+        repo_root, workdir or os.path.join(repo_root, "scripts", "flutter-bench", "out"))
+    print("  compute reference: %s" % (
+        "%d workloads from the host JVM" % len(reference) if reference
+        else "unavailable (no JDK); disagreements stay unattributed"), flush=True)
     return {
         "status": "measured",
         "codenameone": dict((k, list(v)) for k, v in results["codenameone"].items()),
         "flutter": dict((k, list(v)) for k, v in results["flutter"].items()),
-        "verdict": benchlib.compute_verdict(results["codenameone"], results["flutter"]),
+        "reference": reference,
+        "verdict": benchlib.compute_verdict(results["codenameone"], results["flutter"],
+                                            reference),
     }
 
 
@@ -202,7 +212,7 @@ def main(argv=None):
     report = benchlib.build_report(adapter.id, sides, args.runs, notes)
     report["status"] = "measured"
     print("%s: compute workloads" % adapter.label)
-    report["compute"] = measure_compute(adapter)
+    report["compute"] = measure_compute(adapter, args.workdir)
 
     if args.baseline_out:
         _ensure_dir(args.baseline_out)
