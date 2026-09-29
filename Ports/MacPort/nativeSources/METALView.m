@@ -228,6 +228,22 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// server. Bounds the retries, so a surface that stays in use (it should not)
     /// cannot keep a timer alive forever.
     int cn1PresentSweepRetries;
+
+    /// Whether screenTexture is currently marked purgeable, and the frame counter
+    /// that decides when it may be. Both guarded by cn1PresentLock.
+    ///
+    /// At rest the persistent target duplicates the surface under the layer: every
+    /// presented frame blits all of it there. So once a frame's GPU work completes
+    /// and no newer frame has started, the texture is marked volatile and stops
+    /// counting in the footprint. The next user of it -- a frame, or a readback --
+    /// makes it non-volatile first (cn1ScreenTextureResidentFor:), and if the kernel
+    /// did reclaim the pages, copies the surface under the layer back into it
+    /// before anything reads it. The counter is what keeps a late completion from
+    /// marking the texture volatile under a frame that has already begun.
+    BOOL cn1ScreenVolatile;
+    unsigned long long cn1ScreenFrameSeq;
+    /// The counter value of the frame currently being encoded; render thread only.
+    unsigned long long cn1OpenFrameSeq;
 }
 
 @synthesize commandQueue;
@@ -623,7 +639,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> newScreen = [CN1MetalDevice() newTextureWithDescriptor:desc];
+    os_unfair_lock_lock(&cn1PresentLock);
     self.screenTexture = newScreen;
+    cn1ScreenVolatile = NO;
+    os_unfair_lock_unlock(&cn1PresentLock);
 #ifndef CN1_USE_ARC
     [newScreen release];
 #endif
@@ -649,6 +668,15 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         width:pw height:ph mipmapped:NO];
     stencilDesc.usage = MTLTextureUsageRenderTarget;
     stencilDesc.storageMode = MTLStorageModePrivate;
+    // Memoryless where the GPU can: the stencil is cleared at the start of every
+    // pass and never stored (createRenderPassDescriptor), so on an Apple GPU it can
+    // live in tile memory alone and needs no allocation -- a full window of
+    // Stencil8 less at rest. Private elsewhere, where memoryless does not exist.
+    if (@available(macOS 11.0, *)) {
+        if ([CN1MetalDevice() supportsFamily:MTLGPUFamilyApple1]) {
+            stencilDesc.storageMode = MTLStorageModeMemoryless;
+        }
+    }
     id<MTLTexture> newStencil = [CN1MetalDevice() newTextureWithDescriptor:stencilDesc];
     self.stencilTexture = newStencil;
 #ifndef CN1_USE_ARC
@@ -748,6 +776,57 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     }
 }
 
+/// Makes screenTexture safe to read and draw into for work encoded on {@code cb},
+/// restoring its contents if the kernel reclaimed them while it was volatile
+/// (see cn1ScreenVolatile). Render thread, or readback, before anything touches the
+/// texture on {@code cb}. Returns the frame counter value this use owns.
+- (unsigned long long)cn1ScreenTextureResidentFor:(id<MTLCommandBuffer>)cb {
+    BOOL lost = NO;
+    id<MTLTexture> source = nil;
+    id<MTLTexture> target = nil;
+    os_unfair_lock_lock(&cn1PresentLock);
+    unsigned long long seq = ++cn1ScreenFrameSeq;
+    if (cn1ScreenVolatile && self.screenTexture != nil) {
+        MTLPurgeableState old = [self.screenTexture setPurgeableState:MTLPurgeableStateNonVolatile];
+        cn1ScreenVolatile = NO;
+        if (old == MTLPurgeableStateEmpty) {
+            lost = YES;
+            target = self.screenTexture;
+            // The surface under the layer holds exactly what the texture held: the
+            // last presented frame copied all of it there. It is never volatile.
+            int current = atomic_load_explicit(&cn1PresentCurrent, memory_order_acquire);
+            if (current >= 0 && current < CN1_PRESENT_SURFACE_COUNT) {
+                source = cn1PresentTextures[current];
+            }
+#ifndef CN1_USE_ARC
+            [target retain];
+            [source retain];
+#endif
+        }
+    }
+    os_unfair_lock_unlock(&cn1PresentLock);
+    if (lost) {
+        if (source != nil && cb != nil
+                && source.width == target.width && source.height == target.height) {
+            id<MTLBlitCommandEncoder> restore = [cb blitCommandEncoder];
+            [restore copyFromTexture:source sourceSlice:0 sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(target.width, target.height, 1)
+                           toTexture:target destinationSlice:0 destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+            [restore endEncoding];
+        } else {
+            // Nothing to copy from: clear, and let the next full repaint fill it.
+            [self invalidateRetainedFramebuffer];
+        }
+#ifndef CN1_USE_ARC
+        [target release];
+        [source release];
+#endif
+    }
+    return seq;
+}
+
 - (void)setFramebuffer {
     // Tolerates being called more than once per frame, as the UIKit backend
     // does: creating a second encoder would discard everything queued against
@@ -759,6 +838,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // no encoder exists yet, so nothing can be encoding into what is replaced.
     [self applyPendingFrameBufferSize];
     self.commandBuffer = [self.commandQueue commandBuffer];
+    // Before the render pass loads it; see cn1ScreenVolatile.
+    cn1OpenFrameSeq = [self cn1ScreenTextureResidentFor:self.commandBuffer];
     [self createRenderPassDescriptor];
     if (self.renderPassDescriptor == nil) {
         self.renderCommandEncoder = nil;
@@ -775,11 +856,6 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
                        framebufferWidth, framebufferHeight);
 }
 
-/// Asks the framework for another frame, if one is owed.
-///
-/// Clears the owed flag first and only acts if it was set, so the two callers --
-/// a GPU completion that freed a surface, and the timer below for when no GPU
-/// work is outstanding -- cannot both ask for the same frame.
 /// Marks every surface nobody is reading volatile, so an idle window counts one
 /// surface in the footprint rather than three (see cn1PresentVolatile).
 ///
@@ -813,6 +889,11 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     }
 }
 
+/// Asks the framework for another frame, if one is owed.
+///
+/// Clears the owed flag first and only acts if it was set, so the two callers --
+/// a GPU completion that freed a surface, and the timer below for when no GPU
+/// work is outstanding -- cannot both ask for the same frame.
 - (void)cn1PayDeferredPresent {
     // Readiness FIRST, and only then clear the flag. Clearing it and then
     // discovering there is nobody to ask would drop the frame on the floor with
@@ -994,6 +1075,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     int frameGeneration = atomic_load_explicit(&cn1PresentGeneration, memory_order_acquire);
     METALView *presentView = self;
     const int completedIdx = presentIdx;
+    const unsigned long long frameSeq = cn1OpenFrameSeq;
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         // One load for both decisions below, so they cannot disagree.
         int currentGeneration = atomic_load_explicit(&presentView->cn1PresentGeneration,
@@ -1034,6 +1116,16 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         if (currentGeneration == frameGeneration) {
             atomic_store_explicit(&presentView->cn1PresentInFlight[completedIdx], 0,
                                   memory_order_release);
+            // The persistent target duplicates what this frame just put under the
+            // layer. Unless a newer frame (or a readback) has started using it since,
+            // it may stop counting in the footprint; see cn1ScreenVolatile.
+            os_unfair_lock_lock(&presentView->cn1PresentLock);
+            if (presentView->cn1ScreenFrameSeq == frameSeq && !presentView->cn1ScreenVolatile
+                    && presentView.screenTexture != nil) {
+                [presentView.screenTexture setPurgeableState:MTLPurgeableStateVolatile];
+                presentView->cn1ScreenVolatile = YES;
+            }
+            os_unfair_lock_unlock(&presentView->cn1PresentLock);
             // A surface just became free. If a frame was dropped because none
             // was, ask the framework to paint again -- the content of that frame
             // is still in screenTexture, but only a frame started on the thread
@@ -1096,7 +1188,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 #endif
 
 - (void)deleteFramebuffer {
+    os_unfair_lock_lock(&cn1PresentLock);
     self.screenTexture = nil;
+    cn1ScreenVolatile = NO;
+    os_unfair_lock_unlock(&cn1PresentLock);
     self.stencilTexture = nil;
     os_unfair_lock_lock(&cn1PresentLock);
     for (int i = 0; i < CN1_PRESENT_SURFACE_COUNT; i++) {
@@ -1182,6 +1277,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         return NO;
     }
     id<MTLCommandBuffer> cb = [self.commandQueue commandBuffer];
+    // The texture may be volatile between frames; see cn1ScreenVolatile.
+    [self cn1ScreenTextureResidentFor:cb];
     id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
     [blit copyFromTexture:self.screenTexture
               sourceSlice:0 sourceLevel:0
