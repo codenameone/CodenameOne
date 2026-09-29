@@ -35,8 +35,18 @@ public class LinkedHashSet<E> extends HashSet<E> implements Set<E> {
     /**
      * Constructs a new empty instance of {@code LinkedHashSet}.
      */
+    /* The backing map is held HERE rather than in HashSet, so a plain HashSet
+     * carries no field for it and no branch on it -- see the comment on the field
+     * that used to be there. super(true) selects the constructor that allocates no
+     * native table, because the elements live in this map instead.
+     *
+     * Assigned before anything can add: the Collection constructor below adds
+     * through the overrides in this class, which read this field. */
+    transient HashMap<E, HashSet<E>> backingMap;
+
     public LinkedHashSet() {
-        super(new LinkedHashMap<E, HashSet<E>>());
+        super(true);
+        backingMap = new LinkedHashMap<E, HashSet<E>>();
     }
 
     /**
@@ -47,7 +57,8 @@ public class LinkedHashSet<E> extends HashSet<E> implements Set<E> {
      *            the initial capacity of this {@code LinkedHashSet}.
      */
     public LinkedHashSet(int capacity) {
-        super(new LinkedHashMap<E, HashSet<E>>(capacity));
+        super(true);
+        backingMap = new LinkedHashMap<E, HashSet<E>>(capacity);
     }
 
     /**
@@ -60,7 +71,8 @@ public class LinkedHashSet<E> extends HashSet<E> implements Set<E> {
      *            the initial load factor.
      */
     public LinkedHashSet(int capacity, float loadFactor) {
-        super(new LinkedHashMap<E, HashSet<E>>(capacity, loadFactor));
+        super(true);
+        backingMap = new LinkedHashMap<E, HashSet<E>>(capacity, loadFactor);
     }
 
     /**
@@ -71,17 +83,47 @@ public class LinkedHashSet<E> extends HashSet<E> implements Set<E> {
      *            the collection of elements to add.
      */
     public LinkedHashSet(Collection<? extends E> collection) {
-        super(new LinkedHashMap<E, HashSet<E>>(collection.size() < 6 ? 11
-                : collection.size() * 2));
+        super(true);
+        backingMap = new LinkedHashMap<E, HashSet<E>>(collection.size() < 6 ? 11
+                : collection.size() * 2);
         Iterator it = collection.iterator();
         while(it.hasNext()) {
             add((E)it.next());
         }
     }
 
-    /* overrides method in HashMap */
+    /* Every operation HashSet used to fork on `backingMap != null` is overridden
+     * here instead. Same behaviour, and the fork is gone from the plain HashSet
+     * path entirely rather than being paid on every call. isEmpty needs no
+     * override: it is defined in terms of size(). */
+
     @Override
-    HashMap<E, HashSet<E>> createBackingMap(int capacity, float loadFactor) {
-        return new LinkedHashMap<E, HashSet<E>>(capacity, loadFactor);
+    public boolean add(E object) {
+        return backingMap.put(object, this) == null;
+    }
+
+    @Override
+    public void clear() {
+        backingMap.clear();
+    }
+
+    @Override
+    public boolean contains(Object object) {
+        return backingMap.containsKey(object);
+    }
+
+    @Override
+    public Iterator<E> iterator() {
+        return backingMap.keySet().iterator();
+    }
+
+    @Override
+    public boolean remove(Object object) {
+        return backingMap.remove(object) != null;
+    }
+
+    @Override
+    public int size() {
+        return backingMap.size();
     }
 }

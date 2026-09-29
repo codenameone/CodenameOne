@@ -631,7 +631,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_widgetUpdatePixels___long_int_1AR
     if ((int64_t) (*(JAVA_ARRAY) argb).length < count) {
         return;
     }
-    src = (JAVA_INT*) (*(JAVA_ARRAY) argb).data;
+    src = (JAVA_INT*) CN1_ARRAY_DATA(argb);
     op = (CN1WidgetPixelsOp*) malloc(sizeof(CN1WidgetPixelsOp));
     op->id = (gint64) peer;
     op->w = w;
@@ -735,7 +735,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_widgetSetHitRects___long_int_1ARR
         int len = (int) (*(JAVA_ARRAY) rects).length;
         count = len / 4;
         if (count > 0) {
-            JAVA_INT* src = (JAVA_INT*) (*(JAVA_ARRAY) rects).data;
+            JAVA_INT* src = (JAVA_INT*) CN1_ARRAY_DATA(rects);
             int i;
             copy = (int*) malloc((size_t) count * 4 * sizeof(int));
             for (i = 0; i < count * 4; i++) {

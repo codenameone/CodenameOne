@@ -95,9 +95,9 @@ class DebuggerObjectValidationTest {
      * was one bit. Widening the tag to three bits only widens the fraction of arbitrary
      * words this covers, from one in two to seven in eight.
      *
-     * The GC is unaffected. cn1ConservativeResolve rejects any word with a bit set in
-     * (sizeof(void*) - 1), which is the same three bits, so a misread int was never a root
-     * before this change and is not one now.
+     * The debugger classifies the value without dereferencing it. Conservative GC
+     * separately resolves raw machine words against registered allocation ranges,
+     * including unaligned byte-interior pointers retained by optimized native code.
      */
     @Test
     void anIntSlotThatLooksLikeAnImmediateIsReportedWithoutBeingDereferenced() throws Exception {
@@ -485,9 +485,12 @@ class DebuggerObjectValidationTest {
             "#include <string.h>\n" +
             "#include <stdlib.h>\n" +
             "\n" +
-            "static struct clazz registeredClass;\n" +
-            "static struct clazz arrayClass;\n" +
-            "static struct clazz unregisteredClass;\n" +
+            /* The object header holds a class INDEX, so a test class must be in the
+               harness's cn1ClazzById: these are its three spare descriptors. */
+            "extern struct clazz cn1TestClazz[3];\n" +
+            "#define registeredClass (cn1TestClazz[0])\n" +
+            "#define arrayClass (cn1TestClazz[1])\n" +
+            "#define unregisteredClass (cn1TestClazz[2])\n" +
             "\n" +
             "int main(int argc, char** argv) {\n" +
             "    if (argc < 2) { fprintf(stderr, \"usage: validate <candidate>\\n\"); return 2; }\n" +
@@ -510,13 +513,13 @@ class DebuggerObjectValidationTest {
             "    JAVA_OBJECT candidate = JAVA_NULL;\n" +
             "\n" +
             "    if (strcmp(which, \"REGISTERED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"ARRAY\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &arrayClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &arrayClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"IMPOSTOR\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &unregisteredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &unregisteredClass);\n" +
             "        candidate = &object;\n" +
             "    } else if (strcmp(which, \"NO_CLASS_WORD\") == 0) {\n" +
             "        candidate = &object;\n" +
@@ -730,20 +733,20 @@ class DebuggerObjectValidationTest {
             "        printf(\"all-resolvable\\n\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_ISSUED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        cn1_debugger_note_issued(&object);\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_AFTER_RESUME\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        cn1_debugger_note_issued(&object);\n" +
             "        cn1_debugger_forget_issued();   /* the app ran on */\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_NEVER_ISSUED\") == 0) {\n" +
-            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        CN1_OBJ_SET_CLASS(&object, &registeredClass);\n" +
             "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
             "                ? \"accepted\" : \"rejected\");\n" +
             "        return 0;\n" +

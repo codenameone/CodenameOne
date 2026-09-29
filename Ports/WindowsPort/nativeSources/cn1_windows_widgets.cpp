@@ -577,7 +577,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_widgetUpdatePixels___long_int
     if (widget == NULL || argb == JAVA_NULL || w <= 0 || h <= 0) {
         return;
     }
-    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) argb).data;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(argb);
     int len = (*(JAVA_ARRAY) argb).length;
     if (len < w * h) {
         return;
@@ -654,7 +654,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_widgetSetHitRects___long_int_
     int* copy = NULL;
     int rectCount = 0;
     if (rects != JAVA_NULL) {
-        JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*) (*(JAVA_ARRAY) rects).data;
+        JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(rects);
         int len = (*(JAVA_ARRAY) rects).length;
         rectCount = len / 4;
         if (rectCount > 0) {

@@ -95,7 +95,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_resourceBytes___java_lang_S
     JAVA_OBJECT result = allocArray(threadStateData, (int) size,
             &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (result != JAVA_NULL) {
-        memcpy((*(JAVA_ARRAY) result).data, data, size);
+        memcpy(CN1_ARRAY_DATA(result), data, size);
     }
     return result;
 }

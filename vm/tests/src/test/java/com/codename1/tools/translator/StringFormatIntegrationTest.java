@@ -113,6 +113,27 @@ class StringFormatIntegrationTest {
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "StringFormatApp");
 
         Path distDir = outputDir.resolve("dist");
+        Path generated = distDir.resolve("StringFormatApp-src");
+        String builderC = new String(Files.readAllBytes(generated.resolve("java_lang_StringBuilder.c")),
+                StandardCharsets.UTF_8);
+        assertTrue(builderC.contains("&__FINALIZER_java_lang_StringBuilder ,0 , 0,"),
+                "Native primitive storage needs cleanup but no tracing callback");
+        String stringC = new String(Files.readAllBytes(generated.resolve("java_lang_String.c")),
+                StandardCharsets.UTF_8);
+        assertTrue(stringC.contains("&__GC_MARK_java_lang_String,"),
+                "Strings still trace their backing storage");
+        String applicationC = new String(Files.readAllBytes(generated.resolve("StringFormatApp.c")),
+                StandardCharsets.UTF_8);
+        assertTrue(applicationC.contains("cleanup(cn1StackBufferLeave)"),
+                "The exception/return cases must exercise stack buffer ownership");
+        int borrowedStart = applicationC.indexOf("JAVA_OBJECT StringFormatApp_borrowedBuilderResult___R_java_lang_String(");
+        assertTrue(borrowedStart >= 0);
+        assertTrue(applicationC.substring(borrowedStart, applicationC.indexOf("\n}", borrowedStart))
+                .contains("cleanup(cn1StackBufferLeave)"), "A proved borrowing helper must preserve stack allocation");
+        int escapedStart = applicationC.indexOf("JAVA_VOID StringFormatApp_escapingBuilderResult__(");
+        assertTrue(escapedStart >= 0);
+        assertFalse(applicationC.substring(escapedStart, applicationC.indexOf("\n}", escapedStart))
+                .contains("cleanup(cn1StackBufferLeave)"), "A retaining helper must keep heap ownership");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "StringFormatApp-src");

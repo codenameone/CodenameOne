@@ -1,370 +1,195 @@
 # Self-hosting ParparVM
 
-Builds `ByteCodeTranslator` with ParparVM itself: the translator's own bytecode,
-plus ASM's, is translated to C and compiled into a native binary.
+This directory builds the Java bytecode translator and ASM with ParparVM, then
+compiles the generated C into a native translator. The benchmark runs complete,
+fresh-process translation jobs against the same translator classes on HotSpot.
 
-It buys two things:
-
-1. **Validation.** The translator is a ~37k-line real program that exercises
-   collections, strings, file I/O, exceptions and the GC at scale. Running the
-   native build and the JVM build over the same input and diffing the emitted C
-   is an end-to-end conformance test of the whole VM, and the corpus grows on its
-   own as the translator does.
-2. **Performance and memory.** A translation is a short-lived, allocation-heavy
-   batch job -- the shape where AOT should beat a cold JVM.
-
-## `stubs/`
-
-The self-hosted binary does the `clean`/`ios`/`macos` translation and nothing
-else, so a few classes are replaced by no-op stubs when it is built. They are
-never selected at run time; they exist so the source set compiles without
-dragging in API that ParparVM's JavaAPI deliberately lacks.
-
-| stub | why |
-|---|---|
-| `Javascript*` | the JavaScript target, ~12.5k lines. Needs `java.util.regex` and `ConcurrentHashMap`. |
-| `ArchiveClassScanner` | `java.util.zip`. Reachable only from `NativeSignatureVerifier`'s command-line entry point; the translator itself never reads an archive. |
-| `DebugSymbolCompressor` | `java.util.zip` again, for the on-device-debug symbol sidecar. |
-
-`java.util.zip` cannot simply be added to JavaAPI: JavaAPI is mirrored by
-`Ports/CLDC11`, where the package does not belong.
-
-Everything else the translator needs was removed from the translator rather than
-added to JavaAPI -- see `Util`'s `splitLiteral`, `collapseWhitespace`,
-`rewriteLocalObjectRefs`, `getProperty`, `listFiles` and `writeBytes`. Adding
-`String.split`/`replaceAll` to JavaAPI in particular would have collided with
-`BytecodeComplianceMojo`, which rewrites those calls onto
-`com.codename1.util.regex` precisely because JavaAPI does not declare them.
-
-## Building and verifying
+## Build
 
 ```bash
-export JDK_8_HOME=/path/to/a/working/jdk8
-./build-selfhost.sh                                   # -> target/parpar
-./verify-selfhost.sh <classesDir> <AppName> <package> # gates D and A
+export JDK_8_HOME=/path/to/jdk8
+export JDK_25_HOME=/path/to/jdk25
+export JAVA_HOME="$JDK_8_HOME"
+export PATH="$JAVA_HOME/bin:$PATH"
+./vm/selfhost/build-selfhost.sh -O3
 ```
 
-`build-selfhost.sh` compiles the source set against JavaAPI alone, stages ASM as
-class directories (the translator walks directories, never archives), translates,
-and clangs the result. The `-fwrapv -fno-strict-aliasing -fno-builtin-fmod(f)`
-flags are mandatory for generated C -- Java arithmetic wraps and clang -O3
-miscompiles without them.
+Run these commands from the repository root. Release builds use `-O3 -flto=thin`
+and the Java arithmetic flags in `build-selfhost.sh`. The build records source,
+class-directory, binary, compiler and toolchain fingerprints in
+`target/parpar-O3.build.json`. Source changes during a build reject its manifest.
 
-The binary finds the C runtime it has to copy into its output through
-`Class.getResourceAsStream`, which now consults resources linked into the
-executable and then a search path named by `CN1_RESOURCE_PATH`. Before this it
-returned a hard-coded null on every ParparVM target.
+The self-host build substitutes the classes in `stubs/` for facilities outside
+its supported translation targets: JavaScript generation, archive scanning and
+debug-symbol compression. It translates class directories; it does not read JARs.
+The native executable locates runtime resources through `CN1_RESOURCE_PATH`.
 
-## State
-
-Gate D (the native translator against itself) passes. Gate A (JVM against native)
-is at **245 of 247 files byte-identical** on a JavaAPI-sized corpus, and binaries
-built from the two trees produce identical output.
-
-The two files that still differ are `java_util_HashMap.c` and `.h`: the native
-translator's dead-code pass culls seven more methods than the JVM's
-(`cn1PutSlot`, `cn1MaybeGrow`, `clearImpl`, `containsKeyImpl`, `getImpl`,
-`putImpl`, `removeImpl`), and emits them as empty stubs. Both trees compile, link
-and run correctly, so the extra culling is safe here, but the two runtimes should
-not disagree and the cause is not yet found. What is already ruled out: it is not
-nondeterminism -- gate D passes on both sides -- and it is not identity-hash
-iteration order, which was tested directly by re-running the JVM under
-`-XX:hashCode=2` and getting byte-identical output.
-
-## What self-hosting has already found
-
-Three defects that were invisible to every existing test, because each was
-self-consistent on HotSpot:
-
-- **`Integer.TYPE` and the other wrapper `TYPE` fields were null.** `TYPE =
-  int.class` compiles to `getstatic TYPE; putstatic TYPE`. A `Map` keyed on them
-  collapsed onto the single null key. `Util`'s primitive-to-C-type maps are exactly
-  that shape.
-- **C label names came from identity hash codes.** ASM's `Label.toString()` is
-  `"L" + System.identityHashCode(this)`. That made the emitted C irreproducible,
-  and on ParparVM -- whose identity hash is the object pointer narrowed to int, so
-  often negative -- it emitted `label_L-180306432001`, which C reads as a
-  subtraction. Every method with a try/catch failed to compile.
-- **C local-variable declarations were emitted in `HashSet` iteration order**, so
-  the same input produced different C. `debugVarEntries` had already had to learn
-  this for the debug side-table; the declarations had the same defect.
-
-Only the first is a runtime bug. The other two are reproducible-build defects in
-the translator that a second runtime made visible.
-
-## Performance
-
-`bench-selfhost.sh` runs each arm over the same corpus, interleaved, and reports the
-minimum wall clock and the peak `phys_footprint`. It refuses to print ratios unless
-every arm emitted identical C. The reference JVM is **JDK 25** -- what HotSpot can
-actually do; JDK 8 is kept only because it is what the builders currently fork.
-
-Translating the self-hosting corpus (ASM + the translator's own classes, ~570
-classes) on a 64 GB / 16-core Mac, release shape (`-O3 -flto=thin`):
-
-| | wall clock | peak footprint |
-|---|---:|---:|
-| parpar | 1.84 s | 1443 MB |
-| jdk25 | 1.56 s | 516 MB |
-| jdk8 | 2.27 s | 502 MB |
-
-**vs JDK 25: 1.18x slower, 2.79x more memory. vs JDK 8: 1.24x faster.**
-
-Two fixes got it there from 6x slower; both are described below. Wall clock on this
-machine is only meaningful when it is quiet -- at load 113 the same benchmark
-produced samples from 3.6 s to 24 s for every arm, JVM included. CPU time
-(`user+sys`) is far more robust to contention, and by that measure the two are
-level or better: parpar 4.35 s against jdk25 4.82 s on a loaded host.
-
-### Fix 1: the mutator slept instead of allocating
-
-`sample` on the original build put 64% of the process's samples in one stack, and
-the mutator was not marking or sweeping -- it was asleep:
-
-```
-Ldc.getValueAsString -> cn1BibopAlloc -> cn1BibopMaybeGc
-  -> cn1PacingPark -> usleep -> nanosleep -> __semwait_signal
-```
-
-`CN1_LOG_PACING_PARKS` reported only **two** park events for the whole run, so each
-was seconds long. `cn1BibopPacingCap` computed a generous cap -- `cn1CachedFreeMem/8`,
-4 GB here -- and then clamped it to `trigger * 8` once the footprint passed
-`CN1_PACING_GROWTH_FLOOR_BYTES`. That floor was a flat **512 MB**, and early in the
-run the trigger is still at its own 24 MB floor, so the ceiling was **192 MB**
-(`minCapKb=196608` confirmed it). A program with a ~1.4 GB live set cannot stay
-inside a 192 MB allocation window, so it parked against a collector that could
-never get under it.
-
-A fixed 512 MB says "this process has grown"; it does not say the machine is under
-pressure, and the bound exists for pressure. The floor now scales:
-`max(512MB, availableMemory/4)`. Where `cn1_available_memory` is the flat 100 MB
-placeholder (Linux, Windows, the non-Apple fallback) the absolute floor still wins
-and behaviour is unchanged; the floor can only ever rise, never fall. This is the
-no-per-process-ceiling path only -- where a ceiling exists (iOS's dirty-memory
-limit, or an explicit budget) `cn1PacingPark` takes the bounded branch and never
-reaches this code. `ProcessBudgetPacingIntegrationTest` confirms both halves: its
-control arm reports `minCapKb=4194304` with no parks, and its budget-bounded arm
-still holds a 120 MB limit at a 60 MB peak across 427 parks.
-
-`cn1RefreshFreeMemCache()` also had exactly one caller, inside the mark cycle, so
-`cn1CachedFreeMem` was 0 until the first collection and both the cap and this floor
-fell to their absolute minimums during the window with the least reason to throttle.
-It is primed in `cn1BibopDoInit` now.
-
-### Fix 2: the constant pool was O(n^2)
-
-With pacing out of the way, the main thread's own profile was dominated by
-`Parser.addToConstantPool`, which did `constantPool.indexOf(s)` -- a `String.equals`
-against every string already interned. On a self-hosting translation the pool holds
-~200k strings: `String.equals` 11.2%, the list iterator 10.3%, `indexOf` 6.2% and
-`ArrayList.get` 5.1% of main-thread samples, all of it there. A `HashMap` side index
-answers the same question directly; the list stays the source of truth, so the
-emitted indices are unchanged and gate A still passes byte-identical.
-
-### What is left: memory
-
-The remaining gap is peak footprint. Sweeping the GC trigger from 8 MB to 256 MB --
-four cycles down to two -- moves peak by less than 15%, so this is retained data
-rather than uncollected garbage, and page-pool slack is about 2 MB, so it is not
-fragmentation either. `CN1_HEAP_REPORT` on a census build prints the split.
-
-Two allocation defects came out of the per-class census and are fixed:
-
-- **`IdentityHashMap` allocated an `Entry` on every `next()`**, even for key and
-  value iteration, where the entry was built only to read one field back out of it
-  and drop it. 1,366,140 of them, 43.7 MB, all garbage. `java.util.HashMap` already
-  had separate key/value/entry iterators for exactly this reason and this map had
-  been missed; it now has the same split.
-- **`ArrayList()` eagerly allocated `Object[10]`**, a 128-byte slot for every list,
-  including one never added to. It now shares a zero-length array until the first
-  growth. The first growth allocates exactly ten and not the twelve the general
-  growth path would pick, because ten keeps a small list in the size class it
-  already occupied -- growing to twelve would have traded a win on empty lists for
-  a loss on every list of one to ten elements.
-
-Measured together on the self-hosting corpus:
-
-| | before | after |
-|---|---:|---:|
-| allocations | 10,160,401 objects / 991 MB | 8,706,929 / 940 MB |
-| legacy-heap objects | 729,174 | 444,783 |
-| Java live heap | 860 MB | 770 MB |
-| process peak | 1467 MB | 1324 MB |
-
-`CollectionSemanticsIntegrationTest` holds both against a real JDK -- empty-list
-operations, the three growth paths, identity semantics, null keys and values
-through each of the three views, iterator removal, and a rehash. It was confirmed
-to fail when the key iterator stops mapping the table's sentinel back to null.
-
-**`HashMap` was investigated and deliberately left alone.** It eagerly allocates
-three arrays (keys, values, meta) at capacity 16, which looks like the same defect,
-but the maps in this workload are populated rather than empty. Rebuilding with a
-default capacity of 1 -- the cheapest probe for "how much of that table is wasted"
--- made everything worse, because the maps then regrow repeatedly:
-
-| default capacity | Object[] allocs | int[] allocs | Java live |
-|---|---:|---:|---:|
-| 16 (current) | 1,324,987 | 213,725 | 770 MB |
-| 1 (probe) | 1,802,249 | 452,356 | 882 MB |
-
-Growth there is also post-insert by design, so the shared-empty-table trick that
-works for ArrayList would have the put path writing into the shared table. Not
-worth it for an unmeasured win in the hottest class in the runtime.
-
-### Heap telemetry
-
-A census build answers "what is actually in the heap":
+## Reproducible comparisons
 
 ```bash
-CN1_SELFHOST_CFLAGS="-DCN1_ALLOC_CENSUS" ./build-selfhost.sh -O3
-CN1_HEAP_REPORT=1 ./target/parpar-O3 clean ... 2> report.txt
+./vm/selfhost/bench-selfhost.sh \
+  'vm/selfhost/target/classes;vm/selfhost/target/asm-classes' \
+  ByteCodeTranslator com.codename1.tools.translator 7
+
+python3 vm/selfhost/prepare-hello-corpus.py
+./vm/selfhost/bench-selfhost.sh vm/selfhost/target/hello-corpus \
+  HelloCodenameOne com.codenameone.examples.hellocodenameone 7
 ```
 
-Three reports, after every sweep and once at exit:
+The HelloCodenameOne preparation script snapshots an **existing macOS build**
+under `scripts/hellocodenameone/mac/target`. It records the source path and hash of
+every application, dependency and framework class in `target/hello-corpus.json`.
+It replaces that build's JavaAPI with the freshly compiled self-host JavaAPI.
+This measures translation of that snapshot, not a fresh application build or
+application execution.
 
-- `[JHEAP]` -- BiBOP pages reserved / live / slack, plus the legacy heap. Answers
-  "is this fragmentation?" (here: no, slack is ~2 MB of 715 MB).
-- `[LIVE]` -- **the live heap by class**, occupied bytes, objects, bytes each, and
-  how many the last mark proved reachable. This is the one that was missing.
-- `[ALLOC]` -- allocation volume by class. Churn, which costs CPU, as opposed to
-  retention, which costs memory. A class can dominate one and not the other.
+Each comparison has a correctness preflight followed by seven measured rounds.
+Arm order rotates, and each sample starts a new process. Every generated file must
+match byte-for-byte across every sample and runtime. Failed jobs, timeouts, stale
+builds, changing inputs, missing memory statistics and output differences reject
+the comparison. A failed run retains an incomplete `results.json` and its logs.
 
-`[LIVE]` charges each object what it OCCUPIES -- a whole BiBOP size-class slot, a
-whole malloc block -- so the per-class rows add up to the footprint and rounding
-waste is charged to the class that causes it.
+The harness reports median/minimum/maximum elapsed time, median user+system CPU
+time, and maximum total process peak memory across the measured samples. On
+POSIX it waits directly for process exit, with a separate timeout watchdog, so
+timeout polling does not add up to 50 ms to each elapsed-time sample. On
+macOS the memory metric is `/usr/bin/time -l`'s `peak memory footprint`; on Linux
+it is peak RSS. These are process metrics, not Java live-heap sizes. macOS may
+require permission to collect the process statistics outside a sandbox. Run on an
+otherwise idle machine, and retain all samples; do not select the fastest arm's
+sample or compare an instrumented binary against a release binary.
 
-**Read the post-sweep report, not the exit one, for reachability.** `reachable`
-means "carries the current mark", so at exit -- long after the last cycle -- almost
-everything looks unreachable whether it is or not. At exit that column says 6%; at
-the last sweep, with fresh marks, it says 75%.
+Raw evidence is stored under `target/bench/<timestamp>/`. Those directories are
+build artifacts. Historical numbers formerly in this document were not tied to
+the current source fingerprints and are not a baseline for these changes.
+Performance parity with HotSpot remains a measurement goal.
 
-### What the census says about this workload
+The [2026-09-16 regression investigation](REGRESSION-2026-09-16.md) records the
+analysis, GC and string repairs, controlled experiments, failed baseline runs,
+and completed comparisons against JDK 25 and JDK 8.
+The [native lowering audit](NATIVE-LOWERING-2026-09-16.md) records the subsequent
+aligned storage, linked ARM64 checks, allocation-registration repair, and final
+whole-workload comparison, including rejected changes and remaining gaps.
+The [17 September follow-up](NATIVE-LOWERING-2026-09-17.md) covers native builder
+ownership across helper calls and exceptions, concurrent tracing changes, linked
+assembly evidence, and the subsequent whole-workload comparison.
 
-The `[LIVE]` report is printed **pre-sweep**, which is the only point where the four
-reasons a slot is still occupied are distinguishable: `traced` (the current mark
-reached it), `fresh` (allocated since the mark, kept by the grace rule), `aging`
-(known dead, kept one more cycle) and `dead` (this sweep returns it). Post-sweep
-the grace stamp makes the first two identical, and the first version of this census
-reported one as the other.
+## The CI performance gate
 
-At the last cycle of a self-hosting translation:
+Every platform's own build measures ParparVM against JDK 25 and fails on a regression:
+the Linux legs of `linux-build-run.yml` (x64, arm64), the Windows capture jobs of
+`parparvm-tests-windows.yml` (x64, arm64) and the macOS job of `scripts-macos.yml`. Each
+runs `ci-perf-gate.sh` after it has built and run its application, puts the table into
+that platform's PR comment beside its screenshots, and fails the job in its last step:
 
-```
-occupied 4,441,347 objects 349MB
-  traced 47%   fresh 30%   aging 14%   dead 9%
-```
-
-**Only 47% of the occupied heap is traced live. The rest is held by collector
-policy, not by the program.** Per class the split is sharper still -- `char[]` is
-**5% traced and 76% fresh**, i.e. almost pure churn caught between cycles:
-
-```
- 68.84MB  726070 objs   99 B/obj  traced 49% fresh 20% aging 19% dead 12%  java.lang.Object[]
- 51.17MB  483395 objs  110 B/obj  traced  5% fresh 76% aging 13% dead  6%  char[]
- 26.12MB  363289 objs   75 B/obj  traced 57% fresh 27% aging 10% dead  5%  java.lang.String
- 15.09MB  240879 objs   65 B/obj  traced  5% fresh 62% aging 21% dead 13%  boolean[]
-```
-
-The mechanism is the sweep's own rule, confirmed directly by
-`experiments/PinProbe`: a dead object needs **three cycles** to have its slot
-returned -- one of grace while it is fresh, one of aging, then reclamation. A
-translation completes three or four cycles in 1.4s, so most of what it allocates is
-never eligible to be freed and the heap grows towards total allocation volume
-(940MB allocated, 1.3GB peak, ~150-300MB genuinely live).
-
-Collecting faster helps, but does not change the ratio, because the grace rule
-keeps everything allocated since the last mark whatever the rate:
-
-| | cycles | peak | traced at last cycle |
-|---|---:|---:|---:|
-| 1 mark thread | 3 | 1320 MB | 47% |
-| `-DCN1_GC_MARK_THREADS=4` | 8 | **1172 MB** | 25% |
-| 4 threads + `CN1_GC_TRIGGER_MB=24` | 7 | 1259 MB | 39% |
-
-So the dominant lever is **allocation churn**, and the `[ALLOC]` census names it:
-`char[]` 368MB, `Object[]` 196MB, `String` 77MB, `SimpleListIterator` 40MB. Cutting
-an allocation removes roughly three cycles of occupancy, not one object.
-
-Two hypotheses this ruled OUT, both of which looked plausible:
-
-- **Conservative stack roots pinning dead objects.** `experiments/PinProbe` shows
-  the marks are precise and depth makes no difference: a dropped batch reads 100%
-  kept on the cycle after it is allocated (the grace stamp) and 0% on the next,
-  identically whether it was allocated in a shallow frame, under a 400-deep
-  recursion, or with the stack scrubbed afterwards.
-- **Fragmentation.** `[JHEAP]` puts page-pool slack at ~2MB of 715MB.
-
-Where the process memory sits, from `vmmap --summary` around peak:
-
-```
-MALLOC_LARGE          551.5M virtual / 435.8M dirty    BiBOP arenas
-MALLOC_LARGE (empty)   53.7M /  50.2M dirty            freed, not returned
-MALLOC_SMALL          232.0M / 111.7M dirty            legacy heap
-Stack                  12.2M /   0.2M
+```bash
+vm/selfhost/ci-perf-gate.sh run <platform> <outDir> [--hello-workload FILE --hello-app NAME]
+vm/selfhost/ci-perf-gate.sh verdict <outDir>
 ```
 
-It is all malloc'd heap; there is no large non-heap component. (An earlier note
-here claimed ~600MB was "not the Java heap" -- that compared an exit-time census
-against the whole-run peak and was wrong.)
+`run` fetches JDK 25 into a private directory (no later step sees a different JDK),
+builds the self-hosted translator (`build-selfhost.sh -O3`) and the Bench binary
+(`build-bench.sh -O3`, compiled through the same `compile-dist.sh`), and runs
+`perf-gate.py`. It never fails its own step, so a regression cannot stop the screenshots
+and the comment that report it; `verdict` does.
 
-### The second grace cycle: vestigial in origin, load-bearing today
+**The benchmarks**, each run once, unpinned, on all of the runner's CPUs with both
+runtimes' default thread counts -- the configuration an application runs in. A hosted
+runner has a fixed handful of CPUs (4 on Linux and Windows, 3 on macOS), pinning a subset
+of an x64 runner's vCPUs picks hyperthread siblings rather than cores, and macOS cannot
+pin at all, so a 1/2/4-core sweep there measured the runner, not the VM. `--cores 1,2,4`
+still sweeps, pinned, where that means something:
 
-A dead object needs three cycles because the sweep keeps it twice -- once as `fresh`
-(never marked) and once as `aging` (`mark == V-1`). The first is load-bearing. The
-second arrived in November 2014, commit `31528ecfa6`:
+| Benchmark | ParparVM arm | JDK 25 arm |
+|---|---|---|
+| hello | the self-hosted translator translating this build's application -- the exact translation the build just ran (`CN1_TRANSLATION_RECORD`), or on macOS the corpus `prepare-hello-corpus.py` takes from the macOS build | the same translator classes |
+| translator | the self-hosted translator translating itself | the same |
+| each Bench workload | `bench-O3 <reps> <workload>`, one process per workload | `java com.bench.Bench <reps> <workload>` |
 
+**JDK 25 is the unit of measure.** Each round runs both arms back to back, alternating
+which goes first, and yields a paired ratio; the result is the median. Nothing absolute
+is printed or kept, so one baseline holds on a fast runner and a slow one. Translation
+time is the whole process; a workload's time is its fastest measured repetition inside
+the process, so JVM startup does not count against the JDK. RAM is the process peak
+(peak footprint on macOS, maximum RSS on Linux, peak working set on Windows). Every run is
+verified: translation output byte for byte, workload checksums across arms and rounds.
+
+In a `--cores` sweep the count is pinned with CPU affinity on Linux and Windows. macOS
+has no affinity API, so there it is logical: both arms are told it (`CN1_GC_MARK_THREADS`,
+`-XX:ActiveProcessorCount`) and neither is confined to it; the table marks those rows.
+
+**The gate compares against `perf-baseline.json`**: a ratio per platform and benchmark,
+and a tolerance per metric. A ratio more than the tolerance above its
+baseline fails the build, and the comment names the benchmark, the metric and the size
+of the change.
+
+**Calibrating.** Baselines must come from the runners that enforce them: a ratio depends
+on the hardware, so one measured on a developer machine is not a baseline for CI. A
+benchmark with no entry is reported as "not gated", and the comment carries the entry to
+add. When a change moves performance on purpose, update the entries in the same pull
+request, from that pull request's own run.
+
+## Native collection and string implementation
+
+`java.util.NativeStorage` is the common private buffer interface. Its C backing
+blocks carry capacity and byte accounting. Hash tables group key, value, metadata
+and optional ordering slices into one allocation. Only the root slice owns the
+allocation. Generated mark functions trace reference slices; generated ownership
+cleanup releases the root. Replaced blocks are retired until an active mark cycle
+finishes. Reference updates use the runtime's SATB barriers, including bulk move
+and clear operations. Native allocation contributes to GC allocation pressure. Borrowing methods keep
+the Java owner live through their final native-buffer access with a compiler
+lifetime fence: a raw malloc pointer alone is not a conservative Java root.
+Throwing Java finalizers cannot bypass the subsequent native cleanup chain.
+Conservative roots accept byte-interior pointers. A failed native-stack capture
+invalidates that collection's liveness decisions and prevents its sweep.
+
+ArrayList, ArrayDeque, IdentityHashMap, HashMap, Hashtable and LinkedHashMap use
+these buffers. HashSet and LinkedHashSet use their backing maps. Exact Vector and
+Stack instances use native storage; Vector subclasses retain the protected
+`elementData` array contract.
+
+Validated foreach loops use a common native cursor emitter for array lists,
+hash sets, ordered sets and hash-map key/value views. Local allocation proofs
+are computed only for methods containing traversal/view calls; methods without
+category-sensitive stack operations also avoid frame analysis. Proven exact
+receivers omit dispatch. Field, parameter and factory results use a one-time
+exact-class guard and an ordinary iterator fallback for unsupported classes. The owner stays in a GC root, and removal/modification checks
+remain. Immediately consumed views on proven exact maps are eliminated.
+
+StringBuilder uses Latin-1 bytes until an operation requires UTF-16. String
+construction, appending, concatenation and character replacement preserve compact
+storage when representable. Latin-1 character replacement uses a native byte
+scan and copy with a fused result allocation where possible. StringBuffer delegates
+under its monitor. GC store and bulk barriers discard already-marked references
+before logging them; older references still enter the marking snapshot.
+
+Stream operations are lazy, with short-circuiting and one-shot consumption.
+Immediately consumed `Stream.of(array)` pipelines in straight-line methods lower
+filter/map/skip/limit and count/forEach/match terminals into one C loop when their
+callbacks are known lambdas. Captures use native stack structs and explicit Java
+roots; callbacks call their generated implementations directly, without allocating
+stream, cursor or lambda objects. Escaping pipelines, unknown callbacks, sorted,
+distinct and other terminals retain the lazy fallback. Other iterator families
+and escaping entry objects also retain fallback implementations. C emission alone
+does not establish zero overhead or vectorization.
+
+## Validation
+
+```bash
+python3 -m unittest discover -s vm/selfhost -p 'test_*.py'
+./vm/benchmarks/run-gauntlet.sh
+./vm/benchmarks/run-gc-verify.sh
 ```
--  if(o->__codenameOneGcMark != currentGcMarkValue) {      // free what was not marked
-+  if(o->__codenameOneGcMark < currentGcMarkValue - 1) {   // keep one extra generation
-```
 
-message: "Delayed GCing of elements to prevent them from being collected due to a
-race condition with the GC thread". **That collector had no SATB barrier** -- zero
-matches for satb or snapshot at that commit -- so keeping an extra generation made a
-lost-object race improbable rather than impossible.
+Translator tests under `vm/tests` cover reference proofs, native/JVM collection
+and stream semantics, compact strings, JavaScript fallbacks and deterministic C
+floating-point literals. The native storage test compiles the actual allocation
+and retirement code under AddressSanitizer and UndefinedBehaviorSanitizer.
+The GC verifier requires real collection cycles and injected-fault detection;
+a workload completing zero cycles does not pass.
 
-**It was removed, measured, and put back.** Removing it is verifier-green and
-gauntlet-green and gives byte-identical self-hosting output, and it is worth about
-**2-3% of peak** (1334 -> 1322 MB, 1349 -> 1302 MB). Not worth it, because four later
-mechanisms have since been built on the rule:
-
-- Two `java.lang.ref` clearing sites that must use **exactly** the sweep's liveness
-  test. Their comment spells out the failure: "FAILING to clear one the sweep frees
-  hands get() a dangling pointer", and on ParparVM a dangling read is a native crash
-  no Java catch can see.
-- The fast-sweep page shortcut, whose `gcGraceEpoch < V-1` bound is derived from the
-  per-slot rule. Its comment records what happened when the two disagreed: "testing
-  != V let it drop whole pages holding V-1 slots... 26,924 slots in one run. That is
-  what left kept objects pointing into reclaimed memory" -- issue 5425.
-- The legacy and BiBOP sweeps ageing in step, so a matured `Hashtable.Entry` at V-1
-  is never kept while its page-resident payload at V-1 has already gone.
-
-And the verifier does not cover the coupling: the measurement above changed the sweep
-without changing the ref-clearing sites, which is precisely the dangling-`get()` bug,
-and it still came back green.
-
-So the rule started as a band-aid and is now structural. Removing it means changing
-all four together and re-deriving the fast-sweep bound, for 2-3%. The churn is worth
-more and risks nothing.
-
-### String: the NSString field is free
-
-`java.lang.String` carries a `long nsString` for the Apple targets' direct NSString
-mapping, and the obvious question is what that costs everywhere else. Measured:
-nothing.
-
-```
-sizeof(obj__java_lang_String) = 48      nsString at offset 40
-```
-
-The fields before it end at 36 and the struct is 8-aligned, so four of those eight
-bytes were padding already. Without the field the struct is 40 bytes -- and BiBOP's
-size classes are 32, 48, 64, ..., so 40 and 48 both land in the same 48-byte slot.
-Removing it would save zero bytes per String while costing the Apple targets a
-side table and a lookup. Keep it.
-
-The strings themselves are still the largest single consumer (`char[]`, 368 MB
-allocated). Note that a compact Latin-1 path already exists for the concat
-fast path -- `cn1FusedLatin1Begin` allocates the String and a `byte[]` payload in
-one BiBOP slot -- so the remaining `char[]` volume is strings built some other way.
-That is the next thing to look at.
+Allocation census and GC probe builds are diagnostic tools. Their timing and peak
+memory cannot substitute for measurements of the release binary. With GC probing
+enabled, `[NATIVE-STORAGE]` reports live, retired and released backing-block bytes
+alongside managed-heap diagnostics.

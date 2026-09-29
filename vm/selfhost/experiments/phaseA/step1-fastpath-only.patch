@@ -1,0 +1,332 @@
+diff --git a/vm/ByteCodeTranslator/src/cn1_globals.h b/vm/ByteCodeTranslator/src/cn1_globals.h
+index f0aacd1b92..150312e481 100644
+--- a/vm/ByteCodeTranslator/src/cn1_globals.h
++++ b/vm/ByteCodeTranslator/src/cn1_globals.h
+@@ -327,6 +327,16 @@ struct clazz {
+     // an exact registry instead of a distance heuristic (see gcMarkObject). Only
+     // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
+     JAVA_BOOLEAN cn1ClazzRegistered;
++    // Dense index into this thread's typed-page table. TRAILING for the same
++    // reason as the field above: the generated clazz initializers are positional
++    // and never name it, so C zero-fills it and no translator change is needed.
++    // ZERO MEANS UNASSIGNED; indices start at 1.
++    //
++    // Deliberately NOT classId. class__java_lang_String, _i8 and _i16 share one
++    // classId by design -- the twin trick stores String's coder bit in WHICH of
++    // the three a header points at -- and a type-homogeneous page has to keep
++    // those apart or that bit is lost. One index per clazz STRUCT, not per id.
++    int cn1AllocIndex;
+ #ifdef CN1_ALLOC_CENSUS
+     // TRAILING for the same reason as cn1ClazzRegistered above: the generated
+     // clazz initializers are positional and never name these, so C zero-fills
+@@ -1761,6 +1771,13 @@ struct ThreadLocalData {
+     /* Per-size-class current BiBOP page. See the note at the fast path: this was
+      * `__thread`, which costs an indirect call per allocation on Darwin. */
+     struct CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
++    /* Current TYPED page per class, for the fixed-size CN1_FAST_NEW path. Keyed
++     * by class and not by size class: a thread alternating between two classes of
++     * the same size would otherwise retire and re-acquire on every allocation.
++     * Lazily grown; NULL until this thread's first typed allocation. Every other
++     * allocation path keeps bibopCurrent[] above, unchanged. */
++    struct CN1BibopPage** bibopCurrentByClass;
++    int bibopCurrentByClassLen;
+ 
+ #ifdef CN1_GC_VERIFY
+     // The thread's whole C stack, [low, high), recorded beside the limit above and
+@@ -2163,6 +2180,16 @@ _Static_assert(CN1_BIBOP_CIDX(CN1_BIBOP_MAX_OBJECT + 1) == -1,
+ typedef struct CN1BibopPage {
+     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
+     struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
++    /* The one class every object in this page belongs to, or NULL while the page
++     * is size-classed and may hold a mix. This is the single copy that a later
++     * step will use in place of one pointer per object: per-PAGE metadata is
++     * amortised over ~2048 slots, which is why it can pay for itself where a
++     * per-slot field cannot (see REGISTRY Round 36).
++     *
++     * A page may only be TYPED while it is EMPTY. Typing a partially filled page
++     * would leave objects of other classes below the bump cursor, and everything
++     * that later reads the class off the page would be wrong about them. */
++    struct clazz* pageClazz;
+     int classIndex;
+     int slotSize;
+     int slotCount;
+@@ -2414,6 +2441,7 @@ void cn1RecordAllocation(struct clazz* parent, int size);
+ 
+ // Inlined bump fast path. Returns 0 (slow path: page full / free-list present /
+ // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
++struct CN1BibopPage* cn1BibopAcquireTypedPageExt(CODENAME_ONE_THREAD_STATE, int ci, struct clazz* parent);
+ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+     // EVERY allocation path must register the class BEFORE the object publishes --
+@@ -2427,7 +2455,32 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
+     // cn1GcRegisterClazz.) Cost is one predictable flag-test per alloc, measured
+     // at noise level on allocation-heavy renders.
+     CN1_CLAZZ_REGISTER(parent);
+-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
++    // TYPED page for this exact class. The size here is sizeof(struct obj__X), so
++    // it is canonical by construction and one class means one size class. On a
++    // miss, acquire a freshly formatted page for this class; a 0 from that means
++    // "could not type", and returning 0 sends the caller to __NEW_X and the
++    // ordinary shared pages, which is always correct because the object header
++    // still carries its class pointer.
++    const int __cn1ai = parent->cn1AllocIndex;
++    CN1BibopPage* p = (__cn1ai > 0 && __cn1ai < threadStateData->bibopCurrentByClassLen)
++                    ? threadStateData->bibopCurrentByClass[__cn1ai]
++                    : (CN1BibopPage*)0;
++    // EXHAUSTED counts as a miss, and that is not cosmetic. Falling through to
++    // __NEW_X on a full page would leave it installed and owned FOREVER -- and an
++    // owned page is skipped by the sweep, so its dead slots are never reclaimed
++    // and its epoch bookkeeping never advances. It has to be retired and replaced.
++    if(p != (CN1BibopPage*)0) {
++        if(atomic_load_explicit(&p->bumpIndex, memory_order_relaxed) >= CN1_BIBOP_SLOT_COUNT(ci)
++           || p->freeList != (void*)0) {
++            p = (CN1BibopPage*)0;
++        }
++    }
++    if(__builtin_expect(p == (CN1BibopPage*)0, 0)) {
++        p = cn1BibopAcquireTypedPageExt(threadStateData, ci, parent);
++        if(p == (CN1BibopPage*)0) {
++            return (JAVA_OBJECT)0;
++        }
++    }
+     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
+                         constantPoolObjects != (JAVA_OBJECT*)0
+ #ifndef CN1_CONSERVATIVE_GC_ROOTS
+@@ -2522,7 +2575,32 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
+ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
+     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+     CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
+-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
++    // TYPED page for this exact class. The size here is sizeof(struct obj__X), so
++    // it is canonical by construction and one class means one size class. On a
++    // miss, acquire a freshly formatted page for this class; a 0 from that means
++    // "could not type", and returning 0 sends the caller to __NEW_X and the
++    // ordinary shared pages, which is always correct because the object header
++    // still carries its class pointer.
++    const int __cn1ai = parent->cn1AllocIndex;
++    CN1BibopPage* p = (__cn1ai > 0 && __cn1ai < threadStateData->bibopCurrentByClassLen)
++                    ? threadStateData->bibopCurrentByClass[__cn1ai]
++                    : (CN1BibopPage*)0;
++    // EXHAUSTED counts as a miss, and that is not cosmetic. Falling through to
++    // __NEW_X on a full page would leave it installed and owned FOREVER -- and an
++    // owned page is skipped by the sweep, so its dead slots are never reclaimed
++    // and its epoch bookkeeping never advances. It has to be retired and replaced.
++    if(p != (CN1BibopPage*)0) {
++        if(atomic_load_explicit(&p->bumpIndex, memory_order_relaxed) >= CN1_BIBOP_SLOT_COUNT(ci)
++           || p->freeList != (void*)0) {
++            p = (CN1BibopPage*)0;
++        }
++    }
++    if(__builtin_expect(p == (CN1BibopPage*)0, 0)) {
++        p = cn1BibopAcquireTypedPageExt(threadStateData, ci, parent);
++        if(p == (CN1BibopPage*)0) {
++            return (JAVA_OBJECT)0;
++        }
++    }
+     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
+                         constantPoolObjects != (JAVA_OBJECT*)0
+ #ifndef CN1_CONSERVATIVE_GC_ROOTS
+diff --git a/vm/ByteCodeTranslator/src/cn1_globals.m b/vm/ByteCodeTranslator/src/cn1_globals.m
+index 0f33b607ac..b597bde4f9 100644
+--- a/vm/ByteCodeTranslator/src/cn1_globals.m
++++ b/vm/ByteCodeTranslator/src/cn1_globals.m
+@@ -2201,6 +2201,9 @@ static inline void cn1AppendPendingAllocation(struct ThreadLocalData* t, JAVA_OB
+ // page/extent index it classifies against).
+ static int cn1GcVerifyActive;
+ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE);
++#ifdef CN1_GC_VERIFY
++void cn1GcVerifyTypedPages(void);
++#endif
+ void cn1GcVerifyChild(JAVA_OBJECT child, void* markSite);
+ void cn1GcVerifyPoisonSlot(JAVA_OBJECT o, int slotSize);
+ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj);
+@@ -8588,6 +8591,152 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
+ #endif
+ }
+ 
++// ---- TYPED PAGES, STEP 1: the fixed-size fast path only --------------------
++// One class per page, so a later step can delete the class pointer from every
++// object header and read it off the page instead. The slot histogram prices that
++// at 8.9% of allocated bytes on the selfhost corpus and it is the only header
++// field whose removal is free -- per-PAGE metadata amortises over ~2048 slots,
++// per-SLOT metadata does not (REGISTRY Round 36).
++//
++// SCOPE, deliberately small. Only CN1_FAST_NEW feeds these pages. It always asks
++// for sizeof(struct obj__X), so the size is canonical by construction and the
++// "one class, one size class" invariant holds without a runtime check. That is
++// exactly what the first attempt got wrong: cn1AllocFused asks for the String
++// header PLUS its inlined characters, so class__java_lang_String_i8 allocates at
++// many sizes, and keyed by class alone a long string ran off the end of a slot
++// sized for a short one. Every other allocation path -- the general
++// cn1BibopAlloc, the fused natives, arrays -- keeps the shared size-classed
++// pages untouched, so none of them can reach this invariant.
++//
++// EMPTY PAGES ONLY. A page is typed at the moment it is formatted and never
++// afterwards: typing a partially filled page would leave foreign objects below
++// the bump cursor. So this takes a free/fresh page and never a partial one, and
++// clears pageClazz when the page is handed back.
++static int bibopNextAllocIndex = 1;   // 0 means UNASSIGNED; bibopMutex
++extern int classListSize;
++
++// Grow this thread's typed-page table to cover idx. NULL means "cannot type",
++// and every caller then falls back to the ordinary size-classed path.
++static CN1BibopPage** cn1BibopThreadTypedTable(struct ThreadLocalData* d, int idx) {
++    if(idx < d->bibopCurrentByClassLen) {
++        return d->bibopCurrentByClass;
++    }
++    int grow = classListSize + 16;   // slack: the String twins are not in that count
++    if(grow <= idx) {
++        grow = idx * 2 + 16;
++    }
++    CN1BibopPage** n = (CN1BibopPage**)realloc(d->bibopCurrentByClass,
++                                               (size_t)grow * sizeof(CN1BibopPage*));
++    if(n == 0) {
++        return 0;
++    }
++    memset(n + d->bibopCurrentByClassLen, 0,
++           (size_t)(grow - d->bibopCurrentByClassLen) * sizeof(CN1BibopPage*));
++    d->bibopCurrentByClass = n;
++    d->bibopCurrentByClassLen = grow;
++    return n;
++}
++
++// Retire this thread's typed page for `parent` and install a freshly formatted
++// one. Returns the new page, or 0 to mean "could not type -- use the shared
++// path", which is always safe because the object header still carries its class.
++static CN1BibopPage* cn1BibopAcquireTypedPage(CODENAME_ONE_THREAD_STATE, int ci,
++                                              struct clazz* parent) {
++    pthread_mutex_lock(&bibopMutex);
++    int ai = parent->cn1AllocIndex;
++    if(ai == 0) {
++        ai = bibopNextAllocIndex;
++        parent->cn1AllocIndex = ai;
++        bibopNextAllocIndex = ai + 1;
++    }
++    CN1BibopPage** tbl = cn1BibopThreadTypedTable(threadStateData, ai);
++    if(tbl == 0) {
++        pthread_mutex_unlock(&bibopMutex);
++        return 0;
++    }
++    CN1BibopPage* old = tbl[ai];
++    if(old != 0) {
++        old->owned = JAVA_FALSE;
++        // Untyped again on the way out. The page keeps its live objects and goes
++        // back into general circulation, where a mix is expected; nothing reads a
++        // class off a page yet, and when something does, only pages typed at
++        // format time will be eligible.
++        old->pageClazz = 0;
++        CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
++        do {
++            old->nextPool = sh;
++        } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
++                    memory_order_release, memory_order_relaxed));
++        tbl[ai] = 0;
++    }
++    // FREE pages only -- never bibopPartialPool. A partial page already holds
++    // objects of other classes.
++    CN1BibopPage* np = 0;
++    if(bibopFreePool != 0) {
++        np = bibopFreePool;
++        bibopFreePool = np->nextPool;
++        cn1BibopFormatPage(np, ci);
++    }
++    pthread_mutex_unlock(&bibopMutex);
++    if(np == 0) {
++        np = cn1BibopNewPage(ci);
++        if(np == 0) {
++            return 0;
++        }
++    }
++    np->owned = JAVA_TRUE;
++    np->nextPool = 0;
++    np->pageClazz = parent;   // empty page, so every object in it will be `parent`
++    tbl[ai] = np;
++    return np;
++}
++
++#ifdef CN1_GC_VERIFY
++// THE INVARIANT, ASSERTED RATHER THAN ASSUMED: every object in a typed page is
++// an instance of that page's class. This is the whole basis for later deleting
++// the class pointer from the object header, so it is checked directly against
++// the header that is still there -- which is only possible while both exist.
++// Run it before the header is removed or it can never be run at all.
++void cn1GcVerifyTypedPages(void) {
++    long pages = 0, objs = 0, bad = 0;
++    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
++    while(p != 0) {
++        struct clazz* pc = p->pageClazz;
++        if(pc != 0) {
++            pages++;
++            int n = atomic_load_explicit(&p->bumpIndex, memory_order_acquire);
++            for(int i = 0 ; i < n ; i++) {
++                JAVA_OBJECT o = cn1BibopSlot(p, i);
++                int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
++                if(m == CN1_BIBOP_FREE_MARK) {
++                    continue;   // a freed slot carries a free-list pointer, not a class
++                }
++                objs++;
++                if(o->__codenameOneParentClsReference != pc) {
++                    if(bad < 10) {
++                        fprintf(stderr, "[TYPED-PAGE] slot %d of a %s page holds %s\n",
++                                i, pc->clsName != 0 ? pc->clsName : "?",
++                                o->__codenameOneParentClsReference != 0 &&
++                                o->__codenameOneParentClsReference->clsName != 0
++                                    ? o->__codenameOneParentClsReference->clsName : "?");
++                    }
++                    bad++;
++                }
++            }
++        }
++        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
++    }
++    fprintf(stderr, "[TYPED-PAGE] typedPages=%ld objects=%ld MISMATCHES=%ld\n",
++            pages, objs, bad);
++}
++#endif
++
++// Exported shim: the inline fast path in the header cannot see a static.
++struct CN1BibopPage* cn1BibopAcquireTypedPageExt(CODENAME_ONE_THREAD_STATE, int ci,
++                                                 struct clazz* parent) {
++    return cn1BibopAcquireTypedPage(threadStateData, ci, parent);
++}
++
+ // Retire the thread's current page for class ci (if any) onto the global SWEEP
+ // stack and adopt a PARTIAL (preferred) or FREE page, formatting a fresh one
+ // only as a last resort. Runs on the owning thread.
+@@ -10092,6 +10241,26 @@ void cn1BibopRetireThreadPages(CODENAME_ONE_THREAD_STATE) {
+             threadStateData->bibopCurrent[ci] = 0;
+         }
+     }
++    // The TYPED pages this thread owns. Missing these would leave a page per
++    // class it allocated permanently owned, so their dead slots never return.
++    for(int ai = 0 ; ai < threadStateData->bibopCurrentByClassLen ; ai++) {
++        CN1BibopPage* old = threadStateData->bibopCurrentByClass[ai];
++        if(old != 0) {
++            old->owned = JAVA_FALSE;
++            old->pageClazz = 0;
++            CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
++            do {
++                old->nextPool = sh;
++            } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
++                        memory_order_release, memory_order_relaxed));
++            threadStateData->bibopCurrentByClass[ai] = 0;
++        }
++    }
++    if(threadStateData->bibopCurrentByClass != 0) {
++        free(threadStateData->bibopCurrentByClass);
++        threadStateData->bibopCurrentByClass = 0;
++        threadStateData->bibopCurrentByClassLen = 0;
++    }
+ }
+ #endif /* CN1_DISABLE_BIBOP */
+ 
+@@ -11600,6 +11769,9 @@ static void cn1GcVerifySummary(void) {
+ }
+ 
+ void cn1GcVerifyHeap(CODENAME_ONE_THREAD_STATE) {
++    // Check the typed-page invariant on every verify pass, beside the heap walk
++    // that is already paying for a full traversal.
++    cn1GcVerifyTypedPages();
+     if(cn1GcFaultFreeLive && cn1GcFaultFreedN > 0) {
+         // What actually became of each slot the fault freed, at the one moment the
+         // verifier looks. FREE/QUAR here means the instrument can see the defect;

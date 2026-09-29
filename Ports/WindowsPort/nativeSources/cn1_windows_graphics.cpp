@@ -370,8 +370,8 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClipShape___long_float_1AR
         return;
     }
     cn1WinReleaseClipGeom(g);
-    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
-    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    coords = (const JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(__cn1Arg2);
+    types = (const JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg3);
     g->clipGeom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
     g->clipMaskTransform = g->transform; /* freeze the world transform at setClip time */
     g->clipIsRect = (g->clipGeom == NULL) ? JAVA_TRUE : JAVA_FALSE;
@@ -678,7 +678,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawRGB___long_int_1ARRAY_int
     if (__cn1Arg2 == JAVA_NULL || w <= 0 || h <= 0) {
         return;
     }
-    px = (JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg2).data;
+    px = (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg2);
 
     /* Repack the source window into a tightly packed (stride == w) BGRA buffer. */
     bgra = (uint32_t*)malloc((size_t)w * (size_t)h * sizeof(uint32_t));
@@ -835,8 +835,8 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fillShape___long_float_1ARRAY
     if (g == NULL || __cn1Arg2 == NULL || __cn1Arg3 == NULL) {
         return;
     }
-    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
-    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    coords = (const JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(__cn1Arg2);
+    types = (const JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg3);
     cn1WinBeginFrame(g);
     brush = cn1WinBrush(g);
     geom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
@@ -861,8 +861,8 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_drawShape___long_float_1ARRAY
     if (g == NULL || __cn1Arg2 == NULL || __cn1Arg3 == NULL) {
         return;
     }
-    coords = (const JAVA_ARRAY_FLOAT*)(*(JAVA_ARRAY)__cn1Arg2).data;
-    types = (const JAVA_ARRAY_INT*)(*(JAVA_ARRAY)__cn1Arg3).data;
+    coords = (const JAVA_ARRAY_FLOAT*)CN1_ARRAY_DATA(__cn1Arg2);
+    types = (const JAVA_ARRAY_INT*)CN1_ARRAY_DATA(__cn1Arg3);
     cn1WinBeginFrame(g);
     brush = cn1WinBrush(g);
     geom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
