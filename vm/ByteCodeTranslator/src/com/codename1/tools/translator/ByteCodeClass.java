@@ -1887,6 +1887,14 @@ public class ByteCodeClass {
                         // is defined in nativeMethods.m and appears in no
                         // header; without that it is an implicit declaration.
                         b.append("    });\n");
+                        // The main window, built HERE: after the VM boot is already
+                        // dispatched (so it overlaps it instead of delaying it) and before
+                        // [NSApp run] (so it does not wait for the run loop to finish
+                        // launching, which on a slow machine is the longest wait on the
+                        // path to the first frame). Weak, so a port without the function
+                        // still links and keeps the queued build in CN1MacInstallAppDelegate.
+                        b.append("    { extern void CN1MacBuildMainWindowBeforeRun(void) __attribute__((weak_import));\n");
+                        b.append("      if (CN1MacBuildMainWindowBeforeRun) CN1MacBuildMainWindowBeforeRun(); }\n");
                         b.append("    [NSApp run];\n}\n\n");
                     } else {
                         b.append("    ");
