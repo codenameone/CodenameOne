@@ -269,16 +269,18 @@ COMPILER_EMITTED = {
 # undeclared. They are out of this check's scope, which is C and Objective-C -- where our
 # natives live and where the rejection that prompted it came from.
 MANGLED_PREFIXES = ("__Z", "_$s", "_$S", "__swift_")
+SWIFT_MANGLED_CLASS = "_Tt"
 
 # Apple's Swift runtime, copied into Frameworks by Xcode for back deployment. Apple builds and
 # signs these; the App Store accepts them as they are and nothing in them is ours to change.
 APPLE_EMBEDDED = re.compile(r"^libswift[A-Za-z0-9_]*\.dylib$")
 
-# Libraries whose exports are not C or Objective-C API and are not described by C headers:
-# the Swift runtime and overlays publish through .swiftinterface files, and their symbols are
-# mangled. Checked by name, never by what a symbol looks like, so an unmangled private C
-# function that happens to live beside them is still reported.
-SWIFT_LIBRARY = re.compile(r"^(libswift|Swift|_Swift)")
+# The Swift runtime's C entry points (swift_retain, swift_allocObject, ...). swiftc emits calls
+# to them and no header declares them. Credited only when the import really binds to a libswift
+# library: a whole-library exemption would also hide an UNMANGLED private C symbol that a Swift
+# library happens to re-export, and binary mode is the only coverage dependencies get.
+SWIFT_RUNTIME_PREFIX = "_swift_"
+SWIFT_RUNTIME_LIBRARY = re.compile(r"^libswift")
 
 # The self-test. These must be reported: the exact three App Store Connect rejected.
 PROBE_PRIVATE = ["_CCCryptorGCMAddIV", "_CCCryptorGCMAddAAD", "_CCCryptorGCMFinal"]
@@ -407,6 +409,10 @@ def classify(symbols, exported, headers):
             continue
         if symbol.startswith(MANGLED_PREFIXES):
             continue
+        if source_name(symbol).startswith(SWIFT_MANGLED_CLASS):
+            # A Swift class as the Objective-C runtime sees it (_TtCs12_SwiftObject): its
+            # name is mangled, so no header can spell it either.
+            continue
         if source_name(symbol) not in headers:
             private.add(symbol)
     return private
@@ -442,40 +448,80 @@ def imports_of_binary(path):
     return result
 
 
-def binaries_in(app):
-    """Every Mach-O an .app ships: its executable and those of every bundle nested in it.
+# Mach-O magics, both byte orders, thin and universal. The universal magic is also a Java class
+# file's, told apart by the word after it: an architecture count for Mach-O (a handful), the
+# class-file version for Java (45 and up).
+MACHO_THIN = {b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe"}
+MACHO_FAT = {b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
 
-    Recursive because the sample nests bundles several levels deep -- extensions under
-    PlugIns and Extensions, frameworks under Frameworks, and a companion watch app under
-    Watch with extensions of its own -- and App Store Connect scans all of them.
+
+def is_macho(path):
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(8)
+    except OSError:
+        return False
+    if head[:4] in MACHO_THIN:
+        return True
+    return head[:4] in MACHO_FAT and len(head) == 8 and int.from_bytes(head[4:], "big") < 30
+
+
+def binaries_in(app):
+    """Every Mach-O an .app ships, wherever it sits.
+
+    Found by content rather than by bundle suffix or Info.plist: the sample nests code several
+    levels deep (extensions, frameworks, a companion watch app with extensions of its own), and
+    a dependency can put an extensionless executable inside a .bundle or anywhere else. App
+    Store Connect scans every one of them, so a suffix allowlist is a way to miss one.
     """
     if os.path.isfile(app):
         return [app]
-
-    def executable(bundle):
-        for info in (os.path.join(bundle, "Info.plist"),
-                     os.path.join(bundle, "Resources", "Info.plist")):
-            if os.path.isfile(info):
-                with open(info, "rb") as handle:
-                    name = plistlib.load(handle).get("CFBundleExecutable")
-                if name and os.path.isfile(os.path.join(bundle, name)):
-                    return os.path.join(bundle, name)
-        return None
-
-    main = executable(app)
-    if not main:
-        fail("%s has no CFBundleExecutable to read" % app)
-    found = [main]
-    for base, dirs, files in os.walk(app):
-        for name in sorted(dirs):
-            if name.endswith((".app", ".appex", ".framework", ".xpc")):
-                path = executable(os.path.join(base, name))
-                if path:
-                    found.append(path)
+    found = []
+    for base, _dirs, files in os.walk(app):
         for name in sorted(files):
-            if name.endswith(".dylib") and not APPLE_EMBEDDED.match(name):
-                found.append(os.path.join(base, name))
+            path = os.path.join(base, name)
+            if os.path.islink(path) or APPLE_EMBEDDED.match(name):
+                continue
+            if is_macho(path):
+                found.append(path)
+    if not found:
+        fail("%s contains no Mach-O at all -- not a built application" % app)
     return found
+
+
+# LC_BUILD_VERSION platform numbers (mach-o/loader.h) and the SDK each one is built against.
+PLATFORM_SDKS = {
+    "1": "macosx", "2": "iphoneos", "3": "appletvos", "4": "watchos", "6": "macosx",
+    "7": "iphonesimulator", "8": "appletvsimulator", "9": "watchsimulator",
+    "11": "xros", "12": "xrsimulator",
+}
+LEGACY_VERSION_MIN = {
+    "LC_VERSION_MIN_IPHONEOS": "iphoneos", "LC_VERSION_MIN_WATCHOS": "watchos",
+    "LC_VERSION_MIN_TVOS": "appletvos", "LC_VERSION_MIN_MACOSX": "macosx",
+}
+
+
+def platform_sdk(path):
+    """The SDK a binary was built for, read from its own load commands.
+
+    A companion watch app and its extensions are watchOS binaries inside an iOS app. Judged
+    against the iPhoneOS index, a watchOS-only private symbol is simply absent from the exports
+    and passes, so each binary is checked against its own platform's SDK.
+    """
+    # No -arch: a watch binary is a thin arm64_32, where `-arch arm64` prints nothing and still
+    # exits 0. Every slice of a universal binary names the same platform.
+    text = run(["otool", "-l", path]).stdout
+    match = re.search(r"cmd LC_BUILD_VERSION\s.*?\n\s*platform (\w+)", text, re.S)
+    if match:
+        sdk = PLATFORM_SDKS.get(match.group(1))
+        if sdk:
+            return sdk
+        fail("%s declares platform %s, which this check does not map to an SDK"
+             % (path, match.group(1)))
+    for command, sdk in LEGACY_VERSION_MIN.items():
+        if command in text:
+            return sdk
+    fail("%s carries no platform load command; cannot tell which SDK to judge it against" % path)
 
 
 def self_test(clang, sdk, triple, exported, headers, work_dir):
@@ -595,7 +641,46 @@ def compile_port(clang, sdk, project_dir, target, work_dir, jobs, verbose):
         fail("only %d natives compiled -- the harness is broken, not the port" % len(objects))
     print("objects compiled  : %d across %d configuration(s)"
           % (len(objects), len(set(j[0] for j in jobs_list))))
+    report_unreachable_branches(clang, sdk, project_dir, target, sources, stub_dir, work_dir)
     return objects
+
+
+HAS_INCLUDE_ANGLE = re.compile(r"__has_include\(\s*<([^>]+)>\s*\)")
+
+
+def report_unreachable_branches(clang, sdk, project_dir, target, sources, stub_dir, work_dir):
+    """Name the native branches no sweep here compiles, so the gap is visible, not silent.
+
+    Turning every //#define gate on does not reach code behind __has_include(<Pod/Header.h>):
+    MLKit and LiteRT headers exist only in a CocoaPods install the builder adds for apps that
+    ask for them (and a few SDK headers only in a newer SDK), and without the header the branch
+    is preprocessed away -- and it could not
+    compile anyway, since it uses the pod's types. A private Apple call added there is only
+    caught by binary mode on an application that links the pod, which the CI sample does not.
+    So these are listed on every run rather than passed over. Whether a header resolves is
+    asked of clang itself, with the include paths the sweep uses.
+    """
+    wanted = {}
+    for name in sources:
+        with open(os.path.join(NATIVE_SOURCES, name), "r", errors="replace") as handle:
+            for header in HAS_INCLUDE_ANGLE.findall(handle.read()):
+                wanted.setdefault(header, set()).add(name)
+    if not wanted:
+        return
+    probe = os.path.join(work_dir, "has_include_probe.c")
+    with open(probe, "w") as handle:
+        for i, header in enumerate(sorted(wanted)):
+            handle.write("#if __has_include(<%s>)\ncn1_found_%d\n#endif\n" % (header, i))
+    out = run([clang, "-E", "-P", "-target", "arm64-apple-ios" + target, "-isysroot", sdk,
+               "-I", NATIVE_SOURCES, "-I", project_dir, "-I", stub_dir, probe]).stdout
+    missing = [h for i, h in enumerate(sorted(wanted)) if "cn1_found_%d" % i not in out]
+    if not missing:
+        return
+    files = sorted(set(f for h in missing for f in wanted[h]))
+    print("not compiled here : %d __has_include(<...>) branch(es) whose header neither this SDK "
+          "nor the project supplies (a pod, or a newer SDK), in %s" % (len(missing), ", ".join(files)))
+    for header in missing:
+        print("                    <%s>" % header)
 
 
 def shadow_without(project_dir, hidden, shadow):
@@ -651,6 +736,20 @@ def project_definitions(clang, sdk, project_dir, target, work_dir, jobs):
     return defined
 
 
+def sdk_index(name, developer_dir, root=None):
+    """(exported names, public header identifiers) for one SDK, with the size floors applied."""
+    root = root or sdk_root(name, developer_dir)
+    exported = exported_names(root)
+    headers = public_header_names(root)
+    print("sdk %-14s: %d exports, %d header identifiers (%s)"
+          % (name, len(exported), len(headers), root))
+    if len(exported) < MIN_EXPORTED or len(headers) < MIN_HEADER_NAMES:
+        fail("the %s indexes are implausibly small (%d exports, %d header names); the SDK "
+             "layout changed and every symbol would read as fine"
+             % (name, len(exported), len(headers)))
+    return exported, headers
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -681,13 +780,8 @@ def main():
     print("clang             : %s" % clang)
     print("deployment target : %s" % target)
 
-    exported = exported_names(sdk)
-    headers = public_header_names(sdk)
-    print("sdk exports       : %d names" % len(exported))
-    print("public headers    : %d distinct identifiers" % len(headers))
-    if len(exported) < MIN_EXPORTED or len(headers) < MIN_HEADER_NAMES:
-        fail("the SDK indexes are implausibly small (%d exports, %d header names); the SDK "
-             "layout changed and every symbol would read as fine" % (len(exported), len(headers)))
+    exported, headers = sdk_index(args.sdk, args.developer_dir, sdk)
+    indexes = {args.sdk: (exported, headers)}
 
     work_dir = tempfile.mkdtemp(prefix="cn1-private-api-")
     findings = {}
@@ -717,15 +811,21 @@ def main():
             if not os.path.exists(app):
                 fail("--binary does not exist: %s" % app)
             for binary in binaries_in(app):
+                platform = platform_sdk(binary)
+                if platform not in indexes:
+                    indexes[platform] = sdk_index(platform, args.developer_dir)
+                bin_exported, bin_headers = indexes[platform]
                 imports = imports_of_binary(binary)
                 if not imports:
                     # Every executable imports at least dyld's and libSystem's entry points.
                     fail("read no imports from %s -- nm output did not parse" % binary)
-                symbols = {s for s, lib in imports if not SWIFT_LIBRARY.match(lib)}
+                symbols = {sym for sym, lib in imports
+                           if not (sym.startswith(SWIFT_RUNTIME_PREFIX)
+                                   and SWIFT_RUNTIME_LIBRARY.match(lib))}
                 label = os.path.relpath(binary, os.path.dirname(os.path.abspath(app)))
-                print("binary            : %s (%d imports)" % (label, len(imports)))
+                print("binary            : %s (%s, %d imports)" % (label, platform, len(imports)))
                 libraries = dict(imports)
-                for symbol in classify(symbols, exported, headers):
+                for symbol in classify(symbols, bin_exported, bin_headers):
                     findings.setdefault(symbol, set()).add(
                         "%s (from %s)" % (label, libraries.get(symbol) or "?"))
     finally:
