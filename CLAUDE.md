@@ -654,6 +654,39 @@ only calls into natives, and a cn1lib's natives are its author's to declare. The
 watch, tv and macOS slices are not covered yet.
 
 
+#### A private symbol links, ships, and is rejected at upload
+
+App Store Connect refuses an upload that imports any SDK symbol no public header
+declares (`Validation failed (409) The app references non-public symbols`). The
+toolchain cannot see it: the SDK's `.tbd` stubs export those names, so they compile
+and link like any other, and every simulator and device build is green. Customer
+uploads were rejected for CommonCrypto's `CCCryptorGCM*` SPI this way, and the same
+gate then found `sqlite3_key`/`sqlite3_rekey` imported from Apple's libsqlite3.
+
+`scripts/check-ios-private-api.py` asks one question of every C and Objective-C
+import: is the name spelled in a public SDK header (comments stripped)?
+
+- **Source mode** (`scripts-ios.yml`) compiles every port native with **every**
+  feature gate on, plus a pass per optional engine the translator can omit
+  (`ENGINE_VARIANTS`). The GCM calls sat behind a gate the sample never enables;
+  a sweep of what one sample builds would miss them again.
+- **Binary mode** (`ios-packaging.yml`) reads the unsigned Release device app and
+  every bundle nested in it, so cn1libs, pods and Swift targets are covered.
+
+Compiler- and toolchain-emitted names go in `COMPILER_EMITTED`, exact names only.
+Swift and C++ mangled names are out of scope.
+
+The GCM calls were switched on by a builder bug: `String.replace("//#define
+CN1_INCLUDE_CRYPTO", ...)` also matched `CN1_INCLUDE_CRYPTO_GCM`. Switch a define
+with `Executor.replaceMarker` (or `replaceInFile`), which matches the whole name;
+`scripts/check-builder-define-toggles.py` fails on a raw `.replace` of a `#define`.
+
+```bash
+scripts/check-ios-private-api.py --project-dir <generated ...-ios-source/...-src>
+scripts/check-ios-private-api.py --binary <Release-iphoneos/App.app>
+scripts/check-builder-define-toggles.py
+```
+
 ### Integration Tests
 
 Located in `maven/integration-tests/`:
