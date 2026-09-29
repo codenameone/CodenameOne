@@ -186,6 +186,24 @@ class RoadLabelTest extends UITestBase {
     }
 
     @FormTest
+    void ferryRoutesAreNotLabelledBecauseTheirLinesAreNotDrawn() {
+        VectorFeature ferry = named("Sausalito - San Francisco Ferry Building",
+                VectorFeature.GEOM_LINESTRING, new int[]{100, 100, 3000, 3000});
+        ferry.getAttributes().put("class", "ferry");
+        VectorFeature street = named("Bay Street", VectorFeature.GEOM_LINESTRING,
+                new int[]{100, 2000, 3000, 2000});
+        street.getAttributes().put("class", "minor");
+        for (String source : new String[]{"transportation_name", "road", "road_label"}) {
+            VectorTile tile = new VectorTile(Arrays.asList(layer(source, ferry, street)));
+            for (MapStyle style : new MapStyle[]{MapStyle.light(), MapStyle.dark()}) {
+                List labels = TileRenderer.extractLabels(tile, style, 14, 2, 3, 256);
+                assertEquals(1, labels.size(), source);
+                assertEquals("Bay Street", ((LabelCandidate) labels.get(0)).text);
+            }
+        }
+    }
+
+    @FormTest
     void anOverzoomedPieceDrawsOnlyItsQuarterOfTheTileAtFullScale() {
         // A line inside the top-left quarter of the tile only, clear of the
         // centre, where its round cap would reach into the other quarters.

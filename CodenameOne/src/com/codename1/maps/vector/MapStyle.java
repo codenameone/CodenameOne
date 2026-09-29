@@ -164,13 +164,19 @@ public final class MapStyle {
     }
 
     // Within each tile, consider settlement names before streets and landmarks.
-    // Detail labels only appear at neighbourhood/street zooms.
+    // Detail labels only appear at neighbourhood/street zooms. Ferry routes share
+    // the street-name layer but their lines are not drawn (see the line rules),
+    // so their names are left out too: a name laid along an invisible route
+    // reads as text floating on open water.
     private static void addBasemapLabels(MapStyle s, int label, int halo) {
         addSymbolRule(s, "place", "name", label, halo);
         addSymbolRule(s, "place_label", "name", label, halo);
-        addSymbolRule(s, "transportation_name", "name", label, halo).zoomRange(12, 24);
-        addSymbolRule(s, "road", "name", label, halo).zoomRange(12, 24);
-        addSymbolRule(s, "road_label", "name", label, halo).zoomRange(12, 24);
+        addSymbolRule(s, "transportation_name", "name", label, halo).zoomRange(12, 24)
+                .excludeFilter("class", "ferry");
+        addSymbolRule(s, "road", "name", label, halo).zoomRange(12, 24)
+                .excludeFilter("class", "ferry");
+        addSymbolRule(s, "road_label", "name", label, halo).zoomRange(12, 24)
+                .excludeFilter("class", "ferry");
         addSymbolRule(s, "park", "name", label, halo).zoomRange(12, 24);
         addSymbolRule(s, "poi", "name", label, halo).zoomRange(14, 24);
     }
