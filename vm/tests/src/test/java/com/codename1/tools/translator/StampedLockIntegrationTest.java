@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -179,26 +201,14 @@ class StampedLockIntegrationTest {
     }
 
     private String nativeReportSource() {
+        // Through the runtime's own conversion, not a hand-copied String struct: the
+        // layout is the VM's to change, and a fixture that mirrors it stops compiling
+        // (no offset field, no array ->data) and fails every case before it runs.
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void StampedLockTestApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
-                "    struct String_Struct {\n" +
-                "        JAVA_OBJECT header;\n" +
-                "        JAVA_OBJECT value;\n" +
-                "        JAVA_INT offset;\n" +
-                "        JAVA_INT count;\n" +
-                "    };\n" +
-                "    struct String_Struct* str = (struct String_Struct*)msg;\n" +
-                "    \n" +
-                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)str->value;\n" +
-                "    if (arr) {\n" +
-                "        JAVA_CHAR* chars = (JAVA_CHAR*)arr->data;\n" +
-                "        int len = str->count;\n" +
-                "        int off = str->offset;\n" +
-                "        for (int i=0; i<len; i++) {\n" +
-                "             printf(\"%c\", (char)chars[off + i]);\n" +
-                "        }\n" +
-                "        printf(\"\\n\");\n" +
+                "    if (msg != JAVA_NULL) {\n" +
+                "        printf(\"%s\\n\", stringToUTF8(threadStateData, msg));\n" +
                 "        fflush(stdout);\n" +
                 "    }\n" +
                 "}\n";

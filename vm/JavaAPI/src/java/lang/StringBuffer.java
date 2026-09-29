@@ -63,7 +63,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the boolean argument to the string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(boolean b){
+    public synchronized java.lang.StringBuffer append(boolean b){
         internal.append(b);
         return this; 
     }
@@ -73,12 +73,18 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The argument is appended to the contents of this string buffer. The length of this string buffer increases by 1.
      * The overall effect is exactly as if the argument were converted to a string by the method String.valueOf(char) and the character in that string were then appended to this StringBuffer object.
      */
-    public java.lang.StringBuffer append(char c){
+    public synchronized java.lang.StringBuffer append(char c){
         internal.append(c);
         return this; 
     }
 
-    java.lang.StringBuffer append(char[] str){
+    // PUBLIC, and that keyword is load-bearing. Overload resolution picks the most
+    // specific APPLICABLE method, and a package-private one is not applicable from
+    // outside java.lang -- so while this compiled and existed, every caller outside
+    // this package silently bound append(char[]) to append(Object) and appended
+    // "[C@1b6d3586" instead of the characters. No link error, no crash: right in the
+    // simulator (a real JDK) and wrong on the device. SbLatin1T caught it.
+    public synchronized java.lang.StringBuffer append(char[] str){
         internal.append(str);
         return this; 
     }
@@ -88,7 +94,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Characters of the character array str, starting at index offset, are appended, in order, to the contents of this string buffer. The length of this string buffer increases by the value of len.
      * The overall effect is exactly as if the arguments were converted to a string by the method String.valueOf(char[],int,int) and the characters of that string were then appended to this StringBuffer object.
      */
-    public java.lang.StringBuffer append(char[] str, int offset, int len){
+    public synchronized java.lang.StringBuffer append(char[] str, int offset, int len){
         internal.append(str, offset, len);
         return this; 
     }
@@ -97,7 +103,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the double argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(double d){
+    public synchronized java.lang.StringBuffer append(double d){
         internal.append(d);
         return this; 
     }
@@ -106,7 +112,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the float argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(float f){
+    public synchronized java.lang.StringBuffer append(float f){
         internal.append(f);
         return this; 
     }
@@ -115,7 +121,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the int argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(int i){
+    public synchronized java.lang.StringBuffer append(int i){
         internal.append(i);
         return this; 
     }
@@ -124,7 +130,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the long argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(long l){
+    public synchronized java.lang.StringBuffer append(long l){
         internal.append(l);
         return this; 
     }
@@ -133,7 +139,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Appends the string representation of the Object argument to this string buffer.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string buffer.
      */
-    public java.lang.StringBuffer append(java.lang.Object obj){
+    public synchronized java.lang.StringBuffer append(java.lang.Object obj){
         internal.append(obj);
         return this; 
     }
@@ -143,7 +149,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The characters of the String argument are appended, in order, to the contents of this string buffer, increasing the length of this string buffer by the length of the argument. If str is null, then the four characters "null" are appended to this string buffer.
      * Let n be the length of the old character sequence, the one contained in the string buffer just prior to execution of the append method. Then the character at index k in the new character sequence is equal to the character at index k in the old character sequence, if k is less than n; otherwise, it is equal to the character at index k-n in the argument str.
      */
-    public java.lang.StringBuffer append(java.lang.String str){
+    public synchronized java.lang.StringBuffer append(java.lang.String str){
         internal.append(str);
         return this; 
     }
@@ -151,7 +157,7 @@ public final class StringBuffer implements CharSequence, Appendable {
     /**
      * Returns the current capacity of the String buffer. The capacity is the amount of storage available for newly inserted characters; beyond which an allocation will occur.
      */
-    public int capacity(){
+    public synchronized int capacity(){
         return internal.capacity(); 
     }
 
@@ -159,14 +165,14 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The specified character of the sequence currently represented by the string buffer, as indicated by the index argument, is returned. The first character of a string buffer is at index 0, the next at index 1, and so on, for array indexing.
      * The index argument must be greater than or equal to 0, and less than the length of this string buffer.
      */
-    public char charAt(int index){
+    public synchronized char charAt(int index){
         return internal.charAt(index);
     }
 
     /**
      * Removes the characters in a substring of this StringBuffer. The substring begins at the specified start and extends to the character at index end - 1 or to the end of the StringBuffer if no such character exists. If start is equal to end, no changes are made.
      */
-    public java.lang.StringBuffer delete(int start, int end){
+    public synchronized java.lang.StringBuffer delete(int start, int end){
         internal.delete(start, end);
         return this; 
     }
@@ -174,7 +180,7 @@ public final class StringBuffer implements CharSequence, Appendable {
     /**
      * Removes the character at the specified position in this StringBuffer (shortening the StringBuffer by one character).
      */
-    public java.lang.StringBuffer deleteCharAt(int index){
+    public synchronized java.lang.StringBuffer deleteCharAt(int index){
         internal.deleteCharAt(index);
         return this; 
     }
@@ -182,7 +188,7 @@ public final class StringBuffer implements CharSequence, Appendable {
     /**
      * Ensures that the capacity of the buffer is at least equal to the specified minimum. If the current capacity of this string buffer is less than the argument, then a new internal buffer is allocated with greater capacity. The new capacity is the larger of: The minimumCapacity argument. Twice the old capacity, plus 2. If the minimumCapacity argument is nonpositive, this method takes no action and simply returns.
      */
-    public void ensureCapacity(int minimumCapacity){
+    public synchronized void ensureCapacity(int minimumCapacity){
         internal.ensureCapacity(minimumCapacity);
     }
 
@@ -190,7 +196,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Characters are copied from this string buffer into the destination character array dst. The first character to be copied is at index srcBegin; the last character to be copied is at index srcEnd-1. The total number of characters to be copied is srcEnd-srcBegin. The characters are copied into the subarray of dst starting at index dstBegin and ending at index:
      * dstbegin + (srcEnd-srcBegin) - 1
      */
-    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin){
+    public synchronized void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin){
         internal.getChars(srcBegin, srcEnd, dst, dstBegin);
     }
 
@@ -199,7 +205,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the indicated offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, boolean b){
+    public synchronized java.lang.StringBuffer insert(int offset, boolean b){
         internal.insert(offset, b);
         return this; 
     }
@@ -210,12 +216,14 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The overall effect is exactly as if the argument were converted to a string by the method String.valueOf(char) and the character in that string were then inserted into this StringBuffer object at the position indicated by offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, char c){
+    public synchronized java.lang.StringBuffer insert(int offset, char c){
         internal.insert(offset, c);
         return this; 
     }
 
-    java.lang.StringBuffer insert(int offset, char[] str){
+    /** See {@link #append(char[])}: package-private here silently rebound callers
+     *  to insert(int, Object). */
+    public synchronized java.lang.StringBuffer insert(int offset, char[] str){
         internal.insert(offset, str);
         return this; 
     }
@@ -225,7 +233,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the indicated offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, double d){
+    public synchronized java.lang.StringBuffer insert(int offset, double d){
         internal.insert(offset, d);
         return this; 
     }
@@ -235,7 +243,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the indicated offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, float f){
+    public synchronized java.lang.StringBuffer insert(int offset, float f){
         internal.insert(offset, f);
         return this; 
     }
@@ -245,7 +253,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the indicated offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, int i){
+    public synchronized java.lang.StringBuffer insert(int offset, int i){
         internal.insert(offset, i);
         return this; 
     }
@@ -255,7 +263,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the position indicated by offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, long l){
+    public synchronized java.lang.StringBuffer insert(int offset, long l){
         internal.insert(offset, l);
         return this; 
     }
@@ -265,7 +273,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The second argument is converted to a string as if by the method String.valueOf, and the characters of that string are then inserted into this string buffer at the indicated offset.
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, java.lang.Object obj){
+    public synchronized java.lang.StringBuffer insert(int offset, java.lang.Object obj){
         internal.insert(offset, obj);
         return this; 
     }
@@ -276,7 +284,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The character at index k in the new character sequence is equal to: the character at index k in the old character sequence, if k is less than offset the character at index k-offset in the argument str, if k is not less than offset but is less than offset+str.length() the character at index k-str.length() in the old character sequence, if k is not less than offset+str.length()
      * The offset argument must be greater than or equal to 0, and less than or equal to the length of this string buffer.
      */
-    public java.lang.StringBuffer insert(int offset, java.lang.String str){
+    public synchronized java.lang.StringBuffer insert(int offset, java.lang.String str){
         internal.insert(offset, str);
         return this; 
     }
@@ -284,7 +292,7 @@ public final class StringBuffer implements CharSequence, Appendable {
     /**
      * Returns the length (character count) of this string buffer.
      */
-    public int length(){
+    public synchronized int length(){
         return internal.length();
     }
 
@@ -292,7 +300,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The character sequence contained in this string buffer is replaced by the reverse of the sequence.
      * Let n be the length of the old character sequence, the one contained in the string buffer just prior to execution of the reverse method. Then the character at index k in the new character sequence is equal to the character at index n-k-1 in the old character sequence.
      */
-    public java.lang.StringBuffer reverse(){
+    public synchronized java.lang.StringBuffer reverse(){
         internal = internal.reverse();
         return this; 
     }
@@ -301,7 +309,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * The character at the specified index of this string buffer is set to ch. The string buffer is altered to represent a new character sequence that is identical to the old character sequence, except that it contains the character ch at position index.
      * The offset argument must be greater than or equal to 0, and less than the length of this string buffer.
      */
-    public void setCharAt(int index, char ch){
+    public synchronized void setCharAt(int index, char ch){
         internal.setCharAt(index, ch);
     }
 
@@ -314,7 +322,7 @@ public final class StringBuffer implements CharSequence, Appendable {
      * If the newLength argument is greater than or equal to the current length, sufficient null characters ('u0000') are appended to the string buffer so that length becomes the newLength argument.
      * The newLength argument must be greater than or equal to 0.
      */
-    public void setLength(int newLength){
+    public synchronized void setLength(int newLength){
         internal.setLength(newLength);
     }
 
@@ -322,41 +330,41 @@ public final class StringBuffer implements CharSequence, Appendable {
      * Converts to a string representing the data in this string buffer. A new String object is allocated and initialized to contain the character sequence currently represented by this string buffer. This String is then returned. Subsequent changes to the string buffer do not affect the contents of the String.
      * Implementation advice: This method can be coded so as to create a new String object without allocating new memory to hold a copy of the character sequence. Instead, the string can share the memory used by the string buffer. Any subsequent operation that alters the content or capacity of the string buffer must then make a copy of the internal buffer at that time. This strategy is effective for reducing the amount of memory allocated by a string concatenation operation when it is implemented using a string buffer.
      */
-    public java.lang.String toString(){
+    public synchronized java.lang.String toString(){
         return internal.toString();
     }
 
-    public StringBuffer StringBuffer(java.lang.CharSequence cs) {
+    public synchronized StringBuffer StringBuffer(java.lang.CharSequence cs) {
         return new StringBuffer(cs.toString());
     }
 
-    public void trimToSize() {
+    public synchronized void trimToSize() {
         // do nothing: according to the 1.5 javadoc,
         // there is no garantee the buffer capacity will be reduced to
         // fit the actual size
     }
 
-    public StringBuffer append(final java.lang.CharSequence cs) {
+    public synchronized StringBuffer append(final java.lang.CharSequence cs) {
         internal.append(cs);
         return this;
     }
 
-    public StringBuffer append(final java.lang.CharSequence cs, final int start, final int end) {
+    public synchronized StringBuffer append(final java.lang.CharSequence cs, final int start, final int end) {
         internal.append(cs, start, end);
         return this;
     }
 
-    public StringBuffer insert(final int offset, final java.lang.CharSequence cs) {
+    public synchronized StringBuffer insert(final int offset, final java.lang.CharSequence cs) {
         internal.insert(offset, cs);
         return this;
     }
 
-    public StringBuffer insert(final int offset, final CharSequence cs, final int start, final int end) {
+    public synchronized StringBuffer insert(final int offset, final CharSequence cs, final int start, final int end) {
         internal.insert(offset, cs, start, end);
         return this;
     }
 
-    public CharSequence subSequence(int start, int end) {
+    public synchronized CharSequence subSequence(int start, int end) {
         return internal.substring(start, end);
     }
 

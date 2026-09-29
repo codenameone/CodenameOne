@@ -55,7 +55,7 @@ int pthread_once(pthread_once_t* once_control, void (*init_routine)(void)) {
         InterlockedExchange((volatile LONG*)&once_control->state, 2);
     } else {
         while (InterlockedCompareExchange((volatile LONG*)&once_control->state, 2, 2) != 2) {
-            Sleep(0);
+            SwitchToThread();   /* see sched_yield below: Sleep(0) can starve the initializer */
         }
     }
     return 0;
@@ -161,9 +161,15 @@ int pthread_cond_broadcast(pthread_cond_t* cond) {
    reads as "uninitialised" (TLS index 0 is itself a valid slot). */
 int pthread_key_create(pthread_key_t* key, void (*destructor)(void*)) {
     DWORD idx;
-    (void)destructor; /* per-key destructors are not supported */
-    idx = TlsAlloc();
-    if (idx == TLS_OUT_OF_INDEXES) {
+    /* Fiber-local rather than thread-local storage, because FLS runs a callback for a
+       non-null value when the thread exits and TLS does not -- so this is what makes a
+       POSIX key destructor happen at all. The runtime relies on one: a thread the VM did
+       not start is unregistered by its key's destructor, and without it such a thread
+       stays registered after it is gone. A thread that never converts to a fiber has
+       exactly one fiber, so the value is per thread as before. The calling conventions
+       agree on both targets (x64 and arm64 have one). */
+    idx = FlsAlloc((PFLS_CALLBACK_FUNCTION)destructor);
+    if (idx == FLS_OUT_OF_INDEXES) {
         return EAGAIN;
     }
     *key = (pthread_key_t)(idx + 1);
@@ -174,21 +180,21 @@ int pthread_key_delete(pthread_key_t key) {
     if (key == 0) {
         return EINVAL;
     }
-    return TlsFree((DWORD)(key - 1)) ? 0 : EINVAL;
+    return FlsFree((DWORD)(key - 1)) ? 0 : EINVAL;
 }
 
 void* pthread_getspecific(pthread_key_t key) {
     if (key == 0) {
         return NULL;
     }
-    return TlsGetValue((DWORD)(key - 1));
+    return FlsGetValue((DWORD)(key - 1));
 }
 
 int pthread_setspecific(pthread_key_t key, const void* value) {
     if (key == 0) {
         return EINVAL;
     }
-    return TlsSetValue((DWORD)(key - 1), (LPVOID)value) ? 0 : EINVAL;
+    return FlsSetValue((DWORD)(key - 1), (PVOID)value) ? 0 : EINVAL;
 }
 
 /* --- threads --- */
@@ -285,9 +291,86 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 }
 
 /* --- <unistd.h> / <sys/time.h> replacements --- */
+/* PRECISE SHORT SLEEPS. Sleep() takes whole milliseconds and wakes on the system timer
+   tick, 15.6ms by default, so the runtime's usleep(50) -- the collector handshake's
+   backoff -- and usleep(1000) -- a pacing park -- each cost up to ~15ms here against 50us
+   and 1ms on POSIX. With the collector marking serially on this platform that was the
+   dominant Windows cost: emulating it on Linux made objectAllocation 3.4x slower per
+   repetition. A high-resolution waitable timer (Windows 10 1803+) sleeps for the
+   microseconds asked; where it is unavailable, a wait under 2ms yields against the
+   monotonic clock instead of sleeping a whole tick. Longer waits keep Sleep(). */
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+
+/* One timer per thread, created on first use and closed when the thread exits. The
+   fiber-local slot's destructor is what closes it, so a thread that sleeps once does not
+   leak a handle. */
+static DWORD cn1_sleep_timer_slot = FLS_OUT_OF_INDEXES;
+static LONG cn1_sleep_timer_slot_state = 0;   /* 0 = not tried, 1 = trying, 2 = ready */
+
+static void WINAPI cn1_close_sleep_timer(void* handle) {
+    if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
+        CloseHandle((HANDLE)handle);
+    }
+}
+
+static HANDLE cn1_sleep_timer(void) {
+    if (InterlockedCompareExchange(&cn1_sleep_timer_slot_state, 1, 0) == 0) {
+        cn1_sleep_timer_slot = FlsAlloc(cn1_close_sleep_timer);
+        InterlockedExchange(&cn1_sleep_timer_slot_state, 2);
+    }
+    while (InterlockedCompareExchange(&cn1_sleep_timer_slot_state, 2, 2) != 2) {
+        SwitchToThread();
+    }
+    if (cn1_sleep_timer_slot == FLS_OUT_OF_INDEXES) {
+        return NULL;
+    }
+    HANDLE timer = (HANDLE)FlsGetValue(cn1_sleep_timer_slot);
+    if (timer == NULL) {
+        timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                                       TIMER_ALL_ACCESS);
+        /* INVALID_HANDLE_VALUE records "not supported here" so it is not retried. */
+        FlsSetValue(cn1_sleep_timer_slot, timer != NULL ? (void*)timer : INVALID_HANDLE_VALUE);
+    }
+    return timer == INVALID_HANDLE_VALUE ? NULL : timer;
+}
+
 int usleep(unsigned int usec) {
-    /* Millisecond granularity is sufficient for the runtime's polling loops. */
+    if (usec == 0) {
+        /* A yield, not a zero-length sleep: see sched_yield. */
+        SwitchToThread();
+        return 0;
+    }
+    HANDLE timer = cn1_sleep_timer();
+    if (timer != NULL) {
+        LARGE_INTEGER due;
+        due.QuadPart = -(LONGLONG)usec * 10;   /* relative, in 100ns units */
+        if (SetWaitableTimer(timer, &due, 0, NULL, NULL, FALSE)) {
+            WaitForSingleObject(timer, INFINITE);
+            return 0;
+        }
+    }
+    if (usec < 2000) {
+        long long end = cn1_monotonic_micros() + (long long)usec;
+        while (cn1_monotonic_micros() < end) {
+            SwitchToThread();
+        }
+        return 0;
+    }
     Sleep((DWORD)((usec + 999) / 1000));
+    return 0;
+}
+
+/* A YIELD THAT CAN REACH A LOWER-PRIORITY THREAD. Sleep(0) gives the processor only to
+   a ready thread of EQUAL OR HIGHER priority, and the collector runs one step below the
+   mutators (it lowers its own priority when it starts). So a mutator spin-yielding while
+   it waits for the collector never let the collector run: with the process on one core
+   it could only progress when Windows' starvation boost fired, every few seconds, and a
+   Bench workload the other platforms finish in a second ran past a 900-second limit.
+   SwitchToThread yields to any thread ready on this processor, whatever its priority. */
+int sched_yield(void) {
+    SwitchToThread();
     return 0;
 }
 
@@ -303,6 +386,72 @@ long long cn1_monotonic_micros(void) {
     QueryPerformanceCounter(&count);
     return (count.QuadPart / freq.QuadPart) * 1000000LL
          + ((count.QuadPart % freq.QuadPart) * 1000000LL) / freq.QuadPart;
+}
+
+long long cn1_win_available_memory(void) {
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (!GlobalMemoryStatusEx(&status)) {
+        return 0;
+    }
+    return (long long) status.ullAvailPhys;
+}
+
+int cn1_win_cpu_count(void) {
+    return (int) GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+}
+
+void cn1_win_current_stack_limits(void** low, void** high) {
+    ULONG_PTR lo = 0, hi = 0;
+    GetCurrentThreadStackLimits(&lo, &hi);
+    *low = (void*)lo;
+    *high = (void*)hi;
+}
+
+void* cn1_win_suspend_capture(unsigned long threadId, void** handleOut, char* regs,
+                              size_t cap, size_t* lenOut) {
+    HANDLE h;
+    CONTEXT ctx;
+    void* sp;
+    size_t len;
+    *handleOut = NULL;
+    *lenOut = 0;
+    h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION,
+                   FALSE, (DWORD)threadId);
+    if (h == NULL) {
+        return 0;
+    }
+    if (SuspendThread(h) == (DWORD)-1) {
+        CloseHandle(h);
+        return 0;
+    }
+    /* SuspendThread only REQUESTS the suspension; GetThreadContext does not return until
+       the thread has actually stopped, which is what makes the registers read here the
+       ones it is frozen with. */
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
+    if (!GetThreadContext(h, &ctx)) {
+        ResumeThread(h);
+        CloseHandle(h);
+        return 0;
+    }
+#if defined(_M_ARM64) || defined(__aarch64__)
+    sp = (void*)ctx.Sp;
+#else
+    sp = (void*)ctx.Rsp;
+#endif
+    len = sizeof(ctx) < cap ? sizeof(ctx) : cap;
+    memcpy(regs, &ctx, len);
+    *lenOut = len;
+    *handleOut = (void*)h;
+    return sp;
+}
+
+void cn1_win_resume_thread(void* handle) {
+    if (handle != NULL) {
+        ResumeThread((HANDLE)handle);
+        CloseHandle((HANDLE)handle);
+    }
 }
 
 int gettimeofday(struct timeval* tv, void* tz) {

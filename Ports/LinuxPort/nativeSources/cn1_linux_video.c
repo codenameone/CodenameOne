@@ -265,7 +265,7 @@ static JAVA_OBJECT cn1ReaderFrameAt(CODENAME_ONE_THREAD_STATE, CN1VideoReader* r
         if ((int) map.size >= needed) {
             result = allocArray(threadStateData, needed, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
             if (result != JAVA_NULL) {
-                memcpy((*(JAVA_ARRAY) result).data, map.data, needed);
+                memcpy(CN1_ARRAY_DATA(result), map.data, needed);
             }
         }
         p_gst_buffer_unmap(buf, &map);
@@ -316,7 +316,7 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (pcm && pcmLen > 0) {
         result = allocArray(threadStateData, (int) pcmLen, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
         if (result != JAVA_NULL) {
-            memcpy((*(JAVA_ARRAY) result).data, pcm, pcmLen);
+            memcpy(CN1_ARRAY_DATA(result), pcm, pcmLen);
         }
     }
     free(pcm);
@@ -487,7 +487,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_videoWriterFrame___long_byte_1ARR
     if (!st || !st->vsrc || rgba == JAVA_NULL) { return; }
     int len = (*(JAVA_ARRAY) rgba).length;
     gint64 dur = st->frameRate > 0 ? (gint64) (GST_SECOND / st->frameRate) : (GST_SECOND / 30);
-    cn1WriterPush(st->vsrc, (const unsigned char*) (*(JAVA_ARRAY) rgba).data, len, (gint64) ptsMs * GST_MSECOND, dur);
+    cn1WriterPush(st->vsrc, (const unsigned char*) CN1_ARRAY_DATA(rgba), len, (gint64) ptsMs * GST_MSECOND, dur);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_videoWriterAudio___long_byte_1ARRAY_int_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_OBJECT pcm, JAVA_INT sampleRate, JAVA_INT channels, JAVA_LONG ptsMs) {
@@ -496,7 +496,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_videoWriterAudio___long_byte_1ARR
     int len = (*(JAVA_ARRAY) pcm).length;
     int frames = len / (2 * (channels > 0 ? channels : 1));
     gint64 dur = sampleRate > 0 ? (gint64) ((gint64) frames * GST_SECOND / sampleRate) : 0;
-    cn1WriterPush(st->asrc, (const unsigned char*) (*(JAVA_ARRAY) pcm).data, len, (gint64) ptsMs * GST_MSECOND, dur);
+    cn1WriterPush(st->asrc, (const unsigned char*) CN1_ARRAY_DATA(pcm), len, (gint64) ptsMs * GST_MSECOND, dur);
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoWriterClose___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {

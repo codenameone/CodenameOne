@@ -22,30 +22,16 @@
  */
 package com.codename1.tools.translator;
 
-import java.util.List;
-
 /**
- * See {@code vm/selfhost/README.md}.
+ * Stub for the self-hosted translator build. See {@code vm/selfhost/README.md}.
  *
- * Stub for the self-hosted translator build, which does the clean/ios/macos
- * targets only. Replaced on the source path -- the real class is never compiled
- * into that binary, and none of these methods is reachable in it.
- *
- * They throw rather than returning a plausible value: the JavaScript target is
- * selected explicitly, so reaching one of these would mean the binary was asked
- * for a target it was not built with, and that should be loud.
+ * The real class hashes the JavaScript bundle's inline scripts for its
+ * Content-Security-Policy with java.security.MessageDigest and writes the
+ * deployment header files through java.nio.file, neither of which JavaAPI has.
+ * Its only caller is JavascriptBundleWriter, which is itself stubbed here, so
+ * nothing in the self-hosted translator can reach it and it needs no members.
  */
-final class JavascriptReachability {
-    private JavascriptReachability() {
-    }
-
-    /// Stub: the JavaScript target is excluded from the self-hosted build, so the
-    /// per-application fact cache it clears does not exist here.
-    static void resetExportedFacts() {
-    }
-
-    static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
-            String[] nativeSources) {
-        throw new UnsupportedOperationException("JavaScript target not built into this translator");
+final class JavascriptSecurityHeaders {
+    private JavascriptSecurityHeaders() {
     }
 }

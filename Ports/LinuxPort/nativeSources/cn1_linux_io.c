@@ -102,7 +102,7 @@ JAVA_OBJECT cn1LinuxNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src, int
     }
     arr = allocArray(threadStateData, n, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if (arr != JAVA_NULL && n > 0 && src != 0) {
-        memcpy((*(JAVA_ARRAY) arr).data, src, (size_t) n);
+        memcpy(CN1_ARRAY_DATA(arr), src, (size_t) n);
     }
     return arr;
 }
@@ -141,6 +141,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_parkMainThread___int(CODENAME_ONE
     /* Keep the process alive for up to timeoutMillis while workers run, then
      * force-exit; callers leave early via exitProcess when their work completes. */
     int remaining = timeoutMillis > 0 ? (int) timeoutMillis : 0;
+    /* Parked for the whole wait, as the Windows port's parkMainThread is: main is a
+     * managed thread on the clean target, so a sleep it does not park across makes
+     * every collection wait the safepoint bound for it and then force-stop it. */
+    CN1_YIELD_THREAD;
     while (remaining > 0) {
         struct timespec ts;
         int slice = remaining > 100 ? 100 : remaining;
@@ -149,11 +153,15 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_parkMainThread___int(CODENAME_ONE
         nanosleep(&ts, 0);
         remaining -= slice;
     }
+    CN1_RESUME_THREAD;
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_runHeadlessLoop__(CODENAME_ONE_THREAD_STATE) {
     /* No window: park the main thread indefinitely while the EDT renders into the
      * offscreen buffer; the EDT exits the process once the screenshot is saved. */
+    /* Parked for good: this thread never runs Java again, and the process exits from
+     * the EDT. Not parking made every collection wait for it; see parkMainThread. */
+    CN1_YIELD_THREAD;
     for (;;) {
         struct timespec ts;
         ts.tv_sec = 1;
@@ -220,7 +228,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_fileRead___long_byte_1ARRAY_int_in
     if (f == 0 || buffer == JAVA_NULL || length <= 0) {
         return -1;
     }
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     n = fread(data + offset, 1, (size_t) length, f);
     if (n == 0) {
         return feof(f) ? -1 : -1;
@@ -235,7 +243,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_fileWrite___long_byte_1ARRAY_int_i
     if (f == 0 || buffer == JAVA_NULL || length <= 0) {
         return -1;
     }
-    data = (char*) (*(JAVA_ARRAY) buffer).data;
+    data = (char*) CN1_ARRAY_DATA(buffer);
     n = fwrite(data + offset, 1, (size_t) length, f);
     return (JAVA_INT) n;
 }
@@ -396,9 +404,11 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_j
     closedir(d);
     arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        elements = (JAVA_OBJECT*) CN1_ARRAY_DATA(arr);
         for (i = 0; i < count; i++) {
-            elements[i] = newStringFromCString(threadStateData, names[i]);
+            JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, names[i]);
+            CN1_WRITE_BARRIER(arr, cn1__s);  /* each allocation is a safepoint: arr may be old */
+            elements[i] = cn1__s;
         }
     }
     for (i = 0; i < count; i++) {
@@ -470,7 +480,9 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_executableDir___R_java_lang_Str
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileRoots___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
     JAVA_OBJECT arr = allocArray(threadStateData, 1, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     if (arr != JAVA_NULL) {
-        ((JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data)[0] = newStringFromCString(threadStateData, "/");
+        JAVA_OBJECT cn1__s = newStringFromCString(threadStateData, "/");
+        CN1_WRITE_BARRIER(arr, cn1__s);  /* the allocation is a safepoint: arr may be old */
+        ((JAVA_OBJECT*) CN1_ARRAY_DATA(arr))[0] = cn1__s;
     }
     return arr;
 }

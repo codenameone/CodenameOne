@@ -256,7 +256,7 @@ JAVA_INT com_codename1_backend_FileIo_statImpl___int_long_1ARRAY_R_int(CODENAME_
     if(fstat(fd, &st) != 0) {
         return -1;
     }
-    data = (JAVA_ARRAY_LONG*)((JAVA_ARRAY)out)->data;
+    data = (JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(out);
     data[0] = (JAVA_LONG)st.st_size;
     /* Milliseconds, not whole seconds. StaticFiles builds its ETag from size and
        this, so at one-second resolution a file replaced by different content of
@@ -438,7 +438,7 @@ JAVA_INT com_codename1_backend_FileIo_readImpl___int_byte_1ARRAY_int_int_R_int(C
     if(fd < 0 || buffer == JAVA_NULL) {
         return -1;
     }
-    data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
     do {
         n = read(fd, &data[offset], (size_t)length);

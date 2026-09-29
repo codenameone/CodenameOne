@@ -44,6 +44,14 @@ CodenameOne/src/com/codename1/processing/HashtableContent.java | Eric Coolman co
 CodenameOne/src/com/codename1/processing/TextEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/ContainsEvaluator.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
 CodenameOne/src/com/codename1/processing/XMLContent.java | Eric Coolman contribution retaining his copyright line above the standard GPLv2 + Classpath Exception text
+vm/JavaAPI/src/java/util/AbstractCollection.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/AbstractList.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/AbstractSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/ArrayDeque.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/HashSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/LinkedHashSet.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Stack.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Vector.java | Apache Harmony source retaining its original Apache-2.0 notice
 CodenameOne/src/com/codename1/gaming/physics/box2d/callbacks/RayCastCallback.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
 CodenameOne/src/com/codename1/gaming/physics/box2d/collision/AABB.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice
 CodenameOne/src/com/codename1/gaming/physics/box2d/collision/Collision.java | Vendored JBox2D source (Daniel Murphy, BSD 2-Clause) retaining its original notice

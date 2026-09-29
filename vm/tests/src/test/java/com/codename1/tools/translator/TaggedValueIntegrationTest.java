@@ -178,10 +178,13 @@ class TaggedValueIntegrationTest {
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
                 "-DCMAKE_BUILD_TYPE=Release"));
-        if (!cFlags.isEmpty()) {
-            configure.add("-DCMAKE_C_FLAGS=" + cFlags);
-        }
         configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        // AFTER the toolchain arguments, and merged with CN1_TEST_EXTRA_CFLAGS: those add
+        // their own -DCMAKE_C_FLAGS when that variable is set, and the last definition
+        // wins, which silently dropped this arm's -DCN1_DISABLE_TAGGED_INT.
+        if (!cFlags.isEmpty()) {
+            configure.add(CompilerHelper.cFlagsArg(cFlags));
+        }
         CleanTargetIntegrationTest.runCommand(configure, distDir);
         CleanTargetIntegrationTest.runCommand(
                 Arrays.asList("cmake", "--build", buildDir.toString()), distDir);

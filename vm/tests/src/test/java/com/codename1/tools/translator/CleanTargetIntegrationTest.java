@@ -1359,6 +1359,14 @@ class CleanTargetIntegrationTest {
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
+            // When the suite last said anything. The stabilization window below is
+            // measured from this as well as from the last screenshot: the suite's tail is
+            // long NON-rendering tests (DatabaseEncryptionTest, CommonWorkloadBenchmarkTest)
+            // that emit no PNG for minutes while logging steadily, and a window measured
+            // from screenshots alone stopped waiting in the middle of them -- 44 tests then
+            // counted as not run, at a different test each time, depending only on timing.
+            final java.util.concurrent.atomic.AtomicLong lastActivity =
+                    new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
             // Set by the suite watchdog when a test blocks the event dispatch
             // thread; the run cannot progress past that point, so stop waiting.
             final java.util.concurrent.atomic.AtomicReference<String> wedged =
@@ -1396,7 +1404,10 @@ class CleanTargetIntegrationTest {
                             if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
                             int suite = line.indexOf("CN1SS:");
                             if (suite >= 0) { suiteLog.add(line.substring(suite)); }
-                            if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
+                            if (line.contains("CN1SS:") || line.contains("suite ")) {
+                                lastLine.set(line);
+                                lastActivity.set(System.currentTimeMillis());
+                            }
                         }
                     } catch (IOException ignore) {
                     }
@@ -1429,9 +1440,19 @@ class CleanTargetIntegrationTest {
                     System.out.println("CN1SS:HARNESS: " + wedged.get());
                     break;
                 }
+                if (!app.isAlive()) {
+                    // Said here, and into the suite log the report is built from, so an
+                    // early end reads as a crash rather than as tests that never ran.
+                    String ended = "CN1SS:HARNESS: the suite process exited with code " + app.exitValue()
+                            + " before finishing";
+                    System.out.println(ended);
+                    suiteLog.add(ended);
+                    break;
+                }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
+                long quietSince = Math.max(lastChange, lastActivity.get());
+                if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - quietSince) >= stableMs
                         && (!requirePerformance || performanceFinished.get())) { break; }
                 Thread.sleep(3000);
             }
@@ -1764,6 +1785,61 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
+    /**
+     * Appends this translation's inputs to the file CN1_TRANSLATION_RECORD names, one JSON
+     * object per line. vm/selfhost/perf-gate.py replays the platform suite's own
+     * translation from it, so the build's performance gate measures exactly the workload
+     * the build just translated rather than a corpus borrowed from another platform.
+     * Nothing is written when the variable is unset.
+     */
+    static void recordTranslation(String sources, String appName, String appType) {
+        String record = System.getenv("CN1_TRANSLATION_RECORD");
+        if (record == null || record.trim().isEmpty()) {
+            return;
+        }
+        StringBuilder json = new StringBuilder("{\"app\":");
+        appendJsonString(json, appName);
+        json.append(",\"package\":\"com.example.hello\",\"type\":");
+        appendJsonString(json, appType);
+        json.append(",\"sources\":[");
+        String[] roots = sources.split(";");
+        for (int i = 0; i < roots.length; i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            appendJsonString(json, roots[i]);
+        }
+        json.append("]}\n");
+        // Instrumentation for a later step, never a reason for this test to fail: a record
+        // that cannot be written is reported, and the performance gate then says it has no
+        // workload.
+        try {
+            Path file = Paths.get(record.trim());
+            if (file.getParent() != null) {
+                Files.createDirectories(file.getParent());
+            }
+            Files.write(file, json.toString().getBytes(StandardCharsets.UTF_8),
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (java.io.IOException e) {
+            System.err.println("CN1_TRANSLATION_RECORD: could not write " + record + ": " + e);
+        }
+    }
+
+    private static void appendJsonString(StringBuilder out, String value) {
+        out.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"' || c == '\\') {
+                out.append('\\').append(c);
+            } else if (c < 0x20) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        out.append('"');
+    }
+
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         runTranslator(classesDir, outputDir, appName, "ios");
     }
@@ -1773,6 +1849,7 @@ class CleanTargetIntegrationTest {
     }
 
     static void runTranslatorImpl(String sources, Path outputDir, String appName, String appType) throws Exception {
+        recordTranslation(sources, appName, appType);
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
         URL[] systemUrls;
@@ -1882,6 +1959,23 @@ class CleanTargetIntegrationTest {
             return output;
         }
         StringBuilder b = new StringBuilder();
+        // ninja runs compiles in parallel, so a compiler's error lines can land anywhere in the
+        // omitted part while the tail holds only other files' warnings -- which is how a
+        // missing struct member in a port native went unreported for a whole CI round. Quote
+        // the error lines themselves, ahead of the tail.
+        int quoted = 0;
+        for (int iter = 0; iter < lines.length - keep && quoted < 40; iter++) {
+            String line = lines[iter];
+            if ((line.contains(": error") || line.contains("): error") || line.startsWith("FAILED:")
+                    || line.contains("undefined reference") || line.contains("unresolved external"))
+                    && !line.contains("warning")) {
+                if (quoted == 0) {
+                    b.append("Error lines from the omitted part:\n");
+                }
+                b.append(line).append('\n');
+                quoted++;
+            }
+        }
         b.append("... ").append(lines.length - keep)
                 .append(" earlier line(s) omitted; the last ").append(keep).append(" follow\n");
         for (int iter = lines.length - keep; iter < lines.length; iter++) {
@@ -1901,8 +1995,37 @@ class CleanTargetIntegrationTest {
         }
         int exit = process.waitFor();
         assertEquals(0, exit, "Command failed: " + String.join(" ", command)
-                + "\nOutput (tail):\n" + tailOf(output));
+                + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir));
         return output;
+    }
+
+    /// What the generated project's source roots held when its build failed.
+    ///
+    /// A Linux run once failed at LINK with every symbol cn1_globals.c defines undefined and no
+    /// compile error anywhere -- the same sources built and linked under the other compiler
+    /// configs of the same job, and fifteen local runs never reproduced it. That leaves two
+    /// stories the build output cannot tell apart: the file was absent when CMake globbed, or
+    /// present and empty. The runtime files' sizes and the translation-unit count answer it.
+    static String sourceRootSummary(Path workingDir) {
+        StringBuilder b = new StringBuilder();
+        java.io.File[] roots = workingDir.toFile().listFiles();
+        if (roots == null) {
+            return "";
+        }
+        for (java.io.File root : roots) {
+            if (!root.isDirectory() || !root.getName().endsWith("-src")) {
+                continue;
+            }
+            java.io.File[] cFiles = root.listFiles((dir, name) -> name.endsWith(".c"));
+            b.append("\nSource root ").append(root.getName()).append(": ")
+                    .append(cFiles == null ? 0 : cFiles.length).append(" .c files");
+            for (String runtime : new String[]{"cn1_globals.c", "nativeMethods.c", "cn1_globals.h"}) {
+                java.io.File f = new java.io.File(root, runtime);
+                b.append(", ").append(runtime).append('=')
+                        .append(f.exists() ? f.length() + " bytes" : "MISSING");
+            }
+        }
+        return b.toString();
     }
 
     static String helloWorldSource() {
@@ -1923,6 +2046,9 @@ class CleanTargetIntegrationTest {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void HelloWorld_nativeHello__(CODENAME_ONE_THREAD_STATE) {\n" +
+                "    if (!threadStateData->lightweightThread || !threadStateData->threadActive) {\n" +
+                "        printf(\"Java main was not registered as an active managed thread\\n\"); return;\n" +
+                "    }\n" +
                 "    printf(\"Hello, Clean Target!\\n\");\n" +
                 "}\n";
     }

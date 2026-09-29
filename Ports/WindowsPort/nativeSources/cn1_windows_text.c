@@ -192,7 +192,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_charsWidth___long_char_1ARRAY_
         font = cn1WinDefaultFont();
     }
     /* JAVA_ARRAY_CHAR is a 16-bit code unit, identical to WCHAR. */
-    JAVA_ARRAY_CHAR* data = (JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY) __cn1Arg2).data;
+    JAVA_ARRAY_CHAR* data = (JAVA_ARRAY_CHAR*) CN1_ARRAY_DATA(__cn1Arg2);
     return (JAVA_INT) (cn1dwMeasure(font->format, (const WCHAR*) (data + __cn1Arg3), __cn1Arg4) + 0.5f);
 }
 
@@ -305,7 +305,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
 
     if (__cn1Arg2 != JAVA_NULL) {
         int len = (*(JAVA_ARRAY) __cn1Arg2).length;
-        void* data = (*(JAVA_ARRAY) __cn1Arg2).data;
+        void* data = CN1_ARRAY_DATA(__cn1Arg2);
         wchar_t registered[128];
         registered[0] = L'\0';
         if (len > 0 && data != NULL
