@@ -1462,9 +1462,20 @@ public class ByteCodeTranslator {
             // than SHELL:, which the per-source property does not accept; the two words are
             // the only -mllvm in a file's options, so de-duplication cannot split them.
             writer.append("set(CN1_MANIFEST \"${CMAKE_CURRENT_SOURCE_DIR}/cn1-source-manifest.txt\")\n");
-            writer.append("if(EXISTS \"${CN1_MANIFEST}\" AND (MSVC OR CMAKE_C_COMPILER_ID MATCHES \"Clang\"))\n");
+            // GCC gets its own limit. The host cc of a Linux build without zig is gcc (the
+            // Flutter benchmark's runner is one), and none of the clang flags above reach
+            // it -- measured, the Linux gallery's code did not move at all. The GCC knob is
+            // max-inline-insns-single (the size limit on functions a caller may inline):
+            // 20 took the gallery's generated object code from 26.45MB to 23.90MB (-9.6%)
+            // with every vm/benchmarks workload within noise. max-inline-insns-auto would
+            // shrink more but stops -O3 inlining a recursive call into itself, which cost
+            // the recursion benchmark 52%; -O2 costs the same. Turning off -O3's cloning,
+            // unswitching, peeling and loop versioning bought 0.2% and was left alone.
+            writer.append("if(EXISTS \"${CN1_MANIFEST}\" AND (MSVC OR CMAKE_C_COMPILER_ID MATCHES \"Clang\" OR CMAKE_C_COMPILER_ID STREQUAL \"GNU\"))\n");
             writer.append("    if(MSVC)\n");
             writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:/clang:-mllvm>;$<$<CONFIG:Release>:/clang:-inline-threshold=50>\")\n");
+            writer.append("    elseif(CMAKE_C_COMPILER_ID STREQUAL \"GNU\")\n");
+            writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:--param=max-inline-insns-single=20>\")\n");
             writer.append("    else()\n");
             writer.append("        set(CN1_SIZE_OPTIONS \"$<$<CONFIG:Release>:-mllvm>;$<$<CONFIG:Release>:-inline-threshold=50>\")\n");
             writer.append("    endif()\n");
