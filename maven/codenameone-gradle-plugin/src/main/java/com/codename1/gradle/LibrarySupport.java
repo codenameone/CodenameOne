@@ -151,7 +151,8 @@ final class LibrarySupport {
                     new File(layout.projectDir(), "src" + File.separator + "javase" + File.separator + "resources")));
             // The JavaSE jars of the cn1libs this library uses, as an application's
             // javase source set has them: its own JavaSE code may call theirs.
-            ss.setCompileClasspath(main.getOutput().plus(main.getCompileClasspath()).plus(javasePort)
+            ss.setCompileClasspath(ss.getCompileClasspath().plus(main.getOutput()).plus(main.getCompileClasspath())
+                    .plus(javasePort)
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
         });
 

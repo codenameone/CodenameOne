@@ -293,6 +293,31 @@ class GradleConversionTest {
     }
 
     @Test
+    void anActiveProfilesRepositoryComesAlongAndATestCn1libIsNotShipped() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>fixtures-lib</artifactId><version>1</version>"
+                + "<type>pom</type><scope>test</scope></dependency></dependencies><profiles>"
+                + "<profile><id>vendor</id><activation><activeByDefault>true</activeByDefault></activation>"
+                + "<repositories><repository><id>v</id><url>https://maven.vendor.example/repo</url></repository>"
+                + "</repositories><dependencies><dependency><groupId>com.vendor</groupId><artifactId>sdk</artifactId>"
+                + "<version>2</version></dependency></dependencies></profile>"
+                + "<profile><id>off</id><activation><property><name>x</name></property></activation>"
+                + "<repositories><repository><id>o</id><url>https://maven.off.example/repo</url></repository>"
+                + "</repositories></profile>"
+                + "</profiles></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"com.vendor:sdk:2\")"), build);
+        assertTrue(build.contains("maven(url = uri(\"https://maven.vendor.example/repo\"))"), build);
+        assertFalse(build.contains("maven.off.example"), "an undecided profile's repository stays out: " + build);
+        assertFalse(build.contains("\n    cn1lib(\"com.acme:fixtures-lib"), "a test cn1lib is not shipped: " + build);
+        assertTrue(build.contains("// cn1lib(\"com.acme:fixtures-lib:1\") -- test-scoped"), build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

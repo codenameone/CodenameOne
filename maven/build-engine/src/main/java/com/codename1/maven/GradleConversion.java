@@ -527,30 +527,10 @@ public final class GradleConversion {
             }
         }
         addDependencies(child(project, "dependencies"), out, properties);
-        Element profiles = child(project, "profiles");
-        if (profiles == null) {
-            return;
-        }
-        // Decided as a group, as Maven does: an activeByDefault profile is on only
-        // while no other profile of the same pom is.
-        List<Element> all = new ArrayList<Element>();
-        List<Activation> states = new ArrayList<Activation>();
-        boolean anotherIsOn = false;
-        for (Node n = profiles.getFirstChild(); n != null; n = n.getNextSibling()) {
-            if (n instanceof Element && "profile".equals(((Element) n).getTagName())) {
-                Element profile = (Element) n;
-                Activation state = activeInAPlainBuild(profile, pom.getParentFile(), properties);
-                all.add(profile);
-                states.add(state);
-                anotherIsOn |= state == Activation.ON && !byDefault(profile);
-            }
-        }
-        for (int i = 0; i < all.size(); i++) {
-            Element profile = all.get(i);
-            Activation active = states.get(i);
-            if (active == Activation.ON && anotherIsOn && byDefault(profile)) {
-                active = Activation.OFF;
-            }
+        java.util.Map<Element, Activation> profiles = profileStates(project, pom, properties);
+        for (java.util.Map.Entry<Element, Activation> e : profiles.entrySet()) {
+            Element profile = e.getKey();
+            Activation active = e.getValue();
             if (active == Activation.ON) {
                 addDependencies(child(profile, "dependencies"), out, properties);
             } else if (active == Activation.UNDECIDED) {
@@ -562,6 +542,35 @@ public final class GradleConversion {
                 conditional.putAll(deps);
             }
         }
+    }
+
+    /// Every profile of `project` with whether a plain build turns it on,
+    /// decided as a group as Maven does: an activeByDefault profile is on only
+    /// while no other profile of the same pom is. In declaration order.
+    static java.util.Map<Element, Activation> profileStates(Element project, File pom,
+                                                          java.util.Map<String, String> properties) {
+        java.util.Map<Element, Activation> out = new java.util.LinkedHashMap<Element, Activation>();
+        Element profiles = child(project, "profiles");
+        if (profiles == null) {
+            return out;
+        }
+        boolean anotherIsOn = false;
+        for (Node n = profiles.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && "profile".equals(((Element) n).getTagName())) {
+                Element profile = (Element) n;
+                Activation state = activeInAPlainBuild(profile, pom.getParentFile(), properties);
+                out.put(profile, state);
+                anotherIsOn |= state == Activation.ON && !byDefault(profile);
+            }
+        }
+        if (anotherIsOn) {
+            for (java.util.Map.Entry<Element, Activation> e : out.entrySet()) {
+                if (e.getValue() == Activation.ON && byDefault(e.getKey())) {
+                    e.setValue(Activation.OFF);
+                }
+            }
+        }
+        return out;
     }
 
     private static boolean byDefault(Element profile) {
@@ -673,6 +682,12 @@ public final class GradleConversion {
                 || "org.jetbrains.kotlin".equals(g) && KOTLIN_SUPPLIED.contains(a)) {
             return null;
         }
+        if ("pom".equals(type) && "test".equals(scope)) {
+            // cn1lib is part of implementation, so it would ship a library Maven
+            // gives the tests alone; Gradle has no test-only cn1lib configuration.
+            return "    // cn1lib(\"" + g + ":" + a + (v == null ? "" : ":" + v) + "\") -- test-scoped in the pom; "
+                    + "a cn1lib is an application dependency under Gradle, so add it only if the app may ship it";
+        }
         // Test-scoped libraries go with the test sources the conversion copies,
         // or those tests stop compiling.
         String config = "pom".equals(type) ? "cn1lib" : "test".equals(scope) ? "testImplementation"
@@ -766,17 +781,12 @@ public final class GradleConversion {
             return;
         }
         java.util.Map<String, String> properties = pomProperties(pom, 0);
-        Element repos = child(project, "repositories");
-        if (repos != null) {
-            for (Node n = repos.getFirstChild(); n != null; n = n.getNextSibling()) {
-                if (n instanceof Element && "repository".equals(((Element) n).getTagName())) {
-                    String url = interpolate(text((Element) n, "url"), properties);
-                    if (url != null && !url.contains("${") && !url.contains("repo.maven.apache.org")
-                            && !url.contains("repo1.maven.org") && !url.contains("repo.codenameone.com")
-                            && !out.contains(url)) {
-                        out.add(url);
-                    }
-                }
+        addRepositories(child(project, "repositories"), properties, out);
+        // The profiles whose dependencies the conversion keeps bring their
+        // repositories too, or those dependencies would not resolve.
+        for (java.util.Map.Entry<Element, Activation> e : profileStates(project, pom, properties).entrySet()) {
+            if (e.getValue() == Activation.ON) {
+                addRepositories(child(e.getKey(), "repositories"), properties, out);
             }
         }
         Element parent = child(project, "parent");
@@ -788,11 +798,27 @@ public final class GradleConversion {
         }
     }
 
+    private static void addRepositories(Element repos, java.util.Map<String, String> properties, List<String> out) {
+        if (repos == null) {
+            return;
+        }
+        for (Node n = repos.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && "repository".equals(((Element) n).getTagName())) {
+                String url = interpolate(text((Element) n, "url"), properties);
+                if (url != null && !url.contains("${") && !url.contains("repo.maven.apache.org")
+                        && !url.contains("repo1.maven.org") && !url.contains("repo.codenameone.com")
+                        && !out.contains(url)) {
+                    out.add(url);
+                }
+            }
+        }
+    }
+
     /// Says which dependencies were written commented out for want of a version.
     private void warnUnresolved(List<String> lines, String from) {
         for (String line : lines) {
             if (line.trim().startsWith("//") && (line.contains("-- set the version")
-                    || line.contains("-- add this file"))) {
+                    || line.contains("-- add this file") || line.contains("-- test-scoped in the pom"))) {
                 log.warn("A dependency in " + from + " could not be converted as it stands; it is commented "
                         + "out in the build script until you complete it:" + line.trim().substring(2));
             }

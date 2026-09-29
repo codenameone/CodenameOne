@@ -76,6 +76,8 @@ final class BackendPackageSupport {
                     .map(set -> AppSupport.encode(set, "compile")));
             t.getSources().from(main.getJava().getSrcDirs());
             t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
+            t.getProcessedResources().from(project.provider(() -> main.getOutput().getResourcesDir()));
+            t.getProcessedResources().builtBy(main.getProcessResourcesTaskName());
             t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
             t.getTarget().set(project.getProviders().gradleProperty("cn1.backend.target"));
             t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk"));
@@ -128,6 +130,11 @@ final class BackendPackageSupport {
         @Input
         public abstract Property<String> getSourceEncoding();
 
+        /// processResources' output, wherever the build directory is.
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
+        public abstract ConfigurableFileCollection getProcessedResources();
+
         /// Extra C compiler flags.
         @Input
         @Optional
@@ -165,7 +172,9 @@ final class BackendPackageSupport {
                     getCompileClasspath(), sourceRoots(),
                     getArtifacts().get(), null, getCodenameOneVersion().get());
             final java.util.Set<File> toolchain = getToolchain().getFiles();
-            BackendPackager packager = new GradleBackendPackager(host, layout, toolchain);
+            java.util.Iterator<File> resources = getProcessedResources().getFiles().iterator();
+            File processed = resources.hasNext() ? resources.next() : layout.resourcesOutputDir();
+            BackendPackager packager = new GradleBackendPackager(host, layout, toolchain, processed);
             try {
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
@@ -180,16 +189,19 @@ final class BackendPackageSupport {
         private static final class GradleBackendPackager extends BackendPackager {
             private final ProjectLayout layout;
             private final java.util.Set<File> toolchain;
+            private final File processedResources;
 
-            GradleBackendPackager(ProjectHost host, ProjectLayout layout, java.util.Set<File> toolchain) {
+            GradleBackendPackager(ProjectHost host, ProjectLayout layout, java.util.Set<File> toolchain,
+                                  File processedResources) {
                 super(host);
                 this.layout = layout;
                 this.toolchain = toolchain;
+                this.processedResources = processedResources;
             }
 
             @Override
             protected File processedResourcesDirectory() {
-                return layout.resourcesOutputDir();
+                return processedResources;
             }
 
             @Override

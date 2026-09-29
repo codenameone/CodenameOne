@@ -127,7 +127,10 @@ final class Cn1libs {
             java.util.Set<String> added = new java.util.HashSet<String>();
             while (!queue.isEmpty()) {
                 Pending m = queue.removeFirst();
-                if (!visited.add(m.group + ":" + m.name + ":" + m.version)) {
+                // Keyed with the exclusions too: in a diamond, a path that excludes
+                // C must not stand in for another path to the same module that
+                // keeps C, which Gradle's own graph keeps.
+                if (!visited.add(m.group + ":" + m.name + ":" + m.version + "|" + m.exclusionKey())) {
                     continue;
                 }
                 String pom = pomText(p, m.group, m.name, m.version);
@@ -174,6 +177,15 @@ final class Cn1libs {
             this.name = name;
             this.version = version;
             this.exclusions = exclusions;
+        }
+
+        /// The exclusions in a canonical order, to tell two paths apart by.
+        String exclusionKey() {
+            java.util.TreeSet<String> keys = new java.util.TreeSet<String>();
+            for (String[] x : exclusions) {
+                keys.add(x[0] + ":" + x[1]);
+            }
+            return keys.toString();
         }
 
         /// Whether an exclusion ({group, module}, either null for "any") matches.

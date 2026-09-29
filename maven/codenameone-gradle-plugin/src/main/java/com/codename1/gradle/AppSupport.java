@@ -108,7 +108,10 @@ final class AppSupport {
             ss.getJava().setSrcDirs(Collections.singletonList(layout.nativeSourceDir(NativePlatform.JAVASE)));
             ss.getResources().setSrcDirs(Collections.singletonList(
                     new File(layout.projectDir(), "src" + File.separator + "javase" + File.separator + "resources")));
-            ss.setCompileClasspath(main.getOutput().plus(main.getCompileClasspath()).plus(simulator)
+            // Added to the source set's own classpath, not in place of it, so a
+            // javaseImplementation(...) dependency still reaches this code.
+            ss.setCompileClasspath(ss.getCompileClasspath().plus(main.getOutput()).plus(main.getCompileClasspath())
+                    .plus(simulator)
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
         });
 
@@ -256,7 +259,7 @@ final class AppSupport {
             t.setDescription("Runs the Codename One unit tests in the simulator's test runner");
             t.dependsOn(test.getClassesTaskName(), javase.getClassesTaskName(), css);
             t.getTestClassesDirectories().from(test.getOutput().getClassesDirs());
-            t.getRuntimeClasspath().from(test.getRuntimeClasspath(), javase.getOutput(), simulator,
+            t.getRuntimeClasspath().from(test.getRuntimeClasspath(), javase.getRuntimeClasspath(), simulator,
                     project.getConfigurations().getByName(Cn1libs.configurationName("javase")));
             t.getReportsDirectory().set(new File(layout.buildDir(), "cn1-reports"));
         });
@@ -277,7 +280,8 @@ final class AppSupport {
             t.setDescription(description);
             t.dependsOn(prepare, css, main.getClassesTaskName(), javase.getClassesTaskName());
             t.getMainClass().set(SimulatorSupport.SIMULATOR_MAIN_CLASS);
-            t.setClasspath(main.getRuntimeClasspath().plus(javase.getOutput()).plus(simulator)
+            // javase's runtime classpath: its output and javaseRuntimeOnly dependencies.
+            t.setClasspath(main.getRuntimeClasspath().plus(javase.getRuntimeClasspath()).plus(simulator)
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
             t.setWorkingDir(layout.projectDir());
             t.setMaxHeapSize("1024M");
@@ -288,8 +292,11 @@ final class AppSupport {
             t.getJvmArgumentProviders().add(new CssInputArgument(
                     new File(cssWorkDir(layout), Cn1CssTask.SIMULATOR_INPUTS),
                     layout.themeCss()));
-            t.systemProperty(SimulatorSupport.CSS_OUTPUT_PROPERTY,
-                    new File(layout.resourcesOutputDir(), "theme.res").getAbsolutePath());
+            // Where processResources really put theme.res -- the simulator loads it
+            // from there, and a relocated build directory moves it.
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.CSS_OUTPUT_PROPERTY,
+                    project.provider(() -> new File(main.getOutput().getResourcesDir(), "theme.res")
+                            .getAbsolutePath())));
             t.systemProperty(SimulatorSupport.CSS_MERGE_PROPERTY,
                     new File(cssWorkDir(layout), "theme.css").getAbsolutePath());
             t.getArgumentProviders().add(new MainClassArgument(layout.settingsFile(), userProperties));
@@ -327,6 +334,22 @@ final class AppSupport {
         return (compile != null ? kotlinDestination(compile, layout)
                 : new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main"))
                 .getAbsolutePath();
+    }
+
+    /// One `-Dname=value`, the value computed when the task runs.
+    static final class SystemPropertyArgument implements org.gradle.process.CommandLineArgumentProvider {
+        private final String name;
+        private final Provider<String> value;
+
+        SystemPropertyArgument(String name, Provider<String> value) {
+            this.name = name;
+            this.value = value;
+        }
+
+        @Override
+        public Iterable<String> asArguments() {
+            return Collections.singletonList("-D" + name + "=" + value.get());
+        }
     }
 
     /// The -D arguments behind [SimulatorSupport#SOURCE_ROOTS_PROPERTY].
