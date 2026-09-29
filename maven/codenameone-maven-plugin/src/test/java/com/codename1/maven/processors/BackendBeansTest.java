@@ -550,6 +550,87 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anAsyncLifecycleMethodRunsSynchronously() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Warm", PKG + "@Component public class Warm {\n"
+                + "    public static volatile String state = \"cold\";\n"
+                + "    @PostConstruct @Async public void init() throws Exception {\n"
+                + "        Thread.sleep(200);\n"
+                + "        state = \"warm\";\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @Autowired private Warm warm;\n"
+                + "    @GetMapping(\"/x\") public String x() { return Warm.state; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        assertTrue(String.valueOf(warnings), String.valueOf(warnings)
+                .contains("com.example.Warm.init is a lifecycle method"));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("the server was ready before @PostConstruct had run", "warm",
+                    http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void twoScopedFactoryBeansOfOneClassKeepTheirOwnStandIns() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Label", PKG + "public class Label {\n"
+                + "    private final String text;\n"
+                + "    public Label() { this(\"none\"); }\n"
+                + "    public Label(String text) { this.text = text; }\n"
+                + "    public String text() { return text; }\n"
+                + "}\n");
+        s.put("com.example.Labels", PKG + "@Configuration public class Labels {\n"
+                + "    @Bean @RequestScope public Label east() { return new Label(\"east\"); }\n"
+                + "    @Bean @RequestScope public Label west() { return new Label(\"west\"); }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @Autowired @Qualifier(\"east\") private Label east;\n"
+                + "    @Autowired @Qualifier(\"west\") private Label west;\n"
+                + "    @GetMapping(\"/x\") public String x() { return east.text() + \",\" + west.text(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("east,west", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aScopedBeanWhoseConstructorCallsAnOverridableMethodStarts() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Greeter", PKG + "@Component @RequestScope public class Greeter {\n"
+                + "    private final String greeting;\n"
+                + "    public Greeter() { greeting = prefix() + \" there\"; }\n"
+                + "    public String prefix() { return \"hi\"; }\n"
+                + "    public String hello() { return greeting; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @Autowired private Greeter greeter;\n"
+                + "    @GetMapping(\"/x\") public String x() { return greeter.hello(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            assertEquals("hi there", http("GET", port, "/x"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     public void supportNamesStayDistinct() throws Exception {
         // Aa and BB share a Java hash; Outer_Inner and Outer$Inner folded alike.
         assertEquals("Aa".hashCode(), "BB".hashCode());
@@ -557,6 +638,7 @@ public class BackendBeansTest {
                 BackendWeaver.bodyName("p/BB", "work"));
         assertNotEquals(BackendBeans.baseName("p/Outer_Inner"),
                 BackendBeans.baseName("p/Outer$Inner"));
+        assertNotEquals(BackendBeans.baseName("p/A$_B"), BackendBeans.baseName("p/A_$B"));
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Aa", PKG + "public class Aa {\n"
                 + "    @Timed(\"aa.work\") public String work() { return \"base\"; }\n"

@@ -370,12 +370,21 @@ final class BackendSources {
                 }
                 sb.append(typeName(args[i])).append(" a").append(i);
             }
-            sb.append(')').append(throwsClause(m)).append(" {\n        ");
-            if (ret.getSort() != Type.VOID) {
-                sb.append("return ");
+            sb.append(')').append(throwsClause(m)).append(" {\n");
+            // No scope yet means the stand-in's own constructor is running: the
+            // bean's constructor called an overridable method, and dispatch
+            // reached here before cn1Scope was assigned. That call belongs to the
+            // object being built, so it runs the bean's own code.
+            String ret0 = ret.getSort() != Type.VOID ? "return " : "";
+            sb.append("        if (cn1Scope == null) {\n            ").append(ret0)
+              .append("super.").append(m.getName()).append('(')
+              .append(plainArguments(args.length)).append(");\n");
+            if (ret.getSort() == Type.VOID) {
+                sb.append("            return;\n");
             }
-            sb.append("cn1Target().").append(m.getName()).append('(')
-              .append(plainArguments(args.length)).append(");\n    }\n\n");
+            sb.append("        }\n        ").append(ret0).append("cn1Target().")
+              .append(m.getName()).append('(').append(plainArguments(args.length))
+              .append(");\n    }\n\n");
         }
         sb.append("}\n");
         return sb.toString();

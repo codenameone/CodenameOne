@@ -2065,8 +2065,19 @@ final class BackendBeans {
             }
         }
         String pkg = RestClientAnnotationProcessor.packageOf(b.type.replace('/', '.'));
-        b.proxyBinary = qualify(pkg, baseName(b.type) + (b.lazy ? "Cn1Lazy" : "Cn1Scoped"));
+        String name = qualify(pkg, baseName(b.type) + (b.lazy ? "Cn1Lazy" : "Cn1Scoped"));
+        // Per bean, not per type: two @Bean methods of one class, both scoped or
+        // lazy, each need their own stand-in -- sharing the name, the second
+        // source replaced the first and both injections built the second bean.
+        String unique = name;
+        for (int n = 2 ; !proxyNames.add(unique) ; n++) {
+            unique = name + n;
+        }
+        b.proxyBinary = unique;
     }
+
+    /// Stand-in class names already given out, so two beans never share one.
+    private final Set<String> proxyNames = new HashSet<String>();
 
     /// The overridable methods of a class and its project superclasses.
     List<MethodInfo> proxiedMethods(AnnotatedClass cls, boolean includeFinal) {
@@ -2395,6 +2406,18 @@ final class BackendBeans {
                 if (async == null && classAsync != null && m.isPublic() && !m.isStatic()) {
                     async = classAsync;
                 }
+                if (async != null && (m.getAnnotation(POST_CONSTRUCT) != null
+                        || m.getAnnotation(PRE_DESTROY) != null)) {
+                    // Spring calls a lifecycle method on the bean itself, not
+                    // through its proxy, so @Async never applies to it -- and here
+                    // it would be worse than ignored: @PostConstruct would return
+                    // before initialising, and @PreDestroy runs after the executors
+                    // stop, so its body would never run at all.
+                    ctx.getLog().warn("cn1: " + cls.getSourceName() + "." + m.getName()
+                            + " is a lifecycle method, which runs synchronously whatever "
+                            + "@Async says -- as Spring runs it.");
+                    async = null;
+                }
                 AnnotationValues timed = m.getAnnotation(TIMED);
                 AnnotationValues counted = m.getAnnotation(COUNTED);
                 if (tx == null && async == null && timed == null && counted == null) {
@@ -2721,12 +2744,24 @@ final class BackendBeans {
     /// A class's name within its package with `$` turned into `_`: the base the
     /// generated classes beside it are named from.
     /// The class's name in its package, as a Java identifier for the support
-    /// classes named after it. Injective: `_` is doubled before `$` becomes
-    /// `_`, so Outer_Inner and the nested Outer$Inner, which folded to one name,
-    /// get two -- one helper silently replaced the other before.
+    /// classes named after it. Injective: `_` becomes `__` and `$` becomes `_S`,
+    /// so every escape is `_` plus a character saying which, and no two names
+    /// can meet -- Outer_Inner and Outer$Inner, or A$_B and A_$B, each folded to
+    /// one name under a plainer scheme, and one helper replaced the other.
     static String baseName(String internal) {
-        int slash = internal.lastIndexOf('/');
-        return internal.substring(slash + 1).replace("_", "__").replace('$', '_');
+        String simple = internal.substring(internal.lastIndexOf('/') + 1);
+        StringBuilder sb = new StringBuilder(simple.length() + 4);
+        for (int iter = 0 ; iter < simple.length() ; iter++) {
+            char c = simple.charAt(iter);
+            if (c == '_') {
+                sb.append("__");
+            } else if (c == '$') {
+                sb.append("_S");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     static String qualify(String pkg, String simple) {
