@@ -43,6 +43,14 @@ public final class SimulatorSupport {
     /// The compile classpath hot reload recompiles against. The name predates
     /// Gradle support and is kept because the simulator reads it.
     public static final String COMPILE_CLASSPATH_PROPERTY = "cn1.maven.compileClasspathElements";
+    /// The source directories hot reload watches, path-separated, when the build
+    /// knows better than the conventional layout (a Gradle `sourceSets` block).
+    /// The simulator reads the literal names; see SourceChangeWatcher.
+    public static final String SOURCE_ROOTS_PROPERTY = "cn1.hotReload.sourceRoots";
+    /// Where javac writes the main classes, for hot reload's direct recompile.
+    public static final String JAVA_CLASSES_PROPERTY = "cn1.hotReload.javaClasses";
+    /// Where the Kotlin compiler writes the main classes. See [JAVA_CLASSES_PROPERTY].
+    public static final String KOTLIN_CLASSES_PROPERTY = "cn1.hotReload.kotlinClasses";
     /// The live CSS reload inputs, outputs and merge file.
     public static final String CSS_INPUT_PROPERTY = "codename1.css.compiler.args.input";
     /// See [CSS_INPUT_PROPERTY].

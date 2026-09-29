@@ -895,21 +895,33 @@ public class Executor {
         File props = codenameOneSettingsFile;
         File projectDir = props.getAbsoluteFile().getParentFile();
         sourceWatcher = new SourceChangeWatcher();
-            // Maven and Gradle both keep sources in src/main/{java,kotlin,rad}
-            // of the project directory (common/ for Maven, the root for
-            // Gradle), which props sits in either way.
-            File srcMain = new File(projectDir, "src" + File.separator + "main" + File.separator + "java");
-            if (srcMain.exists()) {
-                sourceWatcher.addWatchFolder(srcMain);
-            }
-            File srcMainKotlin = new File(projectDir, "src" + File.separator + "main" + File.separator + "kotlin");
-            if (srcMainKotlin.exists()) {
-                sourceWatcher.addWatchFolder(srcMainKotlin);
-            }
+            // A Gradle launch names the source set's real directories; a
+            // sourceSets block can move them off the conventional layout.
+            String gradleRoots = System.getProperty(SourceChangeWatcher.SOURCE_ROOTS_PROPERTY);
+            if (gradleRoots != null && gradleRoots.length() > 0) {
+                for (String root : gradleRoots.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                    File dir = new File(root);
+                    if (dir.exists()) {
+                        sourceWatcher.addWatchFolder(dir);
+                    }
+                }
+            } else {
+                // Maven and Gradle both keep sources in src/main/{java,kotlin,rad}
+                // of the project directory (common/ for Maven, the root for
+                // Gradle), which props sits in either way.
+                File srcMain = new File(projectDir, "src" + File.separator + "main" + File.separator + "java");
+                if (srcMain.exists()) {
+                    sourceWatcher.addWatchFolder(srcMain);
+                }
+                File srcMainKotlin = new File(projectDir, "src" + File.separator + "main" + File.separator + "kotlin");
+                if (srcMainKotlin.exists()) {
+                    sourceWatcher.addWatchFolder(srcMainKotlin);
+                }
 
-            File srcRad = new File(projectDir, "src" + File.separator + "main" + File.separator + "rad");
-            if (srcRad.exists()) {
-                sourceWatcher.addWatchFolder(srcRad);
+                File srcRad = new File(projectDir, "src" + File.separator + "main" + File.separator + "rad");
+                if (srcRad.exists()) {
+                    sourceWatcher.addWatchFolder(srcRad);
+                }
             }
             
             File hotswapPropsFile = new File(projectDir.getParentFile(), "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");

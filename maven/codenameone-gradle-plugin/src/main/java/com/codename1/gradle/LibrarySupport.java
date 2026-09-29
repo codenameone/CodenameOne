@@ -98,6 +98,29 @@ final class LibrarySupport {
         }
     }
 
+    /// Writes `version` into every `com.codenameone` dependency the pom declares
+    /// without one. The build resolves those with the framework's version
+    /// (ProjectSupport's resolution strategy), but the published pom would carry
+    /// the declaration as written, and a Maven consumer cannot resolve a
+    /// dependency with no version.
+    static void fillFrameworkVersions(org.w3c.dom.Element project, String version) {
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        for (int i = 0; i < deps.getLength(); i++) {
+            org.w3c.dom.Element dep = (org.w3c.dom.Element) deps.item(i);
+            String existing = childText(dep, "version");
+            if (!PluginInfo.GROUP.equals(childText(dep, "groupId")) || existing != null && !existing.isEmpty()) {
+                continue;
+            }
+            org.w3c.dom.NodeList old = dep.getElementsByTagName("version");
+            for (int j = old.getLength() - 1; j >= 0; j--) {
+                dep.removeChild(old.item(j));
+            }
+            org.w3c.dom.Element v = dep.getOwnerDocument().createElement("version");
+            v.setTextContent(version);
+            dep.appendChild(v);
+        }
+    }
+
     private static String childText(org.w3c.dom.Element parent, String name) {
         org.w3c.dom.NodeList n = parent.getElementsByTagName(name);
         return n.getLength() == 0 ? null : n.item(0).getTextContent().trim();
@@ -244,7 +267,11 @@ final class LibrarySupport {
         publishing.getPublications().create("cn1libCommon", MavenPublication.class, pub -> {
             pub.setArtifactId(name + "-common");
             pub.from(project.getComponents().getByName("java"));
-            pub.getPom().withXml(xml -> markCn1libDependencies(xml.asElement(), usedCn1libs.get()));
+            final Provider<String> framework = ext.getVersion();
+            pub.getPom().withXml(xml -> {
+                markCn1libDependencies(xml.asElement(), usedCn1libs.get());
+                fillFrameworkVersions(xml.asElement(), framework.get());
+            });
             if (!hasCss) {
                 return;
             }

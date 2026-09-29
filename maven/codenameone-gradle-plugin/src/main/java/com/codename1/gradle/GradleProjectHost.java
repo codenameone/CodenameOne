@@ -238,6 +238,11 @@ final class GradleProjectHost implements ProjectHost {
     /// their fingerprint is recorded beside the build output, and a change in it
     /// counts as a change now. Without it a hint edited in gradle.properties
     /// returned the artifact built with the old one.
+    ///
+    /// The classpath's PATHS are part of that fingerprint too. A dependency
+    /// changed in a version catalog or an applied script edits none of the files
+    /// checked here, and the newly selected jar, already in Gradle's cache, can
+    /// be older than the output -- but its path names the new version.
     @Override
     public long sourcesModificationTime() {
         long t = lastModified(new File(layout.projectDir(), "src"));
@@ -256,7 +261,11 @@ final class GradleProjectHost implements ProjectHost {
     /// When the build hints last changed, as the fingerprint file's timestamp.
     private long hintsChangedAt() {
         File fingerprint = new File(layout.buildDir(), "codenameone" + File.separator + "build-hints.fingerprint");
-        String current = hintsFingerprint(userProperties);
+        StringBuilder inputs = new StringBuilder(hintsFingerprint(userProperties));
+        for (String element : classpath) {
+            inputs.append('\n').append(element);
+        }
+        String current = inputs.toString();
         try {
             String previous = fingerprint.isFile()
                     ? new String(java.nio.file.Files.readAllBytes(fingerprint.toPath()), StandardCharsets.UTF_8)

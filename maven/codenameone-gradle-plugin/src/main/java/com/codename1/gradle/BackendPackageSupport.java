@@ -75,6 +75,7 @@ final class BackendPackageSupport {
                     .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
                     .map(set -> AppSupport.encode(set, "compile")));
             t.getSources().from(main.getJava().getSrcDirs());
+            t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
             t.getMainClass().set(project.getProviders().gradleProperty("cn1.backend.mainClass"));
             t.getTarget().set(project.getProviders().gradleProperty("cn1.backend.target"));
             t.getJdk().set(project.getProviders().gradleProperty("cn1.backend.jdk"));
@@ -122,6 +123,11 @@ final class BackendPackageSupport {
         @Optional
         public abstract Property<String> getJdk();
 
+        /// The encoding compileJava reads the sources in; the packager recompiles
+        /// the same sources and must read them the same way.
+        @Input
+        public abstract Property<String> getSourceEncoding();
+
         /// Extra C compiler flags.
         @Input
         @Optional
@@ -154,7 +160,8 @@ final class BackendPackageSupport {
         public void build() {
             final ProjectLayout layout = layout();
             ProjectHost host = GradleHostFactory.create(this, log(), layout, layout.projectDir().getName(), "",
-                    Collections.<String, String>emptyMap(), Collections.<String, String>emptyMap(),
+                    Collections.singletonMap("project.build.sourceEncoding", getSourceEncoding().get()),
+                    Collections.<String, String>emptyMap(),
                     getCompileClasspath(), sourceRoots(),
                     getArtifacts().get(), null, getCodenameOneVersion().get());
             final java.util.Set<File> toolchain = getToolchain().getFiles();

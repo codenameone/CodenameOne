@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -91,7 +92,18 @@ final class Cn1libs {
             // cn1lib used by another cn1lib contributes its platform jars too. Walk
             // the same graph: each library's -common module, and the pom-type
             // dependencies through which one cn1lib names another.
-            java.util.Deque<String[]> queue = new java.util.ArrayDeque<String[]>();
+            //
+            // Exclusions travel with the walk, as they do through Gradle's own
+            // graph: cn1lib("a-lib") { exclude(module = "b-lib") } leaves B off the
+            // classpath, so B's platform jars must not be packaged either. The
+            // configurations' own excludes apply to every declaration.
+            java.util.List<String[]> shared = new ArrayList<String[]>();
+            for (String name : new String[] {DECLARED, "implementation"}) {
+                for (org.gradle.api.artifacts.ExcludeRule r : p.getConfigurations().getByName(name).getExcludeRules()) {
+                    shared.add(new String[] {r.getGroup(), r.getModule()});
+                }
+            }
+            java.util.Deque<Pending> queue = new java.util.ArrayDeque<Pending>();
             for (Dependency d : p.getConfigurations().getByName(DECLARED).getAllDependencies()) {
                 if (!(d instanceof ExternalModuleDependency)) {
                     continue;
@@ -104,17 +116,21 @@ final class Cn1libs {
                     version = p.getExtensions().getByType(CodenameOneExtension.class).getVersion().get();
                 }
                 if (version != null && !version.isEmpty()) {
-                    queue.add(new String[] {d.getGroup(), d.getName(), version});
+                    java.util.List<String[]> excludes = new ArrayList<String[]>(shared);
+                    for (org.gradle.api.artifacts.ExcludeRule r : ((ExternalModuleDependency) d).getExcludeRules()) {
+                        excludes.add(new String[] {r.getGroup(), r.getModule()});
+                    }
+                    queue.add(new Pending(d.getGroup(), d.getName(), version, excludes));
                 }
             }
             java.util.Set<String> visited = new java.util.HashSet<String>();
             java.util.Set<String> added = new java.util.HashSet<String>();
             while (!queue.isEmpty()) {
-                String[] m = queue.removeFirst();
-                if (!visited.add(m[0] + ":" + m[1] + ":" + m[2])) {
+                Pending m = queue.removeFirst();
+                if (!visited.add(m.group + ":" + m.name + ":" + m.version)) {
                     continue;
                 }
-                String pom = pomText(p, m[0], m[1], m[2]);
+                String pom = pomText(p, m.group, m.name, m.version);
                 if (pom == null) {
                     continue;
                 }
@@ -126,6 +142,9 @@ final class Cn1libs {
                         continue;
                     }
                     for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
+                        if (m.excludes(c.groupId, c.artifactId)) {
+                            continue;
+                        }
                         if (added.add(e.getKey() + "|" + c.toNotation())) {
                             target.getDependencies().add(p.getDependencies().create(c.toNotation()));
                         }
@@ -134,12 +153,38 @@ final class Cn1libs {
                 for (Cn1libPomProfiles.Coordinate c : Cn1libPomProfiles.dependencies(pom, parents)) {
                     if (c.version != null && c.groupId != null && c.classifier == null
                             && ("pom".equals(c.type) || c.artifactId.endsWith("-common")
-                                    || c.artifactId.endsWith("-lib"))) {
-                        queue.add(new String[] {c.groupId, c.artifactId, c.version});
+                                    || c.artifactId.endsWith("-lib"))
+                            && !m.excludes(c.groupId, c.artifactId)) {
+                        queue.add(new Pending(c.groupId, c.artifactId, c.version, m.exclusions));
                     }
                 }
             }
         });
+    }
+
+    /// A module still to walk, with the exclusions of the declaration it came from.
+    static final class Pending {
+        final String group;
+        final String name;
+        final String version;
+        final java.util.List<String[]> exclusions;
+
+        Pending(String group, String name, String version, java.util.List<String[]> exclusions) {
+            this.group = group;
+            this.name = name;
+            this.version = version;
+            this.exclusions = exclusions;
+        }
+
+        /// Whether an exclusion ({group, module}, either null for "any") matches.
+        boolean excludes(String g, String a) {
+            for (String[] x : exclusions) {
+                if ((x[0] == null || x[0].equals(g)) && (x[1] == null || x[1].equals(a))) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /// A module's pom, fetched from the project's repositories, or null.

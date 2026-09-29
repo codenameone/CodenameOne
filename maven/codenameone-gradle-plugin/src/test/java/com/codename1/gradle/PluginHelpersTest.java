@@ -89,6 +89,37 @@ class PluginHelpersTest {
     }
 
     @Test
+    void aPublishedPomNamesTheFrameworkVersion() throws Exception {
+        String pom = "<project><dependencies>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>googlemaps-lib</artifactId></dependency>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>pinned</artifactId>"
+                + "<version>1.0</version></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>other</artifactId></dependency>"
+                + "</dependencies></project>";
+        org.w3c.dom.Element project = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new org.xml.sax.InputSource(new java.io.StringReader(pom))).getDocumentElement();
+        LibrarySupport.fillFrameworkVersions(project, "9.9.9");
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        assertEquals("9.9.9", version(deps.item(0)), "a versionless framework module gets the framework's");
+        assertEquals("1.0", version(deps.item(1)), "a declared version is kept");
+        assertNull(version(deps.item(2)), "only com.codenameone modules take the framework's version");
+    }
+
+    private static String version(org.w3c.dom.Node dep) {
+        org.w3c.dom.NodeList v = ((org.w3c.dom.Element) dep).getElementsByTagName("version");
+        return v.getLength() == 0 ? null : v.item(0).getTextContent();
+    }
+
+    @Test
+    void aCn1libExclusionStopsTheWalk() {
+        Cn1libs.Pending p = new Cn1libs.Pending("g", "a-lib", "1", Arrays.asList(
+                new String[] {"x", "b-lib"}, new String[] {"y", null}));
+        org.junit.jupiter.api.Assertions.assertTrue(p.excludes("x", "b-lib"));
+        org.junit.jupiter.api.Assertions.assertTrue(p.excludes("y", "anything"), "a group-only exclusion");
+        org.junit.jupiter.api.Assertions.assertFalse(p.excludes("x", "c-lib"));
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

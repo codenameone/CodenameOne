@@ -242,9 +242,6 @@ class GradleConversionTest {
                 + "<version>1.0</version></parent><dependencies>"
                 + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
                 + "</dependency></dependencies><profiles>"
-                + "<profile><id>always</id><activation><activeByDefault>true</activeByDefault></activation>"
-                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>defaulted</artifactId>"
-                + "<version>1</version></dependency></dependencies></profile>"
                 + "<profile><id>present</id><activation><file><exists>${basedir}/src/main/extra</exists></file>"
                 + "</activation><dependencies><dependency><groupId>org.example</groupId><artifactId>present</artifactId>"
                 + "<version>1</version></dependency></dependencies></profile>"
@@ -258,12 +255,41 @@ class GradleConversionTest {
         File out = new File(tmp.toFile(), "out");
         converter().convert(mvn, out, "1.0");
         String build = read(new File(out, "build.gradle.kts"));
-        assertTrue(build.contains("\n    implementation(\"org.example:defaulted:1\")"), build);
         assertTrue(build.contains("\n    implementation(\"org.example:present:1\")"), build);
         assertFalse(build.contains("org.example:absent"), "a file activation that fails is off: " + build);
         assertTrue(build.contains("profile 'ci' of pom.xml"), build);
         assertTrue(build.contains("    // implementation(\"org.example:ci-only:1\")"),
                 "undecided: written, but commented out: " + build);
+    }
+
+    @Test
+    void anActivatedProfileSwitchesTheDefaultOneOff() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/production.marker", "");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><profiles>"
+                + "<profile><id>dev</id><activation><activeByDefault>true</activeByDefault></activation>"
+                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>dev-db</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "<profile><id>prod</id><activation><file><exists>production.marker</exists></file>"
+                + "</activation><dependencies><dependency><groupId>org.example</groupId><artifactId>prod-db</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "</profiles></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"org.example:prod-db:1\")"), build);
+        assertFalse(build.contains("dev-db"), "Maven drops the default profile once another is on: " + build);
+
+        // With nothing else on, the default profile is.
+        if (!new File(mvn, "common/production.marker").delete()) {
+            throw new IOException("could not delete the marker");
+        }
+        File again = new File(tmp.toFile(), "again");
+        converter().convert(mvn, again, "1.0");
+        String dev = read(new File(again, "build.gradle.kts"));
+        assertTrue(dev.contains("implementation(\"org.example:dev-db:1\")"), dev);
+        assertFalse(dev.contains("prod-db"), dev);
     }
 
     @Test

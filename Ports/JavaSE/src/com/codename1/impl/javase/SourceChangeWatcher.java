@@ -96,6 +96,34 @@ public class SourceChangeWatcher implements Runnable {
     /// directory walk per source directory.
     private final Map<File, ProjectLayout> layoutCache = new HashMap<File, ProjectLayout>();
 
+    /// Set by a Gradle launch (SimulatorSupport in the build engine names them):
+    /// the source set's source directories, path-separated, and where javac and
+    /// the Kotlin compiler write its classes. They win over the conventional
+    /// layout, which a sourceSets block or a relocated build directory moves.
+    static final String SOURCE_ROOTS_PROPERTY = "cn1.hotReload.sourceRoots";
+    static final String JAVA_CLASSES_PROPERTY = "cn1.hotReload.javaClasses";
+    static final String KOTLIN_CLASSES_PROPERTY = "cn1.hotReload.kotlinClasses";
+
+    private static File fromProperty(String name, File fallback) {
+        String value = System.getProperty(name);
+        return value == null || value.length() == 0 ? fallback : new File(value);
+    }
+
+    /// The configured source root holding `file`, or `fallback`.
+    private static File sourceRootOf(File file, File fallback) {
+        String roots = System.getProperty(SOURCE_ROOTS_PROPERTY);
+        if (roots != null && roots.length() > 0) {
+            String path = file.getAbsolutePath();
+            for (String root : roots.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                String prefix = new File(root).getAbsolutePath() + File.separator;
+                if (path.startsWith(prefix)) {
+                    return new File(root);
+                }
+            }
+        }
+        return fallback;
+    }
+
     private ProjectLayout layoutFor(File startingPoint) {
         if (startingPoint == null) {
             return null;
@@ -437,14 +465,15 @@ public class SourceChangeWatcher implements Runnable {
         }
 
         StringBuilder classPath = new StringBuilder();
-        File classDestination = layout.classesDir();
+        File classDestination = fromProperty(JAVA_CLASSES_PROPERTY, layout.classesDir());
         classPath.append(classDestination.getAbsolutePath()).append(File.pathSeparator);
         // Gradle compiles Kotlin into a directory of its own. It goes on the
         // classpath -- Java calling Kotlin, or Kotlin calling another Kotlin class,
         // otherwise recompiles against nothing -- and a recompiled Kotlin class
         // goes back there, not beside Java's where it would shadow a stale copy.
         File kotlinClasses = layout.buildSystem() == BuildSystem.GRADLE
-                ? new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main")
+                ? fromProperty(KOTLIN_CLASSES_PROPERTY,
+                        new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main"))
                 : null;
         if (kotlinClasses != null) {
             classPath.append(kotlinClasses.getAbsolutePath()).append(File.pathSeparator);
@@ -459,8 +488,10 @@ public class SourceChangeWatcher implements Runnable {
                 ? new File(layout.buildDir(), "generated" + File.separator + "sources" + File.separator
                         + "annotationProcessor" + File.separator + "java" + File.separator + "main")
                 : generatedSourcesDir(path.toFile(), "annotations");
-        File sourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : layout.javaSourceDir();
-        File kotlinSourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile()) : kotlinSourceDir(layout);
+        File sourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile())
+                : sourceRootOf(path.toFile(), layout.javaSourceDir());
+        File kotlinSourcePath = isRADView ? getRADGeneratedSourcesDirectory(path.toFile())
+                : sourceRootOf(path.toFile(), kotlinSourceDir(layout));
         String recompilingClass = isKotlinFile ?
                 path.toFile().getAbsolutePath().substring(kotlinSourcePath.getAbsolutePath().length()+1) :
                 isRADView ?
@@ -864,8 +895,10 @@ public class SourceChangeWatcher implements Runnable {
                             }
                             File changedFile = new File(path.toFile(), evt.context().toString());
                             ProjectLayout changedLayout = layoutFor(changedFile);
-                            File commonSrcDir = changedLayout == null ? null : changedLayout.javaSourceDir();
-                            File kotlinSrcDir = changedLayout == null ? null : kotlinSourceDir(changedLayout);
+                            File commonSrcDir = changedLayout == null ? null
+                                    : sourceRootOf(changedFile, changedLayout.javaSourceDir());
+                            File kotlinSrcDir = changedLayout == null ? null
+                                    : sourceRootOf(changedFile, kotlinSourceDir(changedLayout));
                             boolean isEligibleKotlinFile = kotlinSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".kt") && changedFile.toPath().startsWith(kotlinSrcDir.toPath());
                             boolean isEligibleJavaFile = commonSrcDir != null && changedFile.exists() && changedFile.getName().endsWith(".java") && changedFile.toPath().startsWith(commonSrcDir.toPath());
                             if (isRADView(changedFile.toPath()) || isEligibleJavaFile || isEligibleKotlinFile) {

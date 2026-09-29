@@ -531,12 +531,26 @@ public final class GradleConversion {
         if (profiles == null) {
             return;
         }
+        // Decided as a group, as Maven does: an activeByDefault profile is on only
+        // while no other profile of the same pom is.
+        List<Element> all = new ArrayList<Element>();
+        List<Activation> states = new ArrayList<Activation>();
+        boolean anotherIsOn = false;
         for (Node n = profiles.getFirstChild(); n != null; n = n.getNextSibling()) {
-            if (!(n instanceof Element) || !"profile".equals(((Element) n).getTagName())) {
-                continue;
+            if (n instanceof Element && "profile".equals(((Element) n).getTagName())) {
+                Element profile = (Element) n;
+                Activation state = activeInAPlainBuild(profile, pom.getParentFile(), properties);
+                all.add(profile);
+                states.add(state);
+                anotherIsOn |= state == Activation.ON && !byDefault(profile);
             }
-            Element profile = (Element) n;
-            Activation active = activeInAPlainBuild(profile, pom.getParentFile(), properties);
+        }
+        for (int i = 0; i < all.size(); i++) {
+            Element profile = all.get(i);
+            Activation active = states.get(i);
+            if (active == Activation.ON && anotherIsOn && byDefault(profile)) {
+                active = Activation.OFF;
+            }
             if (active == Activation.ON) {
                 addDependencies(child(profile, "dependencies"), out, properties);
             } else if (active == Activation.UNDECIDED) {
@@ -548,6 +562,11 @@ public final class GradleConversion {
                 conditional.putAll(deps);
             }
         }
+    }
+
+    private static boolean byDefault(Element profile) {
+        Element activation = child(profile, "activation");
+        return activation != null && "true".equals(text(activation, "activeByDefault"));
     }
 
     /// Whether Maven turns a profile on for a plain build.

@@ -174,7 +174,8 @@ final class AppSupport {
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
-                    layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath()));
+                    layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath())
+                    .withSourceEncoding(javaEncoding(project, main)));
             // Last: in a Java and Kotlin project, both passes have run by now.
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
                     compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
@@ -199,7 +200,8 @@ final class AppSupport {
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
                             layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties.get(),
                             main.getCompileClasspath())
-                            .withPendingJavaSources(main.getJava().getSrcDirs()));
+                            .withPendingJavaSources(main.getJava().getSrcDirs())
+                            .withSourceEncoding(javaEncoding(project, main)));
                 }));
 
         project.getTasks().register("cn1Compile", t -> {
@@ -291,7 +293,60 @@ final class AppSupport {
             t.systemProperty(SimulatorSupport.CSS_MERGE_PROPERTY,
                     new File(cssWorkDir(layout), "theme.css").getAbsolutePath());
             t.getArgumentProviders().add(new MainClassArgument(layout.settingsFile(), userProperties));
+            // Hot reload watches and recompiles where the build really keeps the
+            // sources and classes, which a sourceSets block or a relocated build
+            // directory moves away from the conventional layout.
+            t.getJvmArgumentProviders().add(new HotReloadArguments(
+                    project.provider(() -> hotReloadRoots(main, layout)),
+                    project.provider(() -> main.getJava().getClassesDirectory().get().getAsFile().getAbsolutePath()),
+                    project.provider(() -> kotlinClasses(project, layout))));
         });
+    }
+
+    /// The main source set's own source directories, generated ones under the
+    /// build directory left out (the watcher must not recompile on its own
+    /// output), plus the CodeRAD views.
+    static String hotReloadRoots(SourceSet main, ProjectLayout layout) {
+        String build = layout.buildDir().getAbsolutePath() + File.separator;
+        StringBuilder sb = new StringBuilder();
+        for (String root : ToolSupport.sourceRoots(main)) {
+            if (!root.startsWith(build)) {
+                sb.append(sb.length() == 0 ? "" : File.pathSeparator).append(root);
+            }
+        }
+        return sb.append(sb.length() == 0 ? "" : File.pathSeparator)
+                .append(new File(layout.projectDir(), "src" + File.separator + "main" + File.separator + "rad")
+                        .getAbsolutePath()).toString();
+    }
+
+    /// compileKotlin's destination, or the conventional one when Kotlin is not
+    /// applied.
+    static String kotlinClasses(Project project, ProjectLayout layout) {
+        org.gradle.api.Task compile = project.getPluginManager().hasPlugin("org.jetbrains.kotlin.jvm")
+                ? project.getTasks().findByName("compileKotlin") : null;
+        return (compile != null ? kotlinDestination(compile, layout)
+                : new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main"))
+                .getAbsolutePath();
+    }
+
+    /// The -D arguments behind [SimulatorSupport#SOURCE_ROOTS_PROPERTY].
+    static final class HotReloadArguments implements org.gradle.process.CommandLineArgumentProvider {
+        private final Provider<String> roots;
+        private final Provider<String> javaClasses;
+        private final Provider<String> kotlinClasses;
+
+        HotReloadArguments(Provider<String> roots, Provider<String> javaClasses, Provider<String> kotlinClasses) {
+            this.roots = roots;
+            this.javaClasses = javaClasses;
+            this.kotlinClasses = kotlinClasses;
+        }
+
+        @Override
+        public Iterable<String> asArguments() {
+            return java.util.Arrays.asList("-D" + SimulatorSupport.SOURCE_ROOTS_PROPERTY + "=" + roots.get(),
+                    "-D" + SimulatorSupport.JAVA_CLASSES_PROPERTY + "=" + javaClasses.get(),
+                    "-D" + SimulatorSupport.KOTLIN_CLASSES_PROPERTY + "=" + kotlinClasses.get());
+        }
     }
 
     private static void registerBuild(final Project project, String name, final String platform,
@@ -389,6 +444,13 @@ final class AppSupport {
     /// JVM desktop targets use the simulator's.
     static String nativePlatformOf(String platform) {
         return platform;
+    }
+
+    /// The encoding the source set's javac reads sources in: its
+    /// `options.encoding`, which [ProjectSupport] defaults to UTF-8.
+    static Provider<String> javaEncoding(Project project, SourceSet main) {
+        return project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
+                .map(t -> t.getOptions().getEncoding() == null ? "UTF-8" : t.getOptions().getEncoding());
     }
 
     /// `skipComplianceCheck` as given with -P or -D, or null.

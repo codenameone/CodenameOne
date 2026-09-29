@@ -64,13 +64,15 @@ final class ToolSupport {
         // Evaluated when the task runs, after the build script has had its say
         // about the source directories.
         Provider<List<String>> roots = project.provider(() -> sourceRoots(main));
-        register(project, layout, ext, userProperties, roots, "settings", DesktopTool.SETTINGS,
+        Provider<String> javaRoot = project.provider(() -> primaryJavaRoot(main, layout).getAbsolutePath());
+        register(project, layout, ext, userProperties, roots, javaRoot, "settings", DesktopTool.SETTINGS,
                 "Opens Codename One Settings for this project");
-        register(project, layout, ext, userProperties, roots, "guibuilder", DesktopTool.GUI_BUILDER,
+        register(project, layout, ext, userProperties, roots, javaRoot, "guibuilder", DesktopTool.GUI_BUILDER,
                 "Opens the Codename One GUI Builder for this project");
-        register(project, layout, ext, userProperties, roots, "gameBuilder", DesktopTool.GAME_BUILDER,
+        register(project, layout, ext, userProperties, roots, javaRoot, "gameBuilder", DesktopTool.GAME_BUILDER,
                 "Opens the Codename One Game Builder for this project");
-        register(project, layout, ext, userProperties, roots, "certificateWizard", DesktopTool.CERTIFICATE_WIZARD,
+        register(project, layout, ext, userProperties, roots, javaRoot, "certificateWizard",
+                DesktopTool.CERTIFICATE_WIZARD,
                 "Opens the iOS Certificate Wizard for this project");
     }
 
@@ -78,6 +80,27 @@ final class ToolSupport {
     /// them, a `sourceSets { }` block included. Settings treats the descriptor's
     /// roots as the whole compiled-source set, so the conventional layout's alone
     /// would hide a relocated main class and its annotations from it.
+    /// Where a tool writes the Java it generates: the conventional directory while
+    /// the source set still compiles it, else the source set's first own Java
+    /// directory (not one generated under the build directory), so the output is
+    /// compiled.
+    static File primaryJavaRoot(SourceSet main, ProjectLayout layout) {
+        java.util.Set<File> dirs = main.getJava().getSrcDirs();
+        File conventional = layout.javaSourceDir().getAbsoluteFile();
+        for (File dir : dirs) {
+            if (dir.getAbsoluteFile().equals(conventional)) {
+                return conventional;
+            }
+        }
+        String build = layout.buildDir().getAbsolutePath() + File.separator;
+        for (File dir : dirs) {
+            if (!dir.getAbsolutePath().startsWith(build)) {
+                return dir.getAbsoluteFile();
+            }
+        }
+        return conventional;
+    }
+
     static List<String> sourceRoots(SourceSet main) {
         java.util.LinkedHashSet<String> roots = new java.util.LinkedHashSet<String>();
         for (File dir : main.getJava().getSrcDirs()) {
@@ -94,7 +117,7 @@ final class ToolSupport {
 
     private static void register(Project project, ProjectLayout layout, CodenameOneExtension ext,
                                  Provider<Map<String, String>> userProperties, Provider<List<String>> sourceRoots,
-                                 String name, DesktopTool tool, String description) {
+                                 Provider<String> javaRoot, String name, DesktopTool tool, String description) {
         final Configuration classpath = AppSupport.resolvable(project, "cn1Tool"
                 + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
                 "The " + tool.displayName());
@@ -110,6 +133,7 @@ final class ToolSupport {
             t.setDescription(description);
             t.getToolName().set(name);
             t.getSourceRoots().set(sourceRoots);
+            t.getJavaSourceDir().set(javaRoot);
             t.getToolClasspath().from(classpath);
             t.getDetached().set(project.getProviders().gradleProperty("spawn").map(Boolean::parseBoolean)
                     .orElse(Boolean.TRUE));
@@ -136,6 +160,10 @@ final class ToolSupport {
         /// The main source set's source directories; see [ToolSupport#sourceRoots].
         @Input
         public abstract org.gradle.api.provider.ListProperty<String> getSourceRoots();
+
+        /// Where the GUI and Game Builders write Java; see [ToolSupport#primaryJavaRoot].
+        @Input
+        public abstract Property<String> getJavaSourceDir();
 
         /// Return at once (the default) rather than wait for the window to close.
         @Input
@@ -186,13 +214,13 @@ final class ToolSupport {
                 if (tool == DesktopTool.GUI_BUILDER) {
                     ensureDir(layout.guiBuilderDir());
                     binding.set("guiDir", layout.guiBuilderDir().getAbsolutePath());
-                    binding.set("sourceDir", layout.javaSourceDir().getAbsolutePath());
+                    binding.set("sourceDir", getJavaSourceDir().get());
                     binding.set("cssFile", layout.themeCss().getAbsolutePath());
                     binding.set("initialForm", getInitialForm().getOrNull());
                 } else if (tool == DesktopTool.GAME_BUILDER) {
                     ensureDir(layout.gamesDir());
                     binding.set("gamesDir", layout.gamesDir().getAbsolutePath());
-                    binding.set("sourceDir", layout.javaSourceDir().getAbsolutePath());
+                    binding.set("sourceDir", getJavaSourceDir().get());
                     binding.set("output", new File(tool.runtimeDir(), java.util.UUID.randomUUID() + ".output")
                             .getAbsolutePath());
                     if (getInitialForm().isPresent()) {

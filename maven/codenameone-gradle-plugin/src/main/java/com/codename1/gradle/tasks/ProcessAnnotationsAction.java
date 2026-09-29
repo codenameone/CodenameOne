@@ -56,6 +56,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     private final Map<String, String> userProperties;
     private final FileCollection compileClasspath;
     private final List<File> pendingJavaSources = new ArrayList<File>();
+    private org.gradle.api.provider.Provider<String> sourceEncoding;
 
     /// @param classesDir `compileJava`'s destination
     /// @param stubDir where processors write generated stub sources
@@ -73,6 +74,14 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         this.compileClasspath = compileClasspath;
     }
 
+    /// The encoding javac reads the sources in (`compileJava.options.encoding`),
+    /// in place of the constructor's: the processors read sources back to tell a
+    /// live class from a stale output, and must decode them as javac did.
+    public ProcessAnnotationsAction withSourceEncoding(org.gradle.api.provider.Provider<String> encoding) {
+        this.sourceEncoding = encoding;
+        return this;
+    }
+
     /// For the Kotlin pass, which runs before javac: the Java source directories
     /// of the same source set. Kotlin resolves the project's Java types from these
     /// sources, so a Kotlin `@RestClient` returning a Java DTO compiles -- and the
@@ -88,7 +97,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     /// null when there is nothing to compile or javac refuses. A refusal is left
     /// to compileJava to report with the real diagnostics; this pass then runs
     /// as before, without the Java types.
-    private File compilePendingJava(Task task, List<String> classpath) {
+    private File compilePendingJava(Task task, List<String> classpath, String encoding) {
         List<File> sources = new ArrayList<File>();
         for (File dir : pendingJavaSources) {
             collectJava(dir, sources);
@@ -178,7 +187,8 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         for (File f : compileClasspath) {
             classpath.add(f.getAbsolutePath());
         }
-        File pending = compilePendingJava(task, classpath);
+        String encoding = sourceEncoding != null && sourceEncoding.isPresent() ? sourceEncoding.get() : this.encoding;
+        File pending = compilePendingJava(task, classpath, encoding);
         if (pending != null) {
             classpath.add(pending.getAbsolutePath());
         }
