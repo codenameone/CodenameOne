@@ -23,4 +23,22 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Field name="compileClasspath"/>
     </Match>
+    <!-- The source set's classes directories, the same lazy, deliberately shared
+         FileCollection: it names Kotlin's destination wherever the build put it,
+         which is only known once the Kotlin plugin has configured its task. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.gradle.tasks.ComplianceAction"/>
+                <Method name="withSiblingClasses"/>
+                <Field name="siblingClassDirs"/>
+            </And>
+            <And>
+                <Class name="com.codename1.gradle.tasks.SplitOutputCheck"/>
+                <Method name="&lt;init&gt;"/>
+                <Field name="classesDirs"/>
+            </And>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

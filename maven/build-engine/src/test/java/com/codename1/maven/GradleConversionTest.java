@@ -183,6 +183,37 @@ class GradleConversionTest {
     }
 
     @Test
+    void anAntProjectsIosExtrasGoWhereTheGradleBuildReadsThem() throws Exception {
+        File ant = antApp();
+        touch(ant, "native/ios/app_extensions/Widget.zip", "zip");
+        touch(ant, "native/ios/strings/fr.lproj/Localizable.strings", "\"a\" = \"b\";");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(ant, out, "1.0");
+        assertTrue(new File(out, "src/ios/app_extensions/Widget.zip").isFile());
+        assertTrue(new File(out, "src/ios/strings/fr.lproj/Localizable.strings").isFile());
+        assertFalse(new File(out, "src/ios/objectivec/app_extensions").exists(), "not as native sources");
+        assertFalse(new File(out, "src/ios/objectivec/strings").exists(), "not as native sources");
+        assertTrue(new File(out, "src/ios/objectivec/a_MyNativeImpl.m").isFile());
+    }
+
+    @Test
+    void anEmptyRelativePathTakesNothingFromTheDirectoryAbove() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version><dependencies><dependency><groupId>org.example</groupId>"
+                + "<artifactId>inherited</artifactId><version>7</version></dependency></dependencies></project>");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>corporate</artifactId>"
+                + "<version>1.0</version><relativePath/></parent><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
+                + "</dependency></dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"org.example:util:2.0\")"), build);
+        assertFalse(build.contains("inherited"), "the parent comes from a repository, not ..: " + build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

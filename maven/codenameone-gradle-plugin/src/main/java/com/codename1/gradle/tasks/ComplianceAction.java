@@ -61,6 +61,7 @@ public final class ComplianceAction implements Action<Task> {
     private final Provider<List<String>> artifacts;
     private final Map<String, String> projectProperties;
     private final List<File> siblingClassRoots = new ArrayList<File>();
+    private FileCollection siblingClassDirs;
     private final List<File> pendingJavaSources = new ArrayList<File>();
 
     /// @param compileClasspath the classes the check resolves references against
@@ -87,6 +88,13 @@ public final class ComplianceAction implements Action<Task> {
     /// for the Java pass -- which the checked classes may use.
     public ComplianceAction withSiblingClasses(File... roots) {
         siblingClassRoots.addAll(Arrays.asList(roots));
+        return this;
+    }
+
+    /// Adds every classes directory of the source set except the one checked
+    /// here -- the real ones, wherever the build put them, not a guessed path.
+    public ComplianceAction withSiblingClasses(FileCollection classesDirs) {
+        this.siblingClassDirs = classesDirs;
         return this;
     }
 
@@ -134,6 +142,13 @@ public final class ComplianceAction implements Action<Task> {
             }
         }
         List<File> siblings = new ArrayList<File>(siblingClassRoots);
+        if (siblingClassDirs != null) {
+            for (File dir : siblingClassDirs) {
+                if (!dir.getAbsoluteFile().equals(classesDir.getAbsoluteFile())) {
+                    siblings.add(dir);
+                }
+            }
+        }
         for (File f : compileClasspath) {
             if (!moduleFiles.contains(f.getAbsoluteFile())) {
                 siblings.add(f);

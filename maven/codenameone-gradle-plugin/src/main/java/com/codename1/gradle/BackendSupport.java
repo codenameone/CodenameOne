@@ -71,7 +71,6 @@ final class BackendSupport {
         // The @RestController router and the entry point are generated here, from
         // the compiled classes, exactly as the Maven module's process-annotations
         // execution does.
-        final File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
@@ -79,7 +78,7 @@ final class BackendSupport {
                     layout.settingsFile(), AppSupport.sourceRoots(main, layout),
                     "UTF-8", userProperties.get(), main.getCompileClasspath()));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
-                    compile.getDestinationDirectory().get().getAsFile(), kotlinClasses));
+                    compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
         });
         // Kotlin controllers and entities are processed like Java ones: in a pure
         // Kotlin backend compileJava has no sources and would generate no router or
@@ -88,7 +87,8 @@ final class BackendSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
-                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
+                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
+                            AppSupport.kotlinDestination(compile, layout), stubs,
                             layout.projectDir(), layout.settingsFile(), AppSupport.sourceRoots(main, layout),
                             "UTF-8", userProperties.get(), main.getCompileClasspath()));
                 }));

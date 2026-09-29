@@ -184,9 +184,15 @@ public class AppBuilder {
     }
 
     /// Installs or refreshes the Codename One build client in `~/.codenameone`.
+    ///
+    /// Names the build client jar, so a machine without one gets it before the
+    /// first cloud build: the updater only runs when a file it is given is
+    /// missing, and given none it installed itself and nothing else, leaving the
+    /// build to fail on the absent jar. (The Maven plugin overrides this; its
+    /// projects get the client from the install-codenameone profile.)
     protected void updateCodenameOne(boolean force) throws BuildExecutionException {
         new CodenameOneUpdater(getLog(), antProject).update(force,
-                new File(buildDirectory(), "codenameone"), getCN1ProjectDir());
+                new File(buildDirectory(), "codenameone"), getCN1ProjectDir(), CodenameOneUpdater.buildClientJar());
     }
 
     /// Overlays the build hints declared as annotations on the main class.

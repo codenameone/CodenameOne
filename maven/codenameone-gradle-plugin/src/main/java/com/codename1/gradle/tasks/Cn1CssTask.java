@@ -36,7 +36,6 @@ import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
-import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -72,9 +71,17 @@ public abstract class Cn1CssTask extends Cn1Task {
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
 
-    /// Where the merged stylesheet and the extracted cn1lib bundles go.
-    @Internal
+    /// Where the merged stylesheet, the extracted cn1lib bundles and the
+    /// simulator's input list ([#SIMULATOR_INPUTS]) go. An output, so a build
+    /// cache hit restores the extracted bundles that list names.
+    @OutputDirectory
     public abstract DirectoryProperty getWorkDirectory();
+
+    /// The file in [#getWorkDirectory()] holding the comma-separated stylesheets
+    /// the main theme is compiled from, cn1libs first. The simulator's live CSS
+    /// reload recompiles from the same list, so a library's styles survive an
+    /// edit to the application's own theme.css.
+    public static final String SIMULATOR_INPUTS = "simulator-css-inputs.txt";
 
     /// Empties `out`. It is a main resource directory, so a theme.res left from
     /// an earlier run would still be packaged after CSS was switched off.
@@ -89,6 +96,14 @@ public abstract class Cn1CssTask extends Cn1Task {
             } catch (java.io.IOException ex) {
                 throw new GradleException("Could not delete the stale " + c, ex);
             }
+        }
+    }
+
+    private static void writeInputs(File to, String inputs) {
+        try {
+            java.nio.file.Files.write(to.toPath(), inputs.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException ex) {
+            throw new GradleException("Could not write " + to, ex);
         }
     }
 
@@ -111,6 +126,10 @@ public abstract class Cn1CssTask extends Cn1Task {
             return;
         }
         File work = getWorkDirectory().get().getAsFile();
+        File simulatorInputs = new File(work, SIMULATOR_INPUTS);
+        if (simulatorInputs.exists() && !simulatorInputs.delete()) {
+            throw new GradleException("Could not delete " + simulatorInputs);
+        }
         List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
         for (String encoded : getLibraryCss().get()) {
             com.codename1.build.BuildArtifact a = com.codename1.gradle.GradleHostFactory.decode(encoded);
@@ -143,6 +162,8 @@ public abstract class Cn1CssTask extends Cn1Task {
                 compiler.compile(prefix, cssDir, out, work, libraries, l10n.isDirectory() ? l10n : null,
                         getCompilerClasspath().getAsPath(), layout().projectDir(), Long.MAX_VALUE);
             }
+            // After the compile, which extracted every bundle the list names.
+            writeInputs(simulatorInputs, compiler.inputs(libraries, "", layout().themeCss()));
         } catch (BuildFailureException ex) {
             throw new GradleException(ex.getMessage(), ex);
         } catch (BuildExecutionException ex) {

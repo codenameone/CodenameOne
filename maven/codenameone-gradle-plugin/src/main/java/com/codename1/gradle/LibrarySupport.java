@@ -153,14 +153,14 @@ final class LibrarySupport {
                 compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
                         compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
                         compileArtifacts, Collections.<String, String>emptyMap())
-                        .withSiblingClasses(new File(layout.buildDir(), "classes/kotlin/main"))));
+                        .withSiblingClasses(main.getOutput().getClassesDirs())));
         // A Kotlin library's classes are checked too, as an application's are: in
         // a pure Kotlin library compileJava has no sources and runs no action at
         // all, and a mixed one would otherwise publish its Kotlin half unchecked.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile ->
                         compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
-                                new File(layout.buildDir(), "classes/kotlin/main"), name, main.getCompileClasspath(),
+                                AppSupport.kotlinDestination(compile, layout), name, main.getCompileClasspath(),
                                 compileArtifacts, Collections.<String, String>emptyMap())
                                 .withPendingJavaSources(main.getJava().getSrcDirs()))));
 

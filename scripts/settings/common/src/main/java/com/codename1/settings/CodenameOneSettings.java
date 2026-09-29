@@ -1718,10 +1718,18 @@ public class CodenameOneSettings extends Lifecycle {
         OutputStream out = null;
         try {
             String url = ProjectIO.fsUrl(dependencyFilePath());
-            in = FileSystemStorage.getInstance().openInputStream(url);
-            String pom = Util.readToString(in, "UTF-8");
-            Util.cleanup(in);
-            in = null;
+            String pom;
+            if (binding.isGradle() && !FileSystemStorage.getInstance().exists(url)) {
+                // build.gradle.kts is optional in a Gradle project (the plugin in
+                // settings.gradle.kts is enough), so a missing one is an empty
+                // script and the add below writes it.
+                pom = "";
+            } else {
+                in = FileSystemStorage.getInstance().openInputStream(url);
+                pom = Util.readToString(in, "UTF-8");
+                Util.cleanup(in);
+                in = null;
+            }
             String updated = editor.add(pom, dependency);
             if (updated.equals(pom)) {
                 ToastBar.showInfoMessage("Dependency already exists: " + dependency.coordinates());

@@ -140,7 +140,7 @@ final class AppSupport {
             t.getSources().from(layout.cssDir(), layout.l10nDir(), layout.settingsFile());
             t.getCompilerClasspath().from(cssCompiler);
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/resources/cn1-css"));
-            t.getWorkDirectory().set(new File(layout.buildDir(), "css"));
+            t.getWorkDirectory().set(cssWorkDir(layout));
             Provider<Set<ResolvedArtifactResult>> resolved = project.getConfigurations().getByName("compileClasspath")
                     .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts();
             t.getLibraryCss().set(resolved.map(AppSupport::cssBundles));
@@ -176,14 +176,13 @@ final class AppSupport {
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().get().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
-                    .withSiblingClasses(new File(layout.buildDir(), "classes/kotlin/main")));
+                    .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath()));
             // Last: in a Java and Kotlin project, both passes have run by now.
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
-                    compile.getDestinationDirectory().get().getAsFile(),
-                    new File(layout.buildDir(), "classes/kotlin/main")));
+                    compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
         });
 
         // Kotlin compiles into a directory of its own, before javac. The same two
@@ -194,7 +193,7 @@ final class AppSupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
                     processingInputs(compile, layout, userProperties);
-                    File kotlinClasses = new File(layout.buildDir(), "classes/kotlin/main");
+                    File kotlinClasses = kotlinDestination(compile, layout);
                     List<String> roots = sourceRoots(main, layout);
                     // javac has not run yet, so the Java classes Kotlin calls are
                     // known by their sources.
@@ -286,11 +285,15 @@ final class AppSupport {
             t.setMaxHeapSize("1024M");
             t.setDebug(debug);
             // Live CSS reload recompiles into the resources the simulator runs from.
-            t.systemProperty(SimulatorSupport.CSS_INPUT_PROPERTY, layout.themeCss().getAbsolutePath());
+            // The cn1libs' stylesheets first, as cn1Css compiled them; a reload from
+            // theme.css alone would drop every library style.
+            t.getJvmArgumentProviders().add(new CssInputArgument(
+                    new File(cssWorkDir(layout), Cn1CssTask.SIMULATOR_INPUTS),
+                    layout.themeCss()));
             t.systemProperty(SimulatorSupport.CSS_OUTPUT_PROPERTY,
                     new File(layout.resourcesOutputDir(), "theme.res").getAbsolutePath());
             t.systemProperty(SimulatorSupport.CSS_MERGE_PROPERTY,
-                    new File(layout.buildDir(), "css" + File.separator + "theme.css").getAbsolutePath());
+                    new File(cssWorkDir(layout), "theme.css").getAbsolutePath());
             t.getArgumentProviders().add(new MainClassArgument(layout.settingsFile(), userProperties));
         });
     }
@@ -426,6 +429,22 @@ final class AppSupport {
         });
     }
 
+    /// Where a Kotlin compile task writes its classes: the task's own
+    /// `destinationDirectory`, which follows a relocated build directory, read by
+    /// reflection because the Kotlin plugin's types are not on this plugin's
+    /// classpath. The conventional path only if the task will not say.
+    static File kotlinDestination(org.gradle.api.Task compile, ProjectLayout layout) {
+        try {
+            Object dir = compile.getClass().getMethod("getDestinationDirectory").invoke(compile);
+            if (dir instanceof org.gradle.api.file.DirectoryProperty) {
+                return ((org.gradle.api.file.DirectoryProperty) dir).get().getAsFile();
+            }
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            compile.getLogger().info("cn1: " + compile.getPath() + " did not report its destination: " + ex);
+        }
+        return new File(layout.buildDir(), "classes" + File.separator + "kotlin" + File.separator + "main");
+    }
+
     /// What the annotation processors read besides the compiled classes: the
     /// codename1.* overrides and the settings file -- its mainName and
     /// packageName pick the entry point the manifest is stamped for. As inputs,
@@ -499,6 +518,40 @@ final class AppSupport {
 
     /// The simulator's one argument: the application's main class, from the
     /// effective settings so a `-Pcodename1.mainName` override is honoured.
+    /// cn1Css's work directory, which the simulator reads its CSS inputs from.
+    static File cssWorkDir(ProjectLayout layout) {
+        return new File(layout.buildDir(), "css");
+    }
+
+    /// The simulator's live CSS reload inputs: what cn1Css recorded when it ran,
+    /// else the application's theme.css alone (CSS switched off, so no list).
+    static final class CssInputArgument implements org.gradle.process.CommandLineArgumentProvider {
+        private final File recorded;
+        private final File themeCss;
+
+        CssInputArgument(File recorded, File themeCss) {
+            this.recorded = recorded;
+            this.themeCss = themeCss;
+        }
+
+        @Override
+        public Iterable<String> asArguments() {
+            String inputs = themeCss.getAbsolutePath();
+            if (recorded.isFile()) {
+                try {
+                    String listed = new String(java.nio.file.Files.readAllBytes(recorded.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8).trim();
+                    if (!listed.isEmpty()) {
+                        inputs = listed;
+                    }
+                } catch (java.io.IOException ignored) {
+                    // Falls back to the application's own stylesheet.
+                }
+            }
+            return Collections.singletonList("-D" + SimulatorSupport.CSS_INPUT_PROPERTY + "=" + inputs);
+        }
+    }
+
     static final class MainClassArgument implements org.gradle.process.CommandLineArgumentProvider {
         private final File settingsFile;
         private final Provider<Map<String, String>> userProperties;

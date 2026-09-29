@@ -75,6 +75,20 @@ class PluginHelpersTest {
     }
 
     @Test
+    void liveCssReloadUsesTheListCn1CssRecorded(@org.junit.jupiter.api.io.TempDir File dir) throws Exception {
+        File theme = new File(dir, "theme.css");
+        File recorded = new File(dir, com.codename1.gradle.tasks.Cn1CssTask.SIMULATOR_INPUTS);
+        AppSupport.CssInputArgument arg = new AppSupport.CssInputArgument(recorded, theme);
+        String property = "-D" + com.codename1.maven.SimulatorSupport.CSS_INPUT_PROPERTY + "=";
+        assertEquals(Collections.singletonList(property + theme.getAbsolutePath()), arg.asArguments(),
+                "no list (CSS switched off): the application's stylesheet alone");
+
+        java.nio.file.Files.write(recorded.toPath(), "/x/lib/theme.css,/x/theme.css\n".getBytes("UTF-8"));
+        assertEquals(Collections.singletonList(property + "/x/lib/theme.css,/x/theme.css"), arg.asArguments(),
+                "the library stylesheets come first, as cn1Css compiled them");
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

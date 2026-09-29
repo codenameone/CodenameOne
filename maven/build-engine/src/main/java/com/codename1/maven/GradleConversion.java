@@ -206,14 +206,21 @@ public final class GradleConversion {
                 // resources, css, l10n, guibuilder, rad, test.
                 copyTree(new File(from.projectDir(), "src"), new File(to.projectDir(), "src"));
             }
+            // An Ant project keeps the iOS app extensions and strings inside
+            // native/ios; they have places of their own in the Gradle layout (which
+            // AppBuilder reads), so the native copy leaves them out and they move
+            // below -- nested under src/ios/objectivec, the build would lose them.
+            java.util.Set<File> extras = new java.util.HashSet<File>(java.util.Arrays.asList(
+                    from.iosAppExtensionsDir().getAbsoluteFile(), from.iosStringsDir().getAbsoluteFile()));
             for (NativePlatform p : NativePlatform.values()) {
                 File dir = from.nativeSourceDir(p);
                 if (hasFiles(dir)) {
-                    copyTree(dir, to.nativeSourceDir(p));
+                    copyTreeExcept(dir, to.nativeSourceDir(p), extras);
                 }
             }
+            copyIosExtras(from, to);
             if (from.buildSystem() == BuildSystem.MAVEN) {
-                copyPlatformExtras(from, to);
+                copyPlatformResources(from, to);
             }
             File backend = from.backendDir();
             boolean hasBackend = backend != null && new File(backend, ProjectLayout.BACKEND_SETTINGS_FILE).isFile()
@@ -406,15 +413,19 @@ public final class GradleConversion {
         Files.write(buildScript.toPath(), updated.getBytes(StandardCharsets.UTF_8));
     }
 
-    /// The Maven platform modules' own resources (iOS app extensions and
-    /// localized strings), which live beside their native sources.
-    private static void copyPlatformExtras(ProjectLayout from, ProjectLayout to) throws IOException {
+    /// The iOS app extensions and localized strings, from wherever the source
+    /// build tool keeps them to the Gradle layout's own directories.
+    private static void copyIosExtras(ProjectLayout from, ProjectLayout to) throws IOException {
         if (hasFiles(from.iosAppExtensionsDir())) {
             copyTree(from.iosAppExtensionsDir(), to.iosAppExtensionsDir());
         }
         if (hasFiles(from.iosStringsDir())) {
             copyTree(from.iosStringsDir(), to.iosStringsDir());
         }
+    }
+
+    /// A Maven platform module's own src/main/resources.
+    private static void copyPlatformResources(ProjectLayout from, ProjectLayout to) throws IOException {
         for (NativePlatform p : NativePlatform.values()) {
             File resources = new File(from.rootDir(), p.id() + File.separator + "src" + File.separator + "main"
                     + File.separator + "resources");
@@ -505,7 +516,15 @@ public final class GradleConversion {
         }
     }
 
+    /// The parent pom on disk, as Maven finds it: `relativePath`, `../pom.xml`
+    /// when the element is absent, and none at all when it is present but empty
+    /// -- `<relativePath/>` tells Maven to take the parent from a repository, and
+    /// inheriting from whatever pom happens to sit in `..` would give the
+    /// conversion a different dependency model from the build it converts.
     private static File parentPom(File pom, Element parent) {
+        if (child(parent, "relativePath") != null && text(parent, "relativePath") == null) {
+            return null;
+        }
         String relative = text(parent, "relativePath");
         File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
         if (parentPom.isDirectory()) {
@@ -689,12 +708,8 @@ public final class GradleConversion {
         }
         Element parent = child(project, "parent");
         if (parent != null && depth < 8) {
-            String relative = text(parent, "relativePath");
-            File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
-            if (parentPom.isDirectory()) {
-                parentPom = new File(parentPom, "pom.xml");
-            }
-            if (parentPom.isFile()) {
+            File parentPom = parentPom(pom, parent);
+            if (parentPom != null) {
                 out.putAll(managedVersions(parentPom, depth + 1));
             }
         }
@@ -746,12 +761,8 @@ public final class GradleConversion {
         }
         Element parent = child(project, "parent");
         if (parent != null && depth < 8) {
-            String relative = text(parent, "relativePath");
-            File parentPom = new File(pom.getParentFile(), relative == null ? "../pom.xml" : relative);
-            if (parentPom.isDirectory()) {
-                parentPom = new File(parentPom, "pom.xml");
-            }
-            if (parentPom.isFile()) {
+            File parentPom = parentPom(pom, parent);
+            if (parentPom != null) {
                 props.putAll(pomProperties(parentPom, depth + 1));
             }
         }
@@ -867,6 +878,23 @@ public final class GradleConversion {
             }
         }
         return false;
+    }
+
+    /// [#copyTree(File, File)], leaving out the directories in `except`.
+    private static void copyTreeExcept(File from, File to, java.util.Set<File> except) throws IOException {
+        if (except.contains(from.getAbsoluteFile())) {
+            return;
+        }
+        if (from.isDirectory()) {
+            File[] children = from.listFiles();
+            if (children != null) {
+                for (File c : children) {
+                    copyTreeExcept(c, new File(to, c.getName()), except);
+                }
+            }
+            return;
+        }
+        copyTree(from, to);
     }
 
     private static void copyTree(File from, File to) throws IOException {
