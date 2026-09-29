@@ -68,7 +68,18 @@ class TelemetryTest extends UITestBase {
     private static final long WAIT_MILLIS = 30000;
 
     @BeforeEach
-    void mocks() {
+    void mocks() throws Exception {
+        // The previous test's last export first. Telemetry.uninstall() queues it
+        // and returns, so it could reach the collector mock AFTER the connections
+        // below were cleared -- and a test asking for "at least one span" then
+        // got the previous test's instead of its own, which failed CI on every
+        // PR it happened to land in.
+        long idleBy = System.currentTimeMillis() + WAIT_MILLIS;
+        while (!NetworkManager.getInstance().isQueueIdle()
+                && System.currentTimeMillis() < idleBy) {
+            flushSerialCalls();
+            Thread.sleep(10);
+        }
         TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
         impl.clearNetworkMocks();
         impl.clearConnections();
@@ -306,15 +317,20 @@ class TelemetryTest extends UITestBase {
         // The app's request joins the app's trace downstream, so no span of ours
         // may describe it in another one; ours is recorded as usual.
         Telemetry.flush();
+        // Waits for THIS test's span, not for any span: a count is satisfied by
+        // whatever else reached the collector first.
         List<Span> spans = exported(1);
-        boolean sawOurs = false;
-        for (Span span : spans) {
-            String url = attribute(span.getAttributesList(), "url.full");
-            assertFalse((API + "/own").equals(url),
-                    "a span was recorded for a request that carries the app's own trace");
-            sawOurs |= (API + "/ours").equals(url);
+        long deadline = System.currentTimeMillis() + WAIT_MILLIS;
+        while (!hasUrl(spans, API + "/ours") && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+            spans = exported(1);
         }
-        assertTrue(sawOurs, "the ordinary request's span is missing: " + spans);
+        for (Span span : spans) {
+            assertFalse((API + "/own").equals(attribute(span.getAttributesList(), "url.full")),
+                    "a span was recorded for a request that carries the app's own trace");
+        }
+        assertTrue(hasUrl(spans, API + "/ours"), "the ordinary request's span is missing: "
+                + spans);
     }
 
     @Test
@@ -1261,6 +1277,15 @@ class TelemetryTest extends UITestBase {
             Thread.sleep(20);
         }
         throw new AssertionError("expected " + wanted + " spans, got " + spans);
+    }
+
+    private static boolean hasUrl(List<Span> spans, String url) {
+        for (Span span : spans) {
+            if (url.equals(attribute(span.getAttributesList(), "url.full"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Span find(List<Span> spans, String name) {
