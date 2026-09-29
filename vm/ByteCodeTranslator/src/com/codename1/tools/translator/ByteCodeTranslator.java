@@ -961,6 +961,16 @@ public class ByteCodeTranslator {
         replaceInFile(projectWorkspaceData, "KitchenSink", appName);
 
 
+        // The iOS template sets COMPRESS_PNG_FILES = NO and STRIP_PNG_TEXT = NO. Both are
+        // needed: Xcode's copypng treats -strip-PNG-text as a request to compress too, so
+        // with STRIP_PNG_TEXT on (its Release default) the first setting alone changes
+        // nothing. Xcode's default rewrites every
+        // loose PNG in the bundle into Apple's CgBI form -- premultiplied, byte-swapped
+        // and recompressed with a weaker filter -- which made an application's PNGs larger,
+        // not smaller: 145 photographic PNGs of the Flutter gallery went from 14.4MB to
+        // 20.0MB. Nothing here needs CgBI. Images decode through ImageIO, which reads a
+        // standard PNG just as well, and Image.isPNG only checks the signature both forms
+        // share. An app that wants CgBI can put its images in an asset catalog.
         File projectPbx = new File(xcproj, "project.pbxproj");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));
 
