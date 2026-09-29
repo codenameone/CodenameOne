@@ -1076,8 +1076,8 @@ JAVA_INT com_codename1_backend_Reactor_createWakePipeImpl___int_1ARRAY_R_int(COD
         fcntl(fds[i], F_SETFD, FD_CLOEXEC);
     }
     arr = (JAVA_ARRAY)out;
-    ((JAVA_ARRAY_INT*)arr->data)[0] = fds[0];
-    ((JAVA_ARRAY_INT*)arr->data)[1] = fds[1];
+    ((JAVA_ARRAY_INT*)CN1_ARRAY_DATA(arr))[0] = fds[0];
+    ((JAVA_ARRAY_INT*)CN1_ARRAY_DATA(arr))[1] = fds[1];
     return 0;
 #endif
 }

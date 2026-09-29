@@ -70,6 +70,22 @@ final class BackendWeaver {
     /// A static field whose presence says a class has been rewritten.
     static final String MARKER = "cn1$woven";
     static final String BODY_SUFFIX = "$cn1body";
+
+    /// The name a woven method's original body moves to: its name, the suffix,
+    /// and a tag of the class that declares it. The tag is what keeps two woven
+    /// bodies from overriding each other -- the body is package-private and
+    /// virtual, so a same-package subclass that overrides a woven method would
+    /// otherwise override the base class's BODY too, and an explicit
+    /// super.foo() entered the base stub only to run the subclass body again,
+    /// recursing until the stack ran out.
+    static String bodyName(String ownerInternalName, String method) {
+        return method + BODY_SUFFIX + Integer.toHexString(ownerInternalName.hashCode());
+    }
+
+    /// Whether `name` is a moved body's.
+    static boolean isBody(String name) {
+        return name.indexOf(BODY_SUFFIX) >= 0;
+    }
     static final String INJECT_PREFIX = "cn1$inject$";
     static final String BRIDGE_PREFIX = "cn1$";
     static final String NEW_BRIDGE = "cn1$new";
@@ -173,7 +189,7 @@ final class BackendWeaver {
                 // @Transactional, whose transaction wraps the synchronized call.
                 int bodyAccess = access & ~(Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED
                         | Opcodes.ACC_PRIVATE | Opcodes.ACC_VARARGS | Opcodes.ACC_FINAL);
-                MethodVisitor body = writer.visitMethod(bodyAccess, name + BODY_SUFFIX,
+                MethodVisitor body = writer.visitMethod(bodyAccess, bodyName(owner, name),
                         descriptor, signature, exceptions);
                 MethodVisitor stub = writer.visitMethod(access & ~Opcodes.ACC_SYNCHRONIZED,
                         name, descriptor, signature, exceptions);

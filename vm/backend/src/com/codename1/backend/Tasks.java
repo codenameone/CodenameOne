@@ -282,12 +282,8 @@ public final class Tasks {
     /// it, which is why the native source names it -- that keeps it alive through
     /// dead-code elimination.
     static void runVirtual(long token) {
-        Runnable task = HttpServer.takeVirtualTask(token);
-        if (task == null) {
-            return;
-        }
         try {
-            task.run();
+            HttpServer.runVirtualTask(token);
         } catch (Throwable err) {
             // The top of a virtual thread: nothing above this can catch it.
             System.err.println("A virtual-thread task failed: " + err);

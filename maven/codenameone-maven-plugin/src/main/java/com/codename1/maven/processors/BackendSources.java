@@ -73,8 +73,9 @@ final class BackendSources {
             String retType = isVoid ? "void" : typeName(ret);
             String params = parameters(owner, isStatic, args);
             String callArgs = arguments(isStatic, args.length);
-            String inner = (isStatic ? owner : "self") + "." + m.getName()
-                    + BackendWeaver.BODY_SUFFIX + "(" + plainArguments(args.length) + ")";
+            String inner = (isStatic ? owner : "self") + "."
+                    + BackendWeaver.bodyName(cls.getInternalName(), m.getName())
+                    + "(" + plainArguments(args.length) + ")";
             List<String> layers = new ArrayList<String>();
             if (aspect.transactional != null) {
                 layers.add("tx");

@@ -221,6 +221,20 @@ public final class Backend {
     /// Blocks until the server stops.
     public void awaitTermination() {
         server.awaitTermination();
+        // And the teardown: a stop() from a handler, callback or task finishes
+        // it on another thread after the listener has ended, and a process
+        // returning from run() here would exit with @PreDestroy, the sessions
+        // and the pool still being closed.
+        synchronized (this) {
+            while (stopping && !stopped) {
+                try {
+                    wait();
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
     }
 
     /// Stops accepting, lets what is in flight finish, and closes the database.

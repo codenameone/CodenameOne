@@ -2597,6 +2597,9 @@ public final class HttpServer {
             int index = nextTaskHost;
             nextTaskHost = index + 1 >= hosts.length ? 0 : index + 1;
             host = hosts[index];
+            if (host != null) {
+                VIRTUAL_TASK_HOSTS.put(Long.valueOf(token), host);
+            }
         }
         if (host == null) {
             takeVirtualTask(token);
@@ -2650,7 +2653,34 @@ public final class HttpServer {
     /// The task a virtual thread's body runs, handed over once.
     static Runnable takeVirtualTask(long token) {
         synchronized (VIRTUAL_TASKS) {
+            VIRTUAL_TASK_HOSTS.remove(Long.valueOf(token));
             return (Runnable) VIRTUAL_TASKS.remove(Long.valueOf(token));
+        }
+    }
+
+    /// The host each queued virtual task was given to, by token.
+    private static final Map VIRTUAL_TASK_HOSTS = new java.util.HashMap();
+    /// The host running the calling virtual task, while it runs; see awaitTaskDrain.
+    private static final ThreadLocal TASK_HOST = new ThreadLocal();
+
+    /// Runs the virtual task queued under `token`, on the virtual thread made
+    /// for it, remembering its host: a stop() it calls must not wait for that
+    /// host's drain, which cannot start until the stop returns.
+    static void runVirtualTask(long token) {
+        Runnable task;
+        Object host;
+        synchronized (VIRTUAL_TASKS) {
+            host = VIRTUAL_TASK_HOSTS.remove(Long.valueOf(token));
+            task = (Runnable) VIRTUAL_TASKS.remove(Long.valueOf(token));
+        }
+        if (task == null) {
+            return;
+        }
+        TASK_HOST.set(host);
+        try {
+            task.run();
+        } finally {
+            TASK_HOST.set(null);
         }
     }
 
@@ -3233,7 +3263,10 @@ public final class HttpServer {
         if (hosts == null) {
             return;
         }
-        VtHost callersHost = callerFd >= 0 ? ownerOf(callerFd) : null;
+        // The caller's host: a handler's is the owner of its descriptor, a
+        // virtual task's the host it was given to. Either cannot drain until
+        // this returns, and waiting for it waited out the whole window.
+        VtHost callersHost = callerFd >= 0 ? ownerOf(callerFd) : (VtHost) TASK_HOST.get();
         while (System.currentTimeMillis() < taskDrainDeadline + 50) {
             boolean all = true;
             for (VtHost element : hosts) {

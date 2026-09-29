@@ -1124,6 +1124,23 @@ final class BackendBeans {
                 }
             }
         }
+        // Still clashing: one class, two beans -- two @Bean factories of it -- and
+        // each schedules its own, as in Spring. Named by the bean then, or the
+        // second registration refused the start.
+        Map<String, Integer> named = new LinkedHashMap<String, Integer>();
+        for (Bean b : beans) {
+            for (Job j : b.jobs) {
+                Integer n = named.get(j.name);
+                named.put(j.name, Integer.valueOf(n == null ? 1 : n.intValue() + 1));
+            }
+        }
+        for (Bean b : beans) {
+            for (Job j : b.jobs) {
+                if (named.get(j.name).intValue() > 1) {
+                    j.name = b.name + "." + j.method.getName();
+                }
+            }
+        }
         Map<String, Bean> tools = new LinkedHashMap<String, Bean>();
         Map<String, Bean> managed = new LinkedHashMap<String, Bean>();
         for (Bean b : beans) {
@@ -2063,7 +2080,7 @@ final class BackendBeans {
             for (MethodInfo m : c.getMethods()) {
                 if (m.isConstructor() || m.isStatic() || m.isPrivate() || m.isSynthetic()
                         || "<clinit>".equals(m.getName())
-                        || m.getName().endsWith(BackendWeaver.BODY_SUFFIX)
+                        || BackendWeaver.isBody(m.getName())
                         || m.getName().startsWith(BackendWeaver.BRIDGE_PREFIX)) {
                     continue;
                 }
@@ -2366,7 +2383,7 @@ final class BackendBeans {
             Aspects found = null;
             for (MethodInfo m : cls.getMethods()) {
                 if (m.isConstructor() || m.isSynthetic() || "<clinit>".equals(m.getName())
-                        || m.getName().endsWith(BackendWeaver.BODY_SUFFIX)
+                        || BackendWeaver.isBody(m.getName())
                         || m.getName().startsWith(BackendWeaver.BRIDGE_PREFIX)) {
                     continue;
                 }

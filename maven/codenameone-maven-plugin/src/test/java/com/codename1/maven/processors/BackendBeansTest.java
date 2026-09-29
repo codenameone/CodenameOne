@@ -543,9 +543,32 @@ public class BackendBeansTest {
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());
         Class<?> worker = loader.loadClass("com.example.Worker");
-        java.lang.reflect.Method body = worker.getDeclaredMethod("work$cn1body");
+        java.lang.reflect.Method body = worker.getDeclaredMethod(
+                BackendWeaver.bodyName("com/example/Worker", "work"));
         assertTrue("the woven body lost its synchronized, so executor threads could run it "
                 + "at once", java.lang.reflect.Modifier.isSynchronized(body.getModifiers()));
+    }
+
+    @Test
+    public void aWovenOverrideCallingSuperRunsTheBaseBody() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Base", PKG + "public class Base {\n"
+                + "    @Timed(\"base.work\") public String work() { return \"base\"; }\n"
+                + "}\n");
+        s.put("com.example.Sub", PKG + "public class Sub extends Base {\n"
+                + "    @Timed(\"sub.work\") public String work() { return \"sub+\" + super.work(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Object sub = loader.loadClass("com.example.Sub").newInstance();
+        try {
+            assertEquals("sub+base", sub.getClass().getMethod("work").invoke(sub));
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            throw new AssertionError("the base body was overridden by the subclass's: "
+                    + err.getCause(), err.getCause());
+        }
     }
 
     @Test
@@ -1426,6 +1449,29 @@ public class BackendBeansTest {
             }
             assertTrue("a @Bean-built class's @Scheduled method never ran",
                     ticker.getField("runs").getInt(null) >= 2);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void twoBeansOfOneClassScheduleTheirJobsSeparately() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Worker", PKG + "public class Worker {\n"
+                + "    public static volatile int runs;\n"
+                + "    @Scheduled(fixedRate = 20) public void tick() { runs++; }\n"
+                + "}\n");
+        s.put("com.example.Setup", PKG + "@Configuration public class Setup {\n"
+                + "    @Bean public Worker east() { return new Worker(); }\n"
+                + "    @Bean public Worker west() { return new Worker(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        // Both started: the same job name twice refused the start.
+        Backend backend = start(classes, freePort(), new Properties());
+        try {
+            String jobs = String.valueOf(backend.getApplication().getScheduler().describe());
+            assertTrue(jobs, jobs.contains("east.tick") && jobs.contains("west.tick"));
         } finally {
             backend.stop();
         }

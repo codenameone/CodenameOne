@@ -878,6 +878,41 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("awaitTermination waits for the teardown a handler's stop() deferred")
+    void awaitTerminationWaitsForTheDeferredTeardown() throws Exception {
+        final Backend[] running = new Backend[1];
+        final java.util.concurrent.atomic.AtomicBoolean destroyed =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        running[0] = Backend.builder(Config.of(settings, "test")).quiet()
+                .application(new EmptyApplication() {
+                    public HttpServer.Handler[] create(Backend.Environment environment) {
+                        return new HttpServer.Handler[] {new HttpServer.Handler() {
+                            public HttpServer.Response handle(HttpServer.Request request) {
+                                running[0].stop();
+                                return HttpServer.Response.text(200, "stopping");
+                            }
+                        }};
+                    }
+
+                    public void stopped() {
+                        try {
+                            Thread.sleep(300);              // a slow @PreDestroy
+                        } catch (InterruptedException err) {
+                            Thread.currentThread().interrupt();
+                        }
+                        destroyed.set(true);
+                    }
+                }).start();
+        assertEquals("stopping", read(open(port, "/stop")));
+        running[0].awaitTermination();
+        assertTrue(destroyed.get(),
+                "awaitTermination returned while the teardown was still running");
+    }
+
+    @Test
     @DisplayName("one process runs one backend: a second start is refused, a restart is not")
     void oneBackendPerProcess() throws Exception {
         final HttpServer.Handler none = new HttpServer.Handler() {
