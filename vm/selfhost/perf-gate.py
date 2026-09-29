@@ -382,6 +382,29 @@ def verdict(ratio, base, tolerance, floor=0.0):
     return 'ok'
 
 
+def keep_failure_logs(work, bench_id, cores, out):
+    """Copies a failed benchmark's run logs beside the results file, and returns where.
+
+    The logs are written under vm/selfhost/target/perf-gate, which no workflow uploads,
+    and a crash's own account of itself -- the ParparVM fault handler's backtrace, the
+    last lines the translator printed -- is in them and nowhere else. A crashed round
+    used to reach the job summary as "exited with 139" and a path on a runner that was
+    already gone, which is the whole of the evidence the next person got.
+    """
+    if not out:
+        return None
+    dest = Path(out).resolve().parent / ('failed-%s-c%s' % (bench_id, 'all' if cores is None else cores))
+    pattern = '%s-c%s-*' % (bench_id, 'all' if cores is None else cores)
+    logs = sorted(work.glob(pattern))
+    if not logs:
+        return None
+    dest.mkdir(parents=True, exist_ok=True)
+    for log in logs:
+        if log.is_file():
+            shutil.copy2(str(log), str(dest / log.name))
+    return str(dest)
+
+
 def load_hello(args):
     """The hello benchmark's inputs: a recorded translation, else the macOS corpus."""
     if args.hello_workload:
@@ -653,6 +676,9 @@ def main(argv):
                     reason = str(error).strip().splitlines()[0][:200]
                     if isinstance(error, subprocess.TimeoutExpired):
                         reason = 'did not finish within %ds (hung)' % error.timeout
+                    kept = keep_failure_logs(work, spec['id'], cores, args.out)
+                    if kept:
+                        reason += ' [logs kept: %s]' % kept
                     report['failures'].append({'benchmark': spec['id'], 'cores': key,
                                                'reason': reason})
                     report['results'].setdefault(spec['id'], {})[key] = {
