@@ -1945,6 +1945,29 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.drawImage(peer(graphics), peer(img), x, y);
     }
 
+    /// Direct2D scales while it draws (drawImageScaled: the same bitmap, clip and
+    /// linear interpolation as the unscaled draw, into a w x h rectangle), so this
+    /// port can draw an image at any size directly. It used to answer the
+    /// inherited false, and Graphics.drawImage(img, x, y, w, h) then scaled the
+    /// picture first -- which for an EncodedImage means EncodedImage.scaled:
+    /// decode, scale, RE-ENCODE to PNG (or lossy JPEG for an opaque picture),
+    /// decode again, on every paint. The Linux port had the identical gap; the
+    /// transpiled Flutter gallery ran 13 PNG encodes before its first frame there.
+    @Override
+    public boolean isScaledImageDrawingSupported() {
+        return true;
+    }
+
+    @Override
+    public void drawImage(Object graphics, Object img, int x, int y, int w, int h) {
+        // The native builds its destination as x..x+w, y..y+h and has no guard of
+        // its own; a degenerate or inverted rectangle has nothing to draw.
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        WindowsNative.drawImageScaled(peer(graphics), peer(img), x, y, w, h);
+    }
+
     @Override
     public void drawRGB(Object graphics, int[] rgbData, int offset, int x, int y, int w, int h, boolean processAlpha) {
         WindowsNative.drawRGB(peer(graphics), rgbData, offset, x, y, w, h, processAlpha);
