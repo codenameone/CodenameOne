@@ -66,8 +66,33 @@ PangoContext* cn1LinuxPangoContext(void) {
     return cn1Pango;
 }
 
+/* Metrics already computed, keyed by font description (Pango's own hash/equality,
+ * so family, weight, style and size all take part). pango_context_get_metrics
+ * shapes a sample string to estimate character widths this port never reads, and
+ * a theme creates the same few descriptions over and over: on the transpiled
+ * Flutter gallery it was 7-8% of the launch's CPU. The cache returns exactly what
+ * Pango answered the first time, so no layout moves. Each entry owns a copy of its
+ * key; nothing is ever evicted, since a program uses a bounded set of fonts. The
+ * value packs ascent and height, both small non-negative pixel counts.
+ * Process-wide, like cn1Pango beside it: a thread-local copy would survive the
+ * reset in loadTrueTypeFont on every thread but the one that registered the font. */
+static GHashTable* cn1MetricsCache = NULL;
+
 /* Snapshots ascent/height for the description into the CN1Font. */
 static void cn1FontMetrics(CN1Font* f) {
+    gpointer hit;
+    if (cn1MetricsCache == NULL) {
+        cn1MetricsCache = g_hash_table_new_full(
+                (GHashFunc) pango_font_description_hash,
+                (GEqualFunc) pango_font_description_equal,
+                (GDestroyNotify) pango_font_description_free, NULL);
+    }
+    if (g_hash_table_lookup_extended(cn1MetricsCache, f->desc, NULL, &hit)) {
+        guint64 packed = (guint64) (guintptr) hit;
+        f->ascent = (int) (packed >> 32);
+        f->height = (int) (packed & 0xffffffffu);
+        return;
+    }
     PangoFontMetrics* m = pango_context_get_metrics(cn1LinuxPangoContext(), f->desc, 0);
     if (m != 0) {
         f->ascent = pango_font_metrics_get_ascent(m) / PANGO_SCALE;
@@ -76,6 +101,11 @@ static void cn1FontMetrics(CN1Font* f) {
     } else {
         f->ascent = f->pixelSize;
         f->height = f->pixelSize + f->pixelSize / 4;
+    }
+    if (sizeof(gpointer) >= 8 && f->ascent >= 0 && f->height >= 0) {
+        guint64 packed = ((guint64) (guint32) f->ascent << 32) | (guint32) f->height;
+        g_hash_table_insert(cn1MetricsCache, pango_font_description_copy(f->desc),
+                            (gpointer) (guintptr) packed);
     }
 }
 
@@ -276,6 +306,11 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
              * layout sees the freshly registered family. */
             pango_cairo_font_map_set_default(0);
             cn1Pango = 0;
+            /* A family that fell back to a system face until now may resolve to
+             * the new one, so every cached answer is suspect. */
+            if (cn1MetricsCache != NULL) {
+                g_hash_table_remove_all(cn1MetricsCache);
+            }
         } else {
             close(fd);
         }
