@@ -85,6 +85,12 @@ public class MethodDependencyGraph {
         return new ArrayList<BytecodeMethod>(callers);
     }
 
+    /// The lookup signatures (`desc.name`) this method calls, or an empty set.
+    public Set<String> getCalls(BytecodeMethod method) {
+        Set<String> calls = methodToCalls.get(method);
+        return calls == null ? Collections.<String>emptySet() : calls;
+    }
+
     public void removeMethod(BytecodeMethod method) {
         Set<String> calls = methodToCalls.remove(method);
         if (calls != null) {

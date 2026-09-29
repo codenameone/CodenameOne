@@ -1462,6 +1462,23 @@ public class Parser extends ClassVisitor {
                 if(ByteCodeTranslator.verbose) {
                     System.out.println("unused Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
                 }
+                // What the cull left because something "calls" it, but nothing reachable
+                // does: dead cycles and long dead chains. See ReachabilityCull. The C
+                // targets only -- JavaScript runs its own, stricter RTA below.
+                // -Dcn1.reachabilityCull=false restores the cull's answer alone.
+                if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                        && !"false".equalsIgnoreCase(Util.getProperty("cn1.reachabilityCull", "true"))) {
+                    long reachStart = System.currentTimeMillis();
+                    int unreachable = ReachabilityCull.run(classes, dependencyGraph, nativeSources);
+                    // Drop the classes that no longer have a caller, and whatever their
+                    // removal leaves without one.
+                    int followUp = unreachable > 0 ? eliminateUnusedMethods(true, 0) : 0;
+                    neliminated += unreachable + followUp;
+                    if (ByteCodeTranslator.verbose) {
+                        System.out.println("reachability cull removed " + unreachable + " methods (+" + followUp
+                                + " after the class cull) in " + (System.currentTimeMillis() - reachStart) + " ms");
+                    }
+                }
             }
 
             // JavaScript-target-only Rapid Type Analysis pass. Runs AFTER
