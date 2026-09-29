@@ -1628,6 +1628,14 @@ public class Parser extends ClassVisitor {
             hi.close();
             nativeHeaders[iter] = new String(dat, StandardCharsets.UTF_8);
         }
+        // Every reader of these arrays asks "does the C side name this", so they see the
+        // natives as the compiler will: without a feature the builder left switched off.
+        // See NativeFeatureFilter.
+        if (NativeFeatureFilter.enabled()) {
+            String[][] filtered = NativeFeatureFilter.filterAll(nativeSources, nativeHeaders);
+            nativeSources = filtered[0];
+            nativeHeaders = filtered[1];
+        }
     }
 
     private static String[] nativeHeaders;

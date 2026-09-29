@@ -59,7 +59,13 @@ import java.util.Set;
 /// the cull removes, and it runs after the cull so it starts from what survived.
 ///
 /// What counts as a root is the cull's own list of methods it never eliminates, plus
-/// every method the native sources name. A MISSED ROOT IS SILENT: a culled method of a
+/// every method the native sources name. With the type-aware cull (Allocation) four
+/// things narrow that, each measured on the gallery's iOS build and each with its own
+/// integration test: a name inside a port native's C body, or a static C helper, is a
+/// call that body makes rather than a root (NativeBodies); a branch a switched-off
+/// CN1_INCLUDE_ feature compiles out names nothing (NativeFeatureFilter); a static
+/// initializer runs only once its class is touched (Allocation.touch); and a static call
+/// reaches only the class it names (StaticCalls). A MISSED ROOT IS SILENT: a culled method of a
 /// surviving class is still emitted, as a body that returns 0 (see
 /// BytecodeMethod.appendMethodC), so a live call to one compiles, links and answers
 /// null. That is why the roots are the cull's own, read from the same predicates, and
@@ -126,15 +132,47 @@ final class ReachabilityCull {
         Set<BytecodeMethod> called = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
         Set<BytecodeMethod> live = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
         ArrayDeque<BytecodeMethod> work = new ArrayDeque<BytecodeMethod>();
-        Allocation alloc = nativeHeaders != null
-                && !"false".equalsIgnoreCase(Util.getProperty("cn1.cullRta", "true"))
-                ? new Allocation(classes, nativeSources, nativeHeaders, children, called, live, work)
+        // What a Java native's C body names is a call that native makes, followed once it
+        // is live, rather than a root: see NativeBodies. Only with the type-aware cull,
+        // whose held-method stubs keep such a callee declared for the body that names it.
+        NativeBodies scoped = null;
+        Map<String, BytecodeMethod> bySymbol = null;
+        NativeSymbolIndex rootIndex = null;
+        NativeSymbolIndex fullIndex = null;
+        boolean rta = nativeHeaders != null
+                && !"false".equalsIgnoreCase(Util.getProperty("cn1.cullRta", "true"));
+        if (rta && nativeSources != null && NativeBodies.enabled()) {
+            bySymbol = new HashMap<String, BytecodeMethod>();
+            Set<String> natives = new java.util.HashSet<String>();
+            for (BytecodeMethod m : owner.keySet()) {
+                String s = symbolOf(m);
+                bySymbol.put(s, m);
+                if (m.isNative() && !isRuntimeClass(m.getClsName())) {
+                    natives.add(s);
+                }
+            }
+            scoped = NativeBodies.parse(nativeSources, natives);
+            String[] rootAndHeaders = new String[scoped.rootText.length + nativeHeaders.length];
+            System.arraycopy(scoped.rootText, 0, rootAndHeaders, 0, scoped.rootText.length);
+            System.arraycopy(nativeHeaders, 0, rootAndHeaders, scoped.rootText.length, nativeHeaders.length);
+            rootIndex = new NativeSymbolIndex(rootAndHeaders);
+            fullIndex = Parser.getNativeSymbolIndex(nativeSources);
+        }
+        Allocation alloc = rta
+                ? new Allocation(classes, scoped != null ? scoped.rootText : nativeSources, nativeHeaders,
+                        children, called, live, work)
                 : null;
+        StaticCalls staticCalls = new StaticCalls(classes);
+        CFlow cFlow = scoped != null ? new CFlow(scoped, bySymbol, alloc) : null;
 
         for (Map.Entry<BytecodeMethod, ByteCodeClass> e : owner.entrySet()) {
             BytecodeMethod m = e.getKey();
             ByteCodeClass c = e.getValue();
-            if (isRoot(m, c, nativeSources)) {
+            if (alloc != null && alloc.clinitHandled(m, c)) {
+                // Live once its class is touched: see Allocation.touch.
+                continue;
+            }
+            if (scoped != null ? isScopedRoot(m, c, rootIndex) : isRoot(m, c, nativeSources)) {
                 markCalled(m, c, called, live, work, children, alloc);
             } else if (isExempt(c)) {
                 // The cull never eliminates an interface's or Object's methods, so their
@@ -144,6 +182,12 @@ final class ReachabilityCull {
                 if (live.add(m)) {
                     work.add(m);
                 }
+            }
+        }
+
+        if (cFlow != null) {
+            for (BytecodeMethod t : cFlow.rootHelpers()) {
+                markCalled(t, owner.get(t), called, live, work, children, alloc);
             }
         }
 
@@ -159,6 +203,19 @@ final class ReachabilityCull {
                 alloc.scan(caller);
                 alloc.scanForName(caller, graph.getCalls(caller));
             }
+            if (scoped != null && caller.isNative()) {
+                List<NativeBodies.Body> bodies = scoped.natives.get(symbolOf(caller));
+                if (bodies != null) {
+                    for (NativeBodies.Body b : bodies) {
+                        for (BytecodeMethod t : cFlow.follow(b.file, b.text)) {
+                            if (via != null && !via.containsKey(t)) {
+                                via.put(t, caller);
+                            }
+                            markCalled(t, owner.get(t), called, live, work, children, alloc);
+                        }
+                    }
+                }
+            }
             for (String sig : graph.getCalls(caller)) {
                 List<BytecodeMethod> targets = bySignature.get(sig);
                 if (targets == null) {
@@ -170,6 +227,9 @@ final class ReachabilityCull {
                     }
                     // The cull's own test for "this caller uses that method".
                     if (caller.isMethodUsed(t)) {
+                        if (alloc != null && StaticCalls.ENABLED && t.isStatic() && !staticCalls.reaches(caller, t)) {
+                            continue;
+                        }
                         if (via != null && !via.containsKey(t)) {
                             via.put(t, caller);
                         }
@@ -241,11 +301,264 @@ final class ReachabilityCull {
                 eliminated++;
                 continue;
             }
+            if (scoped != null && fullIndex.contains(symbolOf(m))) {
+                // Named by native C that is compiled whether or not it can run -- the body
+                // of a native nothing calls. That C still has to find the function, so it
+                // stays declared: a native or abstract method as it is, anything else as
+                // the culled stub.
+                if (!m.isNative() && !m.isAbstract()) {
+                    m.cullBody();
+                    graph.removeCalls(m);
+                    eliminated++;
+                }
+                continue;
+            }
+            if (scoped != null && m.isNative()) {
+                // Unnamed by the natives it is still declared in the class header, which
+                // is harmless, and eliminating a native changes nothing that is emitted.
+                continue;
+            }
             m.setEliminated(true);
             graph.removeMethod(m);
             eliminated++;
         }
         return eliminated;
+    }
+
+    /// Follows the C side of NativeBodies: what a live body names -- Java methods, returned
+    /// to be marked called; classes, allocated; and the static helpers of its own file,
+    /// whose bodies are followed in turn, once each.
+    static final class CFlow {
+        private final NativeBodies scoped;
+        private final Map<String, BytecodeMethod> bySymbol;
+        private final Allocation alloc;
+        private final Set<String> liveHelpers = new java.util.HashSet<String>();
+
+        CFlow(NativeBodies scoped, Map<String, BytecodeMethod> bySymbol, Allocation alloc) {
+            this.scoped = scoped;
+            this.bySymbol = bySymbol;
+            this.alloc = alloc;
+        }
+
+        /// The helpers each file's own root text names are live from the start.
+        List<BytecodeMethod> rootHelpers() {
+            List<BytecodeMethod> out = new ArrayList<BytecodeMethod>();
+            for (int f = 0; f < scoped.rootText.length; f++) {
+                Map<String, String> helpers = scoped.helpers.get(f);
+                if (helpers.isEmpty() || scoped.rootText[f] == null) {
+                    continue;
+                }
+                Set<String> tokens = tokens(scoped.rootText[f]);
+                for (String h : helpers.keySet()) {
+                    if (tokens.contains(h)) {
+                        out.addAll(follow(f, "", h));
+                    }
+                }
+            }
+            return out;
+        }
+
+        List<BytecodeMethod> follow(int file, String body) {
+            return follow(file, body, null);
+        }
+
+        private List<BytecodeMethod> follow(int file, String body, String helper) {
+            List<BytecodeMethod> out = new ArrayList<BytecodeMethod>();
+            Map<String, String> helpers = scoped.helpers.get(file);
+            ArrayDeque<String> pending = new ArrayDeque<String>();
+            pending.add(body);
+            if (helper != null) {
+                enqueueHelper(file, helper, helpers, pending);
+            }
+            while (!pending.isEmpty()) {
+                String text = pending.poll();
+                for (String token : tokens(text)) {
+                    if (helpers.containsKey(token)) {
+                        enqueueHelper(file, token, helpers, pending);
+                    }
+                    for (int s = 0; s < token.length(); s++) {
+                        if (s > 0 && token.charAt(s - 1) != '_') {
+                            continue;
+                        }
+                        // A name at any `_` boundary: `virtual_X_m__`, `__NEW_X` and
+                        // `class__X` all count, as they did when every name was a root.
+                        BytecodeMethod m = bySymbol.get(token.substring(s));
+                        if (m != null) {
+                            out.add(m);
+                        }
+                        for (int e = s + 1; e <= token.length(); e++) {
+                            if (e == token.length() || token.charAt(e) == '_') {
+                                alloc.allocateIfClass(token.substring(s, e));
+                            }
+                        }
+                    }
+                }
+            }
+            return out;
+        }
+
+        private void enqueueHelper(int file, String name, Map<String, String> helpers, ArrayDeque<String> pending) {
+            if (liveHelpers.add(file + ":" + name)) {
+                pending.add(helpers.get(name));
+            }
+        }
+
+        private static Set<String> tokens(String text) {
+            Set<String> out = new java.util.HashSet<String>();
+            int n = text.length();
+            int i = 0;
+            while (i < n) {
+                if (!NativeBodies.isIdentifierChar(text.charAt(i))) {
+                    i++;
+                    continue;
+                }
+                int j = i + 1;
+                while (j < n && NativeBodies.isIdentifierChar(text.charAt(j))) {
+                    j++;
+                }
+                out.add(text.substring(i, j));
+                i = j;
+            }
+            return out;
+        }
+    }
+
+    /// Which static methods a caller can reach. A call is matched by lookup signature, so
+    /// a live `Util.split(String)` kept every static `split(String)` in the program --
+    /// the natives' callback classes each have one. A static call names its class, and
+    /// resolves to that class or one of its superclasses, so that is all it reaches.
+    ///
+    /// A name the caller reaches through anything but a plain or custom invoke (a fused
+    /// or rewritten instruction) keeps the signature rule, as does a call to a class this
+    /// program does not have.
+    static final class StaticCalls {
+        /// -Dcn1.cullStaticOwner=false matches static calls by signature alone again.
+        static final boolean ENABLED =
+                !"false".equalsIgnoreCase(Util.getProperty("cn1.cullStaticOwner", "true"));
+        private final Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
+        private final Map<BytecodeMethod, Object> perCaller = new IdentityHashMap<BytecodeMethod, Object>();
+
+        StaticCalls(List<ByteCodeClass> classes) {
+            for (ByteCodeClass c : classes) {
+                if (!c.isEliminated()) {
+                    byName.put(c.getClsName(), c);
+                }
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        boolean reaches(BytecodeMethod caller, BytecodeMethod target) {
+            Object o = perCaller.get(caller);
+            if (o == null) {
+                o = index(caller);
+                perCaller.put(caller, o);
+            }
+            List<String> owners = ((Map<String, List<String>>) o).get(target.getMethodName() + target.getSignature());
+            if (owners == null) {
+                // Only virtual, special or interface calls name it: none reaches a static.
+                return false;
+            }
+            if (owners.contains(null)) {
+                // An instruction naming the method some other way (a fused or rewritten
+                // one) keeps the signature rule.
+                return true;
+            }
+            for (String owner : owners) {
+                ByteCodeClass c = byName.get(Allocation.mangleName(owner));
+                if (c == null) {
+                    return true;
+                }
+                while (c != null) {
+                    if (c.getClsName().equals(target.getClsName())) {
+                        return true;
+                    }
+                    c = c.getBaseClassObject();
+                }
+            }
+            return false;
+        }
+
+        /// Per name and descriptor the caller's instructions name, the owners of its static
+        /// calls. It mirrors what BytecodeMethod.isMethodUsed matches -- an instruction's
+        /// getMethodName and getSignature -- so an instruction that names a method any other
+        /// way (a fused or rewritten one) records a null owner, which keeps the signature
+        /// rule for that name. Exact classes: a subclass of Invoke may call out on its own.
+        private static Object index(BytecodeMethod caller) {
+            Map<String, List<String>> out = new HashMap<String, List<String>>();
+            List<com.codename1.tools.translator.bytecodes.Instruction> ins = caller.getInstructions();
+            if (ins == null) {
+                return out;
+            }
+            for (com.codename1.tools.translator.bytecodes.Instruction i : ins) {
+                String name = i.getMethodName();
+                if (name == null) {
+                    continue;
+                }
+                String key = name + i.getSignature();
+                String owner;
+                boolean plain;
+                if (i.getClass() == com.codename1.tools.translator.bytecodes.Invoke.class) {
+                    owner = ((com.codename1.tools.translator.bytecodes.Invoke) i).getOwner();
+                    plain = true;
+                } else if (i.getClass() == com.codename1.tools.translator.bytecodes.CustomInvoke.class) {
+                    owner = ((com.codename1.tools.translator.bytecodes.CustomInvoke) i).getOwner();
+                    plain = true;
+                } else {
+                    owner = null;
+                    plain = false;
+                }
+                int op = i.getOpcode();
+                if (plain && (op == org.objectweb.asm.Opcodes.INVOKEVIRTUAL || op == org.objectweb.asm.Opcodes.INVOKESPECIAL
+                        || op == org.objectweb.asm.Opcodes.INVOKEINTERFACE)) {
+                    // A virtual, special or interface call never reaches a static method.
+                    continue;
+                }
+                if (plain && op != org.objectweb.asm.Opcodes.INVOKESTATIC) {
+                    // invokedynamic and anything else: no owner to go by.
+                    plain = false;
+                }
+                List<String> l = out.get(key);
+                if (l == null) {
+                    l = new ArrayList<String>(1);
+                    out.put(key, l);
+                }
+                l.add(plain ? owner : null);
+            }
+            return out;
+        }
+    }
+
+    /// The C symbol a native source names a method by.
+    static String symbolOf(BytecodeMethod m) {
+        StringBuilder b = new StringBuilder();
+        m.appendFunctionPointer(b);
+        return b.toString();
+    }
+
+    /// The VM's own class library. Its natives stay roots, as every native used to be: the
+    /// generated code and the runtime's C reach some of them without a bytecode call the
+    /// cull could follow, so their bodies are not scoped.
+    private static boolean isRuntimeClass(String clsName) {
+        return clsName.startsWith("java_") || clsName.startsWith("javax_");
+    }
+
+    /// isRoot, with only the natives' text outside a port's Java native bodies rooting
+    /// anything, and such a native itself live only once something calls it.
+    private static boolean isScopedRoot(BytecodeMethod m, ByteCodeClass c, NativeSymbolIndex rootIndex) {
+        String name = m.getMethodName();
+        if (m.isMain() || "__CLINIT__".equals(name) || "finalize".equals(name)) {
+            return true;
+        }
+        if (m.isNative() && isRuntimeClass(c.getClsName())) {
+            return true;
+        }
+        if (JavascriptNativeRegistry.isRuntimeDelegateTarget(c.getClsName(), name)) {
+            return true;
+        }
+        if (BytecodeMethod.isOnDeviceDebug() && "java_lang_Object".equals(c.getClsName()) && !m.isStatic()) {
+            return true;
+        }
+        return rootIndex.contains(symbolOf(m));
     }
 
     private static void addChild(Map<ByteCodeClass, List<ByteCodeClass>> children, ByteCodeClass parent,
@@ -390,6 +703,13 @@ final class ReachabilityCull {
         final List<String> unnarrowedForName = new ArrayList<String>();
         private boolean reflective;
         private boolean everything;
+        /// -Dcn1.cullClinit=false makes every static initializer a root again.
+        static final boolean CONDITIONAL_CLINIT =
+                !"false".equalsIgnoreCase(Util.getProperty("cn1.cullClinit", "true"));
+        private final Map<ByteCodeClass, BytecodeMethod> clinitOf =
+                new IdentityHashMap<ByteCodeClass, BytecodeMethod>();
+        private final Set<ByteCodeClass> touched = Collections.newSetFromMap(
+                new IdentityHashMap<ByteCodeClass, Boolean>());
         private final List<BytecodeMethod> forNameSites = new ArrayList<BytecodeMethod>();
         private final Map<ByteCodeClass, List<ByteCodeClass>> children;
         private final Set<BytecodeMethod> called;
@@ -406,6 +726,13 @@ final class ReachabilityCull {
             for (ByteCodeClass c : classes) {
                 if (!c.isEliminated()) {
                     byName.put(c.getClsName(), c);
+                    if (CONDITIONAL_CLINIT && !isExempt(c)) {
+                        for (BytecodeMethod m : c.getMethods()) {
+                            if (!m.isEliminated() && "__CLINIT__".equals(m.getMethodName())) {
+                                clinitOf.put(c, m);
+                            }
+                        }
+                    }
                 }
             }
             for (String r : RUNTIME_ROOTS) {
@@ -445,6 +772,12 @@ final class ReachabilityCull {
             return false;
         }
 
+        void allocateIfClass(String name) {
+            if (byName.containsKey(name)) {
+                allocate(name);
+            }
+        }
+
         /// Every method a call reached whose class was never allocated.
         Set<BytecodeMethod> stillHeld() {
             Set<BytecodeMethod> all = Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
@@ -454,11 +787,33 @@ final class ReachabilityCull {
             return all;
         }
 
+        /// A static initializer runs on the first use of its class's own statics, static
+        /// methods or allocation (ParparVM never runs a superclass's from a subclass's, but
+        /// Java does, so the superclasses are touched too). With CONDITIONAL_CLINIT a
+        /// <clinit> is live only once its class is touched this way, instead of being a
+        /// root: a class the program keeps only for a native's sake no longer runs, and
+        /// keeps, everything its initializer names -- the dead-code guards of the
+        /// IOS*Callbacks classes, for one, which call every callback from <clinit>.
+        void touch(ByteCodeClass c) {
+            while (c != null && touched.add(c)) {
+                BytecodeMethod m = clinitOf.get(c);
+                if (m != null) {
+                    markCalled(m, c, called, live, work, children, this);
+                }
+                c = c.getBaseClassObject();
+            }
+        }
+
+        boolean clinitHandled(BytecodeMethod m, ByteCodeClass c) {
+            return c != null && clinitOf.get(c) == m;
+        }
+
         void allocate(String name) {
             if (name == null || !allocated.add(name)) {
                 return;
             }
             ByteCodeClass c = byName.get(name);
+            touch(c);
             ArrayDeque<ByteCodeClass> up = new ArrayDeque<ByteCodeClass>();
             if (c != null) {
                 up.add(c);
@@ -495,6 +850,8 @@ final class ReachabilityCull {
                     seedForNameSite(site);
                 }
             }
+            // Running any of a class's code means the class may be initialized.
+            touch(byName.get(m.getClsName()));
             List<com.codename1.tools.translator.bytecodes.Instruction> ins = m.getInstructions();
             if (ins == null) {
                 return;
@@ -522,8 +879,12 @@ final class ReachabilityCull {
                             }
                         }
                     }
+                } else if (k == com.codename1.tools.translator.bytecodes.Field.class) {
+                    int op = i.getOpcode();
+                    if (op == org.objectweb.asm.Opcodes.GETSTATIC || op == org.objectweb.asm.Opcodes.PUTSTATIC) {
+                        touch(byName.get(mangle(((com.codename1.tools.translator.bytecodes.Field) i).getOwner())));
+                    }
                 } else if (k != com.codename1.tools.translator.bytecodes.BasicInstruction.class
-                        && k != com.codename1.tools.translator.bytecodes.Field.class
                         && k != com.codename1.tools.translator.bytecodes.Invoke.class
                         && k != com.codename1.tools.translator.bytecodes.LabelInstruction.class
                         && k != com.codename1.tools.translator.bytecodes.Jump.class
@@ -618,6 +979,10 @@ final class ReachabilityCull {
                 }
             }
             return false;
+        }
+
+        static String mangleName(String internal) {
+            return mangle(internal);
         }
 
         /// "a/b/C$D" or "a.b.C$D" -> "a_b_C_D", the translator's class naming.
