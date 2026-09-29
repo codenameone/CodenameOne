@@ -90,6 +90,19 @@ public final class AnnotationProcessing {
 
     /// Runs every processor.
     public void run() throws BuildExecutionException {
+        List<File> classpath = new java.util.ArrayList<File>();
+        for (String element : compileClasspath) {
+            classpath.add(new File(element));
+        }
+        com.codename1.maven.annotations.JavaSourceCompiler.setProjectClasspath(classpath);
+        try {
+            runProcessors();
+        } finally {
+            com.codename1.maven.annotations.JavaSourceCompiler.clearProjectClasspath();
+        }
+    }
+
+    private void runProcessors() throws BuildExecutionException {
         if (!outputDirectory.isDirectory()) {
             log.debug("cn1: nothing compiled at " + outputDirectory + " -- skipping annotation processing");
             return;

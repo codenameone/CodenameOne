@@ -214,6 +214,59 @@ class GradleConversionTest {
     }
 
     @Test
+    void anAntProjectsGuiBuilderAndViewSourcesComeAlong() throws Exception {
+        File ant = antApp();
+        touch(ant, "res/guibuilder/a/Main.gui", "<component/>");
+        touch(ant, "rad/views/a/MyView.xml", "<y/>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(ant, out, "1.0");
+        assertTrue(new File(out, "src/main/guibuilder/a/Main.gui").isFile());
+        assertTrue(new File(out, "src/main/rad/views/a/MyView.xml").isFile());
+    }
+
+    @Test
+    void aProvidedDependencyIsOnTheTestClasspathToo() throws Exception {
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mavenApp(UNTOUCHED_API), out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("compileOnly(\"org.example:api:"), build);
+        assertTrue(build.contains("testImplementation(\"org.example:api:"), build);
+        assertFalse(build.contains("implementation(\"org.example:api:"), "never in the application: " + build);
+    }
+
+    @Test
+    void profileDependenciesFollowWhatAPlainMavenBuildActivates() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/src/main/extra/marker", "");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
+                + "</dependency></dependencies><profiles>"
+                + "<profile><id>always</id><activation><activeByDefault>true</activeByDefault></activation>"
+                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>defaulted</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "<profile><id>present</id><activation><file><exists>${basedir}/src/main/extra</exists></file>"
+                + "</activation><dependencies><dependency><groupId>org.example</groupId><artifactId>present</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "<profile><id>absent</id><activation><file><exists>${basedir}/nowhere</exists></file>"
+                + "</activation><dependencies><dependency><groupId>org.example</groupId><artifactId>absent</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "<profile><id>ci</id><activation><property><name>ci</name></property></activation>"
+                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>ci-only</artifactId>"
+                + "<version>1</version></dependency></dependencies></profile>"
+                + "</profiles></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("\n    implementation(\"org.example:defaulted:1\")"), build);
+        assertTrue(build.contains("\n    implementation(\"org.example:present:1\")"), build);
+        assertFalse(build.contains("org.example:absent"), "a file activation that fails is off: " + build);
+        assertTrue(build.contains("profile 'ci' of pom.xml"), build);
+        assertTrue(build.contains("    // implementation(\"org.example:ci-only:1\")"),
+                "undecided: written, but commented out: " + build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

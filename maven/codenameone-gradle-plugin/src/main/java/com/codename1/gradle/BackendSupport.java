@@ -90,7 +90,8 @@ final class BackendSupport {
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                             AppSupport.kotlinDestination(compile, layout), stubs,
                             layout.projectDir(), layout.settingsFile(), AppSupport.sourceRoots(main, layout),
-                            "UTF-8", userProperties.get(), main.getCompileClasspath()));
+                            "UTF-8", userProperties.get(), main.getCompileClasspath())
+                            .withPendingJavaSources(main.getJava().getSrcDirs()));
                 }));
 
         project.getTasks().register("runBackend", RunBackendTask.class, t -> {

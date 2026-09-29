@@ -331,6 +331,10 @@ public final class GradleConversion {
         File src = new File(from.projectDir(), "src");
         splitSources(src, src, new File(to.projectDir(), "src" + File.separator + "main"));
         copyTree(from.cssDir(), to.cssDir());
+        // The legacy GUI builder's XML and CodeRAD's view templates: what the
+        // generated Java was made from, and what the next edit regenerates it from.
+        copyTree(from.guiBuilderDir(), to.guiBuilderDir());
+        copyTree(from.radViewsDir(), to.radViewsDir());
         File test = new File(from.projectDir(), "test");
         splitSources(test, test, new File(to.projectDir(), "src" + File.separator + "test"));
     }
@@ -462,10 +466,14 @@ public final class GradleConversion {
     /// `targetDir/libs` and declaring them as files; with a null `targetDir`
     /// they are written commented out.
     ///
-    /// The dependencies are the effective ones Maven sees without profiles: the
-    /// pom's own plus those its parents declare (nearest wins), with versions
-    /// from properties and `<dependencyManagement>`, and each dependency's
-    /// classifier, type and exclusions kept.
+    /// The dependencies are the effective ones Maven sees: the pom's own plus
+    /// those its parents declare (nearest wins), with versions from properties
+    /// and `<dependencyManagement>`, and each dependency's classifier, type and
+    /// exclusions kept. A profile's dependencies count when the profile is on for
+    /// a plain build -- `activeByDefault`, or a file activation that holds for
+    /// this project. One switched on by a property, JDK or OS is not decided
+    /// here, so its dependencies are written commented out under a note naming
+    /// the profile rather than dropped without a word.
     static List<String> dependencyLines(File pom, File targetDir) {
         List<String> out = new ArrayList<String>();
         if (pom == null || !pom.isFile()) {
@@ -475,11 +483,27 @@ public final class GradleConversion {
             java.util.Map<String, String> properties = pomProperties(pom, 0);
             java.util.Map<String, String> managed = managedVersions(pom, 0);
             java.util.Map<String, Element> declared = new java.util.LinkedHashMap<String, Element>();
-            collectDependencies(pom, 0, declared, properties);
+            java.util.Map<String, Element> conditional = new java.util.LinkedHashMap<String, Element>();
+            java.util.Map<String, String> profileOf = new java.util.HashMap<String, String>();
+            collectDependencies(pom, 0, declared, properties, conditional, profileOf);
             for (Element d : declared.values()) {
                 String line = dependencyLine(d, properties, managed, pom.getParentFile(), targetDir);
                 if (line != null) {
                     out.add(line);
+                }
+            }
+            for (java.util.Map.Entry<String, Element> e : conditional.entrySet()) {
+                if (declared.containsKey(e.getKey())) {
+                    continue;
+                }
+                String line = dependencyLine(e.getValue(), properties, managed, pom.getParentFile(), null);
+                if (line == null) {
+                    continue;
+                }
+                out.add("    // Only with the Maven profile " + profileOf.get(e.getKey())
+                        + " active; add it if this build relied on that profile:");
+                for (String l : line.split("\n")) {
+                    out.add(l.trim().startsWith("//") ? l : "    // " + l.trim());
                 }
             }
         } catch (Exception ex) {
@@ -491,16 +515,86 @@ public final class GradleConversion {
     /// The dependencies of `pom` and its parents on disk, keyed by
     /// group:artifact:classifier:type; a child's replaces its parent's.
     private static void collectDependencies(File pom, int depth, java.util.Map<String, Element> out,
-                                            java.util.Map<String, String> properties) throws Exception {
+                                            java.util.Map<String, String> properties,
+                                            java.util.Map<String, Element> conditional,
+                                            java.util.Map<String, String> profileOf) throws Exception {
         Element project = parsePom(pom);
         Element parent = child(project, "parent");
         if (parent != null && depth < 8) {
             File parentPom = parentPom(pom, parent);
             if (parentPom != null) {
-                collectDependencies(parentPom, depth + 1, out, properties);
+                collectDependencies(parentPom, depth + 1, out, properties, conditional, profileOf);
             }
         }
-        Element deps = child(project, "dependencies");
+        addDependencies(child(project, "dependencies"), out, properties);
+        Element profiles = child(project, "profiles");
+        if (profiles == null) {
+            return;
+        }
+        for (Node n = profiles.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (!(n instanceof Element) || !"profile".equals(((Element) n).getTagName())) {
+                continue;
+            }
+            Element profile = (Element) n;
+            Activation active = activeInAPlainBuild(profile, pom.getParentFile(), properties);
+            if (active == Activation.ON) {
+                addDependencies(child(profile, "dependencies"), out, properties);
+            } else if (active == Activation.UNDECIDED) {
+                java.util.Map<String, Element> deps = new java.util.LinkedHashMap<String, Element>();
+                addDependencies(child(profile, "dependencies"), deps, properties);
+                for (String key : deps.keySet()) {
+                    profileOf.put(key, "'" + text(profile, "id") + "' of " + pom.getName());
+                }
+                conditional.putAll(deps);
+            }
+        }
+    }
+
+    /// Whether Maven turns a profile on for a plain build.
+    enum Activation {
+        ON, OFF, UNDECIDED
+    }
+
+    /// Whether Maven turns `profile` on for a plain build of the pom in `baseDir`:
+    /// on for `activeByDefault` and for a file activation that holds, off for one
+    /// that does not, and undecided for an activation by property, JDK or OS,
+    /// which depends on how the build is invoked.
+    static Activation activeInAPlainBuild(Element profile, File baseDir, java.util.Map<String, String> properties) {
+        Element activation = child(profile, "activation");
+        if (activation == null) {
+            return Activation.UNDECIDED;
+        }
+        if ("true".equals(text(activation, "activeByDefault"))) {
+            return Activation.ON;
+        }
+        Element file = child(activation, "file");
+        if (file != null && child(activation, "property") == null && child(activation, "jdk") == null
+                && child(activation, "os") == null) {
+            java.util.Map<String, String> withBase = new java.util.HashMap<String, String>(properties);
+            withBase.put("basedir", baseDir.getAbsolutePath());
+            withBase.put("project.basedir", baseDir.getAbsolutePath());
+            withBase.put("user.home", System.getProperty("user.home"));
+            String exists = interpolate(text(file, "exists"), withBase);
+            String missing = interpolate(text(file, "missing"), withBase);
+            if (exists != null && !exists.contains("${")) {
+                return resolve(baseDir, exists).exists() ? Activation.ON : Activation.OFF;
+            }
+            if (missing != null && !missing.contains("${")) {
+                return resolve(baseDir, missing).exists() ? Activation.OFF : Activation.ON;
+            }
+        }
+        return Activation.UNDECIDED;
+    }
+
+    private static File resolve(File baseDir, String path) {
+        File f = new File(path);
+        return f.isAbsolute() ? f : new File(baseDir, path);
+    }
+
+    /// The `<dependency>` children of `deps`, keyed as [#collectDependencies]
+    /// keys them; a later declaration replaces an earlier one.
+    private static void addDependencies(Element deps, java.util.Map<String, Element> out,
+                                        java.util.Map<String, String> properties) {
         if (deps == null) {
             return;
         }
@@ -533,8 +627,22 @@ public final class GradleConversion {
         return parentPom.isFile() ? parentPom : null;
     }
 
+    /// The Gradle declaration(s) for one pom dependency, or null. A `provided`
+    /// one is two: `compileOnly` keeps it out of the application, as Maven does,
+    /// and `testImplementation` gives the tests what Maven's test classpath gives
+    /// them, which `compileOnly` alone does not.
     private static String dependencyLine(Element d, java.util.Map<String, String> properties,
                                          java.util.Map<String, String> managed, File pomDir, File targetDir)
+            throws IOException {
+        String line = declaration(d, properties, managed, pomDir, targetDir);
+        if (line == null || !"provided".equals(text(d, "scope"))) {
+            return line;
+        }
+        return line + "\n" + line.replace("compileOnly(", "testImplementation(");
+    }
+
+    private static String declaration(Element d, java.util.Map<String, String> properties,
+                                      java.util.Map<String, String> managed, File pomDir, File targetDir)
             throws IOException {
         String g = interpolate(text(d, "groupId"), properties);
         String a = interpolate(text(d, "artifactId"), properties);

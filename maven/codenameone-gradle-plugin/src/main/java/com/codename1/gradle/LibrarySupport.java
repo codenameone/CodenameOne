@@ -132,6 +132,8 @@ final class LibrarySupport {
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
         });
 
+        AppSupport.registerGuiSources(project, layout, ext, userProperties, main);
+
         final String name = project.getName();
         final Provider<String> group = project.provider(() -> String.valueOf(project.getGroup()));
         final Provider<String> version = project.provider(() -> String.valueOf(project.getVersion()));
@@ -149,20 +151,30 @@ final class LibrarySupport {
                 .getByName(main.getCompileClasspathConfigurationName()).getIncoming()
                 .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
                 .map(set -> AppSupport.encode(set, "provided"));
-        project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile ->
-                compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
-                        compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
-                        compileArtifacts, Collections.<String, String>emptyMap())
-                        .withSiblingClasses(main.getOutput().getClassesDirs())));
+        // Skipping the check is an input, as for an application: a compile made with
+        // it must not satisfy the next ordinary build as up to date.
+        final String skip = AppSupport.skipComplianceCheck(project);
+        final Map<String, String> complianceProperties = skip == null
+                ? Collections.<String, String>emptyMap()
+                : Collections.singletonMap("skipComplianceCheck", skip);
+        project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            compile.getInputs().property("cn1SkipComplianceCheck", String.valueOf(skip));
+            compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
+                    compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
+                    compileArtifacts, complianceProperties)
+                    .withSiblingClasses(main.getOutput().getClassesDirs()));
+        });
         // A Kotlin library's classes are checked too, as an application's are: in
         // a pure Kotlin library compileJava has no sources and runs no action at
         // all, and a mixed one would otherwise publish its Kotlin half unchecked.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
-                project.getTasks().named("compileKotlin").configure(compile ->
-                        compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
-                                AppSupport.kotlinDestination(compile, layout), name, main.getCompileClasspath(),
-                                compileArtifacts, Collections.<String, String>emptyMap())
-                                .withPendingJavaSources(main.getJava().getSrcDirs()))));
+                project.getTasks().named("compileKotlin").configure(compile -> {
+                    compile.getInputs().property("cn1SkipComplianceCheck", String.valueOf(skip));
+                    compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
+                            AppSupport.kotlinDestination(compile, layout), name, main.getCompileClasspath(),
+                            compileArtifacts, complianceProperties)
+                            .withPendingJavaSources(main.getJava().getSrcDirs()));
+                }));
 
         // A library without CSS publishes no cn1css bundle and its -lib pom names
         // none: the Zip task would do nothing, and publishing then failed on the

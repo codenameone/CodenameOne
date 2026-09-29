@@ -50,6 +50,26 @@ public final class JavaSourceCompiler {
 
     private JavaSourceCompiler() { }
 
+    /// The project's compile classpath while [com.codename1.maven.AnnotationProcessing]
+    /// runs, appended to every compile below. Processors compile their generated
+    /// sources against the output directory, which under Maven holds every
+    /// project class. Under Gradle it does not: Kotlin and Java compile into
+    /// directories of their own, so a Kotlin `@RestClient` returning a Java type
+    /// generated code naming a class the compile could not see. Set here, at the
+    /// one call every processor makes, rather than in each processor.
+    private static final ThreadLocal<List<File>> PROJECT_CLASSPATH = new ThreadLocal<List<File>>();
+
+    /// Makes `classpath` part of every compile on this thread until
+    /// [#clearProjectClasspath()].
+    public static void setProjectClasspath(List<File> classpath) {
+        PROJECT_CLASSPATH.set(new ArrayList<File>(classpath));
+    }
+
+    /// Undoes [#setProjectClasspath(List)].
+    public static void clearProjectClasspath() {
+        PROJECT_CLASSPATH.remove();
+    }
+
     /// Compiles the given `fullyQualifiedName -> source` map into `.class` files
     /// rooted at `outputClassDir`. Adds `extraClasspath` (typically the plugin's
     /// own test-classes directory so the @Route + Form + Router stubs resolve).
@@ -138,6 +158,10 @@ public final class JavaSourceCompiler {
                 }
             }
             if (extraClasspath != null) cp.addAll(extraClasspath);
+            List<File> project = PROJECT_CLASSPATH.get();
+            if (project != null) {
+                cp.addAll(project);
+            }
             fm.setLocation(StandardLocation.CLASS_PATH, cp);
 
             List<JavaFileObject> compilationUnits = new ArrayList<JavaFileObject>();

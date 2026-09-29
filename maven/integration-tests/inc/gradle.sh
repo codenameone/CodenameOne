@@ -71,7 +71,10 @@ EOF
 run_gradle() {
   local dir="$1"
   shift
-  (cd "$dir" && JAVA_HOME="$GRADLE_JDK" ./gradlew --no-daemon --stacktrace "$@")
+  # No build cache: the scripts assert on what the build did (a processor's
+  # "generated 2 @RestController router" line, for one), and a re-run whose
+  # inputs match the last one would restore those outputs without doing it.
+  (cd "$dir" && JAVA_HOME="$GRADLE_JDK" ./gradlew --no-daemon --no-build-cache --stacktrace "$@")
 }
 
 # Fails the test, naming what was expected.

@@ -65,6 +65,37 @@ class Helper {
     fun title(): String = "Converted"
 }
 EOF
+# A Kotlin @RestClient returning a Java @Mapped type: Kotlin's annotations are
+# processed before javac has run, so the processors must see the Java type too.
+cat > "$ANT/src/com/acme/antapp/Pet.java" <<'EOF'
+package com.acme.antapp;
+
+import com.codename1.annotations.Mapped;
+
+@Mapped
+public class Pet {
+    public Long id;
+    public String name;
+
+    public Pet() {
+    }
+}
+EOF
+cat > "$ANT/src/com/acme/antapp/PetApi.kt" <<'EOF'
+package com.acme.antapp
+
+import com.codename1.annotations.rest.GET
+import com.codename1.annotations.rest.Path
+import com.codename1.annotations.rest.RestClient
+import com.codename1.io.rest.Response
+import com.codename1.util.OnComplete
+
+@RestClient
+interface PetApi {
+    @GET("/pet/{petId}")
+    fun getPetById(@Path("petId") petId: Long?, callback: OnComplete<Response<Pet>>)
+}
+EOF
 cat > "$ANT/src/com/acme/antapp/MyNative.java" <<'EOF'
 package com.acme.antapp;
 
@@ -120,6 +151,7 @@ run_gradle "$AG" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/ant-android
 JAR=$(sed -n 's/.*codename1.stageOnly is set: staged \(.*\) ([0-9]* bytes) for .*/\1/p' "$WORKDIR/ant-android.log" | tail -1)
 assert_zip_has "$JAR" "^com/acme/antapp/AntApp\.class$"
 assert_zip_has "$JAR" "^com/acme/antapp/Helper\.class$"
+assert_zip_has "$JAR" "^com/acme/antapp/PetApiImpl\.class$"
 assert_zip_has "$JAR" "^com/acme/antapp/MyNativeImpl\.java$"
 run_gradle "$AG" cn1Test > "$WORKDIR/ant-test.log" 2>&1 || { cat "$WORKDIR/ant-test.log"; fail "cn1Test on the converted Ant project"; }
 grep -q "com.acme.antapp.HelperTest passed" "$WORKDIR/ant-test.log" \

@@ -55,6 +55,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     private final String encoding;
     private final Map<String, String> userProperties;
     private final FileCollection compileClasspath;
+    private final List<File> pendingJavaSources = new ArrayList<File>();
 
     /// @param classesDir `compileJava`'s destination
     /// @param stubDir where processors write generated stub sources
@@ -70,6 +71,81 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         this.encoding = encoding;
         this.userProperties = new java.util.HashMap<String, String>(userProperties);
         this.compileClasspath = compileClasspath;
+    }
+
+    /// For the Kotlin pass, which runs before javac: the Java source directories
+    /// of the same source set. Kotlin resolves the project's Java types from these
+    /// sources, so a Kotlin `@RestClient` returning a Java DTO compiles -- and the
+    /// processors, which resolve types through the classpath, must see them too.
+    /// They are compiled into a scratch directory put on the processing
+    /// classpath only; javac's real pass still produces the shipped classes.
+    public ProcessAnnotationsAction withPendingJavaSources(java.util.Collection<File> javaSourceDirs) {
+        this.pendingJavaSources.addAll(javaSourceDirs);
+        return this;
+    }
+
+    /// Compiles [#pendingJavaSources] into `out` against `classpath`, or answers
+    /// null when there is nothing to compile or javac refuses. A refusal is left
+    /// to compileJava to report with the real diagnostics; this pass then runs
+    /// as before, without the Java types.
+    private File compilePendingJava(Task task, List<String> classpath) {
+        List<File> sources = new ArrayList<File>();
+        for (File dir : pendingJavaSources) {
+            collectJava(dir, sources);
+        }
+        if (sources.isEmpty()) {
+            return null;
+        }
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        if (javac == null) {
+            return null;
+        }
+        File out = new File(task.getTemporaryDir(), "pending-java");
+        try {
+            if (out.exists()) {
+                org.apache.commons.io.FileUtils.deleteDirectory(out);
+            }
+        } catch (IOException ex) {
+            throw new GradleException("Could not delete " + out, ex);
+        }
+        if (!out.mkdirs()) {
+            throw new GradleException("Could not create " + out);
+        }
+        StringBuilder cp = new StringBuilder();
+        for (String element : classpath) {
+            if (cp.length() > 0) {
+                cp.append(File.pathSeparatorChar);
+            }
+            cp.append(element);
+        }
+        List<String> args = new ArrayList<String>();
+        java.util.Collections.addAll(args, "-proc:none", "-nowarn", "-implicit:class", "-encoding", encoding,
+                "-cp", cp.toString(), "-d", out.getAbsolutePath());
+        for (File f : sources) {
+            args.add(f.getAbsolutePath());
+        }
+        java.io.ByteArrayOutputStream diagnostics = new java.io.ByteArrayOutputStream();
+        int result = javac.run(null, diagnostics, diagnostics, args.toArray(new String[0]));
+        if (result != 0) {
+            task.getLogger().info("cn1: the Java sources did not compile ahead of javac, so Kotlin annotations "
+                    + "are processed without the project's Java types:\n" + diagnostics);
+            return null;
+        }
+        return out;
+    }
+
+    private static void collectJava(File dir, List<File> out) {
+        File[] children = dir == null ? null : dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File c : children) {
+            if (c.isDirectory()) {
+                collectJava(c, out);
+            } else if (c.getName().endsWith(".java")) {
+                out.add(c);
+            }
+        }
     }
 
     @Override
@@ -101,6 +177,10 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         classpath.add(classesDir.getAbsolutePath());
         for (File f : compileClasspath) {
             classpath.add(f.getAbsolutePath());
+        }
+        File pending = compilePendingJava(task, classpath);
+        if (pending != null) {
+            classpath.add(pending.getAbsolutePath());
         }
         try {
             new AnnotationProcessing(new GradleLog(task.getLogger()), classesDir, stubDir, projectDir, raw,

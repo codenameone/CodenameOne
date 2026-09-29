@@ -61,19 +61,40 @@ final class ToolSupport {
 
     static void register(Project project, ProjectLayout layout, SourceSet main, CodenameOneExtension ext,
                          Provider<Map<String, String>> userProperties) {
-        register(project, layout, ext, userProperties, "settings", DesktopTool.SETTINGS,
+        // Evaluated when the task runs, after the build script has had its say
+        // about the source directories.
+        Provider<List<String>> roots = project.provider(() -> sourceRoots(main));
+        register(project, layout, ext, userProperties, roots, "settings", DesktopTool.SETTINGS,
                 "Opens Codename One Settings for this project");
-        register(project, layout, ext, userProperties, "guibuilder", DesktopTool.GUI_BUILDER,
+        register(project, layout, ext, userProperties, roots, "guibuilder", DesktopTool.GUI_BUILDER,
                 "Opens the Codename One GUI Builder for this project");
-        register(project, layout, ext, userProperties, "gameBuilder", DesktopTool.GAME_BUILDER,
+        register(project, layout, ext, userProperties, roots, "gameBuilder", DesktopTool.GAME_BUILDER,
                 "Opens the Codename One Game Builder for this project");
-        register(project, layout, ext, userProperties, "certificateWizard", DesktopTool.CERTIFICATE_WIZARD,
+        register(project, layout, ext, userProperties, roots, "certificateWizard", DesktopTool.CERTIFICATE_WIZARD,
                 "Opens the iOS Certificate Wizard for this project");
     }
 
+    /// The main source set's Java and Kotlin directories as the build resolved
+    /// them, a `sourceSets { }` block included. Settings treats the descriptor's
+    /// roots as the whole compiled-source set, so the conventional layout's alone
+    /// would hide a relocated main class and its annotations from it.
+    static List<String> sourceRoots(SourceSet main) {
+        java.util.LinkedHashSet<String> roots = new java.util.LinkedHashSet<String>();
+        for (File dir : main.getJava().getSrcDirs()) {
+            roots.add(dir.getAbsolutePath());
+        }
+        Object kotlin = main.getExtensions().findByName("kotlin");
+        if (kotlin instanceof org.gradle.api.file.SourceDirectorySet) {
+            for (File dir : ((org.gradle.api.file.SourceDirectorySet) kotlin).getSrcDirs()) {
+                roots.add(dir.getAbsolutePath());
+            }
+        }
+        return new ArrayList<String>(roots);
+    }
+
     private static void register(Project project, ProjectLayout layout, CodenameOneExtension ext,
-                                 Provider<Map<String, String>> userProperties, String name, DesktopTool tool,
-                                 String description) {
+                                 Provider<Map<String, String>> userProperties, Provider<List<String>> sourceRoots,
+                                 String name, DesktopTool tool, String description) {
         final Configuration classpath = AppSupport.resolvable(project, "cn1Tool"
                 + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
                 "The " + tool.displayName());
@@ -88,6 +109,7 @@ final class ToolSupport {
             AppSupport.common(t, project, layout, ext, userProperties);
             t.setDescription(description);
             t.getToolName().set(name);
+            t.getSourceRoots().set(sourceRoots);
             t.getToolClasspath().from(classpath);
             t.getDetached().set(project.getProviders().gradleProperty("spawn").map(Boolean::parseBoolean)
                     .orElse(Boolean.TRUE));
@@ -110,6 +132,10 @@ final class ToolSupport {
         /// The tool and its runtime.
         @Classpath
         public abstract ConfigurableFileCollection getToolClasspath();
+
+        /// The main source set's source directories; see [ToolSupport#sourceRoots].
+        @Input
+        public abstract org.gradle.api.provider.ListProperty<String> getSourceRoots();
 
         /// Return at once (the default) rather than wait for the window to close.
         @Input
@@ -146,6 +172,12 @@ final class ToolSupport {
             }
             Properties effective = effectiveSettings();
             ProjectDescriptor binding = ProjectDescriptor.fromLayout(layout);
+            if (!getSourceRoots().get().isEmpty()) {
+                binding.set("sourceRoot", null);
+                for (String root : getSourceRoots().get()) {
+                    binding.add("sourceRoot", root);
+                }
+            }
             binding.set("sourceEncoding", "UTF-8");
             binding.set("mainName", effective.getProperty("codename1.mainName"));
             binding.set("packageName", effective.getProperty("codename1.packageName"));

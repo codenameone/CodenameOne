@@ -124,15 +124,7 @@ final class AppSupport {
         });
         main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
 
-        TaskProvider<com.codename1.gradle.tasks.GenerateGuiSourcesTask> gui = project.getTasks().register(
-                "generateGuiSources", com.codename1.gradle.tasks.GenerateGuiSourcesTask.class, t -> {
-                    common(t, project, layout, ext, userProperties);
-                    t.setDescription("Generates sources from GUI builder XML and CodeRAD view templates");
-                    t.getSources().from(layout.guiBuilderDir(), layout.radViewsDir());
-                    // The simulator's hot reload regenerates views into the same place.
-                    t.getRadOutputDirectory().set(new File(layout.buildDir(), "generated-sources/rad-views"));
-                });
-        main.getJava().srcDir(gui.flatMap(com.codename1.gradle.tasks.GenerateGuiSourcesTask::getRadOutputDirectory));
+        registerGuiSources(project, layout, ext, userProperties, main);
 
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -154,7 +146,10 @@ final class AppSupport {
                 .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
                 .map(set -> AppSupport.encode(set, "provided"));
         final Map<String, String> complianceProperties = new java.util.HashMap<String, String>();
-        Object skip = project.findProperty("skipComplianceCheck");
+        // -P, or -D: BytecodeCompliance also honours the JVM system property, so
+        // it has to be an input too, or a -D skipped compile would satisfy the
+        // next ordinary build as up to date.
+        Object skip = skipComplianceCheck(project);
         if (skip != null) {
             complianceProperties.put("skipComplianceCheck", String.valueOf(skip));
         }
@@ -203,7 +198,8 @@ final class AppSupport {
                             .withPendingJavaSources(main.getJava().getSrcDirs()));
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
                             layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties.get(),
-                            main.getCompileClasspath()));
+                            main.getCompileClasspath())
+                            .withPendingJavaSources(main.getJava().getSrcDirs()));
                 }));
 
         project.getTasks().register("cn1Compile", t -> {
@@ -393,6 +389,29 @@ final class AppSupport {
     /// JVM desktop targets use the simulator's.
     static String nativePlatformOf(String platform) {
         return platform;
+    }
+
+    /// `skipComplianceCheck` as given with -P or -D, or null.
+    static String skipComplianceCheck(Project project) {
+        Object skip = project.findProperty("skipComplianceCheck");
+        return skip != null ? String.valueOf(skip)
+                : project.getProviders().systemProperty("skipComplianceCheck").getOrNull();
+    }
+
+    /// `generateGuiSources`, whose generated views are a main source root. An
+    /// application's and a cn1lib's alike: a library's own views extend the
+    /// `Abstract*` classes it generates, exactly as an application's do.
+    static void registerGuiSources(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
+                                   final Provider<Map<String, String>> userProperties, SourceSet main) {
+        TaskProvider<com.codename1.gradle.tasks.GenerateGuiSourcesTask> gui = project.getTasks().register(
+                "generateGuiSources", com.codename1.gradle.tasks.GenerateGuiSourcesTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Generates sources from GUI builder XML and CodeRAD view templates");
+                    t.getSources().from(layout.guiBuilderDir(), layout.radViewsDir());
+                    // The simulator's hot reload regenerates views into the same place.
+                    t.getRadOutputDirectory().set(new File(layout.buildDir(), "generated-sources/rad-views"));
+                });
+        main.getJava().srcDir(gui.flatMap(com.codename1.gradle.tasks.GenerateGuiSourcesTask::getRadOutputDirectory));
     }
 
     static void common(com.codename1.gradle.tasks.Cn1Task t, Project project, ProjectLayout layout,

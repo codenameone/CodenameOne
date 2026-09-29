@@ -937,8 +937,17 @@ public class SourceChangeWatcher implements Runnable {
 
 
     private String findKotlinVersion() {
+        // Maven publishes the application's classpath as cn1.class.path; Gradle's
+        // run task puts it on the simulator's own classpath instead, stdlib and all.
         String classPath = System.getProperty("cn1.class.path", null);
+        if (classPath == null || findKotlinStdlib(classPath) == null) {
+            classPath = System.getProperty("java.class.path", null);
+        }
         if (classPath == null) return null;
+        return findKotlinStdlib(classPath);
+    }
+
+    private static String findKotlinStdlib(String classPath) {
 
         Pattern regex = Pattern.compile("kotlin-stdlib-([\\d\\.\\-]+)\\.jar");
         Matcher matcher = regex.matcher(classPath);
