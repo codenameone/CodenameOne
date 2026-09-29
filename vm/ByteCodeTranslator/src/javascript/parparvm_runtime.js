@@ -5803,8 +5803,38 @@ bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1T
   return invokeTranslatedNativeFallback(__cn1ThisObject, "cn1_s_println_java_lang_Object",
       "cn1_java_io_PrintStream_println_java_lang_Object", [value]);
 });
+// System's static initializer. This used to REPLACE the translated one with just
+// ensureSystemPrintStreams(), so every other static of java.lang.System was never
+// assigned -- LOCK above all, which System.gc() and the GC thread synchronize
+// on. Any app that called System.gc() (the Codename One core does, from the
+// EDT) died on "Cannot read properties of undefined (reading '__monitor')"; the
+// transpiled Flutter gallery did, right after its first frame. The translated
+// initializer now runs first -- installNativeBindings keeps it in
+// jvm.translatedMethods -- and the console print streams replace the ones it
+// built. Still a plain function: a generator binding would make System's
+// initializer, and with it every class-init guard in front of System, suspend.
+// A translated initializer that returns a generator is handed back for the
+// class-init driver to run, with the stream swap after it.
+function useConsolePrintStreams() {
+  const systemClass = jvm.classes["java_lang_System"];
+  if (!systemClass) {
+    return;
+  }
+  const staticFields = systemClass.staticFields || (systemClass.staticFields = {});
+  staticFields.out = createConsolePrintStream();
+  staticFields.err = staticFields.out;
+}
 bindNative(["cn1_java_lang_System___CLINIT__"], function() {
-  ensureSystemPrintStreams();
+  const translated = jvm.translatedMethods ? jvm.translatedMethods["cn1_java_lang_System___CLINIT__"] : null;
+  const result = typeof translated === "function" ? translated() : null;
+  if (result && typeof result.next === "function") {
+    return (function*() {
+      yield* result;
+      useConsolePrintStreams();
+      return null;
+    })();
+  }
+  useConsolePrintStreams();
   return null;
 });
 bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function(__cn1ThisObject) {
