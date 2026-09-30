@@ -78,7 +78,17 @@ final class SettingsSupport {
     static void addRepositoriesIfMissing(final Project project) {
         Object marker = project.getGradle().getExtensions().getExtraProperties().has(APPLIED_MARKER)
                 ? project.getGradle().getExtensions().getExtraProperties().get(APPLIED_MARKER) : null;
-        if (!Boolean.TRUE.equals(marker) && project.getRepositories().isEmpty()) {
+        org.gradle.api.initialization.resolve.DependencyResolutionManagement management = resolution(project);
+        org.gradle.api.initialization.resolve.RepositoriesMode mode = management == null ? null
+                : management.getRepositoriesMode().getOrNull();
+        if (mode == org.gradle.api.initialization.resolve.RepositoriesMode.PREFER_SETTINGS
+                || mode == org.gradle.api.initialization.resolve.RepositoriesMode.FAIL_ON_PROJECT_REPOS) {
+            // The settings script governs resolution: project repositories are
+            // ignored, or fail the build outright, so none is added.
+            return;
+        }
+        boolean settingsDeclare = management != null && !management.getRepositories().isEmpty();
+        if (!Boolean.TRUE.equals(marker) && project.getRepositories().isEmpty() && !settingsDeclare) {
             addRepositories(project.getRepositories(), project.getProviders().gradleProperty("codename1.repository"));
             return;
         }
@@ -91,6 +101,19 @@ final class SettingsSupport {
                 addRepositories(p.getRepositories(), p.getProviders().gradleProperty("codename1.repository"));
             }
         });
+    }
+
+    /// The settings script's `dependencyResolutionManagement`, or null. Settings
+    /// is not public from a Project, so it is reached through the Gradle object;
+    /// null when that fails, which keeps the plugin adding its repositories.
+    static org.gradle.api.initialization.resolve.DependencyResolutionManagement resolution(Project project) {
+        try {
+            Object settings = project.getGradle().getClass().getMethod("getSettings").invoke(project.getGradle());
+            return settings instanceof org.gradle.api.initialization.Settings
+                    ? ((org.gradle.api.initialization.Settings) settings).getDependencyResolutionManagement() : null;
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            return null;
+        }
     }
 
     private static URI toUri(String url) {

@@ -407,10 +407,11 @@ public final class GradleConversion {
             java.util.Arrays.asList("src/main/java", "src/main/kotlin", "src/main/resources",
                     "src/test/java", "src/test/kotlin", "src/test/resources"));
 
-    /// The source and resource roots `pom` adds beyond Maven's conventional
-    /// ones: `<sourceDirectory>`, `<testSourceDirectory>`, `<resources>`,
-    /// `<testResources>` and build-helper's add-source, add-test-source and
-    /// add-resource. Keyed "main" or "test"; each root is absolute.
+    /// The source roots `pom` adds beyond Maven's conventional ones:
+    /// `<sourceDirectory>`, `<testSourceDirectory>` and build-helper's
+    /// add-source and add-test-source. Keyed "main" or "test"; each root is
+    /// absolute. Resources, which carry include and exclude rules, are
+    /// [#resourceSpecs(File)]'s.
     static java.util.Map<String, List<File>> extraRoots(File pom) {
         java.util.Map<String, List<File>> out = new java.util.LinkedHashMap<String, List<File>>();
         out.put("main", new ArrayList<File>());
@@ -426,13 +427,6 @@ public final class GradleConversion {
         props.put("project.basedir", base.getAbsolutePath());
         addRoot(out.get("main"), base, interpolate(text(build, "sourceDirectory"), props));
         addRoot(out.get("test"), base, interpolate(text(build, "testSourceDirectory"), props));
-        for (String[] kind : new String[][] {{"resources", "resource", "main"},
-                {"testResources", "testResource", "test"}}) {
-            Element list = child(build, kind[0]);
-            for (Element r : list == null ? java.util.Collections.<Element>emptyList() : children(list, kind[1])) {
-                addRoot(out.get(kind[2]), base, interpolate(text(r, "directory"), props));
-            }
-        }
         Element plugins = child(build, "plugins");
         for (Element plugin : plugins == null ? java.util.Collections.<Element>emptyList()
                 : children(plugins, "plugin")) {
@@ -456,17 +450,138 @@ public final class GradleConversion {
                                 : children(sources, "source")) {
                             addRoot(out.get(target), base, interpolate(src.getTextContent().trim(), props));
                         }
-                    } else if ("add-resource".equals(g) || "add-test-resource".equals(g)) {
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /// One `<resource>` a pom declares: its directory (absolute), where it goes
+    /// ("main" or "test"), and its include and exclude patterns and filtering.
+    static final class ResourceSpec {
+        final File dir;
+        final String target;
+        final List<String> includes = new ArrayList<String>();
+        final List<String> excludes = new ArrayList<String>();
+        final boolean filtering;
+
+        ResourceSpec(File dir, String target, boolean filtering) {
+            this.dir = dir;
+            this.target = target;
+            this.filtering = filtering;
+        }
+
+        /// Whether `rel` (a '/'-separated path under [#dir]) is packaged: it
+        /// matches an include (every file when there are none) and no exclude.
+        boolean packages(String rel) {
+            boolean in = includes.isEmpty();
+            for (String p : includes) {
+                in |= antMatches(p, rel);
+            }
+            if (!in) {
+                return false;
+            }
+            for (String p : excludes) {
+                if (antMatches(p, rel)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    /// Every `<resource>`/`<testResource>` of `pom`'s build, and build-helper's
+    /// add-resource and add-test-resource ones.
+    static List<ResourceSpec> resourceSpecs(File pom) {
+        List<ResourceSpec> out = new ArrayList<ResourceSpec>();
+        Element project = parsePomOrNull(pom);
+        Element build = project == null ? null : child(project, "build");
+        if (build == null) {
+            return out;
+        }
+        File base = pom.getParentFile();
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        props.put("basedir", base.getAbsolutePath());
+        props.put("project.basedir", base.getAbsolutePath());
+        for (String[] kind : new String[][] {{"resources", "resource", "main"},
+                {"testResources", "testResource", "test"}}) {
+            Element list = child(build, kind[0]);
+            for (Element r : list == null ? java.util.Collections.<Element>emptyList() : children(list, kind[1])) {
+                addSpec(out, base, r, kind[2], props);
+            }
+        }
+        Element plugins = child(build, "plugins");
+        for (Element plugin : plugins == null ? java.util.Collections.<Element>emptyList()
+                : children(plugins, "plugin")) {
+            if (!"build-helper-maven-plugin".equals(text(plugin, "artifactId"))) {
+                continue;
+            }
+            Element executions = child(plugin, "executions");
+            for (Element ex : executions == null ? java.util.Collections.<Element>emptyList()
+                    : children(executions, "execution")) {
+                Element goals = child(ex, "goals");
+                Element config = child(ex, "configuration");
+                if (goals == null || config == null) {
+                    continue;
+                }
+                for (Element goal : children(goals, "goal")) {
+                    String g = goal.getTextContent().trim();
+                    if ("add-resource".equals(g) || "add-test-resource".equals(g)) {
                         Element resources = child(config, "resources");
                         for (Element r : resources == null ? java.util.Collections.<Element>emptyList()
                                 : children(resources, "resource")) {
-                            addRoot(out.get(target), base, interpolate(text(r, "directory"), props));
+                            addSpec(out, base, r, g.contains("test") ? "test" : "main", props);
                         }
                     }
                 }
             }
         }
         return out;
+    }
+
+    private static void addSpec(List<ResourceSpec> out, File base, Element r, String target,
+                                java.util.Map<String, String> props) {
+        String path = interpolate(text(r, "directory"), props);
+        if (path == null || path.length() == 0 || path.contains("${")) {
+            return;
+        }
+        File f = new File(path);
+        ResourceSpec spec = new ResourceSpec((f.isAbsolute() ? f : new File(base, path)).getAbsoluteFile(), target,
+                "true".equals(text(r, "filtering")));
+        for (String[] list : new String[][] {{"includes", "include"}, {"excludes", "exclude"}}) {
+            Element patterns = child(r, list[0]);
+            for (Element p : patterns == null ? java.util.Collections.<Element>emptyList()
+                    : children(patterns, list[1])) {
+                ("includes".equals(list[0]) ? spec.includes : spec.excludes).add(p.getTextContent().trim());
+            }
+        }
+        out.add(spec);
+    }
+
+    /// Maven's (Ant's) path pattern match: `**` spans directories, `*` and `?`
+    /// stay within one, and a pattern ending in `/` means everything below.
+    static boolean antMatches(String pattern, String path) {
+        String p = pattern.replace('\\', '/');
+        if (p.endsWith("/")) {
+            p = p + "**";
+        }
+        StringBuilder re = new StringBuilder();
+        for (int i = 0; i < p.length(); i++) {
+            char c = p.charAt(i);
+            if (c == '*' && i + 1 < p.length() && p.charAt(i + 1) == '*') {
+                boolean slash = i + 2 < p.length() && p.charAt(i + 2) == '/';
+                re.append(slash ? "(?:.*/)?" : ".*");
+                i += slash ? 2 : 1;
+            } else if (c == '*') {
+                re.append("[^/]*");
+            } else if (c == '?') {
+                re.append("[^/]");
+            } else {
+                re.append(java.util.regex.Pattern.quote(String.valueOf(c)));
+            }
+        }
+        return path.matches(re.toString());
     }
 
     private static void addRoot(List<File> out, File base, String path) {
@@ -502,6 +617,50 @@ public final class GradleConversion {
     private void moveMavenExtraRoots(ProjectLayout from, ProjectLayout to) throws IOException {
         java.util.Map<String, List<File>> roots = extraRoots(from.dependencyFile());
         File src = new File(from.projectDir(), "src").getAbsoluteFile();
+        // Resources, with the pom's rules: a file Maven leaves out -- an
+        // environment file, a secret -- is not packaged by the converted build
+        // either, whether its directory is the conventional one or not.
+        // Several <resource> entries may name one directory; Maven packages a
+        // file any of them includes.
+        java.util.Map<String, List<ResourceSpec>> byDir = new java.util.LinkedHashMap<String, List<ResourceSpec>>();
+        for (ResourceSpec spec : resourceSpecs(from.dependencyFile())) {
+            String key = spec.target + "|" + spec.dir.getAbsolutePath();
+            if (!byDir.containsKey(key)) {
+                byDir.put(key, new ArrayList<ResourceSpec>());
+            }
+            byDir.get(key).add(spec);
+        }
+        for (List<ResourceSpec> group : byDir.values()) {
+            ResourceSpec spec = group.get(0);
+            if (!spec.dir.isDirectory()) {
+                continue;
+            }
+            File resources = new File(to.projectDir(), "src" + File.separator + spec.target + File.separator
+                    + "resources");
+            String rel = from.projectDir().getAbsoluteFile().toURI().relativize(spec.dir.toURI()).getPath();
+            boolean conventional = ("src/" + spec.target + "/resources/").equals(rel);
+            copyResources(group, spec.dir, resources, conventional);
+            if (!conventional && spec.dir.getAbsolutePath().startsWith(src.getAbsolutePath() + File.separator)) {
+                File copied = new File(new File(to.projectDir(), "src"),
+                        spec.dir.getAbsolutePath().substring(src.getAbsolutePath().length() + 1));
+                if (copied.exists()) {
+                    org.apache.commons.io.FileUtils.deleteDirectory(copied);
+                }
+            }
+            if (!conventional) {
+                log.info("Moved " + spec.dir + ", which the pom packages as resources, into src/" + spec.target
+                        + "/resources");
+            }
+            boolean filtered = false;
+            for (ResourceSpec s : group) {
+                filtered |= s.filtering;
+            }
+            if (filtered) {
+                log.warn("The pom filters " + spec.dir + " (${...} expanded while packaging); the converted "
+                        + "resources are copied as they are. Add filtering to processResources in "
+                        + "build.gradle.kts if they rely on it.");
+            }
+        }
         for (java.util.Map.Entry<String, List<File>> e : roots.entrySet()) {
             File out = new File(to.projectDir(), "src" + File.separator + e.getKey());
             for (File root : e.getValue()) {
@@ -517,6 +676,37 @@ public final class GradleConversion {
                         org.apache.commons.io.FileUtils.deleteDirectory(copied);
                     }
                 }
+            }
+        }
+    }
+
+    /// Brings `dir` (a resource root, or a directory below it) in line with the
+    /// root's specs under `out`: a conventional root was copied already, so
+    /// what no spec packages is deleted there; any other root's files that a
+    /// spec packages are copied in.
+    private void copyResources(List<ResourceSpec> group, File dir, File out, boolean conventional)
+            throws IOException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                copyResources(group, f, out, conventional);
+                continue;
+            }
+            String rel = group.get(0).dir.toURI().relativize(f.toURI()).getPath();
+            boolean packaged = false;
+            for (ResourceSpec spec : group) {
+                packaged |= spec.packages(rel);
+            }
+            File target = new File(out, rel);
+            if (conventional) {
+                if (!packaged && target.isFile() && !target.delete()) {
+                    throw new IOException("Could not delete " + target);
+                }
+            } else if (packaged) {
+                copyTree(f, target);
             }
         }
     }

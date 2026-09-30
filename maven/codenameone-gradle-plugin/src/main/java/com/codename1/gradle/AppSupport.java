@@ -318,6 +318,8 @@ final class AppSupport {
             t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.TEST_ROOT_PROPERTY,
                     project.provider(() -> ToolSupport.primaryRoot(test.getJava().getSrcDirs(),
                             layout.testSourceDir(), layout).getAbsolutePath())));
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.ENCODING_PROPERTY,
+                    javaEncoding(project, main)));
             t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.RELEASE_PROPERTY,
                     project.provider(() -> String.valueOf(project.getTasks().named(main.getCompileJavaTaskName(),
                             JavaCompile.class).get().getOptions().getRelease().getOrElse(17)))));

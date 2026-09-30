@@ -175,26 +175,47 @@ final class ProjectSupport {
         return out;
     }
 
-    /// Sets a Kotlin compile task's JVM target to [JAVA_RELEASE]. Reflective,
-    /// because the Kotlin Gradle plugin's types are not on this plugin's
-    /// classpath: `compilerOptions.jvmTarget` (Kotlin 1.8 and newer), else the
-    /// older `kotlinOptions.jvmTarget` string.
+    /// The release the Java compile beside a Kotlin one targets: `compileKotlin`
+    /// pairs with `compileJava`, `compileTestKotlin` with `compileTestJava`.
+    /// [JAVA_RELEASE] when there is none or it sets no release.
+    static int javaReleaseFor(org.gradle.api.Task kotlinCompile) {
+        String name = kotlinCompile.getName();
+        org.gradle.api.Task java = name.endsWith("Kotlin")
+                ? kotlinCompile.getProject().getTasks().findByName(
+                        name.substring(0, name.length() - "Kotlin".length()) + "Java")
+                : null;
+        return java instanceof JavaCompile
+                ? ((JavaCompile) java).getOptions().getRelease().getOrElse(JAVA_RELEASE) : JAVA_RELEASE;
+    }
+
+    /// Sets a Kotlin compile task's JVM target to the release its Java compile
+    /// targets -- [JAVA_RELEASE] unless the build raises it, when Kotlin 2 would
+    /// otherwise refuse the two targets as inconsistent. Reflective, because the
+    /// Kotlin Gradle plugin's types are not on this plugin's classpath:
+    /// `compilerOptions.jvmTarget` (Kotlin 1.8 and newer), else the older
+    /// `kotlinOptions.jvmTarget` string.
     @SuppressWarnings("unchecked")
-    static void pinKotlinJvmTarget(org.gradle.api.Task task) {
+    static void pinKotlinJvmTarget(final org.gradle.api.Task task) {
         try {
             Object options = task.getClass().getMethod("getCompilerOptions").invoke(task);
             Object target = options.getClass().getMethod("getJvmTarget").invoke(options);
-            Class<?> jvmTarget = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget", false,
-                    task.getClass().getClassLoader());
-            ((org.gradle.api.provider.Property<Object>) target).set(
-                    Enum.valueOf(jvmTarget.asSubclass(Enum.class), "JVM_" + JAVA_RELEASE));
+            final Class<? extends Enum> jvmTarget = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget",
+                    false, task.getClass().getClassLoader()).asSubclass(Enum.class);
+            ((org.gradle.api.provider.Property<Object>) target).set(task.getProject().provider(() -> {
+                try {
+                    return Enum.valueOf(jvmTarget, "JVM_" + javaReleaseFor(task));
+                } catch (IllegalArgumentException newerThanThisKotlin) {
+                    return Enum.valueOf(jvmTarget, "JVM_" + JAVA_RELEASE);
+                }
+            }));
             return;
         } catch (ReflectiveOperationException | RuntimeException ex) {
             // An older Kotlin plugin: fall through to kotlinOptions.
         }
         try {
             Object options = task.getClass().getMethod("getKotlinOptions").invoke(task);
-            options.getClass().getMethod("setJvmTarget", String.class).invoke(options, String.valueOf(JAVA_RELEASE));
+            options.getClass().getMethod("setJvmTarget", String.class).invoke(options,
+                    String.valueOf(javaReleaseFor(task)));
         } catch (ReflectiveOperationException | RuntimeException ex) {
             task.getLogger().warn("cn1: could not set " + task.getPath() + "'s JVM target to " + JAVA_RELEASE
                     + "; set kotlin { compilerOptions { jvmTarget } } in build.gradle.kts if the build refuses "

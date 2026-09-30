@@ -372,6 +372,42 @@ class GradleConversionTest {
     }
 
     @Test
+    void resourcesMavenLeavesOutAreNotPackagedEither() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><build><resources>"
+                + "<resource><directory>src/main/resources</directory><excludes><exclude>**/*.env</exclude>"
+                + "</excludes></resource>"
+                + "<resource><directory>src/main/resources</directory><includes><include>keep/prod.env</include>"
+                + "</includes></resource>"
+                + "<resource><directory>extra</directory><includes><include>**/*.json</include></includes>"
+                + "<filtering>true</filtering></resource>"
+                + "</resources></build></project>");
+        touch(mvn, "common/src/main/resources/app.properties", "a=b");
+        touch(mvn, "common/src/main/resources/secrets/dev.env", "TOKEN=x");
+        touch(mvn, "common/src/main/resources/keep/prod.env", "kept by the second entry");
+        touch(mvn, "common/extra/data/config.json", "{}");
+        touch(mvn, "common/extra/data/notes.txt", "not included");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "src/main/resources/app.properties").isFile());
+        assertFalse(new File(out, "src/main/resources/secrets/dev.env").exists(), "excluded by the pom");
+        assertTrue(new File(out, "src/main/resources/keep/prod.env").isFile(), "another entry includes it");
+        assertTrue(new File(out, "src/main/resources/data/config.json").isFile());
+        assertFalse(new File(out, "src/main/resources/data/notes.txt").exists(), "not among the includes");
+    }
+
+    @Test
+    void mavenPathPatternsMatchAsMavenDoes() {
+        assertTrue(GradleConversion.antMatches("**/*.env", "a/b/c.env"));
+        assertTrue(GradleConversion.antMatches("**/*.env", "c.env"));
+        assertFalse(GradleConversion.antMatches("*.env", "a/c.env"));
+        assertTrue(GradleConversion.antMatches("secrets/", "secrets/x/y.txt"));
+        assertTrue(GradleConversion.antMatches("a?c.txt", "abc.txt"));
+        assertFalse(GradleConversion.antMatches("a?c.txt", "a/c.txt"));
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

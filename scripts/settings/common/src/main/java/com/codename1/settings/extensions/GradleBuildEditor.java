@@ -191,9 +191,11 @@ public final class GradleBuildEditor implements DependencyEditor {
     }
 
     /// {start, end} of the statement in the dependencies block declaring
-    /// `dependency`, or null. A declaration nested in a named block --
-    /// `constraints { implementation("g:a:1") }` -- is found inside it, so
-    /// removing it leaves the block's other entries alone.
+    /// `dependency`, or null. Only the block's own statements count: a named
+    /// block nested in it -- `constraints { implementation("g:a:1") }` -- holds
+    /// rules about versions, not dependencies, and puts nothing on a classpath.
+    /// Counting it would make installing that library a no-op, and uninstalling
+    /// it remove the constraint instead.
     private static int[] findDeclaration(String script, MavenDependency dependency) {
         int[] block = dependenciesBlock(script);
         return block == null ? null : findIn(script, block, dependency);
@@ -203,15 +205,7 @@ public final class GradleBuildEditor implements DependencyEditor {
         for (int[] statement : statements(s, block)) {
             int brace = headBrace(s, statement);
             if (brace >= 0 && isIdentifier(s.substring(statement[0], brace).trim())) {
-                // A block of its own (constraints, a custom configuration's
-                // scope...): look for the declaration among its statements.
-                int close = matchingBrace(s, brace);
-                if (close > brace) {
-                    int[] nested = findIn(s, new int[]{brace, close}, dependency);
-                    if (nested != null) {
-                        return nested;
-                    }
-                }
+                // A named block (constraints, components...): not a declaration.
                 continue;
             }
             // Only the declaration's own coordinate counts, not strings in its

@@ -526,17 +526,34 @@ public class SourceChangeWatcher implements Runnable {
             pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
             pb.directory(kotlinSourcePath);
         } else {
-            pb = new ProcessBuilder(
-                    javac.getAbsolutePath(),
-                    "-cp", classPath.toString(),
-                    "-d", classDestination.getAbsolutePath(),
-                    "-source", javaLevel(layout),
-                    "-target", javaLevel(layout),
-                    "-encoding", "utf-8",
-                    "-s", generatedSources.getAbsolutePath(),
-                    "-sourcepath", sourcePath.getAbsolutePath(),
-                    recompilingClass
-            );
+            List<String> cmd = new ArrayList<String>();
+            cmd.add(javac.getAbsolutePath());
+            cmd.add("-cp");
+            cmd.add(classPath.toString());
+            cmd.add("-d");
+            cmd.add(classDestination.getAbsolutePath());
+            if (layout.buildSystem() == BuildSystem.GRADLE) {
+                // --release, as Gradle's compile does: -source/-target alone would
+                // let an edit call an API the host JDK has and the target release
+                // lacks, which hot reload runs and the next real build rejects.
+                cmd.add("--release");
+                cmd.add(javaLevel(layout));
+            } else {
+                cmd.add("-source");
+                cmd.add(javaLevel(layout));
+                cmd.add("-target");
+                cmd.add(javaLevel(layout));
+            }
+            // The encoding the build compiles in; a Gradle launch names it.
+            String encoding = System.getProperty("cn1.hotReload.encoding");
+            cmd.add("-encoding");
+            cmd.add(encoding != null && encoding.length() > 0 ? encoding : "utf-8");
+            cmd.add("-s");
+            cmd.add(generatedSources.getAbsolutePath());
+            cmd.add("-sourcepath");
+            cmd.add(sourcePath.getAbsolutePath());
+            cmd.add(recompilingClass);
+            pb = new ProcessBuilder(cmd);
             pb.environment().put("JAVA_HOME", System.getProperty("java.home"));
             pb.directory(sourcePath);
         }
