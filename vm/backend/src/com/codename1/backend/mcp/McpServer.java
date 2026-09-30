@@ -439,7 +439,8 @@ public final class McpServer implements HttpServer.Handler {
         // comparing them lets exactly the page this check exists to stop drive
         // the server. A page the server itself serves must be listed.
         String host = hostOf(origin);
-        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+        return "localhost".equalsIgnoreCase(host)
+                || "127.0.0.1".equals(host) //NOPMD AvoidUsingHardCodedIP - recognises a loopback origin
                 || "[::1]".equals(host);
     }
 

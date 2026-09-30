@@ -158,7 +158,7 @@ public final class Backend {
         return new Builder(config);
     }
 
-    private String listenAddress = "127.0.0.1";
+    private String listenAddress = "127.0.0.1"; //NOPMD AvoidUsingHardCodedIP - loopback default, never dialled
 
     /// The address a client on this machine reaches the listener at: the one
     /// it is bound to (bracketed when IPv6), or 127.0.0.1 when it listens on
@@ -1070,8 +1070,9 @@ public final class Backend {
     /// in brackets when it is IPv6, and 127.0.0.1 for every-interface binds.
     static String advertised(String host) {
         String h = host == null ? "" : host.trim();
-        if (h.length() == 0 || "0.0.0.0".equals(h) || "::".equals(h) || "[::]".equals(h)) {
-            return "127.0.0.1";
+        if (h.length() == 0 || "0.0.0.0".equals(h) //NOPMD AvoidUsingHardCodedIP - recognises the wildcard bind
+                || "::".equals(h) || "[::]".equals(h)) {
+            return "127.0.0.1"; //NOPMD AvoidUsingHardCodedIP - loopback, what a local client reaches a wildcard bind at
         }
         return h.indexOf(':') >= 0 && !h.startsWith("[") ? "[" + h + "]" : h;
     }
@@ -1084,8 +1085,9 @@ public final class Backend {
     /// took it for loopback and let a tokenless MCP endpoint listen publicly.
     static boolean isLoopback(String host) {
         String h = host.trim();
-        if ("localhost".equalsIgnoreCase(h) || "::1".equals(h) || "[::1]".equals(h)
-                || "0:0:0:0:0:0:0:1".equals(h)) {
+        if ("localhost".equalsIgnoreCase(h) || "::1".equals(h) //NOPMD AvoidUsingHardCodedIP - recognises loopback
+                || "[::1]".equals(h)
+                || "0:0:0:0:0:0:0:1".equals(h)) { //NOPMD AvoidUsingHardCodedIP - recognises loopback
             return true;
         }
         // By hand: vm/JavaAPI has no String.split.
@@ -1465,6 +1467,7 @@ public final class Backend {
         /// ask has none of the endpoint in its binary.
         public Builder mcp(final com.codename1.backend.mcp.McpServer.Extension devTools) {
             this.mcpRoute = new OwnRoute() {
+                @Override
                 HttpServer.Handler open(Config config, String name, List tools)
                         throws IOException {
                     return com.codename1.backend.mcp.McpServer.fromConfig(config, devTools,
@@ -1473,15 +1476,18 @@ public final class Backend {
 
                 // Each cast is of the object open() above returned, never
                 // anything else.
+                @Override
                 void attach(HttpServer.Handler opened, Backend running) {
                     ((com.codename1.backend.mcp.McpServer) opened).attach(running);
                 }
 
+                @Override
                 String unguardedBy(HttpServer.Handler opened) {
                     return ((com.codename1.backend.mcp.McpServer) opened).hasToken() ? null
                             : com.codename1.backend.mcp.McpServer.TOKEN;
                 }
 
+                @Override
                 String announce(HttpServer.Handler opened, String base) {
                     com.codename1.backend.mcp.McpServer server =
                             (com.codename1.backend.mcp.McpServer) opened;
@@ -1498,11 +1504,13 @@ public final class Backend {
         /// point calls it only for a build that asked for them.
         public Builder management() {
             this.managementRoute = new OwnRoute() {
+                @Override
                 HttpServer.Handler open(Config config, String name, List tools)
                         throws IOException {
                     return Management.fromConfig(config);
                 }
 
+                @Override
                 void attach(HttpServer.Handler opened, Backend running) {
                     ((Management) opened).attach(running);
                 }
@@ -1751,7 +1759,7 @@ public final class Backend {
             String unguardedBy = mcpServer == null ? null : mcpRoute.unguardedBy(mcpServer);
             if (unguardedBy != null) {
                 if (bindHost == null || bindHost.length() == 0) {
-                    bindHost = "127.0.0.1";
+                    bindHost = "127.0.0.1"; //NOPMD AvoidUsingHardCodedIP - a tokenless MCP endpoint binds loopback only
                     if (!quiet) {
                         System.out.println("cn1: the MCP endpoint has no token, so the server "
                                 + "listens on 127.0.0.1 only; set " + unguardedBy

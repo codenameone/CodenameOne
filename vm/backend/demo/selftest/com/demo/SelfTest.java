@@ -41,6 +41,7 @@ import com.codename1.backend.Reactor;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
+import com.codename1.backend.JsonCodec;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.StaticFiles;
@@ -225,6 +226,7 @@ public class SelfTest {
         clientTls();
         rotatedCaBundlesAreReRead();
         futures();
+        jsonCodec();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -243,6 +245,70 @@ public class SelfTest {
     /// the backend reference documents them, on the translated runtime. They
     /// compile against the JDK in every other test; this is where they have to
     /// work on ParparVM.
+    /// What the build's generated JSON codecs call, on the translated runtime:
+    /// the typed reads, the refusal messages with their paths, and the dates.
+    private static void jsonCodec() throws Exception {
+        JsonCodec.Path root = JsonCodec.Path.ROOT;
+        check("codec: a whole number", "42", String.valueOf(JsonCodec.readLong(
+                Long.valueOf(42), root, "n", -1, Integer.MIN_VALUE, Integer.MAX_VALUE)));
+        check("codec: an integral double is a whole number", "3", String.valueOf(
+                JsonCodec.readLong(Double.valueOf(3.0), root, "n", -1, 0, 10)));
+        check("codec: out of range is refused with its path",
+                "$.items[2].n: expected a whole number from 0 to 10, got the number 11",
+                refusal(Long.valueOf(11), root.child("items").child(2), "n", -1));
+        check("codec: a fraction is refused, not cut short",
+                "$.n: expected a whole number from 0 to 10, got the number 2.5",
+                refusal(Double.valueOf(2.5), root, "n", -1));
+        check("codec: an element index in the path", "$[3]: expected a string, got true",
+                stringRefusal(Boolean.TRUE, root, null, 3));
+        check("codec: a date from milliseconds", "86400000", String.valueOf(
+                JsonCodec.readDate(Long.valueOf(86400000L), root, "d", -1).getTime()));
+        check("codec: an ISO date with Z", "86400000", String.valueOf(
+                JsonCodec.readDate("1970-01-02T00:00:00Z", root, "d", -1).getTime()));
+        check("codec: an ISO date with an offset and a fraction", "86399500", String.valueOf(
+                JsonCodec.readDate("1970-01-02T02:59:59.5+03:00", root, "d", -1).getTime()));
+        check("codec: a date alone is UTC midnight", "951782400000", String.valueOf(
+                JsonCodec.readDate("2000-02-29", root, "d", -1).getTime()));
+        check("codec: an impossible date is refused",
+                "$.d: expected a number or an ISO-8601 date, got a string",
+                dateRefusal("2001-02-29"));
+        ByteSink out = new ByteSink(16);
+        JsonCodec.writeDate(new java.util.Date(1234L), out);
+        check("codec: a date is written as milliseconds", "1234",
+                new String(out.bytes(), 0, out.length(), "UTF-8"));
+        check("codec: base64 reads back", "3", String.valueOf(
+                JsonCodec.readBytes("AQID", root, "b", -1).length));
+        check("codec: a cycle's message names the class", "true", String.valueOf(
+                JsonCodec.tooDeep("Order").getMessage().indexOf("Order") >= 0));
+    }
+
+    private static String refusal(Object json, JsonCodec.Path at, String name, int index) {
+        try {
+            JsonCodec.readLong(json, at, name, index, 0, 10);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
+    private static String stringRefusal(Object json, JsonCodec.Path at, String name, int index) {
+        try {
+            JsonCodec.readString(json, at, name, index);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
+    private static String dateRefusal(String value) {
+        try {
+            JsonCodec.readDate(value, JsonCodec.Path.ROOT, "d", -1);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
     private static void futures() throws Exception {
         java.util.concurrent.Future ready = com.codename1.backend.AsyncResult.of("ready");
         check("future: a completed value", "ready", String.valueOf(ready.get()));
