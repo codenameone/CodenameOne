@@ -967,7 +967,14 @@ extern void CN1MacRefreshModifiers(void);
 
 /// Builds the main window on the main thread before [NSApp run], called from the
 /// generated main right after it has dispatched the VM boot. The queued build in
-/// CN1MacInstallAppDelegate then finds the window already there.
+/// CN1MacInstallAppDelegate then finds the window already there, and stays only as
+/// the fallback for a generated main that predates this function.
+///
+/// Measured on the GitHub macOS runner (flutter-bench, transpiled gallery): the
+/// queued build could not start until [NSApp run] had finished launching, ~264 ms
+/// into the process, and the first frame waited on it. Built here it starts at
+/// ~130 ms, overlapping the VM boot, and the Java side's first paint no longer
+/// waits for a busy main thread (125 ms -> 7-32 ms).
 void CN1MacBuildMainWindowBeforeRun(void) {
     cn1StartupPhase("buildWindowBeforeRun");
     (void)[CN1MacHost sharedHost].renderingView;
