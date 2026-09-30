@@ -86,6 +86,22 @@ public class CryptoGcmDecisionTest {
     }
 
     @Test
+    public void anUnscannableVaultStillGetsWorkingCrypto() {
+        // A library the permission scan never reads can be the only vault user; with public GCM
+        // an unknown answer turns crypto (and so GCM) on rather than shipping the stubs.
+        assertTrue(IPhoneBuilder.cryptoApiRequired(PUBLIC, false, false, true, ""));
+        assertTrue(IPhoneBuilder.resolveCryptoGcm(PUBLIC, true, false, true, ""));
+        // ios.crypto.gcm=false is the developer saying there is no vault.
+        assertFalse(IPhoneBuilder.cryptoApiRequired(PUBLIC, false, false, true, "false"));
+        // The legacy port stops to ask instead, and only an explicit true enables it.
+        assertFalse(IPhoneBuilder.cryptoApiRequired(LEGACY, false, false, true, ""));
+        assertTrue(IPhoneBuilder.cryptoApiRequired(LEGACY, false, false, true, "true"));
+        // Known answers are unchanged.
+        assertTrue(IPhoneBuilder.cryptoApiRequired(PUBLIC, false, true, false, "false"));
+        assertFalse(IPhoneBuilder.cryptoApiRequired(PUBLIC, false, false, false, ""));
+    }
+
+    @Test
     public void onlyLegacyGcmStopsTheBuildToAsk() {
         assertNotNull(IPhoneBuilder.cryptoGcmUndecidable(LEGACY, false, true, ""));
         assertNull(IPhoneBuilder.cryptoGcmUndecidable(LEGACY, false, true, "false"));

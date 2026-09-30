@@ -2071,6 +2071,27 @@ public class IPhoneBuilder extends Executor {
         return usesVault || "true".equals(hint) || (vaultUnknown && !"false".equals(hint));
     }
 
+    /// Whether the base crypto implementation (CN1_INCLUDE_CRYPTO) is compiled in.
+    ///
+    /// The permission scan that sets `usesCryptoAPI` walks the application's classes only, while
+    /// the vault scan also reads submitted libraries, so a library using the vault can leave the
+    /// crypto flag false -- and the vault cannot work without it. So detected vault use turns it
+    /// on. A vault answer left UNKNOWN (part of the input could not be scanned) does too, unless
+    /// the developer said otherwise: with public GCM that is simply the safe answer, since
+    /// enabling it links nothing App Store Connect rejects, and `ios.crypto.gcm=false` is how an
+    /// application states it does not use the vault. With an older port's private-SPI GCM only
+    /// an explicit `ios.crypto.gcm=true` does, because there the build stops and asks instead.
+    static boolean cryptoApiRequired(boolean publicGcm, boolean usesCryptoAPI, boolean usesVault,
+            boolean vaultUnknown, String hint) {
+        if (usesCryptoAPI || usesVault) {
+            return true;
+        }
+        if (!vaultUnknown) {
+            return false;
+        }
+        return publicGcm ? !"false".equals(hint) : "true".equals(hint);
+    }
+
     /// The reason the build must stop and ask about AES-GCM, or null when it need not.
     ///
     /// Only an older port's private-SPI GCM makes the answer matter. There, a scan refused
@@ -3504,9 +3525,6 @@ public class IPhoneBuilder extends Executor {
         // nothing and left the flag false, and the library reached the iOS stubs with a vault that
         // could neither encrypt nor unlock. The vault cannot function without the crypto API, so
         // detecting one is detecting the other.
-        if (usesVault) {
-            usesCryptoAPI = true;
-        }
         String gcmHint = request.getArg("ios.crypto.gcm", "");
         boolean publicGcm;
         try {
@@ -3516,6 +3534,7 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to read CN1Crypto.h", ex);
         }
+        usesCryptoAPI = cryptoApiRequired(publicGcm, usesCryptoAPI, usesVault, vaultUnknown, gcmHint);
         String gcmRefusal = cryptoGcmUndecidable(publicGcm, usesVault, vaultUnknown, gcmHint);
         if (gcmRefusal != null) {
             throw new BuildException(gcmRefusal);
