@@ -50,10 +50,15 @@ Both prove they can fail before trusting a clean result: a probe that imports
 the three CommonCrypto GCM symbols must be reported, and public symbols beside
 it must not be.
 
-Scope: C and Objective-C symbols. Swift and C++ names are mangled and declared
+Scope: OUR code. Source mode reads the port's natives; binary mode reads our
+sample application -- the translated code, its Swift extensions and watch app, and
+the cn1libs it bundles -- which is a known, closed set, not arbitrary third-party
+binaries. The Swift runtime Xcode copies in is Apple's and is not read.
+
+Symbols: C and Objective-C. Swift and C++ names are mangled and declared
 in .swiftinterface files and C++ headers that a header scan cannot match, so they
-are skipped rather than all reported; so are names the compiler and Apple's Swift
-toolchain emit (COMPILER_EMITTED) and the Swift runtime Xcode embeds. Private
+are skipped rather than all reported; so are the exact names the compiler and
+Apple's Swift toolchain emit (COMPILER_EMITTED). Private
 Objective-C SELECTORS are not checked: App Store Connect reports those as a
 warning, and a selector list would be dominated by our own methods.
 """
@@ -473,44 +478,39 @@ def imports_of_binary(path):
     return result
 
 
-# Mach-O magics, both byte orders, thin and universal. The universal magic is also a Java class
-# file's, told apart by the word after it: an architecture count for Mach-O (a handful), the
-# class-file version for Java (45 and up).
-MACHO_THIN = {b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe"}
-MACHO_FAT = {b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
-
-
-def is_macho(path):
-    try:
-        with open(path, "rb") as handle:
-            head = handle.read(8)
-    except OSError:
-        return False
-    if head[:4] in MACHO_THIN:
-        return True
-    return head[:4] in MACHO_FAT and len(head) == 8 and int.from_bytes(head[4:], "big") < 30
-
-
 def binaries_in(app):
-    """Every Mach-O an .app ships, wherever it sits.
+    """The executables of the application and of every bundle nested in it.
 
-    Found by content rather than by bundle suffix or Info.plist: the sample nests code several
-    levels deep (extensions, frameworks, a companion watch app with extensions of its own), and
-    a dependency can put an extensionless executable inside a .bundle or anywhere else. App
-    Store Connect scans every one of them, so a suffix allowlist is a way to miss one.
+    The app is our own sample, so its layout is known: extensions under PlugIns and
+    Extensions, frameworks under Frameworks, and a companion watch app under Watch with
+    extensions of its own. Each bundle's executable is the one its Info.plist names.
     """
     if os.path.isfile(app):
         return [app]
-    found = []
-    for base, _dirs, files in os.walk(app):
+
+    def executable(bundle):
+        for info in (os.path.join(bundle, "Info.plist"),
+                     os.path.join(bundle, "Resources", "Info.plist")):
+            if os.path.isfile(info):
+                with open(info, "rb") as handle:
+                    name = plistlib.load(handle).get("CFBundleExecutable")
+                if name and os.path.isfile(os.path.join(bundle, name)):
+                    return os.path.join(bundle, name)
+        return None
+
+    main = executable(app)
+    if not main:
+        fail("%s has no CFBundleExecutable to read" % app)
+    found = [main]
+    for base, dirs, files in os.walk(app):
+        for name in sorted(dirs):
+            if name.endswith((".app", ".appex", ".framework", ".xpc")):
+                path = executable(os.path.join(base, name))
+                if path:
+                    found.append(path)
         for name in sorted(files):
-            path = os.path.join(base, name)
-            if os.path.islink(path) or APPLE_EMBEDDED.match(name):
-                continue
-            if is_macho(path):
-                found.append(path)
-    if not found:
-        fail("%s contains no Mach-O at all -- not a built application" % app)
+            if name.endswith(".dylib") and not APPLE_EMBEDDED.match(name):
+                found.append(os.path.join(base, name))
     return found
 
 
