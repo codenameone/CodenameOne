@@ -1044,6 +1044,7 @@ public final class Display extends CN1Constants {
             nativeThemeRefreshPending = true;
         }
         callSerially(new Runnable() {
+            @Override
             public void run() {
                 synchronized (Display.this) {
                     nativeThemeRefreshPending = false;

@@ -246,7 +246,8 @@ public class UIManager {
 
     private void restoreNativeThemeValues() {
         for (Map.Entry<String, Object> entry : nativeOriginals.entrySet()) {
-            if (themeProps.get(entry.getKey()) == nativeDerived.get(entry.getKey())) {
+            // Ownership is by identity: an equal application replacement must survive.
+            if (themeProps.get(entry.getKey()) == nativeDerived.get(entry.getKey())) { //NOPMD CompareObjectsWithEquals
                 themeProps.put(entry.getKey(), entry.getValue());
             }
         }
@@ -335,7 +336,8 @@ public class UIManager {
                 try {
                     Font inherited = original.deriveNativeThemeFont(nativeSettings.getFontFamily(),
                             size * nativeSettings.getFontSize() / nativeBaseFontSize);
-                    if (inherited != original) {
+                    // The original instance signals that the font is not eligible for inheritance.
+                    if (inherited != original) { //NOPMD CompareObjectsWithEquals
                         rememberNativeValue(key, inherited);
                     }
                 } catch (RuntimeException ex) {
@@ -2045,6 +2047,10 @@ public class UIManager {
         if (factor == 1f) {
             return;
         }
+        // Zoom the bundled originals, then reapply OS and accessibility settings.
+        // Otherwise zoom replaces the instances tracked by the restoration maps.
+        restoreLargerTextFonts();
+        restoreNativeThemeValues();
         for (Map.Entry<String, Object> entry : themeProps.entrySet()) {
             if (!entry.getKey().endsWith(Style.FONT)) {
                 continue;
@@ -2067,6 +2073,8 @@ public class UIManager {
                 entry.setValue(scaled);
             }
         }
+        applyNativeThemeSettings();
+        applyLargerTextScaleToThemeFonts();
         Font defFont = defaultStyle.getFont();
         if (defFont != null && defFont.isTTFNativeFont()) {
             Font scaled = scaleFontByFactor(defFont, factor);

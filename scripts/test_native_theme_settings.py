@@ -13,6 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class NativeThemeSettingsTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("xcrun"), "Apple toolchain unavailable")
     def test_appkit_snapshot_and_notifications(self):
         source = (ROOT / "Ports/iOSPort/nativeSources/IOSNative.m").read_text()
         start = source.index("static void cn1NativeThemeDidChange(")
@@ -38,7 +39,10 @@ static id fromNSString(NSString* value) { return [[value copy] autorelease]; }
 BRIDGE
 int main(void) {
     @autoreleasepool {
+        NSAppearance* previous = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        [NSAppearance setCurrentAppearance:previous];
         NSString* settings = com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_String(nil);
+        assert([NSAppearance currentAppearance] == previous);
         assert([settings containsString:@"fontFamily=native:\n"]);
         NSString* size = [NSString stringWithFormat:@"fontSize=%g\n", [NSFont systemFontSize] * 2];
         assert([settings containsString:size]);
@@ -60,12 +64,16 @@ int main(void) {
         with tempfile.TemporaryDirectory(prefix="cn1-theme-settings-") as directory:
             path = pathlib.Path(directory)
             source_path = path / "settings.m"
-            source_path.write_text(harness)
             executable = path / "settings"
-            subprocess.run(["xcrun", "clang", "-fblocks", "-framework", "AppKit",
-                            str(source_path), "-o", str(executable)], check=True)
-            subprocess.run([str(executable)], check=True)
+            # Force the Catalina fallback on the current host as well as checking availability at compile time.
+            for variant in (harness, harness.replace("if (@available(macOS 11.0, *))", "if (@available(macOS 99.0, *))")):
+                source_path.write_text(variant)
+                subprocess.run(["xcrun", "clang", "-fblocks", "-framework", "AppKit",
+                                "-mmacosx-version-min=10.15", "-Werror=unguarded-availability",
+                                str(source_path), "-o", str(executable)], check=True)
+                subprocess.run([str(executable)], check=True)
 
+    @unittest.skipUnless(shutil.which("xcrun"), "Apple toolchain unavailable")
     def test_uikit_bridge_compiles(self):
         source = (ROOT / "Ports/iOSPort/nativeSources/IOSNative.m").read_text()
         start = source.index("static void cn1NativeThemeDidChange(")

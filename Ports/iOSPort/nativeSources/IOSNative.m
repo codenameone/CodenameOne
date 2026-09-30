@@ -8563,7 +8563,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_S
         if (@available(macOS 10.14, *)) {
             for (int dark = 0; dark < 2; ++dark) {
                 NSAppearance* appearance = [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-                [appearance performAsCurrentDrawingAppearance:^{
+                void (^readColors)(void) = ^{
                     NSArray* tokens = @[@"accent-color", @"selection-color", @"window-bg-color", @"control-bg-color",
                         @"view-bg-color", @"text-color", @"text-secondary-color", @"separator-color"];
                     NSArray* colors = @[[NSColor controlAccentColor], [NSColor selectedTextBackgroundColor],
@@ -8580,7 +8580,20 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_S
                         unsigned b = (unsigned)lround(255 * (color.blueComponent*a + background.blueComponent*(1-a)));
                         [values appendFormat:@"%@%@=%02x%02x%02x\n", tokens[i], dark ? @"-dark" : @"", r, g, b];
                     }
-                }];
+                };
+                if (@available(macOS 11.0, *)) {
+                    [appearance performAsCurrentDrawingAppearance:readColors];
+                } else {
+                    // Catalina supports semantic colors but not the block appearance API.
+                    NSAppearance* previous = [[NSAppearance currentAppearance] retain];
+                    @try {
+                        [NSAppearance setCurrentAppearance:appearance];
+                        readColors();
+                    } @finally {
+                        [NSAppearance setCurrentAppearance:previous];
+                        [previous release];
+                    }
+                }
             }
         }
 #elif !TARGET_OS_WATCH && !TARGET_OS_TV

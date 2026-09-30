@@ -107,6 +107,46 @@ class UIManagerNativeSettingsTest extends UITestBase {
     }
 
     @Test
+    void zoomRetainsNativeFontRestoration() {
+        assertZoomRetainsNativeFontRestoration(1f);
+    }
+
+    @Test
+    void zoomRetainsNativeFontRestorationWithAccessibilityScaling() {
+        assertZoomRetainsNativeFontRestoration(1.5f);
+    }
+
+    private void assertZoomRetainsNativeFontRestoration(float accessibilityScale) {
+        manager.setUseNativeFonts(true);
+        manager.setUseLargerTextScale(true);
+        implementation.setLargerTextEnabled(true);
+        implementation.setLargerTextScale(accessibilityScale);
+        manager.setThemeProps(nativeTheme());
+        Hashtable app = new Hashtable();
+        app.put("App.font", Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR).derive(19f, Font.STYLE_PLAIN));
+        manager.addThemeProps(app);
+        manager.zoomFonts(2f);
+        assertEquals(48f * accessibilityScale, size("Button"));
+        assertEquals(96f * accessibilityScale, size("Heading"));
+        assertEquals(38f * accessibilityScale, size("App"));
+        for (int i = 0; i < 2; i++) {
+            manager.refreshTheme();
+            assertEquals(48f * accessibilityScale, size("Button"));
+        }
+        implementation.nativeThemeSettings = new NativeThemeSettings().font("native:", 20);
+        manager.refreshNativeThemeSettings();
+        assertEquals(40f * accessibilityScale, size("Button"));
+        assertEquals(80f * accessibilityScale, size("Heading"));
+        manager.setUseNativeFonts(false);
+        manager.refreshTheme();
+        assertEquals(32f * accessibilityScale, size("Button"));
+        manager.setUseLargerTextScale(false);
+        manager.refreshTheme();
+        assertEquals(32f, size("Button"));
+        assertEquals(38f, size("App"));
+    }
+
+    @Test
     void appLiteralsAndFontsWinAcrossSettingsChanges() {
         manager.setUseNativeColors(true);
         manager.setUseNativeFonts(true);

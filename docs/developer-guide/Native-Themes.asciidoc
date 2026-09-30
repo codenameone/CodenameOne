@@ -18,22 +18,14 @@ an application theme that includes the native theme:
 
 [source,css]
 ----
-#Constants {
-    includeNativeBool: true;
-    useNativeColorsBool: true;
-    useNativeFontsBool: true;
-    useLargerTextScaleBool: true;
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-theme-os-settings,indent=0]
 ----
 
 Alternatively, configure the `UIManager` before loading the application theme:
 
 [source,java]
 ----
-UIManager ui = UIManager.getInstance();
-ui.setUseNativeColors(true);
-ui.setUseNativeFonts(true);
-ui.setUseLargerTextScale(true);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NativeThemesJava001Snippet.java[tag=native-theme-os-settings,indent=0]
 ----
 
 An explicit theme constant takes precedence over its Java setter when the theme

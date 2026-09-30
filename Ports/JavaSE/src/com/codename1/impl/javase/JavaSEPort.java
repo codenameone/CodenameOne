@@ -9652,33 +9652,44 @@ public class JavaSEPort extends CodenameOneImplementation {
     private JMenu installNativeThemeSettingsMenu() {
         JMenu menu = new JMenu("OS Theme Settings");
         JMenuItem reset = new JMenuItem("Reset simulated settings");
-        reset.addActionListener(e -> setSimulatorNativeThemeSettings(null));
+        reset.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                setSimulatorNativeThemeSettings(null);
+            }
+        });
         menu.add(reset);
         JMenuItem accent = new JMenuItem("Accent color...");
-        accent.addActionListener(e -> {
-            java.awt.Color color = javax.swing.JColorChooser.showDialog(canvas, "Simulated OS accent", java.awt.Color.BLUE);
-            if (color != null) {
-                com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
-                        ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
-                settings.color("accent-color", color.getRGB()).color("accent-color-dark", color.getRGB());
-                setSimulatorNativeThemeSettings(settings);
+        accent.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                java.awt.Color color = javax.swing.JColorChooser.showDialog(canvas, "Simulated OS accent", java.awt.Color.BLUE);
+                if (color != null) {
+                    com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                            ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                    settings.color("accent-color", color.getRGB()).color("accent-color-dark", color.getRGB());
+                    setSimulatorNativeThemeSettings(settings);
+                }
             }
         });
         menu.add(accent);
         JMenuItem font = new JMenuItem("UI font...");
-        font.addActionListener(e -> {
-            String family = javax.swing.JOptionPane.showInputDialog(canvas, "OS UI font family", "Dialog");
-            if (family == null || family.trim().length() == 0) { return; }
-            String size = javax.swing.JOptionPane.showInputDialog(canvas, "Normal size in CN1 pixels", "16");
-            if (size == null) { return; }
-            try {
-                float pixels = Float.parseFloat(size);
-                if (!(pixels > 0 && pixels < 10000)) { throw new NumberFormatException(); }
-                com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
-                        ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
-                setSimulatorNativeThemeSettings(settings.font(family.trim(), pixels));
-            } catch (NumberFormatException invalid) {
-                javax.swing.JOptionPane.showMessageDialog(canvas, "Enter a positive font size below 10000.");
+        font.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                String family = javax.swing.JOptionPane.showInputDialog(canvas, "OS UI font family", "Dialog");
+                if (family == null || family.trim().length() == 0) { return; }
+                String size = javax.swing.JOptionPane.showInputDialog(canvas, "Normal size in CN1 pixels", "16");
+                if (size == null) { return; }
+                try {
+                    float pixels = Float.parseFloat(size);
+                    if (!(pixels > 0 && pixels < 10000)) { throw new NumberFormatException(); }
+                    com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                            ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                    setSimulatorNativeThemeSettings(settings.font(family.trim(), pixels));
+                } catch (NumberFormatException invalid) {
+                    javax.swing.JOptionPane.showMessageDialog(canvas, "Enter a positive font size below 10000.");
+                }
             }
         });
         menu.add(font);
@@ -10798,7 +10809,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (!nativeThemeDesktopListenersInstalled) {
             nativeThemeDesktopListenersInstalled = true;
             final String[] properties = {"win.messagebox.font", "win.itemHighlightColor",
-                    "win.text.textColor", "win.frame.backgroundColor", "gnome.Gtk/FontName"};
+                    "win.text.textColor", "win.frame.backgroundColor", "gnome.Gtk/FontName", "gnome.Xft/DPI"};
             final java.beans.PropertyChangeListener listener = new java.beans.PropertyChangeListener() {
                 public void propertyChange(java.beans.PropertyChangeEvent event) {
                     Display.getInstance().nativeThemeSettingsChanged();
@@ -10812,11 +10823,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
         }
-        Object font = toolkit.getDesktopProperty("win.messagebox.font");
-        if (font instanceof java.awt.Font) {
-            java.awt.Font uiFont = (java.awt.Font) font;
-            result.font(uiFont.getFamily(), uiFont.getSize2D());
-        }
+        readDesktopThemeFont(result, toolkit.getDesktopProperty("win.messagebox.font"),
+                toolkit.getDesktopProperty("gnome.Gtk/FontName"), toolkit.getDesktopProperty("gnome.Xft/DPI"));
         String[][] properties = {{"selection-color", "win.itemHighlightColor"},
                 {"text-color", "win.text.textColor"}, {"window-bg-color", "win.frame.backgroundColor"}};
         for (String[] pair : properties) {
@@ -10826,6 +10834,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return result;
+    }
+
+    // Package visibility allows deterministic tests without a running desktop session.
+    static void readDesktopThemeFont(com.codename1.impl.NativeThemeSettings result,
+            Object windowsFont, Object gtkFontName, Object gtkDpi) {
+        if (windowsFont instanceof java.awt.Font) {
+            java.awt.Font font = (java.awt.Font) windowsFont;
+            result.font(font.getFamily(), font.getSize2D());
+        } else if (gtkFontName instanceof String) {
+            // Pango descriptions end in a point size (or an absolute px size).
+            java.util.regex.Matcher match = java.util.regex.Pattern.compile(
+                    "^(.+?)\\s+(\\d+(?:\\.\\d+)?)(px)?$").matcher(((String) gtkFontName).trim());
+            if (!match.matches()) {
+                return;
+            }
+            String family = match.group(1).replaceFirst(
+                    "(?i)(?:\\s+(?:bold|italic|oblique|regular|normal|light|medium|semibold|condensed))+$", "");
+            float size = Float.parseFloat(match.group(2));
+            if (match.group(3) == null) {
+                // XSettings publishes DPI as a fixed-point integer with 10 fractional bits.
+                float dpi = gtkDpi instanceof Number ? ((Number) gtkDpi).floatValue() / 1024f : 96f;
+                if (!(dpi > 0) || Float.isInfinite(dpi)) {
+                    dpi = 96f;
+                }
+                size *= dpi / 72f;
+            }
+            result.font(family, size);
+        }
     }
 
     private boolean nativeThemeDesktopListenersInstalled;

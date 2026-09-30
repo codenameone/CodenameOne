@@ -57,4 +57,29 @@ class NativeThemeSettingsSimulationTest {
         assertTrue(font.isBold());
         assertTrue(font.isItalic());
     }
+    @Test
+    void gnomeFontUsesFamilyPointSizeAndDesktopDpi() {
+        NativeThemeSettings settings = new NativeThemeSettings();
+        JavaSEPort.readDesktopThemeFont(settings, null, "Noto Sans Bold Italic 10.5", 144 * 1024);
+        assertEquals("Noto Sans", settings.getFontFamily());
+        assertEquals(21f, settings.getFontSize());
+        JavaSEPort.readDesktopThemeFont(settings, null, "DejaVu Sans 12", null);
+        assertEquals("DejaVu Sans", settings.getFontFamily());
+        assertEquals(16f, settings.getFontSize());
+        JavaSEPort.readDesktopThemeFont(settings, null, "Noto Sans 17px", 144 * 1024);
+        assertEquals(17f, settings.getFontSize());
+    }
+
+    @Test
+    void desktopFontFallbackIgnoresMalformedValuesAndPrefersWindowsFont() {
+        for (Object value : new Object[] {null, 12, "Sans", "Sans -2", "Sans NaN", "Sans 0"}) {
+            NativeThemeSettings settings = new NativeThemeSettings();
+            JavaSEPort.readDesktopThemeFont(settings, null, value, null);
+            assertNull(settings.getFontFamily());
+        }
+        NativeThemeSettings settings = new NativeThemeSettings();
+        JavaSEPort.readDesktopThemeFont(settings, new java.awt.Font("Dialog", 0, 18), "Sans 12", null);
+        assertEquals("Dialog", settings.getFontFamily());
+        assertEquals(18f, settings.getFontSize());
+    }
 }
