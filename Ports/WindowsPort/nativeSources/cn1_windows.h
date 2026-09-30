@@ -126,7 +126,8 @@ typedef enum {
      * Java side handed out in setNativeCommands; x, y and windowId are unused. Routed
      * through the same queue as every other event so the command runs on the EDT rather
      * than on the pump thread, which is the rule the whole bridge is built on. */
-    CN1_EVENT_MENU_COMMAND = 23
+    CN1_EVENT_MENU_COMMAND = 23,
+    CN1_EVENT_THEME_SETTINGS_CHANGED = 24
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

@@ -679,6 +679,12 @@ int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_SETTINGCHANGE:
+        case WM_THEMECHANGED:
+        case WM_SYSCOLORCHANGE:
+        case WM_DWMCOLORIZATIONCOLORCHANGED:
+            cn1WinPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+            break;
         case WM_GETOBJECT:
             return cn1WinAccessibilityObject(hwnd, wParam, lParam);
         case WM_LBUTTONDOWN:

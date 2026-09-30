@@ -2827,6 +2827,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        return com.codename1.impl.NativeThemeSettings.parse(nativeInstance.nativeThemeSettings());
+    }
+
+    /// Called by Apple appearance/font notifications; Display coalesces onto the EDT.
+    public static void nativeThemeSettingsChanged() {
+        Display.getInstance().nativeThemeSettingsChanged();
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return nativeInstance.isLargerTextEnabled();
     }
@@ -14460,6 +14470,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static void applicationDidBecomeActive(boolean clearMinimized) {
+        nativeThemeSettingsChanged();
         callInterruptionActive = false;
         final ArrayList<Runnable> callbacks;
         synchronized(instance.onActiveListeners) {

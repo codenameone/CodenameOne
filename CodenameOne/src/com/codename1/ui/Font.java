@@ -154,6 +154,29 @@ public class Font extends CN {
     private static final Hashtable bitmapCache = new Hashtable();
     private static final HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
 
+    /// Internal theme hook: inherit only native UI fonts, never icon or bundled fonts.
+    public Font deriveNativeThemeFont(String family, float size) {
+        if (fontUniqueId == null || !fontUniqueId.startsWith("native:") || family == null) {
+            return this;
+        }
+        int style = getStyle();
+        if (fontUniqueId.indexOf("Bold") >= 0 || fontUniqueId.indexOf("Black") >= 0) {
+            style |= STYLE_BOLD;
+        }
+        if (fontUniqueId.indexOf("Italic") >= 0) {
+            style |= STYLE_ITALIC;
+        }
+        Object nativeFont = Display.impl.loadNativeThemeFont(family, fontUniqueId, size, style);
+        if (nativeFont == null) {
+            return this;
+        }
+        Font result = new Font(nativeFont);
+        result.ttf = true;
+        result.pixelSize = size;
+        result.fontUniqueId = "os:" + family + ":" + fontUniqueId;
+        return result;
+    }
+
     /// Clears the cache of derived TrueType fonts. Called when the theme changes so
     /// that fonts whose platform rendering depends on theme constants (e.g. a native
     /// theme's text letter spacing) are re-derived against the freshly-installed

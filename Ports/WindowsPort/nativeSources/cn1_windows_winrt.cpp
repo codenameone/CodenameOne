@@ -41,6 +41,8 @@
 #include "cn1_windows.h"
 
 #include <roapi.h>
+#include <windows.ui.viewmanagement.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wrl.h>
@@ -456,6 +458,75 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shareText___java_lang_Stri
     data[1] = titleObj != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, titleObj, NULL) : NULL;
     PostMessageW(cn1Win.hwnd, WM_CN1_SHARE, (WPARAM) data, 0);
     return JAVA_TRUE;
+}
+
+
+/* UISettings provides the user's actual accent palette. Keep initialization balanced:
+   this query runs repeatedly on the long-lived EDT, unlike short-lived worker bridges. */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_java_lang_String(
+        CODENAME_ONE_THREAD_STATE) {
+    using namespace ABI::Windows::UI::ViewManagement;
+    CN1Buf buffer;
+    cn1BufInit(&buffer);
+    NONCLIENTMETRICSW metrics = {};
+    metrics.cbSize = sizeof(metrics);
+    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0)) {
+        char family[256];
+        int count = WideCharToMultiByte(CP_UTF8, 0, metrics.lfMessageFont.lfFaceName, -1,
+                family, sizeof(family), NULL, NULL);
+        HDC dc = GetDC(NULL);
+        int dpi = dc ? GetDeviceCaps(dc, LOGPIXELSY) : 96;
+        if (dc) ReleaseDC(NULL, dc);
+        float size = (float)abs(metrics.lfMessageFont.lfHeight) * 96.0f / (dpi > 0 ? dpi : 96)
+                * (cn1Win.dpiScale > 0 ? cn1Win.dpiScale : 1);
+        if (count > 0 && size > 0) {
+            char line[320];
+            snprintf(line, sizeof(line), "fontFamily=%s\nfontSize=%g\n", family, size);
+            cn1BufAppendBytes(&buffer, line, strlen(line));
+        }
+    }
+    HRESULT initialized = RoInitialize(RO_INIT_MULTITHREADED);
+    {
+        ComPtr<IInspectable> instance;
+        ComPtr<IUISettings3> settings;
+        if (SUCCEEDED(RoActivateInstance(HStringReference(RuntimeClass_Windows_UI_ViewManagement_UISettings).Get(),
+                &instance)) && SUCCEEDED(instance.As(&settings))) {
+            const char* tokens[] = {"accent-color", "accent-color-dark", "selection-color", "selection-color-dark"};
+            UIColorType types[] = {UIColorType_Accent, UIColorType_AccentLight2, UIColorType_Accent, UIColorType_AccentLight2};
+            for (int i = 0; i < 4; ++i) {
+                ABI::Windows::UI::Color color;
+                if (SUCCEEDED(settings->GetColorValue(types[i], &color))) {
+                    char line[96];
+                    snprintf(line, sizeof(line), "%s=%02x%02x%02x\n", tokens[i], color.R, color.G, color.B);
+                    cn1BufAppendBytes(&buffer, line, strlen(line));
+                }
+            }
+        }
+    }
+    if (SUCCEEDED(initialized)) RoUninitialize();
+    /* GetSysColor describes the classic/high-contrast palette, not Fluent dark surfaces.
+       Use these semantic colors only for high contrast; normal Fluent keeps its surfaces. */
+    HIGHCONTRASTW contrast = {};
+    contrast.cbSize = sizeof(contrast);
+    if (SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)
+            && (contrast.dwFlags & HCF_HIGHCONTRASTON)) {
+        const char* tokens[] = {"window-bg-color", "view-bg-color", "control-bg-color", "text-color",
+            "text-secondary-color", "selection-color", "accent-color", "accent-fg-color"};
+        int indices[] = {COLOR_WINDOW, COLOR_WINDOW, COLOR_BTNFACE, COLOR_WINDOWTEXT,
+            COLOR_GRAYTEXT, COLOR_HIGHLIGHT, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT};
+        for (int i = 0; i < 8; ++i) {
+            COLORREF color = GetSysColor(indices[i]);
+            char line[128];
+            for (int dark = 0; dark < 2; ++dark) {
+                snprintf(line, sizeof(line), "%s%s=%02x%02x%02x\n", tokens[i], dark ? "-dark" : "",
+                    GetRValue(color), GetGValue(color), GetBValue(color));
+                cn1BufAppendBytes(&buffer, line, strlen(line));
+            }
+        }
+    }
+    JAVA_OBJECT result = newStringFromCString(threadStateData, buffer.data ? buffer.data : "");
+    free(buffer.data);
+    return result;
 }
 
 } /* extern "C" */

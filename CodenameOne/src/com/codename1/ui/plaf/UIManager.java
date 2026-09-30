@@ -170,6 +170,167 @@ public class UIManager {
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     private boolean useLargerTextScale;
+    private boolean useNativeColors;
+    private boolean useNativeFonts;
+    private boolean refreshingTheme;
+    private final java.util.Set<String> nativeFontKeys = new java.util.HashSet<String>();
+    private final java.util.Set<String> nativeColorKeys = new java.util.HashSet<String>();
+    private final java.util.Set<String> nativeBorderKeys = new java.util.HashSet<String>();
+    private final java.util.Set<String> applicationConstants = new java.util.HashSet<String>();
+    private final Map<String, Object> nativeOriginals = new HashMap<String, Object>();
+    private final Map<String, Object> nativeDerived = new HashMap<String, Object>();
+    private float nativeBaseFontSize;
+    private com.codename1.impl.NativeThemeSettings nativeSettings;
+    private float nativeSettingsTextScale = 1f;
+    private Boolean nativeSettingsDark;
+
+    /// Whether native-theme colors inherit available OS settings. Defaults to false.
+    public boolean isUseNativeColors() { return useNativeColors; }
+
+    /// Opts into OS colors. Call refreshTheme() to apply to an already loaded theme;
+    /// an explicit useNativeColorsBool theme constant takes precedence on rebuild.
+    public void setUseNativeColors(boolean enabled) { useNativeColors = enabled; }
+
+    /// Whether native-theme typography inherits the OS family and normal base size.
+    public boolean isUseNativeFonts() { return useNativeFonts; }
+
+    /// Opts into OS typography, independently of larger-text accessibility scaling.
+    /// Call refreshTheme() to apply; useNativeFontsBool takes precedence on rebuild.
+    public void setUseNativeFonts(boolean enabled) { useNativeFonts = enabled; }
+
+    /// Internal EDT entry point for coalesced platform settings notifications.
+    public void refreshNativeThemeSettings() {
+        if (!useNativeColors && !useNativeFonts && !useLargerTextScale) {
+            return;
+        }
+        Display display = Display.getInstance();
+        com.codename1.impl.NativeThemeSettings next = display.getNativeThemeSettings().forInheritance(useNativeColors, useNativeFonts);
+        float scale = getEffectiveLargerTextScale();
+        Boolean dark = display.isDarkMode();
+        if (next.equals(nativeSettings)
+                && Float.floatToIntBits(scale) == Float.floatToIntBits(nativeSettingsTextScale)
+                && (dark == null ? nativeSettingsDark == null : dark.equals(nativeSettingsDark))) {
+            return;
+        }
+        refreshTheme();
+        com.codename1.ui.Form form = display.getCurrent();
+        if (form != null) {
+            form.refreshTheme(true);
+            revalidateNativeThemeTree(form);
+            form.repaint();
+        }
+        for (com.codename1.ui.Window window : com.codename1.ui.Desktop.getInstance().getWindows()) {
+            window.refreshTheme(true);
+            revalidateNativeThemeTree(window);
+            window.repaint();
+        }
+    }
+
+    private void revalidateNativeThemeTree(com.codename1.ui.Container container) {
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            Component child = container.getComponentAt(i);
+            if (child instanceof com.codename1.ui.Container) {
+                revalidateNativeThemeTree((com.codename1.ui.Container) child);
+            }
+        }
+        container.revalidate();
+    }
+
+    private void restoreNativeThemeValues() {
+        for (Map.Entry<String, Object> entry : nativeOriginals.entrySet()) {
+            if (themeProps.get(entry.getKey()) == nativeDerived.get(entry.getKey())) {
+                themeProps.put(entry.getKey(), entry.getValue());
+            }
+        }
+        nativeOriginals.clear();
+        nativeDerived.clear();
+    }
+
+    private void recordNativeThemeOwnership(Hashtable incoming) {
+        if (refreshingTheme) {
+            return;
+        }
+        boolean nativeLayer = "true".equals(incoming.get("@nativeThemeDefaultsBool"));
+        if (nativeLayer) {
+            Object base = incoming.get("Label.font");
+            if (!(base instanceof Font)) { base = incoming.get("font"); }
+            if (base instanceof Font) { nativeBaseFontSize = nativeFontSize((Font) base); }
+        }
+        for (Object item : incoming.keySet()) {
+            String key = (String) item;
+            if (key.startsWith("@")) {
+                if (!nativeLayer) {
+                    applicationConstants.add(key.substring(1));
+                }
+            } else if (nativeLayer) {
+                if (incoming.get(key) instanceof Font) {
+                    nativeFontKeys.add(key);
+                }
+                if (key.endsWith("border")) { nativeBorderKeys.add(key); }
+                if (incoming.containsKey("@cn1-bind:" + key)) {
+                    nativeColorKeys.add(key);
+                }
+            } else {
+                nativeFontKeys.remove(key);
+                nativeColorKeys.remove(key);
+                nativeBorderKeys.remove(key);
+            }
+        }
+    }
+
+    private void applyNativeThemeSettings() {
+        Boolean colors = isThemeConstant("useNativeColorsBool");
+        Boolean fonts = isThemeConstant("useNativeFontsBool");
+        if (colors != null) { useNativeColors = colors.booleanValue(); }
+        if (fonts != null) { useNativeFonts = fonts.booleanValue(); }
+        if (!useNativeColors && !useNativeFonts && !useLargerTextScale) {
+            return;
+        }
+        Display display = Display.getInstance();
+        nativeSettings = display.getNativeThemeSettings().forInheritance(useNativeColors, useNativeFonts);
+        nativeSettingsTextScale = getEffectiveLargerTextScale();
+        nativeSettingsDark = display.isDarkMode();
+        if (useNativeColors) {
+            for (String key : nativeColorKeys) {
+                Object binding = themeConstants.get("cn1-bind:" + key);
+                if (!(binding instanceof String) || applicationConstants.contains((String) binding)) {
+                    continue;
+                }
+                String value = nativeSettings.getColor((String) binding);
+                if (value != null && themeProps.containsKey(key)) {
+                    rememberNativeValue(key, value);
+                    syncBoundRoundBorderColor(key, value);
+                }
+            }
+        }
+        if (useNativeFonts && nativeBaseFontSize > 0 && nativeSettings.getFontFamily() != null) {
+            for (String key : nativeFontKeys) {
+                Object value = themeProps.get(key);
+                if (!(value instanceof Font)) { continue; }
+                Font original = (Font) value;
+                float size = nativeFontSize(original);
+                if (size <= 0) { continue; }
+                try {
+                    Font inherited = original.deriveNativeThemeFont(nativeSettings.getFontFamily(),
+                            size * nativeSettings.getFontSize() / nativeBaseFontSize);
+                    if (inherited != original) { rememberNativeValue(key, inherited); }
+                } catch (RuntimeException ex) {
+                    Log.e(ex);
+                }
+            }
+        }
+    }
+
+    private float nativeFontSize(Font font) {
+        return font.getPixelSize() > 0 ? font.getPixelSize() : font.getHeight();
+    }
+
+    private void rememberNativeValue(String key, Object value) {
+        nativeOriginals.put(key, themeProps.get(key));
+        nativeDerived.put(key, value);
+        themeProps.put(key, value);
+    }
+
     /// Tracks the original (unscaled) Font we replaced in themeProps when
     /// [#applyLargerTextScaleToThemeFonts] last ran. Without this, each scale
     /// change derives from the previously-scaled font and compounds, so going
@@ -1779,6 +1940,8 @@ public class UIManager {
     /// - `themeProps`: the properties of the given theme
     public void addThemeProps(Hashtable themeProps) {
         if (accessible) {
+            restoreLargerTextFonts();
+            restoreNativeThemeValues();
             dropSupersededBindings(themeProps);
             buildTheme(themeProps);
             styles.clear();
@@ -1935,6 +2098,8 @@ public class UIManager {
         if (!accessible || themeProps == null) {
             return;
         }
+        restoreLargerTextFonts();
+        restoreNativeThemeValues();
         Hashtable props = new Hashtable();
         for (Map.Entry<String, Object> e : themeProps.entrySet()) {
             props.put(e.getKey(), e.getValue());
@@ -1949,7 +2114,12 @@ public class UIManager {
                 props.put("@" + e.getKey(), e.getValue());
             }
         }
-        setThemePropsImpl(props);
+        refreshingTheme = true;
+        try {
+            setThemePropsImpl(props);
+        } finally {
+            refreshingTheme = false;
+        }
     }
 
     /// Returns a theme constant defined in the resource editor
@@ -2070,6 +2240,15 @@ public class UIManager {
     }
 
     void setThemePropsImpl(Hashtable themeProps) {
+        if (!refreshingTheme && buildThemeDepth == 0) {
+            nativeFontKeys.clear();
+            nativeColorKeys.clear();
+            nativeBorderKeys.clear();
+            applicationConstants.clear();
+            nativeOriginals.clear();
+            nativeDerived.clear();
+            nativeBaseFontSize = 0;
+        }
         resetThemeProps(themeProps);
         styles.clear();
         themeConstants.clear();
@@ -2146,11 +2325,17 @@ public class UIManager {
         // returning a paint derived under the previous (or no) theme.
         Font.clearDerivedFontCache();
         String con = (String) themeProps.get("@includeNativeBool");
-        if (con != null && "true".equalsIgnoreCase(con) && Display.getInstance().hasNativeTheme()) {
+        if (!refreshingTheme && con != null && "true".equalsIgnoreCase(con) && Display.getInstance().hasNativeTheme()) {
             boolean a = accessible;
             accessible = true;
             Display.getInstance().installNativeTheme();
             accessible = a;
+        }
+        recordNativeThemeOwnership(themeProps);
+        // A literal supplied by the app supersedes a native palette binding, including
+        // on initial @includeNativeBool composition (not only on addThemeProps).
+        if (!refreshingTheme && !"true".equals(themeProps.get("@nativeThemeDefaultsBool"))) {
+            dropSupersededBindings(themeProps);
         }
         Enumeration e = themeProps.keys();
         while (e.hasMoreElements()) {
@@ -2162,6 +2347,27 @@ public class UIManager {
                 continue;
             }
             this.themeProps.put(key, themeProps.get(key));
+        }
+
+        String overlayThemes = (String) themeProps.get("@OverlayThemes");
+        if (overlayThemes != null) {
+            java.util.List<String> overlayThemesArr = StringUtil.tokenize(overlayThemes, ',');
+            for (String th : overlayThemesArr) {
+                th = th.trim();
+                if (th.length() == 0) {
+                    continue;
+                }
+                try {
+                    Resources res = Resources.openLayered("/" + th);
+                    boolean a = accessible;
+                    accessible = true;
+                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
+                    accessible = a;
+                } catch (Exception ex) {
+                    System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: " + th);
+                    Log.e(ex);
+                }
+            }
         }
 
         applyThemeBindings();
@@ -2194,6 +2400,8 @@ public class UIManager {
         }
 
         if (buildThemeDepth == 1) {
+            restoreLargerTextFonts();
+            applyNativeThemeSettings();
             applyLargerTextScaleToThemeFonts();
         }
 
@@ -2206,27 +2414,6 @@ public class UIManager {
         defaultSelectedStyle = createStyle("", "sel#", true);
         if (buildThemeDepth == 1) {
             applyLargerTextScaleToDefaultStyles();
-        }
-
-        String overlayThemes = (String) themeProps.get("@OverlayThemes");
-        if (overlayThemes != null) {
-            java.util.List<String> overlayThemesArr = StringUtil.tokenize(overlayThemes, ',');
-            for (String th : overlayThemesArr) {
-                th = th.trim();
-                if (th.length() == 0) {
-                    continue;
-                }
-                try {
-                    Resources res = Resources.openLayered("/" + th);
-                    boolean a = accessible;
-                    accessible = true;
-                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
-                    accessible = a;
-                } catch (Exception ex) {
-                    System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: " + th);
-                    Log.e(ex);
-                }
-            }
         }
 
         // Everything above merged into themeProps, so the style-definition index
@@ -2315,6 +2502,11 @@ public class UIManager {
             return;
         }
         String borderKey = themeKey.substring(0, themeKey.length() - suffix.length()) + "border";
+        // An app may replace a native border without replacing its background-color
+        // property. The inherited fill must not recolor that explicitly supplied border.
+        if (nativeColorKeys.contains(themeKey) && !nativeBorderKeys.contains(borderKey)) {
+            return;
+        }
         Object border = themeProps.get(borderKey);
         if (border instanceof RoundBorder) {
             ((RoundBorder) border).color(Integer.parseInt(colorValue, 16));
@@ -2403,7 +2595,7 @@ public class UIManager {
     /// Only [#buildTheme] at depth 1 may call this: the bookkeeping below spans
     /// the whole merged theme, and a nested `@includeNativeBool` install sees
     /// only the native theme's half of it. See [#buildThemeDepth].
-    private void applyLargerTextScaleToThemeFonts() {
+    private void restoreLargerTextFonts() {
         // Roll back any prior scaling we applied so this pass always derives
         // from the original installed font. Without the rollback, repeated
         // refreshes compound (each scale multiplies the previously-derived
@@ -2424,6 +2616,10 @@ public class UIManager {
             scaledFontDerived.clear();
         }
 
+    }
+
+    private void applyLargerTextScaleToThemeFonts() {
+        restoreLargerTextFonts();
         float scale = getEffectiveLargerTextScale();
         if (scale <= 1f) {
             return;

@@ -45,6 +45,8 @@
  */
 
 #Constants {
+    /* Marks bundled defaults eligible for optional OS settings inheritance. */
+    nativeThemeDefaultsBool: true;
     --accent-color: #007aff;            /* NSColor.controlAccentColor, default blue */
     --accent-color-dark: #007aff;
     --accent-fg-color: #ffffff;

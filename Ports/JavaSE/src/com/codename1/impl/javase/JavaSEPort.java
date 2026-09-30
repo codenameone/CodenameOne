@@ -8551,6 +8551,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         final JMenu largerTextMenu = installLargerTextMenu(simulateMenu, pref, frm);
+        simulateMenu.add(installNativeThemeSettingsMenu());
         final JMenu accessibilityPreferencesMenu = installAccessibilityPreferencesMenu(pref);
 
         final JMenu notificationBackgroundMenu = installNotificationBackgroundSimulationMenu(simulateMenu);
@@ -9648,6 +9649,42 @@ public class JavaSEPort extends CodenameOneImplementation {
         return Math.min(h1, w1);
     }
     
+    private JMenu installNativeThemeSettingsMenu() {
+        JMenu menu = new JMenu("OS Theme Settings");
+        JMenuItem reset = new JMenuItem("Reset simulated settings");
+        reset.addActionListener(e -> setSimulatorNativeThemeSettings(null));
+        menu.add(reset);
+        JMenuItem accent = new JMenuItem("Accent color...");
+        accent.addActionListener(e -> {
+            java.awt.Color color = javax.swing.JColorChooser.showDialog(canvas, "Simulated OS accent", java.awt.Color.BLUE);
+            if (color != null) {
+                com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                        ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                settings.color("accent-color", color.getRGB()).color("accent-color-dark", color.getRGB());
+                setSimulatorNativeThemeSettings(settings);
+            }
+        });
+        menu.add(accent);
+        JMenuItem font = new JMenuItem("UI font...");
+        font.addActionListener(e -> {
+            String family = javax.swing.JOptionPane.showInputDialog(canvas, "OS UI font family", "Dialog");
+            if (family == null || family.trim().length() == 0) { return; }
+            String size = javax.swing.JOptionPane.showInputDialog(canvas, "Normal size in CN1 pixels", "16");
+            if (size == null) { return; }
+            try {
+                float pixels = Float.parseFloat(size);
+                if (!(pixels > 0 && pixels < 10000)) { throw new NumberFormatException(); }
+                com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                        ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                setSimulatorNativeThemeSettings(settings.font(family.trim(), pixels));
+            } catch (NumberFormatException invalid) {
+                javax.swing.JOptionPane.showMessageDialog(canvas, "Enter a positive font size below 10000.");
+            }
+        });
+        menu.add(font);
+        return menu;
+    }
+
     private JMenu installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
         // Standard iOS Dynamic Type stops with their actual body-text point sizes.
         // The simulator returns ratio = bodyPt / 17pt, matching what iOS reports.
@@ -10753,6 +10790,62 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        if (simulatorNativeThemeSettings != null) { return simulatorNativeThemeSettings.copy(); }
+        com.codename1.impl.NativeThemeSettings result = new com.codename1.impl.NativeThemeSettings();
+        if (isSimulator()) { return result; }
+        final java.awt.Toolkit toolkit = java.awt.Toolkit.getDefaultToolkit();
+        if (!nativeThemeDesktopListenersInstalled) {
+            nativeThemeDesktopListenersInstalled = true;
+            final String[] properties = {"win.messagebox.font", "win.itemHighlightColor",
+                    "win.text.textColor", "win.frame.backgroundColor", "gnome.Gtk/FontName"};
+            final java.beans.PropertyChangeListener listener = new java.beans.PropertyChangeListener() {
+                public void propertyChange(java.beans.PropertyChangeEvent event) {
+                    Display.getInstance().nativeThemeSettingsChanged();
+                }
+            };
+            for (String property : properties) { toolkit.addPropertyChangeListener(property, listener); }
+            addDeinitializeHook(new Runnable() {
+                public void run() {
+                    for (String property : properties) { toolkit.removePropertyChangeListener(property, listener); }
+                    nativeThemeDesktopListenersInstalled = false;
+                }
+            });
+        }
+        Object font = toolkit.getDesktopProperty("win.messagebox.font");
+        if (font instanceof java.awt.Font) {
+            java.awt.Font uiFont = (java.awt.Font) font;
+            result.font(uiFont.getFamily(), uiFont.getSize2D());
+        }
+        String[][] properties = {{"selection-color", "win.itemHighlightColor"},
+                {"text-color", "win.text.textColor"}, {"window-bg-color", "win.frame.backgroundColor"}};
+        for (String[] pair : properties) {
+            Object color = toolkit.getDesktopProperty(pair[1]);
+            if (color instanceof java.awt.Color) {
+                result.color(pair[0], ((java.awt.Color) color).getRGB());
+            }
+        }
+        return result;
+    }
+
+    private boolean nativeThemeDesktopListenersInstalled;
+    private com.codename1.impl.NativeThemeSettings simulatorNativeThemeSettings;
+
+    /// Deterministic OS settings for simulator previews/tests; null restores host defaults.
+    public void setSimulatorNativeThemeSettings(com.codename1.impl.NativeThemeSettings settings) {
+        simulatorNativeThemeSettings = settings == null ? null : settings.copy();
+        Display.getInstance().nativeThemeSettingsChanged();
+    }
+
+    @Override
+    public Object loadNativeThemeFont(String family, String template, float size, int style) {
+        if ("native:".equals(family)) {
+            return super.loadNativeThemeFont(family, template, size, style);
+        }
+        return new java.awt.Font(family, style, 1).deriveFont(size);
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return largerTextEnabled;
     }
@@ -11494,6 +11587,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowActivated(WindowEvent e) {
+                    Display.getInstance().nativeThemeSettingsChanged();
                     mainSurfaceFocusChanged(true);
                 }
 

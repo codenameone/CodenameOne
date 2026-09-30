@@ -13182,6 +13182,19 @@ public abstract class CodenameOneImplementation {
         return isAccessibilityTreeSupported();
     }
 
+    /// Internal port hook. Return a fresh snapshot; unsupported ports keep bundled defaults.
+    public NativeThemeSettings getNativeThemeSettings() {
+        return new NativeThemeSettings();
+    }
+
+    /// Loads the selected OS family using the original native alias's weight/style.
+    /// A family of "native:" means the platform's existing native aliases.
+    public Object loadNativeThemeFont(String family, String template, float size, int style) {
+        String name = "native:".equals(family) ? template : family;
+        Object font = loadTrueTypeFont(name, null);
+        return font == null ? null : deriveTrueTypeFont(font, size, style);
+    }
+
     /// Returns true if the user has selected larger type fonts in the system settings.
     /// Default implementation returns false.
     ///

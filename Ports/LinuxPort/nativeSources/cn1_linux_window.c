@@ -1867,3 +1867,67 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME
     g_settings_schema_unref(schema);
     return result;
 }
+
+/* Settings and GTK style contexts must only be read on the GTK main thread. */
+static void cn1ThemeSettingsNotify(GObject* object, GParamSpec* property, gpointer data) {
+    (void)object; (void)property; (void)data;
+    cn1LinuxPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+}
+
+static void cn1ReadThemeSettings(void* out) {
+    GString* result = (GString*)out;
+    GtkSettings* settings = gtk_settings_get_default();
+    if (!settings || !cn1Window) return;
+    static GtkSettings* observed;
+    if (observed != settings) {
+        if (observed) {
+            g_signal_handlers_disconnect_by_func(observed, G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+            g_object_unref(observed);
+        }
+        observed = (GtkSettings*)g_object_ref(settings);
+        g_signal_connect(settings, "notify::gtk-font-name", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-xft-dpi", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-theme-name", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-application-prefer-dark-theme", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+    }
+    gchar* fontName = NULL;
+    g_object_get(settings, "gtk-font-name", &fontName, NULL);
+    if (fontName) {
+        PangoFontDescription* font = pango_font_description_from_string(fontName);
+        const char* family = pango_font_description_get_family(font);
+        double size = (double)pango_font_description_get_size(font) / PANGO_SCALE;
+        if (!pango_font_description_get_size_is_absolute(font)) {
+            double dpi = gdk_screen_get_resolution(gtk_widget_get_screen(cn1Window));
+            size *= (dpi > 0 ? dpi : 96) / 72.0;
+        }
+        if (family && size > 0) g_string_append_printf(result, "fontFamily=%s\nfontSize=%g\n", family, size);
+        pango_font_description_free(font);
+        g_free(fontName);
+    }
+    GtkStyleContext* context = gtk_widget_get_style_context(cn1Window);
+    const char* tokens[] = {"accent-color", "accent-fg-color", "selection-color", "window-bg-color",
+        "text-color", "view-bg-color", "text-secondary-color", "separator-color"};
+    const char* names[] = {"theme_selected_bg_color", "theme_selected_fg_color", "theme_selected_bg_color",
+        "theme_bg_color", "theme_fg_color", "theme_base_color", "insensitive_fg_color", "borders"};
+    /* GTK exposes the active palette only. Supply it to the corresponding appearance,
+       never overwrite the other appearance with an invented light/dark variant. */
+    GdkRGBA bg;
+    gboolean dark = gtk_style_context_lookup_color(context, "theme_bg_color", &bg)
+            && (bg.red + bg.green + bg.blue) < 1.5;
+    for (unsigned i = 0; i < sizeof(tokens) / sizeof(tokens[0]); ++i) {
+        GdkRGBA color;
+        if (gtk_style_context_lookup_color(context, names[i], &color) && color.alpha >= 0.999) {
+            g_string_append_printf(result, "%s%s=%02x%02x%02x\n", tokens[i], dark ? "-dark" : "",
+                (unsigned)(color.red * 255 + 0.5), (unsigned)(color.green * 255 + 0.5),
+                (unsigned)(color.blue * 255 + 0.5));
+        }
+    }
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_nativeThemeSettings___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    GString* buffer = g_string_new(NULL);
+    cn1LinuxRunOnMainAndWait(cn1ReadThemeSettings, buffer);
+    JAVA_OBJECT result = newStringFromCString(threadStateData, buffer->str);
+    g_string_free(buffer, TRUE);
+    return result;
+}
