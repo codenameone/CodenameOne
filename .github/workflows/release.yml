@@ -22,7 +22,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Nothing is built or published until the release gate has verified this commit:
+  # every target from every way users start a project, built on the real servers, and
+  # a new user's walk from signup to first build (BuildDaemon release-gate/,
+  # deploy/RELEASE-CHECKLIST.md). The check re-reads every build from BuildCloud and
+  # has no override input; a release that cannot pass is not published.
+  release-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify the release gate record for this commit
+        env:
+          GATE_ACCOUNT: ${{ vars.RELEASE_GATE_ACCOUNT }}
+          RELEASE_GATE_MATRIX_SHA256: ${{ vars.RELEASE_GATE_MATRIX_SHA256 }}
+          RELEASE_GATE_ADMIN_TOKEN: ${{ secrets.RELEASE_GATE_ADMIN_TOKEN }}
+        run: bash scripts/release-gate/check-release-gate.sh
+
   build:
+    needs: release-gate
     runs-on: ubuntu-24.04
     # Was 240 to cover five 30-minute Maven Central propagation polls. Those are gone
     # with Central, and what remains is the core reactor plus four editors against a
