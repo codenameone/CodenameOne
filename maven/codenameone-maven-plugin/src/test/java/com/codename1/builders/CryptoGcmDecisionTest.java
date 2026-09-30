@@ -62,6 +62,14 @@ public class CryptoGcmDecisionTest {
     }
 
     @Test
+    public void theVaultKeepsGcmOverAnExplicitFalse() {
+        // An existing ios.crypto.gcm=false must not turn a working vault application into one
+        // whose crypto fails once the port it builds against moves to public GCM.
+        assertTrue(IPhoneBuilder.resolveCryptoGcm(PUBLIC, true, true, false, "false"));
+        assertTrue(IPhoneBuilder.resolveCryptoGcm(LEGACY, true, true, false, "false"));
+    }
+
+    @Test
     public void noCryptoMeansNoGcmEitherWay() {
         assertFalse(IPhoneBuilder.resolveCryptoGcm(PUBLIC, false, false, false, "true"));
         assertFalse(IPhoneBuilder.resolveCryptoGcm(LEGACY, false, false, false, "true"));

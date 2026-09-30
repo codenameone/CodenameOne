@@ -1215,6 +1215,22 @@ jobs:
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
+      # The tvOS half of the private-API gate. The iOS jobs compile the port for iOS, where
+      # every `#if TARGET_OS_TV` branch is preprocessed away, so this compiles it again for the
+      # tvOS simulator SDK -- the only tvOS build any job produces. Gates whose code tvOS cannot
+      # compile are derived and dropped (no tvOS binary can contain them) and are listed in the
+      # output. The tvOS app itself is binary-checked by run-tv-ui-tests.sh after its build.
+      - name: Check the port's tvOS branches reference no private Apple API
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          scripts/check-ios-private-api.py \
+            --developer-dir "$DEVELOPER_DIR" --sdk appletvsimulator \
+            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+        timeout-minutes: 15
+
       - name: Ensure tvOS simulator runtime
         run: |
           set -euo pipefail

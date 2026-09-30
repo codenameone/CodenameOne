@@ -306,6 +306,23 @@ int cn1_private_api_probe(void) {
 MIN_EXPORTED = 50000
 MIN_HEADER_NAMES = 50000
 
+# The clang target OS for each SDK the source sweep can compile against. Set once in main().
+#
+# tvOS is swept against the SIMULATOR SDK because that is the only tvOS build any job produces,
+# and the device SDK cannot compile the port as it stands: it has no LocalAuthentication, which
+# IOSNative.m imports unconditionally (the simulator SDK does ship it).
+SDK_TRIPLES = {
+    "iphoneos": ("arm64-apple-ios", ""),
+    "appletvsimulator": ("arm64-apple-tvos", "-simulator"),
+}
+TRIPLE_PREFIX = "arm64-apple-ios"
+TRIPLE_SUFFIX = ""
+
+# Directories whose headers are not public API. No SDK in Xcode 26 or 27 ships either, but if one
+# did, a private header would put its names into the "declared" index and a private import would
+# read as public -- the exact failure this check exists to catch.
+PRIVATE_HEADER_DIRS = {"PrivateHeaders", "PrivateFrameworks"}
+
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 COMMENTS = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
 TBD_LIST = re.compile(r"\b(objc-classes|objc-eh-types|objc-ivars|symbols):\s*\[(.*?)\]", re.S)
@@ -340,8 +357,9 @@ def find_clang(developer_dir):
     return out.stdout.strip()
 
 
-def walk(root, suffixes):
-    for base, _dirs, files in os.walk(root, followlinks=False):
+def walk(root, suffixes, skip_dirs=()):
+    for base, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [d for d in dirs if d not in skip_dirs]
         for name in files:
             if name.endswith(suffixes):
                 yield os.path.join(base, name)
@@ -374,9 +392,9 @@ def exported_names(sdk):
 
 
 def public_header_names(sdk):
-    """Every identifier the SDK's headers spell outside a comment."""
+    """Every identifier the SDK's PUBLIC headers spell outside a comment."""
     names = set()
-    for header in walk(sdk, (".h",)):
+    for header in walk(sdk, (".h",), skip_dirs=PRIVATE_HEADER_DIRS):
         try:
             with open(header, "r", errors="replace") as handle:
                 text = handle.read()
@@ -435,9 +453,9 @@ NM_IMPORT = re.compile(r"\(undefined\)\s+(?:weak\s+)?external\s+(\S+)(?:\s+\(fro
 
 def imports_of_binary(path):
     """(symbol, library) for every import of one Mach-O, per `nm -m`."""
-    out = run(["nm", "-m", "-u", "-arch", "arm64", path])
-    if out.returncode != 0:
-        out = run(["nm", "-m", "-u", path])
+    # Every slice: `-arch arm64` succeeds on a universal binary and silently skips an arm64e
+    # (or any other) slice, where an architecture-conditional private import would hide.
+    out = run(["nm", "-m", "-u", "-arch", "all", path])
     if out.returncode != 0:
         fail("nm could not read %s: %s" % (path, out.stderr.strip()))
     result = set()
@@ -564,6 +582,7 @@ def self_test_binary(clang, sdk, triple, exported, headers, probe_o, work_dir):
 def compile_port(clang, sdk, project_dir, target, work_dir, jobs, verbose):
     """Every port native, every gate on, every configuration -> object files."""
     gates = deltas.harvest_gates()
+    tvos = TRIPLE_PREFIX == "arm64-apple-tvos"
     prefix_header = None
     for name in os.listdir(project_dir):
         if name.endswith("-Prefix.pch"):
@@ -589,13 +608,15 @@ def compile_port(clang, sdk, project_dir, target, work_dir, jobs, verbose):
     def compile_one(job):
         config, extra, name, tree = job
         obj = os.path.join(work_dir, "obj", config, name + ".o")
-        cmd = [clang, "-c", "-arch", "arm64", "-target", "arm64-apple-ios" + target,
+        cmd = [clang, "-c", "-arch", "arm64", "-target", TRIPLE_PREFIX + target + TRIPLE_SUFFIX,
                "-isysroot", sdk, "-fmodules", "-fmodules-cache-path=" + cache,
                "-fobjc-arc" if name in arc else "-fno-objc-arc", "-w",
                "-Wno-error=implicit-function-declaration", "-Wno-error=int-conversion",
                "-Wno-error=incompatible-pointer-types",
                "-I", NATIVE_SOURCES, "-I", tree, "-I", stub_dir,
                "-include", os.path.join(tree, os.path.basename(prefix_header))]
+        if tvos:
+            cmd.append("-ferror-limit=0")
         for define in deltas.defines_for(gates, extra):
             cmd += ["-D", define]
         cmd += [os.path.join(NATIVE_SOURCES, name), "-o", obj]
@@ -622,13 +643,36 @@ def compile_port(clang, sdk, project_dir, target, work_dir, jobs, verbose):
               % (variant, len(mentions), ", ".join(present)))
     for config in set(j[0] for j in jobs_list):
         os.makedirs(os.path.join(work_dir, "obj", config))
-    objects, failures = [], []
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        for job, obj, res in pool.map(compile_one, jobs_list):
-            if res.returncode == 0:
-                objects.append((job[2], obj, job[3]))
-            else:
-                failures.append((job, res.stderr.strip().splitlines()[:4]))
+    dropped = []
+    for _round in range(MAX_TVOS_GATE_ROUNDS):
+        objects, failures = [], []
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            for job, obj, res in pool.map(compile_one, jobs_list):
+                if res.returncode == 0:
+                    objects.append((job[2], obj, job[3]))
+                else:
+                    failures.append((job, res.stderr))
+        if not failures or not tvos:
+            break
+        # tvOS: a gate whose code the tvOS SDK cannot compile is, by construction, absent
+        # from every tvOS binary -- an application that enables it with a TV slice fails its
+        # TV build instead. So such gates are dropped, round by round (a fatal error hides
+        # the ones after it), and named below. An error inside no enabled gate is code every
+        # tvOS build compiles, and stays fatal.
+        culprits = set()
+        for _job, stderr in failures:
+            for path, line in error_locations(stderr):
+                gate = innermost_enabled_gate(path, line, gates)
+                if gate:
+                    culprits.add(gate)
+        if not culprits:
+            break
+        gates[:] = [g for g in gates if g not in culprits]
+        dropped += sorted(culprits)
+    if dropped:
+        print("tvOS-only omits   : %d gate(s) whose code the tvOS SDK cannot compile: %s"
+              % (len(dropped), ", ".join(dropped)))
+    failures = [(job, stderr.strip().splitlines()[:4]) for job, stderr in failures]
     if failures:
         # A native that does not compile is one whose imports were never read. Reporting
         # success over a partial set is the failure this check exists to prevent.
@@ -643,6 +687,51 @@ def compile_port(clang, sdk, project_dir, target, work_dir, jobs, verbose):
           % (len(objects), len(set(j[0] for j in jobs_list))))
     report_unreachable_branches(clang, sdk, project_dir, target, sources, stub_dir, work_dir)
     return objects
+
+
+MAX_TVOS_GATE_ROUNDS = 12
+ERROR_LOCATION = re.compile(r"^(/[^:\n]+):(\d+):\d+: (?:fatal )?error:", re.M)
+CONDITIONAL = re.compile(r"^\s*#\s*(ifdef|ifndef|if|elif|else|endif)\b\s*(.*)$")
+DEFINED_NAME = re.compile(r"^(?:defined\s*\(?\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\)?\s*$")
+
+
+def error_locations(stderr):
+    """(file, line) of every error clang reported, in any file."""
+    return [(m.group(1), int(m.group(2))) for m in ERROR_LOCATION.finditer(stderr)]
+
+
+def innermost_enabled_gate(path, line, gates):
+    """The innermost enabled gate whose ON branch contains `line` of `path`, or None.
+
+    Tracks #ifdef GATE / #if defined(GATE) / #if GATE and their #else, so an error in the
+    branch a gate switches OFF is never blamed on it.
+    """
+    try:
+        with open(path, "r", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+    enabled = set(gates)
+    stack = []  # (gate or None, in_else)
+    for number, text in enumerate(lines[:line - 1], 1):
+        match = CONDITIONAL.match(text)
+        if not match:
+            continue
+        kind, rest = match.group(1), match.group(2).split("//")[0].strip()
+        if kind in ("ifdef", "if"):
+            name = DEFINED_NAME.match(rest)
+            gate = name.group(1) if name and name.group(1) in enabled else None
+            stack.append([gate, False])
+        elif kind == "ifndef":
+            stack.append([None, False])
+        elif kind in ("else", "elif") and stack:
+            stack[-1][1] = True
+        elif kind == "endif" and stack:
+            stack.pop()
+    for gate, in_else in reversed(stack):
+        if gate and not in_else:
+            return gate
+    return None
 
 
 HAS_INCLUDE_ANGLE = re.compile(r"__has_include\(\s*<([^>]+)>\s*\)")
@@ -671,7 +760,7 @@ def report_unreachable_branches(clang, sdk, project_dir, target, sources, stub_d
     with open(probe, "w") as handle:
         for i, header in enumerate(sorted(wanted)):
             handle.write("#if __has_include(<%s>)\ncn1_found_%d\n#endif\n" % (header, i))
-    out = run([clang, "-E", "-P", "-target", "arm64-apple-ios" + target, "-isysroot", sdk,
+    out = run([clang, "-E", "-P", "-target", TRIPLE_PREFIX + target + TRIPLE_SUFFIX, "-isysroot", sdk,
                "-I", NATIVE_SOURCES, "-I", project_dir, "-I", stub_dir, probe]).stdout
     missing = [h for i, h in enumerate(sorted(wanted)) if "cn1_found_%d" % i not in out]
     if not missing:
@@ -708,7 +797,7 @@ def project_definitions(clang, sdk, project_dir, target, work_dir, jobs):
 
     def compile_one(name):
         obj = os.path.join(out_dir, name + ".o")
-        cmd = [clang, "-c", "-arch", "arm64", "-target", "arm64-apple-ios" + target,
+        cmd = [clang, "-c", "-arch", "arm64", "-target", TRIPLE_PREFIX + target + TRIPLE_SUFFIX,
                "-isysroot", sdk, "-fno-objc-arc", "-w", "-I", project_dir,
                "-Wno-error=implicit-function-declaration", "-Wno-error=int-conversion",
                "-Wno-error=incompatible-pointer-types"]
@@ -769,13 +858,17 @@ def main():
     if args.developer_dir:
         os.environ["DEVELOPER_DIR"] = args.developer_dir
 
+    global TRIPLE_PREFIX, TRIPLE_SUFFIX
+    if args.sdk not in SDK_TRIPLES:
+        ap.error("--sdk must be one of %s" % ", ".join(sorted(SDK_TRIPLES)))
+    TRIPLE_PREFIX, TRIPLE_SUFFIX = SDK_TRIPLES[args.sdk]
     sdk = sdk_root(args.sdk, args.developer_dir)
     clang = find_clang(args.developer_dir)
     target = deltas.CN1_DEFAULT_DEPLOYMENT_TARGET
     floor = deltas.sdk_minimum_deployment_target(sdk)
     if floor and deltas.sdk_version_macro(floor) > deltas.sdk_version_macro(target):
         target = floor
-    triple = "arm64-apple-ios" + target
+    triple = TRIPLE_PREFIX + target + TRIPLE_SUFFIX
     print("sdk               : %s" % sdk)
     print("clang             : %s" % clang)
     print("deployment target : %s" % target)

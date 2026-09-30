@@ -2048,7 +2048,8 @@ public class IPhoneBuilder extends Executor {
     /// Whether AES-GCM is compiled into an application that uses the crypto API.
     ///
     /// With a port whose GCM uses public CommonCrypto calls (`publicGcm`), it is simply part of
-    /// the crypto API: on unless `ios.crypto.gcm=false` trims it, the same default macOS has.
+    /// the crypto API: on unless `ios.crypto.gcm=false` trims it (never for a vault user, which
+    /// cannot work without it), the same default macOS has.
     /// That is also what iOS applications have always received in practice -- the builder once
     /// enabled CN1_INCLUDE_CRYPTO with a prefix-matching String.replace that uncommented the GCM
     /// line with it -- so AES-GCM through `com.codename1.security` keeps working.
@@ -2063,7 +2064,9 @@ public class IPhoneBuilder extends Executor {
             return false;
         }
         if (publicGcm) {
-            return !"false".equals(hint);
+            // The vault cannot work without GCM, so a detected vault user keeps it even over an
+            // explicit "false" -- as it always did on the private-SPI path below.
+            return usesVault || !"false".equals(hint);
         }
         return usesVault || "true".equals(hint) || (vaultUnknown && !"false".equals(hint));
     }
