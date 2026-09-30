@@ -41,8 +41,12 @@ public final class NativeThemeSettings {
     /// Compares only the categories the application opted into.
     public NativeThemeSettings forInheritance(boolean inheritColors, boolean inheritFonts) {
         NativeThemeSettings result = new NativeThemeSettings();
-        if (inheritColors) { result.colors.putAll(colors); }
-        if (inheritFonts) { result.font(fontFamily, fontSize); }
+        if (inheritColors) {
+            result.colors.putAll(colors);
+        }
+        if (inheritFonts) {
+            result.font(fontFamily, fontSize);
+        }
         return result;
     }
 

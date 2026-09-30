@@ -185,18 +185,26 @@ public class UIManager {
     private Boolean nativeSettingsDark;
 
     /// Whether native-theme colors inherit available OS settings. Defaults to false.
-    public boolean isUseNativeColors() { return useNativeColors; }
+    public boolean isUseNativeColors() {
+        return useNativeColors;
+    }
 
     /// Opts into OS colors. Call refreshTheme() to apply to an already loaded theme;
     /// an explicit useNativeColorsBool theme constant takes precedence on rebuild.
-    public void setUseNativeColors(boolean enabled) { useNativeColors = enabled; }
+    public void setUseNativeColors(boolean enabled) {
+        useNativeColors = enabled;
+    }
 
     /// Whether native-theme typography inherits the OS family and normal base size.
-    public boolean isUseNativeFonts() { return useNativeFonts; }
+    public boolean isUseNativeFonts() {
+        return useNativeFonts;
+    }
 
     /// Opts into OS typography, independently of larger-text accessibility scaling.
     /// Call refreshTheme() to apply; useNativeFontsBool takes precedence on rebuild.
-    public void setUseNativeFonts(boolean enabled) { useNativeFonts = enabled; }
+    public void setUseNativeFonts(boolean enabled) {
+        useNativeFonts = enabled;
+    }
 
     /// Internal EDT entry point for coalesced platform settings notifications.
     public void refreshNativeThemeSettings() {
@@ -253,8 +261,12 @@ public class UIManager {
         boolean nativeLayer = "true".equals(incoming.get("@nativeThemeDefaultsBool"));
         if (nativeLayer) {
             Object base = incoming.get("Label.font");
-            if (!(base instanceof Font)) { base = incoming.get("font"); }
-            if (base instanceof Font) { nativeBaseFontSize = nativeFontSize((Font) base); }
+            if (!(base instanceof Font)) {
+                base = incoming.get("font");
+            }
+            if (base instanceof Font) {
+                nativeBaseFontSize = nativeFontSize((Font) base);
+            }
         }
         for (Object item : incoming.keySet()) {
             String key = (String) item;
@@ -266,7 +278,9 @@ public class UIManager {
                 if (incoming.get(key) instanceof Font) {
                     nativeFontKeys.add(key);
                 }
-                if (key.endsWith("border")) { nativeBorderKeys.add(key); }
+                if (key.endsWith("border")) {
+                    nativeBorderKeys.add(key);
+                }
                 if (incoming.containsKey("@cn1-bind:" + key)) {
                     nativeColorKeys.add(key);
                 }
@@ -281,8 +295,12 @@ public class UIManager {
     private void applyNativeThemeSettings() {
         Boolean colors = isThemeConstant("useNativeColorsBool");
         Boolean fonts = isThemeConstant("useNativeFontsBool");
-        if (colors != null) { useNativeColors = colors.booleanValue(); }
-        if (fonts != null) { useNativeFonts = fonts.booleanValue(); }
+        if (colors != null) {
+            useNativeColors = colors.booleanValue();
+        }
+        if (fonts != null) {
+            useNativeFonts = fonts.booleanValue();
+        }
         if (!useNativeColors && !useNativeFonts && !useLargerTextScale) {
             return;
         }
@@ -306,14 +324,20 @@ public class UIManager {
         if (useNativeFonts && nativeBaseFontSize > 0 && nativeSettings.getFontFamily() != null) {
             for (String key : nativeFontKeys) {
                 Object value = themeProps.get(key);
-                if (!(value instanceof Font)) { continue; }
+                if (!(value instanceof Font)) {
+                    continue;
+                }
                 Font original = (Font) value;
                 float size = nativeFontSize(original);
-                if (size <= 0) { continue; }
+                if (size <= 0) {
+                    continue;
+                }
                 try {
                     Font inherited = original.deriveNativeThemeFont(nativeSettings.getFontFamily(),
                             size * nativeSettings.getFontSize() / nativeBaseFontSize);
-                    if (inherited != original) { rememberNativeValue(key, inherited); }
+                    if (inherited != original) {
+                        rememberNativeValue(key, inherited);
+                    }
                 } catch (RuntimeException ex) {
                     Log.e(ex);
                 }
