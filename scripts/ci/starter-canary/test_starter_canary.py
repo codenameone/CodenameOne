@@ -12,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 import zipfile
 from pathlib import Path
 
@@ -253,6 +254,48 @@ class TokenMinting(unittest.TestCase):
         with self.assertRaises(canary.CanaryFailure) as caught:
             canary.mint_build_token(opener, "https://x")
         self.assertIn("set-user", str(caught.exception))
+
+
+class TokenSetupDiagnostics(unittest.TestCase):
+    """Bootstrap and Maven diagnostics survive failures without credentials."""
+
+    def check_failure(self, timeout):
+        token = "private-canary-token"
+        email = "private-canary-account@example.com"
+        real_run = canary.run
+        # Stand in for the wrapper/Maven executable while exercising seed_token,
+        # the child environment, output capture, timeout and redaction together.
+        probe = (
+            "import os,sys,time;"
+            "print('Downloading Maven distribution', flush=True) "
+            "if os.environ.get('MVNW_VERBOSE') == 'true' else None;"
+            "print('Resolving canary plugin', flush=True) "
+            "if '-q' not in sys.argv and '--quiet' not in sys.argv else None;"
+            "print(' '.join(sys.argv[1:]), flush=True);"
+            + ("time.sleep(30)" if timeout else "sys.exit(1)")
+        )
+
+        def invoke_probe(command, **kwargs):
+            return real_run([sys.executable, "-c", probe, *command[1:]], **kwargs)
+
+        with patch.object(canary, "run", side_effect=invoke_probe), \
+                patch.object(canary, "SEED_TIMEOUT", 1), \
+                self.assertRaises(canary.CanaryFailure) as caught:
+            canary.seed_token(Path("."), "mvnw", email, token, "7.0.269")
+        message = str(caught.exception)
+        self.assertIn("Downloading Maven distribution", message)
+        self.assertIn("Resolving canary plugin", message)
+        self.assertIn("-Dtoken=***", message)
+        self.assertIn("-Duser=***", message)
+        self.assertNotIn(token, message)
+        self.assertNotIn(email, message)
+        self.assertIn("did not finish within" if timeout else "failed with exit 1", message)
+
+    def test_failed_token_setup_retains_redacted_diagnostics(self):
+        self.check_failure(timeout=False)
+
+    def test_timed_out_token_setup_retains_redacted_diagnostics(self):
+        self.check_failure(timeout=True)
 
 
 class TimeoutHandling(unittest.TestCase):
