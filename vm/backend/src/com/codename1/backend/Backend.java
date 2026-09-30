@@ -353,7 +353,7 @@ public final class Backend {
     private static boolean processStarting;
 
     /// ONE Backend per process. Scaling out is more processes -- sessions in the
-    /// JDBC store, scheduler locks in the database -- never more servers in one
+    /// database session store, scheduler locks in the database -- never more servers in one
     /// JVM, and the runtime keeps process-wide state that assumes it: the
     /// installed tracer, the metrics registry and its exporter, the default task
     /// executors, the virtual-thread hosts. A second server beside the first
@@ -1717,8 +1717,8 @@ public final class Backend {
             int ownRoutes = (management != null ? 1 : 0) + (mcpServer != null ? 1 : 0);
             if (routers.size() == ownRoutes && !servesWebSockets) {
                 throw new IOException("This server has no handlers, so every request would "
-                        + "be a 404. Add one with handler(), webSockets(), or a "
-                        + "@RestController class for the build to generate one from.");
+                        + "be a 404. Add a @RestController or @WebSocketMapping class "
+                        + "for the build to generate one from.");
             }
             if (routers.isEmpty()) {
                 // A WEBSOCKET-ONLY SERVER IS A REAL SERVER, and it is what the

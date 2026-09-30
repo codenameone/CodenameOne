@@ -22,12 +22,14 @@
  */
 package com.codenameone.developerguide.backend;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 // tag::backend-contract-server[]
 public class NotesEndpoint implements NotesApiServer {
-    private final Map<String, Note> notes = new ConcurrentHashMap<String, Note>();
+    private final Map<String, Note> notes =
+            Collections.synchronizedMap(new HashMap<String, Note>());
 
     public Note note(String id) {                // no callback: this IS the server
         return notes.get(id);

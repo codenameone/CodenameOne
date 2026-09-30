@@ -35,7 +35,7 @@
   <text x="40" y="344" font-family="Arial, sans-serif" font-size="10" fill="#333333">A restart or a second instance does not see them, so</text>
   <text x="40" y="360" font-family="Arial, sans-serif" font-size="10" fill="#333333">behind a load balancer this needs sticky sessions.</text>
   <rect x="452" y="270" width="404" height="110" rx="4" fill="#ffffff" stroke="#4a7a3d" stroke-width="1.5"/>
-  <text x="468" y="292" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">cn1.session.store=jdbc</text>
+  <text x="468" y="292" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">cn1.session.store=db</text>
   <text x="468" y="312" font-family="Arial, sans-serif" font-size="10" fill="#333333">Sessions live in cn1_http_session in the server's own</text>
   <text x="468" y="328" font-family="Arial, sans-serif" font-size="10" fill="#333333">database, attributes stored as JSON, so every instance</text>
   <text x="468" y="344" font-family="Arial, sans-serif" font-size="10" fill="#333333">sees every session. Values must be strings, numbers,</text>

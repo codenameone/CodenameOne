@@ -224,6 +224,7 @@ public class SelfTest {
         web();
         clientTls();
         rotatedCaBundlesAreReRead();
+        futures();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -236,6 +237,88 @@ public class SelfTest {
     }
 
     // ------------------------------------------------------------------
+
+    /// The vm/JavaAPI classes the backend API promotes beyond the CLDC set --
+    /// Future and what its get() throws, TimeUnit, Properties -- used exactly as
+    /// the backend reference documents them, on the translated runtime. They
+    /// compile against the JDK in every other test; this is where they have to
+    /// work on ParparVM.
+    private static void futures() throws Exception {
+        java.util.concurrent.Future ready = com.codename1.backend.AsyncResult.of("ready");
+        check("future: a completed value", "ready", String.valueOf(ready.get()));
+        check("future: completed is done", "true", String.valueOf(ready.isDone()));
+        check("future: a timed get of a completed value", "ready",
+                String.valueOf(ready.get(1, java.util.concurrent.TimeUnit.SECONDS)));
+
+        com.codename1.backend.AsyncTask ran = new com.codename1.backend.AsyncTask(
+                "selftest.ran", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("ran");
+            }
+        };
+        com.codename1.backend.Tasks.platform(ran);
+        check("future: a task's result", "ran",
+                String.valueOf(ran.get(30, java.util.concurrent.TimeUnit.SECONDS)));
+
+        com.codename1.backend.AsyncTask broken = new com.codename1.backend.AsyncTask(
+                "selftest.broken", false) {
+            protected Object call() {
+                throw new IllegalStateException("broken");
+            }
+        };
+        com.codename1.backend.Tasks.platform(broken);
+        String cause = "no exception";
+        try {
+            broken.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException err) {
+            cause = err.getCause() == null ? "no cause" : err.getCause().getMessage();
+        }
+        check("future: a failure is the ExecutionException's cause", "broken", cause);
+
+        com.codename1.backend.AsyncTask cancelled = new com.codename1.backend.AsyncTask(
+                "selftest.cancelled", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("never");
+            }
+        };
+        check("future: cancel before it runs", "true", String.valueOf(cancelled.cancel(false)));
+        String thrown = "no exception";
+        try {
+            cancelled.get();
+        } catch (java.util.concurrent.CancellationException err) {
+            thrown = "cancelled";
+        }
+        check("future: get of a cancelled task", "cancelled", thrown);
+
+        com.codename1.backend.AsyncTask pending = new com.codename1.backend.AsyncTask(
+                "selftest.pending", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("never");
+            }
+        };
+        String timedOut = "no exception";
+        try {
+            pending.get(50, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.TimeoutException err) {
+            timedOut = "timed out";
+        }
+        check("future: a timed get that runs out", "timed out", timedOut);
+
+        check("timeunit: seconds to millis", "2000",
+                String.valueOf(java.util.concurrent.TimeUnit.SECONDS.toMillis(2)));
+        check("timeunit: convert minutes to millis", "180000",
+                String.valueOf(java.util.concurrent.TimeUnit.MILLISECONDS.convert(3,
+                        java.util.concurrent.TimeUnit.MINUTES)));
+        check("timeunit: a conversion saturates", String.valueOf(Long.MAX_VALUE),
+                String.valueOf(java.util.concurrent.TimeUnit.DAYS.toMillis(Long.MAX_VALUE)));
+
+        java.util.Properties settings = new java.util.Properties();
+        settings.load(new java.io.ByteArrayInputStream(
+                "a=1\nb = two\n# a comment\n".getBytes("UTF-8")));
+        check("properties: a value", "1", settings.getProperty("a"));
+        check("properties: spaces around the separator", "two", settings.getProperty("b"));
+        check("properties: a default", "fallback", settings.getProperty("c", "fallback"));
+    }
 
     private static void threadLocalInitialization() {
         final int[] attempts = new int[1];

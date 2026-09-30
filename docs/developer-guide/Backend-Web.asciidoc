@@ -222,38 +222,6 @@ request, so there's no request or session to find the bean in, and using it ther
 throws `IllegalStateException`, as in Spring. Keep per-connection state in the
 session's attachment instead.
 
-==== A server that writes its own main
-
-The annotation is the answer for an ordinary project, and most servers need
-nothing else: the build finds the endpoint and the entry point it writes registers
-it. The builder below is the same narrow case as the one under
-<<Configuration and profiles>> -- a server that writes its own `main` instead of
-using the generated one -- and it names its endpoints the same way it names its
-handlers, through a callback the runtime invokes while it starts.
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-register,indent=0]
-----
-
-`run()` is what makes that a main: it binds, installs a shutdown handler that
-drains what's in flight, and blocks. `start()` exists for tests, which want the
-server back without a signal handler.
-
-There's no `server.websocket(path, endpoint)` to call once the server is running,
-and the absence is deliberate. Nothing else here is configured that way, and a
-setter on a running server has a window a callback can't: the listener is bound
-before the application gets its reference back, so an upgrade arriving in that gap
-finds a route that hasn't been added yet and is answered as ordinary HTTP.
-
-`HttpServer` takes the same callback, for the rare server built without the
-builder at all:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/WebSocketSnippets.java[tag=backend-websocket-raw,indent=0]
-----
-
 Only `onOpen`, `onText` and `onBinary` have to be written. `onPing`, `onPong`,
 `onClose` and `onError` have empty defaults, and a PING is answered with its PONG
 before the endpoint is told, so an endpoint that ignores them still keeps its

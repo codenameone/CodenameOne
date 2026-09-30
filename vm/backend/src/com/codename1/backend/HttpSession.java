@@ -220,7 +220,7 @@ public final class HttpSession {
     /// Extra time before expiry, for a store whose stored last use lags.
     private long expiryGraceMillis;
 
-    /// Allows `millis` past the timeout before expiry; see Sessions.Jdbc.
+    /// Allows `millis` past the timeout before expiry; see Sessions.Db.
     synchronized void setExpiryGrace(long millis) {
         expiryGraceMillis = millis;
     }

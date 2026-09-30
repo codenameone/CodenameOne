@@ -38,7 +38,7 @@ import com.codename1.backend.sql.Dialect;
 /// ```java
 ///   cn1.session.cookie=CN1SESSION      # the cookie's name
 ///   cn1.session.timeout=1800           # seconds of inactivity, 0 for never
-///   cn1.session.store=memory           # or jdbc
+///   cn1.session.store=memory           # or db
 ///   cn1.session.same-site=Lax          # Lax, Strict or None
 ///   cn1.session.secure=auto            # true, false, or auto (on under TLS)
 /// ```
@@ -85,7 +85,7 @@ public final class Sessions {
     ///
     /// - `tls`: whether the server terminates TLS, for `secure=auto`
     ///
-    /// - `pool`: the database, for `store=jdbc`
+    /// - `pool`: the database, for `store=db`
     ///
     /// - `application`: destroys the session-scoped beans, or null
     public static Sessions configure(Config config, boolean tls, DataSource pool,
@@ -137,15 +137,15 @@ public final class Sessions {
                     + "set cn1.session.secure=true or serve TLS");
         }
         String kind = config.get("cn1.session.store", "memory");
-        if ("jdbc".equalsIgnoreCase(kind)) {
+        if ("db".equalsIgnoreCase(kind)) {
             if (pool == null) {
-                throw new IOException("cn1.session.store=jdbc needs a database, and this "
+                throw new IOException("cn1.session.store=db needs a database, and this "
                         + "server has none");
             }
-            out.setStore(new Jdbc(pool, config.get("cn1.session.namespace", "")));
+            out.setStore(new Db(pool, config.get("cn1.session.namespace", "")));
         } else if (!"memory".equalsIgnoreCase(kind)) {
             throw new IOException("cn1.session.store is \"" + kind
-                    + "\"; it must be memory or jdbc");
+                    + "\"; it must be memory or db");
         }
         return out;
     }
@@ -280,7 +280,7 @@ public final class Sessions {
                 // timeout, because the last use it has stored lags; the beans get
                 // the same grace, or a request in that window would find the row
                 // still valid after its beans were destroyed, and build a second set.
-                long grace = s instanceof Jdbc ? Jdbc.touchInterval(h.maxInactiveSeconds) : 0;
+                long grace = s instanceof Db ? Db.touchInterval(h.maxInactiveSeconds) : 0;
                 if (h.maxInactiveSeconds > 0
                         && now - h.lastAccessed > h.maxInactiveSeconds * 1000L + grace
                         && !busy.contains(e.getKey())) {
@@ -305,8 +305,8 @@ public final class Sessions {
             // application's own sees the plain call.
             if (s instanceof Memory) {
                 ((Memory) s).purgeExpired(now, busy);
-            } else if (s instanceof Jdbc) {
-                ((Jdbc) s).purgeExpired(now, busy);
+            } else if (s instanceof Db) {
+                ((Db) s).purgeExpired(now, busy);
             } else {
                 s.purgeExpired(now);
             }
@@ -415,8 +415,8 @@ public final class Sessions {
                     cookie = cookie(session.getId(), -1);
                 }
                 session.clean();
-            } else if (s instanceof Jdbc) {
-                ((Jdbc) s).touchIfStale(session);
+            } else if (s instanceof Db) {
+                ((Db) s).touchIfStale(session);
             }
             keep(session, previous);
         }
@@ -902,7 +902,7 @@ public final class Sessions {
     /// session, sign-in included; giving each its own namespace keeps them apart,
     /// the way Spring's table-name setting does, while replicas of one server
     /// keep a shared one.
-    public static final class Jdbc implements SessionStore {
+    public static final class Db implements SessionStore {
         private static final String TABLE = "cn1_http_session";
         /// How stale the stored last-access time may get before a read refreshes it.
         private static final long TOUCH_INTERVAL = 60000L;
@@ -911,12 +911,12 @@ public final class Sessions {
         private boolean ready;
 
         /// A store in the empty namespace.
-        public Jdbc(DataSource pool) {
+        public Db(DataSource pool) {
             this(pool, "");
         }
 
         /// A store whose sessions only servers with the same `namespace` see.
-        public Jdbc(DataSource pool, String namespace) {
+        public Db(DataSource pool, String namespace) {
             this.pool = pool;
             this.namespace = namespace == null ? "" : namespace;
         }

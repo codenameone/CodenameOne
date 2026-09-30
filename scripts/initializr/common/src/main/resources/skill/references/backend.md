@@ -171,7 +171,7 @@ public String login(HttpServer.Request request, @RequestBody Map body) {
 ```
 
 A session and its cookie exist only once something calls `getSession(true)`.
-`cn1.session.store=jdbc` keeps sessions in the database so any replica can serve
+`cn1.session.store=db` keeps sessions in the database so any replica can serve
 any client (attributes must then be JSON-able). Cookie is `HttpOnly`,
 `SameSite=Lax`, and `Secure` under TLS.
 
@@ -193,8 +193,8 @@ Custom instruments: `Metrics.counter(...)`, `Metrics.histogram(...)`,
 - `@OpenTelemetry(serviceName = "notes")` on any class (or
   `cn1.otel.enabled=true`) exports traces **and** metrics over OTLP/HTTP; point
   `OTEL_EXPORTER_OTLP_ENDPOINT` at a collector.
-- Management endpoints (always on in dev, otherwise `cn1.management.enabled=true`
-  plus `cn1.management.token`): `/manage/health`, `/manage/metrics`,
+- Management endpoints (on by default in dev, otherwise `cn1.management.enabled=true`
+  plus `cn1.management.token`; `cn1.management.enabled=false` turns them off in dev too): `/manage/health`, `/manage/metrics`,
   `/manage/prometheus`, `/manage/jobs`, `/manage/managed`, and
   `POST /manage/managed/{bean}/{operation}`.
 

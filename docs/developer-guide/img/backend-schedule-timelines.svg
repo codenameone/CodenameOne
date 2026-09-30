@@ -5,18 +5,18 @@
   <text x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Each bar is one run of the same job with a period of 10 seconds. A run never overlaps the previous</text>
   <text x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">run of the same job: a start that finds it still going is skipped, never queued.</text>
   <text x="24" y="104" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">fixedRate = 10000</text>
-  <text x="24" y="120" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">starts on a fixed grid</text>
-  <rect x="190" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="250" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="310" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="370" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="430" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="490" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="550" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="610" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="670" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <text x="24" y="120" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">10s from start to start</text>
+  <rect x="190" y="90" width="12" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="250" y="90" width="36" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="310" y="90" width="18" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="370" y="90" width="42" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="430" y="90" width="12" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="490" y="90" width="30" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="550" y="90" width="18" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="610" y="90" width="36" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="670" y="90" width="12" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
   <rect x="730" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
-  <rect x="790" y="90" width="24" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
+  <rect x="790" y="90" width="18" height="20" rx="2" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.3"/>
   <line x1="190" y1="120" x2="850" y2="120" stroke="#bbbbbb" stroke-width="1"/>
   <line x1="190" y1="117" x2="190" y2="123" stroke="#bbbbbb" stroke-width="1"/>
   <text x="190" y="135" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">0s</text>
@@ -36,15 +36,15 @@
   <line x1="790" y1="117" x2="790" y2="123" stroke="#bbbbbb" stroke-width="1"/>
   <text x="790" y="135" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">100s</text>
   <text x="24" y="194" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a7a3d">fixedDelay = 10000</text>
-  <text x="24" y="210" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">waits after each end</text>
-  <rect x="190" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="274" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="358" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="442" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="526" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="610" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="694" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
-  <rect x="778" y="180" width="24" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <text x="24" y="210" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">10s from end to next start</text>
+  <rect x="190" y="180" width="12" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="262" y="180" width="36" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="358" y="180" width="18" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="436" y="180" width="42" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="538" y="180" width="12" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="610" y="180" width="30" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="700" y="180" width="18" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
+  <rect x="778" y="180" width="36" height="20" rx="2" fill="#f3f8f1" stroke="#4a7a3d" stroke-width="1.3"/>
   <line x1="190" y1="210" x2="850" y2="210" stroke="#bbbbbb" stroke-width="1"/>
   <line x1="190" y1="207" x2="190" y2="213" stroke="#bbbbbb" stroke-width="1"/>
   <text x="190" y="225" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#888888">0s</text>

@@ -193,6 +193,22 @@ arrived, and it parks. Parking returns control to the host, which polls again.
 When the handler finishes a response the descriptor stays armed, so the next
 request on that connection costs no system call to set up.
 
+These are ParparVM's own virtual threads, a feature of the translated runtime, and
+they aren't the virtual threads of Java 21 and later. The two share a name and
+little else. A Java virtual thread unmounts whenever the JDK blocks on its behalf.
+One of these switches stacks in the translated C code and parks only where the
+runtime has made parking possible -- a descriptor a host polls -- while anything
+else that blocks, `Object.wait()` included, blocks the host thread under it and
+every virtual thread that host runs. They're also pinned: a virtual thread stays
+on one host for its whole life.
+
+That's why the development run on the JVM doesn't use Java's virtual threads to
+stand in for them, even for debugging. It serves connections on a pool of platform
+threads and runs `VIRTUAL` work on platform threads too. Code that's correct
+there can still stall a host on the native build, so test anything that depends on
+how threads interleave -- a handler that waits, a task that blocks -- on the
+native server.
+
 Host count follows cores rather than the `workers` argument. On two pinned cores,
 16 hosts served 117 requests where 2 hosts served 257,297: past one host per core
 they compete for the cores the server needs. In this mode `workers` stops meaning
@@ -339,20 +355,13 @@ there is nothing next to the binary.
 | How long SQLite waits on a locked database file, 5 seconds by default.
 |===
 
+One limit is read only from the environment, because it's fixed when the server
+class loads: `CN1_HTTP_MAX_UPLOAD_MB`, 64 by default, bounds the request bodies
+being received at once across all HTTP/1.1 connections. A request that would pass
+the limit gets a 503 rather than being buffered.
+
 The chapters that follow add their own keys -- `cn1.session.*`,
 `cn1.task.executor.*`, `cn1.management.*`, `cn1.mcp.*` and `cn1.otel.*` -- and
 list each one where it's described.
 
 Handlers that need any of this get it from the entry point the build writes.
-Only a server that writes its own `main` names the builder behind it:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/ServerSnippets.java[tag=backend-builder,indent=0]
-----
-
-`run()` reads the configuration, opens the database, binds, installs a shutdown
-handler that drains what's in flight, and blocks. Anything the builder is told
-is used as given, and anything it isn't told comes from the configuration --
-so a port written in the source is the port, and a port that should follow the
-deployment is one nobody writes there.

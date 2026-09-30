@@ -1,12 +1,44 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
 package java.util.concurrent;
 
+/// A unit of time, for timeouts such as [Future#get(long, TimeUnit)]. Conversions
+/// saturate: a value too large for the target unit becomes Long.MAX_VALUE or
+/// Long.MIN_VALUE rather than overflowing.
 public enum TimeUnit {
+    /// Billionths of a second.
     NANOSECONDS(0),
+    /// Millionths of a second.
     MICROSECONDS(1),
+    /// Thousandths of a second.
     MILLISECONDS(2),
+    /// Seconds.
     SECONDS(3),
+    /// Minutes.
     MINUTES(4),
+    /// Hours.
     HOURS(5),
+    /// Days.
     DAYS(6);
 
     private final int index;
@@ -28,6 +60,11 @@ public enum TimeUnit {
         return d * m;
     }
 
+    /// `sourceDuration` in `sourceUnit`, converted to this unit.
+    ///
+    /// @param sourceDuration the duration
+    /// @param sourceUnit its unit
+    /// @return the duration in this unit
     public long convert(long sourceDuration, TimeUnit sourceUnit) {
         switch(this) {
             case NANOSECONDS: return sourceUnit.toNanos(sourceDuration);
@@ -41,6 +78,10 @@ public enum TimeUnit {
         }
     }
 
+    /// `d` of this unit in nanoseconds.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toNanos(long d) {
         if (this == NANOSECONDS) return d;
         if (this == MICROSECONDS) return x(d, C1/C0, MAX/(C1/C0));
@@ -51,6 +92,10 @@ public enum TimeUnit {
         return x(d, C6/C0, MAX/(C6/C0));
     }
 
+    /// `d` of this unit in microseconds.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toMicros(long d) {
         if (this == NANOSECONDS) return d / (C1/C0);
         if (this == MICROSECONDS) return d;
@@ -61,6 +106,10 @@ public enum TimeUnit {
         return x(d, C6/C1, MAX/(C6/C1));
     }
 
+    /// `d` of this unit in milliseconds.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toMillis(long d) {
         if (this == NANOSECONDS) return d / (C2/C0);
         if (this == MICROSECONDS) return d / (C2/C1);
@@ -71,6 +120,10 @@ public enum TimeUnit {
         return x(d, C6/C2, MAX/(C6/C2));
     }
 
+    /// `d` of this unit in seconds.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toSeconds(long d) {
         if (this == NANOSECONDS) return d / (C3/C0);
         if (this == MICROSECONDS) return d / (C3/C1);
@@ -81,6 +134,10 @@ public enum TimeUnit {
         return x(d, C6/C3, MAX/(C6/C3));
     }
 
+    /// `d` of this unit in minutes.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toMinutes(long d) {
         if (this == NANOSECONDS) return d / (C4/C0);
         if (this == MICROSECONDS) return d / (C4/C1);
@@ -91,6 +148,10 @@ public enum TimeUnit {
         return x(d, C6/C4, MAX/(C6/C4));
     }
 
+    /// `d` of this unit in hours.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toHours(long d) {
         if (this == NANOSECONDS) return d / (C5/C0);
         if (this == MICROSECONDS) return d / (C5/C1);
@@ -101,6 +162,10 @@ public enum TimeUnit {
         return x(d, C6/C5, MAX/(C6/C5));
     }
 
+    /// `d` of this unit in days.
+    ///
+    /// @param d the duration
+    /// @return the converted duration
     public long toDays(long d) {
         if (this == NANOSECONDS) return d / (C6/C0);
         if (this == MICROSECONDS) return d / (C6/C1);
@@ -117,6 +182,11 @@ public enum TimeUnit {
         return 0;
     }
 
+    /// Waits on `obj` for `timeout` of this unit, as `obj.wait` does.
+    ///
+    /// @param obj the monitor, which the caller must hold
+    /// @param timeout how long to wait
+    /// @throws InterruptedException when the thread is interrupted
     public void timedWait(Object obj, long timeout) throws InterruptedException {
         if (timeout > 0) {
             long ms = toMillis(timeout);
@@ -125,6 +195,11 @@ public enum TimeUnit {
         }
     }
 
+    /// Waits up to `timeout` of this unit for `thread` to end, as `thread.join` does.
+    ///
+    /// @param thread the thread to wait for
+    /// @param timeout how long to wait
+    /// @throws InterruptedException when the waiting thread is interrupted
     public void timedJoin(Thread thread, long timeout) throws InterruptedException {
         if (timeout > 0) {
             long ms = toMillis(timeout);
@@ -133,6 +208,10 @@ public enum TimeUnit {
         }
     }
 
+    /// Sleeps for `timeout` of this unit, as `Thread.sleep` does.
+    ///
+    /// @param timeout how long to sleep
+    /// @throws InterruptedException when the thread is interrupted
     public void sleep(long timeout) throws InterruptedException {
         if (timeout > 0) {
             long ms = toMillis(timeout);

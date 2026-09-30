@@ -21,26 +21,26 @@
   <text x="442" y="137" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888">1  MCP endpoint</text>
   <text x="442" y="151" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">/mcp, when enabled</text>
   <line x1="555" y1="158" x2="555" y2="166" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="690" y="144" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">null: next</text>
+  <text x="690" y="144" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">not its path: next</text>
   <rect x="430" y="166" width="250" height="36" rx="4" fill="#f7f7f9" stroke="#888888" stroke-width="1.5"/>
   <text x="442" y="181" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888">2  Trace relay</text>
   <text x="442" y="195" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">/otel/v1/traces, when enabled</text>
   <line x1="555" y1="202" x2="555" y2="210" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="690" y="188" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">null: next</text>
+  <text x="690" y="188" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">not its path: next</text>
   <rect x="430" y="210" width="250" height="36" rx="4" fill="#f7f7f9" stroke="#888888" stroke-width="1.5"/>
   <text x="442" y="225" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888">3  Management</text>
   <text x="442" y="239" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">/manage/..., when enabled</text>
   <line x1="555" y1="246" x2="555" y2="254" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="690" y="232" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">null: next</text>
+  <text x="690" y="232" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">not its path: next</text>
   <rect x="430" y="254" width="250" height="36" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
   <text x="442" y="269" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#4a6fa5">4  Your routes</text>
-  <text x="442" y="283" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">generated routers, handler() ones</text>
+  <text x="442" y="283" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">your controllers' generated routers</text>
   <line x1="555" y1="290" x2="555" y2="298" stroke="#555555" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="690" y="276" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">null: next</text>
+  <text x="690" y="276" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">not its path: next</text>
   <rect x="430" y="298" width="250" height="36" rx="4" fill="#f7f7f9" stroke="#888888" stroke-width="1.5"/>
   <text x="442" y="313" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888">5  Static files</text>
   <text x="442" y="327" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">cn1.static.root, always last</text>
-  <text x="690" y="320" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">null: 404</text>
+  <text x="690" y="320" font-family="Arial, sans-serif" font-size="9.5" fill="#888888">no such file: 404</text>
   <text x="418" y="358" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">then: record duration, route and status; save the session and</text>
   <text x="418" y="372" font-family="Arial, sans-serif" font-size="9.5" fill="#444444">add its cookie; destroy the request-scoped beans</text>
   <text x="418" y="386" font-family="Arial, sans-serif" font-size="9.5" fill="#a33a3a">a handler that throws is answered 500 and logged</text>
@@ -56,7 +56,7 @@
   <text x="38" y="277" font-family="Arial, sans-serif" font-size="10" fill="#222222">bound and converted; a missing required</text>
   <text x="38" y="294" font-family="Arial, sans-serif" font-size="10" fill="#222222">one is answered 400 before your method runs;</text>
   <text x="38" y="311" font-family="Arial, sans-serif" font-size="10" fill="#222222">the return value becomes text, JSON or</text>
-  <text x="38" y="328" font-family="Arial, sans-serif" font-size="10" fill="#222222">your own Response; null is a 404;</text>
+  <text x="38" y="328" font-family="Arial, sans-serif" font-size="10" fill="#222222">your own Response; returning null is a 404;</text>
   <text x="38" y="345" font-family="Arial, sans-serif" font-size="10" fill="#222222">void is 204 unless @ResponseStatus says</text>
   <text x="38" y="362" font-family="Arial, sans-serif" font-size="10" fill="#222222">otherwise.</text>
 </svg>

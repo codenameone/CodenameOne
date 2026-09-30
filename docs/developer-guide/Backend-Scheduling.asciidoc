@@ -27,8 +27,12 @@ method is called.
 
 An `@Async` method returns `void` or a `java.util.concurrent.Future`; any other
 return type is a build error, because the caller returns before there is anything
-to return. The body returns `AsyncResult.of(value)`, and the caller receives,
-immediately, a `Future` that completes with that value when the body has run:
+to return. `Future`, the `ExecutionException`, `TimeoutException` and
+`CancellationException` its `get()` throws, and `TimeUnit` aren't part of the
+client's Java subset: they're backend API, documented in the backend API reference
+and tested on the translated runtime. The body returns `AsyncResult.of(value)`,
+and the caller receives, immediately, a `Future` that completes with that value
+when the body has run:
 
 * `get()` waits for the body and returns its value. On a virtual thread it yields
   its host while it waits rather than blocking it, so a request handler can wait
@@ -114,7 +118,10 @@ queue, and `cn1.task.queue_depth` reports how many are waiting, by executor.
   choice is logged once at start-up.
 |===
 
-The choice matters because of how virtual threads work on this runtime, explained
+`VIRTUAL` means ParparVM's own virtual threads, which the native build has, and
+not the virtual threads of Java 21: the two behave differently, and the JVM
+development run has neither, so it runs `VIRTUAL` work on platform threads. The
+choice matters because of how virtual threads work on this runtime, explained
 under <<Virtual threads and the request loop>>. A virtual thread parks only on the
 socket it serves. An outbound read -- a database query, a call to another service
 -- blocks the host thread running it, and with it every connection that host

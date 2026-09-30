@@ -173,7 +173,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 ----
 
 The value comes from the layers described under <<Configuration and profiles>>,
-so `MAIL_HOST` in the environment -- or `CN1_MAIL_HOST` -- overrides the file. A
+so `MAIL_HOST` in the environment overrides the file. A
 key with no fallback that nothing sets stops the server at startup with the key's
 name. `@ConfigurationProperties("mail")` on a bean does the same for every one of
 its setters at once: `setHost` reads `mail.host`, and `setMaxSize` reads
@@ -351,8 +351,12 @@ is checked by the build.
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/ExpensiveIndex.java[tag=backend-bean-lazy,indent=0]
 ----
 
-A WebSocket endpoint and a bean with `@Scheduled` methods must be singletons,
-since each serves the whole life of the server rather than one request.
+A WebSocket endpoint must be a singleton, since it serves the whole life of the
+server rather than one request. A bean with `@Scheduled` methods can't be
+request- or session-scoped, because a job runs outside any request. A
+prototype-scoped one only draws a warning, as in Spring: one instance is built to
+run its jobs and is never destroyed, so make it a singleton if it needs
+`@PreDestroy`.
 
 === Lifecycle
 
@@ -378,8 +382,7 @@ is what makes the `flush` above safe:
 . `@Async` calls and scheduled runs that haven't finished get the same grace. A
   task still waiting in a queue when that time is up is dropped rather than
   started against beans about to be destroyed, and the threads of the ones still
-  running are interrupted. Each server has its own executors, so stopping one
-  server leaves another in the same process running.
+  running are interrupted.
 . `@PreDestroy` and `destroyMethod` run, in reverse dependency order.
 . The connection pool closes.
 . The last metrics and spans are exported.

@@ -23,10 +23,8 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 `getSession(true)` returns the client's session, creating one if the request
 carried no valid cookie. Nothing is stored and no cookie is sent until something
 calls it, so a server that never uses sessions -- an API authenticated with
-bearer tokens, say -- pays nothing for them and sets no cookie. Sessions need a
-server started through `Backend.builder()`, which stores them and sends their
-cookie; on a bare `HttpServer`, `getSession` throws rather than hand out a
-session that would never be kept.
+bearer tokens, say -- pays nothing for them and sets no cookie. The server the
+build generates stores each session and sends its cookie when the request ends.
 
 The call to `changeSessionId()` isn't optional at sign-in. It gives the session a
 new id, keeps its attributes, and sends the client the new cookie. Without it a
@@ -121,7 +119,7 @@ browser closes; how long the session lasts is the server's decision.
   sessions never expire, and a negative value stops the server at start-up.
 
 | `cn1.session.store`
-| `memory`, the default, or `jdbc`. See <<Where sessions are kept>>.
+| `memory`, the default, or `db`. See <<Where sessions are kept>>.
 
 | `cn1.session.same-site`
 | `Lax`, `Strict` or `None`. `None` lets other sites send the cookie, and a
@@ -134,11 +132,8 @@ browser closes; how long the session lasts is the server's decision.
   Anything else stops the server at start-up.
 |===
 
-Every server has its own settings and its own sessions, even when two run in one
-process. That matters because cookies aren't scoped by port: a browser sends a
-cookie for `localhost` to every port on it, and two servers sharing one store
-would accept each other's sessions. `Backend.getSessions()` returns a running
-server's sessions, whose `getStore()` answers the store in use.
+An injected `Backend` returns the server's sessions from `getSessions()`, whose
+`getStore()` answers the store in use.
 
 === Where sessions are kept
 
@@ -148,7 +143,7 @@ object the next one gets. It also means sessions end with the process, and that 
 second instance of the server doesn't know about them, so behind a load balancer
 it needs the balancer to send each client to the same instance.
 
-`cn1.session.store=jdbc` keeps sessions in the server's own database, in a table
+`cn1.session.store=db` keeps sessions in the server's own database, in a table
 called `cn1_http_session` that the server creates on first use. Every instance of
 the server then sees every session, a restart loses nothing, and a deployment can
 add or replace instances at will. The price is in what an attribute can be: the
@@ -189,7 +184,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/b
 Using the stand-in starts a session if the client has none, as `getSession(true)`
 would. The instance is built on the session's first use and kept by the server in
 memory for as long as the session lives. It's never written to the session store,
-whichever store is configured, so with `cn1.session.store=jdbc` each instance of
+whichever store is configured, so with `cn1.session.store=db` each instance of
 the server builds its own copy for a client it serves. State that has to follow the
 client from one instance to another belongs in the session's attributes instead.
 

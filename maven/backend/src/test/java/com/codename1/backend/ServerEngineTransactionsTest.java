@@ -128,7 +128,7 @@ class ServerEngineTransactionsTest {
         DataSource pool = open(engine);
         try {
             pool.execute("DROP TABLE IF EXISTS cn1_http_session", null);
-            Sessions.Jdbc store = new Sessions.Jdbc(pool);
+            Sessions.Db store = new Sessions.Db(pool);
             long now = System.currentTimeMillis();
             HttpSession s = new HttpSession("abc", now, now, 60);
             s.markNew();                                   // only a new session inserts

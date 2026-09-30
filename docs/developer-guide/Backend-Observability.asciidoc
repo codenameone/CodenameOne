@@ -58,12 +58,17 @@ same way it configures everything else it runs:
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `cn1.otel.endpoint` | The collector's base URL; `/v1/traces` is appended. Defaults to `http://localhost:4318`.
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `cn1.otel.traces.endpoint` | The full URL, used as it is.
 | `OTEL_EXPORTER_OTLP_HEADERS` | `cn1.otel.headers` | `name=value` pairs, comma separated, with each value URL-encoded.
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | `cn1.otel.traces.headers` | Headers for traces only, in place of the shared ones.
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `cn1.otel.protocol` | `http/protobuf` or `http/json`. gRPC isn't supported.
+| `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL` | `cn1.otel.traces.protocol` | The protocol for traces only.
 | `OTEL_SERVICE_NAME` | `cn1.otel.service.name` | Overrides the annotation's `serviceName`.
 | `OTEL_RESOURCE_ATTRIBUTES` | `cn1.otel.resource.attributes` | Extra resource attributes, `key=value` pairs.
 | `OTEL_TRACES_SAMPLER` | `cn1.otel.sampler` | `parentbased_always_on` by default; also `always_on`, `always_off`, `traceidratio` and the other `parentbased_` forms.
 | `OTEL_TRACES_SAMPLER_ARG` | `cn1.otel.sampler.arg` | The ratio for the ratio samplers.
 | `OTEL_SDK_DISABLED` | `cn1.otel.disabled` | `true` turns tracing off at start-up without a rebuild.
+| `OTEL_BSP_MAX_QUEUE_SIZE` | `cn1.otel.queue.size` | Spans held for export before new ones are dropped. Defaults to 2048.
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | `cn1.otel.batch.size` | Spans sent in one export. Defaults to 512.
+| `OTEL_BSP_SCHEDULE_DELAY` | `cn1.otel.export.delayMillis` | Milliseconds between exports. Defaults to 5000.
 |===
 
 `cn1.otel.attributes.exclude` names attributes never to record, for example
@@ -78,14 +83,6 @@ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://abc12345.live.dynatrace.com/api/v2/ot
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Api-Token%20dt0c01.XXXX
 ----
 
-A server started without the builder -- one that calls `HttpServer.start` or runs
-the Lambda loop itself -- installs the tracer in one line:
-
-[source,java]
-----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/TracingSnippets.java[tag=backend-otel-install,indent=0]
-----
-
 Under Lambda, the invocation continues the trace the host passes in its X-Ray
 header, and the loop waits for the export before it polls again, because the host
 freezes the process between invocations.
@@ -97,7 +94,7 @@ application's own, and `Tracing.inSpan` times a block of work as a child span.
 
 A mobile app shouldn't carry the collector's credentials: anything inside an app
 package can be read by whoever installs it. With `cn1.otel.relay=true` the backend
-accepts the app's spans at `/otel/v1/traces`, adds its own credentials and
+accepts the app's spans at `/otel/v1/traces` (`cn1.otel.relay.path` moves it), adds its own credentials and
 forwards them to the same collector:
 
 ----
@@ -120,10 +117,7 @@ Traces say what one request did; metrics say how the server is doing. With
 OpenTelemetry turned on, the server exports metrics over OTLP on the same endpoint
 and with the same settings as its traces, every minute by default, with cumulative
 temporality. `cn1.otel.metrics.enabled=false` turns metrics off while leaving
-traces on. The metrics are the process's, so with several servers in one process
-their exporters must report as the same service to the same collector; a second
-exporter that would report the same numbers under another name is refused at
-start-up. The management endpoints described below record and serve the same
+traces on. The management endpoints described below record and serve the same
 metrics whether anything exports them or not.
 
 ==== What the server records
@@ -174,11 +168,6 @@ The route attribute is the template -- `GET /notes/{id}` is recorded as
 `/notes/{id}` -- so a server's metric count doesn't grow with the ids its clients
 ask for. A request that fails, whether in a handler or in the session store, is
 recorded with status 500.
-
-The instruments belong to the process, as an OpenTelemetry meter's do. With more
-than one server in a process, each server gauge reports the sum over the servers
-still running, and the request histogram counts every server's requests. A
-server that stops drops out of the sums.
 
 ==== Managed beans
 
@@ -316,4 +305,4 @@ counter, so `http.server.request.duration` is scraped as
 
 The management endpoints are served before the application's routes, so a
 catch-all route can't answer them. A running server's managed beans are also
-available to code, from `Backend.getManagedBeans()`.
+available to code: inject `Backend` and call its `getManagedBeans()`.

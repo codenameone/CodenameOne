@@ -657,13 +657,13 @@ class ApplicationRuntimeTest {
 
     @Test
     @DisplayName("two servers' database session stores never read each other's sessions")
-    void jdbcSessionNamespaces(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+    void dbSessionNamespaces(@org.junit.jupiter.api.io.TempDir java.io.File dir)
             throws Exception {
         DataSource pool = DataSource.open(new java.io.File(dir, "ns.db").getAbsolutePath(),
                 2, 5000, 10000);
         try {
-            Sessions.Jdbc orders = new Sessions.Jdbc(pool, "com.example.orders");
-            Sessions.Jdbc admin = new Sessions.Jdbc(pool, "com.example.admin");
+            Sessions.Db orders = new Sessions.Db(pool, "com.example.orders");
+            Sessions.Db admin = new Sessions.Db(pool, "com.example.admin");
             long now = System.currentTimeMillis();
             HttpSession signedIn = new HttpSession("shared-cookie", now, now, 1800);
             signedIn.markNew();
@@ -675,7 +675,7 @@ class ApplicationRuntimeTest {
             assertEquals(0, admin.purgeExpired(Long.MAX_VALUE / 4));
             assertEquals("ada", orders.load("shared-cookie").getAttribute("user"));
             // A replica of the same server shares them.
-            assertEquals("ada", new Sessions.Jdbc(pool, "com.example.orders")
+            assertEquals("ada", new Sessions.Db(pool, "com.example.orders")
                     .load("shared-cookie").getAttribute("user"));
         } finally {
             pool.close();
@@ -684,11 +684,11 @@ class ApplicationRuntimeTest {
 
     @Test
     @DisplayName("the database session store: no resurrection, and no early expiry for a short timeout")
-    void jdbcSessionStore(@org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
+    void dbSessionStore(@org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
         DataSource pool = DataSource.open(new java.io.File(dir, "s.db").getAbsolutePath(),
                 2, 5000, 10000);
         try {
-            Sessions.Jdbc store = new Sessions.Jdbc(pool);
+            Sessions.Db store = new Sessions.Db(pool);
             long now = System.currentTimeMillis();
             HttpSession created = new HttpSession("sid", now, now, 1800);
             created.markNew();
@@ -744,8 +744,8 @@ class ApplicationRuntimeTest {
             HttpSession back = store.load("short");
             assertFalse(back.isExpired(now), "expired before the touch interval allowed");
             assertTrue(back.isExpired(now + 2000));
-            assertEquals(2500L, Sessions.Jdbc.touchInterval(10));
-            assertEquals(60000L, Sessions.Jdbc.touchInterval(1800));
+            assertEquals(2500L, Sessions.Db.touchInterval(10));
+            assertEquals(60000L, Sessions.Db.touchInterval(1800));
         } finally {
             pool.close();
         }
@@ -1650,7 +1650,7 @@ class ApplicationRuntimeTest {
                 2, 5000, 10000);
         try {
             Sessions sessions = new Sessions();
-            Sessions.Jdbc store = new Sessions.Jdbc(pool);
+            Sessions.Db store = new Sessions.Db(pool);
             sessions.setStore(store);
             long now = System.currentTimeMillis();
             HttpSession created = new HttpSession("twice", now, now, 1800);
@@ -2091,7 +2091,7 @@ class ApplicationRuntimeTest {
                 2, 5000, 10000);
         try {
             Sessions sessions = new Sessions();
-            sessions.setStore(new Sessions.Jdbc(pool));
+            sessions.setStore(new Sessions.Db(pool));
             long now = System.currentTimeMillis();
             HttpSession stored = new HttpSession("old", now - 3600000, now - 3600000, 60);
             stored.markNew();
@@ -2595,7 +2595,7 @@ class ApplicationRuntimeTest {
                     ended.add(beans);
                 }
             });
-            sessions.setStore(new Sessions.Jdbc(pool));
+            sessions.setStore(new Sessions.Db(pool));
             long now = System.currentTimeMillis();
             HttpSession stored = new HttpSession("shared", now, now, 1800);
             stored.markNew();
@@ -2743,7 +2743,7 @@ class ApplicationRuntimeTest {
                 2, 5000, 10000);
         try {
             Sessions sessions = new Sessions();
-            sessions.setStore(new Sessions.Jdbc(pool));
+            sessions.setStore(new Sessions.Db(pool));
             long now = System.currentTimeMillis();
             HttpSession stored = new HttpSession("kept", now, now, 1800);
             stored.markNew();
@@ -2991,7 +2991,7 @@ class ApplicationRuntimeTest {
                 2, 5000, 10000);
         try {
             Sessions sessions = new Sessions(new EmptyApplication());
-            sessions.setStore(new Sessions.Jdbc(pool));
+            sessions.setStore(new Sessions.Db(pool));
             long now = System.currentTimeMillis();
             HttpSession stored = new HttpSession("shared", now, now, 1800);
             stored.markNew();
@@ -3031,7 +3031,7 @@ class ApplicationRuntimeTest {
 
     @Test
     @DisplayName("a database session's beans get the same expiry grace as its row")
-    void jdbcBeansGetTheRowsGrace(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+    void dbBeansGetTheRowsGrace(@org.junit.jupiter.api.io.TempDir java.io.File dir)
             throws Exception {
         DataSource pool = DataSource.open(new java.io.File(dir, "grace.db").getAbsolutePath(),
                 2, 5000, 10000);
@@ -3042,7 +3042,7 @@ class ApplicationRuntimeTest {
                     ended.add(beans);
                 }
             });
-            sessions.setStore(new Sessions.Jdbc(pool));
+            sessions.setStore(new Sessions.Db(pool));
             long now = System.currentTimeMillis();
             // A minute's timeout, last used 65 seconds ago: past the timeout, inside
             // the 15-second touch interval the store still accepts the row for.

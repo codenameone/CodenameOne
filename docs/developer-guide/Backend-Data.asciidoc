@@ -10,9 +10,9 @@ most likely to be almost right.
 
 === Talking to a database
 
-`DataSource.open` takes a SQLite path or a PostgreSQL or MySQL URL, pools
-connections to it, and returns rows as the same Java types whichever engine
-answered:
+The server opens a connection pool from `cn1.datasource.url` -- a SQLite path or
+a PostgreSQL or MySQL URL -- and injects it as a `DataSource` into any bean that
+asks for one. It returns rows as the same Java types whichever engine answered:
 
 [source,java]
 ----
@@ -116,18 +116,13 @@ point holds a `new` with the argument written into it, and a controller that nee
 a database nothing configured is refused at start-up rather than handed a null to
 fail on later.
 
-The generated entry point is also the only place that registration can live, and
-that's a consequence of the build order rather than a preference. This runtime
-has no reflection and the translator drops a class nothing references, so the
-generated `cn1app.BackendDaoBootstrap` holds a direct reference to every dao and
-is what keeps them in the binary. It's written during `process-classes`, AFTER
-javac has compiled the module's own sources -- so a `main` you write yourself
-can't name it, and a module that sets its own `mainClass` can't reach the
-generated daos at all. Use `DataSource` directly there, or let the build write
-the entry point and put the startup work in a controller.
+The build writes the entry point, and the daos are registered there: this
+runtime has no reflection and the translator drops a class nothing references,
+so the generated code's direct reference to every dao is what keeps them in the
+binary. Put start-up work in a bean's `@PostConstruct` method.
 
-Opening an entity manager is otherwise a single call over a pool, which is what
-a test does:
+Outside the server -- in a unit test, say -- an entity manager is a single call
+over a pool:
 
 [source,java]
 ----

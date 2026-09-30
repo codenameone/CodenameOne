@@ -56,11 +56,6 @@ reads and can correct, rather than with a protocol failure. An
 `IllegalArgumentException` sends its message, so that's the exception to throw for
 arguments the tool can't use, with a message saying what would work.
 
-A program that builds its server itself adds a tool that isn't a bean method by
-implementing `com.codename1.backend.mcp.McpTool` -- a name, a description, an
-input schema and a `call` method -- and passing it to the builder with
-`mcpTool(tool)`, beside `mcp(...)`.
-
 ==== The endpoint
 
 The endpoint speaks JSON-RPC 2.0 over MCP's Streamable HTTP transport, and
@@ -93,9 +88,8 @@ answered 405.
   development profile.
 |===
 
-Each server has its own tools, even with several in one process, so a server
-restarted in a test serves the tools its own beans provide and nothing a previous
-one registered.
+A server restarted in a test serves the tools its own beans provide and nothing
+a previous one registered.
 
 === Tools for developing the server
 

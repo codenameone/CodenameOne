@@ -27,7 +27,7 @@ import java.io.IOException;
 /// Where [HttpSession]s are kept between requests.
 ///
 /// Two are provided, chosen by `cn1.session.store`: `memory` (the
-/// default) and `jdbc`, which keeps them in the server's database so any
+/// default) and `db`, which keeps them in the server's database so any
 /// instance behind a load balancer can serve any client. Implement this for
 /// another -- a cache server -- and pass it to [Sessions#setStore].
 public interface SessionStore {
