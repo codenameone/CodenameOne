@@ -293,6 +293,23 @@ still fail to start.
 | Where the endpoints live, `/manage` by default.
 |===
 
+IMPORTANT: A packaged server has no management code at all unless its build asks
+for it. The generated entry point is the only code that names the endpoints, and
+it names them only when the build sees `@EnableManagement` on a class, or
+`cn1.management.enabled=true` in `application.properties` or a profile's file.
+Without either, the translator leaves the endpoints out of the binary, so there's
+no `/manage` to find or to misconfigure, whatever profile the server later runs
+under. The development run through `cn1:backend` always builds them in.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/OpsSettings.java[tag=backend-enable-management,indent=0]
+----
+
+A server built with them can still turn them off at start-up with
+`cn1.management.enabled=false`, and one built without them ignores the key,
+because there's nothing to turn on.
+
 On a development profile without a token, the read-only views are open to anyone
 who can reach the port, which is a laptop. An operation needs the token on every
 profile, because it changes the running server.

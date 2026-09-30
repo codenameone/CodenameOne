@@ -1208,6 +1208,30 @@ public final class Backend {
     }
 
     /// Collects what a server needs and starts one.
+    /// A route the server serves on its own behalf -- the management endpoints,
+    /// the MCP endpoint -- seen through a type that names neither. Only the
+    /// builder methods that install one create it, so a server whose entry point
+    /// never calls them links none of their code.
+    abstract static class OwnRoute {
+        /// The handler this configuration asks for, or null when it is off.
+        abstract HttpServer.Handler open(Config config, String serviceName, List tools)
+                throws IOException;
+
+        /// Called once the server is running, with what [#open] returned.
+        abstract void attach(HttpServer.Handler opened, Backend running);
+
+        /// The setting that would guard `opened` when it answers anyone who
+        /// reaches the port, or null when it's guarded.
+        String unguardedBy(HttpServer.Handler opened) {
+            return null;
+        }
+
+        /// The start-up line naming where `opened` is served, under `base`.
+        String announce(HttpServer.Handler opened, String base) {
+            return null;
+        }
+    }
+
     public static final class Builder {
         private Config config;
         private final List handlers = new ArrayList();
@@ -1236,8 +1260,9 @@ public final class Backend {
         private Tracer tracer;
         private Application application;
         private com.codename1.backend.metrics.MetricReader metricReader;
-        private boolean mcp;
-        private com.codename1.backend.mcp.McpServer.Extension mcpDevTools;
+        private OwnRoute managementRoute;
+        private OwnRoute mcpRoute;
+        private String[] compiledSettings;
         private String serviceName;
 
         Builder(Config config) {
@@ -1433,9 +1458,63 @@ public final class Backend {
         /// methods and, when `devTools` is given and the profile is a
         /// development one, the development tools. The build calls this; see
         /// [com.codename1.backend.mcp.McpServer].
-        public Builder mcp(com.codename1.backend.mcp.McpServer.Extension devTools) {
-            this.mcp = true;
-            this.mcpDevTools = devTools;
+        ///
+        /// This method is the only code that names the endpoint's classes. The
+        /// generated entry point calls it only for a build that asked for MCP, and
+        /// the translator drops a method nothing calls -- so a server that did not
+        /// ask has none of the endpoint in its binary.
+        public Builder mcp(final com.codename1.backend.mcp.McpServer.Extension devTools) {
+            this.mcpRoute = new OwnRoute() {
+                HttpServer.Handler open(Config config, String name, List tools)
+                        throws IOException {
+                    return com.codename1.backend.mcp.McpServer.fromConfig(config, devTools,
+                            name, tools);
+                }
+
+                // Each cast is of the object open() above returned, never
+                // anything else.
+                void attach(HttpServer.Handler opened, Backend running) {
+                    ((com.codename1.backend.mcp.McpServer) opened).attach(running);
+                }
+
+                String unguardedBy(HttpServer.Handler opened) {
+                    return ((com.codename1.backend.mcp.McpServer) opened).hasToken() ? null
+                            : com.codename1.backend.mcp.McpServer.TOKEN;
+                }
+
+                String announce(HttpServer.Handler opened, String base) {
+                    com.codename1.backend.mcp.McpServer server =
+                            (com.codename1.backend.mcp.McpServer) opened;
+                    return "cn1: MCP endpoint at " + base + server.getPath()
+                            + (server.hasDevTools() ? " (with development tools)" : "");
+                }
+            };
+            return this;
+        }
+
+        /// Serves the management endpoints -- health, metrics, jobs and managed
+        /// beans -- when the configuration turns them on; see [Management]. Like
+        /// [#mcp], this is the only code that names them, and the generated entry
+        /// point calls it only for a build that asked for them.
+        public Builder management() {
+            this.managementRoute = new OwnRoute() {
+                HttpServer.Handler open(Config config, String name, List tools)
+                        throws IOException {
+                    return Management.fromConfig(config);
+                }
+
+                void attach(HttpServer.Handler opened, Backend running) {
+                    ((Management) opened).attach(running);
+                }
+            };
+            return this;
+        }
+
+        /// Settings compiled in from the settings annotations, as key and value
+        /// pairs: the bottom layer of the configuration, below the properties
+        /// files and the environment. The build calls this.
+        public Builder compiledSettings(String[] keysAndValues) {
+            this.compiledSettings = keysAndValues;
             return this;
         }
 
@@ -1489,6 +1568,7 @@ public final class Backend {
             if (config == null) {
                 config = Config.load();
             }
+            config = config.withCompiledDefaults(compiledSettings);
             // BEFORE the database, so the statements start-up runs -- the ORM's
             // CREATE TABLE -- are traced like any other, and before anything that
             // could fail, so a refused configuration is refused up front.
@@ -1618,7 +1698,8 @@ public final class Backend {
             routers.addAll(handlers);
             // FIRST among the routers, after the relay: its paths are its own, and
             // a catch-all controller route must not answer a health check.
-            Management management = Management.fromConfig(config);
+            HttpServer.Handler management = managementRoute == null ? null
+                    : managementRoute.open(config, serviceName, null);
             if (management != null) {
                 // At the front, not appended: the handlers above are already in
                 // the list, and a catch-all one would otherwise answer
@@ -1656,9 +1737,8 @@ public final class Backend {
             // After the application: its @McpTool methods are registered while its
             // beans are built, and whether the endpoint has anything to serve
             // depends on them.
-            com.codename1.backend.mcp.McpServer mcpServer = mcp
-                    ? com.codename1.backend.mcp.McpServer.fromConfig(config, mcpDevTools,
-                            serviceName, tools) : null;
+            HttpServer.Handler mcpServer = mcpRoute == null ? null
+                    : mcpRoute.open(config, serviceName, tools);
             if (mcpServer != null) {
                 routers.add(0, mcpServer);
             }
@@ -1668,20 +1748,19 @@ public final class Backend {
             // interface, so it binds loopback instead; an address chosen
             // explicitly that is not loopback needs the token.
             String bindHost = host;
-            if (mcpServer != null && !mcpServer.hasToken()) {
+            String unguardedBy = mcpServer == null ? null : mcpRoute.unguardedBy(mcpServer);
+            if (unguardedBy != null) {
                 if (bindHost == null || bindHost.length() == 0) {
                     bindHost = "127.0.0.1";
                     if (!quiet) {
                         System.out.println("cn1: the MCP endpoint has no token, so the server "
-                                + "listens on 127.0.0.1 only; set "
-                                + com.codename1.backend.mcp.McpServer.TOKEN
+                                + "listens on 127.0.0.1 only; set " + unguardedBy
                                 + " to serve other machines");
                     }
                 } else if (!isLoopback(bindHost)) {
                     throw new IOException("The MCP endpoint has no token and the server is "
                             + "bound to " + bindHost + ", so any machine that reaches it "
-                            + "could run its tools; set "
-                            + com.codename1.backend.mcp.McpServer.TOKEN
+                            + "could run its tools; set " + unguardedBy
                             + ", or bind to a loopback address");
                 }
             }
@@ -1912,16 +1991,15 @@ public final class Backend {
             boolean running = false;
             try {
                 if (management != null) {
-                    management.attach(backend);
+                    managementRoute.attach(management, backend);
                 }
                 if (mcpServer != null) {
-                    mcpServer.attach(backend);
+                    mcpRoute.attach(mcpServer, backend);
                     if (!quiet) {
                         // The line an agent's setup instructions point at.
-                        System.out.println("cn1: MCP endpoint at http"
+                        System.out.println(mcpRoute.announce(mcpServer, "http"
                                 + (context != null ? "s" : "") + "://" + advertised(bindHost)
-                                + ":" + server.getPort() + mcpServer.getPath()
-                                + (mcpServer.hasDevTools() ? " (with development tools)" : ""));
+                                + ":" + server.getPort()));
                     }
                 }
                 if (application != null) {

@@ -364,4 +364,55 @@ The chapters that follow add their own keys -- `cn1.session.*`,
 `cn1.task.executor.*`, `cn1.management.*`, `cn1.mcp.*` and `cn1.otel.*` -- and
 list each one where it's described.
 
+==== Settings in source
+
+A server that ships as one executable often has no properties file beside it, so
+the common settings can also be written as annotations, on any class in the
+backend module:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/AppSettings.java[tag=backend-settings-annotations,indent=0]
+----
+
+Each attribute is one key -- `port` is `cn1.server.port`, `store` is
+`cn1.session.store` -- and the build compiles its value in as the bottom layer of
+the configuration, below `application.properties`. A properties file or the
+environment still changes it without a rebuild, and an attribute left out sets
+nothing. A value the server would refuse at start-up, such as a session store
+that isn't `memory` or `db`, is a build error naming the class instead, and so
+are two classes that give one key different values.
+
+[cols="2,3", options="header"]
+|===
+| Annotation | Keys
+
+| `@ServerConfig`
+| `cn1.server.port`, `workers`, `backlog`, `shutdownTimeoutMillis`
+
+| `@DataSourceConfig`
+| `cn1.datasource.url`, `pool.size`, `pool.borrowTimeoutMillis`,
+  `busyTimeoutMillis`
+
+| `@SessionConfig`
+| `cn1.session.store`, `timeout`, `cookie`, `same-site`, `secure`, `namespace`
+
+| `@StaticFilesConfig`
+| `cn1.static.root`, `prefix`, `index`, `cacheControl`
+
+| `@OpenTelemetry`
+| turns tracing on and names the service; `cn1.otel.endpoint`, `protocol`,
+  `sampler`, `sampler.arg`
+
+| `@EnableManagement`
+| builds the management endpoints in; `cn1.management.enabled`, `path`
+
+| `@EnableMcpServer`
+| builds the MCP endpoint in; `cn1.mcp.path`, `allowedOrigins`
+|===
+
+Secrets -- a token, a password inside a database URL -- don't belong in source.
+Name them as `${NAME}` in the annotation or leave them to the environment, which
+is where the server reads a token from.
+
 Handlers that need any of this get it from the entry point the build writes.

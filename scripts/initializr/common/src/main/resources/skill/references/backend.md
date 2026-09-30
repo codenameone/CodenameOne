@@ -32,6 +32,12 @@ mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
   and `backend/application-<profile>.properties`, **not** `src/main/resources`.
   Environment variables override them (`cn1.datasource.url` is also read from
   `CN1_DATASOURCE_URL` and `DATABASE_URL`, `cn1.server.port` from `PORT`).
+- **Common settings can be annotations too** (a single binary often ships with
+  no properties file): `@ServerConfig(port = 8080)`, `@SessionConfig(store = "db")`,
+  `@DataSourceConfig(url = "${DATABASE_URL}")`, `@StaticFilesConfig(root = "www")`
+  on any class. Each attribute is one `cn1.*` key compiled in UNDER the properties
+  files and environment, which still override it. A bad value or two classes
+  disagreeing is a build error. Never put a token or password in one.
 - **Imports come from `com.codename1.backend.annotations`**, never
   `org.springframework.*`.
 
@@ -193,10 +199,13 @@ Custom instruments: `Metrics.counter(...)`, `Metrics.histogram(...)`,
 - `@OpenTelemetry(serviceName = "notes")` on any class (or
   `cn1.otel.enabled=true`) exports traces **and** metrics over OTLP/HTTP; point
   `OTEL_EXPORTER_OTLP_ENDPOINT` at a collector.
-- Management endpoints (on by default in dev, otherwise `cn1.management.enabled=true`
-  plus `cn1.management.token`; `cn1.management.enabled=false` turns them off in dev too): `/manage/health`, `/manage/metrics`,
-  `/manage/prometheus`, `/manage/jobs`, `/manage/managed`, and
-  `POST /manage/managed/{bean}/{operation}`.
+- Management endpoints: `/manage/health`, `/manage/metrics`, `/manage/prometheus`,
+  `/manage/jobs`, `/manage/managed`, and `POST /manage/managed/{bean}/{operation}`.
+  Always present in the `cn1:backend` dev run. A **packaged** binary contains them
+  only if the build asked -- `@EnableManagement` on a class or
+  `cn1.management.enabled=true` in a properties file -- otherwise the code is not
+  in the binary at all. Outside dev they also need `cn1.management.token` (env).
+  `cn1.management.enabled=false` turns built-in endpoints off at start-up.
 
 ## MCP: the running backend as a tool server
 
@@ -236,7 +245,9 @@ start without it) and a browser `Origin` other than localhost is refused. On a d
 profile the token is optional, but a server without one listens on `127.0.0.1`
 only: its tools reach the database. To test from a phone or another machine, set
 `cn1.mcp.token` (the MCP client then sends it as a bearer token) or turn the
-endpoint off with `cn1.mcp.enabled=false`.
+endpoint off with `cn1.mcp.enabled=false`. A packaged binary contains the MCP
+endpoint only when it has an `@McpTool` method, `@EnableMcpServer`, or
+`cn1.mcp.enabled=true` in a properties file; the dev tools are only in the dev run.
 
 ## Testing
 

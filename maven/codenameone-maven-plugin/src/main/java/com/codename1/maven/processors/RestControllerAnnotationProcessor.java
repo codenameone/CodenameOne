@@ -212,6 +212,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     boolean telemetry;
     String telemetryServiceName;
 
+    /// The settings annotations, and whether the build asked for the management
+    /// and MCP endpoints. Settled in [#finish] beside [#telemetry].
+    BackendSettings settings;
+
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
     /** Which controller claimed each shape, so a clash names the other one. */
@@ -1273,6 +1277,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         resolveTelemetry(ctx);
+        settings = BackendSettings.resolve(ctx);
         if (ctx.hasErrors()) {
             return;
         }
@@ -2546,8 +2551,24 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // only for the pool.
             sb.append("                .requiresDataSource()\n");
         }
+        if (settings != null && !settings.values.isEmpty()) {
+            // The settings annotations, as the bottom layer of the configuration.
+            sb.append("                .compiledSettings(new String[] {");
+            List<String> flat = settings.flat();
+            for (int i = 0; i < flat.size(); i++) {
+                sb.append(i == 0 ? "" : ", ").append(quote(flat.get(i)));
+            }
+            sb.append("})\n");
+        }
+        if (devTools || (settings != null && settings.management)) {
+            // The ONLY call that names the management endpoints, so a packaged
+            // server that did not ask for them has none of their code: the
+            // translator drops the builder method nothing calls, and the classes
+            // only it named go with it.
+            sb.append("                .management()\n");
+        }
         boolean tools = beans != null && beans.hasTools();
-        if (devTools || tools) {
+        if (devTools || tools || (settings != null && settings.mcp)) {
             // The development tools are named only in a development build, so a
             // packaged server has none of their code.
             sb.append("                .mcp(").append(devTools
@@ -2665,17 +2686,49 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 || "on".equalsIgnoreCase(v) || "1".equals(v);
     }
 
-    /// Whether `key` is set in the module's `application.properties` or any
-    /// `application-<profile>.properties` beside it -- what a build can know about
-    /// a setting that Config will read at run time.
-    static boolean applicationPropertyKnown(ProcessorContext ctx, String key) {
+    /// Whether `key` is set to a literal truth value in the module's
+    /// `application.properties` or any `application-<profile>.properties` beside
+    /// it. A `${...}` reference can't be resolved at build time and doesn't count.
+    static boolean applicationPropertyTrue(ProcessorContext ctx, String key) {
+        for (File f : applicationPropertyFiles(ctx)) {
+            java.util.Properties props = new java.util.Properties();
+            InputStream in = null;
+            try {
+                in = new java.io.FileInputStream(f);
+                props.load(in);
+            } catch (IOException err) {
+                continue;
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // Only read; nothing to lose.
+                    }
+                }
+            }
+            String v = props.getProperty(key);
+            if (v != null) {
+                v = v.trim();
+                if ("true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v)
+                        || "on".equalsIgnoreCase(v) || "1".equals(v)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The module's `application.properties` and every
+    /// `application-<profile>.properties` beside it.
+    private static List<File> applicationPropertyFiles(ProcessorContext ctx) {
+        List<File> files = new ArrayList<File>();
         File base = applicationProperties(ctx);
         if (base == null) {
-            return false;
+            return files;
         }
-        File[] siblings = base.getParentFile() == null ? null : base.getParentFile().listFiles();
-        List<File> files = new ArrayList<File>();
         files.add(base);
+        File[] siblings = base.getParentFile() == null ? null : base.getParentFile().listFiles();
         if (siblings != null) {
             for (File f : siblings) {
                 String n = f.getName();
@@ -2684,7 +2737,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 }
             }
         }
-        for (File f : files) {
+        return files;
+    }
+
+    /// Whether `key` is set in the module's `application.properties` or any
+    /// `application-<profile>.properties` beside it -- what a build can know about
+    /// a setting that Config will read at run time.
+    static boolean applicationPropertyKnown(ProcessorContext ctx, String key) {
+        for (File f : applicationPropertyFiles(ctx)) {
             java.util.Properties props = new java.util.Properties();
             InputStream in = null;
             try {

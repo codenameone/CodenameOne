@@ -186,7 +186,7 @@ public class BackendBeansTest {
         Backend backend = Backend.builder(Config.of(settings, "dev"))
                 .quiet()
                 .requiresDataSource()
-                .mcp(new com.codename1.backend.mcp.DevTools())
+                .mcp(new com.codename1.backend.mcp.DevTools()).management()
                 .application(app)
                 .start();
         try {
@@ -283,6 +283,113 @@ public class BackendBeansTest {
         assertTrue(wiring, wiring.contains("new com.example.Api("));
         assertTrue("the private field is injected through the woven setter:\n" + wiring,
                 wiring.contains(".cn1$inject$greeter("));
+    }
+
+    @Test
+    public void aPackagedServerLinksManagementAndMcpOnlyWhenAsked() throws Exception {
+        Map<String, String> plain = new LinkedHashMap<String, String>();
+        plain.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        File classes = compile(plain);
+        assertNoErrors(process(classes, proc));
+        String bootstrap = proc.generateBootstrap("com.example");
+        assertFalse("nothing asked for management, yet the entry point names it:\n" + bootstrap,
+                bootstrap.contains(".management()"));
+        assertFalse("nothing asked for MCP, yet the entry point names it:\n" + bootstrap,
+                bootstrap.contains(".mcp("));
+        assertFalse(bootstrap, bootstrap.contains(".compiledSettings("));
+
+        Map<String, String> s = new LinkedHashMap<String, String>(plain);
+        s.put("com.example.Settings", PKG
+                + "@EnableManagement(path = \"/ops\") @EnableMcpServer(allowedOrigins = "
+                + "{\"https://a.example\", \"https://b.example\"})\n"
+                + "public class Settings { }\n");
+        proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(compile(s), proc));
+        bootstrap = proc.generateBootstrap("com.example");
+        assertTrue(bootstrap, bootstrap.contains(".management()"));
+        assertTrue(bootstrap, bootstrap.contains(".mcp(null)"));
+        assertTrue(bootstrap, bootstrap.contains("\"cn1.management.enabled\", \"true\""));
+        assertTrue(bootstrap, bootstrap.contains("\"cn1.management.path\", \"/ops\""));
+        assertTrue(bootstrap, bootstrap.contains(
+                "\"cn1.mcp.allowedOrigins\", \"https://a.example,https://b.example\""));
+        assertFalse("@EnableMcpServer links the endpoint; whether it serves stays the "
+                + "endpoint's own default:\n" + bootstrap, bootstrap.contains("cn1.mcp.enabled"));
+
+        // The property, in a profile's file, asks as surely as the annotation.
+        classes = compile(plain);
+        java.io.FileWriter w = new java.io.FileWriter(new File(classes, "application.properties"));
+        w.write("cn1.profile=prod\n");
+        w.close();
+        w = new java.io.FileWriter(new File(classes, "application-prod.properties"));
+        w.write("cn1.management.enabled=true\n");
+        w.close();
+        proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        assertTrue(proc.generateBootstrap("com.example").contains(".management()"));
+    }
+
+    @Test
+    public void settingsAnnotationsBecomeCompiledSettings() throws Exception {
+        Map<String, String> s = sample();
+        s.put("com.example.Settings", PKG
+                + "@ServerConfig(port = 8081, workers = 4)\n"
+                + "@SessionConfig(store = \"DB\", timeoutSeconds = 0, sameSite = \"strict\")\n"
+                + "@DataSourceConfig(url = \"${DATABASE_URL}\", poolSize = 3)\n"
+                + "@StaticFilesConfig(root = \"www\", prefix = \"/assets\")\n"
+                + "public class Settings { }\n");
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        assertNoErrors(process(compile(s), proc));
+        String bootstrap = proc.generateBootstrap("com.example");
+        for (String pair : new String[] {"\"cn1.server.port\", \"8081\"",
+                "\"cn1.server.workers\", \"4\"", "\"cn1.session.store\", \"db\"",
+                "\"cn1.session.timeout\", \"0\"", "\"cn1.session.same-site\", \"Strict\"",
+                "\"cn1.datasource.url\", \"${DATABASE_URL}\"",
+                "\"cn1.datasource.pool.size\", \"3\"", "\"cn1.static.root\", \"www\"",
+                "\"cn1.static.prefix\", \"/assets\""}) {
+            assertTrue(pair + " missing from:\n" + bootstrap, bootstrap.contains(pair));
+        }
+        assertFalse("an attribute left at its default set a key:\n" + bootstrap,
+                bootstrap.contains("cn1.server.backlog"));
+    }
+
+    @Test
+    public void aSettingTheRuntimeWouldRefuseIsABuildError() throws Exception {
+        Map<String, String> s = sample();
+        s.put("com.example.Settings", PKG
+                + "@SessionConfig(store = \"jdbc\") public class Settings { }\n");
+        ProcessorContext ctx = process(compile(s));
+        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
+                .contains("@SessionConfig store is \"jdbc\"; it must be memory or db."));
+        s.put("com.example.Settings", PKG
+                + "@ServerConfig(port = 70000) public class Settings { }\n");
+        ctx = process(compile(s));
+        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
+                .contains("@ServerConfig port is 70000; a port is 0 to 65535."));
+        s.put("com.example.Settings", PKG
+                + "@EnableManagement(path = \"ops\") public class Settings { }\n");
+        ctx = process(compile(s));
+        assertTrue(String.valueOf(ctx.getErrors()), String.valueOf(ctx.getErrors())
+                .contains("@EnableManagement path is \"ops\"; a path starts with /."));
+    }
+
+    @Test
+    public void twoClassesSettingOneKeyDifferentlyIsRefused() throws Exception {
+        Map<String, String> s = sample();
+        s.put("com.example.A", PKG + "@SessionConfig(store = \"db\") public class A { }\n");
+        s.put("com.example.B", PKG + "@SessionConfig(store = \"memory\") public class B { }\n");
+        ProcessorContext ctx = process(compile(s));
+        String errors = String.valueOf(ctx.getErrors());
+        assertTrue(errors, errors.contains("cn1.session.store is set to"));
+        assertTrue(errors, errors.contains("Keep one of them."));
+        s.put("com.example.B", PKG + "@SessionConfig(store = \"db\") public class B { }\n");
+        assertNoErrors(process(compile(s)));
     }
 
     @Test

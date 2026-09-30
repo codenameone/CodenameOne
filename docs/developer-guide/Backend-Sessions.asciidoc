@@ -132,6 +132,11 @@ browser closes; how long the session lasts is the server's decision.
   Anything else stops the server at start-up.
 |===
 
+`@SessionConfig` sets the same keys in source -- `@SessionConfig(store = "db",
+timeoutSeconds = 3600)` -- as the bottom layer under the properties files, and
+refuses at build time a value this table says would stop the server; see
+<<Settings in source>>.
+
 An injected `Backend` returns the server's sessions from `getSessions()`, whose
 `getStore()` answers the store in use.
 

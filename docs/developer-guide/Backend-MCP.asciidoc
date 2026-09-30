@@ -91,6 +91,15 @@ answered 405.
 A server restarted in a test serves the tools its own beans provide and nothing
 a previous one registered.
 
+IMPORTANT: A packaged server has no MCP code at all unless its build asks for it:
+a class with an `@McpTool` method, `@EnableMcpServer` on a class, or
+`cn1.mcp.enabled=true` in a properties file. Without any of those, the generated
+entry point never names the endpoint and the translator leaves it out of the
+binary, development tools included; `cn1:backend` builds the development tools in
+for the development run only. `@EnableMcpServer(path = ..., allowedOrigins = ...)`
+sets the two keys it names, and a server built with the endpoint turns it off at
+start-up with `cn1.mcp.enabled=false`.
+
 === Tools for developing the server
 
 The second reason is development. When the server runs through `cn1:backend` on a

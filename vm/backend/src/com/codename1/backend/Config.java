@@ -68,7 +68,12 @@ import java.util.Properties;
 ///
 /// 5. `application.properties`;
 ///
-/// 6. the default the caller passed in.
+/// 6. what the build compiled in from the settings annotations --
+///   `@ServerConfig`, `@SessionConfig` and the rest of
+///   `com.codename1.backend.annotations` -- so a file or the environment can
+///   still change anything the source says;
+///
+/// 7. the default the caller passed in.
 ///
 /// A value may reference an environment variable as `${NAME}` or
 /// `${NAME:fallback}`. That resolution happens when the value is READ
@@ -162,14 +167,39 @@ public final class Config {
 
     private final Properties profileFile;
     private final Properties baseFile;
+    private final Properties compiled;
     private final String profile;
     private final List loadedFrom;
 
     private Config(Properties baseFile, Properties profileFile, String profile, List loadedFrom) {
+        this(baseFile, profileFile, new Properties(), profile, loadedFrom);
+    }
+
+    private Config(Properties baseFile, Properties profileFile, Properties compiled,
+                   String profile, List loadedFrom) {
         this.baseFile = baseFile;
         this.profileFile = profileFile;
+        this.compiled = compiled;
         this.profile = profile;
         this.loadedFrom = loadedFrom;
+    }
+
+    /// This configuration over a bottom layer of compiled-in values: pairs of
+    /// key and value, in that order, which every other layer overrides. The
+    /// generated entry point passes what the settings annotations say.
+    public Config withCompiledDefaults(String[] keysAndValues) {
+        if (keysAndValues == null || keysAndValues.length == 0) {
+            return this;
+        }
+        if (keysAndValues.length % 2 != 0) {
+            throw new IllegalArgumentException("Compiled settings come in key and value pairs");
+        }
+        Properties merged = new Properties();
+        merged.putAll(compiled);
+        for (int iter = 0 ; iter < keysAndValues.length ; iter += 2) {
+            merged.setProperty(keysAndValues[iter], keysAndValues[iter + 1]);
+        }
+        return new Config(baseFile, profileFile, merged, profile, loadedFrom);
     }
 
     /// Reads the configuration for this process: the active profile, then the two
@@ -358,12 +388,17 @@ public final class Config {
         return out.toString();
     }
 
-    /// Every key the properties files set, sorted, for a development listing.
-    /// The environment is not enumerated: it holds far more than this server's
-    /// settings, and secrets that are none of its business.
+    /// Every key the properties files and the compiled-in settings set, sorted,
+    /// for a development listing. The environment is not enumerated: it holds
+    /// far more than this server's settings, and secrets that are none of its
+    /// business.
     public List keys() {
         java.util.TreeSet names = new java.util.TreeSet();
-        java.util.Enumeration e = baseFile.propertyNames();
+        java.util.Enumeration e = compiled.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        e = baseFile.propertyNames();
         while (e.hasMoreElements()) {
             names.add(e.nextElement());
         }
@@ -392,7 +427,11 @@ public final class Config {
         if (value != null) {
             return value;
         }
-        return baseFile.getProperty(key);
+        value = baseFile.getProperty(key);
+        if (value != null) {
+            return value;
+        }
+        return compiled.getProperty(key);
     }
 
     /// A system property of that name, then the environment variable it maps to.

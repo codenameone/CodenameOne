@@ -109,7 +109,7 @@ public final class McpServer implements HttpServer.Handler {
     ///
     /// #### Parameters
     ///
-    /// - `devTools`: @param devTools the development tools, which the build passes only in a
+    /// - `devTools`: the development tools, which the build passes only in a
     /// development build; they are installed only on a development profile
     /// or with `cn1.mcp.devTools=true`
     ///

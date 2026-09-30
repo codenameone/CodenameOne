@@ -1224,7 +1224,7 @@ class ApplicationRuntimeTest {
         Properties settings = new Properties();
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         settings.setProperty(Management.TOKEN, "t0k");
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
                 .application(new EmptyApplication() {
                     public HttpServer.Handler[] create(Backend.Environment environment) {
                         environment.registerManaged(cache);
@@ -1247,6 +1247,68 @@ class ApplicationRuntimeTest {
         } finally {
             backend.stop();
         }
+    }
+
+    @Test
+    @DisplayName("management is served only by a server built with it, whatever the profile")
+    void managementIsLinkedOnlyWhenAsked() throws Exception {
+        HttpServer.Handler none = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        // A development profile, where management defaults on -- but the entry
+        // point never asked for it, so there is nothing to turn on.
+        Backend without = Backend.builder(Config.of(settings, "dev")).quiet().handler(none)
+                .start();
+        try {
+            assertEquals(404, open(port, "/manage/health").getResponseCode());
+        } finally {
+            without.stop();
+        }
+        Backend with = Backend.builder(Config.of(settings, "dev")).quiet().management()
+                .handler(none).start();
+        try {
+            assertEquals(200, open(port, "/manage/health").getResponseCode());
+        } finally {
+            with.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("compiled-in settings are the bottom layer: a properties value overrides them")
+    void compiledSettingsSitUnderTheFiles() throws Exception {
+        HttpServer.Handler none = new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return null;
+            }
+        };
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
+                .compiledSettings(new String[] {Management.PATH, "/ops",
+                        Config.SERVER_PORT, "1"})
+                .handler(none).start();
+        try {
+            // The compiled path took effect, and the compiled port did not
+            // displace the one the properties set.
+            assertEquals(200, open(port, "/ops/health").getResponseCode());
+            assertEquals(404, open(port, "/manage/health").getResponseCode());
+        } finally {
+            backend.stop();
+        }
+        Config config = Config.of(settings, "dev")
+                .withCompiledDefaults(new String[] {"cn1.session.cookie", "APP"});
+        assertEquals("APP", config.get("cn1.session.cookie"));
+        assertTrue(config.keys().contains("cn1.session.cookie"),
+                "a compiled key was missing from the listing Tasks checks at start-up");
+        assertEquals(String.valueOf(port), config.get(Config.SERVER_PORT));
+        assertThrows(IllegalArgumentException.class,
+                () -> Config.of(settings, "dev").withCompiledDefaults(new String[] {"odd"}));
     }
 
     private static int manage(int port, String path, String body) throws IOException {
@@ -2192,7 +2254,9 @@ class ApplicationRuntimeTest {
         settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
         final CountDownLatch running = new CountDownLatch(1);
         final Scheduler[] scheduler = new Scheduler[1];
-        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet()
+        // With management, as a development entry point builds it: that is what
+        // has the server record metrics when no exporter is configured.
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
                 .application(new EmptyApplication() {
                     public void started(Backend b) {
                         scheduler[0] = new Scheduler(null);
