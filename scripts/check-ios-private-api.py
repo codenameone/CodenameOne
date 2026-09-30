@@ -52,8 +52,9 @@ it must not be.
 
 Scope: C and Objective-C symbols. Swift and C++ names are mangled and declared
 in .swiftinterface files and C++ headers that a header scan cannot match, so they
-are skipped rather than all reported; so are names the compiler and Apple's Swift
-toolchain emit (COMPILER_EMITTED) and the Swift runtime Xcode embeds. Private
+are skipped rather than all reported; so are the exact names the compiler and
+Apple's Swift toolchain emit (COMPILER_EMITTED). Every Mach-O in the app is read,
+the Swift runtime Xcode embeds included. Private
 Objective-C SELECTORS are not checked: App Store Connect reports those as a
 warning, and a selector list would be dominated by our own methods.
 """
@@ -274,9 +275,10 @@ COMPILER_EMITTED = {
 MANGLED_PREFIXES = ("__Z", "_$s", "_$S", "__swift_")
 SWIFT_MANGLED_CLASS = "_Tt"
 
-# Apple's Swift runtime, copied into Frameworks by Xcode for back deployment. Apple builds and
-# signs these; the App Store accepts them as they are and nothing in them is ours to change.
-APPLE_EMBEDDED = re.compile(r"^libswift[A-Za-z0-9_]*\.dylib$")
+# The Swift runtime Xcode embeds for back deployment (libswift_Concurrency.dylib and friends) is
+# scanned like everything else rather than skipped by name: a name is no proof of origin, and a
+# third-party libswiftFoo.dylib would otherwise pass unread. The few unmangled internals Apple's
+# runtime does import are listed individually in COMPILER_EMITTED.
 
 # The Swift runtime's C entry points (swift_retain, swift_allocObject, ...). swiftc emits calls
 # to them and no header declares them. Credited only when the import really binds to a libswift
@@ -513,7 +515,7 @@ def binaries_in(app):
     for base, _dirs, files in os.walk(app):
         for name in sorted(files):
             path = os.path.join(base, name)
-            if os.path.islink(path) or APPLE_EMBEDDED.match(name):
+            if os.path.islink(path):
                 continue
             if is_macho(path):
                 found.append(path)
