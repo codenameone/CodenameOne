@@ -60,7 +60,7 @@ one annotation:
 
 | `@RequestBody`
 | the body
-| `String`, a `Map` or a `List`
+| `String`, a `Map` or a `List`, or a class of your own and collections of it
 
 | none, typed `HttpServer.Request`
 | the request itself
@@ -83,11 +83,10 @@ would hand the method a value nobody sent: `required = false` on a primitive wit
 no `defaultValue`, since an `int` can't hold "absent" and would arrive as `0`;
 and a `defaultValue` that isn't a value of the parameter's type.
 
-A body is parsed as JSON, which produces maps, lists, strings, numbers and
-booleans, so that's what a body binds to. A `List<Order>` would arrive as a list
-of maps and fail the first time an element is used as an `Order`, so the build
-refuses it. For typed bodies, declare the API as a contract, as described under
-<<Sharing the contract with the app>>, which generates the codecs on both sides.
+A body is parsed as JSON. A `String`, `Map` or `List` parameter gets it as parsed;
+a class of your own -- an entity, a DTO -- or a `List<Order>` of them is filled in
+by a codec the build writes for that class, as Jackson fills one in for a Spring
+controller. <<Your own classes as JSON>> describes the form.
 
 A request target with a malformed escape sequence, or one that isn't valid UTF-8,
 is answered 400 before any route is tried, rather than as a 404 the client
@@ -105,7 +104,8 @@ couldn't explain.
 | `String`
 | The text, as `text/plain; charset=utf-8`, with 200 or the `@ResponseStatus` code.
 
-| A `Map`, `List`, `Set`, primitive or box, or a class implementing `Json.Writable`
+| A `Map`, `List`, `Set`, primitive or box, or a class of your own and
+  collections of it
 | JSON, with 200 or the `@ResponseStatus` code.
 
 | `HttpServer.Response`
@@ -116,10 +116,62 @@ couldn't explain.
 | 404.
 |===
 
-Any other return type is a build error. A class the router doesn't know how to
-encode would otherwise come out as the JSON string of its `toString()`, with the
-build and the request both reporting success. `@ResponseStatus` takes a final
-status between 200 and 599.
+Any other return type is a build error: a JDK class with no JSON form, such as
+`java.io.File`, would otherwise come out as the JSON string of its `toString()`,
+with the build and the request both reporting success. `@ResponseStatus` takes a
+final status between 200 and 599.
+
+==== Your own classes as JSON
+
+A method can return an entity or any class of your own, or take one as its body,
+and the build writes the JSON codec for that class and for every class its fields
+reach. There is no reflection at run time: the codec is ordinary code that reads
+and writes each field by name, so it costs what the hand-written version would.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/Order.java[tag=backend-dto-json,indent=0]
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrderLine.java[tag=backend-dto-json,indent=0]
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrdersApi.java[tag=backend-dto-json,indent=0]
+----
+
+A `POST /orders` with `{"customer":"Ada","lines":[{"sku":"A-1","quantity":2}]}`
+answers with the stored order:
+
+----
+{"id":1,"customer":"Ada","placed_at":1740821400000,"lines":[{"sku":"A-1","quantity":2}]}
+----
+
+The JSON form is the one the app's `@Mapped` mapper uses, so a class shared by the
+app and the server reads the same on both sides:
+
+* The fields are the class's own and its superclasses', except static and
+  `transient` ones. A public field is used directly; any other through its
+  `getX` (or `isX`) and `setX` methods, and is left out when it has neither.
+* `@JsonProperty("due_at")` renames a field and `@JsonIgnore` leaves one out, both
+  from `com.codename1.annotations`.
+* A `Date` is written as milliseconds since the epoch, which is Jackson's default
+  and what the app's mapper reads, and is read from that or from an ISO-8601 date
+  such as `2025-03-01T09:30:00Z`. A `byte[]` is base64, an enum is its name.
+* A subclass is written with its own fields, even where a method declares the
+  superclass.
+* A body's unknown members are ignored and absent ones leave the field as the
+  constructor set it, as a Spring Boot application does.
+
+A body the codec can't read -- a string where a number belongs, an enum name that
+doesn't exist -- is answered 400 with where it was and what was expected:
+
+----
+$.items[2].due: expected a number or an ISO-8601 date, got true
+----
+
+Two objects that refer to each other, such as an order whose lines point back at
+it, would be written forever, so a response that nests more than 64 objects deep
+is answered 500 with a message naming the class; mark the field that points back
+`@JsonIgnore`. The build refuses what it can't write a codec for, and says why: a
+field typed by a type variable, such as `List<T>` in a generic `Page<T>`; a body
+class with no constructor without arguments; an interface; and an array other
+than `byte[]`.
 
 A method that throws is answered 500 with the body `internal error`, and the
 exception is logged. The message isn't sent to the client, because an exception

@@ -5296,6 +5296,23 @@ public final class HttpServer {
                     handlerError = err;
                     response = Response.text(500, "internal error");
                 }
+                // A deferred JSON body is rendered HERE, into the connection's
+                // reusable buffer the writer then sends from, rather than inside
+                // the write: rendering runs the application's own code -- a
+                // Json.Writable, a generated codec refusing a cycle -- and a throw
+                // there is the handler's failure, owed a 500. Thrown from inside
+                // the write it dropped the connection with nothing sent.
+                if (response.hasDeferredJson) {
+                    try {
+                        conn.bodySink.reset();
+                        Json.write(response.deferredJson, conn.bodySink);
+                    } catch (Throwable err) {
+                        rethrowIfFatal(err);
+                        System.err.println("handler failed: " + err);
+                        handlerError = err;
+                        response = Response.text(500, "internal error");
+                    }
+                }
                 // Read before the write: writing releases what the Response held.
                 int status = response.status;
                 try {
@@ -5676,6 +5693,18 @@ public final class HttpServer {
                     System.err.println("handler failed: " + err);
                     handlerError = err;
                     response = Response.text(500, "internal error");
+                }
+                // Rendered now for the same reason as on HTTP/1: a deferred JSON
+                // body runs the application's code, and a throw there is a 500.
+                if (response.hasDeferredJson) {
+                    try {
+                        response.serializeDeferredJson();
+                    } catch (Throwable err) {
+                        rethrowIfFatal(err);
+                        System.err.println("handler failed: " + err);
+                        handlerError = err;
+                        response = Response.text(500, "internal error");
+                    }
                 }
                 try {
                     boolean headOnly = "HEAD".equals(stream.getMethod());
@@ -7591,15 +7620,12 @@ public final class HttpServer {
 
     private void writeHeadAndBody(Conn conn, int fd, long session, Response response,
             boolean keepAlive, boolean headOnly) throws IOException {
-        // A deferred JSON body is serialised FIRST: Content-Length has to be
-        // written before it, and the only honest way to know it is to have the
-        // bytes. Into a second reusable buffer rather than the head's, because
-        // the head is not built yet.
+        // A deferred JSON body was rendered before this was called -- see the
+        // caller -- into a second reusable buffer rather than the head's, because
+        // Content-Length has to be written before it and the head is not built yet.
         byte[] deferred = null;
         int deferredLength = 0;
         if (response.hasDeferredJson) {
-            conn.bodySink.reset();
-            Json.write(response.deferredJson, conn.bodySink);
             deferred = conn.bodySink.bytes();
             deferredLength = conn.bodySink.length();
         }

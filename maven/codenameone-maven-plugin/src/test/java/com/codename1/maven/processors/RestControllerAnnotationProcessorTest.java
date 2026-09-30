@@ -1054,11 +1054,11 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void aBodyOfDtosIsRefused() throws Exception {
-        // The descriptor erases this to java.util.List, which binds. What the
-        // parser actually supplies is a list of Map, so the first use of an
-        // element as a Note throws and the endpoint answers 500 -- having
-        // packaged perfectly.
+    public void aBodyOfDtosIsDecodedByACodec() throws Exception {
+        // The descriptor erases this to java.util.List, which binds as parsed --
+        // a list of Map, whose first use as a Note would throw. The generic type
+        // is what is checked, and a class of the application's own gets a
+        // codec, as Jackson decodes it for a Spring controller.
         ProcessorContext ctx = run(compile(
                 "package com.example;\n"
                 + "import com.codename1.backend.annotations.*;\n"
@@ -1069,9 +1069,7 @@ public class RestControllerAnnotationProcessorTest {
                 + "    @PostMapping(\"/notes\")\n"
                 + "    public String add(@RequestBody List<Note> body) { return \"ok\"; }\n"
                 + "}\n"));
-        assertTrue("a body of DTOs should not compile", ctx.hasErrors());
-        assertTrue(ctx.getErrors().toString(),
-                ctx.getErrors().toString().indexOf("Cannot bind") >= 0);
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
     }
 
     @Test
@@ -1109,7 +1107,7 @@ public class RestControllerAnnotationProcessorTest {
                 + "}\n"));
         assertTrue("a collection of Response should not compile", ctx.hasErrors());
         assertTrue(ctx.getErrors().toString(),
-                ctx.getErrors().toString().indexOf("cannot encode") >= 0);
+                ctx.getErrors().toString().indexOf("cannot write as JSON") >= 0);
     }
 
     @Test
@@ -1139,21 +1137,21 @@ public class RestControllerAnnotationProcessorTest {
 
     @Test
     public void aJdkReturnJsonCannotWriteIsRefused() throws Exception {
-        // java.util.Date has no branch in Json.writeValue, so it reaches the
-        // final one and is answered as a quoted, implementation-formatted
-        // toString() -- a date the client cannot parse back, from a build and a
-        // request that both reported success.
+        // StringBuilder has no branch in Json.writeValue and no codec, so it
+        // would reach the final branch and be answered as a quoted toString()
+        // from a build and a request that both reported success. (A Date has a
+        // codec now: milliseconds, as the app's mapper reads it.)
         ProcessorContext ctx = run(compile(
                 "package com.example;\n"
                 + "import com.codename1.backend.annotations.*;\n"
                 + "@RestController\n"
                 + "public class Notes {\n"
                 + "    @GetMapping(\"/when\")\n"
-                + "    public java.util.Date when() { return null; }\n"
+                + "    public StringBuilder when() { return null; }\n"
                 + "}\n"));
         assertTrue("a JDK type Json cannot write should not compile", ctx.hasErrors());
         assertTrue(ctx.getErrors().toString(),
-                ctx.getErrors().toString().indexOf("cannot encode") >= 0);
+                ctx.getErrors().toString().indexOf("cannot write as JSON") >= 0);
     }
 
     @Test
@@ -1209,7 +1207,7 @@ public class RestControllerAnnotationProcessorTest {
                 + "}\n"));
         assertTrue("an array the router cannot encode should not compile", ctx.hasErrors());
         String all = ctx.getErrors().toString();
-        assertTrue(all, all.indexOf("cannot encode") >= 0);
+        assertTrue(all, all.indexOf("cannot write as JSON") >= 0);
     }
 
     @Test
@@ -1252,11 +1250,11 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void aListOfDtosIsRefused() throws Exception {
+    public void aListOfDtosIsWrittenByACodec() throws Exception {
         // The DESCRIPTOR erases this to java.util.List, which the encodable
-        // check waves through on its own name. Every Note in the list would
-        // then be written as the quoted result of its toString(), while the
-        // build and the request both reported success.
+        // check waves through on its own name, and Json would write each Note
+        // as its toString(). The generic type is what is checked, and each Note
+        // is written by the codec the build generates for it.
         ProcessorContext ctx = run(compile(
                 "package com.example;\n"
                 + "import com.codename1.backend.annotations.*;\n"
@@ -1267,10 +1265,7 @@ public class RestControllerAnnotationProcessorTest {
                 + "    @GetMapping(\"/notes\")\n"
                 + "    public List<Note> all() { return null; }\n"
                 + "}\n"));
-        assertTrue("a list of types the router cannot encode should not compile",
-                ctx.hasErrors());
-        String all = ctx.getErrors().toString();
-        assertTrue(all, all.indexOf("cannot encode") >= 0);
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
     }
 
     @Test
@@ -1494,9 +1489,9 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void aTypeThatIsNotWritableAtAllIsStillRefused() throws Exception {
-        // The traversal must not turn the check off: a class with no Writable
-        // anywhere in its hierarchy is still the malformed contract this refuses.
+    public void aPlainClassIsWrittenByItsCodec() throws Exception {
+        // No Writable anywhere in its hierarchy, and none needed: its public
+        // field is written by the codec the build generates, as Jackson would.
         Map<String, String> sources = new LinkedHashMap<String, String>();
         sources.put("com.example.Plain",
                 "package com.example;\n"
@@ -1514,7 +1509,7 @@ public class RestControllerAnnotationProcessorTest {
         File classes = tmp.newFolder();
         JavaSourceCompiler.compile(sources, classes, backendClasspath());
         ProcessorContext ctx = run(classes);
-        assertTrue("a type Json cannot write must still be refused", ctx.hasErrors());
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
     }
 
     @Test

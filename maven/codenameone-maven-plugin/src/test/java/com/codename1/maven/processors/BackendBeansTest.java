@@ -285,6 +285,173 @@ public class BackendBeansTest {
                 wiring.contains(".cn1$inject$greeter("));
     }
 
+    private static Map<String, String> dtoSample() {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Priority", PKG + "public enum Priority { LOW, HIGH }\n");
+        s.put("com.example.Tag", PKG + "public class Tag {\n"
+                + "    public String name;\n"
+                + "    public Tag() { }\n"
+                + "    public Tag(String name) { this.name = name; }\n"
+                + "}\n");
+        s.put("com.example.Note", PKG + "public class Note {\n"
+                + "    public long id;\n"
+                + "    public String title;\n"
+                + "    public Date due;\n"
+                + "    public Priority priority;\n"
+                + "    public List<Tag> tags;\n"
+                + "    @com.codename1.annotations.JsonProperty(\"is_done\") public boolean done;\n"
+                + "    @com.codename1.annotations.JsonIgnore public String secret = \"s3cret\";\n"
+                + "    public transient String cache = \"cached\";\n"
+                + "    private int rank;\n"
+                + "    public int getRank() { return rank; }\n"
+                + "    public void setRank(int rank) { this.rank = rank; }\n"
+                + "    public byte[] blob;\n"
+                + "    public Map<String, Integer> counts;\n"
+                + "    public Note() { }\n"
+                + "}\n");
+        s.put("com.example.Special", PKG + "public class Special extends Note {\n"
+                + "    public String extra = \"more\";\n"
+                + "}\n");
+        s.put("com.example.Node", PKG + "public class Node {\n"
+                + "    public Node next;\n"
+                + "}\n");
+        s.put("com.example.Api", PKG
+                + "@RestController public class Api {\n"
+                + "    static Note note() {\n"
+                + "        Note n = new Note();\n"
+                + "        n.id = 7; n.title = \"hi\"; n.due = new Date(86400000L);\n"
+                + "        n.priority = Priority.HIGH; n.done = true; n.setRank(3);\n"
+                + "        n.tags = new ArrayList<Tag>(); n.tags.add(new Tag(\"a\"));\n"
+                + "        n.blob = new byte[] {1, 2, 3};\n"
+                + "        n.counts = new LinkedHashMap<String, Integer>(); n.counts.put(\"x\", 1);\n"
+                + "        return n;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/note\") public Note one() { return note(); }\n"
+                + "    @GetMapping(\"/notes\") public List<Note> all() {\n"
+                + "        List<Note> out = new ArrayList<Note>();\n"
+                + "        out.add(note()); out.add(new Special());\n"
+                + "        return out;\n"
+                + "    }\n"
+                + "    @PostMapping(\"/echo\") public Note echo(@RequestBody Note n) { return n; }\n"
+                + "    @PostMapping(\"/count\") public String count(@RequestBody List<Note> ns) {\n"
+                + "        return ns.size() + \":\" + ns.get(1).tags.get(0).name;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/loop\") public Node loop() {\n"
+                + "        Node a = new Node(); a.next = a; return a;\n"
+                + "    }\n"
+                + "}\n");
+        return s;
+    }
+
+    @Test
+    public void aControllerReturnsAndAcceptsItsOwnClassesAsJson() throws Exception {
+        File classes = compile(dtoSample());
+        assertNoErrors(process(classes));
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            String one = http("GET", port, "/note");
+            for (String part : new String[] {"\"id\":7", "\"title\":\"hi\"", "\"due\":86400000",
+                    "\"priority\":\"HIGH\"", "\"tags\":[{\"name\":\"a\"}]", "\"is_done\":true",
+                    "\"rank\":3", "\"blob\":\"AQID\"", "\"counts\":{\"x\":1}"}) {
+                assertTrue(part + " missing from " + one, one.contains(part));
+            }
+            assertFalse("@JsonIgnore was written: " + one, one.contains("s3cret"));
+            assertFalse("a transient field was written: " + one, one.contains("cached"));
+
+            String all = http("GET", port, "/notes");
+            assertTrue("a subclass was written as its declared type: " + all,
+                    all.contains("\"extra\":\"more\""));
+
+            String echoed = post(port, "/echo", "{\"id\":9,\"title\":\"t\",\"unknown\":[1],"
+                    + "\"due\":\"1970-01-02T00:00:00Z\",\"priority\":\"LOW\",\"is_done\":true,"
+                    + "\"rank\":5,\"tags\":[{\"name\":\"b\"}],\"blob\":\"AQID\","
+                    + "\"counts\":{\"y\":2}}");
+            for (String part : new String[] {"\"id\":9", "\"due\":86400000", "\"priority\":\"LOW\"",
+                    "\"is_done\":true", "\"rank\":5", "\"tags\":[{\"name\":\"b\"}]",
+                    "\"blob\":\"AQID\"", "\"counts\":{\"y\":2}"}) {
+                assertTrue(part + " missing from " + echoed, echoed.contains(part));
+            }
+            assertTrue(post(port, "/count", "[{},{\"tags\":[{\"name\":\"z\"}]}]").equals("2:z"));
+
+            assertEquals("HTTP 400: $.id: expected a whole number from -9223372036854775808 to "
+                    + "9223372036854775807, got a string", post(port, "/echo", "{\"id\":\"x\"}"));
+            assertEquals("HTTP 400: $[1].tags[0].name: expected a string, got the number 5",
+                    post(port, "/count", "[{},{\"tags\":[{\"name\":5}]}]"));
+            assertEquals("HTTP 400: $.priority: expected one of LOW, HIGH, got a string",
+                    post(port, "/echo", "{\"priority\":\"MEDIUM\"}"));
+            assertEquals("HTTP 400: The request body is not valid JSON",
+                    post(port, "/echo", "{nope"));
+            assertTrue(http("GET", port, "/loop").startsWith("HTTP 500"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void theGuidesOrderExampleWorksAsDocumented() throws Exception {
+        // The developer guide's own files, not a copy: what the chapter shows is
+        // what builds and answers here.
+        File dir = new File("../../docs/demos/backend/src/main/java/com/codenameone/"
+                + "developerguide/backend/orders");
+        assertTrue(dir.getAbsolutePath(), dir.isDirectory());
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        for (String name : new String[] {"Order", "OrderLine", "OrdersApi"}) {
+            s.put("com.codenameone.developerguide.backend.orders." + name, new String(
+                    java.nio.file.Files.readAllBytes(new File(dir, name + ".java").toPath()),
+                    "UTF-8"));
+        }
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Backend.Application app = (Backend.Application) loader.loadClass(
+                "com.codenameone.developerguide.backend.orders.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().application(app)
+                .start();
+        try {
+            String placed = post(port, "/orders",
+                    "{\"customer\":\"Ada\",\"lines\":[{\"sku\":\"A-1\",\"quantity\":2}]}");
+            assertTrue(placed, placed.matches("\\{\"id\":1,\"customer\":\"Ada\","
+                    + "\"placed_at\":[0-9]+,\"lines\":\\[\\{\"sku\":\"A-1\",\"quantity\":2\\}\\]\\}"));
+            assertEquals(placed, http("GET", port, "/orders/1"));
+            assertTrue(http("GET", port, "/orders/2").startsWith("HTTP 404"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void aClassNoCodecCanBeWrittenForIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Page", PKG + "public class Page<T> { public List<T> items; }\n");
+        s.put("com.example.Fixed", PKG + "public class Fixed {\n"
+                + "    public final String id;\n"
+                + "    public Fixed(String id) { this.id = id; }\n"
+                + "}\n");
+        // One controller each: a class stops at its first refused route.
+        s.put("com.example.PageApi", PKG
+                + "@RestController public class PageApi {\n"
+                + "    @GetMapping(\"/p\") public Page<String> page() { return null; }\n"
+                + "}\n");
+        s.put("com.example.FixedApi", PKG
+                + "@RestController public class FixedApi {\n"
+                + "    @PostMapping(\"/f\") public String f(@RequestBody Fixed f) { return f.id; }\n"
+                + "}\n");
+        s.put("com.example.ArrayApi", PKG
+                + "@RestController public class ArrayApi {\n"
+                + "    @GetMapping(\"/a\") public int[] a() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("has a type variable for its type"));
+        assertTrue(errors, errors.contains("has no constructor without arguments"));
+        assertTrue(errors, errors.contains("an array, which has no JSON form here other than "
+                + "byte[]"));
+    }
+
     @Test
     public void aPackagedServerLinksManagementAndMcpOnlyWhenAsked() throws Exception {
         Map<String, String> plain = new LinkedHashMap<String, String>();

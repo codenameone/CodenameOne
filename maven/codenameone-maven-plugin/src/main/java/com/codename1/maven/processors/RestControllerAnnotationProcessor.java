@@ -248,6 +248,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String prefix;
         /** For each variable, the literal that must follow it; "" when it runs to the end. */
         List<String> after = new ArrayList<String>();
+        /**
+         * The statements that write `result` through the generated codecs, when the
+         * return type is one of the application's own classes or holds one; null
+         * when Json writes it as it is.
+         */
+        String codecWrite;
     }
 
     private static final class Param {
@@ -262,6 +268,23 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         /** Set when the body is decoded into a local before the call. */
         String local;
         int variableIndex = -1;
+        /**
+         * The statements that read `parsed` into `target` through the generated
+         * codecs, when the body is one of the application's own classes or holds
+         * one; null when the body binds as parsed.
+         */
+        String codecRead;
+    }
+
+    /// The JSON codecs for the application's own classes, created with the first
+    /// route that needs one.
+    private BackendJsonCodecs codecs;
+
+    private BackendJsonCodecs codecs(ProcessorContext ctx) {
+        if (codecs == null) {
+            codecs = new BackendJsonCodecs(ctx);
+        }
+        return codecs;
     }
 
     @Override
@@ -845,6 +868,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             String badKey = "BODY".equals(p.kind) ? unusableMapKey(genericType) : null;
+            if ("BODY".equals(p.kind) && !"java.lang.String".equals(p.javaType)
+                    && (badKey != null || !bodyElementsAreDecoded(genericType)
+                    || !isBindable(p.javaType, p.kind))) {
+                // Not a shape the parser hands over as it is -- one of the
+                // application's classes, or a container of them, or of a type the
+                // parser does not produce (Integer, Date, an enum). Spring binds
+                // those through Jackson; here the build writes the codec, and a
+                // shape it cannot write one for is refused with the reason.
+                String bodyType = genericType != null ? genericType : p.javaType;
+                String why = codecs(ctx).checkRead(bodyType);
+                if (why == null) {
+                    p.genericJavaType = bodyType;
+                    p.codecRead = codecs(ctx).readStatements(bodyType, "parsed", "com.codename1"
+                            + ".backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target", "");
+                    route.params.add(p);
+                    continue;
+                }
+                if (badKey == null) {
+                    ctx.error(cls, "Cannot bind " + bodyType + " from the body on "
+                            + cls.getBinaryName() + "." + m.getName() + ": it holds " + why + ".");
+                    return null;
+                }
+            }
             if (badKey != null) {
                 // Separate from the element rule below, and with its own message,
                 // because Long is a perfectly good body VALUE -- every JSON
@@ -925,12 +971,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return null;
         }
         if (!isEncodableReturn(route.returnJavaType, ctx)) {
-            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
-                    + route.returnJavaType + ", which the generated router cannot encode: "
-                    + "it would be written as the JSON string of its toString(). Return a "
-                    + "Map, a List, a Set, a String, a primitive, an HttpServer.Response, "
-                    + "or make the type implement com.codename1.backend.Json.Writable.");
-            return null;
+            // One of the application's classes, or a container of them: written
+            // through a codec the build generates for it, as Jackson would write
+            // it for a Spring controller.
+            String why = codecs(ctx).checkWrite(route.returnJavaType);
+            if (why != null) {
+                ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
+                        + route.returnJavaType + ", which the generated router cannot write "
+                        + "as JSON: it holds " + why + ".");
+                return null;
+            }
+            route.codecWrite = codecs(ctx).writeStatements(route.returnJavaType, "result",
+                    "0", "");
         }
         AnnotationValues status = m.getAnnotation(RESPONSE_STATUS);
         // ResponseStatus documents that a value-returning method answers 200 and a
@@ -1323,6 +1375,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "would replace it. Rename that class.");
             return;
         }
+        if (codecs != null) {
+            for (String codec : codecs.codecBinaries()) {
+                if (isNotOurOwnOutput(ctx, codec)) {
+                    ctx.error(codec + " already exists, and the JSON codec generated under "
+                            + "that name would replace it. Rename that class.");
+                    return;
+                }
+            }
+            sources.putAll(codecs.sources());
+        }
         daos = hasGeneratedDaos(ctx);
         sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
@@ -1521,6 +1583,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respond(").append(route.status)
               .append(", \"text/plain; charset=utf-8\", utf8(result));\n");
+        } else if (route.codecWrite != null) {
+            // The application's own classes: written straight into the connection's
+            // buffer by the codec the build generated, with no Map in between.
+            String type = BackendJsonCodecs.source(route.returnJavaType);
+            sb.append(pad).append("final ").append(type).append(" result = ").append(call)
+              .append(";\n");
+            sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
+            sb.append(pad).append("        : request.respondJson(").append(route.status)
+              .append(", new com.codename1.backend.Json.Writable() {\n");
+            sb.append(pad).append("            public void writeTo(com.codename1.backend.ByteSink out) {\n");
+            appendIndented(sb, route.codecWrite, pad + "                ");
+            sb.append(pad).append("            }\n");
+            sb.append(pad).append("        });\n");
         } else {
             // Everything else is JSON. respondJson writes into the connection's own
             // Response, so a route that returns a value still allocates only that value.
@@ -1931,6 +2006,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if (!"BODY".equals(p.kind) || "java.lang.String".equals(p.javaType)) {
                 continue;
             }
+            if (p.codecRead != null) {
+                String type = BackendJsonCodecs.source(p.genericJavaType);
+                p.local = "body" + i;
+                sb.append(pad).append(type).append(' ').append(p.local).append(" = null;\n");
+                sb.append(pad).append("if (request.getBody() != null && request.getBody().length() > 0) {\n");
+                sb.append(pad).append("    Object parsed = bodyAsValue(request.getBody());\n");
+                sb.append(pad).append("    if (parsed == MALFORMED) {\n");
+                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
+                sb.append(pad).append("    }\n");
+                sb.append(pad).append("    ").append(type).append(" target = null;\n");
+                // What the codec refuses is the client's mistake -- a string
+                // where a number belongs -- and its message says where: a 400,
+                // as Spring answers a body Jackson cannot read.
+                sb.append(pad).append("    try {\n");
+                appendIndented(sb, p.codecRead, pad + "        ");
+                sb.append(pad).append("    } catch (IllegalArgumentException err) {\n");
+                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                utf8(String.valueOf(err.getMessage())));\n");
+                sb.append(pad).append("    }\n");
+                sb.append(pad).append("    ").append(p.local).append(" = target;\n");
+                sb.append(pad).append("}\n");
+                continue;
+            }
             boolean map = "java.util.Map".equals(p.javaType);
             String type = map ? "java.util.Map" : "java.util.List";
             String decoder = map ? "bodyAsMap" : "bodyAsList";
@@ -2142,6 +2241,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * runtime class so that a module with no controllers links none of it, and so
      * the dead-code pass can drop whichever ones this controller never calls.
      */
+    /// Each line of `code` with `pad` in front of it.
+    private static void appendIndented(StringBuilder sb, String code, String pad) {
+        int start = 0;
+        while (start < code.length()) {
+            int end = code.indexOf('\n', start);
+            if (end < 0) {
+                end = code.length();
+            }
+            sb.append(pad).append(code, start, end).append('\n');
+            start = end + 1;
+        }
+    }
+
     private static void emitRouterHelpers(StringBuilder sb) {
         sb.append("    private static final byte[] EMPTY = new byte[0];\n\n");
         sb.append("    /**\n");
@@ -2468,6 +2580,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("                || value.equalsIgnoreCase(\"no\") || value.equalsIgnoreCase(\"off\");\n");
         sb.append("    }\n\n");
 
+        // A body that does not parse, told apart from one that parsed to null.
+        sb.append("    private static final Object MALFORMED = new Object();\n\n");
+        sb.append("    private static Object bodyAsValue(String body) {\n");
+        sb.append("        try {\n");
+        sb.append("            return com.codename1.backend.Json.parse(body);\n");
+        sb.append("        } catch (java.io.IOException err) {\n");
+        sb.append("            return MALFORMED;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
         sb.append("    private static java.util.Map bodyAsMap(String body) {\n");
         sb.append("        if (body == null || body.length() == 0) {\n");
         sb.append("            return null;\n");

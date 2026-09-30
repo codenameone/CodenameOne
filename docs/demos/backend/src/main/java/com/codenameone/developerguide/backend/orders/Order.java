@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,23 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.annotations;
+package com.codenameone.developerguide.backend.orders;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.codename1.annotations.JsonProperty;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
-/// Renames a `@Mapped` field in the JSON projection. The default JSON key is
-/// the field name; `@JsonProperty` lets a field map to `snake_case` or any
-/// alternative spelling without touching the Java identifier.
-///
-/// The server's generated codecs read it too, so a class shared between an app
-/// and its backend has one JSON form on both sides.
-@com.codename1.impl.SharedWithBackend
-@Retention(RetentionPolicy.CLASS)
-@Target(ElementType.FIELD)
-public @interface JsonProperty {
-    /// The JSON key.
-    String value();
+/** The Backend chapter's order example, compiled so it cannot drift. */
+// tag::backend-dto-json[]
+public class Order {
+    public long id;
+    public String customer;
+    @JsonProperty("placed_at")
+    public Date placedAt;
+    public List<OrderLine> lines = new ArrayList<OrderLine>();
 }
+// end::backend-dto-json[]

@@ -101,6 +101,24 @@ current session with `Backend.currentRequest().getSession(true)` instead).
 **Parameter names do not survive compilation.** `@PathVariable`, `@RequestParam`,
 `@RequestHeader` and `@McpParam` always need their name spelled out.
 
+## JSON: return and accept your own classes
+
+A controller may return an entity or DTO (or `List<Order>`, `Map<String, Order>`)
+and take one as `@RequestBody`. The build writes a codec per class -- no
+reflection -- in the same JSON form as the app's `@Mapped` mapper, so a class
+shared by app and backend round-trips:
+
+- Fields: non-static, non-`transient`; public directly, otherwise via
+  `getX`/`isX` + `setX`. `@JsonProperty("name")` / `@JsonIgnore` from
+  `com.codename1.annotations`.
+- `Date` = epoch millis (reads millis or ISO-8601), `byte[]` = base64, enum = name.
+- Unknown body members ignored, absent ones keep the default. A bad value is a 400
+  naming its path (`$.lines[0].quantity: expected a whole number ...`).
+- Objects that point back at each other: `@JsonIgnore` the back reference (a
+  response nesting over 64 deep is a 500).
+- Build errors: generic `Page<T>` fields (use a concrete subclass), a body class
+  without a no-arg constructor, interfaces, arrays other than `byte[]`.
+
 ## Transactions
 
 ```java
