@@ -249,7 +249,19 @@ public class LinuxImplementation extends CodenameOneImplementation {
             screenDpi = 96;
         }
         mainLoopInstance = this;
-        installNativeTheme();
+        // Deferred, not installed here: an application that installs its own theme
+        // with setThemeProps -- every Flutter application, and any theme without
+        // @includeNativeBool -- resets the table and discards this one before
+        // anything reads it, and parsing and applying it was about 26ms of every
+        // launch of the transpiled Flutter gallery, all of it thrown away. It is
+        // still installed for an application with no theme of its own, the moment
+        // anything first reads the theme. See UIManager.setDeferredBaseTheme.
+        com.codename1.ui.plaf.UIManager.getInstance().setDeferredBaseTheme(new Runnable() {
+            @Override
+            public void run() {
+                installNativeTheme();
+            }
+        });
     }
 
     /**
@@ -319,7 +331,8 @@ public class LinuxImplementation extends CodenameOneImplementation {
      * iOSModernTheme.res. An app that loads its own theme layers over this.
      * Silently does nothing when the theme resource is absent. This is the
      * framework hook (UIManager calls it for {@code @includeNativeBool} themes);
-     * init() also calls it so an app with no theme of its own still gets it.
+     * init() defers it (UIManager.setDeferredBaseTheme) so an app with no
+     * theme of its own still gets it, without paying for it when the app installs one.
      */
     private boolean installingNativeTheme;
 
