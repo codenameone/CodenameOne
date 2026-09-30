@@ -52,6 +52,14 @@
 //#define CN1_INCLUDE_CRYPTO
 //#define CN1_INCLUDE_CRYPTO_GCM
 
+/*
+ * AES-GCM in this port uses public CommonCrypto calls only (see CN1Crypto.m), so the builders
+ * enable it for every application that uses the crypto API. They read THIS marker to tell such a
+ * port from an older one, whose GCM called CommonCrypto's private SPI and must stay opt-in: a
+ * version-pinned build can stage either. Do not remove it while an older port can still be built.
+ */
+#define CN1_CRYPTO_GCM_PUBLIC_API 1
+
 #define CN1_CRYPTO_E_GENERIC       -1
 #define CN1_CRYPTO_E_BAD_KEY       -2
 #define CN1_CRYPTO_E_BAD_INPUT     -3
