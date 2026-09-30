@@ -16,9 +16,12 @@ source = (NATIVE / 'IOSNative.m').read_text()
 delegate = (NATIVE / 'CodenameOne_GLAppDelegate.m').read_text()
 builder = (ROOT / 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java').read_text()
 
-# Use the template's flag and the builder's actual disabling replacement.
+# Use the template's flag and the builder's actual disabling replacement. The builder switches
+# defines through Executor.replaceMarker, which matches the whole name (a plain String.replace
+# of one define also switched any longer define starting with it); the flag line here is that
+# exact name, so replaying the pair with str.replace below is equivalent.
 flag = re.search(r'^#define INCLUDE_CN1_PUSH2\s*$', source, re.M).group(0)
-disabling = re.search(r'str\.replace\("(#define INCLUDE_CN1_PUSH2)", "([^"]+)"\)', builder)
+disabling = re.search(r'replaceMarker\(str,\s*"(#define INCLUDE_CN1_PUSH2)",\s*"([^"]+)"\)', builder)
 assert disabling, 'Builder push configuration changed; update the test staging'
 start = source.index('typedef void (^CN1PushCompletionHandlerType)')
 start = source.rindex('#ifdef', 0, start)

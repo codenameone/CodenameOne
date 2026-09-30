@@ -790,22 +790,22 @@ public class MacOSBuildHints {
      * spelling an existing settings file actually carries.</p>
      */
     /**
-     * AES-GCM, ON by default because that is what iOS actually ships.
+     * AES-GCM, ON by default, the same as iOS.
      *
-     * <p>IPhoneBuilder uncomments {@code //#define CN1_INCLUDE_CRYPTO}, and that
-     * string is a strict PREFIX of {@code //#define CN1_INCLUDE_CRYPTO_GCM}
-     * sitting on the next line, while replaceInFile is an unrestricted
-     * String.replace. So every iOS application that touches
-     * com.codename1.security gets GCM whether or not it asked for it. Nothing in
-     * this repository sets ios.crypto.gcm and CryptoApiTest's AES-GCM round trip
-     * passes on iOS regardless, which is the proof.</p>
+     * <p>On both, GCM is part of the crypto API: CN1Crypto.m builds it from public
+     * CommonCrypto calls, so an application using com.codename1.security gets it
+     * unless the hint trims it, and CryptoApiTest's AES-GCM round trip runs on
+     * both. (iOS once got the same result by accident -- IPhoneBuilder enabled
+     * CN1_INCLUDE_CRYPTO with a prefix-matching replace that also uncommented the
+     * GCM line -- while its GCM still called CommonCrypto's private SPI; see
+     * IPhoneBuilder.resolveCryptoGcm.)</p>
      *
      * <p>macOS parks the GCM directive under a placeholder so the base
-     * replacement cannot reach it, which is correct -- and with an opt-in
-     * default of false it made the same application work on iOS and fail on
-     * macOS with CN1_CRYPTO_E_UNSUPPORTED, surfacing as "crypto operation failed
-     * with code -5". Hence the default here is true; {@code macos.crypto.gcm
-     * =false} still trims the symbols for an application that wants that.</p>
+     * replacement cannot reach it. With an opt-in default of false that made the
+     * same application work on iOS and fail on macOS with
+     * CN1_CRYPTO_E_UNSUPPORTED, surfacing as "crypto operation failed with code
+     * -5". Hence the default here is true; {@code macos.crypto.gcm=false} still
+     * trims the symbols for an application that wants that.</p>
      */
     public String getCryptoGcm() {
         return hint(source, "crypto.gcm", source.get("ios.crypto.gcm", "true"));
