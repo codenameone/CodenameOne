@@ -1510,6 +1510,142 @@
     }
    }
   },
+  "windows-x64@intel64-family-6-model-106-genuineintel": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.226,
+     "runs": 1,
+     "time": 0.999,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.383,
+     "runs": 1,
+     "time": 1.425,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.103,
+     "runs": 1,
+     "time": 1.214,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 0.761,
+     "runs": 1,
+     "time": 1.212,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.055,
+     "runs": 1,
+     "time": 1.03,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.054,
+     "runs": 1,
+     "time": 1.002,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.059,
+     "runs": 1,
+     "time": 0.809,
+     "tolerance": {
+      "memory": 0.4,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.533,
+     "runs": 1,
+     "time": 3.284,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.119,
+     "runs": 1,
+     "time": 1.108,
+     "tolerance": {
+      "memory": 0.25
+     }
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.059,
+     "runs": 1,
+     "time": 1.262,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.27,
+     "runs": 1,
+     "time": 1.435,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.536,
+     "runs": 1,
+     "time": 0.627,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.044,
+     "runs": 1,
+     "time": 0.132,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   }
+  },
   "windows-x64@intel64-family-6-model-207-genuineintel": {
    "arrayRandom": {
     "all": {
