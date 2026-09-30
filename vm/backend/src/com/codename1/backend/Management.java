@@ -196,12 +196,12 @@ public final class Management implements HttpServer.Handler {
 
     @Override
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-        String target = request.getTarget();
-        if (target == null || !target.startsWith(path)) {
+        // The CANONICAL path, as the routers compare it; see McpServer.handle.
+        String canonical = request.getTarget() == null ? null : request.pathFrom(0);
+        if (canonical == null || !canonical.startsWith(path)) {
             return null;
         }
-        int query = target.indexOf('?');
-        String rest = (query < 0 ? target : target.substring(0, query)).substring(path.length());
+        String rest = canonical.substring(path.length());
         if (rest.length() > 0 && rest.charAt(0) != '/') {
             return null;
         }

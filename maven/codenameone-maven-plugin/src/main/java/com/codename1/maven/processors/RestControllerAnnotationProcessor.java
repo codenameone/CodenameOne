@@ -1376,14 +1376,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         if (codecs != null) {
-            for (String codec : codecs.codecBinaries()) {
+            Map<String, String> codecSources = codecs.sources();
+            for (String codec : codecSources.keySet()) {
                 if (isNotOurOwnOutput(ctx, codec)) {
                     ctx.error(codec + " already exists, and the JSON codec generated under "
                             + "that name would replace it. Rename that class.");
                     return;
                 }
             }
-            sources.putAll(codecs.sources());
+            sources.putAll(codecSources);
         }
         daos = hasGeneratedDaos(ctx);
         sources.put(wiring, generateWiring(entryPackage));

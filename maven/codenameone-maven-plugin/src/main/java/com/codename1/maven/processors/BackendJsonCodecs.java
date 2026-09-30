@@ -119,9 +119,15 @@ final class BackendJsonCodecs {
         }
     }
 
+    /// The generated class that writes a value whose declared type says nothing
+    /// -- an `Object` or raw `Map` or `List` field -- by what it turns out to be.
+    static final String VALUES = "cn1app.JsonValues";
+
     private final ProcessorContext ctx;
     private final Map<String, Dto> dtos = new LinkedHashMap<String, Dto>();
     private int counter;
+    /// Whether any codec writes a value through [#VALUES].
+    private boolean valuesUsed;
 
     BackendJsonCodecs(ProcessorContext ctx) {
         this.ctx = ctx;
@@ -159,6 +165,16 @@ final class BackendJsonCodecs {
         switch (kind) {
             case COLLECTION: {
                 List<String> args = args(type);
+                if (read && "java.util.TreeSet".equals(raw(type))) {
+                    // A TreeSet orders by compareTo, so the codec's first add of an
+                    // element that is not Comparable fails -- and on the translated
+                    // runtime a failed cast is not even an exception. Refused here.
+                    String element = args.isEmpty() ? "java.lang.Object" : strip(args.get(0));
+                    if (element == null || !isComparable(element)) {
+                        return "a TreeSet of " + element + ", which is not Comparable, so a "
+                                + "body cannot fill one; implement Comparable or use a Set";
+                    }
+                }
                 return args.isEmpty() ? null : check(args.get(0), read, visiting);
             }
             case MAP: {
@@ -363,15 +379,19 @@ final class BackendJsonCodecs {
     }
 
     private boolean implementsWritable(AnnotatedClass cls, Set<String> seen) {
+        return implementsInterface(cls, WRITABLE, seen);
+    }
+
+    private boolean implementsInterface(AnnotatedClass cls, String itfName, Set<String> seen) {
         if (cls == null) {
             return false;
         }
         for (String itf : cls.getInterfaceInternalNames()) {
-            if (WRITABLE.equals(itf)) {
+            if (itfName.equals(itf)) {
                 return true;
             }
-            if (seen.add(itf) && implementsWritable(
-                    RestControllerAnnotationProcessor.resolveClass(ctx, itf), seen)) {
+            if (seen.add(itf) && implementsInterface(
+                    RestControllerAnnotationProcessor.resolveClass(ctx, itf), itfName, seen)) {
                 return true;
             }
         }
@@ -379,8 +399,22 @@ final class BackendJsonCodecs {
         if (parent == null || parent.startsWith("java/") || !seen.add(parent)) {
             return false;
         }
-        return implementsWritable(RestControllerAnnotationProcessor.resolveClass(ctx, parent),
-                seen);
+        return implementsInterface(RestControllerAnnotationProcessor.resolveClass(ctx, parent),
+                itfName, seen);
+    }
+
+    /// Whether a TreeSet can order values of `type`.
+    private boolean isComparable(String type) {
+        Kind kind = kindOf(type);
+        if (kind == Kind.STRING || kind == Kind.BOX || kind == Kind.DATE || kind == Kind.ENUM) {
+            return true;
+        }
+        if (kind != Kind.DTO) {
+            return false;
+        }
+        AnnotatedClass cls = RestControllerAnnotationProcessor.resolveClass(ctx,
+                raw(type).replace('.', '/'));
+        return implementsInterface(cls, "java/lang/Comparable", new HashSet<String>());
     }
 
     private static boolean hasNoArgConstructor(AnnotatedClass cls) {
@@ -535,11 +569,18 @@ final class BackendJsonCodecs {
                 return;
             case BOX:
             case STRING:
+                sb.append(ind).append(JSON).append(".writeValue(").append(expr)
+                  .append(", out);\n");
+                return;
             case ANY:
             case RAW_MAP:
             case RAW_LIST:
-                sb.append(ind).append(JSON).append(".writeValue(").append(expr)
-                  .append(", out);\n");
+                // Its declared type says nothing, and Json.writeValue knows no
+                // generated codec: an application object in here would be written
+                // as its toString(). The dispatcher asks what it is at run time.
+                valuesUsed = true;
+                sb.append(ind).append(VALUES).append(".write(").append(expr)
+                  .append(", out, ").append(depth).append(");\n");
                 return;
             case DATE:
                 sb.append(ind).append(CODEC).append(".writeDate(").append(expr)
@@ -859,7 +900,8 @@ final class BackendJsonCodecs {
     // Codec classes
     // ------------------------------------------------------------------
 
-    /// The codec classes the checks above asked for, by binary name.
+    /// The codec classes the checks above asked for, by binary name, and the
+    /// value dispatcher when one of them needs it.
     Map<String, String> sources() {
         Map<String, String> out = new LinkedHashMap<String, String>();
         for (Dto dto : dtos.values()) {
@@ -868,18 +910,100 @@ final class BackendJsonCodecs {
             }
             out.put(codecBinary(dto.binary), codecSource(dto));
         }
+        if (valuesUsed) {
+            out.put(VALUES, valuesSource());
+        }
         return out;
     }
 
-    /// The binary names of the codecs, for the collision check.
-    List<String> codecBinaries() {
-        List<String> out = new ArrayList<String>();
+    /// `cn1app.JsonValues`: writes a value by its run-time class. Each of the
+    /// application's classes this build writes goes through its codec, the JDK's
+    /// JSON shapes through Json, and anything else is refused with an exception
+    /// the server answers with 500 -- never written as its toString(), which
+    /// would ship a quoted class name as data.
+    private String valuesSource() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package cn1app;\n\n");
+        sb.append("// Generated: writes a value by what it is. Do not edit.\n");
+        sb.append("@com.codename1.backend.annotations.Generated\n");
+        sb.append("public final class JsonValues {\n");
+        sb.append("    private JsonValues() {\n    }\n\n");
+        sb.append("    public static void write(Object v, ").append(SINK)
+          .append(" out, int depth) {\n");
+        sb.append("        if (v == null) {\n");
+        sb.append("            out.putAscii(\"null\");\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (depth > ").append(CODEC).append(".MAX_DEPTH) {\n");
+        sb.append("            throw ").append(CODEC).append(".tooDeep(\"value\");\n");
+        sb.append("        }\n");
         for (Dto dto : dtos.values()) {
-            if (dto.problem == null && (dto.write || dto.read)) {
-                out.add(codecBinary(dto.binary));
+            if (dto.problem != null || !dto.write) {
+                continue;
             }
+            // Each codec dispatches to its own subclasses, so the order here does
+            // not decide which fields a subclass instance is written with.
+            String type = source(dto.binary);
+            sb.append("        if (v instanceof ").append(type).append(") {\n");
+            sb.append("            ").append(codecBinary(dto.binary)).append(".write((")
+              .append(type).append(") v, out, depth);\n");
+            sb.append("            return;\n");
+            sb.append("        }\n");
         }
-        return out;
+        sb.append("        if (v instanceof java.util.Map) {\n");
+        sb.append("            out.put('{');\n");
+        sb.append("            boolean first = true;\n");
+        sb.append("            for (java.util.Iterator it = ((java.util.Map) v).entrySet().iterator(); "
+                + "it.hasNext();) {\n");
+        sb.append("                java.util.Map.Entry e = (java.util.Map.Entry) it.next();\n");
+        sb.append("                if (first) {\n");
+        sb.append("                    first = false;\n");
+        sb.append("                } else {\n");
+        sb.append("                    out.put(',');\n");
+        sb.append("                }\n");
+        sb.append("                ").append(JSON)
+          .append(".writeString(String.valueOf(e.getKey()), out);\n");
+        sb.append("                out.put(':');\n");
+        sb.append("                write(e.getValue(), out, depth + 1);\n");
+        sb.append("            }\n");
+        sb.append("            out.put('}');\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (v instanceof java.util.Collection) {\n");
+        sb.append("            out.put('[');\n");
+        sb.append("            boolean first = true;\n");
+        sb.append("            for (java.util.Iterator it = ((java.util.Collection) v).iterator(); "
+                + "it.hasNext();) {\n");
+        sb.append("                if (first) {\n");
+        sb.append("                    first = false;\n");
+        sb.append("                } else {\n");
+        sb.append("                    out.put(',');\n");
+        sb.append("                }\n");
+        sb.append("                write(it.next(), out, depth + 1);\n");
+        sb.append("            }\n");
+        sb.append("            out.put(']');\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (v instanceof java.util.Date) {\n");
+        sb.append("            ").append(CODEC).append(".writeDate((java.util.Date) v, out);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (v instanceof Enum) {\n");
+        sb.append("            ").append(JSON).append(".writeString(((Enum) v).name(), out);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        if (v instanceof String || v instanceof Number || v instanceof Boolean\n");
+        sb.append("                || v instanceof Character || v instanceof byte[]\n");
+        sb.append("                || v instanceof ").append(JSON).append(".Writable) {\n");
+        sb.append("            ").append(JSON).append(".writeValue(v, out);\n");
+        sb.append("            return;\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalStateException(v.getClass().getName() + \" has no JSON \"\n");
+        sb.append("                + \"form: it is not one of the classes this build writes a codec \"\n");
+        sb.append("                + \"for. Declare the field or element with its type.\");\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     private String codecSource(Dto dto) {

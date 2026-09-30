@@ -1090,6 +1090,20 @@ public final class HttpServer {
             return status;
         }
 
+        /// Adds a response header and returns this Response. A copy is made
+        /// rather than writing into the map the Response was built with, which
+        /// may be a caller's constant; a header the server owns -- Date,
+        /// Content-Length -- is refused when the response is written.
+        public Response header(String name, String value) {
+            Map copy = new java.util.LinkedHashMap();
+            if (extraHeaders != null) {
+                copy.putAll(extraHeaders);
+            }
+            copy.put(name, value);
+            extraHeaders = copy;
+            return this;
+        }
+
         private static byte[] bytes(String s) {
             try {
                 return s == null ? new byte[0] : s.getBytes("UTF-8");

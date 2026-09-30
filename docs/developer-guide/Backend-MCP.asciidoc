@@ -29,7 +29,8 @@ machines, and a server bound to another address refuses to start without one.
 It also refuses a browser
 request unless its origin is a loopback address or is listed in
 `cn1.mcp.allowedOrigins`, which keeps a web page from driving it. A page the
-server serves itself has to be listed too.
+server serves itself has to be listed too. An allowed origin gets the CORS
+answers a browser needs, the preflight included.
 
 ==== Writing a tool
 

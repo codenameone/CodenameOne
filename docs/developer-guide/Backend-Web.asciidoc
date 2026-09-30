@@ -131,7 +131,15 @@ and writes each field by name, so it costs what the hand-written version would.
 [source,java]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/Order.java[tag=backend-dto-json,indent=0]
+----
+
+[source,java]
+----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrderLine.java[tag=backend-dto-json,indent=0]
+----
+
+[source,java]
+----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/orders/OrdersApi.java[tag=backend-dto-json,indent=0]
 ----
 
@@ -155,6 +163,10 @@ app and the server reads the same on both sides:
   such as `2025-03-01T09:30:00Z`. A `byte[]` is base64, an enum is its name.
 * A subclass is written with its own fields, even where a method declares the
   superclass.
+* A field declared `Object`, or a raw `Map` or `List`, is written by what it holds
+  when the server runs. A value of a class the build writes a codec for goes
+  through that codec; a value of any other class of yours is answered 500 rather
+  than written as its `toString()`, so declare the field with its type.
 * A body's unknown members are ignored and absent ones leave the field as the
   constructor set it, as a Spring Boot application does.
 

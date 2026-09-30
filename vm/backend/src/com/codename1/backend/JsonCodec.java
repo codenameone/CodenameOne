@@ -160,8 +160,15 @@ public final class JsonCodec {
             }
         } else if (json instanceof Double) {
             double d = ((Double) json).doubleValue();
-            if (d == Math.floor(d) && d >= min && d <= max) {
-                return (long) d;
+            // Bounded by 2^63 BEFORE the conversion, and compared as a long after
+            // it. As a double, Long.MAX_VALUE rounds up to 2^63, so a direct
+            // "d <= max" passed 9223372036854775808.0 and the cast clamped it.
+            if (d == Math.floor(d) && d >= -9.223372036854775808E18
+                    && d < 9.223372036854775808E18) {
+                long v = (long) d;
+                if (v >= min && v <= max) {
+                    return v;
+                }
             }
         }
         throw mismatch(at, name, index, "a whole number from " + min + " to " + max, json);

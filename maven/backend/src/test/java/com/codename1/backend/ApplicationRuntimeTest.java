@@ -3227,6 +3227,79 @@ class ApplicationRuntimeTest {
         return status >= 400 ? "HTTP " + status + ": " + body : body;
     }
 
+    @Test
+    @DisplayName("MCP and management match the canonical path; MCP does CORS for allowed origins")
+    void ownRoutesUseTheCanonicalPathAndMcpDoesCors() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(McpServer.ENABLED, "true");
+        settings.setProperty(McpServer.ALLOWED_ORIGINS, "https://app.example");
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
+                .mcp(null).handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return HttpServer.Response.text(418, "fell through");
+                    }
+                }).start();
+        String ping = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"ping\"}";
+        try {
+            // /%6dcp and /%6danage are /mcp and /manage (RFC 3986 6.2.2).
+            String escaped = rawRequest(port, "POST", "/%6dcp", null, ping);
+            assertTrue(escaped.startsWith("HTTP/1.1 200"), escaped);
+            assertTrue(escaped.contains("\"id\":4"), escaped);
+            String health = rawRequest(port, "GET", "/%6danage/health", null, null);
+            assertTrue(health.startsWith("HTTP/1.1 200"), health);
+
+            // The preflight carries no token and must still be answered.
+            String preflight = rawRequest(port, "OPTIONS", "/mcp", "https://app.example", null);
+            assertTrue(preflight.startsWith("HTTP/1.1 204"), preflight);
+            String lower = preflight.toLowerCase(java.util.Locale.ROOT);
+            assertTrue(lower.contains("access-control-allow-origin: https://app.example"),
+                    preflight);
+            assertTrue(lower.contains("access-control-allow-headers: authorization"), preflight);
+            String call = rawRequest(port, "POST", "/mcp", "https://app.example", ping);
+            assertTrue(call.startsWith("HTTP/1.1 200"), call);
+            assertTrue(call.toLowerCase(java.util.Locale.ROOT)
+                    .contains("access-control-allow-origin: https://app.example"), call);
+
+            String refused = rawRequest(port, "OPTIONS", "/mcp", "https://evil.example", null);
+            assertTrue(refused.startsWith("HTTP/1.1 403"), refused);
+            assertFalse(refused.toLowerCase(java.util.Locale.ROOT)
+                    .contains("access-control-allow-origin"), refused);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    /** One raw HTTP/1.1 exchange; HttpURLConnection drops a hand-set Origin. */
+    private static String rawRequest(int port, String method, String path, String origin,
+                                     String body) throws IOException {
+        java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
+        try {
+            StringBuilder head = new StringBuilder(method).append(' ').append(path)
+                    .append(" HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n");
+            if (origin != null) {
+                head.append("Origin: ").append(origin).append("\r\n");
+            }
+            byte[] bytes = body == null ? new byte[0] : body.getBytes("UTF-8");
+            if (body != null) {
+                head.append("Content-Type: application/json\r\n");
+            }
+            head.append("Content-Length: ").append(bytes.length).append("\r\n\r\n");
+            socket.getOutputStream().write(head.toString().getBytes("UTF-8"));
+            socket.getOutputStream().write(bytes);
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = socket.getInputStream().read(buffer)) > 0) {
+                raw.write(buffer, 0, n);
+            }
+            return new String(raw.toByteArray(), "UTF-8");
+        } finally {
+            socket.close();
+        }
+    }
+
     /**
      * A raw POST of a ping to /mcp, because HttpURLConnection silently drops
      * restricted headers like Origin and Host -- the request would arrive

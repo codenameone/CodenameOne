@@ -191,15 +191,37 @@ public final class McpServer implements HttpServer.Handler {
 
     @Override
     public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-        String target = request.getTarget();
-        if (target == null) {
+        // The CANONICAL path, as every generated route and the static files
+        // compare it: /%6dcp is the same URI as /mcp (RFC 3986 6.2.2), and
+        // matching the raw spelling let it fall through to a later handler.
+        if (request.getTarget() == null || !request.pathFrom(0).equals(path)) {
             return null;
         }
-        int query = target.indexOf('?');
-        String p = query < 0 ? target : target.substring(0, query);
-        if (!p.equals(path)) {
-            return null;
+        // CORS for an origin the configuration allows. A browser sends a JSON
+        // POST with a bearer token only after an OPTIONS preflight, which carries
+        // no token -- so it is answered here, before authentication, and every
+        // answer to that origin names it, or the browser withholds the response
+        // from the page. An origin that is not allowed gets neither, and the 403
+        // below.
+        String origin = request.getHeader("origin");
+        boolean cors = origin != null && origin.length() > 0 && originAllowed(request);
+        if (cors && "OPTIONS".equals(request.getMethod())) {
+            return request.respond(204, "text/plain", new byte[0])
+                    .header("Access-Control-Allow-Origin", origin)
+                    .header("Vary", "Origin")
+                    .header("Access-Control-Allow-Methods", "POST")
+                    .header("Access-Control-Allow-Headers",
+                            "authorization, content-type, mcp-protocol-version, mcp-session-id")
+                    .header("Access-Control-Max-Age", "600");
         }
+        HttpServer.Response response = serve(request);
+        if (cors && response != null) {
+            response.header("Access-Control-Allow-Origin", origin).header("Vary", "Origin");
+        }
+        return response;
+    }
+
+    private HttpServer.Response serve(HttpServer.Request request) throws Exception {
         if (!originAllowed(request)) {
             return request.respondJson(403, rpcError(null, -32600,
                     "Origin not allowed; add it to " + ALLOWED_ORIGINS));

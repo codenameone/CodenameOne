@@ -315,6 +315,13 @@ public class BackendBeansTest {
         s.put("com.example.Node", PKG + "public class Node {\n"
                 + "    public Node next;\n"
                 + "}\n");
+        s.put("com.example.Box", PKG + "public class Box {\n"
+                + "    public Object content;\n"
+                + "    public Map extras = new LinkedHashMap();\n"
+                + "}\n");
+        s.put("com.example.Loner", PKG + "public class Loner {\n"
+                + "    public String x = \"y\";\n"
+                + "}\n");
         s.put("com.example.Api", PKG
                 + "@RestController public class Api {\n"
                 + "    static Note note() {\n"
@@ -338,6 +345,15 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "    @GetMapping(\"/loop\") public Node loop() {\n"
                 + "        Node a = new Node(); a.next = a; return a;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/box\") public Box box() {\n"
+                + "        Box b = new Box(); b.content = new Tag(\"inside\");\n"
+                + "        b.extras.put(\"when\", new Date(5L));\n"
+                + "        b.extras.put(\"level\", Priority.LOW);\n"
+                + "        return b;\n"
+                + "    }\n"
+                + "    @GetMapping(\"/opaque\") public Box opaque() {\n"
+                + "        Box b = new Box(); b.content = new Loner(); return b;\n"
                 + "    }\n"
                 + "}\n");
         return s;
@@ -383,6 +399,12 @@ public class BackendBeansTest {
             assertEquals("HTTP 400: The request body is not valid JSON",
                     post(port, "/echo", "{nope"));
             assertTrue(http("GET", port, "/loop").startsWith("HTTP 500"));
+            // An Object field is written by what it holds: a class this build
+            // writes goes through its codec, a Date as millis, an enum by name.
+            assertEquals("{\"content\":{\"name\":\"inside\"},\"extras\":{\"when\":5,"
+                    + "\"level\":\"LOW\"}}", http("GET", port, "/box"));
+            // A class with no codec is refused, never written as its toString().
+            assertTrue(http("GET", port, "/opaque").startsWith("HTTP 500"));
         } finally {
             backend.stop();
         }
@@ -445,11 +467,25 @@ public class BackendBeansTest {
                 + "@RestController public class ArrayApi {\n"
                 + "    @GetMapping(\"/a\") public int[] a() { return null; }\n"
                 + "}\n");
+        s.put("com.example.Unordered", PKG + "public class Unordered { public String n; }\n");
+        s.put("com.example.SetApi", PKG
+                + "@RestController public class SetApi {\n"
+                + "    @PostMapping(\"/s\") public String s(@RequestBody TreeSet<Unordered> s) {\n"
+                + "        return \"x\";\n"
+                + "    }\n"
+                + "    @PostMapping(\"/t\") public String t(@RequestBody TreeSet<String> s) {\n"
+                + "        return \"x\";\n"
+                + "    }\n"
+                + "}\n");
         String errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("has a type variable for its type"));
         assertTrue(errors, errors.contains("has no constructor without arguments"));
         assertTrue(errors, errors.contains("an array, which has no JSON form here other than "
                 + "byte[]"));
+        assertTrue(errors, errors.contains("a TreeSet of com.example.Unordered, which is not "
+                + "Comparable"));
+        assertFalse("a TreeSet of String is ordered by String: " + errors,
+                errors.contains("TreeSet of java.lang.String"));
     }
 
     @Test
