@@ -477,7 +477,14 @@ def imports_of_binary(path):
 # file's, told apart by the word after it: an architecture count for Mach-O (a handful), the
 # class-file version for Java (45 and up).
 MACHO_THIN = {b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe"}
-MACHO_FAT = {b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
+# Universal headers, in both byte orders: FAT_MAGIC / FAT_MAGIC_64 as Apple's tools write them,
+# and FAT_CIGAM / FAT_CIGAM_64, the same headers stored little-endian, which is equally valid and
+# which a dependency's own tooling can produce. The architecture count that follows is read in
+# the byte order the magic announces.
+MACHO_FAT = {
+    b"\xca\xfe\xba\xbe": "big", b"\xca\xfe\xba\xbf": "big",
+    b"\xbe\xba\xfe\xca": "little", b"\xbf\xba\xfe\xca": "little",
+}
 
 
 def is_macho(path):
@@ -488,7 +495,8 @@ def is_macho(path):
         return False
     if head[:4] in MACHO_THIN:
         return True
-    return head[:4] in MACHO_FAT and len(head) == 8 and int.from_bytes(head[4:], "big") < 30
+    order = MACHO_FAT.get(head[:4])
+    return order is not None and len(head) == 8 and 0 < int.from_bytes(head[4:], order) < 30
 
 
 def binaries_in(app):
