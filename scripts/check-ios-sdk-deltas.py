@@ -161,6 +161,21 @@ PROBE_SOURCE = """#include <Availability.h>
 """
 
 
+# The clang module cache every compile here shares. Per process, never a fixed name under the
+# temp directory: this checkout is one of several run concurrently on one machine, and CI
+# forks translations in parallel, so a shared cache is written by builds against other SDKs and
+# other sources at the same time. Callers that import this module (check-ios-private-api.py)
+# point it into their own work directory instead.
+MODULE_CACHE = None
+
+
+def module_cache():
+    global MODULE_CACHE
+    if MODULE_CACHE is None:
+        MODULE_CACHE = tempfile.mkdtemp(prefix="cn1-sdk-delta-modules-")
+    return MODULE_CACHE
+
+
 def run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
@@ -418,7 +433,7 @@ def parse_diagnostics(out, project_dir):
 def compile_one(clang, sdk, project_dir, prefix_header, filename, defines, arc, target,
                 stub_dir=None):
     src = os.path.join(NATIVE_SOURCES, filename)
-    cache = os.path.join(tempfile.gettempdir(), "cn1-sdk-delta-modules")
+    cache = module_cache()
     cmd = [
         clang, "-fsyntax-only", "-arch", "arm64", "-target", "arm64-apple-ios" + target,
         "-isysroot", sdk, "-fmodules", "-fmodules-cache-path=" + cache,
@@ -474,8 +489,7 @@ def configurations_differ(clang, sdk, project_dir, prefix_header, stub_dir, gate
     def preprocess(extra, witness):
         cmd = [clang, "-E", "-arch", "arm64", "-target", "arm64-apple-ios14.0",
                "-isysroot", sdk, "-fmodules",
-               "-fmodules-cache-path=" + os.path.join(tempfile.gettempdir(),
-                                                      "cn1-sdk-delta-modules"),
+               "-fmodules-cache-path=" + module_cache(),
                "-fno-objc-arc", "-I", NATIVE_SOURCES, "-I", project_dir]
         if stub_dir:
             cmd += ["-I", stub_dir]

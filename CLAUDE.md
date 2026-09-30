@@ -672,6 +672,12 @@ import: is the name spelled in a public SDK header (comments stripped)?
   a sweep of what one sample builds would miss them again.
 - **Binary mode** (`ios-packaging.yml`) reads the unsigned Release device app and
   every bundle nested in it, so cn1libs, pods and Swift targets are covered.
+- **tvOS** (`scripts-ios.yml`, TV job): the same sweep with `--sdk appletvos` and
+  `--sdk appletvsimulator`, every gate on. A TV slice compiles the port with the
+  switches the iOS app turned on, so a gate tvOS cannot compile is a TV build that
+  fails -- turn such a feature off for `TARGET_OS_TV` (the natives are defined
+  outside their gates) or guard the unavailable call. The device SDK differs from
+  the simulator's (no LocalAuthentication) and no UI job builds it.
 
 Compiler- and toolchain-emitted names go in `COMPILER_EMITTED`, exact names only.
 Swift and C++ mangled names are out of scope.
@@ -684,6 +690,7 @@ with `Executor.replaceMarker` (or `replaceInFile`), which matches the whole name
 ```bash
 scripts/check-ios-private-api.py --project-dir <generated ...-ios-source/...-src>
 scripts/check-ios-private-api.py --binary <Release-iphoneos/App.app>
+scripts/check-ios-private-api.py --sdk appletvos --project-dir <...-src>
 scripts/check-builder-define-toggles.py
 ```
 

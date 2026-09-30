@@ -81,7 +81,12 @@ static id<NSObject> cn1MacIdleActivity = nil;
 #include <sys/sysctl.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
+// The tvOS DEVICE SDK has no LocalAuthentication (the tvOS simulator SDK does), so an
+// unconditional import failed every tvOS device build of every application.
+#if __has_include(<LocalAuthentication/LocalAuthentication.h>)
 #import <LocalAuthentication/LocalAuthentication.h>
+#define CN1_HAS_LOCAL_AUTHENTICATION 1
+#endif
 #import <Security/Security.h>
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
@@ -8106,6 +8111,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD
 // NetworkExtension symbols so Apple's API-usage scanner does not flag
 // them.
 //#define CN1_INCLUDE_HOTSPOT
+// NEHotspotConfiguration is unavailable on tvOS; a TV slice answers as an app without WiFi.connect.
+#if TARGET_OS_TV
+#undef CN1_INCLUDE_HOTSPOT
+#endif
 #ifdef CN1_INCLUDE_HOTSPOT
 #import <NetworkExtension/NetworkExtension.h>
 #endif
@@ -8119,6 +8128,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVPNActive___R_boolean(CN1_THREAD
 // on the classpath; stock apps see no CaptiveNetwork symbols and need no
 // wifi-info entitlement.
 //#define CN1_INCLUDE_WIFI_INFO
+// CaptiveNetwork (CNCopyCurrentNetworkInfo) is unavailable on tvOS.
+#if TARGET_OS_TV
+#undef CN1_INCLUDE_WIFI_INFO
+#endif
 #ifdef CN1_INCLUDE_WIFI_INFO
 #import <SystemConfiguration/CaptiveNetwork.h>
 #endif
@@ -11471,7 +11484,9 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
     // IPhoneBuilder flips CN1_USE_APPREVIEW and links StoreKit.framework). When
     // the macro is off this is a harmless no-op with no StoreKit dependency.
 #ifdef CN1_USE_APPREVIEW
-#if !TARGET_OS_WATCH
+    // SKStoreReviewController does not exist on watchOS or tvOS; there the request is a no-op,
+    // which the API allows -- the system decides whether a prompt appears at all.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     dispatch_async(dispatch_get_main_queue(), ^{
         if (@available(iOS 10.3, *)) {
@@ -11479,7 +11494,7 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
         }
     });
     POOL_END();
-#endif // !TARGET_OS_WATCH
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 #endif // CN1_USE_APPREVIEW
 }
 
@@ -12964,6 +12979,85 @@ void com_codename1_impl_ios_IOSNative_fetchProducts___java_lang_String_1ARRAY_co
 SKPayment *paymentInstance = nil;
 NSObject *paymentDiscountInstance = nil;
 #endif
+
+#if defined(CN1_USE_STOREKIT) && TARGET_OS_TV
+/*
+ * tvOS has no +[SKPayment paymentWithProductIdentifier:]: a payment can only be built from an
+ * SKProduct, so the product is looked up first. A product the store does not return is reported
+ * through the same itemPurchaseError callback a failed transaction uses. The request keeps this
+ * object alive until StoreKit answers.
+ */
+@interface CN1TvProductPurchase : NSObject <SKProductsRequestDelegate> {
+    NSString *sku;
+    NSObject *discount;
+    SKProductsRequest *request;
+}
+- (id)initWithSku:(NSString *)aSku discount:(NSObject *)aDiscount;
+- (void)start;
+@end
+
+@implementation CN1TvProductPurchase
+- (id)initWithSku:(NSString *)aSku discount:(NSObject *)aDiscount {
+    if ((self = [super init])) {
+        sku = [aSku copy];
+        discount = [aDiscount retain];
+    }
+    return self;
+}
+
+- (void)start {
+    [self retain];
+    request = [[SKProductsRequest alloc] initWithProductIdentifiers:[NSSet setWithObject:sku]];
+    request.delegate = self;
+    [request start];
+}
+
+- (void)finish {
+    request.delegate = nil;
+    [request release];
+    request = nil;
+    [self release];
+}
+
+- (void)productsRequest:(SKProductsRequest *)req didReceiveResponse:(SKProductsResponse *)response {
+    SKProduct *product = nil;
+    for (SKProduct *candidate in response.products) {
+        if ([candidate.productIdentifier isEqualToString:sku]) {
+            product = candidate;
+            break;
+        }
+    }
+    if (product == nil) {
+        com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(
+                CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sku),
+                fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"The store did not return this product"));
+        [self finish];
+        return;
+    }
+    SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
+    if (discount != nil) {
+        if (@available(tvOS 12.2, *)) {
+            payment.paymentDiscount = (SKPaymentDiscount *)discount;
+        }
+    }
+    [[SKPaymentQueue defaultQueue] addPayment:payment];
+    [self finish];
+}
+
+- (void)request:(SKRequest *)req didFailWithError:(NSError *)error {
+    com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sku),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
+    [self finish];
+}
+
+- (void)dealloc {
+    [sku release];
+    [discount release];
+    [super dealloc];
+}
+@end
+#endif
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
 #ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
@@ -13011,6 +13105,15 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         }
         
     }
+#if TARGET_OS_TV
+    NSString *tvSku = nsSku;
+    NSObject *tvDiscount = paymentDiscountInstance;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1TvProductPurchase *purchase = [[CN1TvProductPurchase alloc] initWithSku:tvSku discount:tvDiscount];
+        [purchase start];
+        [purchase release];
+    });
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         if (paymentDiscountInstance != nil) {
             paymentInstance = [SKMutablePayment paymentWithProductIdentifier:nsSku];
@@ -13026,6 +13129,7 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
         
         [[SKPaymentQueue defaultQueue] addPayment:paymentInstance];
     });
+#endif
 #endif
 }
 

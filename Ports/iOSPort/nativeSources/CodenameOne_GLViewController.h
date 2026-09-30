@@ -341,6 +341,20 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // ID and an app carrying it without cause fails codesigning for no reason.
 //#define CN1_INCLUDE_HOMEKIT
 
+// A tvOS slice compiles these same sources with the switches the iOS app turned on, and the
+// frameworks behind these features do not exist on tvOS: the AddressBook API, the photo picker
+// (UIImagePickerController), CoreNFC, and ASWebAuthenticationSession's presentation context.
+// Left on, an application that used any of them with a TV slice failed its TV build outright.
+// Off, the natives compile to the same "unsupported" answers an app without the feature gets,
+// which is also the truth on that device. The natives themselves are defined outside these
+// switches, so nothing the translated code calls goes missing.
+#if TARGET_OS_TV
+#undef INCLUDE_CONTACTS_USAGE
+#undef INCLUDE_PHOTOLIBRARY_USAGE
+#undef CN1_INCLUDE_NFC
+#undef CN1_INCLUDE_OIDC
+#endif
+
 // CN1_INCLUDE_NEARBY gates the com.codename1.nearby native bridge
 // (CN1Nearby.{h,m}: Nearby Interaction ranging, MultipeerConnectivity
 // transport and AccessorySetupKit association). IPhoneBuilder uncomments this
