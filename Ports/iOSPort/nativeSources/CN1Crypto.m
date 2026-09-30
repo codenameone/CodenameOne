@@ -26,21 +26,6 @@
 #import <CommonCrypto/CommonCryptor.h>
 #import <CommonCrypto/CommonRandom.h>
 
-#ifdef CN1_INCLUDE_CRYPTO_GCM
-/*
- * CommonCrypto exposes AES-GCM only through the SPI header
- * <CommonCrypto/CommonCryptorSPI.h>, which is not in the public iOS SDK. The
- * functions and the kCCModeGCM value below are stable across all current iOS
- * versions and are exported from libcommonCrypto.dylib at runtime -- we
- * declare them here as externs so we can call them without depending on the
- * private header. These symbols are only referenced when the app explicitly
- * opts into AES-GCM via the ios.crypto.gcm build hint.
- */
-enum { kCCModeGCM = 11 };
-extern CCCryptorStatus CCCryptorGCMAddIV(CCCryptorRef ref, const void* iv, size_t ivLen);
-extern CCCryptorStatus CCCryptorGCMAddAAD(CCCryptorRef ref, const void* aData, size_t aDataLen);
-extern CCCryptorStatus CCCryptorGCMFinal(CCCryptorRef ref, void* tag, size_t* tagLen);
-#endif
 
 /* --- secure random ----------------------------------------------------- */
 
@@ -116,6 +101,130 @@ int cn1_crypto_aes_cbc(int encrypt, const uint8_t* key, int keyLen,
 
 /* --- AES-GCM ----------------------------------------------------------- */
 
+#ifdef CN1_INCLUDE_CRYPTO_GCM
+/*
+ * AES-GCM (NIST SP 800-38D) built from PUBLIC CommonCrypto calls only.
+ *
+ * CommonCrypto's own GCM entry points (CCCryptorGCMAddIV, CCCryptorGCMAddAAD,
+ * CCCryptorGCMFinal) are declared only in CommonCryptorSPI.h, which is not in
+ * the iOS or macOS SDK. They link -- libcommonCrypto exports them -- but App
+ * Store Connect rejects any upload that imports them: "Validation failed (409)
+ * The app references non-public symbols ... _CCCryptorGCMAddAAD,
+ * _CCCryptorGCMAddIV, _CCCryptorGCMFinal". So any application that reached
+ * this code could not ship, and scripts/check-ios-private-api.py now fails the
+ * build on any symbol like them.
+ *
+ * GCM is CTR mode plus the GHASH authenticator, and both halves are available
+ * without the SPI:
+ *
+ *   - the keystream is AES-CTR (kCCModeCTR, big-endian counter) started at
+ *     inc32(J0), where J0 = IV || 0x00000001 for the 96-bit IVs accepted here;
+ *   - H = AES_K(0^128) and the tag mask AES_K(J0) are single ECB blocks;
+ *   - GHASH is a GF(2^128) multiply, done below in portable C.
+ *
+ * CommonCrypto's CTR increments the whole 128-bit block while GCM's inc32 wraps
+ * the low 32 bits only. They agree until the low word overflows, which needs
+ * 2^32 - 2 blocks (64 GiB) of input; GCM forbids more than that per IV, and
+ * inLen is an int, so the two never diverge here.
+ *
+ * The GHASH multiply below is branch-free on the key and data (the reduction is
+ * a masked XOR, not a conditional), so it does not leak H through timing.
+ */
+
+static void cn1_gcm_mult(uint8_t x[16], const uint8_t h[16]) {
+    uint8_t z[16];
+    uint8_t v[16];
+    memset(z, 0, 16);
+    memcpy(v, h, 16);
+    for (int i = 0; i < 128; i++) {
+        uint8_t bit = (uint8_t) ((x[i >> 3] >> (7 - (i & 7))) & 1);
+        uint8_t mask = (uint8_t) (0 - bit);
+        for (int j = 0; j < 16; j++) {
+            z[j] ^= v[j] & mask;
+        }
+        uint8_t lsb = (uint8_t) (v[15] & 1);
+        for (int j = 15; j > 0; j--) {
+            v[j] = (uint8_t) ((v[j] >> 1) | (v[j - 1] << 7));
+        }
+        v[0] >>= 1;
+        v[0] ^= (uint8_t) (0xe1 & (0 - lsb));
+    }
+    memcpy(x, z, 16);
+}
+
+/* Absorbs `len` bytes into the GHASH state, zero padding the final block. */
+static void cn1_gcm_ghash(uint8_t y[16], const uint8_t h[16], const uint8_t* data, size_t len) {
+    while (len > 0) {
+        size_t n = len < 16 ? len : 16;
+        for (size_t i = 0; i < n; i++) {
+            y[i] ^= data[i];
+        }
+        cn1_gcm_mult(y, h);
+        data += n;
+        len -= n;
+    }
+}
+
+static int cn1_gcm_ecb_block(const uint8_t* key, int keyLen, const uint8_t in[16], uint8_t out[16]) {
+    size_t produced = 0;
+    CCCryptorStatus s = CCCrypt(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode,
+                                key, (size_t) keyLen, NULL, in, 16, out, 16, &produced);
+    return (s == kCCSuccess && produced == 16) ? 0 : CN1_CRYPTO_E_GENERIC;
+}
+
+/* tag = AES_K(J0) XOR GHASH_H(A || pad || C || pad || [len(A)]64 || [len(C)]64) */
+static int cn1_gcm_tag(const uint8_t* key, int keyLen, const uint8_t h[16], const uint8_t j0[16],
+                       const uint8_t* aad, int aadLen, const uint8_t* ct, int ctLen,
+                       uint8_t tag[16]) {
+    uint8_t y[16];
+    uint8_t lengths[16];
+    memset(y, 0, 16);
+    if (aad != NULL && aadLen > 0) {
+        cn1_gcm_ghash(y, h, aad, (size_t) aadLen);
+    }
+    if (ctLen > 0) {
+        cn1_gcm_ghash(y, h, ct, (size_t) ctLen);
+    }
+    uint64_t aadBits = ((uint64_t) (aadLen > 0 ? aadLen : 0)) * 8;
+    uint64_t ctBits = ((uint64_t) ctLen) * 8;
+    for (int i = 0; i < 8; i++) {
+        lengths[i] = (uint8_t) (aadBits >> (56 - 8 * i));
+        lengths[8 + i] = (uint8_t) (ctBits >> (56 - 8 * i));
+    }
+    cn1_gcm_ghash(y, h, lengths, 16);
+    uint8_t mask[16];
+    if (cn1_gcm_ecb_block(key, keyLen, j0, mask) != 0) {
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    for (int i = 0; i < 16; i++) {
+        tag[i] = (uint8_t) (y[i] ^ mask[i]);
+    }
+    return 0;
+}
+
+/* AES-CTR from inc32(J0): the GCM keystream. Encrypt and decrypt are the same. */
+static int cn1_gcm_ctr(const uint8_t* key, int keyLen, const uint8_t j0[16],
+                       const uint8_t* in, int len, uint8_t* out) {
+    if (len == 0) {
+        return 0;
+    }
+    uint8_t counter[16];
+    memcpy(counter, j0, 16);
+    counter[15] = 2;
+    CCCryptorRef cryptor = NULL;
+    CCCryptorStatus s = CCCryptorCreateWithMode(kCCEncrypt, kCCModeCTR, kCCAlgorithmAES,
+                                                ccNoPadding, counter, key, (size_t) keyLen,
+                                                NULL, 0, 0, kCCModeOptionCTR_BE, &cryptor);
+    if (s != kCCSuccess) {
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    size_t produced = 0;
+    s = CCCryptorUpdate(cryptor, in, (size_t) len, out, (size_t) len, &produced);
+    CCCryptorRelease(cryptor);
+    return (s == kCCSuccess && produced == (size_t) len) ? 0 : CN1_CRYPTO_E_GENERIC;
+}
+#endif /* CN1_INCLUDE_CRYPTO_GCM */
+
 int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
                        const uint8_t* iv, int ivLen,
                        const uint8_t* aad, int aadLen,
@@ -132,104 +241,56 @@ int cn1_crypto_aes_gcm(int encrypt, const uint8_t* key, int keyLen,
     if (ivLen != 12) {
         return CN1_CRYPTO_E_BAD_INPUT;
     }
-
-    // CommonCrypto's GCM API works via CCCryptorCreateWithMode + GCM-specific
-    // calls (CCCryptorGCMAddIV / GCMaddAAD / GCMFinal). These are documented
-    // but the headers mark them as deprecated -- on iOS 13+ we should use the
-    // CryptoKit AES.GCM interface instead. We try CryptoKit first via NS APIs
-    // and fall back to the deprecated CCCryptor path.
-    CCCryptorRef cryptor = NULL;
-    CCCryptorStatus s = CCCryptorCreateWithMode(
-        encrypt ? kCCEncrypt : kCCDecrypt,
-        kCCModeGCM,
-        kCCAlgorithmAES,
-        ccNoPadding,
-        NULL,            /* IV set separately via GCMAddIV */
-        key, (size_t) keyLen,
-        NULL, 0,
-        0, 0,
-        &cryptor);
-    if (s != kCCSuccess) {
-        return CN1_CRYPTO_E_GENERIC;
-    }
-
-    if (CCCryptorGCMAddIV(cryptor, iv, ivLen) != kCCSuccess) {
-        CCCryptorRelease(cryptor);
-        return CN1_CRYPTO_E_GENERIC;
-    }
-    if (aad != NULL && aadLen > 0) {
-        if (CCCryptorGCMAddAAD(cryptor, aad, aadLen) != kCCSuccess) {
-            CCCryptorRelease(cryptor);
-            return CN1_CRYPTO_E_GENERIC;
-        }
-    }
-
     int dataLen = encrypt ? inLen : (inLen - 16);
-    if (dataLen < 0) {
-        CCCryptorRelease(cryptor);
+    if (inLen < 0 || dataLen < 0) {
+        return CN1_CRYPTO_E_BAD_INPUT;
+    }
+    int needed = encrypt ? dataLen + 16 : dataLen;
+    if (needed > outCap) {
         return CN1_CRYPTO_E_BAD_INPUT;
     }
 
-    size_t produced = 0;
-    if (CCCryptorUpdate(cryptor, in, dataLen, out, outCap, &produced) != kCCSuccess) {
-        CCCryptorRelease(cryptor);
+    uint8_t zero[16];
+    uint8_t h[16];
+    uint8_t j0[16];
+    uint8_t tag[16];
+    memset(zero, 0, 16);
+    if (cn1_gcm_ecb_block(key, keyLen, zero, h) != 0) {
         return CN1_CRYPTO_E_GENERIC;
     }
+    memcpy(j0, iv, 12);
+    j0[12] = 0;
+    j0[13] = 0;
+    j0[14] = 0;
+    j0[15] = 1;
 
-    uint8_t tag[16];
-    size_t tagLen = sizeof(tag);
     if (encrypt) {
-        if (CCCryptorGCMFinal(cryptor, tag, &tagLen) != kCCSuccess) {
-            CCCryptorRelease(cryptor);
+        if (cn1_gcm_ctr(key, keyLen, j0, in, dataLen, out) != 0) {
             return CN1_CRYPTO_E_GENERIC;
         }
-        if ((int)(produced + tagLen) > outCap) {
-            CCCryptorRelease(cryptor);
-            return CN1_CRYPTO_E_BAD_INPUT;
-        }
-        memcpy(out + produced, tag, tagLen);
-        produced += tagLen;
-    } else {
-        /*
-         * CCCryptorGCMFinal COMPUTES the tag here, it does not verify one. That is the
-         * whole difference between the two finalizers in this SPI, and it is easy to
-         * read backwards:
-         *
-         *   CCCryptorGCMFinal(ref, void *tagOut, size_t *tagLen)   <- deprecated; OUT,
-         *                                                             both directions
-         *   CCCryptorGCMFinalize(ref, void *tag,  size_t  tagLen)  <- IN on decrypt,
-         *                                                             verifies itself
-         *
-         * This declares and calls the first (note the size_t POINTER), so the tag the
-         * input carries is never handed to CommonCrypto and the comparison below is
-         * what authenticates the message. A review round read this as the second form
-         * and concluded that decryption always fails before reaching the comparison,
-         * which would make the vault unusable on iOS.
-         *
-         * Measured rather than argued, because the SPI is undocumented: this exact
-         * function, compiled against the real CommonCrypto and run on the iOS 27
-         * simulator, encrypts 43 bytes to 59, decrypts them back to the same 43, and
-         * returns CN1_CRYPTO_E_AUTH_FAIL for both a flipped ciphertext byte and a
-         * wrong AAD. If this is ever changed to CCCryptorGCMFinalize, the comparison
-         * below must go with it -- comparing against a tag the finalizer has already
-         * consumed is where the failure the review described would really come from.
-         */
-        if (CCCryptorGCMFinal(cryptor, tag, &tagLen) != kCCSuccess) {
-            CCCryptorRelease(cryptor);
+        if (cn1_gcm_tag(key, keyLen, h, j0, aad, aadLen, out, dataLen, tag) != 0) {
             return CN1_CRYPTO_E_GENERIC;
         }
-        // Constant-time compare against the tag carried in the input
-        const uint8_t* expectedTag = in + dataLen;
-        int diff = 0;
-        for (int i = 0; i < 16; i++) diff |= (expectedTag[i] ^ tag[i]);
-        if (diff != 0) {
-            CCCryptorRelease(cryptor);
-            return CN1_CRYPTO_E_AUTH_FAIL;
-        }
+        memcpy(out + dataLen, tag, 16);
+        return dataLen + 16;
     }
 
-    CCCryptorRelease(cryptor);
-    return (int) produced;
+    // Authenticate BEFORE decrypting, so a forged message never writes unverified
+    // plaintext into the caller's buffer. The tag is computed over the ciphertext,
+    // which is what the input carries, and compared in constant time.
+    if (cn1_gcm_tag(key, keyLen, h, j0, aad, aadLen, in, dataLen, tag) != 0) {
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    const uint8_t* expectedTag = in + dataLen;
+    int diff = 0;
+    for (int i = 0; i < 16; i++) diff |= (expectedTag[i] ^ tag[i]);
+    if (diff != 0) {
+        return CN1_CRYPTO_E_AUTH_FAIL;
+    }
+    if (cn1_gcm_ctr(key, keyLen, j0, in, dataLen, out) != 0) {
+        return CN1_CRYPTO_E_GENERIC;
+    }
+    return dataLen;
 #endif /* CN1_INCLUDE_CRYPTO_GCM */
 }
 
