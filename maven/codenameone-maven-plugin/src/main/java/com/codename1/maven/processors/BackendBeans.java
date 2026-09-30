@@ -2292,9 +2292,17 @@ final class BackendBeans {
     /// beans or not, since the rewrite applies to `new` as much as to injection.
     /// Refuses one named executor asked for two kinds of thread. An executor is
     /// created once, by whichever declaration runs first, so the other's kind
-    /// would be ignored depending on call order -- a PLATFORM database method
-    /// could end up on the virtual hosts. AUTO agrees with either; unnamed
-    /// executors are already named by their kind.
+    /// would be ignored depending on call order -- a PLATFORM method written to
+    /// block in SQLite could end up on the virtual hosts. AUTO agrees with either;
+    /// unnamed executors are already named by their kind.
+    ///
+    /// There is deliberately no warning for a VIRTUAL method that injects a
+    /// DataSource. A PostgreSQL or MySQL query parks its virtual thread as any
+    /// socket wait does; only SQLite blocks the host, and which engine a
+    /// DataSource reaches is cn1.datasource.url, read at start-up from a
+    /// deployment's environment -- so the build cannot tell, and warning on every
+    /// such method would be wrong for the engines a server is usually deployed
+    /// against. Spring does not warn here either.
     private void checkExecutorKinds() {
         Map<String, String[]> kinds = new TreeMap<String, String[]>();
         for (Aspects owner : aspects.values()) {

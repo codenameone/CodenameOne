@@ -197,10 +197,14 @@ These are ParparVM's own virtual threads, a feature of the translated runtime, a
 they aren't the virtual threads of Java 21 and later. The two share a name and
 little else. A Java virtual thread unmounts whenever the JDK blocks on its behalf.
 One of these switches stacks in the translated C code and parks only where the
-runtime has made parking possible -- a descriptor a host polls -- while anything
-else that blocks, `Object.wait()` included, blocks the host thread under it and
-every virtual thread that host runs. They're also pinned: a virtual thread stays
-on one host for its whole life.
+runtime has made parking possible: waiting on a socket. That covers the connection
+it serves and every outbound one -- a PostgreSQL or MySQL query, a `Web` call, a
+TLS handshake -- so a handler waiting on another service costs a parked stack, and
+the host serves other connections meanwhile. Anything else that blocks holds the
+host thread under it and every virtual thread that host runs: SQLite and file
+access, which are local calls rather than sockets, resolving a host name, and
+`Object.wait()`. They're also pinned: a virtual thread stays on one host for its
+whole life.
 
 That's why the development run on the JVM doesn't use Java's virtual threads to
 stand in for them, even for debugging. It serves connections on a pool of platform

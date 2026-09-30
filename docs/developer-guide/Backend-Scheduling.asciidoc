@@ -122,12 +122,13 @@ queue, and `cn1.task.queue_depth` reports how many are waiting, by executor.
 not the virtual threads of Java 21: the two behave differently, and the JVM
 development run has neither, so it runs `VIRTUAL` work on platform threads. The
 choice matters because of how virtual threads work on this runtime, explained
-under <<Virtual threads and the request loop>>. A virtual thread parks only on the
-socket it serves. An outbound read -- a database query, a call to another service
--- blocks the host thread running it, and with it every connection that host
-serves. Work that talks to a database or makes outbound calls belongs on
-`PLATFORM`, which is why it's the default. `VIRTUAL` suits work that's cheap to
-start and mostly computes, or that there is a great deal of.
+under <<Virtual threads and the request loop>>. A virtual thread parks while it
+waits on a socket, so work that queries PostgreSQL or MySQL or calls another
+service suits `VIRTUAL` well: thousands of such waits cost thousands of parked
+stacks rather than thousands of threads. What it must not do is block outside a
+socket. SQLite and file access are local calls that hold the host thread running
+them, and with it every connection that host serves, so work that uses them
+belongs on `PLATFORM`. `PLATFORM` stays the default, as a pool is in Spring.
 
 `Tasks` runs a single piece of work without a bean method:
 
@@ -280,8 +281,9 @@ completes.
 
 === Pitfalls
 
-* **Database work on a virtual thread** blocks the host thread under it. Leave such
-  work on `PLATFORM`.
+* **SQLite or file work on a virtual thread** blocks the host thread under it,
+  because neither waits on a socket. Leave such work on `PLATFORM`. A PostgreSQL
+  or MySQL query parks instead, and is fine on `VIRTUAL`.
 * **Relying on the caller's context.** An `@Async` body runs outside the caller's
   transaction and request. A transaction it needs, it declares itself.
 * **A cron expression read in local time.** Without `zone` it's UTC, so

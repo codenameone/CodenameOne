@@ -89,7 +89,7 @@ public final class TaskExecutor {
     /// same name asks for that kind explicitly. Otherwise which kind a
     /// PLATFORM method got depended on call order: an AUTO call made first
     /// created the executor, and the PLATFORM method then ran on virtual threads
-    /// -- blocking a host on the database I/O it asked a platform thread for.
+    /// -- blocking a host on the SQLite or file I/O it asked a platform thread for.
     /// Tasks already handed to a virtual thread finish there.
     synchronized void pin(boolean toVirtual) {
         if (auto) {

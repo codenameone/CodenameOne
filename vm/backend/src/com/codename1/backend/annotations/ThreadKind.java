@@ -26,10 +26,12 @@ package com.codename1.backend.annotations;
 /// [Scheduled] job.
 ///
 /// A virtual thread is cheap to create and to switch, and many can wait on
-/// sockets at once. But on this runtime only the SERVED socket parks a virtual
-/// thread: a database query or an outbound HTTP call blocks the host thread
-/// under it, and with it every other virtual thread that host is running. Work
-/// that talks to a database belongs on a platform thread.
+/// sockets at once: a PostgreSQL or MySQL query, an outbound HTTP call and a TLS
+/// handshake all park it, and its host runs other virtual threads meanwhile.
+/// What it must not do is block outside a socket. SQLite and file access are
+/// local calls that hold the host thread under it, and with it every other
+/// virtual thread that host is running, so work that uses them belongs on a
+/// platform thread.
 public enum ThreadKind {
     /// A virtual thread when this build and this server run them, a platform
     /// thread otherwise. The choice is logged once at start-up.

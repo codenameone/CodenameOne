@@ -46,9 +46,27 @@ public final class VirtualThread {
     public static final int FINISHED = 0;
     public static final int PARKED_IO = 1;
     public static final int RUNNABLE = 2;
+    public static final int WAITING = 3;
 
     public static int resume(long handle) {
         return FINISHED;
+    }
+
+    /// Nothing ever waits here; see [#create].
+    public static int waitCount(long handle) {
+        return 0;
+    }
+
+    public static int waitDescriptor(long handle, int index) {
+        return -1;
+    }
+
+    public static int waitEvents(long handle, int index) {
+        return 0;
+    }
+
+    public static long waitTimeout(long handle) {
+        return -1;
     }
 
     public static void free(long handle) {

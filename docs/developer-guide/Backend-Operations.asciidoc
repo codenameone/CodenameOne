@@ -151,14 +151,13 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   a different one. What it can't change is the language level: the module's
   sources are compiled at Java 8, because that's the bytecode the translator
   reads.
-* A virtual thread parks on the socket it's SERVING, and not on any other. An
-  outbound read -- a database query, an HTTP call to another service -- blocks the
-  host thread that's running it, because only the server's own descriptors are
-  registered with a poller that can wake them. With one host per core, that many
-  concurrent slow outbound calls occupy every host and other connections wait.
-  Servers that mostly compute and serve get the full benefit; servers whose
-  handlers spend their time waiting on a database should size for that, or run the
-  thread pool with `CN1_HTTP_POLL_MODE=0`.
+* A virtual thread parks on sockets and on nothing else. A PostgreSQL or MySQL
+  query, a `Web` call and a TLS handshake all park it, and its host serves other
+  connections meanwhile. SQLite, file access, resolving a host name and
+  `Object.wait()` block the host thread that's running them, and with one host per
+  core, that many concurrent slow calls of that kind occupy every host while other
+  connections wait. A server whose handlers spend their time in SQLite should size
+  for that, or run the thread pool with `CN1_HTTP_POLL_MODE=0`.
 * TLS runs on the thread pool, whatever the poll mode says. The TLS layer can't
   park a read yet, and a blocking read on a virtual thread holds its host for the
   duration, so one idle TLS client per core would occupy every one of them. The

@@ -51,9 +51,9 @@ import java.util.Map;
 /// ## Which thread
 ///
 /// A virtual thread is the cheaper one, and the right one for work that waits
-/// on sockets. It is the wrong one for work that talks to a database: on this
-/// runtime a database read blocks the HOST thread under the virtual thread, and
-/// every other virtual thread on that host with it. See
+/// on sockets -- a PostgreSQL or MySQL query or an HTTP call parks it. It is the
+/// wrong one for SQLite or file work: those block the HOST thread under the
+/// virtual thread, and every other virtual thread on that host with it. See
 /// `com.codename1.backend.annotations.ThreadKind`.
 public final class Tasks {
     public static final int AUTO = 0;

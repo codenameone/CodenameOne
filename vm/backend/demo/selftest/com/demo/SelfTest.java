@@ -4354,6 +4354,235 @@ public class SelfTest {
                 "aaaaaa|x|6|POST", oneLateBodyRequest(true));
     }
 
+    /**
+     * An OUTBOUND wait on a virtual thread parks the virtual thread, not its host.
+     *
+     * <p>One host serves everything here (workerCount 1 is one host under virtual
+     * threads), so a handler blocked inside a read of a slow peer would stop every
+     * other request until the peer answered. That is what the outbound natives did
+     * until they parked: recv() on a blocking descriptor held the host, and there
+     * is one host per core. Each case below starts a slow outbound call on one
+     * request and times an unrelated request against it; the unrelated one must
+     * not wait for the slow one.
+     *
+     * <p>Covered: a raw Tcp read (the PostgreSQL and MySQL clients' path), an HTTP
+     * call through Web (libcurl), a TLS handshake that never finishes, and a read
+     * deadline, which must still fire -- a parked read no longer has SO_RCVTIMEO
+     * to end it, so the wait carries the deadline itself.
+     */
+    private static void anOutboundWaitLeavesTheHostFree() throws Exception {
+        if(!VirtualThread.supported()) {
+            note("outbound parking checks skipped: this runtime has no virtual threads");
+            return;
+        }
+        final int delay = 2500;
+        final ServerSocket slow = ServerSocket.bind("127.0.0.1", 0, 8);
+        final ServerSocket silent = ServerSocket.bind("127.0.0.1", 0, 8);
+        Thread slowPeer = servePeer(slow, delay, 2);
+        Thread silentPeer = servePeer(silent, -1, 2);
+        final String[] onVirtual = new String[1];
+        final int slowPort = slow.getPort();
+        final int silentPort = silent.getPort();
+        // A slow TLS peer, when the harness made a certificate for 127.0.0.1. A
+        // TLS server always runs on its pool, so it does not take the single
+        // virtual-thread slot the server under test needs.
+        final String certPath = System.getenv("CN1_SELFTEST_TLS_CERT");
+        String keyPath = System.getenv("CN1_SELFTEST_TLS_KEY");
+        HttpServer tlsPeer = null;
+        if(certPath != null && keyPath != null) {
+            tlsPeer = HttpServer.start("127.0.0.1", 0, 16, 2, new HttpServer.Handler() {
+                public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                    Thread.sleep(delay);
+                    return HttpServer.Response.text(200, "pong");
+                }
+            }, Tls.create(certPath, keyPath));
+        }
+        final int tlsPort = tlsPeer == null ? 0 : tlsPeer.getPort();
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                String path = request.getTarget();
+                if("/tcp".equals(path)) {
+                    onVirtual[0] = String.valueOf(VirtualThread.isVirtual());
+                    Tcp out = Tcp.connect("127.0.0.1", slowPort, 5000);
+                    try {
+                        byte[] ask = ("GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+                                .getBytes("UTF-8");
+                        out.write(ask, 0, ask.length);
+                        ByteArrayOutputStream all = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[256];
+                        int n;
+                        while((n = out.read(chunk, 0, chunk.length)) > 0) {
+                            all.write(chunk, 0, n);
+                        }
+                        String text = new String(all.toByteArray(), "UTF-8");
+                        return HttpServer.Response.text(200, text.endsWith("pong") ? "pong" : text);
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/web".equals(path)) {
+                    Web.Result result = Web.get("http://127.0.0.1:" + slowPort + "/");
+                    return HttpServer.Response.text(200, result.getStatus() + ":"
+                            + result.getBodyAsString());
+                }
+                if("/tls".equals(path)) {
+                    Tcp out = Tcp.connect("127.0.0.1", silentPort, 5000);
+                    try {
+                        out.startTls("127.0.0.1");
+                        return HttpServer.Response.text(200, "handshook with nobody");
+                    } catch (IOException refused) {
+                        return HttpServer.Response.text(200, "refused");
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/tlsread".equals(path)) {
+                    // Verified against the peer's own certificate as the CA
+                    // bundle: a real chain and name check, not one switched off.
+                    Tcp out = Tcp.connect("127.0.0.1", tlsPort, 5000);
+                    try {
+                        out.startTls("127.0.0.1", certPath);
+                        byte[] ask = ("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                                + "Connection: close\r\n\r\n").getBytes("UTF-8");
+                        out.write(ask, 0, ask.length);
+                        ByteArrayOutputStream all = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[256];
+                        int n;
+                        while((n = out.read(chunk, 0, chunk.length)) > 0) {
+                            all.write(chunk, 0, n);
+                        }
+                        String text = new String(all.toByteArray(), "UTF-8");
+                        return HttpServer.Response.text(200, text.endsWith("pong") ? "pong" : text);
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/deadline".equals(path)) {
+                    Tcp out = Tcp.connect("127.0.0.1", silentPort, 5000);
+                    long started = System.currentTimeMillis();
+                    try {
+                        out.setReadTimeout(400);
+                        byte[] chunk = new byte[16];
+                        out.read(chunk, 0, chunk.length);
+                        return HttpServer.Response.text(200, "read something");
+                    } catch (IOException timedOut) {
+                        long spent = System.currentTimeMillis() - started;
+                        return HttpServer.Response.text(200, spent < 2000 ? "timed out"
+                                : "timed out after " + spent + "ms");
+                    } finally {
+                        out.close();
+                    }
+                }
+                return HttpServer.Response.text(200, "fast");
+            }
+        });
+        try {
+            int port = server.getPort();
+            String[] tcp = alongsideAFastRequest(port, "/tcp", delay);
+            check("a handler's outbound read runs on a virtual thread", "true", onVirtual[0]);
+            check("an outbound Tcp read returns what the peer sent", "pong", tcp[0]);
+            check("another request is served while a Tcp read waits", "free", tcp[1]);
+            String[] web = alongsideAFastRequest(port, "/web", delay);
+            check("an outbound Web call returns what the peer sent", "200:pong", web[0]);
+            check("another request is served while a Web call waits", "free", web[1]);
+            // The handshake budget is CN1_TLS_HANDSHAKE_MS, 1500 in this suite.
+            String[] tls = alongsideAFastRequest(port, "/tls", 1500);
+            check("a TLS handshake with a silent peer still gives up", "refused", tls[0]);
+            check("another request is served while a TLS handshake waits", "free", tls[1]);
+            check("a parked read still honours its read timeout", "timed out",
+                    httpGetBody("127.0.0.1", port, "/deadline"));
+            if(tlsPeer != null) {
+                String[] tlsRead = alongsideAFastRequest(port, "/tlsread", delay);
+                check("an outbound TLS read returns what the peer sent", "pong", tlsRead[0]);
+                check("another request is served while a TLS read waits", "free", tlsRead[1]);
+            } else {
+                note("outbound TLS read check skipped: CN1_SELFTEST_TLS_CERT and "
+                        + "CN1_SELFTEST_TLS_KEY name no certificate for a local peer");
+            }
+        } finally {
+            server.stop(2000);
+            if(tlsPeer != null) {
+                tlsPeer.stop(2000);
+            }
+            slow.close();
+            silent.close();
+        }
+        slowPeer.join(10000);
+        silentPeer.join(10000);
+    }
+
+    /**
+     * Starts `slowPath` on a thread of its own, waits until it is under way, then
+     * times a trivial request. Answers the slow request's body and "free" when the
+     * trivial one came back in well under `slowMillis`, or how long it took.
+     */
+    private static String[] alongsideAFastRequest(final int port, final String slowPath,
+                                                  int slowMillis) throws Exception {
+        final String[] slowBody = new String[1];
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    slowBody[0] = httpGetBody("127.0.0.1", port, slowPath);
+                } catch (Exception failed) {
+                    slowBody[0] = "failed: " + failed;
+                }
+            }
+        });
+        caller.start();
+        Thread.sleep(400);
+        long started = System.currentTimeMillis();
+        String fast = httpGetBody("127.0.0.1", port, "/fast");
+        long spent = System.currentTimeMillis() - started;
+        caller.join(20000);
+        String verdict = "fast".equals(fast) && spent < slowMillis / 2 ? "free"
+                : "waited " + spent + "ms for " + fast;
+        return new String[] {slowBody[0], verdict};
+    }
+
+    /**
+     * A peer for the outbound checks, on platform threads: accepts `connections`
+     * connections and, for each, reads the request and then waits `delayMillis`
+     * before answering "pong" as an HTTP response -- or, with a negative delay,
+     * never answers and holds the connection open for a while.
+     */
+    private static Thread servePeer(final ServerSocket listener, final int delayMillis,
+                                    final int connections) {
+        Thread acceptor = new Thread(new Runnable() {
+            public void run() {
+                for(int iter = 0 ; iter < connections ; iter++) {
+                    final int client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    Thread one = new Thread(new Runnable() {
+                        public void run() {
+                            try {
+                                ServerSocket.setBlocking(client, true);
+                                if(delayMillis < 0) {
+                                    Thread.sleep(6000);
+                                    return;
+                                }
+                                byte[] request = new byte[1024];
+                                ServerSocket.read(client, request, 0, request.length);
+                                Thread.sleep(delayMillis);
+                                byte[] answer = ("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n"
+                                        + "Connection: close\r\n\r\npong").getBytes("UTF-8");
+                                ServerSocket.write(client, answer, 0, answer.length);
+                            } catch (Exception ignored) {
+                                // The caller gave up; nothing to report from here.
+                            } finally {
+                                ServerSocket.closeFd(client);
+                            }
+                        }
+                    });
+                    one.start();
+                }
+            }
+        });
+        acceptor.start();
+        return acceptor;
+    }
+
     private static String oneLateBodyRequest(boolean interleave) throws Exception {
         final String[] seen = new String[1];
         HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
@@ -5840,6 +6069,7 @@ public class SelfTest {
         anOutboundFragmentIsRefused();
         caseVariantHeadersSignAsOneField();
         aLateBodyIsNotServedAnotherConnectionsBytes();
+        anOutboundWaitLeavesTheHostFree();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
         aMountDeclaredWithAnEscapeIsStillReachable();

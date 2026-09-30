@@ -173,10 +173,11 @@ public class Reports {
   literal expression is parsed at build time — a typo is a build error.
 - A run never overlaps the previous run of the same job; a late fire is skipped.
 - `@Async(thread = ThreadKind.VIRTUAL)` runs on a virtual thread; `PLATFORM` (the
-  default) on a pool. **Rule of thumb: anything that talks to a database or makes an
-  outbound HTTP call belongs on `PLATFORM`** — on this runtime those calls block the
-  host thread under a virtual thread. `Future.get()` on a virtual thread yields its
-  host instead of blocking it.
+  default) on a pool. A virtual thread parks on sockets, so PostgreSQL/MySQL
+  queries, `Web` calls and TLS are fine on `VIRTUAL`. **Rule of thumb: SQLite and
+  file work belong on `PLATFORM`** — those are local calls that block the host
+  thread under a virtual thread. `Future.get()` on a virtual thread yields its host
+  instead of blocking it.
 - Size executors in config: `cn1.task.executor.<name>.threads`,
   `cn1.task.executor.<name>.kind=virtual|platform`; name one with
   `@Async("reports")`. One-off work: `Tasks.platform(runnable)`,

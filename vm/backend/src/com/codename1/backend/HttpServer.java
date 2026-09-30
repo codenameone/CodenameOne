@@ -2747,7 +2747,138 @@ public final class HttpServer {
             VirtualThread.free(handle);
             return;
         }
+        if (state == VirtualThread.WAITING) {
+            parkWaiter(me, handle, true);
+            return;
+        }
         ringOrNap(me, handle);
+    }
+
+    /// Parks a virtual thread that answered WAITING: its outbound descriptors go
+    /// on this host's poller, and it comes back to the ring when one is ready or
+    /// its timeout runs out. Until then this host runs everybody else -- which is
+    /// the whole point: a slow database query or HTTP call used to hold the host
+    /// inside recv(), and there is one host per core.
+    ///
+    /// A wait with no descriptors is a wait on the timeout alone -- libcurl
+    /// between retries -- and is a nap.
+    private static void parkWaiter(VtHost me, long handle, boolean task) {
+        int count = VirtualThread.waitCount(handle);
+        long timeout = VirtualThread.waitTimeout(handle);
+        long deadline = timeout < 0 ? 0 : System.currentTimeMillis() + timeout;
+        if (count == 0) {
+            if (deadline == 0) {
+                me.ringAdd(handle);
+            } else {
+                me.napping.put(Long.valueOf(handle), Long.valueOf(deadline));
+            }
+            return;
+        }
+        for (int iter = 0 ; iter < count ; iter++) {
+            int fd = VirtualThread.waitDescriptor(handle, iter);
+            try {
+                me.poller.add(fd, VirtualThread.waitEvents(handle, iter));
+            } catch (IOException err) {
+                // Cannot be watched: undo what was registered and let it run. It
+                // re-tests its descriptor with a zero-time poll when resumed, so
+                // it sees a real error for itself rather than hanging here.
+                for (int undo = 0 ; undo < iter ; undo++) {
+                    int registered = VirtualThread.waitDescriptor(handle, undo);
+                    me.poller.remove(registered);
+                    me.setWaiter(registered, 0);
+                }
+                me.ringAdd(handle);
+                return;
+            }
+            me.setWaiter(fd, handle);
+        }
+        me.addWaiter(handle, deadline, task);
+    }
+
+    /// Ends the wait of the virtual thread at `index`: its descriptors come off
+    /// the poller BEFORE it runs, so none is ever registered while the virtual
+    /// thread could close it, and it goes back on the ring. Any of its other
+    /// descriptors still waiting in `ready` from this same poll are blanked, or
+    /// the loop would take one for a new connection.
+    private static void wakeWaiterAt(VtHost me, int index, int[] ready, int from, int n) {
+        long handle = me.waiters[index];
+        int count = VirtualThread.waitCount(handle);
+        for (int iter = 0 ; iter < count ; iter++) {
+            int fd = VirtualThread.waitDescriptor(handle, iter);
+            me.poller.remove(fd);
+            me.setWaiter(fd, 0);
+            for (int later = from ; later < n ; later++) {
+                if (ready[later] == fd) {
+                    ready[later] = -1;
+                }
+            }
+        }
+        me.removeWaiterAt(index);
+        me.ringAdd(handle);
+    }
+
+    /// Wakes the waiters whose timeout has run out by `now` -- the call they are
+    /// in fails with its ordinary deadline error -- and answers the earliest
+    /// deadline still ahead, or Long.MAX_VALUE for none.
+    private static long wakeExpiredWaiters(VtHost me, long now) {
+        long earliest = Long.MAX_VALUE;
+        int iter = 0;
+        while (iter < me.waiterCount) {
+            long at = me.waiterDeadlines[iter];
+            if (at != 0 && at <= now) {
+                // Swapped with the last, so the same index is looked at again.
+                wakeWaiterAt(me, iter, null, 0, 0);
+                continue;
+            }
+            if (at != 0 && at < earliest) {
+                earliest = at;
+            }
+            iter++;
+        }
+        return earliest;
+    }
+
+    /// For a stopping host, which no longer runs its poll loop but still owes its
+    /// background tasks their finish: waits up to `timeoutMillis` for a waiting
+    /// TASK's descriptor and wakes it. Connection waiters are left where they
+    /// are -- stop() reclaims those, and from another thread. Any other
+    /// descriptor that reports is taken off the poller, since nothing will serve
+    /// it now and a level-triggered set would report it on every call.
+    private static void pumpTaskWaiters(VtHost me, int timeoutMillis) {
+        int[] ready = new int[READY_CAPACITY];
+        int n;
+        try {
+            n = me.poller.await(ready, timeoutMillis);
+        } catch (IOException err) {
+            n = 0;
+        }
+        for (int iter = 0 ; iter < n ; iter++) {
+            int fd = ready[iter];
+            if (fd < 0) {
+                continue;
+            }
+            if (fd == me.wakeRead) {
+                Reactor.drainWake(fd);
+                continue;
+            }
+            int index = me.waiterIndex(me.waiterFor(fd));
+            if (index >= 0 && me.waiterIsTask[index]) {
+                wakeWaiterAt(me, index, ready, iter + 1, n);
+            } else if (index < 0) {
+                me.poller.remove(fd);
+                me.setArmed(fd, false);
+            }
+        }
+        long now = System.currentTimeMillis();
+        int iter = 0;
+        while (iter < me.waiterCount) {
+            long at = me.waiterDeadlines[iter];
+            if (me.waiterIsTask[iter] && at != 0 && at <= now) {
+                wakeWaiterAt(me, iter, null, 0, 0);
+                continue;
+            }
+            iter++;
+        }
     }
 
     /// Naps a virtual thread asked for, by handle, until when. Written by the
@@ -2890,6 +3021,88 @@ public final class HttpServer {
         /// keeps its host polling with a zero timeout, one core busy for as long
         /// as it waits. Touched only by the host thread.
         final java.util.HashMap napping = new java.util.HashMap();
+
+        /// Virtual threads parked on an OUTBOUND descriptor -- a database socket,
+        /// a TLS peer, libcurl's -- by that descriptor. Registered with this
+        /// host's poller only for as long as the wait lasts, so an entry here and
+        /// a registration there always come and go together. Touched only by the
+        /// host thread.
+        long[] waiterByFd = new long[64];
+        /// The waiting virtual threads themselves, with when each stops waiting
+        /// (0 for never) and whether it is a background task rather than a
+        /// connection -- recorded at park time, because a stopping server frees
+        /// connection handles from another thread and asking a freed one is a
+        /// use-after-free. Unordered; removal swaps in the last entry.
+        long[] waiters = new long[16];
+        long[] waiterDeadlines = new long[16];
+        boolean[] waiterIsTask = new boolean[16];
+        int waiterCount;
+
+        long waiterFor(int fd) {
+            return fd >= 0 && fd < waiterByFd.length ? waiterByFd[fd] : 0;
+        }
+
+        void setWaiter(int fd, long handle) {
+            if (fd < 0) {
+                return;
+            }
+            if (fd >= waiterByFd.length) {
+                int size = waiterByFd.length;
+                while (size <= fd) {
+                    size = size * 2;
+                }
+                long[] grown = new long[size];
+                System.arraycopy(waiterByFd, 0, grown, 0, waiterByFd.length);
+                waiterByFd = grown;
+            }
+            waiterByFd[fd] = handle;
+        }
+
+        void addWaiter(long handle, long deadline, boolean task) {
+            if (waiterCount == waiters.length) {
+                int size = waiters.length * 2;
+                long[] grownWaiters = new long[size];
+                long[] grownDeadlines = new long[size];
+                boolean[] grownTasks = new boolean[size];
+                System.arraycopy(waiters, 0, grownWaiters, 0, waiterCount);
+                System.arraycopy(waiterDeadlines, 0, grownDeadlines, 0, waiterCount);
+                System.arraycopy(waiterIsTask, 0, grownTasks, 0, waiterCount);
+                waiters = grownWaiters;
+                waiterDeadlines = grownDeadlines;
+                waiterIsTask = grownTasks;
+            }
+            waiters[waiterCount] = handle;
+            waiterDeadlines[waiterCount] = deadline;
+            waiterIsTask[waiterCount] = task;
+            waiterCount++;
+        }
+
+        void removeWaiterAt(int index) {
+            waiterCount--;
+            waiters[index] = waiters[waiterCount];
+            waiterDeadlines[index] = waiterDeadlines[waiterCount];
+            waiterIsTask[index] = waiterIsTask[waiterCount];
+            waiters[waiterCount] = 0;
+        }
+
+        int waiterIndex(long handle) {
+            for (int iter = 0 ; iter < waiterCount ; iter++) {
+                if (waiters[iter] == handle) {
+                    return iter;
+                }
+            }
+            return -1;
+        }
+
+        int taskWaiters() {
+            int count = 0;
+            for (int iter = 0 ; iter < waiterCount ; iter++) {
+                if (waiterIsTask[iter]) {
+                    count++;
+                }
+            }
+            return count;
+        }
 
         boolean hasQueuedTasks() {
             synchronized (inbox) {
@@ -3187,7 +3400,13 @@ public final class HttpServer {
                     }
                 }
                 if (tasks == 0 && !me.hasQueuedTasks()) {
-                    return;
+                    // A task parked on a database or HTTP call is still running;
+                    // wait for its descriptor rather than abandoning it.
+                    if (me.taskWaiters() == 0) {
+                        return;
+                    }
+                    pumpTaskWaiters(me, (int) Math.max(1, Math.min(50,
+                            taskDrainDeadline - System.currentTimeMillis())));
                 }
             }
             // Out of time. A task that never had its first turn has no frames:
@@ -3221,6 +3440,8 @@ public final class HttpServer {
                 TaskExecutor.abandoned(task != null ? task : unstarted);
                 abandoned++;
             }
+            // Parked on outbound I/O means STARTED: those overrun like any other.
+            overrunning += me.taskWaiters();
             if (abandoned > 0) {
                 System.err.println(abandoned + " background task(s) on virtual threads did "
                         + "not start within the shutdown window and were dropped");
@@ -3248,7 +3469,11 @@ public final class HttpServer {
             // A napping task is a running one: back on the ring each pass.
             wakeNappers(me, Long.MAX_VALUE);
             if (me.ringEmpty()) {
-                return;
+                if (me.taskWaiters() == 0) {
+                    return;
+                }
+                pumpTaskWaiters(me, 50);
+                continue;
             }
             int budget = me.ringCount;
             int tasks = 0;
@@ -3262,7 +3487,10 @@ public final class HttpServer {
                 }
             }
             if (tasks == 0) {
-                return;
+                if (me.taskWaiters() == 0) {
+                    return;
+                }
+                pumpTaskWaiters(me, 50);
             }
         }
     }
@@ -3330,6 +3558,9 @@ public final class HttpServer {
             // whole poll timeout.
             boolean ranSome = drainRunnable(me);
             long nextNap = wakeNappers(me, System.currentTimeMillis());
+            // Outbound waits whose timeout ran out go back to the ring, and the
+            // poll below sleeps no longer than the next one is due.
+            nextNap = Math.min(nextNap, wakeExpiredWaiters(me, System.currentTimeMillis()));
             int timeout = 250;
             if (ranSome || !me.ringEmpty()) {
                 timeout = 0;
@@ -3375,6 +3606,19 @@ public final class HttpServer {
                             System.err.println("could not re-arm the listener: " + err);
                         }
                         return;
+                    }
+                    continue;
+                }
+                // An OUTBOUND descriptor a virtual thread is parked on. Checked
+                // before advance(), which would take a descriptor it has no handle
+                // for as a newly accepted connection.
+                long waiter = me.waiterFor(fd);
+                if (waiter != 0) {
+                    int slot = me.waiterIndex(waiter);
+                    if (slot >= 0) {
+                        wakeWaiterAt(me, slot, ready, iter + 1, n);
+                    } else {
+                        me.setWaiter(fd, 0);
                     }
                     continue;
                 }
@@ -3466,6 +3710,20 @@ public final class HttpServer {
             // all. See drop().
             me.releaseHandle(fd, handle);
             VirtualThread.free(handle);
+            return;
+        }
+        if (state == VirtualThread.WAITING) {
+            // Parked on an OUTBOUND descriptor -- the handler is inside a database
+            // or HTTP call. Its own connection comes off the poller for the same
+            // reason the RUNNABLE path below takes it off: readable bytes from
+            // the client must not resume a virtual thread that is waiting on
+            // something else, and a level-triggered set would report them on
+            // every poll. The next ordinary park re-arms it. No idle deadline
+            // either: the handler is working, and the call it is in carries its
+            // own timeout.
+            me.poller.remove(fd);
+            me.setArmed(fd, false);
+            parkWaiter(me, handle, false);
             return;
         }
         if (state == VirtualThread.RUNNABLE) {
