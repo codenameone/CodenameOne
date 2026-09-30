@@ -349,6 +349,151 @@ class RoadLabelTest extends UITestBase {
         assertTrue(source.requests.size() <= 4, "fetched " + source.requests);
     }
 
+    @FormTest
+    void zoomingInWhileTheDeepestTileLoadsReusesItsFetch() {
+        HoldingSource source = new HoldingSource();
+        VectorMapEngine engine = new VectorMapEngine(source, MapStyle.light());
+        engine.setCenter(new LatLng(37.4225, -122.1096));
+        engine.setViewport(512, 512);
+        engine.setZoom(14);
+        assertFalse(engine.hasRenderedVisibleTiles());
+        List first = new ArrayList(source.requests);
+        assertFalse(first.isEmpty());
+        // Past the source's deepest zoom while those tiles are still loading.
+        engine.setZoom(16);
+        assertFalse(engine.hasRenderedVisibleTiles());
+        assertEquals(first, source.requests, "no second download of a tile already loading");
+        // When the deepest tiles land, the zoom-16 pieces are cut from them.
+        source.release();
+        awaitRendered(engine);
+    }
+
+    @FormTest
+    void zoomingOutWhileAnOverzoomFetchLoadsReusesItToo() {
+        HoldingSource source = new HoldingSource();
+        VectorMapEngine engine = new VectorMapEngine(source, MapStyle.light());
+        engine.setCenter(new LatLng(37.4225, -122.1096));
+        engine.setViewport(512, 512);
+        engine.setZoom(16);
+        assertFalse(engine.hasRenderedVisibleTiles());
+        List first = new ArrayList(source.requests);
+        assertFalse(first.isEmpty());
+        engine.setZoom(14);
+        assertFalse(engine.hasRenderedVisibleTiles());
+        for (Object r : source.requests.subList(first.size(), source.requests.size())) {
+            assertFalse(first.contains(r), "fetched " + r + " twice");
+        }
+        source.release();
+        awaitRendered(engine);
+    }
+
+    @FormTest
+    void aFailedDeepestTileFailsThePiecesWaitingOnIt() {
+        HoldingSource source = new HoldingSource();
+        VectorMapEngine engine = new VectorMapEngine(source, MapStyle.light());
+        engine.setCenter(new LatLng(37.4225, -122.1096));
+        engine.setViewport(512, 512);
+        engine.setZoom(14);
+        engine.hasRenderedVisibleTiles();
+        engine.setZoom(16);
+        engine.hasRenderedVisibleTiles();
+        source.failAll();
+        flushSerialCalls();
+        assertFalse(engine.hasPendingTiles(), "a piece still waits on a tile that failed");
+    }
+
+    @FormTest
+    void withoutAffineTheNameGoesOnTheVisiblePartOfALongRoad() {
+        Graphics g = graphics(false);
+        // An overzoomed road: thousands of pixels long, its middle far off
+        // screen, crossing the 800x800 view only near its start.
+        double[] road = {-200, 400, 20000, 400};
+        assertTrue(new LabelEngine().placeAlongLine(g, "Main Street", 13, TEXT, HALO, road, 1000,
+                0, 0, 800, 800));
+        ArgumentCaptor<Integer> x = ArgumentCaptor.forClass(Integer.class);
+        verify(drawing, atLeastOnce()).drawString(any(), eq("Main Street"), x.capture(), anyInt());
+        for (Integer left : x.getAllValues()) {
+            assertTrue(left > 0 && left < 800, "drawn at x=" + left);
+        }
+        // And nothing when no part of it is in view.
+        Graphics other = graphics(false);
+        assertFalse(new LabelEngine().placeAlongLine(other, "Main Street", 13, TEXT, HALO,
+                new double[]{2000, 400, 20000, 400}, 1000, 0, 0, 800, 800));
+    }
+
+    @FormTest
+    void overzoomStopsAtTwentyTwoButNeverBelowTheSourcesOwnDeepestLevel() {
+        assertEquals(22, new VectorMapEngine(new RecordingSource(true, 18), MapStyle.light()).getMaxZoom(), 0);
+        assertEquals(24, new VectorMapEngine(new RecordingSource(true, 24), MapStyle.light()).getMaxZoom(), 0);
+    }
+
+    private void awaitRendered(VectorMapEngine engine) {
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!engine.hasRenderedVisibleTiles()) {
+            assertTrue(System.currentTimeMillis() < deadline, "tiles never rendered");
+            flushSerialCalls();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                throw new AssertionError(e);
+            }
+        }
+        assertFalse(engine.hasPendingTiles());
+    }
+
+    // A vector source with data to zoom 14 that holds every request until the
+    // test releases it, then answers with real tile bytes.
+    private static final class HoldingSource implements TileSource {
+        private final List requests = new ArrayList();
+        private final List held = new ArrayList();
+        private final DemoTileSource bytes = new DemoTileSource();
+
+        public boolean isVector() {
+            return true;
+        }
+
+        public int getTileSize() {
+            return 256;
+        }
+
+        public int getMinZoom() {
+            return 0;
+        }
+
+        public int getMaxZoom() {
+            return 14;
+        }
+
+        public String getAttribution() {
+            return "";
+        }
+
+        public void fetchTile(int z, int x, int y, TileCallback callback) {
+            requests.add(z + "/" + x + "/" + y);
+            held.add(new Object[]{new int[]{z, x, y}, callback});
+        }
+
+        void release() {
+            List now = new ArrayList(held);
+            held.clear();
+            for (Object o : now) {
+                Object[] h = (Object[]) o;
+                int[] a = (int[]) h[0];
+                bytes.fetchTile(a[0], a[1], a[2], (TileCallback) h[1]);
+            }
+        }
+
+        void failAll() {
+            List now = new ArrayList(held);
+            held.clear();
+            for (Object o : now) {
+                Object[] h = (Object[]) o;
+                int[] a = (int[]) h[0];
+                ((TileCallback) h[1]).tileFailed(a[0], a[1], a[2]);
+            }
+        }
+    }
+
     private static float[] direction(Transform t) {
         float[] origin = t.transformPoint(new float[]{0, 0});
         float[] unit = t.transformPoint(new float[]{1, 0});

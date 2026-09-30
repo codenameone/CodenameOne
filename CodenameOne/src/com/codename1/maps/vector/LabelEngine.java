@@ -71,8 +71,9 @@ final class LabelEngine {
     /// (neighbouring tiles each carry their own piece of a long road). Text is
     /// kept upright, reading left to right.
     ///
-    /// Without affine transforms the name is placed horizontally at the
-    /// line's midpoint, as [#place] would.
+    /// Without affine transforms the name is placed horizontally, as [#place]
+    /// would, at the middle of the longest stretch of the line inside the
+    /// bounds.
     ///
     /// Returns true when at least one copy was drawn.
     boolean placeAlongLine(Graphics g, String text, double sizePx, int textColor, int haloColor,
@@ -93,7 +94,14 @@ final class LabelEngine {
         }
         double mid = total / 2;
         if (!g.isAffineSupported()) {
-            double[] p = pointAt(pts, cum, mid);
+            // Not the whole line's midpoint: an overzoomed road carries its
+            // entire parent-tile geometry, whose middle is often far off screen
+            // while the part in view goes unnamed.
+            double at = visibleMiddle(pts, cum, left, top, right, bottom);
+            if (at < 0) {
+                return false;
+            }
+            double[] p = pointAt(pts, cum, at);
             return place(g, text, sizePx, textColor, haloColor, round(p[0]), round(p[1]));
         }
         Font font = fontFor(sizePx);
@@ -309,6 +317,58 @@ final class LabelEngine {
         } finally {
             g.setTransform(saved);
         }
+    }
+
+    // The distance along the line of the middle of its longest run inside the
+    // rectangle, or -1 when no part of it is inside. Each segment is clipped to
+    // the rectangle (Liang-Barsky); touching clipped pieces join into one run.
+    private static double visibleMiddle(double[] pts, double[] cum, int left, int top, int right,
+                                        int bottom) {
+        double bestStart = -1;
+        double bestEnd = -1;
+        double runStart = -1;
+        double runEnd = -1;
+        for (int i = 1; i < cum.length; i++) {
+            double x0 = pts[i * 2 - 2];
+            double y0 = pts[i * 2 - 1];
+            double dx = pts[i * 2] - x0;
+            double dy = pts[i * 2 + 1] - y0;
+            double t0 = 0;
+            double t1 = 1;
+            double[] p = {-dx, dx, -dy, dy};
+            double[] q = {x0 - left, right - x0, y0 - top, bottom - y0};
+            boolean inside = true;
+            for (int k = 0; k < 4 && inside; k++) {
+                if (p[k] == 0) {
+                    inside = q[k] >= 0;
+                } else {
+                    double r = q[k] / p[k];
+                    if (p[k] < 0) {
+                        t0 = Math.max(t0, r);
+                    } else {
+                        t1 = Math.min(t1, r);
+                    }
+                    inside = t0 <= t1;
+                }
+            }
+            if (!inside) {
+                continue;
+            }
+            double length = cum[i] - cum[i - 1];
+            double a = cum[i - 1] + t0 * length;
+            double b = cum[i - 1] + t1 * length;
+            if (runStart >= 0 && a <= runEnd + 1e-6) {
+                runEnd = b;
+            } else {
+                runStart = a;
+                runEnd = b;
+            }
+            if (runEnd - runStart > bestEnd - bestStart) {
+                bestStart = runStart;
+                bestEnd = runEnd;
+            }
+        }
+        return bestStart < 0 ? -1 : (bestStart + bestEnd) / 2;
     }
 
     // The point at distance `d` along the line, and the direction of the

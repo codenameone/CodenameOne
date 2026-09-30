@@ -57,6 +57,9 @@ public final class VectorMapEngine {
     // Levels a vector source is drawn past its deepest tiles. Six is 64x the
     // deepest tile's scale: zoom 20, building level, from zoom 14 data.
     private static final int OVERZOOM_LEVELS = 6;
+    // The cap on how far overzoom reaches. It limits overzoom only: a source
+    // that serves deeper tiles than this keeps its own deepest level, since
+    // capping it would hide data the source really has.
     private static final int MAX_DISPLAY_ZOOM = 22;
 
     // Logical pixels between repeats of a road name along a long road.
@@ -177,9 +180,10 @@ public final class VectorMapEngine {
     }
 
     /// The largest zoom level the camera can reach. For a vector source this is
-    /// past the deepest level the source serves (see the class notes); a
-    /// raster source stops at its own deepest level, since stretching a
-    /// bitmap only blurs it.
+    /// six levels past the deepest level the source serves (see the class
+    /// notes), up to zoom 22; a source that serves deeper tiles than that keeps
+    /// its own deepest level. A raster source stops at its own deepest level,
+    /// since stretching a bitmap only blurs it.
     public double getMaxZoom() {
         return displayMaxZoom();
     }
@@ -597,6 +601,14 @@ public final class VectorMapEngine {
             requestOverzoomTile(key, z, x, y);
             return;
         }
+        List loading = (List) parentWaiters.get(key);
+        if (loading != null) {
+            // An overzoom fetch of this very tile is in flight (the user zoomed
+            // back out): join it as its depth-0 piece instead of fetching again.
+            pending.put(key, Integer.valueOf(generation));
+            loading.add(new int[]{z, x, y});
+            return;
+        }
         final int requestGeneration = generation;
         final TileSource requestSource = source;
         final MapStyle requestStyle = style;
@@ -663,8 +675,15 @@ public final class VectorMapEngine {
                         labels.put(key, result.labels);
                     }
                     if (result.z == source.getMaxZoom()) {
-                        // Zooming in from here overzooms this very tile.
+                        // Zooming in from here overzooms this very tile, and
+                        // pieces that zoomed in while it loaded wait for it.
                         decodedParents.put(key, result.tile);
+                        List waiting = (List) parentWaiters.remove(key);
+                        if (waiting != null) {
+                            for (Object w : waiting) {
+                                renderOverzoomed(result.tile, result.z, (int[]) w, requestGeneration);
+                            }
+                        }
                     }
                 } else {
                     image = Image.createImage(result.data, 0, result.data.length);
@@ -673,9 +692,11 @@ public final class VectorMapEngine {
                 repaint();
             } catch (Throwable t) {
                 failed.put(key, Boolean.TRUE);
+                failWaiters(key, requestGeneration);
             }
         } else {
             failed.put(key, Boolean.TRUE);
+            failWaiters(key, requestGeneration);
         }
     }
 
@@ -708,13 +729,19 @@ public final class VectorMapEngine {
             return;
         }
         List waiters = (List) parentWaiters.get(parentKey);
-        if (waiters != null) {
-            waiters.add(address);
+        boolean inFlight = waiters != null || pending.containsKey(parentKey);
+        if (waiters == null) {
+            waiters = new ArrayList();
+            parentWaiters.put(parentKey, waiters);
+        }
+        waiters.add(address);
+        if (inFlight) {
+            // Either another piece already fetches the ancestor, or it is
+            // loading as an ordinary deepest-level tile (the user zoomed in
+            // while it loaded) and applyTileResult hands it to the waiters:
+            // one download and one decode either way.
             return;
         }
-        waiters = new ArrayList();
-        waiters.add(address);
-        parentWaiters.put(parentKey, waiters);
         source.fetchTile(parentZ, px, py, new TileCallback() {
             @Override
             public void tileLoaded(int tz, int tx, int ty, final byte[] data) {
@@ -756,10 +783,7 @@ public final class VectorMapEngine {
             return;
         }
         if (tile == null) {
-            for (Object w : waiters) {
-                int[] a = (int[]) w;
-                finishFailed(TileUtil.key(a[0], a[1], a[2]), requestGeneration);
-            }
+            failAll(waiters, requestGeneration);
             return;
         }
         decodedParents.put(parentKey, tile);
@@ -784,8 +808,10 @@ public final class VectorMapEngine {
             // layer's minzoom/maxzoom and text size are judged at this zoom,
             // not at the source's deepest one, while the anchors stay in the
             // parent's world pixels. Once per zoom, shared by every piece.
-            String labelKey = overzoomLabelKey(address[0], TileUtil.key(parentZ, address[1] >> depth,
-                    address[2] >> depth));
+            // A depth-0 piece is the deepest-level tile itself, labelled like
+            // any ordinary tile.
+            String labelKey = depth == 0 ? key : overzoomLabelKey(address[0],
+                    TileUtil.key(parentZ, address[1] >> depth, address[2] >> depth));
             if (!labels.containsKey(labelKey)) {
                 labels.put(labelKey, TileRenderer.extractLabels(parent, style, address[0], parentZ,
                         address[1] >> depth, address[2] >> depth, tileSize));
@@ -808,6 +834,26 @@ public final class VectorMapEngine {
         }
         removePendingIfMatches(key, requestGeneration);
         failed.put(key, Boolean.TRUE);
+        failWaiters(key, requestGeneration);
+    }
+
+    // Pieces waiting on a deepest-level tile whose ordinary fetch failed fail
+    // with it rather than waiting for a result that will never come.
+    private void failWaiters(String parentKey, int requestGeneration) {
+        if (requestGeneration != generation) {
+            return;
+        }
+        List waiting = (List) parentWaiters.remove(parentKey);
+        if (waiting != null) {
+            failAll(waiting, requestGeneration);
+        }
+    }
+
+    private void failAll(List waiters, int requestGeneration) {
+        for (Object w : waiters) {
+            int[] a = (int[]) w;
+            finishFailed(TileUtil.key(a[0], a[1], a[2]), requestGeneration);
+        }
     }
 
     private void removePendingIfMatches(String key, int requestGeneration) {

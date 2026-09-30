@@ -100,7 +100,7 @@ image::img/maps-road-labels.png[A route drawn over the vector basemap with the s
 
 When you draw on the basemap yourself through `getEngine()`, the engine's `paint` method draws the tiles and their labels together. To put your own drawing between the two, call `paintTiles`, draw, then call `paintLabels`.
 
-A vector map zooms further than the deepest level its tile source serves. OpenFreeMap's data stops at zoom 14, yet the map reaches zoom 20: past zoom 14 the map redraws the zoom 14 geometry at the larger scale, so roads and buildings stay sharp instead of turning into a stretched image. `getMaxZoom()` reports the deepest level the camera can reach, six levels past the source's own, and never more than 22. A raster source stops at its own deepest level, since enlarging an image only blurs it.
+A vector map zooms further than the deepest level its tile source serves. OpenFreeMap's data stops at zoom 14, yet the map reaches zoom 20: past zoom 14 the map redraws the zoom 14 geometry at the larger scale, so roads and buildings stay sharp instead of turning into a stretched image. `getMaxZoom()` reports the deepest level the camera can reach: six levels past the source's own, up to zoom 22. A source that serves deeper tiles than that keeps its own deepest level. A raster source stops at its own deepest level, since enlarging an image only blurs it.
 
 image::img/maps-street-zoom.png[Street-level zoom on the vector basemap with road names repeated along the streets,scaledwidth=40%]
 
