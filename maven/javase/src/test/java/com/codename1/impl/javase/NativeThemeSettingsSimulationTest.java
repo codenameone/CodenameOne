@@ -82,4 +82,25 @@ class NativeThemeSettingsSimulationTest {
         assertEquals("Dialog", settings.getFontFamily());
         assertEquals(18f, settings.getFontSize());
     }
+    @Test
+    void desktopSettingsNotificationInvalidatesCachedAppearance() throws Exception {
+        java.lang.reflect.Field resolved = JavaSEPort.class.getDeclaredField("osDarkModeResolved");
+        java.lang.reflect.Field appearance = JavaSEPort.class.getDeclaredField("osDarkMode");
+        resolved.setAccessible(true);
+        appearance.setAccessible(true);
+        Object previousResolved = resolved.get(null);
+        Object previousAppearance = appearance.get(null);
+        try {
+            for (Boolean oldAppearance : new Boolean[] {Boolean.TRUE, Boolean.FALSE}) {
+                resolved.set(null, true);
+                appearance.set(null, oldAppearance);
+                JavaSEPort.desktopThemeSettingsChanged();
+                assertEquals(false, resolved.get(null));
+                assertNull(appearance.get(null));
+            }
+        } finally {
+            resolved.set(null, previousResolved);
+            appearance.set(null, previousAppearance);
+        }
+    }
 }

@@ -1977,7 +1977,11 @@ public class UIManager {
             programmaticStyleInstalled = false;
             themeGeneration++;
             imageCache.clear();
-            current.refreshTheme(false);
+            // Overlay resources merge inside the enclosing build. Refreshing here
+            // would cache control styles before OS colors/fonts have been applied.
+            if (buildThemeDepth == 0) {
+                current.refreshTheme(false);
+            }
         }
     }
 

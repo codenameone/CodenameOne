@@ -147,6 +147,59 @@ class UIManagerNativeSettingsTest extends UITestBase {
     }
 
     @Test
+    void overlayRefreshUsesInheritedControlStylesOnInitialLoad() throws Exception {
+        assertOverlayRefreshUsesInheritedControlStyles(false);
+    }
+
+    @Test
+    void overlayRefreshUsesInheritedControlStylesWhenAddingTheme() throws Exception {
+        assertOverlayRefreshUsesInheritedControlStyles(true);
+    }
+
+    private void assertOverlayRefreshUsesInheritedControlStyles(boolean add) throws Exception {
+        manager.setUseNativeColors(true);
+        manager.setUseNativeFonts(true);
+        Hashtable overlay = new Hashtable();
+        overlay.put("@overlayMarker", "loaded");
+        com.codename1.ui.util.EditableResources resources = new com.codename1.ui.util.EditableResources();
+        resources.setTheme("overlay", overlay);
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        resources.save(bytes);
+        String resourceName = "native-settings-overlay-" + add;
+        implementation.putResource("/" + resourceName + ".res",
+                new java.io.ByteArrayInputStream(bytes.toByteArray()));
+        Hashtable theme = nativeTheme();
+        theme.put("CheckBox.font", theme.get("Button.font"));
+        theme.put("CheckBox.fgColor", "112233");
+        theme.put("@cn1-bind:CheckBox.fgColor", "accent-color");
+        theme.put("@OverlayThemes", resourceName);
+        final java.util.List<Style> refreshed = new java.util.ArrayList<Style>();
+        LookAndFeel previous = manager.getLookAndFeel();
+        manager.setLookAndFeel(new DefaultLookAndFeel(manager) {
+            @Override
+            public void refreshTheme(boolean complete) {
+                super.refreshTheme(complete);
+                refreshed.add(manager.getComponentStyle("CheckBox"));
+            }
+        });
+        try {
+            if (add) {
+                manager.addThemeProps(theme);
+            } else {
+                manager.setThemeProps(theme);
+            }
+            assertEquals("loaded", manager.getThemeConstant("overlayMarker", "missing"));
+            assertEquals(1, refreshed.size(), "Only the final composed theme should reach the look and feel");
+            assertEquals(0x00aa44, refreshed.get(0).getFgColor());
+            assertEquals(24f, refreshed.get(0).getFont().getPixelSize());
+            assertEquals(0x00aa44, manager.getComponentStyle("CheckBox").getFgColor());
+            assertEquals(24f, size("CheckBox"));
+        } finally {
+            manager.setLookAndFeel(previous);
+        }
+    }
+
+    @Test
     void appLiteralsAndFontsWinAcrossSettingsChanges() {
         manager.setUseNativeColors(true);
         manager.setUseNativeFonts(true);

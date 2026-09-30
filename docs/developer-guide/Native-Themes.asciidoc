@@ -38,11 +38,11 @@ Color inheritance feeds the theme's semantic palette bindings. Font inheritance
 uses the normal OS UI font family and size while retaining the native theme's
 relative heading sizes and styles. Explicit application style properties and
 palette constants override these inherited defaults. Bundled application fonts
-and icon fonts are not replaced. Legacy hand-authored native themes do not carry
+and icon fonts aren't replaced. Legacy hand-authored native themes don't carry
 the inheritance metadata and retain their existing appearance.
 
 The existing larger-text accessibility option remains independent. It scales
-eligible fonts after OS font inheritance, so enabling both does not apply the OS
+eligible fonts after OS font inheritance, so enabling both doesn't apply the OS
 text-size multiplier twice. Existing dark-mode selection remains independent too.
 
 Settings changes and application activation trigger a coalesced theme refresh.
@@ -68,7 +68,7 @@ settings rather than the host's palette.
 
 In the simulator, use *Simulate > OS Theme Settings* to choose an accent and UI
 font or reset the simulated settings. These controls exercise the app's opt-ins;
-they do not enable inheritance for the app. Tests can supply a deterministic
+they don't enable inheritance for the app. Tests can supply a deterministic
 snapshot with `JavaSEPort.setSimulatorNativeThemeSettings(...)`.
 
 === Selecting a theme

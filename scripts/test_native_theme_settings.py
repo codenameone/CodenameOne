@@ -98,6 +98,65 @@ static id fromNSString(NSString* value) { return value; }
             subprocess.run(["xcrun", "clang", "-fblocks", "-fsyntax-only", "-isysroot", sdk,
                             "-target", "arm64-apple-ios15.0-simulator", str(path)], check=True)
 
+    @unittest.skipUnless(shutil.which("c++"), "C++ compiler unavailable")
+    def test_windows_message_font_keeps_device_pixel_size(self):
+        source = (ROOT / "Ports/WindowsPort/nativeSources/cn1_windows_winrt.cpp").read_text()
+        helpers = source[source.index("typedef struct CN1Buf"):source.index("static void cn1BufAppendChar")]
+        start = source.index("    CN1Buf buffer;", source.index("WindowsNative_nativeThemeSettings"))
+        end = source.index("    HRESULT initialized", start)
+        # Exercise the production serialization against Windows message-font metrics
+        # at 100%, 150% and 200% scaling without requiring a Windows runtime.
+        harness = r'''
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cwchar>
+#define CP_UTF8 65001
+#define SPI_GETNONCLIENTMETRICS 41
+#define LOGPIXELSY 90
+struct NONCLIENTMETRICSW {
+    unsigned cbSize;
+    struct { int lfHeight; wchar_t lfFaceName[32]; } lfMessageFont;
+};
+static int dpi, messageHeight;
+static struct { float dpiScale; } cn1Win = {1};
+typedef void* HDC;
+static HDC GetDC(void*) { return reinterpret_cast<HDC>(1); }
+static int GetDeviceCaps(HDC, int) { return dpi; }
+static void ReleaseDC(void*, HDC) {}
+static bool SystemParametersInfoW(unsigned, unsigned, NONCLIENTMETRICSW* m, unsigned) {
+    m->lfMessageFont.lfHeight = -messageHeight;
+    wcscpy(m->lfMessageFont.lfFaceName, L"Segoe UI");
+    return true;
+}
+static int WideCharToMultiByte(unsigned, unsigned, const wchar_t* family, int,
+        char* output, int capacity, void*, void*) {
+    return snprintf(output, capacity, "%ls", family) + 1;
+}
+HELPERS
+static void check() {
+BODY
+    char expected[80];
+    snprintf(expected, sizeof(expected), "fontFamily=Segoe UI\nfontSize=%d\n", messageHeight);
+    assert(buffer.data && strcmp(buffer.data, expected) == 0);
+    free(buffer.data);
+}
+int main() {
+    const int dpis[] = {96, 144, 192};
+    const int heights[] = {13, 20, 26};
+    for (int i = 0; i < 3; ++i) {
+        dpi = dpis[i]; messageHeight = heights[i]; check();
+    }
+}
+'''.replace("HELPERS", helpers).replace("BODY", source[start:end])
+        with tempfile.TemporaryDirectory(prefix="cn1-theme-dpi-") as directory:
+            path = pathlib.Path(directory)
+            (path / "settings.cpp").write_text(harness)
+            executable = path / "settings"
+            subprocess.run(["c++", "-std=c++11", str(path / "settings.cpp"), "-o", str(executable)], check=True)
+            subprocess.run([str(executable)], check=True)
+
     @unittest.skipUnless(shutil.which("x86_64-w64-mingw32-g++"), "MinGW cross compiler unavailable")
     def test_windows_bridge_compiles(self):
         source = (ROOT / "Ports/WindowsPort/nativeSources/cn1_windows_winrt.cpp").read_text()

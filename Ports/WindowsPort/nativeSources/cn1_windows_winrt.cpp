@@ -474,11 +474,10 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_jav
         char family[256];
         int count = WideCharToMultiByte(CP_UTF8, 0, metrics.lfMessageFont.lfFaceName, -1,
                 family, sizeof(family), NULL, NULL);
-        HDC dc = GetDC(NULL);
-        int dpi = dc ? GetDeviceCaps(dc, LOGPIXELSY) : 96;
-        if (dc) ReleaseDC(NULL, dc);
-        float size = (float)abs(metrics.lfMessageFont.lfHeight) * 96.0f / (dpi > 0 ? dpi : 96)
-                * (cn1Win.dpiScale > 0 ? cn1Win.dpiScale : 1);
+        // SPI_GETNONCLIENTMETRICS already returns lfHeight in pixels at the
+        // caller's DPI, the same coordinate system used by screenDpi(). Do not
+        // normalize it to 96 DPI: CN1 fonts consume device pixels directly.
+        float size = (float)abs(metrics.lfMessageFont.lfHeight);
         if (count > 0 && size > 0) {
             char line[320];
             snprintf(line, sizeof(line), "fontFamily=%s\nfontSize=%g\n", family, size);

@@ -651,7 +651,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean osDarkModeResolved;
     private static Boolean osDarkMode;
 
-    private static Boolean osDarkMode() {
+    private static synchronized Boolean osDarkMode() {
         if (!osDarkModeResolved) {
             osDarkModeResolved = true;
             try {
@@ -670,6 +670,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return osDarkMode;
+    }
+
+    // AWT settings listeners and activation run outside the CN1 EDT. Invalidate
+    // under the same lock as the query before queuing the EDT theme refresh.
+    static void desktopThemeSettingsChanged() {
+        synchronized (JavaSEPort.class) {
+            osDarkModeResolved = false;
+            osDarkMode = null;
+        }
+        Display.getInstance().nativeThemeSettingsChanged();
     }
 
     /// Runs a short OS query and returns its standard output, or null when it failed or did
@@ -10812,7 +10822,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     "win.text.textColor", "win.frame.backgroundColor", "gnome.Gtk/FontName", "gnome.Xft/DPI"};
             final java.beans.PropertyChangeListener listener = new java.beans.PropertyChangeListener() {
                 public void propertyChange(java.beans.PropertyChangeEvent event) {
-                    Display.getInstance().nativeThemeSettingsChanged();
+                    desktopThemeSettingsChanged();
                 }
             };
             for (String property : properties) { toolkit.addPropertyChangeListener(property, listener); }
@@ -11623,7 +11633,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowActivated(WindowEvent e) {
-                    Display.getInstance().nativeThemeSettingsChanged();
+                    desktopThemeSettingsChanged();
                     mainSurfaceFocusChanged(true);
                 }
 
