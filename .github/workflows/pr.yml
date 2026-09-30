@@ -38,6 +38,8 @@ on:
       # Same reason: the C++ linkage gate runs from this workflow and nowhere else, so
       # ignoring scripts/** would let a change that weakens it merge unexercised.
       - 'scripts/check-native-cpp-linkage.py'
+      # Same: the builder define-toggle lint runs from this workflow and nowhere else.
+      - 'scripts/check-builder-define-toggles.py'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -103,6 +105,8 @@ on:
       # Same reason: the C++ linkage gate runs from this workflow and nowhere else, so
       # ignoring scripts/** would let a change that weakens it merge unexercised.
       - 'scripts/check-native-cpp-linkage.py'
+      # Same: the builder define-toggle lint runs from this workflow and nowhere else.
+      - 'scripts/check-builder-define-toggles.py'
       # The build hint gates are run from this workflow and nowhere else, and one
       # of them holds an empty baseline. Ignoring the whole directory meant a
       # change that breaks a gate, or that adds a line to the baseline, could
@@ -605,6 +609,17 @@ jobs:
         run: |
           python3 scripts/check-native-cpp-linkage.py --self-test
           python3 scripts/check-native-cpp-linkage.py
+      # A builder switches a port feature by uncommenting its //#define, and related
+      # defines share a prefix: a String.replace of //#define CN1_INCLUDE_CRYPTO also
+      # turned on CN1_INCLUDE_CRYPTO_GCM, linking private CommonCrypto calls into every
+      # app that used any crypto API and getting its App Store upload rejected.
+      # Executor.replaceMarker matches the whole name; this fails on any raw .replace of
+      # a #define literal that goes around it. Needs nothing built.
+      - name: Check builders switch defines by whole name
+        if: ${{ matrix.java-version == 8 }}
+        run: |
+          python3 scripts/check-builder-define-toggles.py --self-test
+          python3 scripts/check-builder-define-toggles.py
       # The native warning gate itself runs on the macOS/Windows/Linux legs that
       # actually compile C; what runs HERE is its parser, against a hand-authored
       # fixture, plus a structural check on the checked-in baselines. Both need no

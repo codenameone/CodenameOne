@@ -2041,6 +2041,73 @@ public class IPhoneBuilder extends Executor {
         return java.util.Collections.singletonList(watchMain);
     }
 
+    /// The line in CN1Crypto.h that says this port's AES-GCM uses public CommonCrypto only.
+    static final String CRYPTO_GCM_PUBLIC_MARKER = "#define CN1_CRYPTO_GCM_PUBLIC_API";
+
+    /// Whether AES-GCM is compiled into an application that uses the crypto API.
+    ///
+    /// With a port whose GCM uses public CommonCrypto calls (`publicGcm`), it is simply part of
+    /// the crypto API: on unless `ios.crypto.gcm=false` trims it (never for a vault user, which
+    /// cannot work without it), the same default macOS has.
+    /// That is also what iOS applications have always received in practice -- the builder once
+    /// enabled CN1_INCLUDE_CRYPTO with a prefix-matching String.replace that uncommented the GCM
+    /// line with it -- so AES-GCM through `com.codename1.security` keeps working.
+    ///
+    /// An older port's GCM called CommonCrypto's private SPI, which App Store Connect rejects
+    /// ("The app references non-public symbols"). There it stays opt-in: the vault needs it,
+    /// `ios.crypto.gcm=true` asks for it, and an application nothing could fully scan gets it
+    /// unless the hint says no.
+    static boolean resolveCryptoGcm(boolean publicGcm, boolean usesCryptoAPI, boolean usesVault,
+            boolean vaultUnknown, String hint) {
+        if (!usesCryptoAPI) {
+            return false;
+        }
+        if (publicGcm) {
+            // The vault cannot work without GCM, so a detected vault user keeps it even over an
+            // explicit "false" -- as it always did on the private-SPI path below.
+            return usesVault || !"false".equals(hint);
+        }
+        return usesVault || "true".equals(hint) || (vaultUnknown && !"false".equals(hint));
+    }
+
+    /// Whether the base crypto implementation (CN1_INCLUDE_CRYPTO) is compiled in.
+    ///
+    /// The permission scan that sets `usesCryptoAPI` walks the application's classes only, while
+    /// the vault scan also reads submitted libraries, so a library using the vault can leave the
+    /// crypto flag false -- and the vault cannot work without it. So detected vault use turns it
+    /// on. A vault answer left UNKNOWN (part of the input could not be scanned) does too, unless
+    /// the developer said otherwise: with public GCM that is simply the safe answer, since
+    /// enabling it links nothing App Store Connect rejects, and `ios.crypto.gcm=false` is how an
+    /// application states it does not use the vault. With an older port's private-SPI GCM only
+    /// an explicit `ios.crypto.gcm=true` does, because there the build stops and asks instead.
+    static boolean cryptoApiRequired(boolean publicGcm, boolean usesCryptoAPI, boolean usesVault,
+            boolean vaultUnknown, String hint) {
+        if (usesCryptoAPI || usesVault) {
+            return true;
+        }
+        if (!vaultUnknown) {
+            return false;
+        }
+        return publicGcm ? !"false".equals(hint) : "true".equals(hint);
+    }
+
+    /// The reason the build must stop and ask about AES-GCM, or null when it need not.
+    ///
+    /// Only an older port's private-SPI GCM makes the answer matter. There, a scan refused
+    /// partway leaves vault use unknown, and guessing either way is silent: yes links private
+    /// symbols Apple rejects, no ships a vault that cannot do its crypto. So the developer is
+    /// asked through the hint. With public GCM, enabling it is harmless and nothing is asked.
+    static String cryptoGcmUndecidable(boolean publicGcm, boolean usesVault, boolean vaultUnknown,
+            String hint) {
+        if (publicGcm || !vaultUnknown || usesVault || "true".equals(hint) || "false".equals(hint)) {
+            return null;
+        }
+        return "Part of this application could not be scanned (see the scan budget warning "
+                + "above), so the build cannot tell whether it uses com.codename1.security.vault. "
+                + "Set codename1.arg.ios.crypto.gcm=true if it does -- the vault needs AES-GCM -- "
+                + "or false if it does not, which keeps the GCM symbols out of the binary.";
+    }
+
     /**
      * Whether an explicit {@code ios.includePush} turns push OFF.
      *
@@ -3467,58 +3534,27 @@ public class IPhoneBuilder extends Executor {
         // com.codename1.security.* get stub-only versions of the iOS
         // crypto bridge -- no CommonCrypto / Security framework symbols
         // referenced -- which keeps Apple's static-symbol scanner happy.
-        // AES-GCM stays OFF unless this application actually uses it, and the reason is in
-        // CN1Crypto.m: CommonCrypto exposes GCM only through <CommonCrypto/CommonCryptorSPI.h>,
-        // which is not in the public iOS SDK. Enabling it makes the binary reference
-        // CCCryptorGCMAddIV, CCCryptorGCMAddAAD and CCCryptorGCMFinal, and an application that
-        // never asked for GCM would then carry private-API symbols into Apple's static scanner.
-        //
-        // Defaulting it on to match macOS -- whose hint documentation claims iOS already did --
-        // was therefore wrong: macOS is not scanned the same way, and the claim described an
-        // intent the iOS side had deliberately not implemented.
-        //
-        // So it is detected instead. usesVault is attributed the same way the database answers
-        // are: the framework classes that merely NAME vault types in their signatures are
-        // excluded by name, because Display, CodenameOneImplementation, SecureStorage and
-        // DatabaseConfig all do -- DatabaseConfig holds a Vault field -- and a plain package
-        // check would answer yes for every application ever built. An application that uses the
-        // vault gets a working one without having to know a hint exists; one that does not keeps
-        // a binary with no GCM symbols in it.
-        //
-        // A scan that was refused partway answers neither yes nor no, and this is the one place
-        // that can resolve it. Guessing yes links the private CommonCrypto SPI into a binary
-        // Apple scans, for an application that may never touch the vault; guessing no ships a
-        // vault that cannot do its crypto. Both are silent, so neither is guessed: the developer
-        // is asked, through the hint that already exists, and the build stops until they answer.
-        // The default is deliberately not "false" here -- an unset hint has to be distinguishable
-        // from one deliberately turned off.
-        String gcmHint = request.getArg("ios.crypto.gcm", "");
-        // Only while the answer is actually open. An unreadable class or a refused archive
-        // can be scanned BEFORE a perfectly readable one that uses Vault, and then both
-        // flags are set -- at which point there is nothing ambiguous left to ask about and
-        // the expression below enables GCM anyway. Stopping the build there would fail a
-        // known vault application over unrelated input it happens to carry.
-        if (vaultUnknown && !usesVault
-                && !"true".equals(gcmHint) && !"false".equals(gcmHint)) {
-            throw new BuildException("Part of this application could not be scanned (see the "
-                    + "scan budget warning above), so the build cannot tell whether it uses "
-                    + "com.codename1.security.vault. Set codename1.arg.ios.crypto.gcm=true if it "
-                    + "does -- the vault needs AES-GCM -- or false if it does not, which keeps "
-                    + "the GCM symbols out of the binary.");
-        }
         // Vault use IS crypto use, and the two answers came from scans of different trees. The
         // database scan merges buildinRes, so a submitted LIBRARY that uses Vault is detected
         // there; the permission scan that sets usesCryptoAPI walks classesDir only, so it saw
-        // nothing and left the flag false. The conjunction below then disabled the base crypto
-        // implementation as well as GCM, and the library reached the iOS stubs with a vault that
+        // nothing and left the flag false, and the library reached the iOS stubs with a vault that
         // could neither encrypt nor unlock. The vault cannot function without the crypto API, so
         // detecting one is detecting the other.
-        if (usesVault) {
-            usesCryptoAPI = true;
+        String gcmHint = request.getArg("ios.crypto.gcm", "");
+        boolean publicGcm;
+        try {
+            File cn1CryptoHeader = new File(buildinRes, "CN1Crypto.h");
+            publicGcm = cn1CryptoHeader.exists()
+                    && readFileToString(cn1CryptoHeader).contains(CRYPTO_GCM_PUBLIC_MARKER);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to read CN1Crypto.h", ex);
         }
-        usesCryptoGcm = usesCryptoAPI
-                && (usesVault || "true".equals(gcmHint)
-                    || (vaultUnknown && !"false".equals(gcmHint)));
+        usesCryptoAPI = cryptoApiRequired(publicGcm, usesCryptoAPI, usesVault, vaultUnknown, gcmHint);
+        String gcmRefusal = cryptoGcmUndecidable(publicGcm, usesVault, vaultUnknown, gcmHint);
+        if (gcmRefusal != null) {
+            throw new BuildException(gcmRefusal);
+        }
+        usesCryptoGcm = resolveCryptoGcm(publicGcm, usesCryptoAPI, usesVault, vaultUnknown, gcmHint);
         try {
             File cn1Crypto = new File(buildinRes, "CN1Crypto.h");
             if (cn1Crypto.exists()) {
@@ -4351,12 +4387,12 @@ public class IPhoneBuilder extends Executor {
                 dis.close();
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(appDelH.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
+                    str = replaceMarker(str, "//#define CN1_INCLUDE_NOTIFICATIONS", "#define CN1_INCLUDE_NOTIFICATIONS");
                     if (request.getArg("ios.notificationPermissionAtLaunch", "false").equalsIgnoreCase("true")) {
                         // Restore pre-#4876 behavior: prompt for notification permission
                         // in didFinishLaunchingWithOptions instead of on first registerPush /
                         // sendLocalNotification call.
-                        str = str.replace("//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
+                        str = replaceMarker(str, "//#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH", "#define CN1_NOTIFICATION_PERMISSION_AT_LAUNCH");
                     }
                     fios.write(str);
                 }
@@ -4368,7 +4404,7 @@ public class IPhoneBuilder extends Executor {
                 dis.close();
                 try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
+                    str = replaceMarker(str, "//#define CN1_INCLUDE_NOTIFICATIONS2", "#define CN1_INCLUDE_NOTIFICATIONS2");
                     fios.write(str);
                 }
             } catch (IOException ex) {
@@ -4399,7 +4435,7 @@ public class IPhoneBuilder extends Executor {
 
                 try(Writer fios = new OutputStreamWriter(Files.newOutputStream(glAppDelegate.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("#define INCLUDE_CN1_PUSH", "");
+                    str = replaceMarker(str, "#define INCLUDE_CN1_PUSH", "");
                     fios.write(str);
                 }
 
@@ -4410,7 +4446,7 @@ public class IPhoneBuilder extends Executor {
                 }
                 try (Writer fios = new OutputStreamWriter(Files.newOutputStream(iosNative.toPath()), StandardCharsets.UTF_8)) {
                     String str = new String(data, StandardCharsets.UTF_8);
-                    str = str.replace("#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
+                    str = replaceMarker(str, "#define INCLUDE_CN1_PUSH2", "//#define INCLUDE_CN1_PUSH2");
                     fios.write(str);
                 }
             } catch (IOException ex) {

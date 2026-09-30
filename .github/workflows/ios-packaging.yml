@@ -11,6 +11,8 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-device-release-build.sh'
+      - 'scripts/check-ios-private-api.py'
+      - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/**'
@@ -27,6 +29,8 @@ on:
       - 'scripts/build-ios-app.sh'
       - 'scripts/lib/xcode.sh'
       - 'scripts/run-ios-device-release-build.sh'
+      - 'scripts/check-ios-private-api.py'
+      - 'scripts/check-ios-sdk-deltas.py'
       - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
       - 'scripts/ios/**'
@@ -202,6 +206,28 @@ jobs:
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
         timeout-minutes: 45
+
+      # The binary half of scripts-ios.yml's private-API gate. App Store Connect scans the
+      # linked executable, so this reads what it would read: every import of the Release
+      # device build and of every bundle nested in it, including what cn1libs, pods and
+      # Swift brought in. Any SDK symbol no public header declares fails the job -- the
+      # upload would have failed with "The app references non-public symbols" anyway.
+      - name: Check the Release app imports no private Apple API
+        env:
+          CN1_IOS_DEVICE_DERIVED_DATA: ${{ runner.temp }}/cn1-ios-device-release-derived
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          APP="$CN1_IOS_DEVICE_DERIVED_DATA/Build/Products/Release-iphoneos/${{ steps.build_ios_app.outputs.scheme }}.app"
+          if [ ! -d "$APP" ]; then
+            echo "No Release app at $APP; found:" >&2
+            ls "$CN1_IOS_DEVICE_DERIVED_DATA/Build/Products/Release-iphoneos" >&2 || true
+            exit 1
+          fi
+          scripts/check-ios-private-api.py --developer-dir "$DEVELOPER_DIR" --binary "$APP"
+        timeout-minutes: 10
 
       - name: Cache iOS derived data
         uses: actions/cache@v5

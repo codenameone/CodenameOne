@@ -197,9 +197,30 @@ public abstract class Executor {
         dis.close();
         try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
             String str = new String(data, StandardCharsets.UTF_8);
-            str = str.replace(marker, newValue);
+            str = replaceMarker(str, marker, newValue);
             fios.write(str);
         }
+    }
+
+    /// A marker that switches a preprocessor define on or off: `#define NAME` or `//#define NAME`.
+    private static final Pattern DEFINE_MARKER =
+            Pattern.compile("(?://\\s*)?#define\\s+[A-Za-z_][A-Za-z0-9_]*");
+
+    /// Replaces every occurrence of `marker` in `text`, treating a define toggle as a whole name.
+    ///
+    /// A plain `String.replace` matches a define by PREFIX, and the port puts related switches on
+    /// consecutive lines: enabling `//#define CN1_INCLUDE_CRYPTO` in CN1Crypto.h also uncommented
+    /// `//#define CN1_INCLUDE_CRYPTO_GCM`. That compiled CommonCrypto's private AES-GCM SPI into
+    /// every application that used any crypto API, ignoring the `ios.crypto.gcm` hint, and App
+    /// Store Connect rejected the upload for referencing non-public symbols. So when the marker is
+    /// a define toggle, an occurrence only counts when the name ends there. Any other marker is
+    /// replaced exactly as before.
+    static String replaceMarker(String text, String marker, String newValue) {
+        if (!DEFINE_MARKER.matcher(marker).matches()) {
+            return text.replace(marker, newValue);
+        }
+        return Pattern.compile(Pattern.quote(marker) + "(?![A-Za-z0-9_])")
+                .matcher(text).replaceAll(Matcher.quoteReplacement(newValue));
     }
 
     public String readFileToString(File sourceFile) throws IOException {
