@@ -65,13 +65,14 @@ final class ToolSupport {
         // about the source directories.
         Provider<List<String>> roots = project.provider(() -> sourceRoots(main));
         Provider<String> javaRoot = project.provider(() -> primaryJavaRoot(main, layout).getAbsolutePath());
-        register(project, layout, ext, userProperties, roots, javaRoot, "settings", DesktopTool.SETTINGS,
-                "Opens Codename One Settings for this project");
-        register(project, layout, ext, userProperties, roots, javaRoot, "guibuilder", DesktopTool.GUI_BUILDER,
-                "Opens the Codename One GUI Builder for this project");
-        register(project, layout, ext, userProperties, roots, javaRoot, "gameBuilder", DesktopTool.GAME_BUILDER,
-                "Opens the Codename One Game Builder for this project");
-        register(project, layout, ext, userProperties, roots, javaRoot, "certificateWizard",
+        Provider<String> encoding = AppSupport.javaEncoding(project, main);
+        register(project, layout, ext, userProperties, roots, javaRoot, encoding, "settings",
+                DesktopTool.SETTINGS, "Opens Codename One Settings for this project");
+        register(project, layout, ext, userProperties, roots, javaRoot, encoding, "guibuilder",
+                DesktopTool.GUI_BUILDER, "Opens the Codename One GUI Builder for this project");
+        register(project, layout, ext, userProperties, roots, javaRoot, encoding, "gameBuilder",
+                DesktopTool.GAME_BUILDER, "Opens the Codename One Game Builder for this project");
+        register(project, layout, ext, userProperties, roots, javaRoot, encoding, "certificateWizard",
                 DesktopTool.CERTIFICATE_WIZARD,
                 "Opens the iOS Certificate Wizard for this project");
     }
@@ -117,7 +118,8 @@ final class ToolSupport {
 
     private static void register(Project project, ProjectLayout layout, CodenameOneExtension ext,
                                  Provider<Map<String, String>> userProperties, Provider<List<String>> sourceRoots,
-                                 Provider<String> javaRoot, String name, DesktopTool tool, String description) {
+                                 Provider<String> javaRoot, Provider<String> encoding, String name, DesktopTool tool,
+                                 String description) {
         final Configuration classpath = AppSupport.resolvable(project, "cn1Tool"
                 + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
                 "The " + tool.displayName());
@@ -134,6 +136,7 @@ final class ToolSupport {
             t.getToolName().set(name);
             t.getSourceRoots().set(sourceRoots);
             t.getJavaSourceDir().set(javaRoot);
+            t.getSourceEncoding().set(encoding);
             t.getToolClasspath().from(classpath);
             t.getDetached().set(project.getProviders().gradleProperty("spawn").map(Boolean::parseBoolean)
                     .orElse(Boolean.TRUE));
@@ -160,6 +163,10 @@ final class ToolSupport {
         /// The main source set's source directories; see [ToolSupport#sourceRoots].
         @Input
         public abstract org.gradle.api.provider.ListProperty<String> getSourceRoots();
+
+        /// compileJava's source encoding, which the tools read sources in.
+        @Input
+        public abstract Property<String> getSourceEncoding();
 
         /// Where the GUI and Game Builders write Java; see [ToolSupport#primaryJavaRoot].
         @Input
@@ -206,7 +213,7 @@ final class ToolSupport {
                     binding.add("sourceRoot", root);
                 }
             }
-            binding.set("sourceEncoding", "UTF-8");
+            binding.set("sourceEncoding", getSourceEncoding().get());
             binding.set("mainName", effective.getProperty("codename1.mainName"));
             binding.set("packageName", effective.getProperty("codename1.packageName"));
             List<String> extra = new ArrayList<String>();

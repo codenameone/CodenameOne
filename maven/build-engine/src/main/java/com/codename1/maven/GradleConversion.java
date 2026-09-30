@@ -212,6 +212,10 @@ public final class GradleConversion {
             // below -- nested under src/ios/objectivec, the build would lose them.
             java.util.Set<File> extras = new java.util.HashSet<File>(java.util.Arrays.asList(
                     from.iosAppExtensionsDir().getAbsoluteFile(), from.iosStringsDir().getAbsoluteFile()));
+            // Ant's simulator loads the jars dropped into native/javase; as sources
+            // under src/javase/java they would be ignored. They become
+            // javaseImplementation files below instead.
+            extras.addAll(antJavaseArchives(from));
             for (NativePlatform p : NativePlatform.values()) {
                 File dir = from.nativeSourceDir(p);
                 if (hasFiles(dir)) {
@@ -362,7 +366,36 @@ public final class GradleConversion {
             lines.add("    implementation(files(\"libs/" + jar.getName() + "\"))");
             log.info("Carried over " + jar.getName() + " as libs/" + jar.getName());
         }
+        // The simulator-only archives: on the javase source set's classpath, which
+        // the simulator runs with and the JavaSE upload carries.
+        for (File archive : antJavaseArchives(from)) {
+            copyTree(archive, new File(targetDir, "libs" + File.separator + "javase" + File.separator
+                    + archive.getName()));
+            lines.add("    javaseImplementation(files(\"libs/javase/" + archive.getName() + "\"))");
+            log.info("Carried over native/javase/" + archive.getName() + " as libs/javase/" + archive.getName());
+        }
         return lines;
+    }
+
+    /// The prebuilt archives an Ant project keeps in `native/javase`, which its
+    /// simulator puts on the classpath: the directory's own `.jar` and `.zip`
+    /// files, as `CN1Bootstrap` lists them.
+    private static List<File> antJavaseArchives(ProjectLayout from) {
+        List<File> out = new ArrayList<File>();
+        if (from.buildSystem() != BuildSystem.ANT) {
+            return out;
+        }
+        File[] archives = from.nativeSourceDir(NativePlatform.JAVASE).listFiles(
+                (d, n) -> n.endsWith(".jar") || n.endsWith(".zip"));
+        if (archives != null) {
+            java.util.Arrays.sort(archives);
+            for (File f : archives) {
+                if (f.isFile()) {
+                    out.add(f.getAbsoluteFile());
+                }
+            }
+        }
+        return out;
     }
 
     /// Sorts one Ant source tree into `java/`, `kotlin/` and `resources/` under

@@ -111,18 +111,11 @@ class PluginHelpersTest {
     }
 
     @Test
-    void aCn1libExclusionStopsTheWalk() {
-        Cn1libs.Pending p = new Cn1libs.Pending("g", "a-lib", "1", Arrays.asList(
-                new String[] {"x", "b-lib"}, new String[] {"y", null}));
-        org.junit.jupiter.api.Assertions.assertTrue(p.excludes("x", "b-lib"));
-        org.junit.jupiter.api.Assertions.assertTrue(p.excludes("y", "anything"), "a group-only exclusion");
-        org.junit.jupiter.api.Assertions.assertFalse(p.excludes("x", "c-lib"));
-        Cn1libs.Pending same = new Cn1libs.Pending("g", "a-lib", "1", Arrays.asList(
-                new String[] {"y", null}, new String[] {"x", "b-lib"}));
-        assertEquals(p.exclusionKey(), same.exclusionKey(), "the order of the exclusions does not matter");
-        Cn1libs.Pending none = new Cn1libs.Pending("g", "a-lib", "1", java.util.Collections.<String[]>emptyList());
-        org.junit.jupiter.api.Assertions.assertNotEquals(p.exclusionKey(), none.exclusionKey(),
-                "a path without the exclusion is walked on its own");
+    void everyResolvedModuleButTheFrameworksIsReadForPlatformProfiles() {
+        org.junit.jupiter.api.Assertions.assertTrue(Cn1libs.mayBeCn1lib("com.acme", "maps-lib"));
+        org.junit.jupiter.api.Assertions.assertTrue(Cn1libs.mayBeCn1lib("com.codenameone", "googlemaps-lib"),
+                "a cn1lib published under com.codenameone");
+        org.junit.jupiter.api.Assertions.assertFalse(Cn1libs.mayBeCn1lib("com.codenameone", "codenameone-core"));
     }
 
     @Test

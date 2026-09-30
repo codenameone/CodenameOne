@@ -458,7 +458,10 @@ final class AppSupport {
     /// (as resources, exactly as Maven packages a platform module) otherwise.
     private static Object platformSources(ProjectLayout layout, String platform, SourceSet javase) {
         if ("javase".equals(platform)) {
-            return javase.getOutput();
+            // Its runtime classpath: the compiled simulator code and what
+            // javaseImplementation declares (a converted Ant project's native/javase
+            // jars among them).
+            return javase.getRuntimeClasspath();
         }
         NativePlatform p = NativePlatform.fromId(platform);
         if (p == null) {
@@ -482,9 +485,16 @@ final class AppSupport {
 
     /// The encoding the source set's javac reads sources in: its
     /// `options.encoding`, which [ProjectSupport] defaults to UTF-8.
+    ///
+    /// A plain provider, not one mapped from the task: that would carry a
+    /// dependency on compileJava, and opening Settings must not need the
+    /// sources to compile.
     static Provider<String> javaEncoding(Project project, SourceSet main) {
-        return project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class)
-                .map(t -> t.getOptions().getEncoding() == null ? "UTF-8" : t.getOptions().getEncoding());
+        final String name = main.getCompileJavaTaskName();
+        return project.provider(() -> {
+            String encoding = project.getTasks().named(name, JavaCompile.class).get().getOptions().getEncoding();
+            return encoding == null ? "UTF-8" : encoding;
+        });
     }
 
     /// `skipComplianceCheck` as given with -P or -D, or null.

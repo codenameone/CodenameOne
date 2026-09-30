@@ -25,15 +25,12 @@ package com.codename1.gradle;
 import com.codename1.maven.Cn1libPomProfiles;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ExternalModuleDependency;
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -88,52 +85,46 @@ final class Cn1libs {
             });
         }
         project.afterEvaluate(p -> {
-            // Maven activates codename1.platform in EVERY pom of the graph, so a
-            // cn1lib used by another cn1lib contributes its platform jars too. Walk
-            // the same graph: each library's -common module, and the pom-type
-            // dependencies through which one cn1lib names another.
-            //
-            // Exclusions travel with the walk, as they do through Gradle's own
-            // graph: cn1lib("a-lib") { exclude(module = "b-lib") } leaves B off the
-            // classpath, so B's platform jars must not be packaged either. The
-            // configurations' own excludes apply to every declaration.
-            java.util.List<String[]> shared = new ArrayList<String[]>();
-            for (String name : new String[] {DECLARED, "implementation"}) {
-                for (org.gradle.api.artifacts.ExcludeRule r : p.getConfigurations().getByName(name).getExcludeRules()) {
-                    shared.add(new String[] {r.getGroup(), r.getModule()});
-                }
+            // Maven activates codename1.platform in EVERY pom of the graph, so every
+            // cn1lib the application ends up with contributes its platform jars --
+            // including one a cn1lib uses. Gradle ignores those profiles, so each
+            // module of the RESOLVED graph has its pom read for them. The resolved
+            // graph, not a walk of the poms: it already applies every exclusion
+            // (on a declaration, a configuration or a pom's own dependency), the
+            // versions dependency management supplies, and conflict resolution, so
+            // a library is packaged exactly when its classes are on the classpath.
+            Configuration source = p.getConfigurations().findByName("runtimeClasspath");
+            if (source == null) {
+                return;
             }
-            java.util.Deque<Pending> queue = new java.util.ArrayDeque<Pending>();
-            for (Dependency d : p.getConfigurations().getByName(DECLARED).getAllDependencies()) {
-                if (!(d instanceof ExternalModuleDependency)) {
+            // A copy: resolving the real configuration here would freeze it for
+            // anything the build still wants to add.
+            Configuration graph = source.copyRecursive();
+            final String framework = p.getExtensions().getByType(CodenameOneExtension.class).getVersion().get();
+            graph.getResolutionStrategy().eachDependency(d -> {
+                String requested = d.getRequested().getVersion();
+                if (PluginInfo.GROUP.equals(d.getRequested().getGroup())
+                        && (requested == null || requested.isEmpty())) {
+                    d.useVersion(framework);
+                }
+            });
+            Set<org.gradle.api.artifacts.result.ResolvedComponentResult> components;
+            try {
+                components = graph.getIncoming().getResolutionResult().getAllComponents();
+            } catch (RuntimeException ex) {
+                p.getLogger().info("cn1: could not resolve the cn1lib graph: " + ex.getMessage());
+                return;
+            }
+            Set<String> added = new java.util.HashSet<String>();
+            for (org.gradle.api.artifacts.result.ResolvedComponentResult component : components) {
+                if (!(component.getId() instanceof ModuleComponentIdentifier)) {
                     continue;
                 }
-                String version = d.getVersion();
-                if ((version == null || version.isEmpty()) && PluginInfo.GROUP.equals(d.getGroup())) {
-                    // Settings writes com.codenameone cn1libs without a version; the
-                    // resolution strategy (ProjectSupport) gives them the framework's,
-                    // and so must this walk, or their platform jars are never found.
-                    version = p.getExtensions().getByType(CodenameOneExtension.class).getVersion().get();
-                }
-                if (version != null && !version.isEmpty()) {
-                    java.util.List<String[]> excludes = new ArrayList<String[]>(shared);
-                    for (org.gradle.api.artifacts.ExcludeRule r : ((ExternalModuleDependency) d).getExcludeRules()) {
-                        excludes.add(new String[] {r.getGroup(), r.getModule()});
-                    }
-                    queue.add(new Pending(d.getGroup(), d.getName(), version, excludes));
-                }
-            }
-            java.util.Set<String> visited = new java.util.HashSet<String>();
-            java.util.Set<String> added = new java.util.HashSet<String>();
-            while (!queue.isEmpty()) {
-                Pending m = queue.removeFirst();
-                // Keyed with the exclusions too: in a diamond, a path that excludes
-                // C must not stand in for another path to the same module that
-                // keeps C, which Gradle's own graph keeps.
-                if (!visited.add(m.group + ":" + m.name + ":" + m.version + "|" + m.exclusionKey())) {
+                ModuleComponentIdentifier id = (ModuleComponentIdentifier) component.getId();
+                if (!mayBeCn1lib(id.getGroup(), id.getModule())) {
                     continue;
                 }
-                String pom = pomText(p, m.group, m.name, m.version);
+                String pom = pomText(p, id.getGroup(), id.getModule(), id.getVersion());
                 if (pom == null) {
                     continue;
                 }
@@ -145,58 +136,20 @@ final class Cn1libs {
                         continue;
                     }
                     for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
-                        if (m.excludes(c.groupId, c.artifactId)) {
-                            continue;
-                        }
                         if (added.add(e.getKey() + "|" + c.toNotation())) {
                             target.getDependencies().add(p.getDependencies().create(c.toNotation()));
                         }
-                    }
-                }
-                for (Cn1libPomProfiles.Coordinate c : Cn1libPomProfiles.dependencies(pom, parents)) {
-                    if (c.version != null && c.groupId != null && c.classifier == null
-                            && ("pom".equals(c.type) || c.artifactId.endsWith("-common")
-                                    || c.artifactId.endsWith("-lib"))
-                            && !m.excludes(c.groupId, c.artifactId)) {
-                        queue.add(new Pending(c.groupId, c.artifactId, c.version, m.exclusions));
                     }
                 }
             }
         });
     }
 
-    /// A module still to walk, with the exclusions of the declaration it came from.
-    static final class Pending {
-        final String group;
-        final String name;
-        final String version;
-        final java.util.List<String[]> exclusions;
-
-        Pending(String group, String name, String version, java.util.List<String[]> exclusions) {
-            this.group = group;
-            this.name = name;
-            this.version = version;
-            this.exclusions = exclusions;
-        }
-
-        /// The exclusions in a canonical order, to tell two paths apart by.
-        String exclusionKey() {
-            java.util.TreeSet<String> keys = new java.util.TreeSet<String>();
-            for (String[] x : exclusions) {
-                keys.add(x[0] + ":" + x[1]);
-            }
-            return keys.toString();
-        }
-
-        /// Whether an exclusion ({group, module}, either null for "any") matches.
-        boolean excludes(String g, String a) {
-            for (String[] x : exclusions) {
-                if ((x[0] == null || x[0].equals(g)) && (x[1] == null || x[1].equals(a))) {
-                    return true;
-                }
-            }
-            return false;
-        }
+    /// Whether a module's pom is worth reading for platform profiles: anything
+    /// but the framework's own modules, whose poms have none and which every
+    /// application depends on.
+    static boolean mayBeCn1lib(String group, String module) {
+        return !(PluginInfo.GROUP.equals(group) && module.startsWith("codenameone-"));
     }
 
     /// A module's pom, fetched from the project's repositories, or null.

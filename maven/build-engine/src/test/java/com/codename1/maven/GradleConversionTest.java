@@ -318,6 +318,20 @@ class GradleConversionTest {
     }
 
     @Test
+    void anAntProjectsSimulatorJarsBecomeJavaseDependencies() throws Exception {
+        File ant = antApp();
+        touch(ant, "native/javase/vendor-sim.jar", "jar");
+        touch(ant, "native/javase/a/MyNativeImpl.java", "package a; public class MyNativeImpl {}");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(ant, out, "1.0");
+        assertTrue(new File(out, "libs/javase/vendor-sim.jar").isFile());
+        assertFalse(new File(out, "src/javase/java/vendor-sim.jar").exists(), "not a source file");
+        assertTrue(new File(out, "src/javase/java/a/MyNativeImpl.java").isFile());
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("javaseImplementation(files(\"libs/javase/vendor-sim.jar\"))"), build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
