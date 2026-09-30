@@ -260,7 +260,7 @@ final class LabelEngine {
                     || (c >= 0x1E00 && c <= 0x1FFF)
                     || (c >= 0x2010 && c <= 0x2027)
                     || (c >= 0x2030 && c <= 0x205E)
-                    || (c >= 0x3000 && c <= 0x9FFF)
+                    || (c >= 0x3000 && c <= 0x9FFF && !isCjkCombiningMark(c))
                     || (c >= 0xAC00 && c <= 0xD7A3)
                     || (c >= 0xFF01 && c <= 0xFFEF);
             if (!safe) {
@@ -268,6 +268,14 @@ final class LabelEngine {
             }
         }
         return true;
+    }
+
+    // The combining marks inside the CJK block: the ideographic tone marks and
+    // the kana voicing marks (dakuten/handakuten), which a decomposed name
+    // such as "ha" + U+3099 attaches to its base. Drawn on their own they
+    // would float as separate rotated glyphs.
+    private static boolean isCjkCombiningMark(char c) {
+        return (c >= 0x302A && c <= 0x302F) || c == 0x3099 || c == 0x309A;
     }
 
     private void drawRotated(Graphics g, String text, Font font, int h, int textColor, int haloColor,

@@ -191,7 +191,9 @@ class RoadLabelTest extends UITestBase {
             "\u0634\u0627\u0631\u0639 \u0627\u0644\u0645\u0644\u0643",  // Arabic: letters join
             "\u05e8\u05d7\u05d5\u05d1 \u05d4\u05e8\u05e6\u05dc",        // Hebrew: right to left
             "Cafe\u0301 Street Upper",                                 // combining acute accent
-            "Street \ud835\udc00 North"                                // a surrogate pair
+            "Street \ud835\udc00 North",                               // a surrogate pair
+            "\u306f\u3099\u3057\u901a\u308a",                            // kana + combining dakuten
+            "\u6f22\u302a\u5b57\u901a\u308a"                             // ideographic tone mark
         };
         for (String name : shaped) {
             assertFalse(LabelEngine.drawsCharByChar(name), name);
