@@ -13,160 +13,60 @@ on:
       - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
       - '.github/workflows/ai-cn1lib-native-check.yml'
+      - 'scripts/ci/select-cn1lib-checks.py'
+      - 'scripts/ci/check-ios-cn1lib.py'
   push:
     branches: [master]
     paths:
       - 'maven/cn1-ai-whisper/**'
       - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
+      - '.github/workflows/ai-cn1lib-native-check.yml'
+      - 'scripts/ci/select-cn1lib-checks.py'
+      - 'scripts/ci/check-ios-cn1lib.py'
 
 concurrency:
-  # These jobs run on macOS, where the runner pool is small and a queued run
-  # holds its slots until it finishes. Without this, a branch that is pushed
-  # several times queues every superseded run behind the current one -- five
-  # obsolete runs of this workflow, 4 macOS jobs each, sat queued on this
-  # branch before it was added.
-  #
-  # Keyed on the pull request number rather than head_ref, which is the source
-  # branch name with no fork identity in it: two pull requests opened from
-  # different forks that both use a common branch name -- master, patch-1 --
-  # would share a group and cancel each other's check. On push to master there
-  # is no pull request, so the group falls back to the unique run_id and every
-  # master commit is still checked in full.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  xcodebuild-cn1libs:
-    name: xcodebuild ${{ matrix.lib }} (ARC ${{ matrix.arc }})
-    # macos-14 ships Xcode 15.4 by default but also has Xcode 16.x
-    # under /Applications/Xcode_16.X.app. xcodegen 2.45.4 emits
-    # objectVersion=77 (Xcode 16-format) projects, so we explicitly
-    # select Xcode 16 via xcode-select in a setup step below.
-    runs-on: macos-14
-    strategy:
-      fail-fast: false
-      matrix:
-        # Each library is compiled under both memory models. The generated app
-        # target is manual-retain-release (CLANG_ENABLE_OBJC_ARC = NO in
-        # vm/ByteCodeTranslator/src/template/template.xcodeproj) and that is
-        # what compiles a cn1lib's sources today, while IPhoneBuilder can add
-        # -fobjc-arc to an individual file, so ARC is reachable too. An
-        # ARC-only check accepts code that does not build for customers.
-        include:
-          - { lib: cn1-ai-whisper,            pod: '', arc: NO  }   # links static libwhisper.a
-          - { lib: cn1-ai-whisper,            pod: '', arc: YES }
-          - { lib: cn1-ai-stablediffusion,    pod: '', arc: NO  }   # links Swift runner
-          - { lib: cn1-ai-stablediffusion,    pod: '', arc: YES }
+  select:
+    runs-on: ubuntu-24.04
+    outputs:
+      libraries: ${{ steps.plan.outputs.ios_ai }}
+      link: ${{ steps.plan.outputs.admob_link }}
     steps:
       - uses: actions/checkout@v6
+      - name: Select impacted libraries before allocating a Mac
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: python3 scripts/ci/select-cn1lib-checks.py
 
-      - name: Select Xcode 16 (xcodegen emits Xcode-16-format projects)
-        # The default xcode-select on macos-14 is Xcode 15.4; that can't
-        # read xcodegen's objectVersion=77 projects ("future project file
-        # format"). Pick the highest-version Xcode 16.* available on this
-        # runner image.
+  native-checks:
+    # One runner, one checkout/tool installation, and one pod resolution per
+    # library. Keep both ARC modes and both AdMob link destinations.
+    needs: select
+    if: ${{ needs.select.outputs.libraries != '' }}
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select Xcode 16
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE_PATH" ]; then
-              echo "::error::No Xcode 16.* found in /Applications"; ls /Applications/Xcode_*.app; exit 1
-          fi
+          test -n "$XCODE_PATH"
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
-
-      - name: Install xcodegen
-        # xcodegen produces a full-featured pbxproj from a YAML spec. We need
-        # a real Xcode project (not a hand-rolled minimal pbxproj) so the
-        # CocoaPods integration step can inject baseConfigurationReference
-        # entries and the xcframework -> framework extraction script phase.
-        run: brew install xcodegen
-
-      - name: Synthesise Xcode project via xcodegen
-        run: |
-          set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
-          mkdir -p "$PROBE/CN1AIProbe"
-          # Objective-C and Objective-C++ alike. check-cn1lib-native-coverage.py
-          # counts a .mm file as an iOS native source, so staging only .m would
-          # let a broken Objective-C++ bridge be reported as covered while
-          # nothing ever compiled it.
-          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AIProbe/" 2>/dev/null || true
-          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/" 2>/dev/null || true
-          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.mm "$PROBE/CN1AIProbe/" 2>/dev/null || true
-          # An empty probe would build green and check nothing. find is used
-          # rather than ls because ls reports failure when either glob is
-          # unmatched, which is the normal case for a library with no .mm.
-          staged=$(find "$PROBE/CN1AIProbe" -maxdepth 1 \( -name '*.m' -o -name '*.mm' \) | wc -l)
-          if [ "$staged" -eq 0 ]; then
-              echo "::error::No Objective-C sources staged for ${{ matrix.lib }}"; exit 1
-          fi
-          ls -la "$PROBE/CN1AIProbe/"
-
-          cat > "$PROBE/project.yml" <<'YAML'
-          name: CN1AIProbe
-          options:
-            bundleIdPrefix: com.codenameone.cn1ai
-            deploymentTarget:
-              iOS: "14.0"
-          targets:
-            CN1AIProbe:
-              # Static library: archives .o files without linking, so cn1libs
-              # that reference externs supplied by the real build server
-              # (libwhisper.a for whisper, cn1_sd_generate for stable
-              # diffusion, the actual ML Kit framework binaries) still
-              # compile-check successfully.
-              type: library.static
-              platform: iOS
-              sources:
-                - path: CN1AIProbe
-              settings:
-                base:
-                  CLANG_ENABLE_MODULES: YES
-                  CLANG_ENABLE_OBJC_ARC: ${{ matrix.arc }}
-                  CODE_SIGNING_ALLOWED: NO
-          YAML
-          cd "$PROBE"
-          xcodegen generate --spec project.yml
-
-      - name: pod install (with integration)
-        if: ${{ matrix.pod != '' }}
-        # With a proper xcodegen-generated pbxproj, CocoaPods can integrate
-        # normally -- it injects the baseConfigurationReference, sets up the
-        # framework-extraction script phase, and produces a workspace that
-        # xcodebuild can build directly.
-        run: |
-          set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
-          cd "$PROBE"
-          cat > Podfile <<EOF
-          platform :ios, '14.0'
-          target 'CN1AIProbe' do
-            use_frameworks!
-            pod '${{ matrix.pod }}'
-          end
-          EOF
-          pod install --repo-update
-
-      - name: xcodebuild
-        run: |
-          set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
-          cd "$PROBE"
-          if [ -d "CN1AIProbe.xcworkspace" ]; then
-              xcodebuild -workspace CN1AIProbe.xcworkspace \
-                         -scheme CN1AIProbe \
-                         -configuration Debug \
-                         -sdk iphonesimulator \
-                         -destination 'generic/platform=iOS Simulator' \
-                         CODE_SIGNING_ALLOWED=NO \
-                         build
-          else
-              xcodebuild -project CN1AIProbe.xcodeproj \
-                         -scheme CN1AIProbe \
-                         -configuration Debug \
-                         -sdk iphonesimulator \
-                         -destination 'generic/platform=iOS Simulator' \
-                         CODE_SIGNING_ALLOWED=NO \
-                         build
-          fi
+      - name: Install xcodegen once
+        if: needs.select.outputs.libraries != ''
+        run: command -v xcodegen || brew install xcodegen
+      - name: Compile cn1-ai-whisper (MRR and ARC)
+        if: ${{ !cancelled() && contains(needs.select.outputs.libraries, 'cn1-ai-whisper') }}
+        run: python3 scripts/ci/check-ios-cn1lib.py cn1-ai-whisper
+      - name: Compile cn1-ai-stablediffusion (MRR and ARC)
+        if: ${{ !cancelled() && contains(needs.select.outputs.libraries, 'cn1-ai-stablediffusion') }}
+        run: python3 scripts/ci/check-ios-cn1lib.py cn1-ai-stablediffusion

@@ -51,6 +51,12 @@ name: Car (Android Auto) integration
       - 'vm/backend/demo/cn1ss/**'
       - 'scripts/lib/cn1ss.sh'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   car-android:
     name: Car Android Auto
@@ -135,7 +141,7 @@ jobs:
           disk-size: 2048M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload car screenshot + report
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: car-android-artifacts

@@ -20,7 +20,7 @@ nothing read. A mingw-w64 cross compiler supplies the Win32 headers for that;
 the port itself is built with clang-cl, so this gate is about the API existing
 and the syntax parsing, not about matching that ABI.
 
-  scripts/check-cn1lib-native-sources.py [--require-all]
+  scripts/check-cn1lib-native-sources.py [--require-all] [lib ...]
 
 Not covered here, deliberately: cn1-ai-whisper's android-aar JNI sources. They
 need the NDK and a whisper.cpp checkout, and unlike everything above they are
@@ -103,6 +103,11 @@ def prepare_headers(work):
 
 def main(argv):
     require_all = '--require-all' in argv
+    wanted = set(arg for arg in argv if arg != '--require-all')
+    unknown = wanted - set(libraries())
+    if unknown:
+        print('Unknown cn1libs: ' + ', '.join(sorted(unknown)), file=sys.stderr)
+        return 1
     findings = []
     skipped = []
 
@@ -114,6 +119,8 @@ def main(argv):
 
     checked = 0
     for lib in libraries():
+        if wanted and lib not in wanted:
+            continue
         for platform, path in c_sources(lib):
             rel = os.path.relpath(path, REPO)
             compiler = win_cc if platform == 'win' else cc

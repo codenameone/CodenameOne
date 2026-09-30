@@ -27,9 +27,6 @@ jobs:
     timeout-minutes: 60
     outputs:
       cn1_built_mac_cache_key: ${{ steps.cn1_built_mac_key.outputs.key }}
-    concurrency:
-      group: mac-port-${{ github.workflow }}-${{ github.ref_name }}
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
 
