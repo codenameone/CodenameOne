@@ -205,6 +205,8 @@ public final class GradleConversion {
                 // Everything under common/src moves as it stands: java, kotlin,
                 // resources, css, l10n, guibuilder, rad, test.
                 copyTree(new File(from.projectDir(), "src"), new File(to.projectDir(), "src"));
+                // Plus any root the module's pom compiles from elsewhere.
+                moveMavenExtraRoots(from, to);
             }
             // An Ant project keeps the iOS app extensions and strings inside
             // native/ios; they have places of their own in the Gradle layout (which
@@ -246,7 +248,8 @@ public final class GradleConversion {
                 File script = new File(target, "build.gradle.kts");
                 Files.write(script.toPath(), GradleProjectTemplate.text("backend/build.gradle.kts.txt")
                         .getBytes(StandardCharsets.UTF_8));
-                List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"), target);
+                List<String> backendDeps = dependencyLines(new File(backend, "pom.xml"), target,
+                        hasSuffix(new File(target, "src"), ".kt"));
                 writeRepositories(script, repositoryUrls(new File(backend, "pom.xml")));
                 if (!backendDeps.isEmpty()) {
                     warnUnresolved(backendDeps, "backend/pom.xml");
@@ -263,7 +266,8 @@ public final class GradleConversion {
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,
                     GradleProjectTemplate.Shape.APP);
             if (from.buildSystem() == BuildSystem.MAVEN) {
-                List<String> deps = dependencyLines(from.dependencyFile(), targetDir);
+                List<String> deps = dependencyLines(from.dependencyFile(), targetDir,
+                        hasSuffix(new File(targetDir, "src"), ".kt"));
                 writeRepositories(new File(targetDir, "build.gradle.kts"), repositoryUrls(from.dependencyFile()));
                 if (!deps.isEmpty()) {
                     warnUnresolved(deps, "common/pom.xml");
@@ -398,6 +402,125 @@ public final class GradleConversion {
         return out;
     }
 
+    /// The source roots a Maven module compiles by convention, relative to it.
+    private static final java.util.Set<String> CONVENTIONAL_ROOTS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("src/main/java", "src/main/kotlin", "src/main/resources",
+                    "src/test/java", "src/test/kotlin", "src/test/resources"));
+
+    /// The source and resource roots `pom` adds beyond Maven's conventional
+    /// ones: `<sourceDirectory>`, `<testSourceDirectory>`, `<resources>`,
+    /// `<testResources>` and build-helper's add-source, add-test-source and
+    /// add-resource. Keyed "main" or "test"; each root is absolute.
+    static java.util.Map<String, List<File>> extraRoots(File pom) {
+        java.util.Map<String, List<File>> out = new java.util.LinkedHashMap<String, List<File>>();
+        out.put("main", new ArrayList<File>());
+        out.put("test", new ArrayList<File>());
+        Element project = parsePomOrNull(pom);
+        Element build = project == null ? null : child(project, "build");
+        if (build == null) {
+            return out;
+        }
+        File base = pom.getParentFile();
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        props.put("basedir", base.getAbsolutePath());
+        props.put("project.basedir", base.getAbsolutePath());
+        addRoot(out.get("main"), base, interpolate(text(build, "sourceDirectory"), props));
+        addRoot(out.get("test"), base, interpolate(text(build, "testSourceDirectory"), props));
+        for (String[] kind : new String[][] {{"resources", "resource", "main"},
+                {"testResources", "testResource", "test"}}) {
+            Element list = child(build, kind[0]);
+            for (Element r : list == null ? java.util.Collections.<Element>emptyList() : children(list, kind[1])) {
+                addRoot(out.get(kind[2]), base, interpolate(text(r, "directory"), props));
+            }
+        }
+        Element plugins = child(build, "plugins");
+        for (Element plugin : plugins == null ? java.util.Collections.<Element>emptyList()
+                : children(plugins, "plugin")) {
+            if (!"build-helper-maven-plugin".equals(text(plugin, "artifactId"))) {
+                continue;
+            }
+            Element executions = child(plugin, "executions");
+            for (Element ex : executions == null ? java.util.Collections.<Element>emptyList()
+                    : children(executions, "execution")) {
+                Element goals = child(ex, "goals");
+                Element config = child(ex, "configuration");
+                if (goals == null || config == null) {
+                    continue;
+                }
+                for (Element goal : children(goals, "goal")) {
+                    String g = goal.getTextContent().trim();
+                    String target = g.contains("test") ? "test" : "main";
+                    if ("add-source".equals(g) || "add-test-source".equals(g)) {
+                        Element sources = child(config, "sources");
+                        for (Element src : sources == null ? java.util.Collections.<Element>emptyList()
+                                : children(sources, "source")) {
+                            addRoot(out.get(target), base, interpolate(src.getTextContent().trim(), props));
+                        }
+                    } else if ("add-resource".equals(g) || "add-test-resource".equals(g)) {
+                        Element resources = child(config, "resources");
+                        for (Element r : resources == null ? java.util.Collections.<Element>emptyList()
+                                : children(resources, "resource")) {
+                            addRoot(out.get(target), base, interpolate(text(r, "directory"), props));
+                        }
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void addRoot(List<File> out, File base, String path) {
+        if (path == null || path.length() == 0 || path.contains("${")) {
+            return;
+        }
+        File f = new File(path);
+        File abs = (f.isAbsolute() ? f : new File(base, path)).getAbsoluteFile();
+        String rel = base.getAbsoluteFile().toURI().relativize(abs.toURI()).getPath();
+        if (rel.endsWith("/")) {
+            rel = rel.substring(0, rel.length() - 1);
+        }
+        if (!CONVENTIONAL_ROOTS.contains(rel) && !out.contains(abs)) {
+            out.add(abs);
+        }
+    }
+
+    private static List<Element> children(Element parent, String name) {
+        List<Element> out = new ArrayList<Element>();
+        for (Node n = parent.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element && name.equals(((Element) n).getTagName())) {
+                out.add((Element) n);
+            }
+        }
+        return out;
+    }
+
+    /// Folds the roots [#extraRoots(File)] finds into the Gradle layout's
+    /// conventional ones, where the converted build compiles them. Without
+    /// this a module compiling from, say, `src/java` or a build-helper tree
+    /// lost those classes. A root inside `src/` was already copied as it
+    /// stands, where Gradle would not compile it, so that copy is removed.
+    private void moveMavenExtraRoots(ProjectLayout from, ProjectLayout to) throws IOException {
+        java.util.Map<String, List<File>> roots = extraRoots(from.dependencyFile());
+        File src = new File(from.projectDir(), "src").getAbsoluteFile();
+        for (java.util.Map.Entry<String, List<File>> e : roots.entrySet()) {
+            File out = new File(to.projectDir(), "src" + File.separator + e.getKey());
+            for (File root : e.getValue()) {
+                if (!root.isDirectory()) {
+                    continue;
+                }
+                splitSources(root, root, out);
+                log.info("Moved " + root + ", which the pom compiles from, into src/" + e.getKey());
+                if (root.getAbsolutePath().startsWith(src.getAbsolutePath() + File.separator)) {
+                    File copied = new File(new File(to.projectDir(), "src"),
+                            root.getAbsolutePath().substring(src.getAbsolutePath().length() + 1));
+                    if (copied.exists()) {
+                        org.apache.commons.io.FileUtils.deleteDirectory(copied);
+                    }
+                }
+            }
+        }
+    }
+
     /// Sorts one Ant source tree into `java/`, `kotlin/` and `resources/` under
     /// `out`, the way the Maven migration sorts it into `common/src/main`.
     private void splitSources(File root, File dir, File out) throws IOException {
@@ -486,7 +609,7 @@ public final class GradleConversion {
     /// type `pom` is a cn1lib; a test-scoped one is `testImplementation`. A version that is still a `${...}` expression is
     /// written as it stands, with a comment, rather than guessed.
     static List<String> dependencyLines(File pom) {
-        return dependencyLines(pom, null);
+        return dependencyLines(pom, null, true);
     }
 
     /// The Kotlin artifacts the Kotlin Gradle plugin supplies itself. Others in
@@ -507,7 +630,11 @@ public final class GradleConversion {
     /// this project. One switched on by a property, JDK or OS is not decided
     /// here, so its dependencies are written commented out under a note naming
     /// the profile rather than dropped without a word.
-    static List<String> dependencyLines(File pom, File targetDir) {
+    ///
+    /// `kotlinPlugin` says whether the converted script applies the Kotlin
+    /// plugin, which then supplies the standard library itself; a Java project
+    /// that calls the Kotlin runtime keeps its explicit dependency.
+    static List<String> dependencyLines(File pom, File targetDir, boolean kotlinPlugin) {
         List<String> out = new ArrayList<String>();
         if (pom == null || !pom.isFile()) {
             return out;
@@ -520,6 +647,10 @@ public final class GradleConversion {
             java.util.Map<String, String> profileOf = new java.util.HashMap<String, String>();
             collectDependencies(pom, 0, declared, properties, conditional, profileOf);
             for (Element d : declared.values()) {
+                if (kotlinPlugin && "org.jetbrains.kotlin".equals(interpolate(text(d, "groupId"), properties))
+                        && KOTLIN_SUPPLIED.contains(interpolate(text(d, "artifactId"), properties))) {
+                    continue;
+                }
                 String line = dependencyLine(d, properties, managed, pom.getParentFile(), targetDir);
                 if (line != null) {
                     out.add(line);
@@ -711,8 +842,7 @@ public final class GradleConversion {
         String scope = text(d, "scope");
         String type = text(d, "type");
         String classifier = interpolate(text(d, "classifier"), properties);
-        if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)
-                || "org.jetbrains.kotlin".equals(g) && KOTLIN_SUPPLIED.contains(a)) {
+        if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)) {
             return null;
         }
         if ("pom".equals(type) && "test".equals(scope)) {

@@ -332,6 +332,46 @@ class GradleConversionTest {
     }
 
     @Test
+    void aJavaProjectCallingTheKotlinRuntimeKeepsTheStdlib() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-stdlib</artifactId>"
+                + "<version>2.0</version></dependency></dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"org.jetbrains.kotlin:kotlin-stdlib:2.0\")"),
+                "no Kotlin plugin supplies it here: " + build);
+    }
+
+    @Test
+    void sourceRootsThePomAddsAreCompiledAfterConversion() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><build><sourceDirectory>src/java</sourceDirectory>"
+                + "<resources><resource><directory>${project.basedir}/assets</directory></resource></resources>"
+                + "<plugins><plugin><groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals><configuration><sources>"
+                + "<source>generated-by-hand</source></sources></configuration></execution>"
+                + "<execution><goals><goal>add-test-source</goal></goals><configuration><sources>"
+                + "<source>it/java</source></sources></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>");
+        touch(mvn, "common/src/java/a/Moved.java", "package a; public class Moved {}");
+        touch(mvn, "common/assets/logo.txt", "logo");
+        touch(mvn, "common/generated-by-hand/a/Helper.java", "package a; public class Helper {}");
+        touch(mvn, "common/it/java/a/ItTest.java", "package a; public class ItTest {}");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "src/main/java/a/Moved.java").isFile());
+        assertFalse(new File(out, "src/java").exists(), "the uncompiled copy under src/ is gone");
+        assertTrue(new File(out, "src/main/resources/logo.txt").isFile());
+        assertTrue(new File(out, "src/main/java/a/Helper.java").isFile());
+        assertTrue(new File(out, "src/test/java/a/ItTest.java").isFile());
+        assertTrue(new File(out, "src/main/java/a/MvnApp.java").isFile(), "the conventional root still comes");
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
@@ -487,6 +527,8 @@ class GradleConversionTest {
                 + "<dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-reflect</artifactId>"
                 + "<version>2.0</version></dependency>"
                 + "</dependencies></project>");
+        // Kotlin sources: the Kotlin plugin is applied and supplies the stdlib.
+        touch(mvn, "common/src/main/kotlin/a/K.kt", "package a\nclass K");
         File out = new File(tmp.toFile(), "out");
         converter().convert(mvn, out, "1.0");
         String build = read(new File(out, "build.gradle.kts"));

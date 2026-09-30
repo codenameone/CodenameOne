@@ -119,6 +119,16 @@ class PluginHelpersTest {
     }
 
     @Test
+    void aTimestampedSnapshotKeepsItsClassifier() {
+        assertEquals("cn1css", GradleProjectHost.classifierOf("maps-1.0-SNAPSHOT-cn1css", "maps", "1.0-SNAPSHOT"));
+        assertEquals("cn1css", GradleProjectHost.classifierOf("maps-1.0-20260101.120000-3-cn1css", "maps",
+                "1.0-SNAPSHOT"), "a unique snapshot is named for its timestamp");
+        assertEquals("", GradleProjectHost.classifierOf("maps-1.0-20260101.120000-3", "maps", "1.0-SNAPSHOT"));
+        assertEquals("", GradleProjectHost.classifierOf("maps-1.0", "maps", "1.0"));
+        assertEquals("sources", GradleProjectHost.classifierOf("maps-1.0-sources", "maps", "1.0"));
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

@@ -120,8 +120,13 @@ public final class ProjectLayouts {
             if (!hasSettingsScript(dir) && parent != null && hasSettingsScript(parent)
                     && isGradleRoot(parent, false)) {
                 // A subproject that applies the plugin in its own build script;
-                // the root is the directory with the settings script.
-                return gradleLayout(parent, origin);
+                // the root is the directory with the settings script, and the
+                // project -- its settings, sources and build output -- is this one.
+                ProjectLayout atRoot = gradleLayout(parent, origin);
+                if (atRoot.kind() == ProjectKind.BACKEND) {
+                    return atRoot;
+                }
+                return new ProjectLayout(BuildSystem.GRADLE, gradleKind(dir), parent, dir, null);
             }
             return gradleLayout(dir, origin);
         }

@@ -193,6 +193,22 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void anIncludedAppSubprojectIsItsOwnProjectDirectory() throws IOException {
+        File root = new File(tmp, "multiapp");
+        touch(root, "settings.gradle.kts", "include(\"app\")\n");
+        touch(root, "build.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" apply false }\n");
+        touch(root, "app/build.gradle.kts", "plugins { id(\"com.codenameone\") }\n");
+        touch(root, "app/codenameone_settings.properties");
+        dir(root, "app/src/main/java");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "app/src/main/java"));
+        assertEquals(root.getCanonicalFile(), l.rootDir());
+        assertEquals(new File(root, "app").getCanonicalFile(), l.projectDir());
+        assertEquals(ProjectKind.APP, l.kind());
+        assertEquals(new File(root, "app/codenameone_settings.properties").getCanonicalFile(), l.settingsFile());
+        assertEquals(":app:cn1Compile", l.gradleTaskPath("cn1Compile"));
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

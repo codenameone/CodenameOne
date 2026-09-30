@@ -310,6 +310,17 @@ final class AppSupport {
                     project.provider(() -> hotReloadRoots(main, layout)),
                     project.provider(() -> main.getJava().getClassesDirectory().get().getAsFile().getAbsolutePath()),
                     project.provider(() -> kotlinClasses(project, layout))));
+            // The test recorder saves into the test source set's own directory, and
+            // the direct recompile targets the release compileJava does -- a build
+            // may raise it past 17.
+            final SourceSet test = project.getExtensions().getByType(org.gradle.api.plugins.JavaPluginExtension.class)
+                    .getSourceSets().getByName(SourceSet.TEST_SOURCE_SET_NAME);
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.TEST_ROOT_PROPERTY,
+                    project.provider(() -> ToolSupport.primaryRoot(test.getJava().getSrcDirs(),
+                            layout.testSourceDir(), layout).getAbsolutePath())));
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.RELEASE_PROPERTY,
+                    project.provider(() -> String.valueOf(project.getTasks().named(main.getCompileJavaTaskName(),
+                            JavaCompile.class).get().getOptions().getRelease().getOrElse(17)))));
         });
     }
 
@@ -514,6 +525,10 @@ final class AppSupport {
                     common(t, project, layout, ext, userProperties);
                     t.setDescription("Generates sources from GUI builder XML and CodeRAD view templates");
                     t.getSources().from(layout.guiBuilderDir(), layout.radViewsDir());
+                    // The legacy GUI builder writes its Java into a source directory;
+                    // the one the source set compiles, which sourceSets can move.
+                    t.getJavaSourceDir().set(project.provider(
+                            () -> ToolSupport.primaryJavaRoot(main, layout).getAbsolutePath()));
                     // The simulator's hot reload regenerates views into the same place.
                     t.getRadOutputDirectory().set(new File(layout.buildDir(), "generated-sources/rad-views"));
                 });

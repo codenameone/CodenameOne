@@ -50,6 +50,11 @@ public abstract class GenerateGuiSourcesTask extends Cn1Task {
     @PathSensitive(PathSensitivity.RELATIVE)
     public abstract ConfigurableFileCollection getSources();
 
+    /// The main source set's Java directory, where the legacy GUI builder writes
+    /// its forms.
+    @org.gradle.api.tasks.Input
+    public abstract org.gradle.api.provider.Property<String> getJavaSourceDir();
+
     /// Where the generated view classes go; a source root of the main source set.
     @OutputDirectory
     public abstract DirectoryProperty getRadOutputDirectory();
@@ -79,7 +84,7 @@ public abstract class GenerateGuiSourcesTask extends Cn1Task {
                 File client = CodenameOneUpdater.buildClientJar();
                 new CodenameOneUpdater(log(), AntSupport.newProject(layout.projectDir())).update(false,
                         new File(layout.buildDir(), "codenameone"), layout.projectDir(), client);
-                generator.generateLegacyGui(client, layout.javaSourceDir(), layout.guiBuilderDir());
+                generator.generateLegacyGui(client, new File(getJavaSourceDir().get()), layout.guiBuilderDir());
             }
             generator.generateRadViews();
         } catch (BuildExecutionException ex) {

@@ -51,6 +51,10 @@ public final class SimulatorSupport {
     public static final String JAVA_CLASSES_PROPERTY = "cn1.hotReload.javaClasses";
     /// Where the Kotlin compiler writes the main classes. See [JAVA_CLASSES_PROPERTY].
     public static final String KOTLIN_CLASSES_PROPERTY = "cn1.hotReload.kotlinClasses";
+    /// The test source set's Java directory, where the test recorder saves.
+    public static final String TEST_ROOT_PROPERTY = "cn1.hotReload.testRoot";
+    /// The Java release compileJava targets, which the direct recompile matches.
+    public static final String RELEASE_PROPERTY = "cn1.hotReload.release";
     /// The live CSS reload inputs, outputs and merge file.
     public static final String CSS_INPUT_PROPERTY = "codename1.css.compiler.args.input";
     /// See [CSS_INPUT_PROPERTY].

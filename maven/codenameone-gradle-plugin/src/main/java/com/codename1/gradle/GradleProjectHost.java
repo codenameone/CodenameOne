@@ -109,10 +109,34 @@ final class GradleProjectHost implements ProjectHost {
         int dot = name.lastIndexOf('.');
         String type = dot < 0 ? "jar" : name.substring(dot + 1);
         String base = dot < 0 ? name : name.substring(0, dot);
-        String prefix = m.getModule() + "-" + m.getVersion();
-        String classifier = base.startsWith(prefix + "-") ? base.substring(prefix.length() + 1) : "";
+        String classifier = classifierOf(base, m.getModule(), m.getVersion());
         return m.getGroup() + "|" + m.getModule() + "|" + m.getVersion() + "|" + classifier + "|" + type + "|"
                 + scope + "|" + file.getAbsolutePath();
+    }
+
+    private static final java.util.regex.Pattern SNAPSHOT_STAMP =
+            java.util.regex.Pattern.compile("\\d{8}\\.\\d{6}-\\d+(?:-(.+))?");
+
+    /// The classifier in an artifact's file name (without its extension), or
+    /// "" for none. A snapshot resolved from a repository with unique snapshots
+    /// is named for its timestamp -- `maps-1.0-20260101.120000-3-cn1css` for
+    /// `1.0-SNAPSHOT` -- which the version alone does not match; missing that
+    /// dropped a snapshot cn1lib's CSS from the theme.
+    static String classifierOf(String base, String module, String version) {
+        String prefix = module + "-" + version;
+        if (base.startsWith(prefix + "-")) {
+            return base.substring(prefix.length() + 1);
+        }
+        if (version.endsWith("-SNAPSHOT")) {
+            String stem = module + "-" + version.substring(0, version.length() - "SNAPSHOT".length());
+            if (base.startsWith(stem)) {
+                java.util.regex.Matcher stamp = SNAPSHOT_STAMP.matcher(base.substring(stem.length()));
+                if (stamp.matches()) {
+                    return stamp.group(1) == null ? "" : stamp.group(1);
+                }
+            }
+        }
+        return "";
     }
 
     static BuildArtifact decode(String encoded) {

@@ -86,8 +86,14 @@ final class ToolSupport {
     /// directory (not one generated under the build directory), so the output is
     /// compiled.
     static File primaryJavaRoot(SourceSet main, ProjectLayout layout) {
-        java.util.Set<File> dirs = main.getJava().getSrcDirs();
-        File conventional = layout.javaSourceDir().getAbsoluteFile();
+        return primaryRoot(main.getJava().getSrcDirs(), layout.javaSourceDir(), layout);
+    }
+
+    /// Of a source set's Java directories: `conventional` while it is one of
+    /// them, else the first not generated under the build directory, else
+    /// `conventional`.
+    static File primaryRoot(java.util.Set<File> dirs, File conventionalDir, ProjectLayout layout) {
+        File conventional = conventionalDir.getAbsoluteFile();
         for (File dir : dirs) {
             if (dir.getAbsoluteFile().equals(conventional)) {
                 return conventional;
