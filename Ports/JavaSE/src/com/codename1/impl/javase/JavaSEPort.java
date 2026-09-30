@@ -3187,6 +3187,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
         mode = mode == null ? null : mode.trim();
+        if ((mode == null || mode.isEmpty()) && "custom".equalsIgnoreCase(sharedNativeThemeHint())) {
+            // nativeTheme=custom asks for no platform theme anywhere, and the desktop is part
+            // of anywhere -- the same reasoning that lets nativeTheme=native reach it.
+            mode = "custom";
+        }
         // A null theme basename can mean either custom or legacy. Keep that distinction
         // at both installation paths so the simulator does not reintroduce a framework base.
         // Custom means no framework base; legacy still uses the stub's historical resource.
@@ -3396,6 +3401,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if ("legacy".equalsIgnoreCase(iosMode) || "iphone".equalsIgnoreCase(iosMode)) {
                     return "iPhoneTheme";
                 }
+                if ("custom".equalsIgnoreCase(iosMode)) {
+                    // The device installs none; the modern default below would not match it.
+                    return null;
+                }
             }
             String shared = sharedNativeThemeHint();
             if ("legacy".equalsIgnoreCase(shared)) {
@@ -3421,6 +3430,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 if ("legacy".equalsIgnoreCase(andMode)) {
                     return "androidTheme";
+                }
+                if ("custom".equalsIgnoreCase(andMode)) {
+                    // The device installs none; Material 3 below would not match it.
+                    return null;
                 }
             }
             String shared = sharedNativeThemeHint();

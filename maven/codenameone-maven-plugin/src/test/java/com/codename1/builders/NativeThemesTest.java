@@ -35,6 +35,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /// The builders ship only the native theme the runtime will install.
@@ -180,6 +181,53 @@ public class NativeThemesTest {
         cls.getParentFile().mkdirs();
         Files.write(cls.toPath(), bytesWith("and.themeMode nativeTheme"));
         assertFalse(NativeThemes.namesAny(classes, NativeThemes.ANDROID_MODE_PROPERTIES));
+    }
+
+    @Test
+    public void customShipsNoAppleTheme() throws IOException {
+        assertNull(NativeThemes.themeFor("custom", "26", false));
+        assertNull(NativeThemes.themeFor(" CUSTOM ", null, true));
+        File dir = portDir();
+        List<String> removed = NativeThemes.removeUnusedApple(dir, "custom", "26", false,
+                tmp.newFolder("customClasses"));
+        assertEquals(Arrays.asList(NativeThemes.ALL), removed);
+        assertTrue("not a native theme", new File(dir, "CN1Resource.res").isFile());
+    }
+
+    @Test
+    public void customShipsNoAndroidTheme() throws IOException {
+        assertTrue(NativeThemes.androidThemesFor("custom", null, null, null, null).isEmpty());
+        assertTrue(NativeThemes.androidThemesFor(null, "Custom", null, null, null).isEmpty());
+        assertTrue(NativeThemes.androidThemesFor(null, null, "custom", null, null).isEmpty());
+        assertTrue(NativeThemes.androidThemesFor(null, null, null, "custom", null).isEmpty());
+        // The platform hint outranks the shared one, in both directions.
+        assertEquals(set("AndroidMaterialTheme", "android_holo_light"),
+                NativeThemes.androidThemesFor("modern", null, "custom", null, null));
+        File dir = tmp.newFolder();
+        for (String name : NativeThemes.ANDROID_ALL) {
+            Files.write(new File(dir, name + ".res").toPath(), new byte[] {1});
+        }
+        List<String> removed = NativeThemes.removeUnusedAndroid(dir,
+                NativeThemes.androidThemesFor(null, null, "custom", null, null),
+                tmp.newFolder("customAndroidClasses"));
+        assertEquals(Arrays.asList(NativeThemes.ANDROID_ALL), removed);
+    }
+
+    @Test
+    public void desktopPortsDropTheirThemeOnlyForCustom() throws IOException {
+        assertTrue(NativeThemes.desktopShipsNoTheme("custom", null, null));
+        assertTrue(NativeThemes.desktopShipsNoTheme(null, "custom", null));
+        assertTrue(NativeThemes.desktopShipsNoTheme("", null, "custom"));
+        // desktop.themeMode decides when it is set.
+        assertFalse(NativeThemes.desktopShipsNoTheme("auto", "custom", null));
+        assertFalse(NativeThemes.desktopShipsNoTheme(null, "modern", null));
+        assertFalse(NativeThemes.desktopShipsNoTheme(null, null, null));
+        File dir = tmp.newFolder();
+        File theme = new File(dir, "linuxNativeTheme.res");
+        Files.write(theme.toPath(), new byte[] {1});
+        assertTrue(NativeThemes.removeDesktopTheme(dir, "linuxNativeTheme.res"));
+        assertFalse(theme.exists());
+        assertFalse(NativeThemes.removeDesktopTheme(dir, "linuxNativeTheme.res"));
     }
 
     private static java.util.Set<String> set(String... names) {

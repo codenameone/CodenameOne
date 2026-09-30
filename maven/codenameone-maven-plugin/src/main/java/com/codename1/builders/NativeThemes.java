@@ -44,6 +44,11 @@ import java.util.Set;
 /// `MacImplementation.nativeThemeResourceName()`. A theme the application's own
 /// classes name -- `Resources.open("/iOS7Theme.res")` -- is kept as well, since
 /// that is a use no build hint can see.
+///
+/// The `custom` mode ships none of them. It says the application's own theme is
+/// the only one it uses -- the theme pairs it with `includeNativeBool: false` --
+/// and every port's runtime answers it by installing nothing, so a platform theme
+/// in the bundle would be dead weight.
 final class NativeThemes {
 
     /// Every native theme a port jar carries, without the `.res`.
@@ -54,13 +59,17 @@ final class NativeThemes {
     private NativeThemes() {
     }
 
-    /// The native theme the runtime will install for `mode`, without the `.res`.
+    /// The native theme the runtime will install for `mode`, without the `.res`,
+    /// or null for `custom`, which installs none.
     ///
     /// @param mode the theme mode written into the stub; null means the runtime default, "auto"
     /// @param generation the iOS modern generation, "26" or "27"; null means 26
     /// @param mac true for the native macOS port, whose Aqua theme answers auto/aqua/native
     static String themeFor(String mode, String generation, boolean mac) {
         String m = mode == null ? "auto" : asciiLower(mode.trim());
+        if (isCustom(m)) {
+            return null;
+        }
         if (mac && ("auto".equals(m) || "aqua".equals(m) || "native".equals(m))) {
             return "MacOSAquaTheme";
         }
@@ -89,6 +98,7 @@ final class NativeThemes {
     /// The Android themes a build needs: the one installNativeTheme() resolves the
     /// hints to, and always android_holo_light, which hasNativeTheme() probes for on
     /// every device from API 14 up and without which no native theme is installed.
+    /// None at all for `custom`, which installs no native theme and does not probe.
     static Set<String> androidThemesFor(String andThemeMode, String cn1AndroidTheme,
             String nativeTheme, String cn1NativeTheme, String hololight) {
         String mode = andThemeMode != null ? andThemeMode : cn1AndroidTheme;
@@ -96,6 +106,8 @@ final class NativeThemes {
             String shared = nativeTheme != null ? nativeTheme : cn1NativeTheme;
             if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
                 mode = "material";
+            } else if (isCustom(shared)) {
+                mode = "custom";
             } else if ("legacy".equalsIgnoreCase(shared)) {
                 mode = "hololight";
             } else if ("true".equalsIgnoreCase(hololight)) {
@@ -104,9 +116,12 @@ final class NativeThemes {
                 mode = "hololight";
             }
         } else {
-            mode = asciiLower(mode);
+            mode = asciiLower(mode.trim());
         }
         Set<String> keep = new LinkedHashSet<String>();
+        if (isCustom(mode)) {
+            return keep;
+        }
         if ("material".equals(mode) || "modern".equals(mode) || "auto".equals(mode)) {
             keep.add("AndroidMaterialTheme");
         } else if (!"hololight".equals(mode) && !"holo".equals(mode)) {
@@ -142,11 +157,52 @@ final class NativeThemes {
     static List<String> removeUnusedApple(File dir, String mode, String generation, boolean mac,
             File appClasses) throws IOException {
         Set<String> keep = new LinkedHashSet<String>();
-        keep.add(themeFor(mode, generation, mac));
+        String theme = themeFor(mode, generation, mac);
+        if (theme != null) {
+            keep.add(theme);
+        }
         if (namesAny(appClasses, new String[] {NATIVE_THEME_RESOURCE_PROPERTY})) {
             keep.add(themeFor("modern", generation, false));
         }
         return removeUnused(dir, keep, ALL, appClasses);
+    }
+
+    /// True for the `custom` theme mode: the application ships the only theme it
+    /// uses, so no platform theme is packaged and none is installed.
+    static boolean isCustom(String mode) {
+        return mode != null && "custom".equalsIgnoreCase(mode.trim());
+    }
+
+    /// The single native theme a native desktop port (Linux, Windows) bundles in its
+    /// port jar, and installs from `init()` whenever the file is present.
+    ///
+    /// Those ports have one theme and no mode to choose between, so the only question
+    /// is whether to ship it: not when `desktop.themeMode` is `custom`, or when it is
+    /// unset and the cross-platform `nativeTheme` (`cn1.nativeTheme`) is. The same
+    /// resolution the JavaSE desktop port runs.
+    ///
+    /// @return true when the port's theme file should be removed before translation
+    static boolean desktopShipsNoTheme(String desktopThemeMode, String nativeTheme,
+            String cn1NativeTheme) {
+        if (desktopThemeMode != null && desktopThemeMode.trim().length() > 0) {
+            return isCustom(desktopThemeMode);
+        }
+        return isCustom(nativeTheme != null ? nativeTheme : cn1NativeTheme);
+    }
+
+    /// Removes `fileName` from `dir` when present, for a desktop port whose theme
+    /// the build does not ship. See [#desktopShipsNoTheme(String, String, String)].
+    ///
+    /// @return true when the file was there and is now gone
+    static boolean removeDesktopTheme(File dir, String fileName) throws IOException {
+        File f = new File(dir, fileName);
+        if (!f.isFile()) {
+            return false;
+        }
+        if (!f.delete()) {
+            throw new IOException("Could not remove the unused theme " + f);
+        }
+        return true;
     }
 
     /// Deletes from `dir` every native theme other than `keep` and the ones the

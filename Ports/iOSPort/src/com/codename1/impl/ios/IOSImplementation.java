@@ -2943,8 +2943,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    /// False for the `custom` theme mode, which says the application ships the only
+    /// theme it uses: the builder packages no native theme for it, so there is none to
+    /// install. The macOS port inherits this.
     public boolean hasNativeTheme() {
-        return true;
+        return !"custom".equals(nativeThemeMode());
     }
 
     private static String iosMode = "auto";
@@ -3009,9 +3012,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void installNativeTheme() {
+        String mode = nativeThemeMode();
+        if ("custom".equals(mode)) {
+            // The application ships its own theme and the builder shipped no native one,
+            // so there is nothing to open. This used to fall through to the pre-flat
+            // iPhoneTheme.res at the bottom of the chain, so a custom application
+            // shipped and installed the legacy iPhone theme under its own.
+            return;
+        }
         try {
             Resources r;
-            String mode = nativeThemeMode();
             // A subclass may own a theme this class knows nothing about. The macOS port
             // extends this one and ships Aqua, which is not in the list below; without the
             // hook it inherited the iOS chain and installed an iPhone theme on a Mac.

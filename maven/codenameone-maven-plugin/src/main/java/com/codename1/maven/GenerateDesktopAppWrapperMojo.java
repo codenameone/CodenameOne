@@ -246,8 +246,9 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
 
     /// What `desktop.themeMode` resolves to when the project does not set it.
     ///
-    /// The cross-platform `nativeTheme` hint selects the mobile themes, and only its
-    /// `native` value also asks for the desktop one -- `modern` deliberately does not,
+    /// The cross-platform `nativeTheme` hint selects the mobile themes. Its `native`
+    /// value also asks for the desktop one and its `custom` value for no theme on the
+    /// desktop either -- `modern` deliberately does not reach it,
     /// because it shipped years before the desktop themes existed and an application
     /// that set it for its phone builds never asked for its desktop screens to move.
     /// Every other value, and no value at all, leaves the desktop on what it has always
@@ -258,6 +259,10 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
     /// hint back out of.
     private String sharedThemeModeDefault() {
         String shared = arg("nativeTheme", arg("cn1.nativeTheme", null));
+        if ("custom".equalsIgnoreCase(shared)) {
+            // No platform theme anywhere, which is as much a desktop request as a phone one.
+            return "custom";
+        }
         return "native".equalsIgnoreCase(shared) ? "native" : "legacy";
     }
 

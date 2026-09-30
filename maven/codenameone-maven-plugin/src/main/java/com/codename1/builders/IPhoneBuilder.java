@@ -2345,6 +2345,10 @@ public class IPhoneBuilder extends Executor {
                 // to the FLAT iOS 7 theme -- the exact opposite of what was asked for,
                 // and silently, because an unrecognised mode is not an error here.
                 iosMode = "modern";
+            } else if (NativeThemes.isCustom(sharedMode)) {
+                // The application's own theme is the only one: the stub tells the
+                // runtime to install none, and no native theme is packaged.
+                iosMode = "custom";
             } else {
                 iosMode = "auto";
             }

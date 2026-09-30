@@ -280,6 +280,22 @@ GENERATED_MAIN="$COMMON/src/main/java/com/example/bench/Bench.java"
   echo "the archetype did not generate a main class at $GENERATED_MAIN" >&2
   exit 2; }
 cp "$HERE/cn1/Bench.java" "$GENERATED_MAIN"
+
+# The Flutter widgets draw every pixel themselves, so the application needs no
+# platform theme under them. includeNativeBool:false stops the theme asking for
+# one at run time; build_apps.sh passes nativeTheme=custom, which keeps the
+# platform theme files out of the bundle. Both are ordinary settings any
+# application whose own theme is complete can use -- nothing Flutter-specific.
+THEME_CSS="$COMMON/src/main/css/theme.css"
+python3 - "$THEME_CSS" <<'PY'
+import io, re, sys
+path = sys.argv[1]
+text = io.open(path, encoding="utf-8").read()
+text, n = re.subn(r"includeNativeBool\s*:\s*true", "includeNativeBool: false", text)
+if n != 1:
+    raise SystemExit("expected one includeNativeBool: true in %s, found %d" % (path, n))
+io.open(path, "w", encoding="utf-8").write(text)
+PY
 # The Java side of compute mode, from the same vm/benchmarks source.
 mkdir -p "$COMMON/src/main/java/com/bench"
 cp "$REPO/vm/benchmarks/common/src/main/java/com/bench/CommonWorkloads.java" \

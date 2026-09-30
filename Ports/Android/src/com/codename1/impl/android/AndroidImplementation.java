@@ -5930,6 +5930,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean nativeThemeAvailable;
 
     public boolean hasNativeTheme() {
+        if ("custom".equals(nativeThemeMode())) {
+            // The application ships the only theme it uses, and the builder packaged
+            // no native one for it. Asked every time rather than cached: the mode is a
+            // Display property the application may set before its theme loads.
+            return false;
+        }
         if (!testedNativeTheme) {
             testedNativeTheme = true;
             try {
@@ -5950,50 +5956,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return nativeThemeAvailable;
     }
 
+    /// The theme flavor the build hints ask for. and.themeMode is the per-platform
+    /// hint (auto | modern | material | hololight | legacy | custom); the legacy
+    /// name cn1.androidTheme is still honored for back-compat. The cross-platform
+    /// shortcut nativeTheme=modern/legacy/custom (deprecated alias: cn1.nativeTheme)
+    /// feeds in when no platform-specific hint is set. Default stays on
+    /// android_holo_light - what master shipped and what existing screenshot goldens
+    /// are anchored against. The ancient pre-Holo androidTheme.res is only reached
+    /// via explicit and.hololight=true (historical back-compat) or
+    /// and.themeMode=legacy.
+    ///
+    /// Mirrored by the builders' NativeThemes.androidThemesFor, which decides which
+    /// of the themes are packaged at all.
+    private static String nativeThemeMode() {
+        Display d = Display.getInstance();
+        String mode = d.getProperty("and.themeMode",
+                d.getProperty("cn1.androidTheme", null));
+        if (mode != null) {
+            return asciiLower(mode.trim());
+        }
+        String shared = d.getProperty("nativeTheme",
+                d.getProperty("cn1.nativeTheme", null));
+        // "native" is "modern plus the desktop": the desktop half belongs to
+        // the JavaSE port, and Android's own answer to "the platform's own
+        // look" is Material either way. Without it the value fell through to
+        // the hololight default below, so asking for the native look got the
+        // legacy one.
+        if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
+            return "material";
+        }
+        if ("custom".equalsIgnoreCase(shared)) {
+            return "custom";
+        }
+        if ("legacy".equalsIgnoreCase(shared)) {
+            return "hololight";
+        }
+        if ("true".equalsIgnoreCase(d.getProperty("and.hololight", "false"))) {
+            return "legacy";
+        }
+        return "hololight";
+    }
+
     /**
      * Installs the native theme, this is only applicable if hasNativeTheme()
      * returned true. Notice that this method might replace the
      * DefaultLookAndFeel instance and the default transitions.
      */
     public void installNativeTheme() {
-        hasNativeTheme();
-        if (!nativeThemeAvailable) {
+        if (!hasNativeTheme()) {
             return;
         }
         try {
-            // Resolve desired theme flavor. and.themeMode is the per-platform
-            // hint (auto | modern | material | hololight | legacy); the legacy
-            // name cn1.androidTheme is still honored for back-compat. The
-            // cross-platform shortcut nativeTheme=modern/legacy (deprecated
-            // alias: cn1.nativeTheme) feeds in when no platform-specific hint
-            // is set. Default stays on android_holo_light - what master
-            // shipped and what existing screenshot goldens are anchored
-            // against. The ancient pre-Holo androidTheme.res is only reached
-            // via explicit and.hololight=true (historical back-compat) or
-            // and.themeMode=legacy.
-            Display d = Display.getInstance();
-            String mode = d.getProperty("and.themeMode",
-                    d.getProperty("cn1.androidTheme", null));
-            if (mode == null) {
-                String shared = d.getProperty("nativeTheme",
-                        d.getProperty("cn1.nativeTheme", null));
-                // "native" is "modern plus the desktop": the desktop half belongs to
-                // the JavaSE port, and Android's own answer to "the platform's own
-                // look" is Material either way. Without it the value fell through to
-                // the hololight default below, so asking for the native look got the
-                // legacy one.
-                if ("modern".equalsIgnoreCase(shared) || "native".equalsIgnoreCase(shared)) {
-                    mode = "material";
-                } else if ("legacy".equalsIgnoreCase(shared)) {
-                    mode = "hololight";
-                } else if ("true".equalsIgnoreCase(d.getProperty("and.hololight", "false"))) {
-                    mode = "legacy";
-                } else {
-                    mode = "hololight";
-                }
-            } else {
-                mode = mode.toLowerCase();
-            }
+            String mode = nativeThemeMode();
 
             String resPath;
             if ("material".equals(mode) || "modern".equals(mode) || "auto".equals(mode)) {

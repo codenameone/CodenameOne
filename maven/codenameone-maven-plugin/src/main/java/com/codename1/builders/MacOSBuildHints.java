@@ -773,6 +773,9 @@ public class MacOSBuildHints {
         // the Aqua theme could not be selected at all -- by a hint or by default.
         "aqua", "native",
         "modern", "liquid", "material", "ios7", "flat", "auto",
+        // custom installs no native theme. Rejected here it became "modern", so an
+        // application that asked for none got the iOS modern theme under its own.
+        "custom",
     };
 
     /**

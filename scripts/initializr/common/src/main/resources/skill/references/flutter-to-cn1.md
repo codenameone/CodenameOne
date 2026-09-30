@@ -53,6 +53,23 @@ Useful properties:
 | `cn1.flutter.outputDir` | `target/generated-sources/flutter` |
 | `cn1.flutter.package` | `com.codename1.generated.flutter` |
 
+4. Optional, for a `runApp` application: drop the platform theme. Its widgets
+   draw everything themselves, so a native theme underneath is dead weight
+   (a few hundred KB on iOS and Android). This is the generic setting for
+   any app whose own theme is complete, not something specific to Flutter:
+   * set `includeNativeBool: false` in the `#Constants` block of
+     `common/src/main/css/theme.css`, so the theme stops asking for a native
+     base at run time;
+   * set the build hint `codename1.arg.nativeTheme=custom` (or
+     `@Build(nativeTheme = ThemeMode.CUSTOM)`), so no build packages a platform
+     theme and no port installs one.
+     A per-platform hint outranks it, and generated projects set
+     `codename1.arg.ios.themeMode=modern` and `codename1.arg.and.themeMode=modern`
+     in `codenameone_settings.properties`: change those to `custom` or delete them.
+
+   Leave both alone if you `wrap` widgets inside screens that rely on the
+   native theme.
+
 ## The port loop that actually converges
 
 Do not read the whole Dart codebase and plan. Let the build tell you what it

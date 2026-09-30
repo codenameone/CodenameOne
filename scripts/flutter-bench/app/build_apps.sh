@@ -90,12 +90,18 @@ FLUTTER_ENTRY="lib/main_bench.dart"
 # layout; see cn1_reported.
 CN1_LOG="$WORK/cn1-build.log"
 
+# nativeTheme=custom: the application's own theme is the only one (see the
+# includeNativeBool edit in prepare.sh), so no build packages a platform theme.
+# The per-platform hints are passed too because they outrank nativeTheme, and
+# the archetype's settings file sets ios.themeMode and and.themeMode to modern.
 cn1_build() {   # cn1_build <platform> <buildTarget> [extra maven args...]
   local plat="$1" target="$2"; shift 2
   # retry.sh for Central's transient 403/429 only; a build failure is not retried.
   ( cd "$CN1" && RETRY_ONLY_MATCHING=transient $XVFB bash "$HERE/../../ci/retry.sh" \
       mvn -B $MVN_REPO_ARG package -DskipTests \
       -DskipComplianceCheck=true \
+      -Dcodename1.arg.nativeTheme=custom \
+      -Dcodename1.arg.ios.themeMode=custom -Dcodename1.arg.and.themeMode=custom \
       -Dcodename1.platform="$plat" -Dcodename1.buildTarget="$target" "$@" ) 2>&1 | tee "$CN1_LOG"
 }
 
