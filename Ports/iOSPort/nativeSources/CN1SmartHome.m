@@ -3522,6 +3522,20 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
         JAVA_OBJECT numericValues, JAVA_OBJECT stringValues,
         JAVA_OBJECT unitWireIds) {
     cn1homeInit();
+#if TARGET_OS_TV
+    // tvOS HomeKit can run scenes but cannot create or remove them: addActionSetWithName:,
+    // removeActionSet:, addAction: and HMCharacteristicWriteAction are unavailable there. Answer
+    // NOT_SUPPORTED through the normal callback, on the main queue like every other answer.
+    JAVA_INT tvRid = requestId;
+    NSString *tvHome = [toNSString(CN1_THREAD_STATE_PASS_ARG structureId) retain];
+    cn1homeOnMain(^{
+        com_codename1_impl_ios_IOSHomeCallbacks_sceneResult___int_java_lang_String_java_lang_String_java_lang_String(
+            getThreadLocalData(), tvRid, JAVA_NULL,
+            fromNSString(getThreadLocalData(), tvHome),
+            fromNSString(getThreadLocalData(), cn1homeError(@"NOT_SUPPORTED", nil)));
+        [tvHome release];
+    });
+#else
     JAVA_INT rid = requestId;
     NSString *homeId = [toNSString(CN1_THREAD_STATE_PASS_ARG structureId)
                         retain];
@@ -3781,6 +3795,7 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
             }
         }];
     });
+#endif
 }
 
 void
@@ -3788,6 +3803,20 @@ com_codename1_impl_ios_IOSNative_homeDeleteScene___int_java_lang_String_java_lan
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId,
         JAVA_OBJECT structureId, JAVA_OBJECT sceneId) {
     cn1homeInit();
+#if TARGET_OS_TV
+    // tvOS HomeKit can run scenes but cannot create or remove them: addActionSetWithName:,
+    // removeActionSet:, addAction: and HMCharacteristicWriteAction are unavailable there. Answer
+    // NOT_SUPPORTED through the normal callback, on the main queue like every other answer.
+    JAVA_INT tvRid = requestId;
+    NSString *tvHome = [toNSString(CN1_THREAD_STATE_PASS_ARG structureId) retain];
+    cn1homeOnMain(^{
+        com_codename1_impl_ios_IOSHomeCallbacks_sceneResult___int_java_lang_String_java_lang_String_java_lang_String(
+            getThreadLocalData(), tvRid, JAVA_NULL,
+            fromNSString(getThreadLocalData(), tvHome),
+            fromNSString(getThreadLocalData(), cn1homeError(@"NOT_SUPPORTED", nil)));
+        [tvHome release];
+    });
+#else
     JAVA_INT rid = requestId;
     NSString *homeId = [toNSString(CN1_THREAD_STATE_PASS_ARG structureId)
                         retain];
@@ -3826,6 +3855,7 @@ com_codename1_impl_ios_IOSNative_homeDeleteScene___int_java_lang_String_java_lan
             [scene release];
         }];
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_homeIdentify___int_java_lang_String(

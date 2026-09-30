@@ -1138,6 +1138,27 @@ final class BuildHintsAndroid {
                 .type(HintType.STRING)
                 .platform("android"));
 
+        // Two builders read this hint and they differ on purpose. The Maven plugin's local
+        // AndroidGradleBuilder honours an explicit 9.x exactly (downloaded into its own managed
+        // home). The build cloud's AndroidGradleBuilder lives in the separate BuildDaemon
+        // repository, whose hosts carry exactly one provisioned Gradle 9; its gradle9Requested()
+        // maps every accepted 9.x onto that one. Nothing in this repository shows the second
+        // half, which is why the doc spells out both.
+        h.add(new Hint("android.gradleVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .platform("android")
+                .doc("Opts the build into Gradle 9. `9` builds with Gradle 9.8.0 and Android Gradle plugin "
+                        + "9.4.1 instead of the default Gradle 8 toolchain. An explicit 9.x release of 9.6.0 "
+                        + "or newer (the oldest Gradle that plugin runs on) is also accepted, with a difference "
+                        + "between where the build runs: a local build (`android-source`, or Gradle on your "
+                        + "machine) downloads and uses exactly that release, while the Codename One build "
+                        + "cloud has one Gradle 9 installed and builds every accepted 9.x value with its "
+                        + "Gradle 9.8.0. Older 9.x releases and Gradle 10 are refused. Kotlin sources are compiled "
+                        + "by the plugin's built-in Kotlin, so a hint that applies `kotlin-android` itself "
+                        + "fails on this path, and so does any Gradle plugin a hint adds that still uses the "
+                        + "variant API Android Gradle plugin 9 removed."));
+
         h.add(new Hint("android.versionCode")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)

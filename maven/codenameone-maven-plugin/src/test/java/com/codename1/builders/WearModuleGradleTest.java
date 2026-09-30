@@ -333,4 +333,14 @@ class WearModuleGradleTest {
                 PHONE_GRADLE.split("minSdkVersion ")[1].split("\n")[0].trim()),
                 "the phone module keeps its own floor");
     }
+
+    @Test
+    void builtInKotlinGetsTheSharedSourceRootsAsKotlinRoots() {
+        // AGP 9's built-in Kotlin does not follow java.srcDirs, so the app module's .kt files
+        // have to be named as Kotlin roots or the Wear build loses them.
+        String wear = AndroidGradleBuilder.deriveWearGradle(PHONE_GRADLE, 100, 101, WEAR_DEPS, true);
+        assertTrue(wear.contains("kotlin.srcDirs = ['../app/src/main/java', 'src/main/java']"), wear);
+        // The Gradle 8 module is unchanged: kotlin-android compiles the java roots already.
+        assertFalse(deriveWearGradle().contains("kotlin.srcDirs"));
+    }
 }
