@@ -667,6 +667,7 @@ public final class VectorMapEngine {
         }
         removePendingIfMatches(key, requestGeneration);
         if (result.success) {
+            boolean drawn = false;
             try {
                 Image image;
                 if (result.vector) {
@@ -674,25 +675,26 @@ public final class VectorMapEngine {
                     if (result.labels != null) {
                         labels.put(key, result.labels);
                     }
-                    if (result.z == source.getMaxZoom()) {
-                        // Zooming in from here overzooms this very tile, and
-                        // pieces that zoomed in while it loaded wait for it.
-                        decodedParents.put(key, result.tile);
-                        List waiting = (List) parentWaiters.remove(key);
-                        if (waiting != null) {
-                            for (Object w : waiting) {
-                                renderOverzoomed(result.tile, result.z, (int[]) w, requestGeneration);
-                            }
-                        }
-                    }
                 } else {
                     image = Image.createImage(result.data, 0, result.data.length);
                 }
                 rendered.put(key, image);
-                repaint();
+                drawn = true;
             } catch (Throwable t) {
                 failed.put(key, Boolean.TRUE);
                 failWaiters(key, requestGeneration);
+            }
+            // Outside the try on purpose: the waiter list is read through
+            // casts, and ParparVM's casts are unchecked, so none may sit under
+            // a catch (scripts/check-cast-semantics.sh).
+            if (drawn) {
+                if (result.vector && result.z == source.getMaxZoom()) {
+                    // Zooming in from here overzooms this very tile, and
+                    // pieces that zoomed in while it loaded wait for it.
+                    decodedParents.put(key, result.tile);
+                    drainWaiters(key, result.tile, result.z, requestGeneration);
+                }
+                repaint();
             }
         } else {
             failed.put(key, Boolean.TRUE);
@@ -835,6 +837,15 @@ public final class VectorMapEngine {
         removePendingIfMatches(key, requestGeneration);
         failed.put(key, Boolean.TRUE);
         failWaiters(key, requestGeneration);
+    }
+
+    private void drainWaiters(String parentKey, VectorTile tile, int parentZ, int requestGeneration) {
+        List waiting = (List) parentWaiters.remove(parentKey);
+        if (waiting != null) {
+            for (Object w : waiting) {
+                renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
+            }
+        }
     }
 
     // Pieces waiting on a deepest-level tile whose ordinary fetch failed fail
