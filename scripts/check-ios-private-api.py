@@ -321,6 +321,8 @@ SDK_TRIPLES = {
     "appletvsimulator": ("arm64-apple-tvos", "-simulator"),
 }
 TRIPLE_PREFIX = "arm64-apple-ios"
+# TvNativeBuilder's default tvNative.minDeploymentTarget, before it raises to the SDK floor.
+TVOS_DEFAULT_DEPLOYMENT_TARGET = "13.0"
 TRIPLE_SUFFIX = ""
 
 # Directories whose headers are not public API. No SDK in Xcode 26 or 27 ships either, but if one
@@ -512,16 +514,37 @@ def binaries_in(app):
     return found
 
 
-# LC_BUILD_VERSION platform numbers (mach-o/loader.h) and the SDK each one is built against.
+# LC_BUILD_VERSION platforms (mach-o/loader.h) and the SDK each one is built against. otool prints
+# the number on some versions and the symbolic name on others (WatchNativeBuilder copes with the
+# same), so both spellings are keys -- lowercased, as platform_of() compares them.
 PLATFORM_SDKS = {
-    "1": "macosx", "2": "iphoneos", "3": "appletvos", "4": "watchos", "6": "macosx",
-    "7": "iphonesimulator", "8": "appletvsimulator", "9": "watchsimulator",
-    "11": "xros", "12": "xrsimulator",
+    "1": "macosx", "macos": "macosx",
+    "2": "iphoneos", "ios": "iphoneos",
+    "3": "appletvos", "tvos": "appletvos",
+    "4": "watchos", "watchos": "watchos",
+    "6": "macosx", "maccatalyst": "macosx",
+    "7": "iphonesimulator", "iossimulator": "iphonesimulator",
+    "8": "appletvsimulator", "tvossimulator": "appletvsimulator",
+    "9": "watchsimulator", "watchossimulator": "watchsimulator",
+    "11": "xros", "xros": "xros", "visionos": "xros",
+    "12": "xrsimulator", "xrossimulator": "xrsimulator", "visionossimulator": "xrsimulator",
 }
 LEGACY_VERSION_MIN = {
     "LC_VERSION_MIN_IPHONEOS": "iphoneos", "LC_VERSION_MIN_WATCHOS": "watchos",
     "LC_VERSION_MIN_TVOS": "appletvos", "LC_VERSION_MIN_MACOSX": "macosx",
 }
+BUILD_VERSION_PLATFORM = re.compile(r"cmd LC_BUILD_VERSION\s.*?\n\s*platform\s+(\S+)", re.S)
+
+
+def platform_of(otool_text):
+    """The SDK name for `otool -l` output, or None when it names no platform this maps."""
+    match = BUILD_VERSION_PLATFORM.search(otool_text)
+    if match:
+        return PLATFORM_SDKS.get(match.group(1).strip().lower())
+    for command, sdk in LEGACY_VERSION_MIN.items():
+        if command in otool_text:
+            return sdk
+    return None
 
 
 def platform_sdk(path):
@@ -534,16 +557,13 @@ def platform_sdk(path):
     # No -arch: a watch binary is a thin arm64_32, where `-arch arm64` prints nothing and still
     # exits 0. Every slice of a universal binary names the same platform.
     text = run(["otool", "-l", path]).stdout
-    match = re.search(r"cmd LC_BUILD_VERSION\s.*?\n\s*platform (\w+)", text, re.S)
+    sdk = platform_of(text)
+    if sdk:
+        return sdk
+    match = BUILD_VERSION_PLATFORM.search(text)
     if match:
-        sdk = PLATFORM_SDKS.get(match.group(1))
-        if sdk:
-            return sdk
         fail("%s declares platform %s, which this check does not map to an SDK"
              % (path, match.group(1)))
-    for command, sdk in LEGACY_VERSION_MIN.items():
-        if command in text:
-            return sdk
     fail("%s carries no platform load command; cannot tell which SDK to judge it against" % path)
 
 
@@ -798,8 +818,11 @@ def main():
     TRIPLE_PREFIX, TRIPLE_SUFFIX = SDK_TRIPLES[args.sdk]
     sdk = sdk_root(args.sdk, args.developer_dir)
     clang = find_clang(args.developer_dir)
-    target = deltas.CN1_DEFAULT_DEPLOYMENT_TARGET
-    floor = deltas.sdk_minimum_deployment_target(sdk)
+    # Start where the builders start -- IPhoneBuilder's 14.0 for iOS, TvNativeBuilder's 13.0 for
+    # tvOS -- and raise to the SDK's own floor for THIS platform, as both builders do.
+    target = TVOS_DEFAULT_DEPLOYMENT_TARGET if TRIPLE_PREFIX == "arm64-apple-tvos" \
+        else deltas.CN1_DEFAULT_DEPLOYMENT_TARGET
+    floor = deltas.sdk_minimum_deployment_target(sdk, args.sdk)
     if floor and deltas.sdk_version_macro(floor) > deltas.sdk_version_macro(target):
         target = floor
     triple = TRIPLE_PREFIX + target + TRIPLE_SUFFIX

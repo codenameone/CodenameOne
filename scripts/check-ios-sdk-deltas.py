@@ -551,17 +551,19 @@ def synthesize_generated_stubs(clang, sdk, project_dir, prefix_header, files, al
     return sorted(created)
 
 
-def sdk_minimum_deployment_target(sdk_path):
-    """The lowest deployment target this SDK accepts, or None.
+def sdk_minimum_deployment_target(sdk_path, platform="iphoneos"):
+    """The lowest deployment target this SDK accepts for `platform`, or None.
 
     The same value AppleSdkFloor reads in the builder, and read the same way, so the sweep
-    compiles at the target the build will actually use.
+    compiles at the target the build will actually use. `platform` is the SupportedTargets key --
+    the SDK's own name (iphoneos, appletvos, appletvsimulator ...): a tvOS SDK has no iphoneos
+    entry, so reading that key there answered None and left a tvOS sweep below the tvOS floor.
     """
     settings = os.path.join(sdk_path, "SDKSettings.plist")
     if not os.path.isfile(settings):
         return None
     res = run(["/usr/bin/plutil", "-extract",
-               "SupportedTargets.iphoneos.MinimumDeploymentTarget", "raw", settings])
+               "SupportedTargets.%s.MinimumDeploymentTarget" % platform, "raw", settings])
     value = res.stdout.strip()
     return value if res.returncode == 0 and value and value[0].isdigit() else None
 
