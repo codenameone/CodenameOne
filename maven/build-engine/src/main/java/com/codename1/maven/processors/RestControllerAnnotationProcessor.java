@@ -102,6 +102,20 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     }
 
     private static final String REQUEST_TYPE = "com.codename1.backend.HttpServer.Request";
+
+    /**
+     * The same class as the descriptor spells it, for the same reason as
+     * RESPONSE_TYPE_BINARY below: a parameter's type comes from the descriptor,
+     * where a member class is Outer$Inner, so comparing against the dotted
+     * spelling alone never matched -- and a handler taking the Request itself,
+     * which the refusal message names as the way out, was refused.
+     */
+    private static final String REQUEST_TYPE_BINARY = "com.codename1.backend.HttpServer$Request";
+
+    /** Either spelling of HttpServer.Request. */
+    private static boolean isRequestType(String javaType) {
+        return REQUEST_TYPE.equals(javaType) || REQUEST_TYPE_BINARY.equals(javaType);
+    }
     private static final String RESPONSE_TYPE = "com.codename1.backend.HttpServer.Response";
 
     /**
@@ -166,7 +180,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String binaryName;
         String sourceName;
         String packageName;
-        String injection;
         String path;
     }
 
@@ -181,11 +194,27 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// when the entry point is written; see [#hasGeneratedDaos].
     private boolean daos;
 
+    /// The beans this build resolved, once [#finish] has asked for them.
+    BackendBeans beans;
+
+    /// Whether the entry point installs the development MCP tools. True for the
+    /// JVM build `cn1:backend` runs; the packaging goal turns it off unless asked.
+    boolean devTools = true;
+
+    /// See [#devTools].
+    public void setDevTools(boolean devTools) {
+        this.devTools = devTools;
+    }
+
     /// Whether the generated entry point installs a tracer, and the service
     /// name it passes. Settled in [#finish], before any source is generated,
     /// because the routers name their routes for it too.
     boolean telemetry;
     String telemetryServiceName;
+
+    /// The settings annotations, and whether the build asked for the management
+    /// and MCP endpoints. Settled in [#finish] beside [#telemetry].
+    BackendSettings settings;
 
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
@@ -204,9 +233,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String packageName;
         String simpleName;
         String routerSimpleName;
-        /// What the generated entry point passes to the constructor: the
-        /// entity manager, the connection pool, or nothing. See [#injectionOf].
-        String injection;
         List<String> basePaths = new ArrayList<String>();
         List<Route> routes = new ArrayList<Route>();
     }
@@ -222,6 +248,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String prefix;
         /** For each variable, the literal that must follow it; "" when it runs to the end. */
         List<String> after = new ArrayList<String>();
+        /**
+         * The statements that write `result` through the generated codecs, when the
+         * return type is one of the application's own classes or holds one; null
+         * when Json writes it as it is.
+         */
+        String codecWrite;
     }
 
     private static final class Param {
@@ -236,6 +268,23 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         /** Set when the body is decoded into a local before the call. */
         String local;
         int variableIndex = -1;
+        /**
+         * The statements that read `parsed` into `target` through the generated
+         * codecs, when the body is one of the application's own classes or holds
+         * one; null when the body binds as parsed.
+         */
+        String codecRead;
+    }
+
+    /// The JSON codecs for the application's own classes, created with the first
+    /// route that needs one.
+    private BackendJsonCodecs codecs;
+
+    private BackendJsonCodecs codecs(ProcessorContext ctx) {
+        if (codecs == null) {
+            codecs = BackendJsonCodecs.of(ctx);
+        }
+        return codecs;
     }
 
     @Override
@@ -285,16 +334,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (controller.basePaths.isEmpty()) {
             controller.basePaths.add("");
         }
-        controller.injection = injectionOf(cls);
-        if (controller.injection == null) {
-            ctx.error(cls, "@RestController " + controller.binaryName + " has no constructor "
-                    + "the generated entry point can call. Declare a public constructor "
-                    + "taking nothing, or one taking a "
-                    + "com.codename1.backend.orm.EntityManager, or one taking a "
-                    + "com.codename1.backend.DataSource -- the entry point opens both from "
-                    + "the configuration and hands over whichever the controller asks for.");
-            return;
-        }
+        // What the constructor is given is the bean pass's to decide -- see
+        // BackendBeans -- like every other bean's.
 
         for (MethodInfo m : cls.getMethods()) {
             if (m.isConstructor() || m.isSynthetic() || m.isStatic() || !m.isPublic()) {
@@ -803,7 +844,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else if (requestBody != null) {
                 p.kind = "BODY";
                 p.required = requestBody.getBoolOrDefault("required", true);
-            } else if (REQUEST_TYPE.equals(p.javaType)) {
+            } else if (isRequestType(p.javaType)) {
                 // The escape hatch: a handler that needs something this binding does not
                 // model takes the Request itself, exactly as it would have before.
                 p.kind = "REQUEST";
@@ -827,6 +868,29 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 return null;
             }
             String badKey = "BODY".equals(p.kind) ? unusableMapKey(genericType) : null;
+            if ("BODY".equals(p.kind) && !"java.lang.String".equals(p.javaType)
+                    && (badKey != null || !bodyElementsAreDecoded(genericType)
+                    || !isBindable(p.javaType, p.kind))) {
+                // Not a shape the parser hands over as it is -- one of the
+                // application's classes, or a container of them, or of a type the
+                // parser does not produce (Integer, Date, an enum). Spring binds
+                // those through Jackson; here the build writes the codec, and a
+                // shape it cannot write one for is refused with the reason.
+                String bodyType = genericType != null ? genericType : p.javaType;
+                String why = codecs(ctx).checkRead(bodyType);
+                if (why == null) {
+                    p.genericJavaType = bodyType;
+                    p.codecRead = codecs(ctx).readStatements(bodyType, "parsed", "com.codename1"
+                            + ".backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target", "");
+                    route.params.add(p);
+                    continue;
+                }
+                if (badKey == null) {
+                    ctx.error(cls, "Cannot bind " + bodyType + " from the body on "
+                            + cls.getBinaryName() + "." + m.getName() + ": it holds " + why + ".");
+                    return null;
+                }
+            }
             if (badKey != null) {
                 // Separate from the element rule below, and with its own message,
                 // because Long is a perfectly good body VALUE -- every JSON
@@ -891,13 +955,34 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // success. This processor has no DTO codec generation (the @RestClient
         // half does), so the honest answer today is to refuse the shape rather
         // than emit JSON nobody can use.
-        if (!isEncodableReturn(route.returnJavaType, ctx)) {
-            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
-                    + route.returnJavaType + ", which the generated router cannot encode: "
-                    + "it would be written as the JSON string of its toString(). Return a "
-                    + "Map, a List, a Set, a String, a primitive, an HttpServer.Response, "
-                    + "or make the type implement com.codename1.backend.Json.Writable.");
+        if (route.returnJavaType != null
+                && route.returnJavaType.startsWith("java.util.concurrent.Future")) {
+            // Named on its own rather than left to the generic refusal below: the
+            // shape comes from @Async, whose woven stub returns the queued task at
+            // once, and the route would send that task instead of its result --
+            // a success with a bogus body, the work's failure lost. Spring MVC
+            // does not await a plain Future either.
+            ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns a "
+                    + "java.util.concurrent.Future. A route answers with what its method "
+                    + "returns, and an @Async method returns before its work is done, so "
+                    + "the client would get the pending task, not the result. Return the "
+                    + "value itself -- the request already runs on its own thread -- or "
+                    + "start the work and return an id to ask about it by.");
             return null;
+        }
+        if (!isEncodableReturn(route.returnJavaType, ctx)) {
+            // One of the application's classes, or a container of them: written
+            // through a codec the build generates for it, as Jackson would write
+            // it for a Spring controller.
+            String why = codecs(ctx).checkWrite(route.returnJavaType);
+            if (why != null) {
+                ctx.error(cls, cls.getBinaryName() + "." + m.getName() + " returns "
+                        + route.returnJavaType + ", which the generated router cannot write "
+                        + "as JSON: it holds " + why + ".");
+                return null;
+            }
+            route.codecWrite = codecs(ctx).writeStatements(route.returnJavaType, "result",
+                    "0", "");
         }
         AnnotationValues status = m.getAnnotation(RESPONSE_STATUS);
         // ResponseStatus documents that a value-returning method answers 200 and a
@@ -1041,63 +1126,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 || "short".equals(javaType) || "byte".equals(javaType);
     }
 
-    /// The DESCRIPTORS of the constructors the generated entry point knows how
-    /// to call, most specific first.
-    private static final String CONSTRUCTOR_ENTITIES =
-            "(Lcom/codename1/backend/orm/EntityManager;)V";
-    private static final String CONSTRUCTOR_DATASOURCE =
-            "(Lcom/codename1/backend/DataSource;)V";
-
-    /// What to hand this controller's constructor, or null when it declares
-    /// none that can be called.
-    ///
-    /// This is the whole of the dependency injection, and it is deliberately
-    /// three cases rather than a container: a server handler needs the database
-    /// and nothing else, the two ways to want it are the ORM and the pool, and
-    /// a controller that needs something else builds it itself. There is no
-    /// scanning, no proxying and nothing resolved at run time -- the generated
-    /// entry point contains a `new` with the argument written into it.
-    ///
-    /// The entity manager wins over the pool, and the pool over nothing, when a
-    /// class declares several: a test that keeps a no-arg constructor around
-    /// should not quietly become the shape production runs.
-    private static String injectionOf(AnnotatedClass cls) {
-        boolean entities = false;
-        boolean dataSource = false;
-        boolean none = false;
-        for (MethodInfo m : cls.getMethods()) {
-            if (!m.isConstructor() || !m.isPublic()) {
-                continue;
-            }
-            String descriptor = m.getDescriptor();
-            if (CONSTRUCTOR_ENTITIES.equals(descriptor)) {
-                entities = true;
-            } else if (CONSTRUCTOR_DATASOURCE.equals(descriptor)) {
-                dataSource = true;
-            } else if (Type.getArgumentTypes(descriptor).length == 0) {
-                none = true;
-            }
-        }
-        if (entities) {
-            return "ENTITIES";
-        }
-        if (dataSource) {
-            return "DATASOURCE";
-        }
-        return none ? "NONE" : null;
-    }
-
-    private static boolean hasNoArgConstructor(AnnotatedClass cls) {
-        for (MethodInfo m : cls.getMethods()) {
-            if (m.isConstructor() && m.isPublic()
-                    && Type.getArgumentTypes(m.getDescriptor()).length == 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-
     /**
      * Records one `@WebSocketMapping`, refusing everything the generated entry
      * point could not honour.
@@ -1145,6 +1173,16 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                             + cls.getBinaryName() + " -> \"" + full + "\"");
                     return;
                 }
+                if (full.indexOf('%') >= 0) {
+                    // The upgrade looks up the CANONICAL path -- unreserved escapes
+                    // decoded, the rest upper-cased -- so a mapping spelled with
+                    // an escape is a key nothing matches, and one that evades the
+                    // duplicate check against its decoded twin. Write the path out.
+                    ctx.error(cls, "@WebSocketMapping path must not contain a percent "
+                            + "escape; write the characters themselves: "
+                            + cls.getBinaryName() + " -> \"" + full + "\"");
+                    return;
+                }
                 if (full.indexOf('?') >= 0) {
                     // tryUpgrade strips the query before it looks a path up, so a
                     // mapping with one in it goes into the route map under a key
@@ -1167,7 +1205,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 endpoint.sourceName = cls.getSourceName();
                 endpoint.packageName =
                         RestClientAnnotationProcessor.packageOf(endpoint.binaryName);
-                endpoint.injection = injectionOf(cls);
                 endpoint.path = full;
                 webSockets.put(full, endpoint);
             }
@@ -1258,11 +1295,32 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (ctx.hasErrors()) {
             return;
         }
+        // The beans FIRST: the controllers and endpoints are beans too, and the
+        // classes are rewritten before anything generated here is compiled
+        // against them.
+        beans = BackendBeans.prepare(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
         // A module with only websocket endpoints is a real server and needs an
         // entry point exactly as much as one with only controllers does. Guarding
         // on controllers alone left it with no main at all -- and the failure is
-        // that the build succeeds and produces nothing runnable.
-        if (controllers.isEmpty() && webSockets.isEmpty()) {
+        // that the build succeeds and produces nothing runnable. The same goes
+        // for one whose only work is scheduled jobs, MCP tools or managed
+        // resources -- the management endpoints serve those.
+        // And one that asked only for the management endpoints: health, metrics
+        // and Prometheus are a server's whole job for a sidecar.
+        settings = BackendSettings.resolve(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
+        // And one that only serves files: a static root configured in source or
+        // in a properties file is a server the runtime builds a router for.
+        boolean staticFiles = settings.values.containsKey("cn1.static.root")
+                || applicationPropertyKnown(ctx, "cn1.static.root");
+        if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
+                && !beans.hasTools() && !beans.hasManaged() && !settings.management
+                && !staticFiles) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
             // early without this left the marker naming a bootstrap that still
@@ -1304,9 +1362,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // WHERE THE ENTRY POINT GOES. The first controller's package, as before --
         // but a module may now have websocket endpoints and no controller at all,
         // and this used to be an unguarded iterator().next() on an empty map.
-        String entryPackage = controllers.isEmpty()
-                ? webSockets.values().iterator().next().packageName
-                : controllers.values().iterator().next().packageName;
+        String entryPackage = !controllers.isEmpty()
+                ? controllers.values().iterator().next().packageName
+                : !webSockets.isEmpty() ? webSockets.values().iterator().next().packageName
+                : beans.entryPackage;
         String bootstrap = qualify(entryPackage, "BackendApplication");
         // A class of this name already in that package would be OVERWRITTEN in the
         // output directory by the one compiled below -- silently, because the
@@ -1320,7 +1379,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "that class, or move the controllers into another package.");
             return;
         }
+        String wiring = qualify(entryPackage, BackendWiringWriter.CLASS_NAME);
+        if (isNotOurOwnOutput(ctx, wiring)) {
+            ctx.error(wiring + " already exists, and the wiring generated for this module "
+                    + "would replace it. Rename that class.");
+            return;
+        }
+        // The shared set, not only this processor's: the bean processor's tools
+        // may have added classes, and the dispatcher compiled last must know them.
+        if (codecs != null || ctx.getAttribute("cn1.backend.jsonCodecs") != null) {
+            Map<String, String> codecSources = codecs(ctx).sources();
+            if (ctx.hasErrors()) {
+                return;
+            }
+            for (String codec : codecSources.keySet()) {
+                if (isNotOurOwnOutput(ctx, codec)) {
+                    ctx.error(codec + " already exists, and the JSON codec generated under "
+                            + "that name would replace it. Rename that class.");
+                    return;
+                }
+            }
+            sources.putAll(codecSources);
+        }
         daos = hasGeneratedDaos(ctx);
+        sources.put(wiring, generateWiring(entryPackage));
         sources.put(bootstrap, generateBootstrap(entryPackage));
         try {
             List<File> cp = new ArrayList<File>();
@@ -1517,6 +1599,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respond(").append(route.status)
               .append(", \"text/plain; charset=utf-8\", utf8(result));\n");
+        } else if (route.codecWrite != null) {
+            // The application's own classes: written straight into the connection's
+            // buffer by the codec the build generated, with no Map in between.
+            String type = BackendJsonCodecs.source(route.returnJavaType);
+            sb.append(pad).append("final ").append(type).append(" result = ").append(call)
+              .append(";\n");
+            sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
+            sb.append(pad).append("        : request.respondJson(").append(route.status)
+              .append(", new com.codename1.backend.Json.Writable() {\n");
+            sb.append(pad).append("            public void writeTo(com.codename1.backend.ByteSink out) {\n");
+            appendIndented(sb, route.codecWrite, pad + "                ");
+            sb.append(pad).append("            }\n");
+            sb.append(pad).append("        });\n");
         } else {
             // Everything else is JSON. respondJson writes into the connection's own
             // Response, so a route that returns a value still allocates only that value.
@@ -1927,6 +2022,30 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if (!"BODY".equals(p.kind) || "java.lang.String".equals(p.javaType)) {
                 continue;
             }
+            if (p.codecRead != null) {
+                String type = BackendJsonCodecs.source(p.genericJavaType);
+                p.local = "body" + i;
+                sb.append(pad).append(type).append(' ').append(p.local).append(" = null;\n");
+                sb.append(pad).append("if (request.getBody() != null && request.getBody().length() > 0) {\n");
+                sb.append(pad).append("    Object parsed = bodyAsValue(request.getBody());\n");
+                sb.append(pad).append("    if (parsed == MALFORMED) {\n");
+                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
+                sb.append(pad).append("    }\n");
+                sb.append(pad).append("    ").append(type).append(" target = null;\n");
+                // What the codec refuses is the client's mistake -- a string
+                // where a number belongs -- and its message says where: a 400,
+                // as Spring answers a body Jackson cannot read.
+                sb.append(pad).append("    try {\n");
+                appendIndented(sb, p.codecRead, pad + "        ");
+                sb.append(pad).append("    } catch (IllegalArgumentException err) {\n");
+                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("                utf8(String.valueOf(err.getMessage())));\n");
+                sb.append(pad).append("    }\n");
+                sb.append(pad).append("    ").append(p.local).append(" = target;\n");
+                sb.append(pad).append("}\n");
+                continue;
+            }
             boolean map = "java.util.Map".equals(p.javaType);
             String type = map ? "java.util.Map" : "java.util.List";
             String decoder = map ? "bodyAsMap" : "bodyAsList";
@@ -2138,6 +2257,19 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
      * runtime class so that a module with no controllers links none of it, and so
      * the dead-code pass can drop whichever ones this controller never calls.
      */
+    /// Each line of `code` with `pad` in front of it.
+    private static void appendIndented(StringBuilder sb, String code, String pad) {
+        int start = 0;
+        while (start < code.length()) {
+            int end = code.indexOf('\n', start);
+            if (end < 0) {
+                end = code.length();
+            }
+            sb.append(pad).append(code, start, end).append('\n');
+            start = end + 1;
+        }
+    }
+
     private static void emitRouterHelpers(StringBuilder sb) {
         sb.append("    private static final byte[] EMPTY = new byte[0];\n\n");
         sb.append("    /**\n");
@@ -2464,6 +2596,15 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("                || value.equalsIgnoreCase(\"no\") || value.equalsIgnoreCase(\"off\");\n");
         sb.append("    }\n\n");
 
+        // A body that does not parse, told apart from one that parsed to null.
+        sb.append("    private static final Object MALFORMED = new Object();\n\n");
+        sb.append("    private static Object bodyAsValue(String body) {\n");
+        sb.append("        try {\n");
+        sb.append("            return com.codename1.backend.Json.parse(body);\n");
+        sb.append("        } catch (java.io.IOException err) {\n");
+        sb.append("            return MALFORMED;\n");
+        sb.append("        }\n");
+        sb.append("    }\n\n");
         sb.append("    private static java.util.Map bodyAsMap(String body) {\n");
         sb.append("        if (body == null || body.length() == 0) {\n");
         sb.append("            return null;\n");
@@ -2524,68 +2665,83 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         }
         // Everything a server used to open with -- read the port, start, install
         // a shutdown handler, drain on SIGTERM, wait -- is inside run(). What is
-        // left here is the part that differs between one server and the next:
-        // which controllers there are and what each of them is given.
+        // left here is the part that differs between one server and the next,
+        // and even that lives in the generated BackendWiring: every bean, built
+        // and injected by straight-line code.
         sb.append("        com.codename1.backend.Backend.builder()\n");
         if (telemetry) {
-            // The ONLY reference to the tracer implementation anywhere in the
-            // program, which is what keeps it out of a binary that does not ask
-            // for it: the translator drops what nothing reaches.
+            // The ONLY references to the OTLP exporters anywhere in the program,
+            // which is what keeps them out of a binary that does not ask for
+            // them: the translator drops what nothing reaches.
+            String name = telemetryServiceName == null || telemetryServiceName.length() == 0
+                    ? "null" : quote(telemetryServiceName);
             sb.append("                .tracing(new com.codename1.backend.otel.OtlpTracer(")
-              .append(telemetryServiceName == null || telemetryServiceName.length() == 0
-                      ? "null" : quote(telemetryServiceName))
-              .append("))\n");
+              .append(name).append("))\n");
+            sb.append("                .metrics(new com.codename1.backend.otel.OtlpMetricExporter(")
+              .append(name).append("))\n");
         }
-        if (needsDatabase() || needsDatabaseForWebSockets()) {
-            // A controller that declares a DataSource or an EntityManager needs
-            // a database, and this is where the build says so: the builder opens
-            // one for a server that has no entities either, which is how a
-            // development profile's in-memory default reaches a controller that
-            // asked only for the pool.
+        if (beans != null && beans.needsDatabase) {
+            // A bean that declares a DataSource, an EntityManager or a Session
+            // needs a database, and this is where the build says so: the builder
+            // opens one for a server that has no entities either, which is how a
+            // development profile's in-memory default reaches a bean that asked
+            // only for the pool.
             sb.append("                .requiresDataSource()\n");
         }
-        // A CALLBACK, like .handlers below, not a setter on a started server. The
-        // runtime invokes this while it is starting and before the listener
-        // accepts, so there is no window in which a generated route exists here
-        // and not in the server.
-        //
-        // Sorted by path (webSockets is a TreeMap), which keeps the generated
-        // source byte-identical between builds -- a bootstrap whose text depends
-        // on scan order recompiles for no reason and diffs noisily.
-        if (!webSockets.isEmpty()) {
-            sb.append("                .webSockets(new com.codename1.backend.Backend.WebSocketEndpoints() {\n");
-            sb.append("            public void register(\n");
-            sb.append("                    com.codename1.backend.HttpServer.WebSocketRegistry registry,\n");
-            sb.append("                    com.codename1.backend.DataSource dataSource,\n");
-            sb.append("                    com.codename1.backend.orm.EntityManager entities)\n");
-            sb.append("                    throws Exception {\n");
-            for (WebSocketEndpoint endpoint : webSockets.values()) {
-                sb.append("                registry.route(\"").append(endpoint.path)
-                  .append("\", new ").append(endpoint.sourceName).append("(")
-                  .append(argumentForInjection(endpoint.injection, endpoint.binaryName))
-                  .append("));\n");
+        if (settings != null && !settings.values.isEmpty()) {
+            // The settings annotations, as the bottom layer of the configuration.
+            sb.append("                .compiledSettings(new String[] {");
+            List<String> flat = settings.flat();
+            for (int i = 0; i < flat.size(); i++) {
+                sb.append(i == 0 ? "" : ", ").append(quote(flat.get(i)));
             }
-            sb.append("            }\n");
-            sb.append("        })\n");
+            sb.append("})\n");
         }
-        sb.append("                .handlers(new com.codename1.backend.Backend.Handlers() {\n");
-        sb.append("            public com.codename1.backend.HttpServer.Handler[] create(\n");
-        sb.append("                    com.codename1.backend.DataSource dataSource,\n");
-        sb.append("                    com.codename1.backend.orm.EntityManager entities)\n");
-        sb.append("                    throws Exception {\n");
-        sb.append("                return new com.codename1.backend.HttpServer.Handler[] {\n");
-        int index = 0;
-        for (Controller c : controllers.values()) {
-            sb.append("                    new ").append(qualify(c.packageName, c.routerSimpleName))
-              .append("(new ").append(c.sourceName).append("(").append(argumentFor(c)).append("))");
-            sb.append(++index < controllers.size() ? ",\n" : "\n");
+        if (devTools || (settings != null && settings.management)) {
+            // The ONLY call that names the management endpoints, so a packaged
+            // server that did not ask for them has none of their code: the
+            // translator drops the builder method nothing calls, and the classes
+            // only it named go with it.
+            sb.append("                .management()\n");
         }
-        sb.append("                };\n");
-        sb.append("            }\n");
-        sb.append("        }).run();\n");
+        boolean tools = beans != null && beans.hasTools();
+        if (devTools || tools || (settings != null && settings.mcp)) {
+            // The development tools are named only in a development build, so a
+            // packaged server has none of their code.
+            sb.append("                .mcp(").append(devTools
+                    ? "new com.codename1.backend.mcp.DevTools()" : "null").append(")\n");
+            if (telemetryServiceName != null && telemetryServiceName.length() > 0) {
+                sb.append("                .serviceName(").append(quote(telemetryServiceName))
+                  .append(")\n");
+            }
+        }
+        sb.append("                .application(new ")
+          .append(qualify(packageName, BackendWiringWriter.CLASS_NAME)).append("())\n");
+        sb.append("                .run();\n");
         sb.append("    }\n");
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// The source of the generated BackendWiring, package-visible so a test can
+    /// read what the build decided.
+    String generateWiring(String packageName) {
+        List<BackendWiringWriter.Router> routers = new ArrayList<BackendWiringWriter.Router>();
+        List<String[]> routes = new ArrayList<String[]>();
+        for (Controller c : controllers.values()) {
+            routers.add(new BackendWiringWriter.Router(c.binaryName,
+                    qualify(c.packageName, c.routerSimpleName)));
+            for (Route r : c.routes) {
+                routes.add(new String[] {r.httpMethod, r.pattern,
+                        c.binaryName + "." + r.javaMethod, c.binaryName});
+            }
+        }
+        Map<String, String> sockets = new LinkedHashMap<String, String>();
+        for (WebSocketEndpoint e : webSockets.values()) {
+            sockets.put(e.path, e.binaryName);
+            routes.add(new String[] {"WEBSOCKET", e.path, e.binaryName, e.binaryName});
+        }
+        return new BackendWiringWriter(beans).write(packageName, routers, sockets, routes);
     }
 
     /// Whether this module asked for tracing, and under what service name.
@@ -2667,6 +2823,88 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 || "on".equalsIgnoreCase(v) || "1".equals(v);
     }
 
+    /// Whether `key` is set to a literal truth value in the module's
+    /// `application.properties` or any `application-<profile>.properties` beside
+    /// it. A `${...}` reference can't be resolved at build time and doesn't count.
+    static boolean applicationPropertyTrue(ProcessorContext ctx, String key) {
+        for (File f : applicationPropertyFiles(ctx)) {
+            java.util.Properties props = new java.util.Properties();
+            InputStream in = null;
+            try {
+                in = new java.io.FileInputStream(f);
+                props.load(in);
+            } catch (IOException err) {
+                continue;
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // Only read; nothing to lose.
+                    }
+                }
+            }
+            String v = props.getProperty(key);
+            if (v != null) {
+                v = v.trim();
+                if ("true".equalsIgnoreCase(v) || "yes".equalsIgnoreCase(v)
+                        || "on".equalsIgnoreCase(v) || "1".equals(v)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// The module's `application.properties` and every
+    /// `application-<profile>.properties` beside it.
+    private static List<File> applicationPropertyFiles(ProcessorContext ctx) {
+        List<File> files = new ArrayList<File>();
+        File base = applicationProperties(ctx);
+        if (base == null) {
+            return files;
+        }
+        files.add(base);
+        File[] siblings = base.getParentFile() == null ? null : base.getParentFile().listFiles();
+        if (siblings != null) {
+            for (File f : siblings) {
+                String n = f.getName();
+                if (n.startsWith("application-") && n.endsWith(".properties")) {
+                    files.add(f);
+                }
+            }
+        }
+        return files;
+    }
+
+    /// Whether `key` is set in the module's `application.properties` or any
+    /// `application-<profile>.properties` beside it -- what a build can know about
+    /// a setting that Config will read at run time.
+    static boolean applicationPropertyKnown(ProcessorContext ctx, String key) {
+        for (File f : applicationPropertyFiles(ctx)) {
+            java.util.Properties props = new java.util.Properties();
+            InputStream in = null;
+            try {
+                in = new java.io.FileInputStream(f);
+                props.load(in);
+            } catch (IOException err) {
+                continue;
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // Only read; nothing to lose.
+                    }
+                }
+            }
+            if (props.getProperty(key) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// The backend module's `application.properties`, or null.
     ///
     /// Looked for beside the module that owns the output directory FIRST
@@ -2706,51 +2944,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
         }
         return null;
-    }
-
-    /// Whether any controller declared a constructor that needs a database.
-    private boolean needsDatabase() {
-        for (Controller c : controllers.values()) {
-            if ("ENTITIES".equals(c.injection) || "DATASOURCE".equals(c.injection)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// What the generated entry point passes to one controller's constructor.
-    ///
-    /// Through a REQUIRE rather than straight: a controller declaring one of
-    /// these constructors is declaring a dependency, and handing it null because
-    /// nothing configured a database produces a server that starts, reports
-    /// healthy and fails on the first request that touches it. The check names
-    /// the controller, and it runs before the server binds.
-    private static String argumentFor(Controller c) {
-        return argumentForInjection(c.injection, c.binaryName);
-    }
-
-    /// The same rule for a websocket endpoint, which declares a dependency the
-    /// same way a controller does.
-    private static String argumentForInjection(String injection, String binaryName) {
-        if ("ENTITIES".equals(injection)) {
-            return "com.codename1.backend.Backend.requireEntities(entities, \""
-                    + binaryName + "\")";
-        }
-        if ("DATASOURCE".equals(injection)) {
-            return "com.codename1.backend.Backend.requireDataSource(dataSource, \""
-                    + binaryName + "\")";
-        }
-        return "";
-    }
-
-    /// Whether any websocket endpoint declared a constructor that needs one.
-    private boolean needsDatabaseForWebSockets() {
-        for (WebSocketEndpoint endpoint : webSockets.values()) {
-            if ("ENTITIES".equals(endpoint.injection) || "DATASOURCE".equals(endpoint.injection)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /// Whether this module has server-side daos for the entry point to register.

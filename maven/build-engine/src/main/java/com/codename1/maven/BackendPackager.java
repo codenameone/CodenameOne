@@ -105,6 +105,8 @@ public class BackendPackager {
     protected boolean sqlite = true;
     /// Make a failed cast throw.
     protected boolean checkedCasts = true;
+    /// Whether the binary carries the development MCP tools; see [#devTools(boolean)].
+    protected boolean devTools;
 
     /// Sets [mainClass].
     public BackendPackager mainClass(String v) {
@@ -140,6 +142,15 @@ public class BackendPackager {
     /// Sets [sqlite].
     public BackendPackager sqlite(boolean v) {
         this.sqlite = v;
+        return this;
+    }
+
+    /// Whether the packaged server carries the development MCP tools. Off by
+    /// default: they read the database and call the server on an agent's
+    /// behalf, and a production binary should not contain them at all -- not
+    /// merely have them switched off. The JVM run has them.
+    public BackendPackager devTools(boolean v) {
+        this.devTools = v;
         return this;
     }
 
@@ -268,6 +279,7 @@ public class BackendPackager {
                     + err.getMessage(), err);
         }
         RestControllerAnnotationProcessor processor = new RestControllerAnnotationProcessor();
+        processor.setDevTools(devTools);
         ProcessorContext ctx = new ProcessorContext(classes, new File(work, "stubs"), index,
                 getLog(), host.baseDir(), new Properties(), mainClass,
                 java.util.Collections.<String>emptyList(), "UTF-8",
@@ -315,6 +327,8 @@ public class BackendPackager {
                     processor.processClass(cls, ctx);
                 }
             }
+            // finish() runs the bean pass -- the wiring, the rewritten classes and
+            // the classes generated beside them -- into this same tree.
             processor.finish(ctx);
             entities.enhance(ctx);
         } catch (ProcessingException err) {
@@ -322,7 +336,7 @@ public class BackendPackager {
                     + err.getMessage(), err);
         }
         if (ctx.hasErrors()) {
-            StringBuilder sb = new StringBuilder("@RestController could not be processed:");
+            StringBuilder sb = new StringBuilder("The backend's annotations could not be processed:");
             for (ProcessorContext.ProcessingError e : ctx.getErrors()) {
                 sb.append("\n  ").append(e);
             }

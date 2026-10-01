@@ -119,7 +119,8 @@ generate_gradle_app() {
   use_local_plugin "$name-gradle"
 }
 
-# Starts a backend with the given task, waits for /healthz to answer, then
+# Starts a backend with the given task, waits for /healthz to answer, checks
+# the template's /greet route answers through its injected Greeter service, then
 # stops it, on the dev profile the template documents (in-memory SQLite).
 # PORT overrides cn1.server.port, so parallel runs do not collide.
 #   check_backend_healthz <project-dir> <task> <log>
@@ -134,12 +135,16 @@ check_backend_healthz() {
     kill -0 $pid 2>/dev/null || break
     sleep 1
   done
+  local greeting=""
+  [ -n "$body" ] && greeting=$(curl -fsS "http://127.0.0.1:$port/greet/gradle" 2>/dev/null || true)
   stop_tree $pid
   [ -n "$body" ] || { cat "$log"; fail "$task never answered /healthz on port $port"; }
   echo "   $task /healthz: $body"
+  [ "$greeting" = "Hello, gradle" ] || { cat "$log"; fail "$task did not answer /greet through its injected service (got '$greeting')"; }
 }
 
-# Checks a packaged backend binary answers /healthz.
+# Checks a packaged backend binary answers /healthz, and /greet through the
+# Greeter service the build wired into it.
 #   check_binary_healthz <binary> <working-dir> <log>
 check_binary_healthz() {
   local bin="$1" dir="$2" log="$3"
@@ -152,9 +157,12 @@ check_binary_healthz() {
     kill -0 $pid 2>/dev/null || break
     sleep 1
   done
+  local greeting=""
+  [ -n "$body" ] && greeting=$(curl -fsS "http://127.0.0.1:$port/greet/gradle" 2>/dev/null || true)
   stop_tree $pid
   [ -n "$body" ] || { cat "$log"; fail "$bin never answered /healthz on port $port"; }
   echo "   $(basename "$bin") /healthz: $body"
+  [ "$greeting" = "Hello, gradle" ] || { cat "$log"; fail "$bin did not answer /greet through its injected service (got '$greeting')"; }
 }
 
 # Kills a process and its children (gradlew forks the backend JVM).

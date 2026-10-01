@@ -65,6 +65,13 @@ if [ ! -f "backend/target/classes/$ROUTER_DIR/ApiRouter.class" ]; then
   echo "no router was generated for the @RestController" >&2
   exit 1
 fi
+# The beans are wired by a class the build generates beside the entry point; the
+# sample's controller takes its Greeter service through the constructor, so a
+# missing BackendWiring means dependency injection did not happen at all.
+if [ ! -f "backend/target/classes/$ROUTER_DIR/BackendWiring.class" ]; then
+  echo "no BackendWiring was generated for the backend's beans" >&2
+  exit 1
+fi
 
 # `cn1:backend-package` -- the goal that turns the module above into a native
 # binary -- ON A JDK THAT IS NOT 8, with JDK_8_HOME deliberately unset.
@@ -129,8 +136,15 @@ else
     fi
     sleep 1
   done
+  # The route that goes through an injected @Service, while the binary still runs.
+  GREETING="$(curl -s --max-time 5 "http://127.0.0.1:$BACKEND_PORT/greet/archetype" || true)"
   kill -9 $BACKEND_PID 2>/dev/null || true
   trap 'set_auto_bundle_pref false' EXIT
+  if [ "$HEALTH" = "ok" ] && [ "$GREETING" != "Hello, archetype" ]; then
+    echo "the packaged backend did not answer /greet through its injected service (got '$GREETING'):" >&2
+    cat backend/target/backend-run.log >&2
+    exit 1
+  fi
   if [ "$HEALTH" != "ok" ]; then
     echo "the packaged backend did not answer /healthz with ok (got '$HEALTH'):" >&2
     cat backend/target/backend-run.log >&2

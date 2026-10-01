@@ -96,6 +96,8 @@ final class BackendPackageSupport {
                     .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
             t.getCheckedCasts().set(project.getProviders().gradleProperty("cn1.backend.checkedCasts")
                     .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
+            t.getDevTools().set(project.getProviders().gradleProperty("cn1.backend.devTools")
+                    .map(Boolean::parseBoolean).orElse(Boolean.FALSE));
             t.getBinary().set(new File(layout.buildDir(), project.getName()));
         });
     }
@@ -158,6 +160,11 @@ final class BackendPackageSupport {
         @Input
         public abstract Property<Boolean> getCheckedCasts();
 
+        /// Carry the development MCP tools in the binary (`-Pcn1.backend.devTools`);
+        /// off by default, as for Maven's backend-package.
+        @Input
+        public abstract Property<Boolean> getDevTools();
+
         /// The binary.
         @OutputFile
         public abstract RegularFileProperty getBinary();
@@ -188,7 +195,8 @@ final class BackendPackageSupport {
             try {
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
-                        .sqlite(getSqlite().get()).checkedCasts(getCheckedCasts().get()).execute();
+                        .sqlite(getSqlite().get()).checkedCasts(getCheckedCasts().get())
+                        .devTools(getDevTools().get()).execute();
             } catch (BuildExecutionException ex) {
                 throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
             }

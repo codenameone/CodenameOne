@@ -343,6 +343,8 @@ public class GeneratorModel {
                 gradleTemplate(scaffold, "backend/application-dev.properties.txt", taskPrefix));
         putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Api.java",
                 gradleTemplate(scaffold, "backend/Api.java.txt", taskPrefix));
+        putGradleText(entries, dir + "src/main/java/" + packageName.replace('.', '/') + "/Greeter.java",
+                gradleTemplate(scaffold, "backend/Greeter.java.txt", taskPrefix));
     }
 
     private void putGradleText(Map<String, byte[]> entries, String path, String content) throws IOException {

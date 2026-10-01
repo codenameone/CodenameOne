@@ -161,6 +161,15 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.checkedCasts", defaultValue = "true")
     private boolean checkedCasts;
 
+    /**
+     * Whether the packaged server carries the development MCP tools. Off by
+     * default: they read the database and call the server on an agent's behalf,
+     * and a production binary should not contain them at all -- not merely have
+     * them switched off. {@code cn1:backend} runs the JVM build, which has them.
+     */
+    @Parameter(property = "cn1.backend.devTools", defaultValue = "false")
+    private boolean devTools;
+
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
             packager().execute();
@@ -205,7 +214,7 @@ public class BackendPackageMojo extends AbstractMojo {
             }
         };
         return p.mainClass(mainClass).output(output).target(target).jdk(jdkHome, jdk8Home).cflags(cflags)
-                .sqlite(sqlite).checkedCasts(checkedCasts);
+                .sqlite(sqlite).checkedCasts(checkedCasts).devTools(devTools);
     }
 
     /**

@@ -939,6 +939,19 @@ class OtlpTracerTest {
             HttpURLConnection connection = (HttpURLConnection)new URL(
                     "http://127.0.0.1:" + port + "/x").openConnection();
             assertEquals(200, connection.getResponseCode());
+            // The request's span ends after its response is written, so the client
+            // can read the 200 before the span is queued -- and a flush then has
+            // nothing to wait for and returns at once. Wait for the span first.
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                java.util.Map now = backend.getServer().getMetrics();
+                if (((Number) now.get("spansQueued")).intValue() > 0
+                        || ((Number) now.get("spansExported")).longValue() > 0
+                        || now.get("spansRejected") != null) {
+                    break;
+                }
+                Thread.sleep(10);
+            }
             Tracing.getTracer().flush(5000);
             metrics = backend.getServer().getMetrics();
         } finally {

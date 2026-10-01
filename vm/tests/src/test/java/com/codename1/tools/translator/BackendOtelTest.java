@@ -75,7 +75,7 @@ class BackendOtelTest {
     private static final String WS_REFUSED_TRACE = "7d0a1e4bb7c9a2f35e61d8c04f2b9a13";
 
     @Test
-    @DisplayName("a translated server exports one connected trace, and an untraced one carries no tracer")
+    @DisplayName("a translated server exports one connected trace, and an untraced one carries no tracer, management or MCP")
     void tracesOnThePackagedRuntime() throws Exception {
         if (CompilerHelper.isWindows()) {
             BackendTestSupport.skipOrFail("the server-side backend is POSIX-only for now");
@@ -106,6 +106,17 @@ class BackendOtelTest {
                 "the traced binary carries no tracer symbols; the check below would be vacuous");
         assertEquals(0, otelSymbols(untraced),
                 "a server that never asked for tracing links the tracer anyway");
+        // The same claim for the server's own endpoints, which the docs make: the
+        // generated entry point names them only when the build asked, and a
+        // server that never did must not carry them.
+        assertTrue(symbols(traced, "com_codename1_backend_Management_") > 0
+                        && symbols(traced, "com_codename1_backend_mcp_McpServer_") > 0,
+                "the control links management and MCP and carries neither symbol; the "
+                        + "check below would be vacuous");
+        assertEquals(0, symbols(untraced, "com_codename1_backend_Management_"),
+                "a server that never asked for the management endpoints links them anyway");
+        assertEquals(0, symbols(untraced, "com_codename1_backend_mcp_McpServer_"),
+                "a server that never asked for MCP links the endpoint anyway");
 
         final List exports = Collections.synchronizedList(new ArrayList());
         final List contentTypes = Collections.synchronizedList(new ArrayList());
@@ -271,10 +282,15 @@ class BackendOtelTest {
 
     /** How many translated symbols of the tracer package a binary holds. */
     private static int otelSymbols(Path binary) throws Exception {
+        return symbols(binary, "com_codename1_backend_otel_");
+    }
+
+    /** How many of a binary's symbols contain `prefix`. */
+    private static int symbols(Path binary, String prefix) throws Exception {
         String symbols = BackendTestSupport.run(Arrays.asList("nm", binary.toString()), 120);
         int count = 0;
         int at = 0;
-        while ((at = symbols.indexOf("com_codename1_backend_otel_", at)) >= 0) {
+        while ((at = symbols.indexOf(prefix, at)) >= 0) {
             count++;
             at++;
         }

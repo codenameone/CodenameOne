@@ -43,7 +43,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /// Turns an existing Maven or Ant Codename One application into the Gradle
@@ -85,14 +87,22 @@ public final class GradleConversion {
         return this;
     }
 
-    /// Whether `backend` is exactly the generated skeleton: one controller, the
-    /// generated `Api` with its `/healthz` and `/echo` routes and nothing else.
+    /// Whether `backend` is exactly the generated skeleton: the generated `Api`
+    /// controller with its routes, the `Greeter` service it is given, and nothing
+    /// else.
     static boolean isUntouchedSkeleton(File backend) {
-        // The generated sources and nothing else: one Api.java, no Kotlin, no
-        // resources, no extra profiles.
+        // The generated sources and nothing else: Api.java and Greeter.java side by
+        // side, no Kotlin, no resources, no extra profiles.
         List<File> sources = new ArrayList<File>();
         collectFiles(new File(backend, "src"), sources);
-        if (sources.size() != 1 || !"Api.java".equals(sources.get(0).getName())) {
+        Map<String, File> byName = new HashMap<String, File>();
+        for (File f : sources) {
+            byName.put(f.getName(), f);
+        }
+        File api = byName.get("Api.java");
+        File greeter = byName.get("Greeter.java");
+        if (sources.size() != 2 || api == null || greeter == null
+                || !api.getParentFile().equals(greeter.getParentFile())) {
             return false;
         }
         String[] profiles = backend.list((d, n) -> n.startsWith("application-") && n.endsWith(".properties")
@@ -107,8 +117,7 @@ public final class GradleConversion {
             // Compared as code, not by counting routes: a backend that kept the two
             // generated routes but changed what they do, secured them or added a
             // helper is someone's work, and leaving it behind would lose it.
-            String api = new String(Files.readAllBytes(sources.get(0).toPath()), StandardCharsets.UTF_8);
-            if (!javaCode(api).equals(javaCode(GradleProjectTemplate.text("backend/Api.java.txt")))) {
+            if (!sameCode(api, "backend/Api.java.txt") || !sameCode(greeter, "backend/Greeter.java.txt")) {
                 return false;
             }
             return sameSettings(new File(backend, "application.properties"), "backend/application.properties.txt")
@@ -154,6 +163,12 @@ public final class GradleConversion {
             }
         }
         return true;
+    }
+
+    /// Whether `source` is the template's code, whatever its comments and package.
+    private static boolean sameCode(File source, String template) throws IOException {
+        String code = new String(Files.readAllBytes(source.toPath()), StandardCharsets.UTF_8);
+        return javaCode(code).equals(javaCode(GradleProjectTemplate.text(template)));
     }
 
     /// Java source reduced to its code: comments, whitespace, the package line

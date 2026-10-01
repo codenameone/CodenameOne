@@ -54,6 +54,48 @@ public final class Tracing {
     private static volatile Tracer tracer; //NOPMD AvoidUsingVolatile - read on every request without the lock
     private static final ThreadLocal CURRENT = new ThreadLocal();
     private static final ThreadLocal SUPPRESSED = new ThreadLocal();
+    /// The tracer of the server whose work this thread is doing when no span says
+    /// so: a websocket callback runs after its upgrade's span has ended, and with
+    /// two servers in one process the installed tracer is only the latest one's.
+    private static final ThreadLocal OWNER = new ThreadLocal();
+
+    /// The owner of a server that traces nothing. Null already means "whatever
+    /// tracer is installed", which is right for a bare HttpServer or a program's
+    /// own threads -- and wrong for a backend with tracing off: another backend in
+    /// the same process installing its tracer would then export this one's
+    /// requests, jobs and callbacks under the other's service name. A server with
+    /// tracing off passes this instead, and nothing it does is traced.
+    static final Tracer NONE = new Untraced();
+
+    private static final class Untraced implements Tracer {
+        @Override
+        public boolean open(Config config) {
+            return false;
+        }
+
+        @Override
+        public Span startSpan(String name, int kind, Span parent, String traceparent,
+                              String tracestate) {
+            return null;
+        }
+
+        @Override
+        public void flush(int timeoutMillis) {
+        }
+
+        @Override
+        public void shutdown(int timeoutMillis) {
+        }
+
+        @Override
+        public HttpServer.Handler relay() {
+            return null;
+        }
+
+        @Override
+        public void metrics(Map out) {
+        }
+    }
     private static volatile boolean reportedFailure; //NOPMD AvoidUsingVolatile - set once from any host thread
     private static final Span NOOP = new NoopSpan();
 
@@ -129,12 +171,32 @@ public final class Tracing {
     /// can block for seconds.
     private static final Object LIFECYCLE = new Object();
 
+    /// Tracers of servers that are running. A server's start used to retire
+    /// whatever tracer it displaced -- including a live server's, whose requests
+    /// then went out under the newcomer's name and endpoint while its own
+    /// exporter was stopped. An owned tracer is left alone and stopped by its
+    /// server.
+    private static final List OWNED = new ArrayList();
+
     /// A start-up completed: what its tracer displaced is stopped.
     static void commit(Swap claim) {
+        commit(claim, false);
+    }
+
+    /// A start-up completed. With `owned` the installed tracer belongs to
+    /// the server that just started and lives until that server stops it with
+    /// [#shutdown]; a displaced tracer another running server owns is kept.
+    static void commit(Swap claim, boolean owned) {
         Tracer displaced;
         synchronized (LIFECYCLE) {
             PENDING.remove(claim);
             displaced = claim.previous;
+            if (owned && claim.installed != null && !OWNED.contains(claim.installed)) {
+                OWNED.add(claim.installed);
+            }
+            if (displaced != null && OWNED.contains(displaced)) {
+                displaced = null;
+            }
         }
         retire(displaced, claim.installed);
     }
@@ -144,7 +206,7 @@ public final class Tracing {
         if (previous != null && previous != installed) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
             try {
                 previous.shutdown(REPLACED_SHUTDOWN_MILLIS);
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
             }
         }
@@ -193,7 +255,7 @@ public final class Tracing {
                 // failed after its database initialisation holds exactly the spans
                 // that explain the failure, and shutdown(0) dropped them unsent.
                 stopFailed.shutdown(REPLACED_SHUTDOWN_MILLIS);
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
             }
         }
@@ -240,22 +302,121 @@ public final class Tracing {
         } catch (Exception err) {
             guardedException(span, err);
             throw err;
+        } catch (Error err) {
+            // Recorded too: the span ends in the finally either way, and an
+            // AssertionError that failed the work must not export as a success.
+            guardedException(span, err);
+            throw err;
         } finally {
             finish(span);
         }
     }
 
-    /// A new child of the current span that is NOT made current, for work whose
-    /// start and end are in different places. The caller must end it.
+    /// The current span when tracing is on, for handing to work that runs on
+    /// another thread; null otherwise.
+    static Span captureParent() {
+        return active() == null ? null : currentOrNull();
+    }
+
+    /// The tracer a span started now reports to: the one that made the current
+    /// span, so everything a request does is exported by the tracer of the server
+    /// serving it -- with two servers in one process, the installed one is only
+    /// the latest -- and otherwise the installed one.
+    static Tracer active() {
+        Span current = currentOrNull();
+        if (current != null && current.owner != null) {
+            return current.owner;
+        }
+        Object owner = OWNER.get();
+        if (owner == NONE) { //NOPMD CompareObjectsWithEquals - the untraced marker, by identity
+            return null;
+        }
+        if (owner instanceof Tracer) {
+            return (Tracer) owner;
+        }
+        return tracer;
+    }
+
+    /// The owner this thread's work was bound to, for work handed to another
+    /// thread with no span to carry it; null when unbound.
+    static Tracer captureOwner() {
+        Object owner = OWNER.get();
+        return owner instanceof Tracer ? (Tracer) owner : null;
+    }
+
+    /// Makes `own` the tracer this thread's spans report to while no span of
+    /// its own is current; answers what to hand [#disown] afterwards. A null
+    /// `own` leaves the installed tracer in charge.
+    static Object own(Tracer own) {
+        Object previous = OWNER.get();
+        OWNER.set(own);
+        return previous;
+    }
+
+    /// Restores what [#own] replaced.
+    static void disown(Object previous) {
+        OWNER.set(previous);
+    }
+
+    /// Runs `work` on this thread as a span whose parent is `parent`,
+    /// captured on the thread that scheduled it -- an `@Async` method's
+    /// caller -- or as a root span when that is null, as a scheduled job's run is.
+    static Object inBackground(String name, Span parent, Work work) throws Exception {
+        return inBackground(name, parent, null, work);
+    }
+
+    /// [#inBackground(String,Span,Work)] reporting to `own` when
+    /// there is no parent to take the tracer from -- a scheduled run, whose
+    /// scheduler knows which server it belongs to.
+    static Object inBackground(String name, Span parent, Tracer own, Work work)
+            throws Exception {
+        // The parent's tracer: the run belongs to whoever started it.
+        Tracer t = parent != null && parent.owner != null ? parent.owner
+                : own != null ? own : tracer;
+        if (t == null || t == NONE || isSuppressed()) { //NOPMD CompareObjectsWithEquals - the untraced marker
+            return work.run(NOOP);
+        }
+        Span span = null;
+        try {
+            span = t.startSpan(name, Span.KIND_INTERNAL, parent, null, null);
+            if (span != null) {
+                span.owner = t;
+                enter(span);
+            }
+        } catch (Throwable err) {
+            failed(err);
+            span = null;
+        }
+        if (span == null) {
+            return work.run(NOOP);
+        }
+        try {
+            return work.run(span);
+        } catch (Exception err) {
+            guardedException(span, err);
+            throw err;
+        } catch (Error err) {
+            // Recorded too: the span ends in the finally either way, and an
+            // AssertionError that failed the work must not export as a success.
+            guardedException(span, err);
+            throw err;
+        } finally {
+            finish(span);
+        }
+    }
+
     public static Span startSpan(String name) {
-        Tracer t = tracer;
+        Tracer t = active();
         if (t == null || isSuppressed()) {
             return NOOP;
         }
         try {
             Span span = t.startSpan(name, Span.KIND_INTERNAL, currentOrNull(), null, null);
+            if (span != null) {
+                span.owner = t;
+            }
             return span == null ? NOOP : span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return NOOP;
         }
@@ -289,9 +450,12 @@ public final class Tracing {
     /// generated routers, which are the only code that knows the TEMPLATE -- the
     /// path alone would make every pet id its own operation.
     public static void route(String template) {
+        // The request histogram's label, when metrics are on: one static read
+        // when they are not.
+        com.codename1.backend.metrics.Metrics.route(template);
         // Every generated router calls this on every matched request, traced or
         // not; with no tracer that is this one read and nothing else.
-        if (tracer == null) {
+        if (tracer == null && currentOrNull() == null) {
             return;
         }
         Span span = currentOrNull();
@@ -314,7 +478,7 @@ public final class Tracing {
             if (name != null && name.indexOf(' ') < 0) {
                 span.updateName(name + " " + template);
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -327,8 +491,16 @@ public final class Tracing {
     /// The span for one request, made current. Everything is read from the
     /// request NOW, because a Request is valid only while its handler runs.
     static Span startServer(HttpServer.Request request, boolean secure) {
-        Tracer t = tracer;
-        if (t == null || request == null) {
+        return startServer(request, secure, null);
+    }
+
+    /// [#startServer(HttpServer.Request,boolean)] with the tracer of the
+    /// server the request reached, when it has one of its own: a second server in
+    /// the process installs its tracer over the first's, and the first's requests
+    /// must still go to the first's endpoint under its service name.
+    static Span startServer(HttpServer.Request request, boolean secure, Tracer own) {
+        Tracer t = own != null ? own : tracer;
+        if (t == null || t == NONE || request == null) { //NOPMD CompareObjectsWithEquals - the untraced marker
             return null;
         }
         Span span = null;
@@ -339,6 +511,7 @@ public final class Tracing {
             if (span == null) {
                 return null;
             }
+            span.owner = t;
             if (span.isRecording()) {
                 span.setAttribute("http.request.method", method);
                 String target = request.getTarget();
@@ -365,7 +538,7 @@ public final class Tracing {
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             abandon(span);
             return null;
@@ -395,7 +568,7 @@ public final class Tracing {
                     span.setError("the response could not be written");
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         finish(span);
@@ -414,13 +587,21 @@ public final class Tracing {
     /// ends after that write; shutting the tracer down first made the exporter
     /// refuse that span, so every shutdown requested over HTTP lost its own trace.
     static void shutdownAfterServing(Tracer owned, int timeoutMillis) {
-        Span serving = servingSpan();
-        if (serving != null) {
-            serving.shutdownOnEnd = owned;
-            serving.shutdownOnEndMillis = timeoutMillis;
-            return;
+        if (!shutdownWhenServingEnds(owned, timeoutMillis)) {
+            shutdown(owned, timeoutMillis);
         }
-        shutdown(owned, timeoutMillis);
+    }
+
+    /// Arranges for `owned` to stop once the request this thread is serving
+    /// has ended its span; false, arranging nothing, when it serves none.
+    static boolean shutdownWhenServingEnds(Tracer owned, int timeoutMillis) {
+        Span serving = servingSpan();
+        if (serving == null) {
+            return false;
+        }
+        serving.shutdownOnEnd = owned;
+        serving.shutdownOnEndMillis = timeoutMillis;
+        return true;
     }
 
     /// The server span of the request this thread is serving, or null.
@@ -432,7 +613,7 @@ public final class Tracing {
                 if (span.getKind() == Span.KIND_SERVER) {
                     return span;
                 }
-            } catch (RuntimeException err) {
+            } catch (Throwable err) {
                 failed(err);
                 return null;
             }
@@ -445,7 +626,7 @@ public final class Tracing {
     /// is off, suppressed on this thread, or already inside a client span -- one
     /// outbound operation is one span, whatever it happens to be built from.
     static Span startHttpClient(String method, String url, List callerHeaders) {
-        Tracer t = tracer;
+        Tracer t = active();
         if (t == null || isSuppressed()) {
             return null;
         }
@@ -473,7 +654,7 @@ public final class Tracing {
                     }
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         return span;
@@ -501,7 +682,7 @@ public final class Tracing {
                 out.add(TRACESTATE + ": " + state);
             }
             return out;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return null;
         }
@@ -527,7 +708,7 @@ public final class Tracing {
                     span.setError(String.valueOf(status));
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         finish(span);
@@ -540,7 +721,7 @@ public final class Tracing {
     /// inlines literals into its SQL can drop the text with
     /// `cn1.otel.attributes.exclude=db.query.text`.
     static Span startDatabase(String system, String sql) {
-        Tracer t = tracer;
+        Tracer t = active();
         if (t == null || isSuppressed()) {
             return null;
         }
@@ -560,7 +741,7 @@ public final class Tracing {
                     span.setAttribute("db.query.text", sql);
                 }
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
         return span;
@@ -575,7 +756,7 @@ public final class Tracing {
             if (span.isRecording()) {
                 span.setAttribute(key, value);
             }
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -644,7 +825,7 @@ public final class Tracing {
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             abandon(span);
             return null;
@@ -681,7 +862,7 @@ public final class Tracing {
         }
         try {
             t.flush(timeoutMillis);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -704,8 +885,15 @@ public final class Tracing {
         }
         boolean stop = false;
         synchronized (LIFECYCLE) {
+            boolean wasOwned = OWNED.remove(owned);
             if (tracer == owned) { //NOPMD CompareObjectsWithEquals - tracer instances are compared by identity
-                tracer = null;
+                // Another running server's tracer takes the slot, so the work a
+                // thread does outside any request is still traced somewhere.
+                tracer = OWNED.isEmpty() ? null : (Tracer) OWNED.get(OWNED.size() - 1);
+                stop = true;
+            } else if (wasOwned) {
+                // Displaced by a later server, left running for its own; stopped
+                // now that its server is.
                 stop = true;
             }
             for (Object pending : PENDING) {
@@ -721,7 +909,7 @@ public final class Tracing {
         }
         try {
             owned.shutdown(timeoutMillis);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -734,7 +922,7 @@ public final class Tracing {
         }
         try {
             t.metrics(out);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -751,7 +939,7 @@ public final class Tracing {
     /// query of its own to learn its key is one statement to the caller, and an
     /// outbound call cannot have another outbound call inside it.
     private static Span begin(String name, int kind, String traceparent, String tracestate) {
-        Tracer t = tracer;
+        Tracer t = active();
         if (t == null || isSuppressed()) {
             return null;
         }
@@ -764,12 +952,15 @@ public final class Tracing {
                 return null;
             }
             Span span = t.startSpan(name, kind, parent, traceparent, tracestate);
+            if (span != null) {
+                span.owner = t;
+            }
             if (span == null) {
                 return null;
             }
             enter(span);
             return span;
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
             return null;
         }
@@ -802,7 +993,7 @@ public final class Tracing {
         }
         try {
             span.end();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -818,13 +1009,13 @@ public final class Tracing {
         }
         try {
             span.discard();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             // The tracer is already failing; ending the span below still matters.
             failed(err);
         }
         try {
             span.end();
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
@@ -832,13 +1023,20 @@ public final class Tracing {
     private static void guardedException(Span span, Throwable error) {
         try {
             span.recordException(error);
-        } catch (RuntimeException err) {
+        } catch (Throwable err) {
             failed(err);
         }
     }
 
     /// Once per process: a broken tracer must not also flood the log.
-    private static void failed(RuntimeException err) {
+    /// Every hook into the tracer catches Throwable, not just RuntimeException:
+    /// an AssertionError or a LinkageError out of a tracer is as much a
+    /// monitoring fault as an exception, and letting it escape would fail the
+    /// request -- and every later one, since the tracer stays installed. That
+    /// includes a VirtualMachineError raised inside the tracer's own code; if
+    /// the process really is out of memory, the request's next allocation says
+    /// so on its own.
+    private static void failed(Throwable err) {
         if (!reportedFailure) {
             reportedFailure = true;
             System.err.println("tracing failed and the operation continued untraced: " + err);

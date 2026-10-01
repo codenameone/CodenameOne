@@ -48,6 +48,10 @@ class GradleConversionTest {
     private static final String UNTOUCHED_API = template("backend/Api.java.txt")
             .replace("${package}", "a.backend").replace("__BACKEND__", ":backend:");
 
+    /// The service the generated Api is given, as the archetype writes it.
+    private static final String UNTOUCHED_GREETER = template("backend/Greeter.java.txt")
+            .replace("${package}", "a.backend");
+
     private static final String GENERATED_BACKEND_POM = "<project><dependencies>"
             + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-backend</artifactId>"
             + "</dependency>"
@@ -148,6 +152,7 @@ class GradleConversionTest {
         touch(mvn, "backend/application.properties", template("backend/application.properties.txt"));
         touch(mvn, "backend/application-dev.properties", template("backend/application-dev.properties.txt"));
         touch(mvn, "backend/src/main/java/a/backend/Api.java", backendApi);
+        touch(mvn, "backend/src/main/java/a/backend/Greeter.java", UNTOUCHED_GREETER);
         return mvn;
     }
 
@@ -685,6 +690,26 @@ class GradleConversionTest {
                 "the backend keeps its own libraries: " + backendBuild);
         assertFalse(backendBuild.contains("codenameone-backend"), "the plugin adds the runtime: " + backendBuild);
         assertFalse(backendBuild.contains("kotlin("), "a Java backend needs no Kotlin plugin: " + backendBuild);
+    }
+
+    @Test
+    void aBackendWhoseServiceChangedIsConverted() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "backend/src/main/java/a/backend/Greeter.java",
+                UNTOUCHED_GREETER.replace("\"Hello, \"", "\"Welcome, \""));
+        assertFalse(GradleConversion.isUntouchedSkeleton(new File(mvn, "backend")));
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(read(new File(out, "backend/src/main/java/a/backend/Greeter.java")).contains("Welcome, "),
+                "the changed service is someone's work and is kept");
+    }
+
+    @Test
+    void anOlderSkeletonWithoutItsServiceIsNotUntouched() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        new File(mvn, "backend/src/main/java/a/backend/Greeter.java").delete();
+        assertFalse(GradleConversion.isUntouchedSkeleton(new File(mvn, "backend")),
+                "an Api that names a Greeter nobody declares is not the generated skeleton");
     }
 
     @Test

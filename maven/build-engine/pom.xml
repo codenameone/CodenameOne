@@ -40,6 +40,14 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- The backend's JVM database driver, so the bean tests can run the
+             generated wiring of a transactional service against a real SQLite. -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>test</scope>
+        </dependency>
         <!-- JUnit 4 tests run through Surefire's JUnit Platform provider, which
              needs the Vintage engine or it silently reports zero tests. -->
         <dependency>

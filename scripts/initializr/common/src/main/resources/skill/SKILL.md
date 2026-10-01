@@ -1,6 +1,6 @@
 ---
 name: codename-one
-description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven or Gradle, ParparVM/Android/iOS/JavaScript). Use when the project contains a `codenameone_settings.properties` (in `common/` for Maven, at the root for Gradle), a `settings.gradle.kts` applying the `com.codenameone` plugin, depends on `com.codenameone:codenameone-core`, edits CSS files under `src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build` or `./gradlew run`, references `com.codename1.ui.*` / `com.codename1.testing.*`, or when the user asks to build a UI, write screen tests, generate screenshots, or compare to Swing/HTML.
+description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven or Gradle, ParparVM/Android/iOS/JavaScript). Use when the project contains a `codenameone_settings.properties` (in `common/` for Maven, at the root for Gradle), a `settings.gradle.kts` applying the `com.codenameone` plugin, depends on `com.codenameone:codenameone-core`, edits CSS files under `src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build` or `./gradlew run`, references `com.codename1.ui.*` / `com.codename1.testing.*`, works in the `backend/` project (`cn1:backend`, `./gradlew runBackend`, `com.codename1.backend.*`, `@RestController`, `@Service`, `@Transactional`, `@Scheduled`), or when the user asks to build a UI, write screen tests, generate screenshots, build a server or full-stack feature, or compare to Swing/HTML.
 metadata:
   type: skill
 ---
@@ -43,6 +43,8 @@ This skill teaches you how to write code for a Codename One (CN1) cross-platform
 - `references/3d-graphics.md` — Portable GPU 3D (`com.codename1.gpu`): the `RenderView` + `Renderer` loop, declarative `Material` / `VertexFormat` (engine-generated shaders — no GLSL), `Primitives`, `GltfLoader` for glTF models, `Camera` / `Light` / `Matrix4`, and platform backends. Read this for product viewers, 3D scenes, or custom GPU rendering.
 - `references/snapshot-builds.md` — Edge case: compiling against a Codename One SNAPSHOT from git.
 - `references/debugging.md` — `jdb`-attach workflow for an agent: start the simulator paused, set breakpoints, dump locals, drive the session non-interactively from a script.
+- `references/backend.md` — The **server side** (`backend/` module): Spring-style `@RestController`, `@Service`, `@Autowired`, `@Value`, scopes, `@Transactional`, `@Async`/`@Scheduled` and virtual vs platform threads, sessions, metrics and management endpoints, `@McpTool`, the development MCP tools (`backend_routes`, `backend_call`, `backend_sql`, ...), testing, and what each build error means. Everything is resolved at **build time** — read this before writing backend code, because a few Spring habits (runtime scanning, reflection, `org.springframework` imports) do not apply.
+- `references/full-stack-loop.md` — A change that spans the app **and** the backend: run the backend, connect its MCP and the simulator's, point the app at it, then drive the UI while checking the requests and rows the server saw.
 - `references/mcp-agent-control.md` — Driving the **running** simulator yourself over MCP: turn the server on from the simulator's `MCP` menu, register it with Claude Desktop / Claude Code / Codex in one click, then read the screen with `ui_snapshot`, find a field with `ui_find`, type with `ui_set_text` and tap with `ui_activate`. Read this when you need to know whether a flow *behaves* correctly, not just how it looks.
 - `tools/` — runnable Java 17 single-file utilities. `tools/IsApiSupported.java` answers "is this `java.*` class in the CN1 subset?"; `tools/IsCssValid.java` answers "does this `theme.css` compile?"; `tools/CompareToMockup.java` scores a rendered screenshot against a designer mockup (similarity %, with region masking); `tools/DesignImport.java` turns a Figma/Sketch/Adobe XD design — or an HTML/React design's `tokens.css`/`styles.css` (Claude-generated mockups) — into starter CN1 CSS + tokens + a layout map. **`tools/DumpForm.java`** boots the app in **desktop mode** and dumps a model of the current screen, which **`tools/DescribeForm.java`** (vision-free outline), **`tools/AlignmentCheck.java`** (designer alignment guides) and **`tools/GuiLint.java`** (nested scroll, opaque text/containers, image borders) analyse. **`tools/UpdateSkills.java`** self-updates this whole skill from GitHub. Run with `java tools/<Name>.java <args>`.
 
@@ -77,6 +79,7 @@ Every path in this skill and its references is written relative to the **app dir
 | Update Codename One | `mvn cn1:update` | `./gradlew cn1Update` |
 | Add a cn1lib | a `<dependency>` in `common/pom.xml` | `cn1lib("group:artifact-lib:version")` in `build.gradle.kts` |
 | Run the app's backend | `mvn -pl backend -Dcodename1.platform=backend cn1:backend` | `./gradlew :backend:runBackend` (`./gradlew addBackend` creates it) |
+| Package the backend as a native binary | `mvn -pl backend -Dcodename1.platform=backend cn1:backend-package` | `./gradlew :backend:backendPackage` |
 
 `./gradlew tasks` lists every task. A `-Dcodename1.arg.<hint>=<value>` override on a Maven command is `-Pcodename1.arg.<hint>=<value>` on a Gradle task. On Windows use `.\gradlew.bat` (or `mvnw.cmd`).
 
@@ -120,10 +123,13 @@ my-app/
 ├── javase/                       # Desktop simulator port
 ├── android/                      # Android wrapper (built via build server or local Gradle)
 ├── ios/                          # iOS wrapper (ParparVM)
-└── javascript/                   # TeaVM-based web port
+├── javascript/                   # TeaVM-based web port
+└── backend/                      # Optional server side (see references/backend.md)
+    ├── application.properties    # Server settings: in the MODULE ROOT, not src/main/resources
+    └── src/main/java/<pkg>/      # @RestController / @Service classes (Java 8 level, no UI classes)
 ```
 
-**Only edit `common/`**. The platform modules are thin wrappers — touching them is almost always wrong unless you are intentionally writing a native interface.
+**Only edit `common/`** for the app, and `backend/` for the server. The platform modules are thin wrappers — touching them is almost always wrong unless you are intentionally writing a native interface.
 
 ## Java version and language features
 
@@ -330,6 +336,11 @@ mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios
 # Use -Dcodename1.buildTarget=javascript instead for the cloud builder; set
 # javascript.port=teavm only when the legacy compatibility fallback is needed.
 mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
+
+# The backend: run it on this JVM (dev profile = in-memory database + MCP dev tools at /mcp),
+# or package it as a native server binary. -Dcodename1.platform=backend is required.
+CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
+mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
 ```
 
 See `references/build-and-run.md` for the local-vs-cloud matrix, automated-build mode (Enterprise), iOS local-build prerequisites, and the complete goal list. The full `codename1.arg.*` index lives in `references/build-hints.md`.
@@ -385,6 +396,9 @@ If you cannot run the simulator (e.g. headless environment), **say so explicitly
 | "Debug a faulty screen — attach `jdb` to the simulator" | `references/debugging.md` |
 | "It only breaks on the phone" / "attach a debugger to the Android/iOS build" / `android.onDeviceDebug`, `ios.onDeviceDebug` / drive the app on a device over MCP | `references/on-device-debugging.md` |
 | "Try the flow" / "fill in this form and press submit" / "drive the running app" / MCP | `references/mcp-agent-control.md` |
+| "Add an endpoint / a service / a scheduled job" / `@RestController`, `@Service`, `@Transactional`, `@Scheduled`, `@Async` / "the server side" | `references/backend.md` |
+| "Inspect or exercise the running backend" / `backend_*` MCP tools / "why did this request fail" | `references/backend.md` |
+| "Build this feature end to end" / "the screen should save to the server" / a bug that could be client or server | `references/full-stack-loop.md` |
 | Quick yes/no check: "is this `java.*` class supported", "does my `theme.css` compile" | `tools/` directory — `java tools/IsApiSupported.java <class>` / `java tools/IsCssValid.java <file>` |
 | "Score this screen against a mockup" / "Import a Figma/Sketch/XD design" | `tools/` directory — `java tools/CompareToMockup.java <render> <mockup>` / `java tools/DesignImport.java <design>` (see `references/mockup-comparison.md`) |
 | "Describe this screen" / "are these elements aligned" / "lint this UI for bugs" | `tools/` — `java -cp <cp> tools/DumpForm.java <MainClass>` then `tools/DescribeForm.java` / `tools/AlignmentCheck.java` / `tools/GuiLint.java` on the model (see `references/mockup-comparison.md`) |

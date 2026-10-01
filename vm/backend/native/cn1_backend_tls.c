@@ -184,6 +184,10 @@ static long long cn1TlsNowMillis(void) {
  * stubbed -- so the reference has to disappear with the client's own TLS code,
  * which it does, both being inside CN1_BACKEND_NO_TLS.
  */
+/* Defined in cn1_backend_server.c: parks a virtual thread, polls anywhere else. */
+int cn1BackendAwaitFd(int fd, int events, long long deadline);
+long long cn1BackendDeadline(long long millis);
+
 int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
                                  int connecting) {
     long long deadline = cn1TlsNowMillis() + budgetMillis;
@@ -201,16 +205,20 @@ int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
     for(;;) {
         int err;
         long long remaining;
-        struct pollfd p;
         int polled;
-        int pollErrno;
         CN1_YIELD_THREAD;
+        /* Emptied before every attempt: the error queue is per OS thread, and a
+           virtual thread that parked below shares its host's with every other
+           virtual thread that ran meanwhile -- SSL_get_error reads it first. */
+        ERR_clear_error();
         out = connecting ? SSL_connect(ssl) : SSL_accept(ssl);
+        /* Classified BEFORE the resume, which can hand the host to another
+           virtual thread (the collector's backpressure) and so to its errors. */
+        err = out == 1 ? SSL_ERROR_NONE : SSL_get_error(ssl, out);
         CN1_RESUME_THREAD;
         if(out == 1) {
             break;
         }
-        err = SSL_get_error(ssl, out);
         if(err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
             break;
         }
@@ -219,22 +227,15 @@ int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
             out = 0;                  /* out of time: an unfinished handshake */
             break;
         }
-        p.fd = fd;
-        p.events = (short)(err == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT);
-        p.revents = 0;
+        /* A virtual thread PARKS here, on its host's poller, rather than holding
+           the host for the peer's round trips; any other thread polls as before.
+           Both honour the same budget, which the helper takes on its own clock. */
         CN1_YIELD_THREAD;
-        polled = poll(&p, 1, (int)remaining);
-        /* Captured before the resume, which is a GC safepoint that can park this
-           thread on a timed wait and leave errno as ETIMEDOUT -- the same trap
-           cn1_backend_server.c documents at its own poll. */
-        pollErrno = errno;
+        polled = cn1BackendAwaitFd(fd, err == SSL_ERROR_WANT_READ ? 1 : 2,
+                                   cn1BackendDeadline(remaining));
         CN1_RESUME_THREAD;
-        if(polled == 0) {
-            out = 0;                  /* the budget expired inside the wait */
-            break;
-        }
-        if(polled < 0 && pollErrno != EINTR) {
-            out = 0;
+        if(polled <= 0) {
+            out = 0;                  /* the budget expired inside the wait, or it failed */
             break;
         }
     }

@@ -23,6 +23,7 @@
 package ${package};
 
 import com.codename1.backend.annotations.GetMapping;
+import com.codename1.backend.annotations.PathVariable;
 import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.annotations.RestController;
 
@@ -61,18 +62,34 @@ import java.util.Map;
  *
  *     CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend
  *
- * A controller that needs the database says so in its constructor. Declare one
- * taking a com.codename1.backend.DataSource for SQL, or one taking a
+ * A controller is a bean like any other, so its constructor says what it needs
+ * and the generated entry point passes it in: another bean such as the Greeter
+ * below, a com.codename1.backend.DataSource for SQL, or a
  * com.codename1.backend.orm.EntityManager for the daos generated from the
- * project's &#64;Entity classes, and the generated entry point passes it in.
+ * project's &#64;Entity classes.
+ *
+ * On the dev profile the running server also answers MCP at /mcp, with tools
+ * that list its routes and beans, call its endpoints and query its database --
+ * see the backend reference in this project's agent skill.
  */
 @RestController
 public class Api {
+    private final Greeter greeter;
+
+    public Api(Greeter greeter) {
+        this.greeter = greeter;
+    }
 
     /** What a load balancer polls. A String answer is sent as text. */
     @GetMapping("/healthz")
     public String health() {
         return "ok";
+    }
+
+    /** Delegates to the injected service. */
+    @GetMapping("/greet/{name}")
+    public String greet(@PathVariable("name") String name) {
+        return greeter.greet(name);
     }
 
     /** Anything that is not a String is sent as JSON. */

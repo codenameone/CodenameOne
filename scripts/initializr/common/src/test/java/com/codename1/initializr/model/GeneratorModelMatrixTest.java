@@ -155,6 +155,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             String api = getText(entries, apiPath);
             assertContains(api, "./gradlew runBackend", label + "backend-only tasks are addressed from the root");
             assertFalse(api.indexOf(":backend:") >= 0, label + "backend-only has no :backend: subproject");
+            assertContains(getText(entries, "src/main/java/" + packagePath + "/Greeter.java"),
+                    "package " + packageName + ";", label + "the service the Api is given ships beside it");
             assertContains(readme, "./gradlew runBackend", label + "backend README should say how to run it");
         } else {
             String settingsProps = getText(entries, "codenameone_settings.properties");
@@ -190,6 +192,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 String api = getText(entries, apiPath);
                 assertContains(api, "package " + packageName + ";", label + "backend shares the app package");
                 assertContains(api, "./gradlew :backend:runBackend", label + "backend tasks are addressed as a subproject");
+                assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/Greeter.java"),
+                        "package " + packageName + ";", label + "the service the Api is given ships beside it");
                 assertContains(getText(entries, "backend/application.properties"), ":backend:runBackend",
                         label + "backend settings comment should name the subproject task");
             } else {
@@ -468,6 +472,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/mcp-agent-control.md",
                 ".agent-skills/codename-one/references/on-device-debugging.md",
                 ".agent-skills/codename-one/references/ai-and-speech.md",
+                ".agent-skills/codename-one/references/backend.md",
+                ".agent-skills/codename-one/references/full-stack-loop.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
                 ".agent-skills/codename-one/tools/IsCssValid.java"
@@ -501,6 +507,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // build is attachable will give up at "cannot reproduce in the simulator".
         assertContains(agentsMd, "references/on-device-debugging.md",
                 "AGENTS.md should point agents at the on-device debug/MCP loops");
+        // And the server: an agent that does not know the backend is there, or that
+        // it can be inspected over MCP, writes a client against guesses.
+        assertContains(agentsMd, "references/backend.md",
+                "AGENTS.md should point agents at the backend reference");
 
         String claudeStub = getText(entries, ".claude/skills/codename-one/SKILL.md");
         assertContains(claudeStub, "name: codename-one", "Claude stub must keep the skill frontmatter");

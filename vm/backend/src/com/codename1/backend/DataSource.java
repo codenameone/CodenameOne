@@ -87,6 +87,8 @@ public final class DataSource {
     /// which wraps one somebody else opened and still owns.
     private final boolean owns;
     private boolean closed;
+    /// Slots reserved by borrowers opening a connection outside the monitor.
+    private int opening;
 
     private DataSource(String url, String describedAs, int maxSize, int busyTimeoutMillis,
                        long borrowTimeoutMillis, Dialect dialect, boolean owns) {
@@ -220,84 +222,152 @@ public final class DataSource {
 
     /// Takes a connection, blocking until one is free. Release it in a finally, or
     /// prefer the methods that cannot leak one.
-    public synchronized Database borrow() throws IOException {
-        // Checked before the idle list rather than only when it is empty: close()
-        // can run while a borrower still holds a connection, and that borrower's
-        // finally releases afterwards, so the list can be non-empty after closing.
-        if (closed) {
-            throw new IOException("This pool is closed");
+    public Database borrow() throws IOException {
+        // THE THREAD'S TRANSACTION FIRST. A thread inside a @Transactional
+        // method gets that transaction's connection, so every statement it runs
+        // through this pool -- directly, through a dao, through a session --
+        // is part of it. Outside the lock: joining may send a BEGIN, and a
+        // round trip to the database is not something to do while every other
+        // borrower waits on this monitor.
+        Database joined = Transactions.joined(this);
+        if (joined != null) {
+            return joined;
         }
-        long deadline = borrowTimeoutMillis == 0 ? 0
-                : System.currentTimeMillis() + borrowTimeoutMillis;
+        return borrowFromPool();
+    }
+
+    /// Takes a connection from the pool itself, never the thread's transaction's.
+    /// What a transaction borrows its own connection with.
+    ///
+    /// NOT synchronized as a whole, and that is the point. Opening a connection
+    /// parks a virtual thread -- a TCP connect, an authentication handshake -- and
+    /// a virtual thread parked while holding this monitor leaves its host free to
+    /// run another that then blocks the host's OS thread on the same monitor:
+    /// the opener can only resume on that host, so neither ever moves again. The
+    /// slot is therefore RESERVED under the lock (`opening`), so the pool still
+    /// never opens more than its size, and the open happens outside it. A full
+    /// pool is waited on the same way: wait() on a virtual thread would block
+    /// its host, so a virtual thread naps between looks instead, as
+    /// AsyncTask.get does.
+    Database borrowFromPool() throws IOException {
+        long deadline = borrowTimeoutMillis == 0 ? Long.MAX_VALUE
+                : AsyncTask.deadline(System.currentTimeMillis(), borrowTimeoutMillis);
+        boolean virtual = VirtualThread.isVirtual();
+        long nap = 1;
         while (true) {
-            while (!idle.isEmpty()) {
-                Database candidate = (Database) idle.remove(idle.size() - 1);
-                if (candidate.isOpen()) {
-                    return candidate;
+            boolean reserved = false;
+            synchronized (this) {
+                // Checked before the idle list rather than only when it is
+                // empty: close() can run while a borrower still holds a
+                // connection, and that borrower's finally releases afterwards,
+                // so the list can be non-empty after closing.
+                if (closed) {
+                    throw new IOException("This pool is closed");
                 }
-                // A connection the server hung up on, or one closed by an error
-                // it could not resynchronize from. Dropping it here rather than
-                // handing it out is the difference between one failed request
-                // and every request that borrows it afterwards.
-                discard(candidate);
+                while (!idle.isEmpty()) {
+                    Database candidate = (Database) idle.remove(idle.size() - 1);
+                    if (candidate.isOpen()) {
+                        return candidate;
+                    }
+                    // A connection the server hung up on, or one closed by an
+                    // error it could not resynchronize from. Dropping it here
+                    // rather than handing it out is the difference between one
+                    // failed request and every request that borrows it afterwards.
+                    discard(candidate);
+                }
+                if (url != null && all.size() + opening < maxSize) {
+                    opening++;
+                    reserved = true;
+                } else {
+                    if (url == null && all.isEmpty()) {
+                        // A pool made by of(): it wraps ONE connection somebody
+                        // else opened and has no URL to open another from. Once
+                        // that connection has been discarded nothing can ever put
+                        // one back, so waiting is waiting for an event that
+                        // cannot happen.
+                        throw new IOException("The connection this data source wraps was "
+                                + "closed and there is no URL to open another from. Open the "
+                                + "DataSource with a URL if it has to survive its connection "
+                                + "being dropped.");
+                    }
+                    long left = deadline - System.currentTimeMillis();
+                    if (left <= 0) {
+                        throw new IOException("No database connection became free within "
+                                + borrowTimeoutMillis + "ms; the pool holds " + maxSize
+                                + " and they are all in use. Either the work holding them is "
+                                + "too slow or " + Config.DATASOURCE_POOL_SIZE + " is too low.");
+                    }
+                    if (!virtual) {
+                        try {
+                            wait(deadline == Long.MAX_VALUE ? 0 : left);
+                        } catch (InterruptedException err) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Interrupted while waiting for a database "
+                                    + "connection", err);
+                        }
+                        continue;
+                    }
+                }
             }
-            if (url != null && all.size() < maxSize) {
-                // Opened while HOLDING the monitor, which blocks the other
-                // borrowers for a TCP connect and an authentication handshake.
-                // That is deliberate: it happens at most maxSize times in the
-                // life of the pool, and the alternative -- releasing the lock to
-                // connect -- lets several threads decide at once that the pool
-                // has room and open more connections than it is allowed.
-                Database opened = Database.open(url);
-                try {
-                    configure(opened);
-                } catch (IOException err) {
-                    // Not in `all` yet, so nothing else can ever close it: a WAL
-                    // pragma the filesystem refuses would leak one handle per
-                    // borrow, and the pool would go on believing it has room to
-                    // open another. The eager path in open() already does this.
-                    opened.close();
-                    throw err;
+            if (reserved) {
+                return openReserved();
+            }
+            // A virtual thread, outside the monitor: give the host back.
+            long now = System.currentTimeMillis();
+            HttpServer.napUntil(Math.min(deadline, now + nap));
+            nap = Math.min(20, nap * 2);
+        }
+    }
+
+    /// Opens the connection a borrower reserved a slot for, outside the monitor,
+    /// and gives the slot back however the open ends.
+    private Database openReserved() throws IOException {
+        Database opened = null;
+        boolean added = false;
+        try {
+            try {
+                opened = Database.open(url);
+            } catch (IOException err) {
+                // Spring's CannotGetJdbcConnectionException is a data access
+                // failure too, and rolls a transaction back.
+                throw DataAccessException.of(err);
+            }
+            // Not in `all` yet if this throws, so nothing else could ever close
+            // it: closed in the finally below, as the eager path in open() does.
+            configure(opened);
+            synchronized (this) {
+                if (closed) {
+                    throw new IOException("This pool is closed");
                 }
                 all.add(opened);
-                return opened;
+                added = true;
             }
-            if (closed) {
-                throw new IOException("This pool is closed");
+            return opened;
+        } finally {
+            synchronized (this) {
+                opening--;
+                // The reservation is capacity again, whether it became a
+                // connection or not; a borrower waiting for room has to look.
+                notifyAll();
             }
-            if (url == null && all.isEmpty()) {
-                // A pool made by of(): it wraps ONE connection somebody else
-                // opened and has no URL to open another from. Once that
-                // connection has been discarded -- the server hung up, or an
-                // error it could not resynchronize from closed it -- nothing can
-                // ever put one back, so waiting is waiting for an event that
-                // cannot happen. With the borrow timeout this form is built with
-                // (none), that is every later request hanging for good.
-                throw new IOException("The connection this data source wraps was closed and "
-                        + "there is no URL to open another from. Open the DataSource with a "
-                        + "URL if it has to survive its connection being dropped.");
-            }
-            long wait = 0;
-            if (deadline != 0) {
-                wait = deadline - System.currentTimeMillis();
-                if (wait <= 0) {
-                    throw new IOException("No database connection became free within "
-                            + borrowTimeoutMillis + "ms; the pool holds " + maxSize
-                            + " and they are all in use. Either the work holding them is "
-                            + "too slow or " + Config.DATASOURCE_POOL_SIZE + " is too low.");
-                }
-            }
-            try {
-                wait(wait);
-            } catch (InterruptedException err) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while waiting for a database connection", err);
+            if (!added && opened != null) {
+                opened.close();
             }
         }
     }
 
     /// Returns a borrowed connection to the pool.
-    public synchronized void release(Database db) {
+    public void release(Database db) {
+        // The transaction's connection goes back when the transaction ends, not
+        // when one of the statements inside it does.
+        if (Transactions.isJoined(this, db)) {
+            return;
+        }
+        releaseToPool(db);
+    }
+
+    /// [#release], for a connection that is certainly not a transaction's.
+    synchronized void releaseToPool(Database db) {
         if (db == null) {
             return;
         }
@@ -336,6 +406,24 @@ public final class DataSource {
     /// second connection, which the database sees as another session entirely, and
     /// on SQLite it will simply block against the write lock the first one holds.
     public Object inTransaction(Work body) throws Exception {
+        Database joined = Transactions.joined(this);
+        if (joined != null) {
+            // Already inside the thread's transaction, which every engine refuses
+            // to nest: run as part of it, the way a joined @Transactional method
+            // does -- including its failure. A body that throws leaves the whole
+            // transaction unable to commit, as it rolls back when it runs alone;
+            // otherwise a caller catching the exception would commit what the body
+            // wrote before failing.
+            try {
+                return body.run(joined);
+            } catch (Exception err) {
+                Transactions.markRollbackOnly(this);
+                throw err;
+            } catch (Error err) {
+                Transactions.markRollbackOnly(this);
+                throw err;
+            }
+        }
         return withConnection(new TransactionWork(body));
     }
 

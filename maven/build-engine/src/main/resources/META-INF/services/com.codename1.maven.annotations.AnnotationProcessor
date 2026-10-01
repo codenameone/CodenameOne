@@ -9,5 +9,6 @@ com.codename1.maven.processors.GrpcClientAnnotationProcessor
 com.codename1.maven.processors.GraphQLClientAnnotationProcessor
 com.codename1.maven.processors.AppIntentAnnotationProcessor
 com.codename1.maven.processors.BuildHintAnnotationProcessor
+com.codename1.maven.processors.BackendBeanAnnotationProcessor
 com.codename1.maven.processors.RestControllerAnnotationProcessor
 com.codename1.maven.processors.TelemetryAnnotationProcessor
