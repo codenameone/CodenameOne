@@ -38,6 +38,10 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual('improved', gate.verdict(0.89, 1.0, 0.1))
         self.assertEqual('uncalibrated', gate.verdict(5.0, None, 0.1))
 
+    def test_an_improvement_inside_the_floor_is_not_one(self):
+        self.assertEqual('ok', gate.verdict(0.04, 0.06, 0.15, 0.05))
+        self.assertEqual('improved', gate.verdict(0.40, 0.60, 0.15, 0.05))
+
     def test_a_ram_change_below_the_floor_is_not_a_regression(self):
         # 0.06x -> 0.08x is +33%, and under a megabyte for a few-MB process.
         self.assertEqual('ok', gate.verdict(0.08, 0.06, 0.15, 0.05))
@@ -87,6 +91,24 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('**no baseline for this CPU model** -- the gate fails', text)
         self.assertIn('**Result: no baseline: calibration required**', text)
 
+    def test_an_improvement_fails_and_says_how_to_rebaseline(self):
+        r = report({'quicksort': {'all': (metric(0.7, 1.0, 'improved'), metric(0.9, 0.9, 'ok'))}})
+        r['pr'] = 5931
+        text = gate.render_markdown(r)
+        self.assertIn('**IMPROVED: rebaseline** (time -30.0%)', text)
+        self.assertIn('vm/selfhost/perf-baseline/pr/5931.json', text)
+        self.assertIn('--pr 5931 --reason', text)
+        self.assertIn('**Result: improved past the baseline: rebaseline required**', text)
+
+    def test_a_calibration_names_this_pull_requests_overlay(self):
+        r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
+                                          metric(0.9, None, 'uncalibrated'))}})
+        r['calibration'] = {'quicksort': {'all': {'time': 1.3, 'memory': 0.9}}}
+        r['calibration_key'] = 'linux-x64@new'
+        text = gate.render_markdown(r)
+        self.assertIn('pr/<PR number>.json', text)
+        self.assertIn('calibrate-perf-baseline.py --pr <PR number> perf-results.json', text)
+
     def test_an_incomplete_gate_says_so(self):
         text = gate.render_markdown(report({}, error='stale native build'))
         self.assertIn('could not complete', text)
@@ -118,19 +140,49 @@ class MarkdownTests(unittest.TestCase):
 
 
 calibrate = load('calibrate_perf_baseline', 'calibrate-perf-baseline.py')
+baselines = load('perf_baseline', 'perf_baseline.py')
+POLICY = {'tolerance': {'time': 0.15, 'memory': 0.15}, 'floor': {'time': 0.0, 'memory': 0.05}}
+
+
+class BaselineTree:
+    """A throwaway perf-baseline directory: policy.json, base/, pr/."""
+
+    def __init__(self, base=None, overlays=None):
+        import json
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name) / 'perf-baseline'
+        (self.root / 'pr').mkdir(parents=True)
+        (self.root / 'policy.json').write_text(json.dumps(POLICY))
+        baselines.write_base(self.root, base or {})
+        for number, overlay in (overlays or {}).items():
+            (self.root / 'pr' / ('%d.json' % number)).write_text(json.dumps(overlay))
+
+    def overlay(self, number):
+        import json
+        path = self.root / 'pr' / ('%d.json' % number)
+        return json.loads(path.read_text()) if path.exists() else None
+
+    def close(self):
+        self._tmp.cleanup()
+
+
+def row(t, m, runs=3, **tolerance):
+    r = {'time': t, 'memory': m, 'runs': runs}
+    if tolerance:
+        r['tolerance'] = tolerance
+    return r
 
 
 class CalibrationTest(unittest.TestCase):
-    """calibrate-perf-baseline.py: medians as baselines, spread-driven tolerances."""
+    """calibrate-perf-baseline.py: medians as baselines, spread-driven tolerances, written
+    into the pull request's own overlay."""
 
-    def run_calibration(self, runs, existing=None, fresh=False):
+    def run_calibration(self, runs, existing=None, overlays=None, pr=7, reason=None,
+                        everything=False):
         import json
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / 'baseline.json'
-            out.write_text(json.dumps({'tolerance': {'time': 0.15, 'memory': 0.15},
-                                       'floor': {'time': 0.0, 'memory': 0.05},
-                                       'platforms': existing or {}}))
+        tree = BaselineTree(existing, overlays)
+        try:
             files = []
             for i, run in enumerate(runs):
                 platform, per_bench = run[0], run[1]
@@ -139,41 +191,54 @@ class CalibrationTest(unittest.TestCase):
                 report = {'platform': platform, 'results': results}
                 if len(run) > 2:
                     report['cpu'] = run[2]
-                f = Path(tmp) / ('run%d.json' % i)
+                f = tree.root.parent / ('run%d.json' % i)
                 f.write_text(json.dumps(report))
                 files.append(str(f))
-            calibrate.main(['--out', str(out)] + (['--fresh'] if fresh else []) + files)
-            return json.loads(out.read_text())
+            calibrate.main(['--root', str(tree.root), '--pr', str(pr)] +
+                           (['--reason', reason] if reason else []) +
+                           (['--all'] if everything else []) + files)
+            return tree.overlay(pr), baselines.load(tree.root)['platforms']
+        finally:
+            tree.close()
 
     def test_median_baseline_and_global_tolerance_for_a_steady_row(self):
-        b = self.run_calibration([('linux-x64', {'quicksort': (1.00, 0.10)}),
-                                  ('linux-x64', {'quicksort': (1.02, 0.10)}),
-                                  ('linux-x64', {'quicksort': (1.01, 0.10)})])
-        row = b['platforms']['linux-x64']['quicksort']['all']
-        self.assertEqual(row['time'], 1.01)
-        self.assertNotIn('tolerance', row)  # 1% spread: the global 15% already covers it
-        self.assertEqual(row['runs'], 3)
+        overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (1.00, 0.10)}),
+                                              ('linux-x64', {'quicksort': (1.02, 0.10)}),
+                                              ('linux-x64', {'quicksort': (1.01, 0.10)})])
+        r = overlay['calibrate']['linux-x64']['quicksort']['all']
+        self.assertEqual(r['time'], 1.01)
+        self.assertNotIn('tolerance', r)  # 1% spread: the global 15% already covers it
+        self.assertEqual(r['runs'], 3)
+        self.assertEqual(rows['linux-x64']['quicksort']['all'], r)
 
-    def test_noisy_row_gets_a_wider_tolerance_that_covers_every_run(self):
-        runs = [('linux-x64', {'objectAllocation': (v, 0.4)}) for v in (5.0, 5.5, 6.5)]
-        b = self.run_calibration(runs)
-        row = b['platforms']['linux-x64']['objectAllocation']['all']
-        self.assertEqual(row['time'], 5.5)
-        tol = row['tolerance']['time']
+    def test_noisy_row_gets_a_wider_tolerance_that_covers_every_run_both_ways(self):
+        runs = [('linux-x64', {'objectAllocation': (v, 0.4)}) for v in (3.5, 5.5, 6.5)]
+        overlay, _ = self.run_calibration(runs)
+        r = overlay['calibrate']['linux-x64']['objectAllocation']['all']
+        self.assertEqual(r['time'], 5.5)
+        tol = r['tolerance']['time']
         self.assertGreater(tol, 0.15)
+        # An improvement fails too, so the LOW run (3.5, -36%) must pass as well.
         for _, per in runs:
-            self.assertNotEqual(gate.verdict(per['objectAllocation'][0], row['time'], tol), 'regression')
+            self.assertEqual(gate.verdict(per['objectAllocation'][0], r['time'], tol), 'ok')
         # ...and it still bites: well past the observed spread is a regression.
-        self.assertEqual(gate.verdict(row['time'] * (1 + tol) * 1.01, row['time'], tol), 'regression')
+        self.assertEqual(gate.verdict(r['time'] * (1 + tol) * 1.01, r['time'], tol), 'regression')
 
-    def test_single_run_platform_borrows_the_widest_tolerance_seen_elsewhere(self):
+    def test_single_run_row_borrows_the_widest_tolerance_seen_elsewhere(self):
         runs = [('linux-x64', {'objectAllocation': (v, 0.4)}) for v in (5.0, 5.5, 6.5)]
         runs.append(('macos-arm64', {'objectAllocation': (3.0, 0.3)}))
-        b = self.run_calibration(runs)
-        linux = b['platforms']['linux-x64']['objectAllocation']['all']['tolerance']['time']
-        mac = b['platforms']['macos-arm64']['objectAllocation']['all']
+        overlay, _ = self.run_calibration(runs)
+        linux = overlay['calibrate']['linux-x64']['objectAllocation']['all']['tolerance']['time']
+        mac = overlay['calibrate']['macos-arm64']['objectAllocation']['all']
         self.assertEqual(mac['runs'], 1)
         self.assertEqual(mac['tolerance']['time'], linux)
+
+    def test_a_single_run_row_borrows_tolerance_from_the_baseline(self):
+        old = {'windows-x64@a': {'arraySequential': {'all': row(1.35, 0.4, time=0.7)}}}
+        overlay, _ = self.run_calibration(
+            [('windows-x64', {'arraySequential': (1.67, 0.38)}, 'Model B')], existing=old)
+        self.assertEqual(overlay['calibrate']['windows-x64@model-b']['arraySequential']['all']
+                         ['tolerance']['time'], 0.7)
 
     def test_rows_are_per_cpu_model_and_an_unseen_model_is_not_gated(self):
         zen3 = 'AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD'
@@ -181,7 +246,7 @@ class CalibrationTest(unittest.TestCase):
         intel = 'Intel64 Family 6 Model 207 Stepping 2, GenuineIntel'
         runs = [('windows-x64', {'arraySequential': (v, 0.4)}, zen3) for v in (1.35, 1.36, 1.38)]
         runs += [('windows-x64', {'arraySequential': (1.98, 0.38)}, intel)]
-        b = self.run_calibration(runs)['platforms']
+        _, b = self.run_calibration(runs)
         self.assertEqual(sorted(b), ['windows-x64@amd64-family-25-model-1-authenticamd',
                                      'windows-x64@intel64-family-6-model-207-genuineintel'])
         self.assertEqual(gate.baseline_key(b, 'windows-x64', zen3.replace('Stepping 1', 'Stepping 2')),
@@ -191,39 +256,246 @@ class CalibrationTest(unittest.TestCase):
         self.assertIsNone(gate.baseline_key(b, 'windows-x64', None))
 
     def test_a_run_with_no_known_cpu_feeds_the_plain_row(self):
-        b = self.run_calibration([('macos-arm64', {'quicksort': (1.0, 0.1)})])['platforms']
+        _, b = self.run_calibration([('macos-arm64', {'quicksort': (1.0, 0.1)})])
         self.assertEqual(sorted(b), ['macos-arm64'])
         self.assertEqual(gate.baseline_key(b, 'macos-arm64', 'Apple M1 (Virtual)'), 'macos-arm64')
 
-    def test_only_measured_rows_are_replaced_unless_fresh(self):
-        old = {'macos-arm64': {'quicksort': {'all': {'time': 0.9, 'memory': 0.1, 'runs': 1}}},
-               'linux-x64': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}},
-               'linux-x64@intel': {'quicksort': {'all': {'time': 9.9, 'memory': 0.9, 'runs': 1}}}}
-        b = self.run_calibration([('linux-x64', {'quicksort': (1.0, 0.1)})], existing=old)
-        b = b['platforms']
-        self.assertEqual(b['macos-arm64'], old['macos-arm64'])
-        self.assertEqual(b['linux-x64']['quicksort']['all']['time'], 1.0)
-        # Adding one CPU model's rows must not drop the platform's other models.
-        self.assertEqual(b['linux-x64@intel'], old['linux-x64@intel'])
-        fresh = self.run_calibration([('linux-x64', {'quicksort': (1.0, 0.1)})], existing=old,
-                                     fresh=True)['platforms']
-        self.assertEqual(sorted(fresh), ['linux-x64'])
+    def test_a_row_inside_its_tolerance_is_left_alone(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)},
+                             'recursion': {'all': row(1.0, 0.1)}}}
+        overlay, _ = self.run_calibration(
+            [('linux-x64', {'quicksort': (1.05, 0.1), 'recursion': (1.4, 0.1)})],
+            existing=old, reason='recursion got slower on purpose')
+        self.assertEqual(sorted(overlay['rebaseline']['linux-x64']), ['recursion'])
+        self.assertNotIn('calibrate', overlay)
 
-    def test_a_thinly_sampled_row_borrows_the_widest_tolerance(self):
-        runs = [('linux-x64', {'hello': (v, 0.8)}, 'CPU A') for v in (0.50, 0.70, 0.60, 0.55, 0.65)]
-        runs += [('linux-x64', {'hello': (v, 0.8)}, 'CPU B') for v in (0.79, 0.80)]
-        b = self.run_calibration(runs)['platforms']
-        wide = b['linux-x64@cpu-a']['hello']['all']['tolerance']['time']
-        self.assertEqual(b['linux-x64@cpu-a']['hello']['all']['runs'], 5)
-        # Two runs 1% apart would give 15%; two runs cannot estimate a spread.
-        self.assertEqual(b['linux-x64@cpu-b']['hello']['all']['tolerance']['time'], wide)
+    def test_a_moved_row_is_rebaselined_from_its_old_value_and_needs_a_reason(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1, memory=0.3)}}}
+        with self.assertRaises(SystemExit):
+            self.run_calibration([('linux-x64', {'quicksort': (0.7, 0.1)})], existing=old)
+        overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.7, 0.1)})],
+                                             existing=old, reason='faster partitioning')
+        r = overlay['rebaseline']['linux-x64']['quicksort']['all']
+        self.assertEqual(r['from'], {'time': 1.0, 'memory': 0.1})
+        self.assertEqual(r['time'], 0.7)
+        # Only the metric that moved is replaced; RAM keeps its baseline and tolerance.
+        self.assertEqual(r['memory'], 0.1)
+        self.assertEqual(r['tolerance'], {'memory': 0.3})
+        self.assertEqual(overlay['reason'], 'faster partitioning')
+        self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.7)
 
-    def test_a_single_run_row_borrows_tolerance_from_the_existing_file(self):
-        old = {'windows-x64@a': {'arraySequential': {'all': {
-            'time': 1.35, 'memory': 0.4, 'runs': 3, 'tolerance': {'time': 0.7}}}}}
-        b = self.run_calibration([('windows-x64', {'arraySequential': (1.67, 0.38)}, 'Model B')],
-                                 existing=old)['platforms']
-        self.assertEqual(b['windows-x64@model-b']['arraySequential']['all']['tolerance']['time'], 0.7)
+    def test_all_recalibrates_every_measured_row(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}}}
+        overlay, _ = self.run_calibration(
+            [('linux-x64', {'quicksort': (v, 0.1)}) for v in (0.97, 1.0, 1.02, 1.01, 0.99)],
+            existing=old, reason='five runs of unchanged code', everything=True)
+        r = overlay['rebaseline']['linux-x64']['quicksort']['all']
+        self.assertEqual((r['time'], r['runs']), (1.0, 5))
+
+    def test_rerunning_replaces_this_pull_requests_own_rows(self):
+        old = {'linux-x64': {'quicksort': {'all': row(1.0, 0.1)}}}
+        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.5, 0.1)})],
+                                             existing=old, overlays={7: mine})
+        r = overlay['rebaseline']['linux-x64']['quicksort']['all']
+        # Still FROM the base value, not from this pull request's own earlier 0.7.
+        self.assertEqual(r['from']['time'], 1.0)
+        self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.5)
+
+    def test_a_row_this_pull_request_calibrated_stays_a_calibration(self):
+        mine = {'pr': 7, 'calibrate': {'linux-x64@new': {'quicksort': {'all': row(1.0, 0.1, 1)}}}}
+        overlay, _ = self.run_calibration([('linux-x64', {'quicksort': (1.5, 0.1)}, 'New')],
+                                          overlays={7: mine})
+        self.assertNotIn('rebaseline', overlay)
+        self.assertEqual(overlay['calibrate']['linux-x64@new']['quicksort']['all']['time'], 1.5)
+
+
+class OverlayTests(unittest.TestCase):
+    """perf_baseline.py: how base/ and the pull requests' overlays become one baseline."""
+
+    BASE = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}}}
+
+    def resolve(self, overlays, base=None):
+        for number, overlay in overlays:
+            baselines.validate_overlay(number, overlay, 'pr/%d.json' % number)
+        return baselines.resolve(base if base is not None else self.BASE, overlays)
+
+    def rebase(self, number, t, frm=1.0, reason='moved'):
+        return (number, {'pr': number, 'reason': reason, 'rebaseline': {'linux-x64@a': {
+            'quicksort': {'all': dict(row(t, 0.1), **{'from': {'time': frm, 'memory': 0.1}})}}}})
+
+    def calib(self, number, t, key='linux-x64@b', runs=1, **tol):
+        return (number, {'pr': number, 'calibrate': {key: {'quicksort': {'all': row(t, 0.2, runs, **tol)}}}})
+
+    def test_a_rebaseline_replaces_the_row(self):
+        rows, _ = self.resolve([self.rebase(12, 0.8)])
+        self.assertEqual(rows['linux-x64@a']['quicksort']['all'], row(0.8, 0.1))
+
+    def test_two_rebaselines_of_one_row_are_a_conflict_naming_both(self):
+        with self.assertRaises(baselines.BaselineError) as caught:
+            self.resolve([self.rebase(12, 0.8), self.rebase(15, 0.9)])
+        self.assertIn('pr/12.json', str(caught.exception))
+        self.assertIn('pr/15.json', str(caught.exception))
+
+    def test_a_rebaseline_from_a_stale_value_is_rejected(self):
+        # pr/12 was folded into base; pr/15 measured against the value before it.
+        moved = {'linux-x64@a': {'quicksort': {'all': row(0.8, 0.1)}}}
+        with self.assertRaises(baselines.BaselineError) as caught:
+            self.resolve([self.rebase(15, 0.9, frm=1.0)], base=moved)
+        self.assertIn('another merged change moved it first', str(caught.exception))
+
+    def test_a_rebaseline_needs_a_reason_and_a_from(self):
+        number, overlay = self.rebase(12, 0.8, reason='TODO')
+        with self.assertRaises(baselines.BaselineError):
+            baselines.validate_overlay(number, overlay, 'pr/12.json')
+        number, overlay = self.rebase(12, 0.8)
+        del overlay['rebaseline']['linux-x64@a']['quicksort']['all']['from']
+        with self.assertRaises(baselines.BaselineError):
+            baselines.validate_overlay(number, overlay, 'pr/12.json')
+
+    def test_a_rebaseline_of_a_missing_row_is_rejected(self):
+        with self.assertRaises(baselines.BaselineError):
+            self.resolve([self.rebase(12, 0.8)], base={})
+
+    def test_the_overlay_number_must_match_its_file(self):
+        with self.assertRaises(baselines.BaselineError):
+            baselines.validate_overlay(13, self.calib(12, 1.0)[1], 'pr/13.json')
+
+    def test_two_branches_calibrating_one_cpu_are_combined_in_any_order(self):
+        a, b = self.calib(12, 1.0, time=0.3), self.calib(15, 1.2, runs=2)
+        rows_ab, _ = self.resolve([a, b])
+        rows_ba, _ = self.resolve([b, a])
+        self.assertEqual(rows_ab, rows_ba)
+        combined = rows_ab['linux-x64@b']['quicksort']['all']
+        self.assertEqual((combined['time'], combined['runs']), (1.1, 3))
+        self.assertEqual(combined['tolerance'], {'time': 0.3})
+
+    def test_a_calibration_of_an_existing_row_is_superseded_not_fatal(self):
+        rows, notes = self.resolve([self.calib(12, 9.9, key='linux-x64@a')])
+        self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 1.0)
+        self.assertIn('superseded', notes[0])
+
+    def test_a_rebaseline_can_move_a_row_another_branch_calibrated(self):
+        frm = (15, {'pr': 15, 'reason': 'moved', 'rebaseline': {'linux-x64@b': {'quicksort': {
+            'all': dict(row(0.5, 0.2), **{'from': {'time': 1.0, 'memory': 0.2}})}}}})
+        rows, _ = self.resolve([self.calib(12, 1.0), frm])
+        self.assertEqual(rows['linux-x64@b']['quicksort']['all']['time'], 0.5)
+
+    def test_fold_moves_everything_into_base_and_changes_no_verdict(self):
+        tree = BaselineTree(self.BASE, dict([self.rebase(12, 0.8), self.calib(15, 1.0)]))
+        try:
+            before = baselines.load(tree.root)['platforms']
+            self.assertEqual(baselines.fold(tree.root), [12, 15])
+            self.assertEqual(list((tree.root / 'pr').iterdir()), [])
+            self.assertEqual(baselines.load_base(tree.root), before)
+            self.assertEqual(sorted(p.name for p in (tree.root / 'base').iterdir()),
+                             ['linux-x64@a.json', 'linux-x64@b.json'])
+            self.assertEqual(baselines.fold(tree.root), [])
+        finally:
+            tree.close()
+
+    def test_fold_refuses_contradicting_overlays(self):
+        tree = BaselineTree(self.BASE, dict([self.rebase(12, 0.8), self.rebase(15, 0.9)]))
+        try:
+            with self.assertRaises(baselines.BaselineError):
+                baselines.fold(tree.root)
+            self.assertEqual(len(list((tree.root / 'pr').iterdir())), 2)
+        finally:
+            tree.close()
+
+    def test_the_checked_in_baselines_resolve(self):
+        data = baselines.load()
+        self.assertTrue(data['platforms'])
+        for key in data['platforms']:
+            self.assertRegex(key, baselines.KEY_RE)
+
+    def test_import_legacy_takes_only_the_branchs_own_edits(self):
+        tree = BaselineTree({'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, memory=0.3)},
+                                             'recursion': {'all': row(2.0, 0.1)}}})
+        try:
+            # The branch started before master gave quicksort its RAM tolerance, so its
+            # copy has the OLD quicksort row -- that is not an edit of its own.
+            original = dict(POLICY, platforms={'linux-x64@a': {
+                'quicksort': {'all': row(1.0, 0.1)}, 'recursion': {'all': row(2.0, 0.1)}}})
+            legacy = dict(POLICY, platforms={
+                'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)},
+                                'recursion': {'all': row(1.5, 0.1)}},
+                'linux-x64@b': {'quicksort': {'all': row(2.0, 0.2, 1)}}})
+            baselines.import_legacy(tree.root, 31, legacy, original, 'imported')
+            overlay = tree.overlay(31)
+            self.assertEqual(overlay['calibrate']['linux-x64@b']['quicksort']['all']['time'], 2.0)
+            self.assertEqual(sorted(overlay['rebaseline']['linux-x64@a']), ['recursion'])
+            self.assertEqual(overlay['rebaseline']['linux-x64@a']['recursion']['all']['from'],
+                             {'time': 2.0, 'memory': 0.1})
+            # A row both the branch and master calibrated stays master's, and is no rebaseline.
+            master_too = dict(legacy, platforms=dict(legacy['platforms'], **{
+                'linux-x64@c': {'quicksort': {'all': row(3.0, 0.3, 1)}}}))
+            tree2 = BaselineTree({'linux-x64@c': {'quicksort': {'all': row(2.9, 0.3, 2)}}})
+            try:
+                path, notes = baselines.import_legacy(tree2.root, 32, master_too, original, 'x')
+                self.assertNotIn('rebaseline', tree2.overlay(32) or {})
+                self.assertTrue(any('linux-x64@c' in n for n in notes), notes)
+            finally:
+                tree2.close()
+        finally:
+            tree.close()
+
+
+class CheckTests(unittest.TestCase):
+    """perf_baseline.py check --base: what a pull request may change."""
+
+    def check(self, changed, number=31, migrating=False):
+        originals = baselines.changed_files, baselines.base_exists_at
+        baselines.changed_files = lambda base_ref, root=None: changed
+        baselines.base_exists_at = lambda ref, root=None: not migrating
+        try:
+            return baselines.check(baselines.ROOT, 'base-sha', number)
+        finally:
+            baselines.changed_files, baselines.base_exists_at = originals
+
+    def test_the_migration_that_creates_base_may(self):
+        self.assertEqual(self.check(['base/linux-x64@a.json'], migrating=True), [])
+
+    def test_a_pull_request_may_write_its_own_overlay_and_the_policy(self):
+        self.assertEqual(self.check(['pr/31.json', 'policy.json']), [])
+
+    def test_base_is_the_folds_alone(self):
+        problems = self.check(['base/linux-x64@a.json'])
+        self.assertEqual(len(problems), 1)
+        self.assertIn('nightly fold', problems[0])
+
+    def test_another_pull_requests_overlay_is_off_limits(self):
+        self.assertIn('pr/31.json', self.check(['pr/30.json'])[0])
+
+
+class SummaryTests(unittest.TestCase):
+    def test_one_entry_per_platform_with_the_spread_of_its_cpus(self):
+        rows = {'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}},
+                'linux-x64@b': {'quicksort': {'all': row(1.4, 0.3)}},
+                'linux-x64@c': {'quicksort': {'all': row(1.2, 0.2)}},
+                'macos-arm64': {'quicksort': {'all': row(0.9, 0.1)}}}
+        s = baselines.summary(rows)
+        self.assertEqual([p['id'] for p in s['platforms']], ['linux-x64', 'macos-arm64'])
+        linux = s['platforms'][0]
+        self.assertEqual(linux['name'], 'Linux x64')
+        self.assertEqual(linux['cpus'], ['a', 'b', 'c'])
+        self.assertEqual(linux['benchmarks']['quicksort']['time'],
+                         {'median': 1.2, 'min': 1.0, 'max': 1.4})
+
+    def test_every_gated_benchmark_is_described(self):
+        self.assertEqual([b for b, _, _ in baselines.BENCHMARKS],
+                         ['hello', 'translator'] + gate.WORKLOADS)
+
+    def test_shared_workloads_read_as_the_absolute_table_does(self):
+        # The workloads are CommonWorkloads, which the Port Status page's absolute table
+        # also runs; one benchmark must not be described two ways on one page.
+        import json
+        support = json.loads((Path(__file__).resolve().parents[2] /
+                              'docs/website/data/port_status_support.json').read_text())
+        mine = {b: (n, d) for b, n, d in baselines.BENCHMARKS}
+        for r in support['benchmark']['rows']:
+            self.assertEqual(mine[r['id']], (r['name'], r['description']), r['id'])
 
 
 class VerdictStepTests(unittest.TestCase):
@@ -248,8 +520,9 @@ class VerdictStepTests(unittest.TestCase):
                                   capture_output=True, text=True)
 
     def row(self, verdict_):
-        return {'all': {'time': {'median': 1.0, 'baseline': None if verdict_ == 'uncalibrated'
-                                 else 1.0, 'verdict': verdict_},
+        return {'all': {'time': {'median': 0.7 if verdict_ == 'improved' else 1.0,
+                                 'baseline': None if verdict_ == 'uncalibrated' else 1.0,
+                                 'verdict': verdict_},
                         'memory': {'median': 0.5, 'baseline': 0.5, 'verdict': 'ok'}}}
 
     def test_a_missing_baseline_fails_the_job(self):
@@ -261,6 +534,13 @@ class VerdictStepTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn('NO BASELINE', r.stdout)
         self.assertIn('calibrate-perf-baseline.py', r.stdout)
+
+    def test_an_improvement_fails_the_job(self):
+        r = self.verdict({'platform': 'linux-x64', 'pr': 5931, 'labels': {},
+                          'results': {'quicksort': self.row('improved')}, 'regression': False})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('IMPROVED', r.stdout)
+        self.assertIn('perf-baseline/pr/5931.json', r.stdout)
 
     def test_a_judged_run_passes(self):
         r = self.verdict({'platform': 'linux-x64', 'results': {'quicksort': self.row('ok')},

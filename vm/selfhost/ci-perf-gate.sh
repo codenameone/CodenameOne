@@ -40,19 +40,29 @@ if report.get('failures'):
     for f in report['failures']:
         print('  %s at %s cores: %s' % (f['benchmark'], f['cores'], f['reason']))
     sys.exit(1)
-if report.get('regression'):
+def moved(verdict):
     lines = []
     for bench, per_cores in report['results'].items():
         for cores, entry in per_cores.items():
+            if 'failed' in entry:
+                continue
             for metric in ('time', 'memory'):
                 e = entry[metric]
-                if e['verdict'] == 'regression':
+                if e['verdict'] == verdict:
                     lines.append('  %s at %s cores: %s %.2fx against %.2fx (%+.1f%%)' % (
                         report['labels'].get(bench, bench), cores,
                         'time' if metric == 'time' else 'RAM', e['median'], e['baseline'],
                         (e['median'] / e['baseline'] - 1) * 100))
+    return lines
+number = report.get('pr') or '<PR number>'
+overlay = 'vm/selfhost/perf-baseline/pr/%s.json' % number
+rebaseline = ('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s --reason "<why>" perf-results.json'
+              % number)
+if report.get('regression'):
     print('ParparVM performance REGRESSION on %s:' % report['platform'])
-    print('\n'.join(lines))
+    print('\n'.join(moved('regression')))
+    print('If this change costs performance on purpose, rebaseline it in %s:' % overlay)
+    print(rebaseline)
     sys.exit(1)
 missing = [(b, c) for b, per in report['results'].items() for c, e in per.items()
            if 'failed' not in e and 'uncalibrated' in (e['time']['verdict'], e['memory']['verdict'])]
@@ -62,9 +72,17 @@ if missing or report.get('calibration'):
     key = report.get('calibration_key') or report['platform']
     print('ParparVM performance gate: NO BASELINE on %s for %s (runner CPU: %s).'
           % (report['platform'], key, report.get('cpu', 'unknown')))
-    print('Add it from this job\'s perf-results.json and commit perf-baseline.json:')
-    print('  python3 vm/selfhost/calibrate-perf-baseline.py perf-results.json')
+    print('Add it to %s from this job\'s perf-results.json:' % overlay)
+    print('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s perf-results.json' % number)
     print(json.dumps({key: report.get('calibration') or sorted(missing)}, indent=1))
+    sys.exit(1)
+improved = moved('improved')
+if improved:
+    # An improvement that is not written down lets a later change give it back unnoticed.
+    print('ParparVM performance IMPROVED past the baseline on %s:' % report['platform'])
+    print('\n'.join(improved))
+    print('Record the new baseline in %s:' % overlay)
+    print(rebaseline)
     sys.exit(1)
 print('ParparVM performance gate: no regression on %s' % report['platform'])
 PY

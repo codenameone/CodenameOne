@@ -159,6 +159,26 @@ function validate() {
             fail(`performance cells for ${name} must identify the platform in their tooltip`);
         }
     }
+    // The ParparVM / JDK 25 table, rendered from the performance gate's baselines by
+    // build.sh. Its size comes from the data it was rendered from, not a number spelled
+    // here, so adding a gated platform or benchmark cannot fail this one CI round at a time.
+    const jdkData = JSON.parse(fs.readFileSync(
+        path.resolve(publicDirectory, "..", "data", "port_status_jdk25.json"), "utf8"));
+    const jdkRows = countMatches(page, /\bdata-jdk25-row(?:=|\s|>)/g);
+    const jdkCellTags = page.match(/<td\b[^>]*data-jdk25-cell[^>]*>/g) || [];
+    if (jdkData.platforms.length < 5 || jdkRows !== jdkData.benchmarks.length ||
+        jdkCellTags.length !== jdkRows * jdkData.platforms.length) {
+        fail("the ParparVM against JDK 25 table is incomplete");
+    }
+    for (const platform of jdkData.platforms) {
+        if (!jdkCellTags.some((tag) => attribute(tag, "data-platform") === platform.id &&
+            attribute(tag, "title").startsWith(`${platform.name}:`))) {
+            fail(`JDK 25 cells for ${platform.name} must identify the platform in their tooltip`);
+        }
+    }
+    if (/Not measured/.test(page.match(/data-jdk25-evidence[\s\S]*?<\/section>/)?.[0] || "")) {
+        fail("a gated platform is missing a benchmark the gate measures everywhere");
+    }
     const primaryCellTags = Array.from(page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)[^>]*>/gi), match => match[0]);
     for (const cell of primaryCellTags) {
         const port = attribute(cell, "data-port");

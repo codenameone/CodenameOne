@@ -1,0 +1,96 @@
+{
+ "arrayRandom": {
+  "all": {
+   "memory": 0.228,
+   "runs": 7,
+   "time": 0.937
+  }
+ },
+ "arraySequential": {
+  "all": {
+   "memory": 0.387,
+   "runs": 7,
+   "time": 0.394,
+   "tolerance": {
+    "time": 0.3
+   }
+  }
+ },
+ "hashMapChurn": {
+  "all": {
+   "memory": 0.119,
+   "runs": 7,
+   "time": 0.985
+  }
+ },
+ "hello": {
+  "all": {
+   "memory": 0.9,
+   "runs": 7,
+   "time": 1.107
+  }
+ },
+ "intArithmetic": {
+  "all": {
+   "memory": 0.059,
+   "runs": 7,
+   "time": 1.044
+  }
+ },
+ "longArithmetic": {
+  "all": {
+   "memory": 0.059,
+   "runs": 7,
+   "time": 0.795
+  }
+ },
+ "mathTranscendental": {
+  "all": {
+   "memory": 0.064,
+   "runs": 7,
+   "time": 0.72
+  }
+ },
+ "objectAllocation": {
+  "all": {
+   "memory": 0.463,
+   "runs": 7,
+   "time": 2.732
+  }
+ },
+ "quicksort": {
+  "all": {
+   "memory": 0.122,
+   "runs": 7,
+   "time": 1.001
+  }
+ },
+ "recursion": {
+  "all": {
+   "memory": 0.065,
+   "runs": 7,
+   "time": 1.464
+  }
+ },
+ "stringBuilding": {
+  "all": {
+   "memory": 0.268,
+   "runs": 7,
+   "time": 1.427
+  }
+ },
+ "translator": {
+  "all": {
+   "memory": 0.539,
+   "runs": 7,
+   "time": 0.751
+  }
+ },
+ "valueEscape": {
+  "all": {
+   "memory": 0.05,
+   "runs": 7,
+   "time": 0.761
+  }
+ }
+}
