@@ -53,16 +53,20 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     private final File settingsFile;
     private final List<String> sourceRoots;
     private final String encoding;
-    private final Map<String, String> userProperties;
+    private final org.gradle.api.provider.Provider<Map<String, String>> userProperties;
     private final FileCollection compileClasspath;
     private final List<File> pendingJavaSources = new ArrayList<File>();
     private org.gradle.api.provider.Provider<String> sourceEncoding;
 
     /// @param classesDir `compileJava`'s destination
     /// @param stubDir where processors write generated stub sources
-    /// @param userProperties the command-line `codename1.*` overrides
+    /// @param userProperties the command-line `codename1.*` overrides and the
+    ///        `codenameone { }` settings, read when the action runs: a build
+    ///        that realizes the compile task before its `codenameone { }` block
+    ///        must not process annotations for a stale main class
     public ProcessAnnotationsAction(File classesDir, File stubDir, File projectDir, File settingsFile,
-                                    List<String> sourceRoots, String encoding, Map<String, String> userProperties,
+                                    List<String> sourceRoots, String encoding,
+                                    org.gradle.api.provider.Provider<Map<String, String>> userProperties,
                                     FileCollection compileClasspath) {
         this.classesDir = classesDir;
         this.stubDir = stubDir;
@@ -70,7 +74,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         this.settingsFile = settingsFile;
         this.sourceRoots = new ArrayList<String>(sourceRoots);
         this.encoding = encoding;
-        this.userProperties = new java.util.HashMap<String, String>(userProperties);
+        this.userProperties = userProperties;
         this.compileClasspath = compileClasspath;
     }
 
@@ -175,7 +179,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         if (raw != null) {
             effective.putAll(raw);
         }
-        for (Map.Entry<String, String> e : userProperties.entrySet()) {
+        for (Map.Entry<String, String> e : userProperties.get().entrySet()) {
             effective.setProperty(e.getKey(), e.getValue());
         }
         String main = effective.getProperty("codename1.mainName");

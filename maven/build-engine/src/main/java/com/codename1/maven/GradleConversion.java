@@ -273,6 +273,16 @@ public final class GradleConversion {
                     warnUnresolved(deps, "common/pom.xml");
                     writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");
                 }
+                for (NativePlatform p : NativePlatform.values()) {
+                    File platformPom = new File(from.rootDir(), p.id() + File.separator + "pom.xml");
+                    List<String> platformDeps = platformDependencyLines(p, platformPom, from.dependencyFile(),
+                            deps, targetDir, hasSuffix(new File(targetDir, "src"), ".kt"));
+                    if (!platformDeps.isEmpty()) {
+                        warnUnresolved(platformDeps, p.id() + "/pom.xml");
+                        writeDependencies(new File(targetDir, "build.gradle.kts"), platformDeps,
+                                p.id() + "/pom.xml");
+                    }
+                }
             } else {
                 List<String> jars = copyAntLibraryJars(from, targetDir);
                 if (!jars.isEmpty()) {
@@ -800,6 +810,74 @@ public final class GradleConversion {
     /// written as it stands, with a comment, rather than guessed.
     static List<String> dependencyLines(File pom) {
         return dependencyLines(pom, null, true);
+    }
+
+    /// The dependencies a Maven platform module (`javase/pom.xml` and the like)
+    /// declares beyond the framework and the application's own common module.
+    /// JavaSE's become the `javase` source set's (`javaseImplementation`,
+    /// `javaseRuntimeOnly`, `javaseCompileOnly`), which the simulator runs with
+    /// and the JavaSE upload carries. A Gradle project has no per-platform
+    /// compile configuration for the device targets, so theirs are written
+    /// commented out under a note naming the module rather than dropped
+    /// silently. Test-scoped entries are left out: the platform modules'
+    /// tests are not converted.
+    List<String> platformDependencyLines(NativePlatform platform, File pom, File commonPom, List<String> commonLines,
+                                         File targetDir, boolean kotlinPlugin) {
+        List<String> out = new ArrayList<String>();
+        if (!pom.isFile()) {
+            return out;
+        }
+        Element common = parsePomOrNull(commonPom);
+        String commonArtifact = common == null ? null : text(common, "artifactId");
+        boolean javase = platform == NativePlatform.JAVASE;
+        boolean noted = false;
+        for (String entry : dependencyLines(pom, targetDir, kotlinPlugin)) {
+            String trimmed = entry.trim();
+            if (trimmed.startsWith("testImplementation(") || trimmed.startsWith("// testImplementation(")) {
+                continue;
+            }
+            int testPair = entry.indexOf("\n    testImplementation(");
+            if (testPair >= 0) {
+                entry = entry.substring(0, testPair);
+            }
+            if (commonArtifact != null && (entry.contains(":" + commonArtifact + ":")
+                    || entry.contains(":" + commonArtifact + "\""))) {
+                continue;
+            }
+            // Inherited from the parent pom, which common/pom.xml inherits too.
+            String coordinate = firstQuoted(entry);
+            boolean inCommon = false;
+            for (String line : commonLines) {
+                inCommon |= coordinate != null && line.contains(coordinate);
+            }
+            if (inCommon) {
+                continue;
+            }
+            if (javase) {
+                out.add(entry.replaceFirst("^(\\s*(?:// )?)implementation\\(", "$1javaseImplementation(")
+                        .replaceFirst("^(\\s*(?:// )?)runtimeOnly\\(", "$1javaseRuntimeOnly(")
+                        .replaceFirst("^(\\s*(?:// )?)compileOnly\\(", "$1javaseCompileOnly("));
+                continue;
+            }
+            if (!noted) {
+                out.add("    // " + platform.id() + "/pom.xml declared these for the " + platform.id()
+                        + " build only; a Gradle project has no such configuration, so add any it needs above:");
+                log.warn(platform.id() + "/pom.xml declares dependencies for that platform alone; they are "
+                        + "written commented out in build.gradle.kts for you to place.");
+                noted = true;
+            }
+            for (String line : entry.split("\n")) {
+                out.add(line.trim().startsWith("//") ? line : "    // " + line.trim());
+            }
+        }
+        return out;
+    }
+
+    /// The first double-quoted literal in `text`, quotes included, or null.
+    private static String firstQuoted(String text) {
+        int open = text.indexOf('"');
+        int close = open < 0 ? -1 : text.indexOf('"', open + 1);
+        return close < 0 ? null : text.substring(open, close + 1);
     }
 
     /// The Kotlin artifacts the Kotlin Gradle plugin supplies itself. Others in

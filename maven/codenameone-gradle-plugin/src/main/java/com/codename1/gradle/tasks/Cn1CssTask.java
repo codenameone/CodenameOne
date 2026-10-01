@@ -99,6 +99,25 @@ public abstract class Cn1CssTask extends Cn1Task {
         }
     }
 
+    /// `inputs` (comma separated) with each path under `projectDir` written
+    /// relative to it. The file is a cached output: absolute paths would send a
+    /// checkout restored from the build cache somewhere else to the old one's
+    /// stylesheets. The simulator resolves them against the project again.
+    public static String relative(String inputs, File projectDir) {
+        String base = projectDir.getAbsolutePath() + File.separator;
+        StringBuilder sb = new StringBuilder();
+        for (String path : inputs.split(",")) {
+            if (path.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(path.startsWith(base) ? path.substring(base.length()) : path);
+        }
+        return sb.toString();
+    }
+
     private static void writeInputs(File to, String inputs) {
         try {
             java.nio.file.Files.write(to.toPath(), inputs.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -163,7 +182,8 @@ public abstract class Cn1CssTask extends Cn1Task {
                         getCompilerClasspath().getAsPath(), layout().projectDir(), Long.MAX_VALUE);
             }
             // After the compile, which extracted every bundle the list names.
-            writeInputs(simulatorInputs, compiler.inputs(libraries, "", layout().themeCss()));
+            writeInputs(simulatorInputs, relative(compiler.inputs(libraries, "", layout().themeCss()),
+                    layout().projectDir()));
         } catch (BuildFailureException ex) {
             throw new GradleException(ex.getMessage(), ex);
         } catch (BuildExecutionException ex) {

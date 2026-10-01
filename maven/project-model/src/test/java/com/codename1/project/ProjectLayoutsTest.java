@@ -209,6 +209,27 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void aNestedIncludedAppSubprojectFindsTheBuildRoot() throws IOException {
+        File root = new File(tmp, "nested");
+        touch(root, "settings.gradle.kts", "include(\":clients:app\")\n");
+        touch(root, "clients/app/build.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");
+        touch(root, "clients/app/codenameone_settings.properties");
+        dir(root, "clients/app/src/main/java");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "clients/app/src/main/java"));
+        assertEquals(root.getCanonicalFile(), l.rootDir());
+        assertEquals(new File(root, "clients/app").getCanonicalFile(), l.projectDir());
+        assertEquals(":clients:app:cn1Compile", l.gradleTaskPath("cn1Compile"));
+
+        File stray = new File(tmp, "enclosing");
+        touch(stray, "settings.gradle.kts", "include(\"other\")\n");
+        touch(stray, "deep/app/build.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");
+        touch(stray, "deep/app/codenameone_settings.properties");
+        ProjectLayout alone = ProjectLayouts.detect(new File(stray, "deep/app"));
+        assertEquals(new File(stray, "deep/app").getCanonicalFile(), alone.rootDir(),
+                "a build that neither applies the plugin nor names the project is not adopted");
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

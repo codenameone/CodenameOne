@@ -180,7 +180,7 @@ final class AppSupport {
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
-                    layout.settingsFile(), roots, "UTF-8", userProperties.get(), main.getCompileClasspath())
+                    layout.settingsFile(), roots, "UTF-8", userProperties, main.getCompileClasspath())
                     .withSourceEncoding(javaEncoding(project, main)));
             // Last: in a Java and Kotlin project, both passes have run by now.
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
@@ -204,7 +204,7 @@ final class AppSupport {
                             main.getCompileClasspath(), compileArtifacts, complianceProperties)
                             .withPendingJavaSources(main.getJava().getSrcDirs()));
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
-                            layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties.get(),
+                            layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties,
                             main.getCompileClasspath())
                             .withPendingJavaSources(main.getJava().getSrcDirs())
                             .withSourceEncoding(javaEncoding(project, main)));
@@ -294,7 +294,7 @@ final class AppSupport {
             // theme.css alone would drop every library style.
             t.getJvmArgumentProviders().add(new CssInputArgument(
                     new File(cssWorkDir(layout), Cn1CssTask.SIMULATOR_INPUTS),
-                    layout.themeCss()));
+                    layout.themeCss(), layout.projectDir()));
             // Where processResources really put theme.res -- the simulator loads it
             // from there, and a relocated build directory moves it.
             t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.CSS_OUTPUT_PROPERTY,
@@ -670,10 +670,12 @@ final class AppSupport {
     static final class CssInputArgument implements org.gradle.process.CommandLineArgumentProvider {
         private final File recorded;
         private final File themeCss;
+        private final File projectDir;
 
-        CssInputArgument(File recorded, File themeCss) {
+        CssInputArgument(File recorded, File themeCss, File projectDir) {
             this.recorded = recorded;
             this.themeCss = themeCss;
+            this.projectDir = projectDir;
         }
 
         @Override
@@ -684,7 +686,14 @@ final class AppSupport {
                     String listed = new String(java.nio.file.Files.readAllBytes(recorded.toPath()),
                             java.nio.charset.StandardCharsets.UTF_8).trim();
                     if (!listed.isEmpty()) {
-                        inputs = listed;
+                        // Recorded relative to the project (it is a cached output).
+                        StringBuilder sb = new StringBuilder();
+                        for (String path : listed.split(",")) {
+                            File f = new File(path);
+                            sb.append(sb.length() == 0 ? "" : ",")
+                                    .append((f.isAbsolute() ? f : new File(projectDir, path)).getAbsolutePath());
+                        }
+                        inputs = sb.toString();
                     }
                 } catch (java.io.IOException ignored) {
                     // Falls back to the application's own stylesheet.

@@ -76,7 +76,7 @@ final class BackendSupport {
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), AppSupport.sourceRoots(main, layout),
-                    "UTF-8", userProperties.get(), main.getCompileClasspath())
+                    "UTF-8", userProperties, main.getCompileClasspath())
                     .withSourceEncoding(AppSupport.javaEncoding(project, main)));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
                     compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
@@ -91,7 +91,7 @@ final class BackendSupport {
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                             AppSupport.kotlinDestination(compile, layout), stubs,
                             layout.projectDir(), layout.settingsFile(), AppSupport.sourceRoots(main, layout),
-                            "UTF-8", userProperties.get(), main.getCompileClasspath())
+                            "UTF-8", userProperties, main.getCompileClasspath())
                             .withPendingJavaSources(main.getJava().getSrcDirs())
                             .withSourceEncoding(AppSupport.javaEncoding(project, main)));
                 }));

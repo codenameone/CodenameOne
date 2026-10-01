@@ -116,17 +116,16 @@ public final class ProjectLayouts {
         boolean hasCn1Settings = settings.isFile() || libSettings.isFile();
 
         if (!hasPom && isGradleRoot(dir, hasCn1Settings)) {
-            File parent = dir.getParentFile();
-            if (!hasSettingsScript(dir) && parent != null && hasSettingsScript(parent)
-                    && isGradleRoot(parent, false)) {
+            File root = hasSettingsScript(dir) ? null : includingRoot(dir);
+            if (root != null) {
                 // A subproject that applies the plugin in its own build script;
                 // the root is the directory with the settings script, and the
                 // project -- its settings, sources and build output -- is this one.
-                ProjectLayout atRoot = gradleLayout(parent, origin);
+                ProjectLayout atRoot = gradleLayout(root, origin);
                 if (atRoot.kind() == ProjectKind.BACKEND) {
                     return atRoot;
                 }
-                return new ProjectLayout(BuildSystem.GRADLE, gradleKind(dir), parent, dir, null);
+                return new ProjectLayout(BuildSystem.GRADLE, gradleKind(dir), root, dir, null);
             }
             return gradleLayout(dir, origin);
         }
@@ -208,6 +207,49 @@ public final class ProjectLayouts {
         // settings file beside it, or a backend-only project's
         // application.properties under a settings script, decides.
         return hasCn1Settings || new File(dir, ProjectLayout.BACKEND_SETTINGS_FILE).isFile();
+    }
+
+    /// The root of the build that includes `dir` as a subproject, or null. As
+    /// Gradle finds it: the nearest directory above with a settings script --
+    /// `clients/app` of a `:clients:app` project is two levels down. Accepted
+    /// when that build applies the plugin, or its settings script names this
+    /// project, so an unrelated build that happens to enclose a project is not
+    /// adopted.
+    private static File includingRoot(File dir) {
+        File candidate = dir.getParentFile();
+        while (candidate != null && !hasSettingsScript(candidate)) {
+            candidate = candidate.getParentFile();
+        }
+        if (candidate == null) {
+            return null;
+        }
+        if (isGradleRoot(candidate, false)) {
+            return candidate;
+        }
+        String rel = candidate.toURI().relativize(dir.toURI()).getPath();
+        if (rel.endsWith("/")) {
+            rel = rel.substring(0, rel.length() - 1);
+        }
+        String path = rel.replace('/', ':');
+        for (String name : new String[] {"settings.gradle.kts", "settings.gradle"}) {
+            File settings = new File(candidate, name);
+            if (settings.isFile()) {
+                String text = readQuietly(settings);
+                if (text.contains("\"" + path + "\"") || text.contains("\":" + path + "\"")
+                        || text.contains("'" + path + "'") || text.contains("':" + path + "'")) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String readQuietly(File f) {
+        try {
+            return readText(f);
+        } catch (IOException ex) {
+            return "";
+        }
     }
 
     private static boolean hasSettingsScript(File dir) {

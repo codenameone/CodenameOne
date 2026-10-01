@@ -78,14 +78,24 @@ class PluginHelpersTest {
     void liveCssReloadUsesTheListCn1CssRecorded(@org.junit.jupiter.api.io.TempDir File dir) throws Exception {
         File theme = new File(dir, "theme.css");
         File recorded = new File(dir, com.codename1.gradle.tasks.Cn1CssTask.SIMULATOR_INPUTS);
-        AppSupport.CssInputArgument arg = new AppSupport.CssInputArgument(recorded, theme);
+        AppSupport.CssInputArgument arg = new AppSupport.CssInputArgument(recorded, theme, dir);
         String property = "-D" + com.codename1.maven.SimulatorSupport.CSS_INPUT_PROPERTY + "=";
         assertEquals(Collections.singletonList(property + theme.getAbsolutePath()), arg.asArguments(),
                 "no list (CSS switched off): the application's stylesheet alone");
 
         java.nio.file.Files.write(recorded.toPath(), "/x/lib/theme.css,/x/theme.css\n".getBytes("UTF-8"));
-        assertEquals(Collections.singletonList(property + "/x/lib/theme.css,/x/theme.css"), arg.asArguments(),
+        assertEquals(Collections.singletonList(property + new File("/x/lib/theme.css").getAbsolutePath() + ","
+                + new File("/x/theme.css").getAbsolutePath()), arg.asArguments(),
                 "the library stylesheets come first, as cn1Css compiled them");
+
+        // Recorded relative to the project, so a checkout restored from the build
+        // cache elsewhere still points at its own files.
+        String recordedText = com.codename1.gradle.tasks.Cn1CssTask.relative(
+                new File(dir, "build/css/libs/a/theme.css").getAbsolutePath() + "," + theme.getAbsolutePath(), dir);
+        assertEquals("build/css/libs/a/theme.css,theme.css".replace("/", File.separator), recordedText);
+        java.nio.file.Files.write(recorded.toPath(), recordedText.getBytes("UTF-8"));
+        assertEquals(Collections.singletonList(property + new File(dir, "build/css/libs/a/theme.css").getAbsolutePath()
+                + "," + theme.getAbsolutePath()), arg.asArguments());
     }
 
     @Test

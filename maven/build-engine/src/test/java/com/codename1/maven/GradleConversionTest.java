@@ -408,6 +408,39 @@ class GradleConversionTest {
     }
 
     @Test
+    void platformModuleDependenciesAreNotDroppedSilently() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><artifactId>mvnapp-common</artifactId><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
+                + "</dependency></dependencies></project>");
+        touch(mvn, "javase/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>mvnapp-common</artifactId><version>1.0</version>"
+                + "</dependency>"
+                + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-javase</artifactId>"
+                + "<version>1</version><scope>provided</scope></dependency>"
+                + "<dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>"
+                + "<version>5</version><scope>test</scope></dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>desktop-only</artifactId><version>3</version>"
+                + "</dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
+                + "</dependency></dependencies></project>");
+        touch(mvn, "android/pom.xml", "<project><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>android-sdk-glue</artifactId>"
+                + "<version>4</version></dependency></dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("    javaseImplementation(\"org.example:desktop-only:3\")"), build);
+        assertFalse(build.contains("mvnapp-common"), "the application's own module is not a dependency: " + build);
+        assertFalse(build.contains("junit-jupiter"), "the platform modules' tests are not converted: " + build);
+        assertFalse(build.contains("javaseImplementation(\"org.example:util"), "already common's: " + build);
+        assertTrue(build.contains("    // implementation(\"org.example:android-sdk-glue:4\")"), build);
+        assertTrue(build.contains("android/pom.xml declared these for the android build only"), build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
