@@ -90,6 +90,39 @@ static long long cn1ClientTlsHandshakeBudget(void) {
 #if !defined(_WIN32)
 int cn1BackendTlsHandshakeWithin(SSL* ssl, int fd, long long budgetMillis,
                                  int connecting);
+/* Defined in cn1_backend_server.c: parks a virtual thread, polls anywhere else. */
+int cn1BackendAwaitFd(int fd, int events, long long deadline);
+long long cn1BackendDeadline(long long millis);
+
+/*
+ * The wait behind an SSL_read or SSL_write that answered WANT_READ/WANT_WRITE.
+ *
+ * The descriptor is non-blocking -- cn1_backend_net.c leaves every outbound one
+ * that way -- so OpenSSL hands the wait back rather than blocking in it, and this
+ * is where it happens: parked on the host's poller on a virtual thread, polled
+ * anywhere else. `which` is the socket option whose deadline bounds it
+ * (SO_RCVTIMEO or SO_SNDTIMEO, which Tcp.setReadTimeout sets together), so a
+ * stalled peer still fails the call after the time a blocking read allowed.
+ * `*deadline` starts at -1 and is resolved on the first wait, so a call that
+ * never waits never asks. Returns 1 to retry, 0 to give up.
+ */
+static int cn1ClientTlsAwait(SSL* ssl, int rc, int which, long long* deadline) {
+    int err = SSL_get_error(ssl, rc);
+    int fd = SSL_get_fd(ssl);
+    if(err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
+        return 0;
+    }
+    if(*deadline < 0) {
+        struct timeval tv;
+        socklen_t tvLen = (socklen_t)sizeof(tv);
+        *deadline = 0;
+        if(getsockopt(fd, SOL_SOCKET, which, (char*)&tv, &tvLen) == 0) {
+            *deadline = cn1BackendDeadline((long long)tv.tv_sec * 1000LL
+                                           + (long long)(tv.tv_usec / 1000));
+        }
+    }
+    return cn1BackendAwaitFd(fd, err == SSL_ERROR_WANT_READ ? 1 : 2, *deadline) > 0;
+}
 #endif
 
 static int cn1ClientTlsInitialised = 0;
@@ -373,6 +406,10 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         return 0;
     }
     SSL_set_fd(ssl, fd);
+    /* A write that answers WANT_WRITE is retried after a park, and the Java array
+       it reads from is looked up again then: the retry must not be refused for
+       arriving with a pointer OpenSSL has not seen before. */
+    SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_set_tlsext_host_name(ssl, h);
     /* The name check. Without it a valid certificate for any other host would
      * pass, which is most of what TLS is for here.
@@ -415,13 +452,12 @@ JAVA_LONG com_codename1_backend_Tcp_startTlsImpl___long_java_lang_String_java_la
         /* The helper yields around its own syscalls, as the loop below the
            budget check does. */
         long long budget = cn1ClientTlsHandshakeBudget();
-        if(budget > 0) {
-            rc = cn1BackendTlsHandshakeWithin(ssl, SSL_get_fd(ssl), budget, 1);
-        } else {
-            CN1_YIELD_THREAD;
-            rc = SSL_connect(ssl);
-            CN1_RESUME_THREAD;
-        }
+        /* ALWAYS the waiting loop, even unbounded: the descriptor is
+           non-blocking (cn1_backend_net.c leaves it so), and a bare SSL_connect
+           on it answers WANT_READ at the first round trip. "No bound" is a
+           budget of about 35 years rather than a second code path. */
+        rc = cn1BackendTlsHandshakeWithin(ssl, SSL_get_fd(ssl),
+                                          budget > 0 ? budget : (1LL << 40), 1);
     }
 #else
     CN1_YIELD_THREAD;
@@ -459,7 +495,23 @@ JAVA_INT com_codename1_backend_Tcp_tlsReadImpl___long_byte_1ARRAY_int_int_R_int(
     }
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
+#if !defined(_WIN32)
+    {
+        long long deadline = -1;
+        for(;;) {
+            /* Per attempt: the error queue is the host thread's, and other
+               virtual threads ran on it while this one was parked. */
+            ERR_clear_error();
+            n = SSL_read(ssl, (char*)&data[offset], (int)length);
+            if(n > 0 || !cn1ClientTlsAwait(ssl, n, SO_RCVTIMEO, &deadline)) {
+                break;
+            }
+            data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+        }
+    }
+#else
     n = SSL_read(ssl, (char*)&data[offset], (int)length);
+#endif
     CN1_RESUME_THREAD;
     if(n > 0) {
         return (JAVA_INT)n;
@@ -484,7 +536,21 @@ JAVA_INT com_codename1_backend_Tcp_tlsWriteImpl___long_byte_1ARRAY_int_int_R_int
     while(written < (int)length) {
         int n;
         CN1_YIELD_THREAD;
+#if !defined(_WIN32)
+        {
+            long long deadline = -1;
+            for(;;) {
+                ERR_clear_error();
+                n = SSL_write(ssl, (char*)&data[offset + written], (int)length - written);
+                if(n > 0 || !cn1ClientTlsAwait(ssl, n, SO_SNDTIMEO, &deadline)) {
+                    break;
+                }
+                data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+            }
+        }
+#else
         n = SSL_write(ssl, (char*)&data[offset + written], (int)length - written);
+#endif
         CN1_RESUME_THREAD;
         if(n <= 0) {
             return -2;

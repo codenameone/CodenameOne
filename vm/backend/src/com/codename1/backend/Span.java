@@ -46,6 +46,8 @@ public abstract class Span {
     /// What was current when this span became current, restored when it ends.
     /// Owned by [Tracing]; a tracer never reads it.
     Span previous;
+    /// The tracer that made this span, which the spans started under it use too.
+    Tracer owner;
     /// Whether [Tracing] made this span current and must restore on end.
     boolean entered;
     /// A tracer to shut down once this server span has ended, set when the

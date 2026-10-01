@@ -1,0 +1,100 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend.metrics;
+
+import java.util.List;
+
+/// A value read when metrics are collected -- a queue's depth, a pool's size, a
+/// `@ManagedAttribute`. Nothing is recorded in between, so a gauge costs
+/// nothing until something asks.
+public final class Gauge extends Instrument {
+    /// Where a gauge's value comes from.
+    public interface Source {
+        double read();
+    }
+
+    /// Where a gauge with several labelled values comes from -- one per executor,
+    /// say. Each point is a map with `attributes` and `value`; see
+    /// [#point].
+    public interface MultiSource {
+        List read();
+    }
+
+    private final Source source;
+    private final MultiSource multi;
+
+    Gauge(String name, String description, String unit, Source source) {
+        super(name, description, unit, GAUGE);
+        this.source = source;
+        this.multi = null;
+    }
+
+    Gauge(String name, String description, String unit, MultiSource multi) {
+        super(name, description, unit, GAUGE);
+        this.source = null;
+        this.multi = multi;
+    }
+
+    /// One labelled value, for a [MultiSource].
+    public static java.util.Map point(String key, Object label, double value) {
+        if (key == null || key.length() == 0) {
+            // As a histogram refuses one: rendered as {="value"}, an empty name
+            // makes the whole exposition invalid, not just this gauge.
+            throw new IllegalArgumentException("A gauge point needs a label key");
+        }
+        java.util.Map attributes = new java.util.LinkedHashMap();
+        attributes.put(key, label);
+        return Instrument.point(attributes, value);
+    }
+
+    /// The value now, or NaN when reading it failed.
+    ///
+    /// Application code runs here, on the exporter's thread and on the
+    /// management endpoint's, so ANY throwable is contained -- an AssertionError
+    /// or LinkageError escaping used to end the exporter's only thread, and every
+    /// later export with it.
+    public double read() {
+        if (source == null) {
+            return Double.NaN;
+        }
+        try {
+            return source.read();
+        } catch (Throwable err) {
+            return Double.NaN;
+        }
+    }
+
+    @Override
+    public List points() {
+        if (multi != null) {
+            try {
+                List points = multi.read();
+                return points == null ? new java.util.ArrayList() : points;
+            } catch (Throwable err) {
+                // Contained like read(): the callback is the application's.
+                return new java.util.ArrayList();
+            }
+        }
+        return single(point(null, read()));
+    }
+}

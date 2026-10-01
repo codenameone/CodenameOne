@@ -172,9 +172,25 @@ done < <("$BACKEND_DIR/shared-sources.sh")
 # server as for an app. The website's doclet marks the whole tree shared with
 # --shared-sources.
 BACKEND_SOURCES_ARGFILE="$CN1_DIR/build/backend-javadoc-sources.txt"
+# The vm/JavaAPI classes the backend's public API exposes beyond the CLDC set --
+# @Async's Future and what its get() throws, Config's Properties. The backend
+# compiles against vm/JavaAPI, so these work there; listing them here is what makes
+# them documented, supported API rather than an accident of the class library.
+# check-backend-jdk-surface.py fails the build when the backend exposes a JDK type
+# that is neither CLDC nor in this list. Keep the two lists in step.
+BACKEND_PROMOTED_JDK="java/util/Properties.java
+java/util/concurrent/CancellationException.java
+java/util/concurrent/ExecutionException.java
+java/util/concurrent/Future.java
+java/util/concurrent/TimeUnit.java
+java/util/concurrent/TimeoutException.java"
+python3 "$ROOT_DIR/scripts/check-backend-jdk-surface.py"
 {
   find "$BACKEND_STAGE" -name "*.java" | grep -v '/com/codename1/impl/'
   find "$ROOT_DIR/Ports/CLDC11/src" -name "*.java"
+  echo "$BACKEND_PROMOTED_JDK" | while IFS= read -r promoted; do
+    echo "$ROOT_DIR/vm/JavaAPI/src/$promoted"
+  done
 } | LC_ALL=C sort > "$BACKEND_SOURCES_ARGFILE"
 
 # Held to the same doclint as the client API above. --release 8 matches the backend module's
@@ -185,7 +201,7 @@ BACKEND_SOURCES_ARGFILE="$CN1_DIR/build/backend-javadoc-sources.txt"
   --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
   --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
   --release 8 \
-  -sourcepath "$BACKEND_STAGE:$ROOT_DIR/Ports/CLDC11/src" \
+  -sourcepath "$BACKEND_STAGE:$ROOT_DIR/Ports/CLDC11/src:$ROOT_DIR/vm/JavaAPI/src" \
   -Xdoclint:all,-missing \
   -Xmaxerrs 10000 \
   -Xmaxwarns 10000 \

@@ -22,10 +22,6 @@
  */
 package com.codenameone.developerguide.backend;
 
-import com.codename1.backend.Backend;
-import com.codename1.backend.DataSource;
-import com.codename1.backend.orm.EntityManager;
-import com.codename1.backend.HttpServer;
 import com.codename1.backend.WebSocket;
 import com.codename1.backend.WebSocketSession;
 import com.codename1.backend.annotations.WebSocketMapping;
@@ -57,19 +53,6 @@ public static final class Echo implements WebSocket {
     }
 }
 // end::backend-websocket-echo[]
-
-// tag::backend-websocket-register[]
-public static void main(String[] args) throws Exception {
-    Backend.builder()
-            .webSockets(new Backend.WebSocketEndpoints() {
-                public void register(HttpServer.WebSocketRegistry registry,
-                                     DataSource dataSource, EntityManager entities) {
-                    registry.route("/echo", new Echo());
-                }
-            })
-            .run();
-}
-// end::backend-websocket-register[]
 
 // tag::backend-websocket-annotated[]
 @WebSocketMapping("/chat")
@@ -143,18 +126,4 @@ public static final class Graph implements WebSocket {
 }
 // end::backend-websocket-subprotocol[]
 
-// tag::backend-websocket-raw[]
-public static void serveForever() throws Exception {
-    HttpServer server = HttpServer.start(null, 8080, 512, 16, new HttpServer.Handler() {
-        public HttpServer.Response handle(HttpServer.Request request) {
-            return HttpServer.Response.text(200, "ok");
-        }
-    }, null, new HttpServer.WebSocketRoutes() {
-        public void register(HttpServer.WebSocketRegistry registry) {
-            registry.route("/echo", new Echo());
-        }
-    });
-    server.awaitTermination();
-}
-// end::backend-websocket-raw[]
 }

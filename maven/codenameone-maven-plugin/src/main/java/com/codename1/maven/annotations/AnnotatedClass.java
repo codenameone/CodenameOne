@@ -134,6 +134,11 @@ public final class AnnotatedClass {
     void setSourceName(String sourceName) { this.sourceName = sourceName; }
 
     void setSourceFile(String sourceFile) { this.sourceFile = sourceFile; }
+    private boolean accessible = true;
+    void setAccessible(boolean accessible) { this.accessible = accessible; }
+    /// Whether code in another package can name this class: it and every class
+    /// enclosing it are public.
+    public boolean isAccessibleFromAnywhere() { return accessible; }
 
     private String sourceName;
 
@@ -150,6 +155,7 @@ public final class AnnotatedClass {
     public boolean isInterface() { return (access & Opcodes.ACC_INTERFACE) != 0; }
     public boolean isPublic() { return (access & Opcodes.ACC_PUBLIC) != 0; }
     public boolean isSynthetic() { return (access & Opcodes.ACC_SYNTHETIC) != 0; }
+    public boolean isFinal() { return (access & Opcodes.ACC_FINAL) != 0; }
 
     /// `true` when the class file's `ACC_RECORD` flag is set (Java 16+ record).
     /// Inlined as a constant so this code keeps compiling against ASM versions
