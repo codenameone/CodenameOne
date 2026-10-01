@@ -53,6 +53,21 @@ class JsonCodecTest {
     }
 
     @Test
+    @DisplayName("a float is read only when a float can hold it")
+    void floats() {
+        assertEquals(1.5f, JsonCodec.readFloat(Double.valueOf(1.5), ROOT, "f", -1));
+        assertEquals(3f, JsonCodec.readFloat(Long.valueOf(3), ROOT, "f", -1));
+        assertEquals(0f, JsonCodec.readFloat(Double.valueOf(0.0), ROOT, "f", -1));
+        // Past Float.MAX_VALUE it became infinity, below the smallest float zero.
+        IllegalArgumentException big = assertThrows(IllegalArgumentException.class,
+                () -> JsonCodec.readFloat(Double.valueOf(1e100), ROOT, "f", -1));
+        assertEquals("$.f: expected a number within the range of a float, got the number "
+                + "1.0E100", big.getMessage());
+        assertThrows(IllegalArgumentException.class,
+                () -> JsonCodec.readFloat(Double.valueOf(1e-100), ROOT, "f", -1));
+    }
+
+    @Test
     @DisplayName("dates are read from milliseconds and ISO-8601, and an impossible one is refused")
     void dates() {
         assertEquals(86400000L, JsonCodec.readDate(Long.valueOf(86400000L), ROOT, "d", -1)

@@ -338,6 +338,41 @@ final class BackendBeans {
     private final Map<String, String[]> aspectMetrics = new LinkedHashMap<String, String[]>();
     /// Prometheus series name -> the aspect metric exporting it, and where.
     private final Map<String, String[]> aspectSeries = new LinkedHashMap<String, String[]>();
+
+    /// The instruments the server registers itself (Metrics.enableServer), and
+    /// their kinds; keep in step with it. Claimed up front, so an aspect cannot
+    /// take one of these names -- or one that exports to the same Prometheus
+    /// series. At run time that clash is refused in the woven finally, AFTER the
+    /// body's work (and any transaction around it) has committed, so the caller
+    /// sees a failure for work that succeeded and may retry it.
+    private static final String[][] BUILT_IN_METRICS = {
+        {"http.server.request.duration", "histogram"},
+        {"cn1.scheduler.run.duration", "histogram"},
+        {"http.server.active_requests", "gauge"},
+        {"http.server.open_connections", "gauge"},
+        {"cn1.server.websocket_connections", "gauge"},
+        {"cn1.server.requests_served", "gauge"},
+        {"cn1.server.connections_refused", "gauge"},
+        {"db.client.connection.count", "gauge"},
+        {"db.client.connection.idle", "gauge"},
+        {"cn1.task.queue_depth", "gauge"},
+        {"process.runtime.memory.used", "gauge"},
+        {"process.uptime", "gauge"},
+    };
+
+    {
+        String by = "the server's own instruments";
+        for (String[] builtIn : BUILT_IN_METRICS) {
+            aspectMetrics.put(builtIn[0], new String[] {"built-in", by});
+            String base = promName(builtIn[0]);
+            String[] series = "histogram".equals(builtIn[1])
+                    ? new String[] {base, base + "_bucket", base + "_sum", base + "_count"}
+                    : new String[] {base};
+            for (String element : series) {
+                aspectSeries.put(element, new String[] {builtIn[0], by});
+            }
+        }
+    }
     final Map<String, BackendWeaver.Plan> plans = new TreeMap<String, BackendWeaver.Plan>();
     /// Eager singletons (and the prototypes they need) in construction order.
     final List<Bean> order = new ArrayList<Bean>();
@@ -2405,6 +2440,11 @@ final class BackendBeans {
     private void claimAspectMetric(AnnotatedClass cls, String name, String kind, String by) {
         String[] earlier = aspectMetrics.get(name);
         if (earlier != null) {
+            if ("built-in".equals(earlier[0])) {
+                ctx.error(cls, "Metric " + name + " for " + by + " is one of the server's own "
+                        + "instruments; give it another name.");
+                return;
+            }
             if (!earlier[0].equals(kind)) {
                 ctx.error(cls, "Metric " + name + " is a " + kind + " for " + by + " and a "
                         + earlier[0] + " for " + earlier[1] + ". One name cannot be both: "

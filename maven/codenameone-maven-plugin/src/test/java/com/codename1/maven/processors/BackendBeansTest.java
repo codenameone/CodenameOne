@@ -1322,6 +1322,16 @@ public class BackendBeansTest {
                 + "}\n");
         errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("would be exported to Prometheus as latency_ms"));
+        // The server's own instruments are taken, by name and by Prometheus series.
+        s.put("com.example.Work", PKG + "@Component public class Work {\n"
+                + "    @Timed(\"http.server.request.duration\") public void a() { }\n"
+                + "    @Timed(\"process_uptime\") public void b() { }\n"
+                + "}\n");
+        errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Metric http.server.request.duration for @Timed on "
+                + "com.example.Work.a is one of the server's own instruments"));
+        assertTrue(errors, errors.contains("would be exported to Prometheus as process_uptime, "
+                + "which metric process.uptime (the server's own instruments)"));
         s.put("com.example.Work", PKG + "@Component public class Work {\n"
                 + "    @Timed(\"jobs.time\") @Counted(\"jobs\") public void a() { }\n"
                 + "    @Counted(\"jobs\") public void b() { }\n"

@@ -243,6 +243,16 @@ final class BackendJsonCodecs {
             case DTO:
                 return checkDto(raw(type), read, visiting);
             default:
+                // Including Object and a raw Map or List, which are accepted on
+                // purpose although their contents are only known at run time.
+                // JsonValues writes each value by its class: one this build has
+                // a codec for, a JDK shape, or else a 500 that names the class --
+                // never its toString(). Writing EVERY application class, as
+                // Jackson can, would mean a codec for each class in the module,
+                // linked into every binary with an Object field; and refusing
+                // these declarations would refuse the free-form maps and lists
+                // handlers commonly return. A class meant to go out inside one
+                // is declared with its type, which is what the 500 says.
                 return null;
         }
     }
@@ -894,7 +904,7 @@ final class BackendJsonCodecs {
             return CODEC + ".readDouble(" + json + ", " + where + ")";
         }
         if ("float".equals(prim)) {
-            return "(float) " + CODEC + ".readDouble(" + json + ", " + where + ")";
+            return CODEC + ".readFloat(" + json + ", " + where + ")";
         }
         if ("boolean".equals(prim)) {
             return CODEC + ".readBoolean(" + json + ", " + where + ")";

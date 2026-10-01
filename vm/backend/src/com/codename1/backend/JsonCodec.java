@@ -182,6 +182,20 @@ public final class JsonCodec {
         throw mismatch(at, name, index, "a number", json);
     }
 
+    /// A number a float can hold. One past Float.MAX_VALUE would become
+    /// infinity and one below the smallest float would become zero -- a
+    /// different number from the one sent -- so both are refused, as an MCP
+    /// tool's float argument is.
+    public static float readFloat(Object json, Path at, String name, int index) {
+        double d = readDouble(json, at, name, index);
+        float f = (float) d;
+        if (Double.isNaN(d) || Double.isInfinite(d) || Math.abs(d) > Float.MAX_VALUE
+                || (f == 0 && d != 0)) {
+            throw mismatch(at, name, index, "a number within the range of a float", json);
+        }
+        return f;
+    }
+
     /// `true` or `false`.
     public static boolean readBoolean(Object json, Path at, String name, int index) {
         if (json instanceof Boolean) {
