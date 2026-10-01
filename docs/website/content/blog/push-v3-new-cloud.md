@@ -17,7 +17,7 @@ This week we merged [Push V3](https://github.com/codenameone/CodenameOne/pull/54
 
 There is also one thing every existing push developer should do now:
 
-> Change the push service URL from `https://push.codenameone.com` to `https://cloud.codenameone.com` and send a real notification through your existing code.
+> Change the classic push URL from `https://push.codenameone.com/push/push` to `https://cloud.codenameone.com/push/push` and send a real notification through your existing code.
 
 Next week we plan to bring down the old push service and direct `push.codenameone.com` traffic to the new implementation. The compatibility endpoint accepts the existing request format, so existing code should keep working. It is still a completely new server, and “should” is not a test result. Please test before the cutover while both routes are easy to compare.
 
@@ -38,6 +38,8 @@ If your server currently sends through the classic endpoint, keep the request ex
 -https://push.codenameone.com/push/push
 +https://cloud.codenameone.com/push/push
 ```
+
+This endpoint takes the existing form-encoded request and classic push token. `/api/v3/push/messages` is a separate JSON API with a separate server API key. The [push setup and migration guide](/developer-guide/push-notifications/#push-classic-server-migration) explains both paths, including V3 sends to installed `PushCallback` apps.
 
 Send to test devices on every platform your application supports. Exercise a visible notification, a data payload, a cold start, and any badge, sound, category, image, or deep-link behavior you use. Compare the result with the old host and [open an issue](https://github.com/codenameone/CodenameOne/issues) if the two disagree.
 

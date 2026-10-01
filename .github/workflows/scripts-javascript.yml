@@ -96,11 +96,9 @@ on:
       - 'vm/backend/demo/cn1ss/**'
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -373,7 +371,7 @@ jobs:
           ./scripts/run-javascript-browser-tests.sh "${{ steps.locate_bundle.outputs.bundle }}" "${GITHUB_WORKSPACE}/scripts/javascript/screenshots"
 
       - name: Upload JavaScript port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-javascript
@@ -382,7 +380,7 @@ jobs:
           retention-days: 14
 
       - name: Upload JavaScript screenshot artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: javascript-ui-tests

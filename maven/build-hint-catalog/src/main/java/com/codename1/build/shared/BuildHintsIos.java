@@ -364,8 +364,11 @@ final class BuildHintsIos {
         h.add(new Hint("ios.crypto.gcm")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios"));
+                .def("true")
+                .platform("ios")
+                .doc("Whether AES-GCM is compiled into the crypto library. On by default wherever "
+                        + "the crypto API is used; set false to leave it out and keep the binary "
+                        + "smaller. The secure vault needs it."));
 
         h.add(new Hint("ios.debug.teamId")
                 .group(HintGroup.IOS)

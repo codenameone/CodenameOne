@@ -98,6 +98,12 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -412,7 +418,7 @@ jobs:
           fi
 
       - name: Upload codenameone link policy report
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: codenameone-link-policy-report

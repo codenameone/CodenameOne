@@ -123,6 +123,12 @@ BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/I
 [ -z "$BUNDLE_ID" ] && { rt_log "Could not read CFBundleIdentifier from $APP_PATH"; exit 5; }
 rt_log "Built $APP_PATH (bundle $BUNDLE_ID)"
 
+# App Store Connect rejects an upload importing any SDK symbol no public header declares, and
+# the tvOS app is a separate product the iOS jobs never read, so check it here, where it exists.
+rt_log "Checking $APP_PATH for private Apple API"
+"$REPO_ROOT/scripts/check-ios-private-api.py" --sdk appletvsimulator --binary "$APP_PATH" || {
+  rt_log "tvOS app references private Apple API (see above)"; exit 6; }
+
 # --- Screenshot capture: host WS sink + the streaming tvOS app --------------
 JAVA_BIN="${JAVA17_BIN:-$(command -v java)}"
 cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"

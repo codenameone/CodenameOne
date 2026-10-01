@@ -86,7 +86,9 @@ on:
       - '.github/workflows/parparvm-parallel-mark.yml'
 
 concurrency:
-  group: parparvm-parallel-mark-${{ github.ref }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -147,7 +149,7 @@ jobs:
         working-directory: vm
 
       - name: Surefire reports
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: gc-suite-${{ matrix.arch }}-${{ matrix.markers }}marker
