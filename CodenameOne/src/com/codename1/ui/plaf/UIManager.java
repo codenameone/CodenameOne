@@ -208,11 +208,8 @@ public class UIManager {
 
     /// Internal EDT entry point for coalesced platform settings notifications.
     public void refreshNativeThemeSettings() {
-        if (!useNativeColors && !useNativeFonts && !useLargerTextScale) {
-            return;
-        }
         Display display = Display.getInstance();
-        com.codename1.impl.NativeThemeSettings next = display.getNativeThemeSettings().forInheritance(useNativeColors, useNativeFonts);
+        com.codename1.impl.NativeThemeSettings next = getEffectiveNativeThemeSettings(display);
         float scale = getEffectiveLargerTextScale();
         Boolean dark = display.isDarkMode();
         if (next.equals(nativeSettings)
@@ -223,25 +220,26 @@ public class UIManager {
         refreshTheme();
         com.codename1.ui.Form form = display.getCurrent();
         if (form != null) {
+            // Invalidate the tree once. Form.refreshTheme performs its root layout.
+            form.setShouldCalcPreferredSize(true);
             form.refreshTheme(true);
-            revalidateNativeThemeTree(form);
             form.repaint();
         }
         for (com.codename1.ui.Window window : com.codename1.ui.Desktop.getInstance().getWindows()) {
+            window.setShouldCalcPreferredSize(true);
             window.refreshTheme(true);
-            revalidateNativeThemeTree(window);
+            window.revalidateLater();
             window.repaint();
         }
     }
 
-    private void revalidateNativeThemeTree(com.codename1.ui.Container container) {
-        for (int i = 0; i < container.getComponentCount(); i++) {
-            Component child = container.getComponentAt(i);
-            if (child instanceof com.codename1.ui.Container) {
-                revalidateNativeThemeTree((com.codename1.ui.Container) child);
-            }
+    private com.codename1.impl.NativeThemeSettings getEffectiveNativeThemeSettings(Display display) {
+        // Appearance follows the OS independently; do not query optional palette/font
+        // settings just to detect a light/dark change in a default-configured app.
+        if (useNativeColors || useNativeFonts) {
+            return display.getNativeThemeSettings().forInheritance(useNativeColors, useNativeFonts);
         }
-        container.revalidate();
+        return new com.codename1.impl.NativeThemeSettings();
     }
 
     private void restoreNativeThemeValues() {
@@ -302,11 +300,8 @@ public class UIManager {
         if (fonts != null) {
             useNativeFonts = fonts.booleanValue();
         }
-        if (!useNativeColors && !useNativeFonts && !useLargerTextScale) {
-            return;
-        }
         Display display = Display.getInstance();
-        nativeSettings = display.getNativeThemeSettings().forInheritance(useNativeColors, useNativeFonts);
+        nativeSettings = getEffectiveNativeThemeSettings(display);
         nativeSettingsTextScale = getEffectiveLargerTextScale();
         nativeSettingsDark = display.isDarkMode();
         if (useNativeColors) {

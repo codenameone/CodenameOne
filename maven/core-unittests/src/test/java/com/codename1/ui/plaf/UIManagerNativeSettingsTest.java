@@ -36,6 +36,7 @@ class UIManagerNativeSettingsTest extends UITestBase {
     @BeforeEach
     void resetSettings() {
         manager = UIManager.getInstance();
+        display.setDarkMode(null);
         manager.setUseNativeColors(false);
         manager.setUseNativeFonts(false);
         manager.setUseLargerTextScale(false);
@@ -306,6 +307,114 @@ class UIManagerNativeSettingsTest extends UITestBase {
         manager.refreshNativeThemeSettings();
         assertEquals(0x112233, button.getUnselectedStyle().getBgColor());
         assertEquals(0x112233, ((RoundBorder) button.getUnselectedStyle().getBorder()).getColor());
+    }
+
+    @com.codename1.junit.FormTest
+    void appearanceChangesRefreshVisibleStylesWithoutOptionalSettings() {
+        Hashtable theme = nativeTheme();
+        theme.put("$DarkButton.fgColor", "eeeeee");
+        manager.setThemeProps(theme);
+        com.codename1.ui.Button button = new com.codename1.ui.Button("Appearance");
+        display.getCurrent().add(button);
+        assertEquals(0x112233, button.getUnselectedStyle().getFgColor());
+        int generation = UIManager.getThemeGeneration();
+        manager.refreshNativeThemeSettings();
+        assertEquals(generation, UIManager.getThemeGeneration());
+        implementation.nativeDarkMode = Boolean.TRUE;
+        manager.refreshNativeThemeSettings();
+        assertEquals(0xeeeeee, button.getUnselectedStyle().getFgColor());
+        assertFalse(manager.isUseNativeColors());
+        assertFalse(manager.isUseNativeFonts());
+        generation = UIManager.getThemeGeneration();
+        manager.refreshNativeThemeSettings();
+        assertEquals(generation, UIManager.getThemeGeneration());
+        implementation.nativeDarkMode = Boolean.FALSE;
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x112233, button.getUnselectedStyle().getFgColor());
+    }
+
+    @Test
+    void explicitAppearanceOverrideIgnoresOsChangesWithoutOptIns() {
+        display.setDarkMode(Boolean.FALSE);
+        try {
+            Hashtable theme = nativeTheme();
+            theme.put("$DarkButton.fgColor", "eeeeee");
+            manager.setThemeProps(theme);
+            int generation = UIManager.getThemeGeneration();
+            implementation.nativeDarkMode = Boolean.TRUE;
+            manager.refreshNativeThemeSettings();
+            assertEquals(generation, UIManager.getThemeGeneration());
+            assertEquals(0x112233, color());
+        } finally {
+            display.setDarkMode(null);
+        }
+    }
+
+    private static class CountingLayout extends com.codename1.ui.layouts.BoxLayout {
+        int passes;
+
+        CountingLayout() {
+            super(com.codename1.ui.layouts.BoxLayout.Y_AXIS);
+        }
+
+        @Override
+        public void layoutContainer(com.codename1.ui.Container parent) {
+            passes++;
+            super.layoutContainer(parent);
+        }
+    }
+
+    private com.codename1.ui.Button addDeepTree(com.codename1.ui.Container root) {
+        com.codename1.ui.Container parent = root;
+        for (int i = 0; i < 20; i++) {
+            com.codename1.ui.Container child = new com.codename1.ui.Container(com.codename1.ui.layouts.BoxLayout.y());
+            parent.add(child);
+            parent = child;
+        }
+        com.codename1.ui.Button leaf = new com.codename1.ui.Button("Font preview");
+        parent.add(leaf);
+        return leaf;
+    }
+
+    @com.codename1.junit.FormTest
+    void appearanceRefreshLaysOutADeepFormOnce() {
+        manager.setUseNativeFonts(true);
+        manager.setThemeProps(nativeTheme());
+        com.codename1.ui.Form form = display.getCurrent();
+        CountingLayout layout = new CountingLayout();
+        form.setLayout(layout);
+        com.codename1.ui.Button leaf = addDeepTree(form);
+        form.revalidate();
+        layout.passes = 0;
+        implementation.nativeThemeSettings = new NativeThemeSettings().font("native:", 32);
+        manager.refreshNativeThemeSettings();
+        assertEquals(1, layout.passes, "Nested containers must not each lay out the root");
+        assertEquals(32f, leaf.getUnselectedStyle().getFont().getPixelSize());
+    }
+
+    @com.codename1.junit.FormTest
+    void appearanceRefreshSchedulesOneDeepWindowLayout() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        manager.setUseNativeFonts(true);
+        manager.setThemeProps(nativeTheme());
+        CountingLayout layout = new CountingLayout();
+        com.codename1.ui.Window window = new com.codename1.ui.Window("Font preview", layout);
+        try {
+            com.codename1.ui.Button leaf = addDeepTree(window);
+            window.show();
+            window.revalidate();
+            layout.passes = 0;
+            implementation.nativeThemeSettings = new NativeThemeSettings().font("native:", 32);
+            manager.refreshNativeThemeSettings();
+            assertEquals(0, layout.passes, "Window layout should be deferred to the paint cycle");
+            java.lang.reflect.Method flush = com.codename1.ui.Window.class.getDeclaredMethod("flushRevalidateQueue");
+            flush.setAccessible(true);
+            flush.invoke(window);
+            assertEquals(1, layout.passes);
+            assertEquals(32f, leaf.getUnselectedStyle().getFont().getPixelSize());
+        } finally {
+            window.dispose();
+        }
     }
 
     @Test

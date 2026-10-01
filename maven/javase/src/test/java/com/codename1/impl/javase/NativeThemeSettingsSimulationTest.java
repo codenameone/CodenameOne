@@ -28,12 +28,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class NativeThemeSettingsSimulationTest {
     private JavaSEPort previous;
+    private double previousFontScale;
 
     @org.junit.jupiter.api.BeforeEach
-    void savePort() { previous = JavaSEPort.instance; }
+    void savePort() {
+        previous = JavaSEPort.instance;
+        previousFontScale = JavaSEPort.getFontScale();
+        JavaSEPort.setFontScale(1.0);
+    }
 
     @org.junit.jupiter.api.AfterEach
-    void restorePort() { JavaSEPort.instance = previous; }
+    void restorePort() {
+        JavaSEPort.instance = previous;
+        JavaSEPort.setFontScale(previousFontScale);
+    }
 
     @Test
     void simulatorSnapshotsAreDefensiveAndDeterministic() {
@@ -57,6 +65,21 @@ class NativeThemeSettingsSimulationTest {
         assertTrue(font.isBold());
         assertTrue(font.isItalic());
     }
+    @Test
+    void inheritedFontUsesPortScalingAndRetinaCorrection() {
+        JavaSEPort port = new JavaSEPort();
+        for (double scale : new double[] {1.0, 1.5, 0.5}) {
+            JavaSEPort.setFontScale(scale);
+            int style = com.codename1.ui.Font.STYLE_BOLD | com.codename1.ui.Font.STYLE_ITALIC;
+            java.awt.Font inherited = (java.awt.Font) port.loadNativeThemeFont("Serif", "native:MainBold", 24, style);
+            java.awt.Font ordinary = (java.awt.Font) port.deriveTrueTypeFont(new java.awt.Font("Serif", 0, 1), 24, style);
+            assertEquals(ordinary, inherited, "Inherited UI fonts must use the same physical scaling");
+            assertEquals(scale == 1.5 ? 36f : 24f, inherited.getSize2D());
+            assertTrue(inherited.isBold());
+            assertTrue(inherited.isItalic());
+        }
+    }
+
     @Test
     void gnomeFontUsesFamilyPointSizeAndDesktopDpi() {
         NativeThemeSettings settings = new NativeThemeSettings();

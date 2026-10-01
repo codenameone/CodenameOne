@@ -10888,7 +10888,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("native:".equals(family)) {
             return super.loadNativeThemeFont(family, template, size, style);
         }
-        return new java.awt.Font(family, style, 1).deriveFont(size);
+        return deriveTrueTypeFont(new java.awt.Font(family, java.awt.Font.PLAIN, 1), size, style);
     }
 
     @Override
