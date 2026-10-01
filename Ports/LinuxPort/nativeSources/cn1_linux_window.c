@@ -1841,31 +1841,48 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureWindowToPngBytes___R_byt
  * compiles, links, and leaves the Java method looking unused to the dead-code pass,
  * which then removes it. scripts/check-native-signatures.sh is what catches that.
  */
-JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+static gint cn1DesktopColorScheme = -1;
+
+static void cn1ReadDesktopColorScheme(GSettings* settings) {
+    gchar* scheme = g_settings_get_string(settings, "color-scheme");
+    g_atomic_int_set(&cn1DesktopColorScheme, scheme ? (strcmp(scheme, "prefer-dark") == 0 ? 1 : 0) : -1);
+    g_free(scheme);
+}
+
+static void cn1DesktopColorSchemeChanged(GSettings* settings, gchar* key, gpointer data) {
+    (void)key; (void)data;
+    cn1ReadDesktopColorScheme(settings);
+    cn1LinuxPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+}
+
+static void cn1ObserveDesktopColorScheme(void* unused) {
+    (void)unused;
     GSettingsSchemaSource* source = g_settings_schema_source_get_default();
-    if (source == NULL) {
-        return -1;
-    }
+    if (!source) return;
     GSettingsSchema* schema = g_settings_schema_source_lookup(source,
             "org.gnome.desktop.interface", TRUE);
-    if (schema == NULL) {
-        return -1;
-    }
-    int result = -1;
-    /* has_key as well as the schema lookup: color-scheme arrived in GNOME 42, and the
-     * schema exists without it on older desktops. g_settings_get_string on a missing key
-     * aborts the same way a missing schema does. */
+    if (!schema) return;
+    /* Older GNOME schemas do not contain color-scheme. Never read a missing key. */
     if (g_settings_schema_has_key(schema, "color-scheme")) {
-        GSettings* settings = g_settings_new("org.gnome.desktop.interface");
-        gchar* scheme = g_settings_get_string(settings, "color-scheme");
-        if (scheme != NULL) {
-            result = strcmp(scheme, "prefer-dark") == 0 ? 1 : 0;
-            g_free(scheme);
-        }
-        g_object_unref(settings);
+        /* Retained for the process lifetime so change notifications stay connected.
+           Constructed on the GTK context independently of palette/font snapshots. */
+        GSettings* settings = g_settings_new_full(schema, NULL, NULL);
+        g_signal_connect(settings, "changed::color-scheme", G_CALLBACK(cn1DesktopColorSchemeChanged), NULL);
+        /* Reading after connecting enables GSettings change delivery for this key. */
+        cn1ReadDesktopColorScheme(settings);
     }
     g_settings_schema_unref(schema);
-    return result;
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+    static gsize initialized;
+    if (g_once_init_enter(&initialized)) {
+        cn1LinuxRunOnMainAndWait(cn1ObserveDesktopColorScheme, NULL);
+        g_once_init_leave(&initialized, 1);
+    }
+    /* Style resolution queries this frequently. Only observer installation needs
+       a GTK thread round trip; notifications publish later values atomically. */
+    return g_atomic_int_get(&cn1DesktopColorScheme);
 }
 
 /* Settings and GTK style contexts must only be read on the GTK main thread. */

@@ -362,6 +362,68 @@ class UIManagerNativeSettingsTest extends UITestBase {
     }
 
     @com.codename1.junit.FormTest
+    void nativeRefreshPreservesProgrammaticStylesAndUpdatesResourceStyles() {
+        manager.setUseNativeColors(true);
+        Hashtable theme = nativeTheme();
+        theme.put("Custom.fgColor", "101010");
+        theme.put("Child.press#derive", "Custom");
+        manager.setThemeProps(theme);
+        Style normal = new Style();
+        normal.setFgColor(0xabcdef);
+        normal.setFont(Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR).derive(19f, Font.STYLE_PLAIN));
+        Style selected = new Style();
+        selected.setFgColor(0x123456);
+        Style pressed = new Style();
+        pressed.setFgColor(0x654321);
+        manager.setComponentStyle("Custom", normal);
+        manager.setComponentSelectedStyle("Custom", selected);
+        manager.setComponentStyle("Custom", pressed, "press");
+        com.codename1.ui.Button visible = new com.codename1.ui.Button("Custom");
+        visible.setUIID("Custom");
+        display.getCurrent().add(visible);
+        assertEquals(0x00aa44, color()); // Populate a resource-derived cache too.
+
+        implementation.nativeThemeSettings = new NativeThemeSettings().color("accent-color", 0x556677);
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x556677, color(), "Resource styles must still refresh");
+        assertEquals(0xabcdef, visible.getUnselectedStyle().getFgColor());
+        assertEquals(19f, visible.getUnselectedStyle().getFont().getPixelSize());
+        assertEquals(0x123456, visible.getSelectedStyle().getFgColor());
+        assertEquals(0x654321, visible.getPressedStyle().getFgColor());
+        com.codename1.ui.Button createdAfter = new com.codename1.ui.Button("After");
+        createdAfter.setUIID("Custom");
+        assertEquals(0xabcdef, createdAfter.getUnselectedStyle().getFgColor());
+
+        // The caller still owns the installed objects after an appearance-only change.
+        normal.setFgColor(0xaabbcc);
+        implementation.nativeDarkMode = Boolean.TRUE;
+        manager.refreshNativeThemeSettings();
+        assertEquals(0xaabbcc, visible.getUnselectedStyle().getFgColor());
+        assertEquals(0xaabbcc, manager.getComponentCustomStyle("Child", "press").getFgColor());
+        normal.setFgColor(0xbbccdd);
+        assertEquals(0xbbccdd, manager.getComponentCustomStyle("Child", "press").getFgColor());
+
+        // An explicit theme replacement retains the existing reset semantics.
+        manager.setThemeProps(theme);
+        assertEquals(0x101010, manager.getComponentStyle("Custom").getFgColor());
+        implementation.nativeDarkMode = Boolean.FALSE;
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x101010, manager.getComponentStyle("Custom").getFgColor());
+    }
+
+    @Test
+    void parsedStyleReplacementIsNotResurrectedByNativeRefresh() {
+        manager.setThemeProps(nativeTheme());
+        Style installed = new Style();
+        installed.setFgColor(0xabcdef);
+        manager.setComponentStyle("Custom", installed);
+        manager.parseComponentStyle(null, null, "Custom", "fgColor:123456");
+        implementation.nativeDarkMode = Boolean.TRUE;
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x123456, manager.getComponentStyle("Custom").getFgColor());
+    }
+
+    @com.codename1.junit.FormTest
     void appearanceChangesRefreshVisibleStylesWithoutOptionalSettings() {
         Hashtable theme = nativeTheme();
         theme.put("$DarkButton.fgColor", "eeeeee");

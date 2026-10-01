@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-2.0-only WITH Classpath-exception-2.0
 """Local native-theme bridge checks: AppKit runtime, UIKit and Windows compilation."""
 import pathlib
+import os
 import shutil
 import shlex
 import subprocess
@@ -19,6 +20,9 @@ class NativeThemeSettingsTest(unittest.TestCase):
         start = source.index("static void cn1NativeThemeDidChange(")
         end = source.index("JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled", start)
         bridge = source[start:end]
+        start = source.index("JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean")
+        end = source.index("JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported", start)
+        bridge += source[start:end]
         harness = r'''
 #import <AppKit/AppKit.h>
 #include <assert.h>
@@ -30,6 +34,10 @@ class NativeThemeSettingsTest(unittest.TestCase):
 #define CN1_THREAD_STATE_PASS_ARG
 #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG
 #define JAVA_OBJECT id
+#define JAVA_BOOLEAN BOOL
+#define JAVA_TRUE YES
+#define JAVA_FALSE NO
+static BOOL CN1MacHostIsDarkMode(void) { return YES; }
 #define POOL_BEGIN()
 #define POOL_END()
 static float scaleValue = 2;
@@ -41,6 +49,10 @@ int main(void) {
     @autoreleasepool {
         NSAppearance* previous = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
         [NSAppearance setCurrentAppearance:previous];
+        // Appearance-only apps never request native font/palette snapshots.
+        assert(com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(nil));
+        [[NSNotificationCenter defaultCenter] postNotificationName:NSSystemColorsDidChangeNotification object:nil];
+        assert(notifications == 1);
         NSString* settings = com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_String(nil);
         assert([NSAppearance currentAppearance] == previous);
         assert([settings containsString:@"fontFamily=native:\n"]);
@@ -51,11 +63,11 @@ int main(void) {
         assert([settings containsString:@"text-color="]);
         assert([settings containsString:@"text-color-dark="]);
         [[NSNotificationCenter defaultCenter] postNotificationName:NSSystemColorsDidChangeNotification object:nil];
-        assert(notifications == 1);
+        assert(notifications == 2);
         // Repeated snapshots must not install duplicate observers.
         com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_String(nil);
         [[NSNotificationCenter defaultCenter] postNotificationName:NSSystemColorsDidChangeNotification object:nil];
-        assert(notifications == 2);
+        assert(notifications == 3);
         puts("AppKit native theme snapshot and notification checks passed");
     }
     return 0;
@@ -279,6 +291,73 @@ static GtkWidget* cn1Window;
             path = pathlib.Path(directory) / "settings.c"
             path.write_text(prelude + source[start:])
             subprocess.run(["cc", "-fsyntax-only", "-Werror=implicit-function-declaration", *flags, str(path)], check=True)
+
+    def test_gnome_appearance_notifications_without_native_snapshot(self):
+        if not shutil.which("pkg-config") or not shutil.which("glib-compile-schemas") or subprocess.call(
+                ["pkg-config", "--exists", "gio-2.0"]) != 0:
+            self.skipTest("GLib development tools unavailable")
+        source = (ROOT / "Ports/LinuxPort/nativeSources/cn1_linux_window.c").read_text()
+        start = source.index("static gint cn1DesktopColorScheme =")
+        end = source.index("/* Settings and GTK style contexts", start)
+        harness = r'''
+#include <gio/gio.h>
+#include <assert.h>
+#include <string.h>
+#define JAVA_INT int
+#define CODENAME_ONE_THREAD_STATE void* threadStateData
+#define CN1_EVENT_THEME_SETTINGS_CHANGED 24
+static int notifications, mainCalls;
+static void cn1LinuxPushEvent(int type, int x, int y, int key) {
+    assert(type == CN1_EVENT_THEME_SETTINGS_CHANGED);
+    notifications++;
+}
+static void cn1LinuxRunOnMainAndWait(void (*fn)(void*), void* arg) { mainCalls++; fn(arg); }
+BRIDGE
+static void drain(void) { while (g_main_context_pending(NULL)) g_main_context_iteration(NULL, FALSE); }
+int main(int argc, char** argv) {
+    int initial = com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(NULL);
+    assert(mainCalls == 1);
+    if (argc > 1) {
+        assert(initial == -1);
+        assert(notifications == 0);
+        return 0;
+    }
+    assert(initial == 0);
+    GSettings* writer = g_settings_new("org.gnome.desktop.interface");
+    g_settings_set_string(writer, "color-scheme", "prefer-dark");
+    drain();
+    assert(notifications == 1);
+    assert(com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(NULL) == 1);
+    assert(com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(NULL) == 1);
+    g_settings_set_string(writer, "color-scheme", "default");
+    drain();
+    assert(notifications == 2); // Repeated reads must not duplicate observers.
+    assert(com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(NULL) == 0);
+    assert(mainCalls == 1); // Frequent style queries must not block on GTK.
+    g_object_unref(writer);
+    return 0;
+}
+'''.replace("BRIDGE", source[start:end])
+        flags = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gio-2.0"], text=True))
+        with tempfile.TemporaryDirectory(prefix="cn1-gnome-settings-") as directory:
+            path = pathlib.Path(directory)
+            (path / "settings.c").write_text(harness)
+            executable = path / "settings"
+            subprocess.run(["cc", str(path / "settings.c"), *flags, "-o", str(executable)], check=True)
+            for variant in ("supported", "old-schema", "no-schema"):
+                schemas = path / variant
+                schemas.mkdir()
+                schema_id = "unrelated" if variant == "no-schema" else "org.gnome.desktop.interface"
+                key = "color-scheme" if variant == "supported" else "old-key"
+                (schemas / "test.gschema.xml").write_text(
+                    '<schemalist><schema id="%s" path="/org/gnome/desktop/interface/">'
+                    '<key name="%s" type="s"><default>"default"</default></key>'
+                    '</schema></schemalist>' % (schema_id, key))
+                subprocess.run(["glib-compile-schemas", str(schemas)], check=True)
+                env = dict(os.environ, GSETTINGS_BACKEND="memory", GSETTINGS_SCHEMA_DIR=str(schemas),
+                           XDG_DATA_DIRS=str(schemas))
+                subprocess.run([str(executable)] + ([] if variant == "supported" else ["unavailable"]),
+                               env=env, check=True)
 
 
 if __name__ == "__main__":

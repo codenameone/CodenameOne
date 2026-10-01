@@ -87,6 +87,22 @@ public class UIManager {
     /// This costs almost nothing in practice: no framework or port code calls
     /// those setters at all, they are purely an application-facing API.
     private boolean programmaticStyleInstalled;
+    private final Map<String, Style> programmaticStyles = new HashMap<String, Style>();
+    private final Map<String, Style> programmaticSelectedStyles = new HashMap<String, Style>();
+    private boolean refreshingNativeTheme;
+
+    private void clearStyleCaches() {
+        styles.clear();
+        selectedStyles.clear();
+        prefixedStyles.clear();
+        if (!refreshingNativeTheme) {
+            programmaticStyles.clear();
+            programmaticSelectedStyles.clear();
+        }
+        styles.putAll(programmaticStyles);
+        selectedStyles.putAll(programmaticSelectedStyles);
+        programmaticStyleInstalled = !programmaticStyles.isEmpty() || !programmaticSelectedStyles.isEmpty();
+    }
 
     /// Style-lookup keys derived from a UIID, memoised.
     ///
@@ -219,7 +235,12 @@ public class UIManager {
                 && (dark == null ? nativeSettingsDark == null : dark.equals(nativeSettingsDark))) {
             return;
         }
-        refreshTheme();
+        refreshingNativeTheme = true;
+        try {
+            refreshTheme();
+        } finally {
+            refreshingNativeTheme = false;
+        }
         com.codename1.ui.Form form = display.getCurrent();
         if (form != null) {
             // Invalidate the tree once. Form.refreshTheme performs its root layout.
@@ -653,6 +674,7 @@ public class UIManager {
         }
 
         styles.put(id, style);
+        programmaticStyles.put(id, style);
         // A prefixed style can derive from this id: createStyle resolves
         // "derive" through getComponentStyle, which reads the very map written
         // here, and then the result is cached under prefix + id. Without this
@@ -691,6 +713,7 @@ public class UIManager {
         }
 
         styles.put(id, style);
+        programmaticStyles.put(id, style);
         // A prefixed style can derive from this id: createStyle resolves
         // "derive" through getComponentStyle, which reads the very map written
         // here, and then the result is cached under prefix + id. Without this
@@ -718,6 +741,7 @@ public class UIManager {
         }
 
         selectedStyles.put(id, style);
+        programmaticSelectedStyles.put(id, style);
         // A prefixed style can derive from this id: createStyle resolves
         // "derive" through getComponentStyle, which reads the very map written
         // here, and then the result is cached under prefix + id. Without this
@@ -1980,11 +2004,7 @@ public class UIManager {
             restoreNativeThemeValues();
             dropSupersededBindings(themeProps);
             buildTheme(themeProps);
-            styles.clear();
-            selectedStyles.clear();
-            prefixedStyles.clear();
-            // styles.clear() above discarded the installed objects too.
-            programmaticStyleInstalled = false;
+            clearStyleCaches();
             themeGeneration++;
             imageCache.clear();
             // Overlay resources merge inside the enclosing build. Refreshing here
@@ -2103,11 +2123,7 @@ public class UIManager {
                 defaultSelectedStyle.setFont(scaled);
             }
         }
-        styles.clear();
-        selectedStyles.clear();
-        prefixedStyles.clear();
-        // styles.clear() above discarded the installed objects too.
-        programmaticStyleInstalled = false;
+        clearStyleCaches();
         themeGeneration++;
         imageCache.clear();
         current.refreshTheme(false);
@@ -2297,12 +2313,8 @@ public class UIManager {
             nativeBaseFontSize = 0;
         }
         resetThemeProps(themeProps);
-        styles.clear();
+        clearStyleCaches();
         themeConstants.clear();
-        selectedStyles.clear();
-        prefixedStyles.clear();
-        // styles.clear() above discarded the installed objects too.
-        programmaticStyleInstalled = false;
         themeGeneration++;
         imageCache.clear();
         if (themelisteners != null) {
@@ -2860,8 +2872,10 @@ public class UIManager {
 
         if (selected) {
             selectedStyles.remove(id);
+            programmaticSelectedStyles.remove(id);
         } else {
             this.styles.remove(id);
+            programmaticStyles.remove(id);
         }
         // The prefixed cache too, or a re-parse of the same id is ignored.
         //

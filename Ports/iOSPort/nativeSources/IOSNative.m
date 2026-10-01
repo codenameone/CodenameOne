@@ -8037,12 +8037,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_ST
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {}
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MPMoviePlayer / AVKit video peer functions)
 
+static void cn1ObserveSystemColors(void);
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_OSX
     // Asked of the system rather than inferred. The Catalyst path derives dark
     // mode from the content pane's luma because it has no reliable way to read
     // the host appearance; AppKit just answers, including when the user changes
     // it while the application is running.
+    cn1ObserveSystemColors();
     return CN1MacHostIsDarkMode() ? JAVA_TRUE : JAVA_FALSE;
 #else
 #if !TARGET_OS_WATCH
@@ -8547,6 +8550,16 @@ static void cn1NativeThemeDidChange(NSNotification* notification) {
     com_codename1_impl_ios_IOSImplementation_nativeThemeSettingsChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+static void cn1ObserveSystemColors(void) {
+#if TARGET_OS_OSX
+    static dispatch_once_t observing;
+    dispatch_once(&observing, ^{
+        [[NSNotificationCenter defaultCenter] addObserverForName:NSSystemColorsDidChangeNotification
+            object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
+    });
+#endif
+}
+
 static void cn1ObserveContentSizeChanges(void) {
 #if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
     static dispatch_once_t observing;
@@ -8564,11 +8577,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_S
     void (^readSettings)(void) = ^{
         NSMutableString* values = [NSMutableString string];
 #if TARGET_OS_OSX
-        static dispatch_once_t observing;
-        dispatch_once(&observing, ^{
-            [[NSNotificationCenter defaultCenter] addObserverForName:NSSystemColorsDidChangeNotification
-                object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
-        });
+        cn1ObserveSystemColors();
         [values appendFormat:@"fontFamily=native:\nfontSize=%g\n", [NSFont systemFontSize] * (scaleValue > 0 ? scaleValue : 1)];
         if (@available(macOS 10.14, *)) {
             for (int dark = 0; dark < 2; ++dark) {
