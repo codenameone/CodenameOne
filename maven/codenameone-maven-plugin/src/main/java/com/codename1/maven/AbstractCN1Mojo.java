@@ -81,7 +81,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * simulator.properties key carrying {@link #getCssCliClasspath()} through to the
      * simulator, where CSSWatcher forks the CSS compiler for live reload.
      */
-    protected static final String CSS_CLI_CLASSPATH_PROPERTY = "cn1.css.cli.classpath";
+    protected static final String CSS_CLI_CLASSPATH_PROPERTY = SimulatorSupport.CSS_CLI_CLASSPATH_PROPERTY;
 
 
     @Component
@@ -336,16 +336,178 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * simulator is supposed to report.</p>
      */
     protected static Properties commandLineBuildHints(Properties userProperties) {
-        Properties out = new Properties();
-        if (userProperties == null) {
-            return out;
+        return SimulatorSupport.commandLineBuildHints(userProperties);
+    }
+
+    /**
+     * This mojo's project as the build engine sees it. Engine code (the builders,
+     * {@link AppBuilder}, the CSS and annotation steps) asks its questions through
+     * this, so the Gradle plugin can answer the same ones from its own model.
+     */
+    protected com.codename1.build.ProjectHost projectHost() {
+        return new MavenProjectHost();
+    }
+
+    /**
+     * The dependency keys the application needs without the desktop runtime
+     * aggregator, or null when unknown. Only the build goal computes it.
+     */
+    protected Set<String> neededWithoutDesktopRuntimeKeys() {
+        return null;
+    }
+
+    /** {@link com.codename1.build.ProjectHost} answered from the Maven model. */
+    protected class MavenProjectHost implements com.codename1.build.ProjectHost {
+        @Override
+        public com.codename1.build.Log log() {
+            return MavenLog.of(getLog());
         }
-        for (String key : userProperties.stringPropertyNames()) {
-            if (key.startsWith("codename1.arg.")) {
-                out.setProperty(key, userProperties.getProperty(key));
+
+        @Override
+        public com.codename1.project.ProjectLayout layout() {
+            File dir = getCN1ProjectDir();
+            com.codename1.project.ProjectLayout l = com.codename1.project.ProjectLayouts.detect(
+                    dir != null ? dir : project.getBasedir());
+            if (l != null) {
+                return l;
+            }
+            return com.codename1.project.ProjectLayouts.of(com.codename1.project.BuildSystem.MAVEN,
+                    com.codename1.project.ProjectKind.APP, project.getBasedir(), project.getBasedir());
+        }
+
+        @Override
+        public File cn1ProjectDir() {
+            return getCN1ProjectDir();
+        }
+
+        @Override
+        public File baseDir() {
+            return project.getBasedir();
+        }
+
+        @Override
+        public File buildDirectory() {
+            return new File(project.getBuild().getDirectory());
+        }
+
+        @Override
+        public File outputDirectory() {
+            return new File(project.getBuild().getOutputDirectory());
+        }
+
+        @Override
+        public String finalName() {
+            return project.getBuild().getFinalName();
+        }
+
+        @Override
+        public String groupId() {
+            return project.getGroupId();
+        }
+
+        @Override
+        public Properties projectProperties() {
+            return project.getProperties();
+        }
+
+        @Override
+        public Properties userProperties() {
+            Properties p = AbstractCN1Mojo.this.userProperties();
+            return p == null ? new Properties() : p;
+        }
+
+        @Override
+        public List<String> compileClasspathElements() throws com.codename1.build.BuildExecutionException {
+            try {
+                return project.getCompileClasspathElements();
+            } catch (Exception ex) {
+                throw new com.codename1.build.BuildExecutionException("Failed to get classpath elements", ex);
             }
         }
-        return out;
+
+        @Override
+        public List<String> runtimeClasspathElements() throws com.codename1.build.BuildExecutionException {
+            try {
+                return project.getRuntimeClasspathElements();
+            } catch (Exception ex) {
+                throw new com.codename1.build.BuildExecutionException("Failed to get classpath elements", ex);
+            }
+        }
+
+        @Override
+        public List<String> compileSourceRoots() {
+            return AbstractCN1Mojo.compileSourceRoots(project, AbstractCN1Mojo.this.userProperties());
+        }
+
+        @Override
+        public Collection<com.codename1.build.BuildArtifact> artifacts() {
+            List<com.codename1.build.BuildArtifact> out = new ArrayList<com.codename1.build.BuildArtifact>();
+            for (Artifact a : project.getArtifacts()) {
+                out.add(toBuildArtifact(a));
+            }
+            return out;
+        }
+
+        @Override
+        public Set<String> neededWithoutDesktopRuntime() {
+            return neededWithoutDesktopRuntimeKeys();
+        }
+
+        @Override
+        public File getJar(com.codename1.build.BuildArtifact artifact) {
+            for (Artifact a : project.getArtifacts()) {
+                if (a.getGroupId().equals(artifact.getGroupId())
+                        && a.getArtifactId().equals(artifact.getArtifactId())
+                        && Objects.equals(a.getClassifier(), artifact.getClassifier())) {
+                    return AbstractCN1Mojo.this.getJar(a);
+                }
+            }
+            return artifact.getFile();
+        }
+
+        @Override
+        public File getJar(String groupId, String artifactId, String classifier) {
+            return classifier == null
+                    ? AbstractCN1Mojo.this.getJar(groupId, artifactId)
+                    : AbstractCN1Mojo.this.getJar(groupId, artifactId, classifier);
+        }
+
+        @Override
+        public long sessionStartTime() {
+            return getSession() != null && getSession().getRequest() != null
+                    && getSession().getRequest().getStartTime() != null
+                    ? getSession().getRequest().getStartTime().getTime() : Long.MAX_VALUE;
+        }
+
+        @Override
+        public long sourcesModificationTime() throws IOException {
+            return getSourcesModificationTime();
+        }
+
+        @Override
+        public void attachArtifact(String type, String classifier, File file) {
+            if (classifier == null) {
+                projectHelper.attachArtifact(project, type, file);
+            } else {
+                projectHelper.attachArtifact(project, type, classifier, file);
+            }
+        }
+
+        @Override
+        public String codenameOneVersion() {
+            return project.getProperties().getProperty("cn1.version", "");
+        }
+
+        @Override
+        public String pluginVersion() {
+            return project.getProperties().getProperty("cn1.plugin.version", "");
+        }
+    }
+
+    /** The engine's view of a Maven artifact. */
+    protected static com.codename1.build.BuildArtifact toBuildArtifact(Artifact a) {
+        return new com.codename1.build.BuildArtifact(a.getGroupId(), a.getArtifactId(), a.getVersion(),
+                a.getClassifier(), a.getType(), a.getScope(), a.getFile(), a.getDependencyTrail());
     }
 
     /** The session this mojo is running in, for a subclass that has to reproduce it. */
@@ -974,95 +1136,27 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return new File(getCN1ProjectDir(), "native");
     }
     
-    public static final String UPDATE_CODENAMEONE_JAR_URL = "https://www.codenameone.com/files/updates/UpdateCodenameOne.jar";
-    public static final String UPDATE_CODENAMEONE_JAR_FALLBACK_URL = "https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar";
-    public static final String UPDATE_CODENAMEONE_JAR_RESOURCE = "/com/codename1/maven/UpdateCodenameOne.jar";
-    public static final String JPDATE_CODENAMEONE_JAR_PATH = System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar";
+    public static final String UPDATE_CODENAMEONE_JAR_URL = com.codename1.build.CodenameOneUpdater.UPDATE_CODENAMEONE_JAR_URL;
+    public static final String UPDATE_CODENAMEONE_JAR_FALLBACK_URL = com.codename1.build.CodenameOneUpdater.UPDATE_CODENAMEONE_JAR_FALLBACK_URL;
+    public static final String UPDATE_CODENAMEONE_JAR_RESOURCE = com.codename1.build.CodenameOneUpdater.UPDATE_CODENAMEONE_JAR_RESOURCE;
+    public static final String JPDATE_CODENAMEONE_JAR_PATH = com.codename1.build.CodenameOneUpdater.updaterJar().getPath();
 
-
+    /** Installs the updater in ~/.codenameone; see {@link com.codename1.build.CodenameOneUpdater}. */
     protected void installUpdater() throws IOException {
-        File re = new File(JPDATE_CODENAMEONE_JAR_PATH);
-        if (re.exists()) {
-            getLog().debug("Designer is up to date");
-            return;
-        }
-        re.getParentFile().mkdirs();
-
-        try (InputStream bundled = AbstractCN1Mojo.class.getResourceAsStream(UPDATE_CODENAMEONE_JAR_RESOURCE)) {
-            if (bundled != null) {
-                getLog().info("Installing Codename One Updater from bundled plugin resource");
-                copyToFile(bundled, re);
-                return;
-            }
-        }
-
-        IOException lastFailure = null;
-        for (String url : new String[] { UPDATE_CODENAMEONE_JAR_URL, UPDATE_CODENAMEONE_JAR_FALLBACK_URL }) {
-            getLog().info("Installing Codename One Updater from " + url);
-            try (InputStream is = new URL(url).openStream()) {
-                copyToFile(is, re);
-                return;
-            } catch (IOException ex) {
-                lastFailure = ex;
-                getLog().warn("Failed to download Codename One Updater from " + url + ": " + ex.getMessage());
-            }
-        }
-        throw lastFailure != null ? lastFailure : new IOException("Failed to install Codename One updater");
+        new com.codename1.build.CodenameOneUpdater(MavenLog.of(getLog()), antProject).installUpdater();
     }
 
-    private static void copyToFile(InputStream is, File dest) throws IOException {
-        try (FileOutputStream os = new FileOutputStream(dest)) {
-            byte[] buf = new byte[65536];
-            int len;
-            while ((len = is.read(buf)) > -1) {
-                os.write(buf, 0, len);
-            }
-        }
-    }
-    
+    /** Runs the updater; see {@link com.codename1.build.CodenameOneUpdater}, which Gradle shares. */
     protected void updateCodenameOne(boolean force, File... files) throws MojoExecutionException {
         try {
-            installUpdater();
-        } catch (Exception ex) {
-            getLog().error("Failed to install Codename One updater");
-            throw new MojoExecutionException("Failed to install codenameone updater", ex);
+            new com.codename1.build.CodenameOneUpdater(MavenLog.of(getLog()), antProject).update(force,
+                    new File(project.getBuild().getDirectory(), "codenameone"), getCN1ProjectDir(), files);
+        } catch (com.codename1.build.BuildExecutionException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }
-        if (!force) {
-            // If we're not forcing an update, and there are no missing files being requested,
-            // then we'll call it a day.
-            boolean missing = false;
-            for (File f : files) {
-                if (!f.exists()) {
-                    missing = true;
-                    break;
-                }
-            }
-            if (!missing) {
-                return;
-            }
-        }
-        
-        Java java = createJava();
-        java.setFork(true);
-        java.setJar(new File(JPDATE_CODENAMEONE_JAR_PATH));
-        File dummyProject = new File(project.getBuild().getDirectory(), path("codenameone", "update-dummy"));
-        File dummyProjectLib = new File(dummyProject, "lib");
-        dummyProjectLib.mkdirs();
-        File cn1Properties = new File(getCN1ProjectDir(), "codenameone_settings.properties");
-        if (cn1Properties.exists()) {
-            try {
-                FileUtils.copyFile(cn1Properties, new File(dummyProject, cn1Properties.getName()));
-            } catch (IOException ex) {
-                getLog().warn("Failed to copy "+cn1Properties+" into dummy project", ex);
-            }
-        }
-        //java.createArg().setFile(getCN1ProjectDir());
-        java.createArg().setFile(dummyProject);
-        java.createArg().setValue("force");
-        java.executeJava();
     }
-    
-    
+
+
     protected void copyKotlinIncrementalCompileOutputToOutputDir() {
         if ("true".equals(project.getProperties().getProperty("kotlin.compiler.incremental"))) {
             File kotlinIncrementalOutputDir = new File(project.getBuild().getDirectory() + File.separator + "kotlin-ic" + File.separator + "compile" + File.separator + "classes");
@@ -1083,7 +1177,90 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     protected static String OS = System.getProperty("os.name").toLowerCase();
     protected static boolean isWindows = (OS.indexOf("win") >= 0);
-    protected static boolean isMac = (OS.indexOf("mac") >= 0);
+
+    /// The jars `tool` runs from -- its own and its runtime dependencies --
+    /// resolved through Maven at `version`. The tool is then started with
+    /// [#launchDesktopTool]; the Gradle plugin launches the same tools through
+    /// the same [DesktopTool], resolving them through its own configurations.
+    ///
+    /// @param toWorkOnIt how to run the tool from its own module, appended to
+    ///        the failure when it cannot be resolved
+    protected List<File> resolveDesktopTool(DesktopTool tool, String version, String toWorkOnIt)
+            throws MojoFailureException {
+        Artifact artifact = getArtifact("com.codenameone", tool.artifactId());
+        if (artifact == null) {
+            artifact = repositorySystem.createArtifact("com.codenameone", tool.artifactId(), version, "jar");
+        }
+        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setLocalRepository(localRepository)
+                .setRemoteRepositories(new java.util.ArrayList<org.apache.maven.artifact.repository.ArtifactRepository>(
+                        remoteRepositories))
+                .setResolveTransitively(true)
+                // Maven documents -o as "work offline"; the legacy resolver does not read the
+                // session flag by itself, so without this mvn -o still reaches the network and can
+                // refresh a snapshot over the jar this build just produced.
+                .setOffline(offline)
+                .setArtifact(artifact));
+        List<File> files = new java.util.ArrayList<File>();
+        addToolJar(files, artifact);
+        if (result != null && result.getArtifacts() != null) {
+            for (Artifact resolved : result.getArtifacts()) {
+                addToolJar(files, resolved);
+            }
+        }
+        // A cached main jar with a missing transitive dependency still leaves the
+        // list nonempty, and in detached mode the goal would report a successful
+        // launch while the process died in the tool's log with a
+        // NoClassDefFoundError nobody goes looking for.
+        String incomplete = resolutionFailure(result);
+        if (incomplete != null) {
+            throw new MojoFailureException(tool.displayName() + " could not be fully resolved: " + incomplete
+                    + "\nRun the goal again with -U to refresh it, or drop -o if you are building offline.");
+        }
+        if (tool.primaryJar(files) == null) {
+            throw new MojoFailureException("Could not resolve " + tool.displayName() + " (com.codenameone:"
+                    + tool.artifactId() + ":" + version + ").\n"
+                    + "It is published alongside the Codename One plugin.\n" + toWorkOnIt);
+        }
+        return files;
+    }
+
+    /// Starts `tool` bound to `input`: detached (logging to the tool's runtime
+    /// directory) or attached, waiting for its window to close.
+    protected void launchDesktopTool(DesktopTool tool, List<File> classpath, File input, File workingDir,
+                                     boolean detached, List<String> extraJvmArgs) throws MojoExecutionException {
+        try {
+            tool.launch(classpath, tool.primaryJar(classpath), input, workingDir, detached, extraJvmArgs,
+                    MavenLog.of(getLog()));
+        } catch (com.codename1.build.BuildExecutionException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex);
+        }
+    }
+
+    /// Describes what the resolver could not produce, or null when the result is complete.
+    static String resolutionFailure(ArtifactResolutionResult result) {
+        if (result == null) {
+            return null;
+        }
+        if (result.hasMissingArtifacts()) {
+            return "missing " + result.getMissingArtifacts();
+        }
+        if (result.hasExceptions()) {
+            Exception first = (Exception) result.getExceptions().get(0);
+            return first.getMessage();
+        }
+        return null;
+    }
+
+    private static void addToolJar(List<File> files, Artifact artifact) {
+        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) {
+            return;
+        }
+        File file = artifact.getFile().getAbsoluteFile();
+        if (file.exists() && !files.contains(file)) {
+            files.add(file);
+        }
+    }
 
     protected File getFFmpegDir() {
         String path = System.getProperty("ffmpeg.dir", null);
@@ -2032,7 +2209,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
                 : new File(project.getBuild().getDirectory(), "css-resources");
         return new SvgTranscodeRunner(project.getBasedir(), svgSourceDirs,
-                svgOutputDir(), placeholders, svgPackage(), getLog());
+                svgOutputDir(), placeholders, svgPackage(), MavenLog.of(getLog()));
     }
 
     // ------------------------------------------------------------------
@@ -2570,704 +2747,35 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /**
-     * Name of the resource {@code BuildHintAnnotationProcessor} emits into
-     * {@code target/classes} at PROCESS_CLASSES.
-     */
-    private static final String ANNOTATION_HINTS_RESOURCE =
-            "META-INF/codenameone/build-hints.properties";
-
-    /**
      * Overlays the build hints that came from annotations onto the settings the
-     * build request is assembled from.
-     *
-     * <p>Read from the compile classpath rather than from the staged fat jar.
-     * {@code mergeJars} builds that jar with Ant's {@code Zip} in update mode,
-     * which adds and overwrites entries but never removes one, and the jar is
-     * reused when it is not stale &mdash; so a project that had its annotations
-     * deleted would keep shipping yesterday's hints. The classpath directory is
-     * written by the annotation processor on every build and deleted by it when
-     * the last annotation goes away, so it always reflects the current source.</p>
+     * build request is assembled from. See {@link AnnotationBuildHints}, in the
+     * build engine, which the Gradle plugin shares.
      */
     protected void mergeAnnotationBuildHints(Properties target, List<String> classpathElements)
             throws MojoFailureException {
-        if (target == null || classpathElements == null) {
-            return;
-        }
-        String expectedMain = null;
-        if (properties != null) {
-            String main = properties.getProperty("codename1.mainName");
-            String pkg = properties.getProperty("codename1.packageName");
-            if (main != null && main.trim().length() > 0) {
-                expectedMain = (pkg == null || pkg.trim().length() == 0)
-                        ? main.trim() : pkg.trim() + "." + main.trim();
-            }
-        }
-        // The manifest's presence, not its contents, is what proves the processor
-        // ran. An annotation with every member left at its default -- @Ios() after
-        // the last attribute was deleted -- is legal Java, and the processor emits
-        // a manifest carrying only the main-class stamp for it. Judging by the hint
-        // count alone would read that as "never processed" and refuse a build that
-        // is in fact perfectly configured.
-        String stale = null;
-        // The processor writes the manifest into the SAME directory it scanned,
-        // so a manifest stamped for a main class was written beside that class.
-        // An element carrying the stamp without the class is therefore left over
-        // -- the shape is moving the application class from a platform module
-        // into common without cleaning -- and project output comes before
-        // dependencies on the classpath, so the leftover was found first, applied
-        // its old values and returned before the real one was ever read.
-        //
-        // Ordered rather than refused. Refusing assumes the two can never be
-        // packaged apart, and an element that assembles resources from another
-        // module would then lose its hints entirely; putting the colocated ones
-        // first fixes the stale-wins bug and still falls back to a manifest that
-        // is all there is.
-        for (String element : colocatedFirst(classpathElements, expectedMain)) {
-            Properties found = readAnnotationHints(new File(element));
-            if (found == null) {
-                continue;
-            }
-            String stamped = found.getProperty("cn1.buildHints.mainClass");
-            if (expectedMain != null && !expectedMain.equals(stamped)) {
-                // A cn1lib that bound the goal itself, a stale artifact, or a
-                // file a project keeps in src/main/resources -- anything on the
-                // classpath can carry this name. It has to say it was generated
-                // for THIS main class: an unstamped one used to be accepted, and
-                // then it both applied somebody else's hints and counted as
-                // proof that the processor ran, which is what suppresses the
-                // refusal below when the goal is not bound at all.
-                getLog().debug("cn1: ignoring build hints from " + element
-                        + " -- they were generated for " + stamped);
-                continue;
-            }
-            if (found.getProperty(com.codename1.maven.processors.BuildHintAnnotationProcessor
-                    .SOURCE_DIGEST_KEY) == null) {
-                // The processor always records one. A manifest without it was
-                // written by something else.
-                getLog().debug("cn1: ignoring build hints from " + element
-                        + " -- no processor fingerprint");
-                continue;
-            }
-            // The stamp says which class produced this file, not when. Nothing
-            // clears target/classes between builds, so a project that ran the
-            // processor once and then stopped -- goal unbound, skipped, or bound
-            // to a phase that no longer runs -- keeps a manifest naming the right
-            // class while the annotations beside it have changed. Comparing the
-            // recorded fingerprint against the compiled class is what tells those
-            // apart; without it the build silently ships the older values and the
-            // guard below never runs.
-            String mismatch = digestMismatch(new File(element), expectedMain, found, classpathElements);
-            if (mismatch != null) {
-                getLog().debug("cn1: ignoring build hints from " + element + " -- " + mismatch);
-                stale = mismatch;
-                continue;
-            }
-            int applied = 0;
-            for (String key : found.stringPropertyNames()) {
-                if (!key.startsWith("codename1.arg.")) {
-                    continue;
-                }
-                // The processor refuses a hint declared as an annotation and as a
-                // properties line, but it can only refuse the builds it runs in.
-                // The fingerprint above covers the annotations and nothing else,
-                // so with processing skipped a line added to the properties file
-                // afterwards leaves a manifest that still matches -- and this
-                // overlay would quietly replace the value the developer just
-                // wrote, until the next clean build regenerated the manifest and
-                // failed. Same declaration, same answer, whether or not
-                // target/classes happened to be cleaned.
-                String conflict = conflictingPropertiesDeclaration(target, key, found);
-                if (conflict != null) {
-                    throw new MojoFailureException(conflict);
-                }
-                if (overriddenOnTheCommandLine(key)) {
-                    // -D wins, and it wins whichever SPELLING it used. The
-                    // overlay below only replaces the same key, so
-                    // -Dcodename1.arg.cn1.androidTheme against an annotated
-                    // and.themeMode left both set -- and the two readers then
-                    // disagreed with each other: JavaSEPort takes the canonical
-                    // and falls back to the alias, so the annotation won in the
-                    // simulator, while AndroidGradleBuilder writes both and the
-                    // alias landed last, so -D won on the device. Same command
-                    // line, opposite results.
-                    getLog().debug("cn1: " + key + " comes from the command line, "
-                            + "so the annotation value is not applied");
-                    continue;
-                }
-                target.setProperty(key, found.getProperty(key));
-                applied++;
-            }
-            // The FIRST accepted manifest is the answer, whether or not it set
-            // anything. Continuing when it happened to apply nothing let a later
-            // element decide instead: `@Ios()` with no members -- legal Java, and
-            // what is left after the last attribute is deleted -- produces a
-            // current manifest with no hint keys, and an older copy of the same
-            // main class further down the classpath carries a manifest that
-            // passes its own digest check, because it is fingerprinted against
-            // the stale class sitting beside it. Its obsolete hints were then
-            // applied over the authoritative empty one. The same is true of a
-            // manifest whose every key is overridden on the command line.
-            if (applied > 0) {
-                getLog().info("cn1: applied " + applied + " build hint(s) from annotations");
-            } else {
-                getLog().debug("cn1: annotations were processed and set no build hint");
-            }
-            failOnMisplacedAnnotations(classpathElements, expectedMain);
-            return;
-        }
-        // No manifest at all. If the compiled classes carry build hint
-        // annotations anyway, the processor never ran -- a mojo's defaultPhase
-        // does not add an execution to a project's POM, so an app that adopts the
-        // annotations without binding process-annotations compiles cleanly and
-        // ships with every annotated hint missing. Refuse rather than build that.
-        String annotated = classCarryingBuildHintAnnotations(classpathElements, expectedMain);
-        if (annotated != null) {
-            throw new MojoFailureException(annotated + " carries build hint annotations, but "
-                    + (stale == null
-                        ? "no " + ANNOTATION_HINTS_RESOURCE + " was produced"
-                        : "the only " + ANNOTATION_HINTS_RESOURCE + " on the classpath is left "
-                          + "over from an earlier build (" + stale + ")")
-                    + ", so none of them reached this "
-                    + "build.\n\nThe cn1 process-annotations goal has to run on the module that "
-                    + "compiles it:\n"
-                    + "    <execution>\n"
-                    + "      <id>cn1-process-classes</id>\n"
-                    + "      <phase>process-classes</phase>\n"
-                    + "      <goals>\n"
-                    + "        <goal>process-annotations</goal>\n"
-                    + "      </goals>\n"
-                    + "    </execution>");
-        }
-    }
-
-    /**
-     * Refuses a build where a class other than the main one carries build hint
-     * annotations.
-     *
-     * <p>Run even when a manifest was accepted, because accepting one does not
-     * mean the processor ran THIS build: the fingerprint covers the main class,
-     * so an annotation added to a live class beside it leaves the manifest
-     * looking entirely current. With the goal unbound or skipped, the hints from
-     * that class reach nothing and the build succeeds having neither applied
-     * them nor said the annotation is in the wrong place -- the silent failure
-     * this whole feature exists to remove. Had the processor run, it would have
-     * refused the build for the same class.</p>
-     */
-    private void failOnMisplacedAnnotations(List<String> classpathElements, String expectedMain)
-            throws MojoFailureException {
-        if (expectedMain == null) {
-            return;
-        }
-        java.util.Collection<String> descriptors = hintAnnotationDescriptors(classpathElements);
-        for (String element : classpathElements) {
-            String live = liveAnnotatedClass(new File(element), descriptors, expectedMain);
-            if (live != null) {
-                throw new MojoFailureException(live + " carries build hint annotations, but they "
-                        + "are only read from the application's main class (" + expectedMain
-                        + "), so none of them reached this build.\n\nMove them onto "
-                        + expectedMain + ", or set those hints in "
-                        + "codenameone_settings.properties.");
-            }
-        }
-    }
-
-    /**
-     * The duplicate-declaration message for a hint set by an annotation and by a
-     * properties line, or null when there is no clash.
-     *
-     * <p>Only reached when the processor did not run this build; when it did, it
-     * has already failed for the same reason and with more to say -- it can point
-     * at the offending line. An alias counts as the same setting, matching what
-     * the processor checks, so declaring {@code and.captureRecord} in the file
-     * still collides with {@code @Android(captureRecord)}.</p>
-     */
-    private String conflictingPropertiesDeclaration(Properties settings, String key,
-                                                    Properties manifest) {
-        String name = key.substring("codename1.arg.".length());
-        java.util.Set<String> names = new java.util.LinkedHashSet<String>();
-        names.add(name);
-        for (com.codename1.build.shared.BuildHints.Hint h
-                : com.codename1.build.shared.BuildHints.entries()) {
-            if (name.equals(h.aliasOf())
-                    || name.equals(com.codename1.build.shared.BuildHints.canonicalName(h.name()))) {
-                names.add(h.name());
-            }
-        }
-        for (String candidate : names) {
-            String candidateKey = "codename1.arg." + candidate;
-            String fromFile = settings.getProperty(candidateKey);
-            if (fromFile == null) {
-                continue;
-            }
-            String origin = manifest.getProperty("cn1.buildHints.origin." + name);
-            return candidateKey + " is declared twice.\n"
-                    + "    annotation : " + (origin == null ? "on the main class" : origin)
-                    + " = " + manifest.getProperty(key) + "\n"
-                    + "    properties : codenameone_settings.properties\n"
-                    + "                 " + candidateKey + "=" + fromFile + "\n"
-                    + "    A build hint has one source of truth. Delete the properties line and "
-                    + "keep the annotation, or delete the annotation attribute and keep the line. "
-                    + "(-D" + candidateKey + "=... overrides either and is not a conflict.)";
-        }
-        return null;
-    }
-
-    /**
-     * {@code classpathElements}, with those containing {@code expectedMain}'s
-     * class file first and the relative order otherwise preserved.
-     *
-     * @param classpathElements the compile classpath, in Maven's order
-     * @param expectedMain the binary name of the app's main class, or null
-     * @return the elements to search, colocated ones first
-     */
-    private List<String> colocatedFirst(List<String> classpathElements, String expectedMain) {
-        if (expectedMain == null) {
-            return classpathElements;
-        }
-        List<String> beside = new ArrayList<String>();
-        List<String> rest = new ArrayList<String>();
-        for (String element : classpathElements) {
-            boolean here;
-            try {
-                here = readClass(new File(element), expectedMain) != null;
-            } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
-                // Unreadable is not evidence either way; leave it where it was.
-                getLog().debug("cn1: could not look for " + expectedMain + " in " + element, ex);
-                here = false;
-            }
-            (here ? beside : rest).add(element);
-        }
-        beside.addAll(rest);
-        return beside;
-    }
-
-    /**
-     * Why a manifest cannot have come from the class beside it, or null when it can.
-     *
-     * <p>Answered only when both halves are actually available: with no
-     * {@code codename1.mainName}, no class file for it ANYWHERE on the classpath,
-     * or no recorded fingerprint, there is nothing to compare and the manifest is
-     * taken at face value -- the same as before this check existed. It refuses
-     * only on positive evidence of a mismatch.</p>
-     */
-    private String digestMismatch(File element, String expectedMain, Properties manifest,
-                                  List<String> classpathElements) {
-        String recorded = manifest.getProperty(
-                com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY);
-        if (expectedMain == null || recorded == null || recorded.length() == 0) {
-            return null;
-        }
-        // Beside the manifest first, then anywhere on the classpath. Looking only
-        // beside it answers "no evidence" for the layout that packages resources
-        // apart from classes, and a manifest with no evidence against it is taken
-        // at face value -- so a manifest left by a build that no longer runs the
-        // processor applied its obsolete hints, and counted as proof the processor
-        // ran, while the recompiled class sat in another element.
-        com.codename1.maven.annotations.AnnotatedClass cls = classOnClasspath(element, expectedMain);
-        if (cls == null) {
-            for (String other : classpathElements) {
-                cls = classOnClasspath(new File(other), expectedMain);
-                if (cls != null) {
-                    break;
-                }
-            }
-        }
-        if (cls == null) {
-            return null;
-        }
-        try {
-            String actual = com.codename1.maven.processors.BuildHintAnnotationProcessor
-                    .sourceDigest(cls);
-            if (recorded.equals(actual)) {
-                return null;
-            }
-            return "it was generated from a different set of annotations on "
-                    + expectedMain + " than the one compiled onto the classpath";
-        } catch (com.codename1.maven.annotations.ProcessingException ex) {
-            // Unreadable is not evidence of staleness.
-            getLog().debug("cn1: could not fingerprint " + expectedMain, ex);
-            return null;
-        }
-    }
-
-    /** {@code expectedMain} read out of {@code element}, or null when it is not there. */
-    private com.codename1.maven.annotations.AnnotatedClass classOnClasspath(File element,
-                                                                           String expectedMain) {
-        try {
-            return readClass(element, expectedMain);
-        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
-            getLog().debug("cn1: could not look for " + expectedMain + " in " + element, ex);
-            return null;
-        }
-    }
-
-    /** Reads one compiled class out of a classpath directory or jar. */
-    private com.codename1.maven.annotations.AnnotatedClass readClass(File element, String binaryName)
-            throws IOException, com.codename1.maven.annotations.ProcessingException {
-        String path = binaryName.replace('.', '/') + ".class";
-        if (element.isDirectory()) {
-            File f = new File(element, path.replace('/', File.separatorChar));
-            if (!f.isFile()) {
-                return null;
-            }
-            try (InputStream in = new FileInputStream(f)) {
-                return com.codename1.maven.annotations.ClassScanner.readClass(in, f);
-            }
-        }
-        if (element.isFile() && element.getName().endsWith(".jar")) {
-            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
-                java.util.zip.ZipEntry entry = zip.getEntry(path);
-                if (entry == null) {
-                    return null;
-                }
-                try (InputStream in = zip.getInputStream(entry)) {
-                    return com.codename1.maven.annotations.ClassScanner.readClass(in, element);
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * The application class carrying a build hint annotation, or null.
-     *
-     * <p>Read straight out of the class file's annotation table rather than from
-     * source, so it sees exactly what the compiler emitted.</p>
-     *
-     * <p>The MAIN class alone when the project names one. The processor honours
-     * no other class, so no other class is evidence that annotations went
-     * unprocessed &mdash; and scanning them all meant a stale annotated
-     * {@code .class}, left behind by a rename without a clean, failed every build
-     * with "no manifest was produced" for a class the developer had already
-     * deleted. The processor ignores that orphan; so does this. Only when the
-     * project names no main class at all does this fall back to scanning
-     * everything, since then there is nothing more specific to ask about.</p>
-     */
-    private String classCarryingBuildHintAnnotations(List<String> classpathElements,
-                                                     String expectedMain) {
-        java.util.Collection<String> descriptors = hintAnnotationDescriptors(classpathElements);
-        if (expectedMain != null) {
-            for (String element : classpathElements) {
-                try {
-                    if (mainClassCarriesAnnotation(new File(element), expectedMain, descriptors)) {
-                        return expectedMain;
+        AnnotationBuildHints hints = new AnnotationBuildHints(MavenLog.of(getLog()), properties,
+                getSession() == null ? null : getSession().getUserProperties(),
+                new AnnotationBuildHints.Sources() {
+                    @Override
+                    public List<String> rootsFor(File element) {
+                        org.apache.maven.project.MavenProject owner = moduleProducing(element);
+                        return compileSourceRoots(owner == null ? project : owner, userProperties());
                     }
-                } catch (IOException | RuntimeException ex) {
-                    getLog().debug("cn1: could not read " + expectedMain + " from " + element, ex);
-                }
-            }
-            // The main class carries none. A LIVE class elsewhere still counts:
-            // @Target(TYPE) accepts the placement, so without this the build
-            // succeeds having neither applied the hint nor said the annotation is
-            // in the wrong place -- which is the silent failure the whole feature
-            // removes. It is only stale output that must not count, and that is a
-            // question about the source, not about which class it is.
-            //
-            // Reported as a misplacement, because that is what it is: had the
-            // processor run it would have refused the build for this class.
-            for (String element : classpathElements) {
-                String live = liveAnnotatedClass(new File(element), descriptors);
-                if (live != null) {
-                    return live;
-                }
-            }
-            return null;
-        }
-        // A reactor `package` build hands us the dependency module's jar rather
-        // than its output directory, which findAnnotatedClasses handles alongside
-        // a directory -- that is exactly the shape this check has to work in.
-        for (String element : classpathElements) {
-            String hit = findAnnotatedClass(new File(element), descriptors);
-            if (hit != null) {
-                return hit;
-            }
-        }
-        return null;
-    }
 
-    /**
-     * The first annotated class in this element whose source still exists, or null.
-     *
-     * <p>Stale output is excluded the same way the processor excludes it &mdash;
-     * by asking whether the module's configured source roots still declare the
-     * class &mdash; so an orphan left by a rename cannot fail the build, while a
-     * class the developer actually wrote does.</p>
-     */
-    private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors) {
-        return liveAnnotatedClass(element, descriptors, null);
-    }
-
-    /// As above, ignoring `exclude` -- the class the manifest was generated for,
-    /// which carrying annotations is the whole point of.
-    private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors,
-                                      String exclude) {
-        List<String> roots;
-        String encoding;
+                    @Override
+                    public String encodingFor(File element) {
+                        org.apache.maven.project.MavenProject owner = moduleProducing(element);
+                        return sourceEncodingOf(owner == null ? project : owner, userProperties());
+                    }
+                });
         try {
-            // The module that PRODUCED this element, not the one running. In the
-            // generated layout the application's classes come from `common`
-            // while a platform module runs the build, so asking the running
-            // project where its sources are answered for the wrong module: every
-            // class compiled from `common` had no backing source, read as stale,
-            // and its misplaced annotation went unreported -- which is exactly
-            // the silence this check exists to break.
-            //
-            // The complete set, not only what getCompileSourceRoots lists: the
-            // Kotlin plugin compiles its own sourceDirs without adding them
-            // back, and this list is used to decide that a source is ABSENT.
-            org.apache.maven.project.MavenProject owner = moduleProducing(element);
-            org.apache.maven.project.MavenProject module = owner == null ? project : owner;
-            roots = compileSourceRoots(module, userProperties());
-            // The charset that module compiles with, for the same reason
-            // ProcessAnnotationsMojo is given it: the scan below decides a source
-            // is ABSENT by reading it, and the single-byte encodings all decode
-            // every byte into DIFFERENT characters. Without it a name outside
-            // ASCII is unjudgeable and the class is kept -- which is the safe
-            // direction, but it keeps a genuinely deleted class forever and fails
-            // its placement check on every incremental build. This caller knows
-            // the module, so there is no reason for it to be the one guessing.
-            encoding = sourceEncodingOf(module, userProperties());
-        } catch (RuntimeException ex) {
-            return null;
+            hints.merge(target, classpathElements);
+        } catch (com.codename1.build.BuildFailureException ex) {
+            throw new MojoFailureException(ex.getMessage(), ex);
         }
-        if (roots == null || roots.isEmpty()) {
-            // Not told where the sources are, so staleness cannot be judged and
-            // an orphan would fail the build. Silence is the lesser harm: the
-            // processor still refuses this placement whenever it runs.
-            return null;
-        }
-        // Every candidate, not the first: rejecting one stale class must not end
-        // the search, or whether a live misplacement is reported depends on the
-        // order the directory happened to be listed in.
-        for (String hit : findAnnotatedClasses(element, descriptors)) {
-            if (exclude != null && exclude.equals(hit)) {
-                continue;
-            }
-            try {
-                com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
-                if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .hasBackingSource(cls, roots, encoding)) {
-                    return hit;
-                }
-            } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
-                getLog().debug("cn1: could not read " + hit + " from " + element, ex);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Whether {@code -D} already sets this hint, under any spelling.
-     *
-     * <p>An alias and its target are ONE effective setting -- the builder reads
-     * {@code android.captureRecord} and then lets {@code and.captureRecord}
-     * override it -- so a command line that names either of them is setting the
-     * hint an annotation would otherwise supply. Comparing the keys literally
-     * missed that, and the documented rule is that {@code -D} overrides both the
-     * annotation and the properties file.</p>
-     */
-    private boolean overriddenOnTheCommandLine(String key) {
-        return overriddenOnTheCommandLine(key,
-                getSession() == null ? null : getSession().getUserProperties());
     }
 
     static boolean overriddenOnTheCommandLine(String key, Properties user) {
-        if (user == null) {
-            return false;
-        }
-        String canonical = com.codename1.build.shared.BuildHints.canonicalName(
-                com.codename1.build.shared.BuildHints.strip(key));
-        for (String name : user.stringPropertyNames()) {
-            if (!name.startsWith(com.codename1.build.shared.BuildHints.ARG_PREFIX)) {
-                continue;
-            }
-            String other = com.codename1.build.shared.BuildHints.canonicalName(
-                    com.codename1.build.shared.BuildHints.strip(name));
-            if (canonical.equals(other)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Whether the named class, read from this classpath element, is annotated. */
-    private boolean mainClassCarriesAnnotation(File element, String binaryName,
-                                               java.util.Collection<String> descriptors)
-            throws IOException {
-        String path = binaryName.replace('.', '/') + ".class";
-        if (element.isDirectory()) {
-            File f = new File(element, path.replace('/', File.separatorChar));
-            if (!f.isFile()) {
-                return false;
-            }
-            try (InputStream in = new FileInputStream(f)) {
-                return carriesBuildHintAnnotation(in, descriptors);
-            }
-        }
-        if (element.isFile() && element.getName().endsWith(".jar")) {
-            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
-                java.util.zip.ZipEntry entry = zip.getEntry(path);
-                if (entry == null) {
-                    return false;
-                }
-                try (InputStream in = zip.getInputStream(entry)) {
-                    return carriesBuildHintAnnotation(in, descriptors);
-                }
-            }
-        }
-        return false;
-    }
-
-
-    private boolean carriesBuildHintAnnotation(InputStream in,
-                                               java.util.Collection<String> descriptors)
-            throws IOException {
-        final boolean[] seen = {false};
-        new org.objectweb.asm.ClassReader(in).accept(
-                new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
-                    @Override
-                    public org.objectweb.asm.AnnotationVisitor visitAnnotation(
-                            String desc, boolean visible) {
-                        if (descriptors.contains(desc)) {
-                            seen[0] = true;
-                        }
-                        return null;
-                    }
-                },
-                org.objectweb.asm.ClassReader.SKIP_CODE
-                        | org.objectweb.asm.ClassReader.SKIP_DEBUG
-                        | org.objectweb.asm.ClassReader.SKIP_FRAMES);
-        return seen[0];
-    }
-
-    private String findAnnotatedClass(File dir, java.util.Collection<String> descriptors) {
-        List<String> all = findAnnotatedClasses(dir, descriptors);
-        return all.isEmpty() ? null : all.get(0);
-    }
-
-    /**
-     * Every annotated class under this element, by BINARY name.
-     *
-     * <p>The binary name, not the file's own: returning {@code Wrong} for
-     * {@code com/example/Wrong.class} made the message name a class that does not
-     * exist, and made re-reading it by name fail, so the guard saw nothing.</p>
-     *
-     * <p>All of them, not the first: an incremental output directory can hold a
-     * stale annotated class and a live one at once, and stopping at whichever
-     * {@code File.listFiles} returned first made the answer depend on directory
-     * order.</p>
-     */
-    private List<String> findAnnotatedClasses(File element, java.util.Collection<String> descriptors) {
-        List<String> out = new ArrayList<String>();
-        if (element.isDirectory()) {
-            collectAnnotatedClasses(element, element, descriptors, out);
-        } else if (element.isFile() && element.getName().endsWith(".jar")) {
-            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
-                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-                while (entries.hasMoreElements()) {
-                    java.util.zip.ZipEntry entry = entries.nextElement();
-                    if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
-                        continue;
-                    }
-                    try (InputStream in = zip.getInputStream(entry)) {
-                        if (carriesBuildHintAnnotation(in, descriptors)) {
-                            out.add(entry.getName()
-                                    .substring(0, entry.getName().length() - ".class".length())
-                                    .replace('/', '.'));
-                        }
-                    }
-                }
-            } catch (IOException | RuntimeException ex) {
-                getLog().debug("cn1: could not scan " + element + ": " + ex.getMessage());
-            }
-        }
-        return out;
-    }
-
-    private void collectAnnotatedClasses(File root, File dir,
-                                         java.util.Collection<String> descriptors,
-                                         List<String> out) {
-        File[] children = dir.listFiles();
-        if (children == null) {
-            return;
-        }
-        for (File f : children) {
-            if (f.isDirectory()) {
-                collectAnnotatedClasses(root, f, descriptors, out);
-                continue;
-            }
-            if (!f.getName().endsWith(".class")) {
-                continue;
-            }
-            try (InputStream in = new FileInputStream(f)) {
-                if (carriesBuildHintAnnotation(in, descriptors)) {
-                    String rel = f.getAbsolutePath()
-                            .substring(root.getAbsolutePath().length())
-                            .replace(File.separatorChar, '/');
-                    while (rel.startsWith("/")) {
-                        rel = rel.substring(1);
-                    }
-                    out.add(rel.substring(0, rel.length() - ".class".length()).replace('/', '.'));
-                }
-            } catch (IOException | RuntimeException ex) {
-                getLog().debug("cn1: could not scan " + f + ": " + ex.getMessage());
-            }
-        }
-    }
-
-    /// The build hint annotation types, read off the classpath they live on.
-    ///
-    /// The package is enumerated rather than listed: a generated table naming
-    /// each annotation was a second statement of which ones exist, and it went
-    /// stale the moment one was added without regenerating it.
-    private java.util.Collection<String> hintAnnotationDescriptors(
-            List<String> classpathElements) {
-        try {
-            return com.codename1.build.shared.BuildHintAnnotationReader
-                    .bindingsFromClasspath(classpathElements).descriptors();
-        } catch (IOException ex) {
-            getLog().debug("cn1: could not read the build hint annotations", ex);
-            return java.util.Collections.emptyList();
-        }
-    }
-
-    /**
-     * Reads the emitted hints out of a classpath element, which is either the
-     * module's output directory or a jar.
-     *
-     * @return the properties, or null when this element carries none
-     */
-    private Properties readAnnotationHints(File element) {
-        if (element == null || !element.exists()) {
-            return null;
-        }
-        try {
-            if (element.isDirectory()) {
-                File f = new File(element, ANNOTATION_HINTS_RESOURCE);
-                if (!f.isFile()) {
-                    return null;
-                }
-                try (FileInputStream in = new FileInputStream(f)) {
-                    Properties p = new Properties();
-                    p.load(in);
-                    return p;
-                }
-            }
-            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
-                java.util.zip.ZipEntry entry = zip.getEntry(ANNOTATION_HINTS_RESOURCE);
-                if (entry == null) {
-                    return null;
-                }
-                try (InputStream in = zip.getInputStream(entry)) {
-                    Properties p = new Properties();
-                    p.load(in);
-                    return p;
-                }
-            }
-        } catch (IOException ex) {
-            getLog().warn("cn1: could not read build hints from " + element + ": "
-                    + ex.getMessage());
-            return null;
-        }
+        return AnnotationBuildHints.overriddenOnTheCommandLine(key, user);
     }
 }

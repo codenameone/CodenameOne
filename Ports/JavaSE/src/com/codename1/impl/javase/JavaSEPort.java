@@ -3550,10 +3550,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static long cachedCnopMtime = -1L;
 
     private static Properties loadCodenameOneSettings() {
-        File f = new File(getCWD(), "codenameone_settings.properties");
-        if (!f.exists()) {
-            f = new File(getCWD(), "common" + File.separator + "codenameone_settings.properties");
-        }
+        File f = projectSettingsFile();
         if (!f.exists()) {
             return null;
         }
@@ -6173,7 +6170,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             String t = props.getProperty("nativeThemeAttribute", null);
                             if (t != null) {
                                 Properties cnop = new Properties();
-                                File cnopFile = new File(getCWD(), "codenameone_settings.properties");
+                                File cnopFile = projectSettingsFile();
                                 if (cnopFile.exists()) {
                                     cnop.load(new FileInputStream(cnopFile));
                                     int themeConst = Integer.parseInt(cnop.getProperty("codename1.j2me.nativeThemeConst", "3"));
@@ -15754,7 +15751,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return "SE";
         }
         if ("AppName".equals(key)) {
-            File f = new File(getCWD(),"codenameone_settings.properties");
+            File f = projectSettingsFile();
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -15767,7 +15764,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return defaultValue;
         }
         if ("AppVersion".equals(key)) {
-            File f = new File(getCWD(), "codenameone_settings.properties");
+            File f = projectSettingsFile();
             if (f.exists()) {
                 try {
                     Properties p = new Properties();
@@ -20744,7 +20741,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void installTar() throws IOException {
-        File f = new File(getCWD(),"codenameone_settings.properties");
+        File f = projectSettingsFile();
         if(!f.exists()) {
             super.installTar();
         }
@@ -20755,7 +20752,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     @Override
     public void setBrowserPageInHierarchy(PeerComponent browserPeer, String url) throws IOException {
-        File f = new File(getCWD(), "codenameone_settings.properties");
+        File f = projectSettingsFile();
         if(!f.exists()) {
             super.setBrowserPageInHierarchy(browserPeer, url);
             return;
@@ -20763,6 +20760,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         String sep = File.separator;
         File[] searchPaths = new File[]{
+            // Processed resources: Maven's target/classes, or Gradle's
+            // build/resources/main, whichever the project model names.
+            new File(SimulatorProject.resourcesOutputDir(f.getAbsoluteFile().getParentFile()), "html"),
             new File(f.getParent(), "target" + sep + "classes"+ sep + "html"),
             new File(f.getParent(), "build" + sep + "classes"+ sep + "html"),
             new File(f.getParent(), "src" + sep + "main"+ sep + "resources" + sep +"html"),
@@ -22698,6 +22698,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         candidates.add(new File(projectDir, "src" + File.separator + "main" + File.separator + "i18n"));
         candidates.add(new File(projectDir, "l10n"));
         candidates.add(new File(projectDir, "src" + File.separator + "l10n"));
+        // The project model's answer for whatever build owns this directory:
+        // it also covers a Maven simulator started at the project root,
+        // whose bundles are in common/ rather than in a sibling of it.
+        com.codename1.project.ProjectLayout layout = SimulatorProject.locate(projectDir);
+        if (layout != null) {
+            File l10n = layout.l10nDir();
+            candidates.add(l10n);
+            candidates.add(new File(l10n.getParentFile(), "i18n"));
+        }
         File parent = projectDir.getParentFile();
         if (parent != null) {
             File commonModule = new File(parent, "common");
@@ -22941,7 +22950,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         return new File(System.getProperty("user.dir"));
     }
     
+    /// The project's `codenameone_settings.properties`: in the working
+    /// directory, else wherever the project model finds it (`common/` of a
+    /// Maven project started at its root, for one). Returned whether or not it
+    /// exists; callers check.
+    static File projectSettingsFile() {
+        File f = new File(getCWD(), "codenameone_settings.properties");
+        if (f.exists()) {
+            return f;
+        }
+        return SimulatorProject.settingsFile();
+    }
+
     public static File getSourceResourcesDir() {
+        com.codename1.project.ProjectLayout layout = SimulatorProject.current();
+        if (layout != null && layout.resourcesDir().exists()) {
+            return layout.resourcesDir();
+        }
         File resDir = new File(getCWD(), "src" + File.separator + "main" + File.separator + "resources");
         if (!resDir.exists()) {
             resDir = new File(getCWD(), "src");
@@ -22952,7 +22977,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public Map<String, String> getProjectBuildHints() {
-        File cnopFile = new File(getCWD(), "codenameone_settings.properties");
+        File cnopFile = projectSettingsFile();
         if(cnopFile.exists()) {
             java.util.Properties cnop = new java.util.Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
@@ -22976,7 +23001,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void setProjectBuildHint(String key, String value) {
-         File cnopFile = new File(getCWD(),"codenameone_settings.properties");
+         File cnopFile = projectSettingsFile();
         if(cnopFile.exists()) {
             Properties cnop = new Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {

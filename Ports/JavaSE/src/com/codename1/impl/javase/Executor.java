@@ -208,8 +208,13 @@ public class Executor {
         String currentDir = System.getProperty("user.dir");
         File props = new File(currentDir, "codenameone_settings.properties");
         if (!props.exists()) {
-            if (new File(currentDir, "common" + File.separator + "codenameone_settings.properties").exists()) {
-                System.setProperty("user.dir", currentDir + File.separator + "common");
+            // Ask the project model where the settings live: `common/` for a
+            // Maven application, the root for Ant and Gradle. Everything else in
+            // the simulator resolves paths against user.dir, so it is moved to
+            // the project directory, as it always was for Maven's `common/`.
+            File located = SimulatorProject.settingsFile();
+            if (located.exists()) {
+                System.setProperty("user.dir", located.getParentFile().getAbsolutePath());
                 currentDir = System.getProperty("user.dir");
                 props = new File(currentDir, "codenameone_settings.properties");
             }
@@ -310,7 +315,11 @@ public class Executor {
                             }
                             
                             //if (isDebug && usingHotswapAgent) {
-                            if (MavenUtils.isRunningInMaven() && MavenUtils.isRunningInJDK()) {
+                            // A Gradle launch may carry none of the system
+                            // properties isRunningInMaven() keys on; the project
+                            // layout says it is a build-tool project all the same,
+                            // and SourceChangeWatcher recompiles it with Gradle.
+                            if ((MavenUtils.isRunningInMaven() || SimulatorProject.isGradle()) && MavenUtils.isRunningInJDK()) {
                                 // In debug mode, when the Hotswap Agent is present, the simulator
                                 // will monitor all the source files for changes, and automatically
                                 // trigger a re-compile - then hotswap the classes.
@@ -884,22 +893,42 @@ public class Executor {
     
     private static void startSourceWatcher(File codenameOneSettingsFile, Class launcherClass) throws IOException {
         File props = codenameOneSettingsFile;
+        File projectDir = props.getAbsoluteFile().getParentFile();
         sourceWatcher = new SourceChangeWatcher();
-            File srcMain = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "java");
-            if (srcMain.exists()) {
-                sourceWatcher.addWatchFolder(srcMain);
-            }
-            File srcMainKotlin = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "kotlin");
-            if (srcMainKotlin.exists()) {
-                sourceWatcher.addWatchFolder(srcMainKotlin);
-            }
+            // A Gradle launch names the source set's real directories; a
+            // sourceSets block can move them off the conventional layout.
+            String gradleRoots = System.getProperty(SourceChangeWatcher.SOURCE_ROOTS_PROPERTY);
+            if (gradleRoots != null && gradleRoots.length() > 0) {
+                for (String root : gradleRoots.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                    File dir = new File(root);
+                    if (dir.exists()) {
+                        sourceWatcher.addWatchFolder(dir);
+                    }
+                }
+            } else {
+                // Maven and Gradle both keep sources in src/main/{java,kotlin,rad}
+                // of the project directory (common/ for Maven, the root for
+                // Gradle), which props sits in either way.
+                File srcMain = new File(projectDir, "src" + File.separator + "main" + File.separator + "java");
+                if (srcMain.exists()) {
+                    sourceWatcher.addWatchFolder(srcMain);
+                }
+                File srcMainKotlin = new File(projectDir, "src" + File.separator + "main" + File.separator + "kotlin");
+                if (srcMainKotlin.exists()) {
+                    sourceWatcher.addWatchFolder(srcMainKotlin);
+                }
 
-            File srcRad = new File(props.getParentFile(), "src" + File.separator + "main" + File.separator + "rad");
-            if (srcRad.exists()) {
-                sourceWatcher.addWatchFolder(srcRad);
+                File srcRad = new File(projectDir, "src" + File.separator + "main" + File.separator + "rad");
+                if (srcRad.exists()) {
+                    sourceWatcher.addWatchFolder(srcRad);
+                }
             }
             
-            File hotswapPropsFile = new File(props.getParentFile().getParentFile(), "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");
+            File hotswapPropsFile = new File(projectDir.getParentFile(), "javase" + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "hotswap-agent.properties");
+            File gradleHotswapProps = SimulatorProject.gradleHotswapProperties();
+            if (gradleHotswapProps != null) {
+                hotswapPropsFile = gradleHotswapProps;
+            }
             
             InputStream hotswapPropsStream;
             if (hotswapPropsFile.exists()) {
@@ -918,8 +947,8 @@ public class Executor {
                 
                 //String extraClasspath = new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath();//hotswapProps.getProperty("extraClasspath");
                 String extraClasspath = hotswapProps.getProperty("extraClasspath");
-                extraClasspath = extraClasspath == null ? new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() :
-                        new File(props.getParentFile(), "target" +File.separator + "classes").getAbsolutePath() + "; " + extraClasspath;
+                String ownClasses = SimulatorProject.classesDir(projectDir).getAbsolutePath();
+                extraClasspath = extraClasspath == null ? ownClasses : ownClasses + "; " + extraClasspath;
                 if (extraClasspath != null) {
                     System.out.println("extraClasspath="+extraClasspath);
                     String[] extraPaths = extraClasspath.split(";");

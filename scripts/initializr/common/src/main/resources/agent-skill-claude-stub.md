@@ -1,6 +1,6 @@
 ---
 name: codename-one
-description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven, ParparVM/Android/iOS/JavaScript). Use when the project contains a `common/codenameone_settings.properties`, depends on `com.codenameone:codenameone-core`, edits CSS files under `common/src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build`, references `com.codename1.ui.*` / `com.codename1.testing.*`, works in the `backend/` module (`cn1:backend`, `com.codename1.backend.*`, `@RestController`, `@Service`, `@Transactional`), or when the user asks to build a UI, write screen tests, generate screenshots, build a server or full-stack feature, or compare to Swing/HTML/Android.
+description: Build and modify Codename One cross-platform mobile apps (Java 17, Maven or Gradle, ParparVM/Android/iOS/JavaScript). Use when the project contains a `codenameone_settings.properties` (in `common/` for Maven, at the root for Gradle), a `settings.gradle.kts` applying the `com.codenameone` plugin, depends on `com.codenameone:codenameone-core`, edits CSS files under `src/main/css/`, calls `cn1:run`, `cn1:test`, `cn1:build` or `./gradlew run`, references `com.codename1.ui.*` / `com.codename1.testing.*`, works in the `backend/` project (`cn1:backend`, `./gradlew runBackend`, `com.codename1.backend.*`, `@RestController`, `@Service`, `@Transactional`), or when the user asks to build a UI, write screen tests, generate screenshots, build a server or full-stack feature, or compare to Swing/HTML/Android.
 metadata:
   type: skill
 ---

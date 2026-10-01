@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.model;
 
 public final class ProjectOptions {
@@ -59,6 +81,47 @@ public final class ProjectOptions {
         }
     }
 
+    /// The build tool the generated project uses. Maven is the default and the
+    /// only one that offers Java 8; Gradle projects are single-project builds
+    /// driven by the `com.codenameone` Gradle plugin and always target Java 17.
+    public enum BuildTool {
+        MAVEN("Maven"),
+        GRADLE("Gradle");
+
+        public final String label;
+
+        BuildTool(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    /// What the generated project holds. Only a Gradle project has a choice: a
+    /// Maven download always carries the backend module behind the `backend`
+    /// profile (it builds only when asked for, so an app pays nothing for it),
+    /// which makes APP and APP_WITH_BACKEND the same download there, and there is
+    /// no backend-only Maven scaffold -- GeneratorModel refuses that combination.
+    public enum ProjectType {
+        APP("App"),
+        APP_WITH_BACKEND("App + backend"),
+        BACKEND_ONLY("Backend only");
+
+        public final String label;
+
+        ProjectType(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     public final ThemeMode themeMode;
     public final Accent accent;
     public final boolean roundedButtons;
@@ -66,6 +129,8 @@ public final class ProjectOptions {
     public final PreviewLanguage previewLanguage;
     public final JavaVersion javaVersion;
     public final String customThemeCss;
+    public final BuildTool buildTool;
+    public final ProjectType projectType;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
@@ -76,6 +141,14 @@ public final class ProjectOptions {
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
                           JavaVersion javaVersion, String customThemeCss) {
+        this(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage, javaVersion,
+                customThemeCss, BuildTool.MAVEN, ProjectType.APP);
+    }
+
+    public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
+                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                          JavaVersion javaVersion, String customThemeCss,
+                          BuildTool buildTool, ProjectType projectType) {
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
@@ -83,6 +156,18 @@ public final class ProjectOptions {
         this.previewLanguage = previewLanguage == null ? PreviewLanguage.ENGLISH : previewLanguage;
         this.javaVersion = javaVersion == null ? JavaVersion.JAVA_17 : javaVersion;
         this.customThemeCss = customThemeCss;
+        this.buildTool = buildTool == null ? BuildTool.MAVEN : buildTool;
+        this.projectType = projectType == null ? ProjectType.APP : projectType;
+    }
+
+    /// A copy of these options with a different build tool and project type.
+    public ProjectOptions withBuild(BuildTool buildTool, ProjectType projectType) {
+        return new ProjectOptions(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
+                javaVersion, customThemeCss, buildTool, projectType);
+    }
+
+    public boolean isGradle() {
+        return buildTool == BuildTool.GRADLE;
     }
 
     public static ProjectOptions defaults() {

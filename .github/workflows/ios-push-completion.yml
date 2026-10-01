@@ -7,7 +7,7 @@ on:
     paths:
       - 'Ports/iOSPort/nativeSources/IOSNative.m'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'scripts/ios/push-completion-tests/**'
       - '.github/workflows/ios-push-completion.yml'
   push:
@@ -15,7 +15,7 @@ on:
     paths:
       - 'Ports/iOSPort/nativeSources/IOSNative.m'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'scripts/ios/push-completion-tests/**'
       - '.github/workflows/ios-push-completion.yml'
 

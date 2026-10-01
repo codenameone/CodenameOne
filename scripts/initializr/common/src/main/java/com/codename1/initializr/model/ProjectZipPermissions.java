@@ -49,7 +49,9 @@ final class ProjectZipPermissions {
             int next = offset + 46 + nameLength + readShort(zip, offset + 30) + readShort(zip, offset + 32);
             if (next > end) throw new IOException("Truncated project ZIP entry");
             String name = new String(zip, offset + 46, nameLength, "UTF-8");
-            boolean executable = "build.sh".equals(name) || "run.sh".equals(name) || "mvnw".equals(name);
+            // The launchers and wrappers, Maven's and Gradle's, must extract executable.
+            boolean executable = "build.sh".equals(name) || "run.sh".equals(name) || "mvnw".equals(name)
+                    || "gradlew".equals(name);
             int mode = name.endsWith("/") ? 040755 : (executable ? 0100755 : 0100644);
             zip[offset + 5] = 3; // version-made-by host: Unix
             int attributes = (mode << 16) | (name.endsWith("/") ? 0x10 : 0);

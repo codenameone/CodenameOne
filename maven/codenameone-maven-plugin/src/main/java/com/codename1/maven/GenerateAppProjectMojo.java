@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -20,7 +20,6 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-
 package com.codename1.maven;
 
 import com.codename1.ant.SortedProperties;
@@ -80,6 +79,14 @@ public class GenerateAppProjectMojo extends AbstractMojo {
 
     @Parameter(property="version", defaultValue = "1.0-SNAPSHOT")
     private String version;
+
+    /**
+     * {@code maven} (the default) or {@code gradle}. With {@code gradle} the project is
+     * generated as usual and then converted to the single-project Gradle layout by
+     * {@link GradleConversion}, the same conversion {@code cn1:convert-to-gradle} runs.
+     */
+    @Parameter(property = "cn1.buildTool", defaultValue = "maven")
+    private String buildTool;
 
 
     private Properties loadSourceProjectProperties() throws IOException {
@@ -908,6 +915,11 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
             doExecute();
+            if ("gradle".equalsIgnoreCase(buildTool)) {
+                convertToGradle();
+            } else if (buildTool != null && !"maven".equalsIgnoreCase(buildTool)) {
+                throw new MojoFailureException("cn1.buildTool must be maven or gradle, not " + buildTool);
+            }
         } catch (MojoExecutionException | MojoFailureException e) {
             com.codename1.maven.help.ToolingHelp.offerAfterFailure(getLog(),
                     com.codename1.maven.help.ToolingHelp.COMPONENT_MAVEN_PLUGIN,
@@ -921,6 +933,27 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                     com.codename1.maven.help.ToolingHelp.pluginVersion(), e);
             throw e;
         }
+    }
+
+    /**
+     * Replaces the generated Maven project with its Gradle conversion, in place.
+     */
+    private void convertToGradle() throws MojoExecutionException, MojoFailureException {
+        File maven = targetProjectDir().getAbsoluteFile();
+        File gradle = new File(maven.getParentFile(), maven.getName() + ".gradle-conversion");
+        try {
+            new GradleConversion(MavenLog.of(getLog())).convert(maven, gradle,
+                    com.codename1.maven.help.ToolingHelp.pluginVersion());
+            FileUtils.deleteDirectory(maven);
+            if (!gradle.renameTo(maven)) {
+                throw new MojoExecutionException("Could not move " + gradle + " to " + maven);
+            }
+        } catch (com.codename1.build.BuildFailureException ex) {
+            throw new MojoFailureException(ex.getMessage(), ex);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Could not replace the Maven project with the Gradle one", ex);
+        }
+        getLog().info("Generated a Gradle project at " + maven + ". Run it with ./gradlew run");
     }
 
     private void doExecute() throws MojoExecutionException, MojoFailureException {

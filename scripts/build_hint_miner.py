@@ -26,7 +26,10 @@ silence.
 import re, os, sys, json, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "maven/codenameone-maven-plugin/src/main/java/com/codename1")
+# The builders moved to maven/build-engine; the mojos stayed in the plugin. Both
+# read hints, so both are mined.
+SRCS = [os.path.join(ROOT, "maven/build-engine/src/main/java/com/codename1"),
+        os.path.join(ROOT, "maven/codenameone-maven-plugin/src/main/java/com/codename1")]
 
 OPENERS = [
     (re.compile(r'\bgetArg\(\s*"'), False),
@@ -212,7 +215,7 @@ def concat_of_literals(expr):
             return None
     return "".join(out)
 
-for dirpath, _, files in os.walk(SRC):
+for dirpath, _, files in (w for src in SRCS for w in os.walk(src)):
     for fn in sorted(files):
         if not fn.endswith(".java"):
             continue

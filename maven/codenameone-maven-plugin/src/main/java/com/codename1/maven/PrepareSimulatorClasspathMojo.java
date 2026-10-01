@@ -23,27 +23,20 @@
 package com.codename1.maven;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.text.StringEscapeUtils;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.tools.ant.taskdefs.Expand;
-import org.apache.tools.ant.taskdefs.Java;
-import org.apache.tools.ant.types.Environment;
-import org.apache.tools.ant.types.Path;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -113,68 +106,25 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         File resFile = new File(getCN1ProjectDir(), "target" + File.separator + "classes" + File.separator + "theme.res");
         File mergeFile = new File(getCN1ProjectDir(), "target" + File.separator + "css" + File.separator + "theme.css");
 
-        final StringBuilder inputs = new StringBuilder();
-
-        project.getArtifacts().forEach(artifact->{
+        // The same inputs the css goal compiles, library bundles first; see
+        // CssCompiler, shared with the Gradle plugin.
+        List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
+        for (Artifact artifact : project.getArtifacts()) {
             if (artifact.hasClassifier() && "cn1css".equals(artifact.getClassifier())) {
                 File zip = findArtifactFile(artifact);
                 if (zip == null || !zip.exists()) {
-                    return;
+                    continue;
                 }
-
-                File extracted = new File(zip.getParentFile(), zip.getName()+"-extracted");
-                getLog().debug("Checking for extracted CSS bundle "+extracted);
-                if (extracted.exists() && artifact.isSnapshot() && getLastModified(artifact) > extracted.lastModified()) {
-                    try {
-                        FileUtils.deleteDirectory(extracted);
-                    } catch (IOException ex){
-                        getLog().error(ex);
-                    }
-                }
-                if (!extracted.exists()) {
-                    getLog().debug("CSS bundle "+zip+" not extracted yet.  Extracting to "+extracted);
-                    // This is a cn1css artifact, which is a zip file.
-                    // We extract it so that we can access the files directly.
-                    Expand expand = (Expand)antProject.createTask("unzip");
-                    expand.setSrc(zip);
-                    expand.setDest(extracted);
-                    expand.execute();
-
-                }
-                if (extracted.exists()) {
-                    File extractedCssDir = new File(extracted, path("META-INF","codenameone", artifact.getGroupId(), artifact.getArtifactId(), "css"));
-                    if (extractedCssDir.exists()) {
-                        // We expect that the cn1css artifact has a theme.css file at its root
-                        // If found, we add it to the list of inputs.
-                        File theme = new File(extractedCssDir, "theme.css");
-                        if (theme.exists()) {
-                            if (inputs.length() > 0) {
-                                inputs.append(",");
-                            }
-                            inputs.append(theme.getAbsolutePath());
-                        }
-                    }
-
-                } else {
-                    getLog().debug("CSS bundle extraction must have failed for "+zip+" because after extraction it still doesn't exist at "+extracted);
-                }
+                libraries.add(new CssCompiler.LibraryCss(artifact.getGroupId(), artifact.getArtifactId(), zip,
+                        new File(zip.getParentFile(), zip.getName() + "-extracted"),
+                        artifact.isSnapshot(), getLastModified(artifact)));
             }
-        });
-
-        // The project's theme.css file is added to the input list last so that it will result in it
-        // being last in the merged theme.css file (i.e. the application project CSS can override the
-        // CSS in dependent libraries.
-
-        if (cssFile.exists()) {
-            if (inputs.length() > 0) {
-                inputs.append(",");
-            }
-            inputs.append(cssFile.getAbsolutePath());
         }
-
+        final String inputs = new CssCompiler(MavenLog.of(getLog()), antProject, null)
+                .inputs(libraries, "", cssFile);
 
         if (cssFile.exists()) {
-            project.getModel().addProperty("codename1.css.compiler.args.input", inputs.toString());
+            project.getModel().addProperty("codename1.css.compiler.args.input", inputs);
             project.getModel().addProperty("codename1.css.compiler.args.output", resFile.getAbsolutePath());
             project.getModel().addProperty("codename1.css.compiler.args.merge", mergeFile.getAbsolutePath());
         } else {
@@ -186,43 +136,27 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
             project.getModel().addProperty("cn1.class.path", prepareClasspath());
         }
 
-        Properties simulatorProperties = new Properties();
         File simulatorPropertiesFile = new File(getCN1ProjectDir(), path("target", "codenameone", "simulator.properties"));
-        if (!simulatorPropertiesFile.getParentFile().exists()) {
-            simulatorPropertiesFile.getParentFile().mkdirs();
-        }
-
-
+        String compileClasspath = null;
         try {
-            StringBuilder compileClasspath = new StringBuilder();
+            StringBuilder cp = new StringBuilder();
             for (String el : project.getCompileClasspathElements()) {
-                if (compileClasspath.length() > 0) {
-                    compileClasspath.append(File.pathSeparator);
+                if (cp.length() > 0) {
+                    cp.append(File.pathSeparator);
                 }
-                compileClasspath.append(el);
+                cp.append(el);
             }
-           simulatorProperties.setProperty("cn1.maven.compileClasspathElements", compileClasspath.toString());
-
-        } catch (Exception ex){}
-
-        // Classpath the simulator's CSSWatcher uses to fork the headless CSS compiler.
-        // Simulator.java loads simulator.properties into System properties, so the port
-        // reads this the same way SourceChangeWatcher reads
-        // cn1.maven.compileClasspathElements -- no change needed in generated poms.
-        simulatorProperties.setProperty(CSS_CLI_CLASSPATH_PROPERTY, getCssCliClasspath());
-
-        addCommandLineOverrides(simulatorProperties,
-                getSession() == null ? null : getSession().getUserProperties(), properties);
-
-        try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
-            if (System.getProperty("ffmpeg.dir") != null) {
-                simulatorProperties.setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
-            }
-            simulatorProperties.store(fos, "Updated simulator properties in PrepareSimulatorClasspathMojo");
+            compileClasspath = cp.toString();
+        } catch (Exception ex) {
+            getLog().debug("Could not resolve the compile classpath for hot reload", ex);
+        }
+        try {
+            SimulatorSupport.writeSimulatorProperties(simulatorPropertiesFile, compileClasspath,
+                    getCssCliClasspath(), getSession() == null ? null : getSession().getUserProperties(),
+                    properties);
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to write simulator.properties file", ex);
         }
-        
     }
 
     protected File findCSSDirectory() {
@@ -239,51 +173,10 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
     }
     
     
-    /**
-     * Puts the command line's build hints and the effective entry point into the
-     * simulator's properties.
-     *
-     * <p>The simulator is started by {@code exec:exec} from the generated javase
-     * POM, whose {@code <arguments>} are a fixed list -- no {@code -D} of ours
-     * reaches it, and that POM cannot be changed for a project that already
-     * exists. This file can: {@code Simulator.loadSimulatorProperties} copies
-     * every key here into the system properties, and does it BEFORE the
-     * annotated build hints are published.</p>
-     *
-     * <p>That is what makes the simulator's own guard work. It publishes an
-     * annotated hint only where no system property already claims the key, so
-     * that {@code -D} keeps winning the way it does in a device build -- but
-     * nothing was ever setting one, so the guard never fired and
-     * {@code -Dcodename1.arg.desktop.titleBar=...} did nothing locally while the
-     * same command line changed the device build.</p>
-     *
-     * <p>Only what {@code -D} passed, never the settings file's own hints: a
-     * system property outranks the file in {@code buildHint()}, so publishing
-     * those would hide the both-declared conflict the simulator reports.</p>
-     *
-     * <p>The entry point travels too. It is what {@code process-annotations}
-     * stamped the manifest with, and a simulator reading {@code codename1.mainName}
-     * out of the settings file instead disagreed with that stamp on an
-     * overridden build and refused the manifest outright.</p>
-     */
+    /** See {@link SimulatorSupport#addCommandLineOverrides}. */
     static void addCommandLineOverrides(Properties simulatorProperties,
                                         Properties userProperties, Properties effective) {
-        Properties commandLine = commandLineBuildHints(userProperties);
-        for (String key : commandLine.stringPropertyNames()) {
-            simulatorProperties.setProperty(key, commandLine.getProperty(key));
-        }
-        copyEffective(simulatorProperties, effective, "codename1.mainName");
-        copyEffective(simulatorProperties, effective, "codename1.packageName");
-    }
-
-    /// Copies one resolved settings key into the simulator's properties, when it
-    /// has a value.
-    private static void copyEffective(Properties simulatorProperties, Properties effective,
-                                      String key) {
-        String value = effective == null ? null : effective.getProperty(key);
-        if (value != null && value.trim().length() > 0) {
-            simulatorProperties.setProperty(key, value.trim());
-        }
+        SimulatorSupport.addCommandLineOverrides(simulatorProperties, userProperties, effective);
     }
 
 }

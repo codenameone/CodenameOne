@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -17,8 +39,10 @@ import java.util.jar.JarFile;
 ///     java tools/IsApiSupported.java java.nio.file.Files
 ///     java tools/IsApiSupported.java java.util.HashMap#put
 ///
-/// The tool resolves the highest-versioned `java-runtime` jar under
-/// ~/.m2/repository/com/codenameone/java-runtime/ and looks the class up there.
+/// The tool resolves the highest-versioned `java-runtime` jar in the local Maven
+/// repository (~/.m2/repository/com/codenameone/java-runtime/) or the Gradle
+/// cache (~/.gradle/caches/modules-2/files-2.1/com.codenameone/java-runtime/) and
+/// looks the class up there.
 ///
 /// Exit codes:
 ///
@@ -45,11 +69,12 @@ public class IsApiSupported {
             method = target.substring(hash + 1);
         }
 
-        Path jar = findLatestJavaRuntimeJar();
+        Path jar = findLatestJar("java-runtime");
         if (jar == null) {
-            System.err.println("Could not locate java-runtime jar under "
-                    + System.getProperty("user.home") + "/.m2/repository/com/codenameone/java-runtime/. "
-                    + "Run a Codename One build (or `mvn -pl common compile`) to populate the local cache.");
+            System.err.println("Could not locate a java-runtime jar under "
+                    + System.getProperty("user.home") + "/.m2/repository/com/codenameone/java-runtime/ or in the "
+                    + "Gradle cache. Build the project once (`./gradlew classes` or `mvn -pl common compile`) "
+                    + "to populate the local cache.");
             System.exit(2);
         }
         System.err.println("[IsApiSupported] using " + jar);
@@ -71,31 +96,52 @@ public class IsApiSupported {
         }
     }
 
-    private static Path findLatestJavaRuntimeJar() throws IOException {
-        Path baseDir = Paths.get(System.getProperty("user.home"),
-                ".m2", "repository", "com", "codenameone", "java-runtime");
-        if (!Files.isDirectory(baseDir)) return null;
-        List<Path> candidates = new ArrayList<>();
+    /// A jar of a com.codenameone artifact, with the version it was published as.
+    record Candidate(String version, Path jar) { }
+
+    /// The newest jar of a com.codenameone artifact in either local cache: the
+    /// Maven repository (~/.m2/repository, filled by a Maven build) or the Gradle
+    /// cache ($GRADLE_USER_HOME, default ~/.gradle, filled by a Gradle build). A
+    /// project built with either tool therefore works without further setup.
+    private static Path findLatestJar(String artifactId) throws IOException {
+        List<Candidate> candidates = new ArrayList<>();
+        String home = System.getProperty("user.home");
+        collect(Paths.get(home, ".m2", "repository", "com", "codenameone", artifactId), artifactId, false, candidates);
+        String gradleHome = System.getenv("GRADLE_USER_HOME");
+        Path gradleBase = gradleHome != null && !gradleHome.isEmpty() ? Paths.get(gradleHome) : Paths.get(home, ".gradle");
+        collect(gradleBase.resolve(Paths.get("caches", "modules-2", "files-2.1", "com.codenameone", artifactId)),
+                artifactId, true, candidates);
+        if (candidates.isEmpty()) return null;
+        candidates.sort((a, b) -> compareVersions(b.version(), a.version()));
+        return candidates.get(0).jar();
+    }
+
+    /// Adds the jars under `baseDir/<version>/` (Maven) or
+    /// `baseDir/<version>/<sha1>/` (Gradle) to `out`.
+    private static void collect(Path baseDir, String artifactId, boolean hashed, List<Candidate> out) throws IOException {
+        if (!Files.isDirectory(baseDir)) return;
         try (DirectoryStream<Path> versions = Files.newDirectoryStream(baseDir)) {
             for (Path versionDir : versions) {
                 if (!Files.isDirectory(versionDir)) continue;
-                try (DirectoryStream<Path> jars = Files.newDirectoryStream(versionDir, "java-runtime-*.jar")) {
-                    for (Path jar : jars) {
-                        if (jar.getFileName().toString().endsWith("-sources.jar")) continue;
-                        if (jar.getFileName().toString().endsWith("-javadoc.jar")) continue;
-                        candidates.add(jar);
+                List<Path> dirs = new ArrayList<>();
+                if (hashed) {
+                    try (DirectoryStream<Path> hashes = Files.newDirectoryStream(versionDir)) {
+                        for (Path h : hashes) if (Files.isDirectory(h)) dirs.add(h);
+                    }
+                } else {
+                    dirs.add(versionDir);
+                }
+                for (Path dir : dirs) {
+                    try (DirectoryStream<Path> jars = Files.newDirectoryStream(dir, artifactId + "-*.jar")) {
+                        for (Path jar : jars) {
+                            String n = jar.getFileName().toString();
+                            if (n.endsWith("-sources.jar") || n.endsWith("-javadoc.jar")) continue;
+                            out.add(new Candidate(versionDir.getFileName().toString(), jar));
+                        }
                     }
                 }
             }
         }
-        if (candidates.isEmpty()) return null;
-        candidates.sort((a, b) -> compareVersions(versionOf(b), versionOf(a)));
-        return candidates.get(0);
-    }
-
-    private static String versionOf(Path jar) {
-        Path versionDir = jar.getParent();
-        return versionDir == null ? "" : versionDir.getFileName().toString();
     }
 
     private static int compareVersions(String left, String right) {

@@ -54,6 +54,10 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         Path java8Or11 = findJava8Or11Home();
         Path java17 = findJavaHomeForMajor(17);
 
+        // The Gradle half needs no build client (nothing is sent to the build server),
+        // so it runs before the Maven half's early return.
+        buildGeneratedGradleProjects(java17);
+
         Path buildClient = findBuildClientJar();
         if (buildClient == null) {
             // Every goal in the generated project's compile runs out of this jar, so
@@ -109,6 +113,104 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         assertLocalizationBakedIntoThemeRes(projectDir, version);
     }
 
+    /// Compiles generated Gradle projects (App, App + backend, Backend only) with
+    /// `./gradlew classes`, against the Maven repository named by the
+    /// CN1_GRADLE_PLUGIN_REPO environment variable -- a directory holding the
+    /// `com.codenameone` plugin (its marker and jar) and the framework, e.g. a
+    /// checkout's `maven/.m2-repo` after `mvn install`. The generated settings name
+    /// a released plugin version that only exists on repo.codenameone.com, so
+    /// without that repository there is nothing to build against and the check is
+    /// skipped, as the Maven half skips without a build client.
+    /// CN1_GRADLE_PLUGIN_VERSION, when set, replaces the plugin version in the
+    /// copy under test (the repository usually holds a SNAPSHOT).
+    private void buildGeneratedGradleProjects(Path java17) throws Exception {
+        String repo = System.getenv("CN1_GRADLE_PLUGIN_REPO");
+        if (repo == null || repo.length() == 0) {
+            System.out.println("[WARN] Skipping Gradle integration build checks. Set CN1_GRADLE_PLUGIN_REPO to a "
+                    + "Maven repository holding the com.codenameone Gradle plugin.");
+            return;
+        }
+        if (java17 == null) {
+            System.out.println("[WARN] Skipping Gradle integration build checks. No JDK 17 found.");
+            return;
+        }
+        Path repoDir = Paths.get(repo).toAbsolutePath();
+        String version = System.getenv("CN1_GRADLE_PLUGIN_VERSION");
+        // Every project type with the Java template, plus each template whose build
+        // script adds something of its own (the Kotlin plugin, Tweet's cn1libs).
+        Object[][] cases = new Object[][] {
+                {Template.BAREBONES, ProjectOptions.ProjectType.APP},
+                {Template.BAREBONES, ProjectOptions.ProjectType.APP_WITH_BACKEND},
+                {Template.BAREBONES, ProjectOptions.ProjectType.BACKEND_ONLY},
+                {Template.KOTLIN, ProjectOptions.ProjectType.APP},
+                // cn1libs by coordinates, CodeRAD XML views and an annotation processor.
+                {Template.TWEET, ProjectOptions.ProjectType.APP}
+        };
+        for (int i = 0; i < cases.length; i++) {
+            Template template = (Template) cases[i][0];
+            ProjectOptions.ProjectType type = (ProjectOptions.ProjectType) cases[i][1];
+            if (!template.supportsGradle()) {
+                // Listed so it is built as soon as the template is enabled for Gradle.
+                System.out.println("[WARN] Skipping " + template + ": " + template.GRADLE_UNSUPPORTED_REASON);
+                continue;
+            }
+            String suffix = "gradle" + i;
+            ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+                    true, true, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_17, null,
+                    ProjectOptions.BuildTool.GRADLE, type);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            GeneratorModel.create(IDE.INTELLIJ, template, "IntegrationGradle" + i + "App",
+                    "com.acme.initializr." + suffix, options).writeProjectZip(output);
+            Path projectDir = Files.createTempDirectory("initializr-integration-" + suffix + "-");
+            unzipProject(output.toByteArray(), projectDir);
+            injectPluginRepository(projectDir.resolve("settings.gradle.kts"), repoDir, version);
+
+            int exit = runGradleClasses(projectDir, repoDir, java17);
+            assertTrue(exit == 0, "Generated Gradle project should compile. Template=" + template + " Type="
+                    + type.label + " | exitCode=" + exit);
+        }
+    }
+
+    /// Puts `repoDir` first in the copy's pluginManagement repositories, so the
+    /// plugin resolves from it; -Pcodename1.repository does the same for the
+    /// framework the plugin adds.
+    private void injectPluginRepository(Path settings, Path repoDir, String version) throws IOException {
+        String text = new String(Files.readAllBytes(settings), "UTF-8");
+        String marker = "    repositories {\n";
+        assertTrue(text.indexOf(marker) >= 0, "settings.gradle.kts should declare pluginManagement repositories");
+        text = text.replace(marker, marker + "        maven(uri(\"" + repoDir.toUri() + "\"))\n");
+        if (version != null && version.length() > 0) {
+            text = text.replaceAll("id\\(\"com\\.codenameone\"\\) version \"[^\"]*\"",
+                    "id(\"com.codenameone\") version \"" + version + "\"");
+        }
+        Files.write(settings, text.getBytes("UTF-8"));
+    }
+
+    private int runGradleClasses(Path projectDir, Path repoDir, Path javaHome) throws Exception {
+        Path gradlew = projectDir.resolve("gradlew");
+        gradlew.toFile().setExecutable(true);
+        boolean windows = File.separatorChar == '\\';
+        List<String> command = new ArrayList<String>();
+        if (windows) {
+            command.add("cmd");
+            command.add("/c");
+            command.add(projectDir.resolve("gradlew.bat").toString());
+        } else {
+            command.add(gradlew.toString());
+        }
+        command.add("--no-daemon");
+        command.add("--stacktrace");
+        command.add("classes");
+        command.add("-Pcodename1.repository=" + repoDir);
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(projectDir.toFile());
+        pb.redirectErrorStream(true);
+        Map<String, String> env = pb.environment();
+        env.put("JAVA_HOME", javaHome.toString());
+        env.put("PATH", javaHome.resolve("bin") + File.pathSeparator + env.get("PATH"));
+        return runAndReport(pb);
+    }
+
     private void assertLocalizationBakedIntoThemeRes(Path projectDir, ProjectOptions.JavaVersion version) throws Exception {
         Path themeRes = projectDir.resolve("common/target/classes/theme.res");
         assertTrue(Files.isRegularFile(themeRes),
@@ -161,6 +263,11 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         env.put("JAVA_HOME", javaHome.toString());
         env.put("PATH", javaHome.resolve("bin") + File.pathSeparator + env.get("PATH"));
 
+        return runAndReport(pb);
+    }
+
+    /// Runs the process, and prints its output when it fails.
+    private int runAndReport(ProcessBuilder pb) throws Exception {
         List<String> output = new ArrayList<String>();
         Process process = pb.start();
         try (InputStream in = process.getInputStream()) {

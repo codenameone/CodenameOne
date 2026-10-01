@@ -1,0 +1,16 @@
+// The only Codename One line a Gradle project needs. The plugin adds the
+// repository the framework is published to, applies itself to this project
+// (and to backend/, when there is one), and builds against its own version.
+// Bump the version here, or run ./gradlew cn1Update.
+pluginManagement {
+    repositories {
+        maven("https://repo.codenameone.com/maven2")
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id("com.codenameone") version "__CN1_VERSION__"
+}
+
+rootProject.name = "__PROJECT_NAME__"

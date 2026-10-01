@@ -1,6 +1,8 @@
 # Build Hints Reference
 
-Build hints are key/value pairs in `common/codenameone_settings.properties` that are forwarded to the Codename One build server. Every key starts with `codename1.arg.` (the build server strips that prefix). They control native platform behaviour that cannot be expressed in Java/CSS: permissions, frameworks, splash screens, signing, platform SDK versions, etc.
+Build hints are key/value pairs in `codenameone_settings.properties` (`common/` in a Maven project, the root of a Gradle project) that are forwarded to the Codename One build server. Every key starts with `codename1.arg.` (the build server strips that prefix). They control native platform behaviour that cannot be expressed in Java/CSS: permissions, frameworks, splash screens, signing, platform SDK versions, etc.
+
+To override a hint for a single build, pass it on the command line: `-Dcodename1.arg.<hint>=<value>` to a Maven goal, `-Pcodename1.arg.<hint>=<value>` to a Gradle task. A Gradle project can also set hints in `build.gradle.kts` with `codenameone { buildHints.put("<hint>", "<value>") }`, which wins over the settings file.
 
 This file is a curated index of the most commonly needed hints. The complete authoritative reference is in the Codename One Developer Guide:
 
@@ -118,7 +120,7 @@ Two things to get right. Node ids must be stable for the life of the item -- the
 
 If all you want is the app's own documents folder visible in Files, you need none of this -- set `ios.plistInject` with `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` instead.
 
-The extension needs its own App ID and provisioning profile; `mvn cn1:certificatewizard` creates both, along with the App Group.
+The extension needs its own App ID and provisioning profile; `mvn cn1:certificatewizard` (Gradle: `./gradlew certificateWizard`) creates both, along with the App Group.
 
 ## State restoration and continuity
 
@@ -168,5 +170,5 @@ codename1.arg.ios.pods.platform=${var.iosDeploy}
 ## How to discover the right hint
 
 1. Search the [Developer Guide](https://www.codenameone.com/developer-guide/) for the platform feature you need.
-2. Or run the simulator (`mvn -pl common cn1:run`) and use the **Build Hints** menu — it lists every hint the plugin understands, with descriptions.
-3. Or grep the project's existing `codename1.arg.*` keys in `common/codenameone_settings.properties` to see what's already wired.
+2. Or run the simulator (`mvn -pl common cn1:run`, or `./gradlew run`) and use the **Build Hints** menu — it lists every hint the plugin understands, with descriptions.
+3. Or grep the project's existing `codename1.arg.*` keys in `codenameone_settings.properties` to see what's already wired.

@@ -21,10 +21,10 @@ name: Health (Health Connect) integration
       - 'Ports/Android/src/com/codename1/impl/android/AndroidHealth*.java'
       - 'Ports/Android/src/com/codename1/impl/android/HealthConnectDelegate.java'
       - 'Ports/Android/src/com/codename1/health/**'
-      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/health/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthManifestFragments.java'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthListenerBindings.java'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/health/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthManifestFragments.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthListenerBindings.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'scripts/hellocodenameone/health-smoke/**'
   push:
     branches:
@@ -36,10 +36,10 @@ name: Health (Health Connect) integration
       - 'Ports/Android/src/com/codename1/impl/android/AndroidHealth*.java'
       - 'Ports/Android/src/com/codename1/impl/android/HealthConnectDelegate.java'
       - 'Ports/Android/src/com/codename1/health/**'
-      - 'maven/codenameone-maven-plugin/src/main/resources/com/codename1/builders/health/**'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthManifestFragments.java'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/HealthListenerBindings.java'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/health/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthManifestFragments.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/HealthListenerBindings.java'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/AndroidGradleBuilder.java'
       - 'scripts/hellocodenameone/health-smoke/**'
 
 concurrency:

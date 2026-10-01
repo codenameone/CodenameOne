@@ -2,18 +2,22 @@
 
 ## Local builds vs cloud builds
 
+> **Maven or Gradle?** A project with `settings.gradle.kts` + `gradlew` and no `pom.xml` is a Gradle project: the app lives at the root instead of in `common/`, and every command below is a `./gradlew` task (see the "Gradle task" column and the Gradle cheat sheet). Everything else in this file applies to both.
+
 A Codename One project can produce four kinds of artifacts. Some build entirely on your machine; others rely on the Codename One **build server** (cloud) because cross-compiling iOS/Android natively on every developer's box would be unrealistic.
 
-| Output | Where it builds | Maven goal |
-| --- | --- | --- |
-| Desktop simulator | Local (your machine, JVM only) | `mvn -pl common cn1:run` / `cn1:debug` |
-| Unit tests | Local (the CN1 test runner inside a JVM) | `mvn -pl common cn1:test` |
-| Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) |
-| Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` |
-| iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) |
-| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) |
-| Native Windows `.exe` (`win32`, ParparVM → clang-cl, no JVM) | Cloud (Linux build server cross-compiles); **also** locally on Windows, or as a project via `windows-source` | `mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device` (cloud) or `…-Dcodename1.buildTarget=local-windows-device` (local). A regular build returns x64 + arm64 release exes; add the `windows.debug` build hint for a single x64 debug exe. |
-| JavaScript / web bundle | Local (ParparVM to JavaScript translator, available to all users). Cloud builds use ParparVM by default and accept `javascript.port=teavm` as a compatibility fallback. | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` |
+| Output | Where it builds | Maven goal | Gradle task |
+| --- | --- | --- | --- |
+| Desktop simulator | Local (your machine, JVM only) | `mvn -pl common cn1:run` / `cn1:debug` | `./gradlew run` / `debug` |
+| Unit tests | Local (the CN1 test runner inside a JVM) | `mvn -pl common cn1:test` | `./gradlew cn1Test` |
+| Standalone desktop app (`.jar` + bundled JRE for Mac/Win/Linux) | Cloud (build server packages a JRE for each OS) | `mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=mac-os-x-desktop` (or `windows-desktop`, `linux-desktop`) | `./gradlew buildMacDesktop` / `buildWindowsDesktop` |
+| Android APK / AAB | Cloud by default; **also** locally if you run `cn1:install-android-sdk` and use the local Android build path | `mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device` | `./gradlew buildAndroid` (local project: `buildAndroidGradleProject`) |
+| iOS app | Cloud, **or** locally as an Xcode project via `ios-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device` (cloud) or `…-Dcodename1.buildTarget=ios-source` (local Xcode project) | `./gradlew buildIos` / `buildIosRelease` (local project: `buildIosXcodeProject`) |
+| Mac Native app (AOT-compiled, same pipeline as iOS) | Cloud, **or** locally as an Xcode project via `mac-source` | `mvn -pl ios package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native` (cloud) or `…-Dcodename1.buildTarget=mac-source` (local Xcode project) | `./gradlew buildMacNative` |
+| Native Windows `.exe` (`win32`, ParparVM → clang-cl, no JVM) | Cloud (Linux build server cross-compiles); **also** locally on Windows, or as a project via `windows-source` | `mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device` (cloud) or `…-Dcodename1.buildTarget=local-windows-device` (local). A regular build returns x64 + arm64 release exes; add the `windows.debug` build hint for a single x64 debug exe. | `./gradlew buildWindowsDevice` |
+| JavaScript / web bundle | Local (ParparVM to JavaScript translator, available to all users). Cloud builds use ParparVM by default and accept `javascript.port=teavm` as a compatibility fallback. | `mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript` | `./gradlew buildJavascriptLocal` (cloud: `buildJavascript`) |
+
+Any target without its own Gradle task (`linux-desktop`, `mac-source`, `local-windows-device`, ...) is `./gradlew cn1Build -Pcodename1.platform=<platform> -Pcodename1.buildTarget=<target>`.
 
 The two big "local-only" outputs are the **simulator** and **tests** — those are everything you need for ordinary development and CI feedback loops. You only invoke the cloud builds when you want a deployable native artifact.
 
@@ -25,7 +29,7 @@ The two big "local-only" outputs are the **simulator** and **tests** — those a
 | Running `cn1:run` / `cn1:debug` (the simulator) | **JDK 17–25** (CN1 plugin aborts on older JDKs with a friendly error) |
 | Cross-compiling for Android **locally with Gradle 8** | The same JDK 17+ already used as `JAVA_HOME` is reused automatically; you only need to set `JAVA17_HOME` if Maven is running on an older JVM |
 | Cross-compiling for iOS locally (`ios-source`) | macOS only — see Xcode prerequisites below |
-| Cloud builds (any target) | None — the cloud server holds the toolchain. Local `JAVA_HOME` only runs Maven. |
+| Cloud builds (any target) | None — the cloud server holds the toolchain. Local `JAVA_HOME` only runs Maven or Gradle. |
 
 `codename1.arg.java.version=17` in `codenameone_settings.properties` selects the **build server's** JDK 17 toolchain. Keep it set even when you upgrade your local JDK (21, 25, …) — the local JDK only runs Maven and the simulator; the property routes the cloud-build target.
 
@@ -112,6 +116,34 @@ mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=windo
 mvn -pl javase package -Dcodename1.platform=javase -Dcodename1.buildTarget=linux-desktop
 ```
 
+## Gradle task cheat sheet
+
+A Gradle project applies the `com.codenameone` plugin from `settings.gradle.kts`; its version there is the Codename One version. Run tasks from the project root (`.\gradlew.bat` on Windows). `./gradlew tasks` lists them all.
+
+```bash
+# --- Local-only ---
+./gradlew run                      # the simulator, with hot CSS reload
+./gradlew debug                    # the simulator, suspended until a debugger attaches on port 5005
+./gradlew cn1Test                  # the CN1 test runner; ./gradlew test runs JUnit
+./gradlew cn1Css                   # compile theme.css into theme.res without running the app
+./gradlew generateNativeInterfaces # stubs under src/<platform>/<lang>/ for every NativeInterface
+./gradlew buildJavascriptLocal     # web bundle, locally
+./gradlew buildIosXcodeProject     # local Xcode project (macOS)
+./gradlew buildAndroidGradleProject # local Android Studio project
+./gradlew settings                 # Codename One Settings; also guibuilder, certificateWizard
+./gradlew cn1Update                # move settings.gradle.kts to the latest Codename One
+
+# --- Cloud builds ---
+./gradlew buildIos                 # debug .ipa; buildIosRelease for the App Store
+./gradlew buildAndroid
+./gradlew buildJavascript
+./gradlew buildMacNative
+./gradlew buildMacDesktop          # buildWindowsDesktop, buildWindowsDevice, buildLinuxDevice
+./gradlew cn1Build -Pcodename1.platform=javase -Pcodename1.buildTarget=linux-desktop   # any other target
+```
+
+A build hint can be overridden for one build with `-Pcodename1.arg.<hint>=<value>`. The OpenAPI / gRPC / GraphQL client generators above are Maven goals; there is no Gradle task for them yet.
+
 ## Hot reload — Java edits without restarting the simulator
 
 The simulator (`cn1:run` / `cn1:debug`) supports three reload modes, picked from the **Hot Reload** menu in the simulator's window (the setting persists per-project in Java preferences):
@@ -119,12 +151,12 @@ The simulator (`cn1:run` / `cn1:debug`) supports three reload modes, picked from
 | Mode | What it does | When to use |
 | --- | --- | --- |
 | **Disabled** (default) | No reload — restart `cn1:run` to pick up Java edits. CSS still live-reloads regardless. | Production-style runs. |
-| **Reload Simulator** | A file watcher (`SourceChangeWatcher`) recompiles changed `.java` files in `common/src/main/java/` via the IDE's incremental compiler and triggers a simulator restart. The simulator keeps the same JVM but rebuilds the form stack. | The most reliable mode — works on any edit (new class, signature change, new field). |
+| **Reload Simulator** | A file watcher (`SourceChangeWatcher`) recompiles changed `.java` files in `src/main/java/` (`common/src/main/java/` under Maven) via the IDE's incremental compiler and triggers a simulator restart. The simulator keeps the same JVM but rebuilds the form stack. | The most reliable mode — works on any edit (new class, signature change, new field). |
 | **Reload Current Form** | Requires the **HotswapAgent** JVM agent (set up via `cn1:debug` + an IDE that pushes class file redefinitions through JDWP) **plus** CodeRAD wiring on your forms. When a `.java` file is recompiled, the simulator calls `FormController.tryCloneAndReplaceCurrentForm()` and re-shows the current form on the patched class. | Fastest iteration for UI tweaks inside a single form — preserves global state and the navigation stack, only the visible form re-renders. Method-body edits work; adding fields or methods falls back to a full restart. |
 
 Behind the scenes:
 
-- **CSS reload** is always on. Edits to `common/src/main/css/theme.css` are watched and `theme.res` is regenerated + re-injected into the running simulator without restarting the JVM. This works in every mode.
+- **CSS reload** is always on. Edits to `src/main/css/theme.css` (`common/src/main/css/theme.css` under Maven) are watched and `theme.res` is regenerated + re-injected into the running simulator without restarting the JVM. This works in every mode.
 - **Java reload (mode 2)** is driven by the standard JVM HotSwap protocol (`-agentlib:jdwp=...,redefinitions=true`) plus [HotswapAgent](https://github.com/HotswapProjects/HotswapAgent) for the deeper redefinitions (added/removed methods, new classes). The IDE compiles the `.java` to a `.class` and JDWP-pushes it; the simulator notices via a system property and re-clones the form.
 - The watcher only sees files written by the IDE — running `mvn compile` from a separate shell doesn't trigger reload because the IDE's incremental compiler is what writes the `.class` to `target/classes/`.
 
@@ -132,7 +164,7 @@ Method-body edits feel instantaneous; structural edits cost a form rebuild but n
 
 ## Tests in CI/CD
 
-For **logic, UI, and screenshot tests**, run `mvn -pl common cn1:test` (the CN1 test runner). It executes inside a local JVM via the simulator, so CI/CD does not need a Codename One account, a build server, or platform tooling — any GitHub Actions runner with a JDK 17+ can run it. This is the right loop for fast feedback.
+For **logic, UI, and screenshot tests**, run `mvn -pl common cn1:test` or `./gradlew cn1Test` (the CN1 test runner). It executes inside a local JVM via the simulator, so CI/CD does not need a Codename One account, a build server, or platform tooling — any GitHub Actions runner with a JDK 17+ can run it. This is the right loop for fast feedback.
 
 ### Framebuffer requirement on headless Linux runners
 
@@ -149,11 +181,12 @@ jobs:
         with: { distribution: 'temurin', java-version: '17' }
       - name: Run CN1 tests under a virtual framebuffer
         run: xvfb-run -a ./mvnw -pl common test-compile cn1:test
+        # Gradle: run: xvfb-run -a ./gradlew cn1Test
 ```
 
 `xvfb-run -a` automatically picks a free display number (`-a` = autodisplay). Without it the test JVM aborts with `java.awt.HeadlessException` or "Can't connect to X11 display".
 
-On `macos-latest` / `windows-latest` runners just call `./mvnw -pl common test-compile cn1:test` directly — no wrapper needed.
+On `macos-latest` / `windows-latest` runners just call `./mvnw -pl common test-compile cn1:test` (or `./gradlew cn1Test`) directly — no wrapper needed.
 
 You only need the cloud build path when you want to **produce a native artifact** (.ipa / .apk / desktop installer / web bundle) — see the next section.
 
@@ -164,6 +197,10 @@ You only need the cloud build path when you want to **produce a native artifact*
 ```bash
 mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device     -Dautomated=true
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device -Dautomated=true
+
+# Gradle
+./gradlew buildIos -Pautomated=true
+./gradlew buildAndroid -Pautomated=true
 ```
 
 This is the right tool **specifically for producing native artifacts in unattended pipelines** (release builds, nightly TestFlight uploads, LLM-driven builds that need to verify a target compiles). It is **not** needed for running tests — tests are local.
@@ -192,7 +229,7 @@ After the project is generated, you can also run `xcodebuild -workspace <App>.xc
 
 ## `codenameone_settings.properties` — the configuration source of truth
 
-This file lives at `common/codenameone_settings.properties`. The most useful keys:
+This file lives at `common/codenameone_settings.properties` in a Maven project and at the project root in a Gradle project. The most useful keys:
 
 ```properties
 codename1.packageName=com.example.myapp
@@ -210,6 +247,8 @@ Anything prefixed `codename1.arg.<platform>.<key>` is forwarded to the build ser
 
 ## Layout invariants
 
+Paths below are Maven's; in a Gradle project drop the leading `common/` (and `common/target/` is `build/`).
+
 - `common/src/main/css/theme.css` — **the** CSS file. Compiled to `common/target/classes/theme.res`.
 - `common/src/main/l10n/messages*.properties` — i18n bundles. **MUST** live here (not in `src/main/resources`), or the CSS compiler will not bake them in.
 - `common/src/main/java/<pkg>/<MainClass>.java` — entry point. Class name must match `codename1.mainName`.
@@ -219,15 +258,16 @@ Anything prefixed `codename1.arg.<platform>.<key>` is forwarded to the build ser
 ## Common build errors and fixes
 
 - **`Resources.getGlobalResources().getL10N(...)` returns null at runtime** → your bundles are under `common/src/main/resources/` instead of `common/src/main/l10n/`. Move them.
-- **`Cannot find symbol class XxxView`** after using the GUI builder → run `mvn -pl common generate-sources` to regenerate.
+- **`Cannot find symbol class XxxView`** after using the GUI builder → run `mvn -pl common generate-sources` (Gradle: `./gradlew generateGuiSources`, which also runs before every compile) to regenerate.
 - **`OutOfMemoryError` running `cn1:test`** → bump `<argLine>-Xmx2g</argLine>` in the surefire/cn1 plugin config in `common/pom.xml`.
 - **Build server returns "build args invalid"** → check `codename1.arg.*` keys against [`build-hints.md`](build-hints.md) or the Developer Guide.
+- **`Codename One Gradle projects compile for Java 17`** → a Gradle build script set a lower `release`; remove it. Java 8 projects need the Maven build.
 - **`When using gradle 8, you must set the JAVA17_HOME environment variable`** for a local Android build → only happens when Maven itself is running on a JDK older than 17. Re-launch Maven with a JDK 17+ `JAVA_HOME` and the builder reuses it automatically.
 - **`-Dautomated=true` exits 0 even though the build failed** → make sure you're on a recent `cn1.plugin.version`; older versions of the plugin swallowed errors.
 
 ## The build client jar
 
-The build server protocol is driven by `CodeNameOneBuildClient.jar`. The Codename One Maven plugin places it under `~/.codenameone/CodeNameOneBuildClient.jar` automatically the first time you run a `cn1:build` / `package` goal. If it ever goes missing, download the canonical copy:
+The build server protocol is driven by `CodeNameOneBuildClient.jar`. The Codename One Maven (and Gradle) plugin places it under `~/.codenameone/CodeNameOneBuildClient.jar` automatically the first time you run a `cn1:build` / `package` goal. If it ever goes missing, download the canonical copy:
 
 <https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar>
 

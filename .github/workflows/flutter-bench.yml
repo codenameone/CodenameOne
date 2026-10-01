@@ -19,6 +19,8 @@ on:
       - 'maven/dart-transpiler/**'
       - 'maven/dart-runtime/**'
       - 'maven/codenameone-maven-plugin/**'
+      # The builders the plugin runs live here since the build engine split out.
+      - 'maven/build-engine/**'
       - 'maven/cn1app-archetype/**'
       - 'scripts/flutter-bench/**'
       - '.github/workflows/flutter-bench.yml'

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <!--
+    The Gradle plugin marker. Gradle resolves `plugins { id("com.codenameone") version "X" }`
+    by looking up <id>:<id>.gradle.plugin:X in the plugin repositories and following its
+    single dependency to the implementation. With the id com.codenameone, the marker's
+    groupId is com.codenameone too, so it lives beside every other Codename One artifact
+    and the repository scripts (maven/scripts/r2) treat it like any of them.
+    -->
+    <artifactId>com.codenameone.gradle.plugin</artifactId>
+    <packaging>pom</packaging>
+    <name>Codename One Gradle Plugin Marker</name>
+    <description>Plugin marker for the com.codenameone Gradle plugin</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-gradle-plugin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+</project>

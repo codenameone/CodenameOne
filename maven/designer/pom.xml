@@ -40,6 +40,14 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-css-cli</artifactId>
         </dependency>
+        <!-- CSSImageImporter, ResourceEditorApp and ResourceEditorView find the
+             project (Ant, Maven or Gradle) through it. Declared directly rather
+             than inherited through css-cli because the editor uses it itself. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-project-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.swinglabs/swing-layout -->
         <dependency>
             <groupId>org.swinglabs</groupId>

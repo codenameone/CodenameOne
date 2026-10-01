@@ -22,7 +22,7 @@ Either way, the `TestUtils` helpers below (`waitForFormTitle`, `clickButtonByLab
 common/src/test/java/<pkg>/MyTest.java
 ```
 
-Tests in this folder are picked up by the CN1 test runner. The runner can execute on the desktop (simulator) and also on real devices via `cn1:test`. Surefire (`mvn test`) is mapped to `cn1:test` in the standard initializr POM so the usual `mvn test` works.
+(`src/test/java/<pkg>/MyTest.java` in a Gradle project.) Tests in this folder are picked up by the CN1 test runner -- `mvn -pl common cn1:test`, or `./gradlew cn1Test` under Gradle. The runner can execute on the desktop (simulator) and also on real devices via `cn1:test`. Surefire (`mvn test`) is mapped to `cn1:test` in the standard initializr POM so the usual `mvn test` works.
 
 ## The `AbstractTest` base class
 
@@ -124,6 +124,7 @@ rm ~/.codenameone/com.example.myapp.MyAppName/settings-screen.png
 # Run twice — first records baseline, second confirms it's stable:
 mvn -pl common cn1:test
 mvn -pl common cn1:test
+# Gradle: ./gradlew cn1Test, twice
 ```
 
 The two-run pattern is important: a single passing run only proves "we wrote a file", not "we compare equal across runs". The second run is the one that actually validates determinism.
@@ -135,7 +136,7 @@ The two-run pattern is important: a single passing run only proves "we wrote a f
 The right loop:
 
 1. Write/modify the UI.
-2. Run the simulator (`mvn -pl common cn1:run`) and **visually confirm** the screen looks right at least once.
+2. Run the simulator (`mvn -pl common cn1:run`, or `./gradlew run`) and **visually confirm** the screen looks right at least once.
 3. *Then* write a `screenshotTest("name")` and run it twice to lock in the baseline.
 4. On the next CI run, the screen rendering must continue to match — that's where the test earns its keep.
 

@@ -6,6 +6,8 @@
 
 Both platforms need a build made with an on-device-debug build hint, because the flag is baked into the binary. A release build cannot be attached to.
 
+**Gradle projects.** The settings file is `codenameone_settings.properties` at the root and the sources are `src/main/java` (drop the `common/` below). The builds are Gradle tasks: `./gradlew buildAndroid -Pcodename1.arg.android.onDeviceDebug=true` or `./gradlew buildAndroidGradleProject` for Android, and `./gradlew buildIos -Pcodename1.arg.ios.onDeviceDebug=true` or `./gradlew buildIosXcodeProject` for iOS. The device-side helpers -- `cn1:android-on-device-debugging` (install, launch, forward JDWP) and `cn1:ios-on-device-debugging` (the JDWP proxy) -- are Maven goals with no Gradle task yet; under Gradle, do the Android steps with `adb` by hand (`adb install`, `adb shell am set-debug-app -w <package>`, `adb forward tcp:5005 jdwp:<pid>`) and say so if the iOS proxy is needed.
+
 ## Android
 
 Android's runtime already exposes a JDWP socket per debuggable process, so there is no proxy — the Maven goal just drives `adb`.
@@ -43,7 +45,7 @@ It prints the adb it picked, the target device, the app's PID, and a banner conf
 
 ```bash
 jdb -attach localhost:5005 \
-    -sourcepath common/src/main/java
+    -sourcepath common/src/main/java   # src/main/java under Gradle
 ```
 
 By default the goal runs `am set-debug-app -w`, so the app sits paused at startup until you attach. Everything the simulator debugger does works here — this is the real Android runtime, not a proxy.
@@ -101,7 +103,7 @@ mvn cn1:ios-on-device-debugging
 
 ```bash
 jdb -attach localhost:8000 \
-    -sourcepath common/src/main/java
+    -sourcepath common/src/main/java   # src/main/java under Gradle
 ```
 
 **Two ports, and mixing them up is the usual mistake:** the *app* dials the proxy on **55333**; the *debugger* attaches to the proxy on **8000**. Override them with `-Dcn1.onDeviceDebug.devicePort` and `-Dcn1.onDeviceDebug.jdwpPort` if either is taken.

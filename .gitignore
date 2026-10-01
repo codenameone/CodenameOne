@@ -15,6 +15,9 @@
 /Ports/JavaSE/build/
 *.skin
 *.jar
+# The Gradle project template's wrapper: gradlew cannot start without it (unlike
+# mvnw, it never downloads its own), so every generated Gradle project ships it.
+!maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/gradle/wrapper/gradle-wrapper.jar
 *.class
 *.pyc
 **/__pycache__/
