@@ -373,8 +373,7 @@ public class FidelityDeviceRunner {
         // it passed while the running app showed no glass -- a false green. Capturing the live
         // screen makes the suite tell the truth: glass widgets go red until the live-screen
         // glass actually works. (emitTiles, the old offscreen path, is kept for reference.)
-        waitForTilesPainted(wrappers);
-        cropAndEmit(captureStableScreen(), wrappers, names, w, h);
+        cropAndEmit(captureSettled(wrappers), wrappers, names, w, h);
     }
 
     // ---- animation-frame render ----
@@ -456,8 +455,7 @@ public class FidelityDeviceRunner {
                 }
             });
             settle();
-            waitForTilesPainted(wrappers);
-            cropAndEmit(captureStableScreen(), wrappers, names, w, h);
+            cropAndEmit(captureSettled(wrappers), wrappers, names, w, h);
         }
     }
 
@@ -655,8 +653,8 @@ public class FidelityDeviceRunner {
     /// place. The capture now waits until every tile has been painted at the position
     /// it will be cropped from.
     private static final class PaintedTile extends Container {
-        private int paintedX = Integer.MIN_VALUE;
-        private int paintedY = Integer.MIN_VALUE;
+        /// The geometry the last paint drew, or null before the first paint.
+        private String paintedGeometry;
 
         PaintedTile(com.codename1.ui.layouts.Layout layout) {
             super(layout);
@@ -665,12 +663,29 @@ public class FidelityDeviceRunner {
         @Override
         public void paint(com.codename1.ui.Graphics g) {
             super.paint(g);
-            paintedX = getAbsoluteX();
-            paintedY = getAbsoluteY();
+            paintedGeometry = geometry();
+        }
+
+        /// Position AND size of the tile and of each child. Position alone was not
+        /// enough: a centring layout (FlowLayout CENTER) moves the child inside a
+        /// tile whose own x/y never change when the tile's WIDTH settles after a
+        /// paint, and the crop then cut the old pixels with the new geometry --
+        /// TextField_normal_light 50px right of its golden on Android.
+        private String geometry() {
+            StringBuilder b = new StringBuilder();
+            b.append(getAbsoluteX()).append(',').append(getAbsoluteY()).append(',')
+                    .append(getWidth()).append(',').append(getHeight());
+            int n = getComponentCount();
+            for (int i = 0; i < n; i++) {
+                Component c = getComponentAt(i);
+                b.append(';').append(c.getX()).append(',').append(c.getY()).append(',')
+                        .append(c.getWidth()).append(',').append(c.getHeight());
+            }
+            return b.toString();
         }
 
         boolean paintedWhereItIs() {
-            return paintedX == getAbsoluteX() && paintedY == getAbsoluteY();
+            return paintedGeometry != null && paintedGeometry.equals(geometry());
         }
     }
 
@@ -725,6 +740,39 @@ public class FidelityDeviceRunner {
     /// baseline), and the next run on the same code measured exactly the baseline.
     /// Content that never settles (a blinking caret) falls back to the last capture,
     /// which is what a single capture gave before.
+    private static final int SETTLED_CAPTURE_ATTEMPTS = 5;
+
+    /// A screen capture taken while every tile still sits where it was painted.
+    ///
+    /// waitForTilesPainted alone left a window: a layout that lands after the check
+    /// and before the capture still pairs new geometry with old pixels. The tiles are
+    /// re-checked after the capture, and a capture that raced a layout is retaken.
+    private Image captureSettled(final List wrappers) {
+        Image shot = null;
+        for (int attempt = 0; attempt < SETTLED_CAPTURE_ATTEMPTS; attempt++) {
+            waitForTilesPainted(wrappers);
+            shot = captureStableScreen();
+            final boolean[] still = new boolean[] {true};
+            runOnEdtSync(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < wrappers.size(); i++) {
+                        Object t = wrappers.get(i);
+                        if (t instanceof PaintedTile && !((PaintedTile) t).paintedWhereItIs()) {
+                            still[0] = false;
+                        }
+                    }
+                }
+            });
+            if (still[0]) {
+                return shot;
+            }
+            Log.p("FidelityDeviceRunner: layout moved during capture; retaking (attempt "
+                    + (attempt + 1) + ")");
+        }
+        return shot;
+    }
+
     private Image captureStableScreen() {
         Image last = captureScreen();
         for (int attempt = 0; attempt < STABLE_ATTEMPTS && last != null; attempt++) {
