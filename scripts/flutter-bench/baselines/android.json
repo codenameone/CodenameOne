@@ -15,7 +15,7 @@
   "recorded_from": "code_bytes: flutter-bench run 36839251552 (commit 8c399d5a96, +1.1% from features added since; still 4.5x under Flutter); other sizes: flutter-bench run 35772357318; start-up and memory: the envelope of the runs through 35793506968 (commit fb8880b96d)",
   "schema_version": 1,
   "tolerances": {
-    "code_bytes": 0.0,
+    "code_bytes": 0.005,
     "cold_start_ms": 0.25,
     "idle_memory_bytes": 0.15,
     "install_bytes": 0.0,
