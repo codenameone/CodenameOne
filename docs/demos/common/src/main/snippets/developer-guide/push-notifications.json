@@ -103,3 +103,27 @@
 }
 // end::push-notifications-json-006[]
 
+
+// tag::push-notifications-json-007[]
+{
+  "teamId": "YOUR_APPLE_TEAM_ID",
+  "keyId": "YOUR_APNS_KEY_ID",
+  "topic": "com.example.app",
+  "environment": "production",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nYOUR_COMPLETE_P8_KEY_CONTENTS\n-----END PRIVATE KEY-----\n"
+}
+// end::push-notifications-json-007[]
+
+// tag::push-notifications-json-008[]
+{
+  "appId": "YOUR_APPLICATION_UUID",
+  "targets": [
+    {"provider": "fcm", "token": "cn1-fcm-YOUR_ANDROID_DEVICE_TOKEN"},
+    {"provider": "apns", "token": "cn1-ios-YOUR_IOS_DEVICE_TOKEN"}
+  ],
+  "message": {
+    "schema": 3,
+    "classic": {"type": 1, "body": "Hello"}
+  }
+}
+// end::push-notifications-json-008[]

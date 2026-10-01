@@ -27,6 +27,12 @@ on:
       - 'Ports/JavaSE/**'
       - '!Ports/JavaSE/**/*.md'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   javase-simulator-tests:
     permissions:
@@ -71,7 +77,7 @@ jobs:
         run: ./scripts/run-javase-simulator-integration-tests.sh
 
       - name: Upload JavaSE simulator artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: javase-simulator-tests

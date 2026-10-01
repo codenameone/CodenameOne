@@ -31,8 +31,10 @@ import com.codename1.util.MathUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// The pure-Codename One map renderer behind [com.codename1.maps.MapView] (and
 /// the [com.codename1.maps.NativeMap] fallback).
@@ -43,9 +45,25 @@ import java.util.Map;
 /// the visible buffers scaled to the fractional zoom and places labels with
 /// the [LabelEngine]. All drawing uses the framework [Graphics] API -- there
 /// is no native peer.
+///
+/// A vector map zooms past the deepest level its source serves: beyond it the
+/// deepest tile's geometry is drawn again for each smaller area on screen
+/// ("overzoom"), the way vector map renderers reach street level from data
+/// that stops at zoom 14.
 public final class VectorMapEngine {
 
     private static final int tileSize = WebMercator.TILE_SIZE;
+
+    // Levels a vector source is drawn past its deepest tiles. Six is 64x the
+    // deepest tile's scale: zoom 20, building level, from zoom 14 data.
+    private static final int OVERZOOM_LEVELS = 6;
+    // The cap on how far overzoom reaches. It limits overzoom only: a source
+    // that serves deeper tiles than this keeps its own deepest level, since
+    // capping it would hide data the source really has.
+    private static final int MAX_DISPLAY_ZOOM = 22;
+
+    // Logical pixels between repeats of a road name along a long road.
+    private static final double ROAD_LABEL_REPEAT = 256;
     private TileSource source;
     private MapStyle style;
 
@@ -67,7 +85,22 @@ public final class VectorMapEngine {
     private final Map pending = new HashMap();
     private final Map failed = new HashMap();
     private final LabelEngine labelEngine = new LabelEngine();
+    // Decoded deepest-level tiles, kept so every overzoomed piece of one is
+    // drawn from a single fetch and decode.
+    private final TileCache decodedParents = new TileCache(8);
+    private final Map parentWaiters = new HashMap();
     private int generation;
+
+    // What [#paintTiles] saw, for the [#paintLabels] call that follows it.
+    private List frameLabels;
+    private double frameScale;
+    private double frameCenterX;
+    private double frameCenterY;
+    private int frameOriginX;
+    private int frameOriginY;
+    private int frameWidth;
+    private int frameHeight;
+    private int frameZoom;
 
     private Runnable repaintCallback;
 
@@ -92,6 +125,8 @@ public final class VectorMapEngine {
         labels.clear();
         pending.clear();
         failed.clear();
+        decodedParents.clear();
+        parentWaiters.clear();
     }
 
     /// The active tile source.
@@ -107,6 +142,8 @@ public final class VectorMapEngine {
         labels.clear();
         pending.clear();
         failed.clear();
+        decodedParents.clear();
+        parentWaiters.clear();
     }
 
     /// The active style.
@@ -142,9 +179,21 @@ public final class VectorMapEngine {
         return source.getMinZoom();
     }
 
-    /// The largest zoom level the tile source serves.
+    /// The largest zoom level the camera can reach. For a vector source this is
+    /// six levels past the deepest level the source serves (see the class
+    /// notes), up to zoom 22; a source that serves deeper tiles than that keeps
+    /// its own deepest level. A raster source stops at its own deepest level,
+    /// since stretching a bitmap only blurs it.
     public double getMaxZoom() {
-        return source.getMaxZoom();
+        return displayMaxZoom();
+    }
+
+    private int displayMaxZoom() {
+        int max = source.getMaxZoom();
+        if (!source.isVector()) {
+            return max;
+        }
+        return Math.max(max, Math.min(max + OVERZOOM_LEVELS, MAX_DISPLAY_ZOOM));
     }
 
     /// Sets the pixel size of the viewport (called by the host component on
@@ -167,6 +216,8 @@ public final class VectorMapEngine {
             labels.clear();
             pending.clear();
             failed.clear();
+            decodedParents.clear();
+            parentWaiters.clear();
         }
     }
 
@@ -198,7 +249,7 @@ public final class VectorMapEngine {
 
     private double clampZoom(double z) {
         double min = source.getMinZoom();
-        double max = source.getMaxZoom();
+        double max = displayMaxZoom();
         if (z < min) {
             return min;
         }
@@ -315,7 +366,18 @@ public final class VectorMapEngine {
     /// Paints the basemap and labels into `g`, offset by `originX,originY`.
     /// The caller is responsible for clipping to the component bounds and for
     /// drawing overlays (markers/shapes) afterwards.
+    ///
+    /// This is [#paintTiles] followed by [#paintLabels]; call those two
+    /// instead to draw shapes such as a route between them, so the route
+    /// does not cover the street names, as on familiar street maps.
     public void paint(Graphics g, int originX, int originY, int width, int height) {
+        paintTiles(g, originX, originY, width, height);
+        paintLabels(g);
+    }
+
+    /// Paints the basemap without its labels, and remembers the labels in view
+    /// for the next [#paintLabels] call.
+    public void paintTiles(Graphics g, int originX, int originY, int width, int height) {
         viewWidth = width;
         viewHeight = height;
 
@@ -346,6 +408,8 @@ public final class VectorMapEngine {
         int tyMax = floorDiv((int) Math.floor(wzBottom), tileSize);
 
         List visibleLabels = new ArrayList();
+        Set labelKeys = new HashSet();
+        int sourceMax = source.getMaxZoom();
 
         for (int tx = txMin; tx <= txMax; tx++) {
             for (int ty = tyMin; ty <= tyMax; ty++) {
@@ -364,14 +428,40 @@ public final class VectorMapEngine {
                     int bottom = screenY((ty + 1) * (double) tileSize, s, cwy, originY, height);
                     g.drawImage(img, left, top, right - left, bottom - top);
                 }
-                List tileLabels = (List) labels.get(key);
+                // An overzoomed tile shows part of a deeper-level tile, whose
+                // labels (styled for this zoom) cover all of its pieces:
+                // collect them once.
+                String labelKey = key;
+                if (source.isVector() && z > sourceMax) {
+                    int depth = z - sourceMax;
+                    labelKey = overzoomLabelKey(z, TileUtil.key(sourceMax, wrappedTx >> depth, ty >> depth));
+                }
+                List tileLabels = labelKeys.add(labelKey) ? (List) labels.get(labelKey) : null;
                 if (tileLabels != null) {
                     visibleLabels.addAll(tileLabels);
                 }
             }
         }
 
-        drawLabels(g, visibleLabels, s, cwx, cwy, originX, originY, width, height, z);
+        frameLabels = visibleLabels;
+        frameScale = s;
+        frameCenterX = cwx;
+        frameCenterY = cwy;
+        frameOriginX = originX;
+        frameOriginY = originY;
+        frameWidth = width;
+        frameHeight = height;
+        frameZoom = z;
+    }
+
+    /// Draws the labels of the basemap painted by the last [#paintTiles]
+    /// call. Does nothing before one.
+    public void paintLabels(Graphics g) {
+        if (frameLabels == null) {
+            return;
+        }
+        drawLabels(g, frameLabels, frameScale, frameCenterX, frameCenterY, frameOriginX, frameOriginY,
+                frameWidth, frameHeight, frameZoom);
     }
 
     private boolean checkVisibleTilesReady() {
@@ -424,6 +514,10 @@ public final class VectorMapEngine {
             LabelCandidate c = (LabelCandidate) cand;
             // Candidate world coords are at its own tile zoom; rescale to this z.
             double factor = MathUtil.pow(2, z - c.tileZoom);
+            if (c.path != null) {
+                drawLineLabel(g, c, factor * s, cwx, cwy, originX, originY, width, height);
+                continue;
+            }
             double wzx = c.worldX * factor;
             double wzy = c.worldY * factor;
             int sx = (int) Math.floor(originX + (wzx * s - cwx) * pixelRatio + width / 2.0 + 0.5);
@@ -435,6 +529,35 @@ public final class VectorMapEngine {
             int sizePx = (int) Math.round(c.sizePx * pixelRatio);
             labelEngine.place(g, c.text, sizePx, c.textColor, c.haloColor, sx, sy);
         }
+    }
+
+    // A road name repeats along the road, so it is culled by the road's
+    // screen bounds rather than by its midpoint, which an overzoomed road can
+    // put far off screen while the road crosses it.
+    private void drawLineLabel(Graphics g, LabelCandidate c, double scale, double cwx, double cwy,
+                               int originX, int originY, int width, int height) {
+        double[] path = c.path;
+        double[] pts = new double[path.length];
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        for (int i = 0; i + 1 < path.length; i += 2) {
+            double x = originX + (path[i] * scale - cwx) * pixelRatio + width / 2.0;
+            double y = originY + (path[i + 1] * scale - cwy) * pixelRatio + height / 2.0;
+            pts[i] = x;
+            pts[i + 1] = y;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        if (maxX < originX || minX > originX + width || maxY < originY || minY > originY + height) {
+            return;
+        }
+        int sizePx = (int) Math.round(c.sizePx * pixelRatio);
+        labelEngine.placeAlongLine(g, c.text, sizePx, c.textColor, c.haloColor, pts,
+                ROAD_LABEL_REPEAT * pixelRatio, originX, originY, originX + width, originY + height);
     }
 
     private int screenX(double worldZ, double s, double cwx, int originX, int width) {
@@ -450,8 +573,8 @@ public final class VectorMapEngine {
         if (z < source.getMinZoom()) {
             z = source.getMinZoom();
         }
-        if (z > source.getMaxZoom()) {
-            z = source.getMaxZoom();
+        if (z > displayMaxZoom()) {
+            z = displayMaxZoom();
         }
         if (z < 0) {
             z = 0;
@@ -472,6 +595,18 @@ public final class VectorMapEngine {
     private void requestTile(final int z, final int x, final int y) {
         final String key = TileUtil.key(z, x, y);
         if (pending.containsKey(key) || failed.containsKey(key)) {
+            return;
+        }
+        if (source.isVector() && z > source.getMaxZoom()) {
+            requestOverzoomTile(key, z, x, y);
+            return;
+        }
+        List loading = (List) parentWaiters.get(key);
+        if (loading != null) {
+            // An overzoom fetch of this very tile is in flight (the user zoomed
+            // back out): join it as its depth-0 piece instead of fetching again.
+            pending.put(key, Integer.valueOf(generation));
+            loading.add(new int[]{z, x, y});
             return;
         }
         final int requestGeneration = generation;
@@ -532,6 +667,7 @@ public final class VectorMapEngine {
         }
         removePendingIfMatches(key, requestGeneration);
         if (result.success) {
+            boolean drawn = false;
             try {
                 Image image;
                 if (result.vector) {
@@ -543,13 +679,154 @@ public final class VectorMapEngine {
                     image = Image.createImage(result.data, 0, result.data.length);
                 }
                 rendered.put(key, image);
-                repaint();
+                drawn = true;
             } catch (Throwable t) {
                 failed.put(key, Boolean.TRUE);
+                failWaiters(key, requestGeneration);
+            }
+            // Outside the try on purpose: the waiter list is read through
+            // casts, and ParparVM's casts are unchecked, so none may sit under
+            // a catch (scripts/check-cast-semantics.sh).
+            if (drawn) {
+                if (result.vector && result.z == source.getMaxZoom()) {
+                    // Zooming in from here overzooms this very tile, and
+                    // pieces that zoomed in while it loaded wait for it.
+                    decodedParents.put(key, result.tile);
+                    drainWaiters(key, result.tile, result.z, requestGeneration);
+                }
+                repaint();
             }
         } else {
             failed.put(key, Boolean.TRUE);
+            failWaiters(key, requestGeneration);
         }
+    }
+
+    // Overzoomed tiles are cut from their deepest-level ancestor. Every piece
+    // waiting on one ancestor shares its fetch and decode; the ancestor's
+    // labels are stored under its own key, which [#paint] reads for all of
+    // its pieces.
+    private void requestOverzoomTile(String key, int z, int x, int y) {
+        final int parentZ = source.getMaxZoom();
+        int depth = z - parentZ;
+        final int px = x >> depth;
+        final int py = y >> depth;
+        final String parentKey = TileUtil.key(parentZ, px, py);
+        final int requestGeneration = generation;
+        pending.put(key, Integer.valueOf(requestGeneration));
+        final int[] address = new int[]{z, x, y};
+        final VectorTile parent = (VectorTile) decodedParents.get(parentKey);
+        if (parent != null) {
+            // Rasterizing is EDT work, but not work for the middle of a paint.
+            MapTileWorker.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (requestGeneration != generation) {
+                        return;
+                    }
+                    renderOverzoomed(parent, parentZ, address, requestGeneration);
+                    repaint();
+                }
+            });
+            return;
+        }
+        List waiters = (List) parentWaiters.get(parentKey);
+        boolean inFlight = waiters != null || pending.containsKey(parentKey);
+        if (waiters == null) {
+            waiters = new ArrayList();
+            parentWaiters.put(parentKey, waiters);
+        }
+        waiters.add(address);
+        if (inFlight) {
+            // Either another piece already fetches the ancestor, or it is
+            // loading as an ordinary deepest-level tile (the user zoomed in
+            // while it loaded) and applyTileResult hands it to the waiters:
+            // one download and one decode either way.
+            return;
+        }
+        source.fetchTile(parentZ, px, py, new TileCallback() {
+            @Override
+            public void tileLoaded(int tz, int tx, int ty, final byte[] data) {
+                MapTileWorker.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        VectorTile decoded;
+                        try {
+                            decoded = MvtDecoder.decode(data);
+                        } catch (Throwable t) {
+                            decoded = null;
+                        }
+                        final VectorTile tile = decoded;
+                        MapTileWorker.callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                applyParent(parentKey, parentZ, tile, requestGeneration);
+                            }
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void tileFailed(int tz, int tx, int ty) {
+                applyParent(parentKey, parentZ, null, requestGeneration);
+            }
+        });
+    }
+
+    private void applyParent(String parentKey, int parentZ, VectorTile tile, int requestGeneration) {
+        // A reset since the request already dropped its waiters, and the key
+        // may belong to a newer request by now.
+        if (requestGeneration != generation) {
+            return;
+        }
+        List waiters = (List) parentWaiters.remove(parentKey);
+        if (waiters == null) {
+            return;
+        }
+        if (tile == null) {
+            failAll(waiters, requestGeneration);
+            return;
+        }
+        decodedParents.put(parentKey, tile);
+        for (Object w : waiters) {
+            renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
+        }
+        repaint();
+    }
+
+    private void renderOverzoomed(VectorTile parent, int parentZ, int[] address, int requestGeneration) {
+        String key = TileUtil.key(address[0], address[1], address[2]);
+        removePendingIfMatches(key, requestGeneration);
+        int depth = address[0] - parentZ;
+        int subX = address[1] - ((address[1] >> depth) << depth);
+        int subY = address[2] - ((address[2] >> depth) << depth);
+        try {
+            int size = rasterTileSize();
+            Image buffer = Image.createImage(size, size, 0);
+            TileRenderer.renderTile(buffer.getGraphics(), parent, style, address[0], size, subX, subY, depth);
+            rendered.put(key, buffer);
+            // The parent's labels, styled for the zoom actually shown: a symbol
+            // layer's minzoom/maxzoom and text size are judged at this zoom,
+            // not at the source's deepest one, while the anchors stay in the
+            // parent's world pixels. Once per zoom, shared by every piece.
+            // A depth-0 piece is the deepest-level tile itself, labelled like
+            // any ordinary tile.
+            String labelKey = depth == 0 ? key : overzoomLabelKey(address[0],
+                    TileUtil.key(parentZ, address[1] >> depth, address[2] >> depth));
+            if (!labels.containsKey(labelKey)) {
+                labels.put(labelKey, TileRenderer.extractLabels(parent, style, address[0], parentZ,
+                        address[1] >> depth, address[2] >> depth, tileSize));
+            }
+        } catch (Throwable t) {
+            failed.put(key, Boolean.TRUE);
+        }
+    }
+
+    // Overzoomed labels are keyed by the zoom they were styled for as well as
+    // the parent tile they come from.
+    private static String overzoomLabelKey(int displayZoom, String parentKey) {
+        return displayZoom + ">" + parentKey;
     }
 
     private void finishFailed(String key, int requestGeneration) {
@@ -559,6 +836,35 @@ public final class VectorMapEngine {
         }
         removePendingIfMatches(key, requestGeneration);
         failed.put(key, Boolean.TRUE);
+        failWaiters(key, requestGeneration);
+    }
+
+    private void drainWaiters(String parentKey, VectorTile tile, int parentZ, int requestGeneration) {
+        List waiting = (List) parentWaiters.remove(parentKey);
+        if (waiting != null) {
+            for (Object w : waiting) {
+                renderOverzoomed(tile, parentZ, (int[]) w, requestGeneration);
+            }
+        }
+    }
+
+    // Pieces waiting on a deepest-level tile whose ordinary fetch failed fail
+    // with it rather than waiting for a result that will never come.
+    private void failWaiters(String parentKey, int requestGeneration) {
+        if (requestGeneration != generation) {
+            return;
+        }
+        List waiting = (List) parentWaiters.remove(parentKey);
+        if (waiting != null) {
+            failAll(waiting, requestGeneration);
+        }
+    }
+
+    private void failAll(List waiters, int requestGeneration) {
+        for (Object w : waiters) {
+            int[] a = (int[]) w;
+            finishFailed(TileUtil.key(a[0], a[1], a[2]), requestGeneration);
+        }
     }
 
     private void removePendingIfMatches(String key, int requestGeneration) {
@@ -591,6 +897,8 @@ public final class VectorMapEngine {
         labels.clear();
         pending.clear();
         failed.clear();
+        decodedParents.clear();
+        parentWaiters.clear();
     }
 
     private static final class TileResult {

@@ -77,11 +77,9 @@ on:
       - published
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -382,7 +380,7 @@ jobs:
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
 
       - name: Publish ByteCodeTranslator quality previews
-        if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ !cancelled() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         id: publish-bytecode-quality-previews
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -440,7 +438,7 @@ jobs:
           echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
 
       - name: Generate ByteCodeTranslator quality report
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         env:
           QUALITY_REPORT_TARGET_DIRS: vm/tests/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
@@ -519,7 +517,7 @@ jobs:
         run: vm/backend/ws-conformance.sh --arm javase
 
       - name: Upload the Autobahn report
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: autobahn-report

@@ -32,6 +32,12 @@ name: Car (CarPlay) integration
       - 'scripts/hellocodenameone/common/src/main/kotlin/com/codenameone/examples/hellocodenameone/HelloCodenameOne.kt'
       - 'scripts/lib/xcode.sh'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   car-ios:
     name: Car CarPlay
@@ -39,9 +45,6 @@ jobs:
       contents: read
     runs-on: macos-15
     timeout-minutes: 75
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
-      cancel-in-progress: true
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}

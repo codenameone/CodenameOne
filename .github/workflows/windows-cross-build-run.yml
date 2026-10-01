@@ -53,7 +53,9 @@ on:
       - 'scripts/ci/retry.sh'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -298,7 +300,7 @@ jobs:
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
 
       - name: Upload screenshot artifact (cross-compiled, x64)
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-cross-screenshot-raw
@@ -432,7 +434,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then echo "Windows cross screenshot gate failed."; exit 1; fi
 
       - name: Upload Windows port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: port-status-windows-x64
@@ -447,11 +449,11 @@ jobs:
       # fallback for the Windows x64 column. The report is already on disk in
       # this job, so publish it directly and depend on no event.
       #
-      # if: always() for the same reason the job itself runs on failure -- a
+      # if: ${{ !cancelled() }} for the same reason the job itself runs on failure -- a
       # report recording real failures is the one the table most needs.
       - name: Publish the Windows report to the data branch
         if: >-
-          always() && github.ref == 'refs/heads/master' &&
+          !cancelled() && github.ref == 'refs/heads/master' &&
           (github.event_name == 'push' || github.event_name == 'schedule' ||
           github.event_name == 'workflow_dispatch')
         env:

@@ -115,11 +115,9 @@ name: Test Android build scripts
 #     and edit the CN1SS_GH_TOKEN to use the new token
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -298,7 +296,7 @@ jobs:
         if: matrix.id == 'default'
         run: ./scripts/verify-android-app-compile-sdk.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" 37
       - name: Upload Android port status
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-android
@@ -306,7 +304,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Upload emulator screenshot
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: emulator-screenshot
@@ -315,7 +313,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload emulator screenshot for JDK matrix
-        if: always() && matrix.id != 'default'
+        if: ${{ !cancelled() && matrix.id != 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: emulator-screenshot-${{ matrix.id }}
@@ -324,7 +322,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android Gradle logs
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: android-gradle-logs
@@ -339,7 +337,7 @@ jobs:
       # this upload step disappears, the next decode flake will be
       # un-debuggable: keep it.
       - name: Upload Android instrumentation logs
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs
@@ -355,7 +353,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android instrumentation logs for JDK matrix
-        if: always() && matrix.id != 'default'
+        if: ${{ !cancelled() && matrix.id != 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs-${{ matrix.id }}
@@ -367,7 +365,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android test report
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: android-test-report
@@ -376,7 +374,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android Jacoco coverage report
-        if: always() && matrix.id == 'default'
+        if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7
         with:
           name: android-jacoco-coverage
