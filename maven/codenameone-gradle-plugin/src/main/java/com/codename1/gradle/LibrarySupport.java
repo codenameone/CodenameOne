@@ -249,6 +249,20 @@ final class LibrarySupport {
                                     + File.separator + "resources"));
                         }
                     }));
+            // The same jar for an application in this build that declares
+            // cn1lib(project(":this")): it resolves a project, not a pom with
+            // profiles, so it takes each platform's jar from here.
+            final TaskProvider<Jar> platformJar = platformJars.get(platformJars.size() - 1);
+            Configuration elements = project.getConfigurations().create(Cn1libs.platformElementsName(p.id()), c -> {
+                c.setCanBeConsumed(true);
+                c.setCanBeResolved(false);
+                c.setDescription("The " + p.id() + " implementation, for applications in this build");
+            });
+            if (p == NativePlatform.JAVASE) {
+                elements.extendsFrom(project.getConfigurations().getByName(javase.getImplementationConfigurationName()),
+                        project.getConfigurations().getByName(javase.getRuntimeOnlyConfigurationName()));
+            }
+            project.getArtifacts().add(elements.getName(), platformJar);
         }
 
         project.getTasks().register("generateNativeInterfaces", NativeInterfacesTask.class, t -> {

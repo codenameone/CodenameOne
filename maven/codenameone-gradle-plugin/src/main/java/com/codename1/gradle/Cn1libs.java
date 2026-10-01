@@ -117,6 +117,11 @@ final class Cn1libs {
             }
             Set<String> added = new java.util.HashSet<String>();
             for (org.gradle.api.artifacts.result.ResolvedComponentResult component : components) {
+                if (component.getId() instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                    addProjectPlatforms(p, (org.gradle.api.artifacts.component.ProjectComponentIdentifier)
+                            component.getId());
+                    continue;
+                }
                 if (!(component.getId() instanceof ModuleComponentIdentifier)) {
                     continue;
                 }
@@ -176,6 +181,46 @@ final class Cn1libs {
             rule.put("module", artifact);
         }
         return rule.isEmpty() ? null : rule;
+    }
+
+    /// The consumable configuration a Gradle cn1lib exposes `platform`'s jar in.
+    static String platformElementsName(String platform) {
+        return configurationName(platform) + "Elements";
+    }
+
+    /// A cn1lib of this build declared as `cn1lib(project(":maps"))`: it has no
+    /// published pom to read, so each platform's jar comes from the library's
+    /// own [#platformElementsName(String)] configuration. A project that is not
+    /// a Codename One library has none and adds nothing.
+    private static void addProjectPlatforms(Project p,
+                                            org.gradle.api.artifacts.component.ProjectComponentIdentifier id) {
+        Project other = p.findProject(id.getProjectPath());
+        if (other == null || other == p) {
+            p.getLogger().warn("cn1: " + id.getDisplayName() + " is a project of another build; its platform "
+                    + "implementations are not packaged. Publish it and depend on its coordinates instead.");
+            return;
+        }
+        if (!other.getState().getExecuted()) {
+            try {
+                p.evaluationDependsOn(other.getPath());
+            } catch (RuntimeException ex) {
+                p.getLogger().warn("cn1: could not configure " + other.getPath() + " to read its platform "
+                        + "implementations (" + ex.getMessage() + "); declare evaluationDependsOn(\""
+                        + other.getPath() + "\") in this build script");
+                return;
+            }
+        }
+        for (String platform : PLATFORMS) {
+            String elements = platformElementsName(platform);
+            Configuration target = p.getConfigurations().findByName(configurationName(platform));
+            if (target == null || other.getConfigurations().findByName(elements) == null) {
+                continue;
+            }
+            Map<String, String> notation = new java.util.HashMap<String, String>();
+            notation.put("path", other.getPath());
+            notation.put("configuration", elements);
+            target.getDependencies().add(p.getDependencies().project(notation));
+        }
     }
 
     /// Whether a module's pom is worth reading for platform profiles: anything

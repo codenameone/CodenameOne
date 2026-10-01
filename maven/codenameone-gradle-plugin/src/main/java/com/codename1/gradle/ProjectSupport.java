@@ -180,47 +180,28 @@ final class ProjectSupport {
         return out;
     }
 
-    /// The release the Java compile beside a Kotlin one targets: `compileKotlin`
-    /// pairs with `compileJava`, `compileTestKotlin` with `compileTestJava`.
-    /// [JAVA_RELEASE] when there is none or it sets no release.
-    static int javaReleaseFor(org.gradle.api.Task kotlinCompile) {
-        String name = kotlinCompile.getName();
-        org.gradle.api.Task java = name.endsWith("Kotlin")
-                ? kotlinCompile.getProject().getTasks().findByName(
-                        name.substring(0, name.length() - "Kotlin".length()) + "Java")
-                : null;
-        return java instanceof JavaCompile
-                ? ((JavaCompile) java).getOptions().getRelease().getOrElse(JAVA_RELEASE) : JAVA_RELEASE;
-    }
-
-    /// Sets a Kotlin compile task's JVM target to the release its Java compile
-    /// targets -- [JAVA_RELEASE] unless the build raises it, when Kotlin 2 would
-    /// otherwise refuse the two targets as inconsistent. Reflective, because the
+    /// Sets a Kotlin compile task's JVM target to [JAVA_RELEASE], the one level
+    /// Codename One builds: the build server translates Java 17 bytecode for
+    /// every platform, and Android runs nothing newer. Reflective, because the
     /// Kotlin Gradle plugin's types are not on this plugin's classpath:
     /// `compilerOptions.jvmTarget` (Kotlin 1.8 and newer), else the older
     /// `kotlinOptions.jvmTarget` string.
     @SuppressWarnings("unchecked")
-    static void pinKotlinJvmTarget(final org.gradle.api.Task task) {
+    static void pinKotlinJvmTarget(org.gradle.api.Task task) {
         try {
             Object options = task.getClass().getMethod("getCompilerOptions").invoke(task);
             Object target = options.getClass().getMethod("getJvmTarget").invoke(options);
-            final Class<? extends Enum> jvmTarget = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget",
-                    false, task.getClass().getClassLoader()).asSubclass(Enum.class);
-            ((org.gradle.api.provider.Property<Object>) target).set(task.getProject().provider(() -> {
-                try {
-                    return Enum.valueOf(jvmTarget, "JVM_" + javaReleaseFor(task));
-                } catch (IllegalArgumentException newerThanThisKotlin) {
-                    return Enum.valueOf(jvmTarget, "JVM_" + JAVA_RELEASE);
-                }
-            }));
+            Class<?> jvmTarget = Class.forName("org.jetbrains.kotlin.gradle.dsl.JvmTarget", false,
+                    task.getClass().getClassLoader());
+            ((org.gradle.api.provider.Property<Object>) target).set(
+                    Enum.valueOf(jvmTarget.asSubclass(Enum.class), "JVM_" + JAVA_RELEASE));
             return;
         } catch (ReflectiveOperationException | RuntimeException ex) {
             // An older Kotlin plugin: fall through to kotlinOptions.
         }
         try {
             Object options = task.getClass().getMethod("getKotlinOptions").invoke(task);
-            options.getClass().getMethod("setJvmTarget", String.class).invoke(options,
-                    String.valueOf(javaReleaseFor(task)));
+            options.getClass().getMethod("setJvmTarget", String.class).invoke(options, String.valueOf(JAVA_RELEASE));
         } catch (ReflectiveOperationException | RuntimeException ex) {
             task.getLogger().warn("cn1: could not set " + task.getPath() + "'s JVM target to " + JAVA_RELEASE
                     + "; set kotlin { compilerOptions { jvmTarget } } in build.gradle.kts if the build refuses "
@@ -228,7 +209,10 @@ final class ProjectSupport {
         }
     }
 
-    /// Fails a compile that targets less than [JAVA_RELEASE].
+    /// Fails a compile that targets less than [JAVA_RELEASE]. Codename One builds
+    /// Java 17 bytecode only (Android runs nothing newer); the compliance check
+    /// rewrites anything a newer compiler emits down to 17, so only a lower
+    /// release is an error here.
     static final class RequireRelease implements org.gradle.api.Action<org.gradle.api.Task> {
         @Override
         public void execute(org.gradle.api.Task task) {
@@ -236,7 +220,7 @@ final class ProjectSupport {
             Integer release = compile.getOptions().getRelease().getOrNull();
             if (release != null && release < JAVA_RELEASE) {
                 throw new GradleException("Codename One Gradle projects compile for Java " + JAVA_RELEASE
-                        + " or newer, but " + task.getPath() + " asks for Java " + release + ". Remove the "
+                        + ", but " + task.getPath() + " asks for Java " + release + ". Remove the "
                         + "release setting, or use the Maven build for a project that must target Java 8.");
             }
         }

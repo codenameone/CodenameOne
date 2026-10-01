@@ -55,8 +55,6 @@ public final class SimulatorSupport {
     public static final String TEST_ROOT_PROPERTY = "cn1.hotReload.testRoot";
     /// The encoding compileJava reads sources in, which the direct recompile uses.
     public static final String ENCODING_PROPERTY = "cn1.hotReload.encoding";
-    /// The Java release compileJava targets, which the direct recompile matches.
-    public static final String RELEASE_PROPERTY = "cn1.hotReload.release";
     /// The live CSS reload inputs, outputs and merge file.
     public static final String CSS_INPUT_PROPERTY = "codename1.css.compiler.args.input";
     /// See [CSS_INPUT_PROPERTY].

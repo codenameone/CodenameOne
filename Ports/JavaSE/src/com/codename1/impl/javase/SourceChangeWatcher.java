@@ -115,8 +115,8 @@ public class SourceChangeWatcher implements Runnable {
         if (roots != null && roots.length() > 0) {
             String path = file.getAbsolutePath();
             for (String root : roots.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
-                String prefix = new File(root).getAbsolutePath() + File.separator;
-                if (path.startsWith(prefix)) {
+                String rootPath = new File(root).getAbsolutePath();
+                if (path.equals(rootPath) || path.startsWith(rootPath + File.separator)) {
                     return new File(root);
                 }
             }
@@ -136,6 +136,14 @@ public class SourceChangeWatcher implements Runnable {
         synchronized (layoutCache) {
             if (layoutCache.containsKey(dir)) {
                 return layoutCache.get(dir);
+            }
+            // A source root the launch named belongs to the running project, even
+            // outside its directory (sourceSets can point anywhere), where
+            // detection from the file system would find nothing or another project.
+            if (sourceRootOf(dir, null) != null && SimulatorProject.current() != null) {
+                ProjectLayout running = SimulatorProject.current();
+                layoutCache.put(dir, running);
+                return running;
             }
             ProjectLayout layout = ProjectLayouts.detect(dir);
             if (layout != null && layout.kind() == ProjectKind.BACKEND) {
@@ -651,15 +659,13 @@ public class SourceChangeWatcher implements Runnable {
     
     /// `src/main/kotlin` beside the Java sources, whether or not it exists.
     /// The language level the direct recompile uses: the project's own, so a
-    /// source using Java 17 syntax recompiles. A Gradle project's is what its
-    /// run task passes (compileJava's release, 17 unless the build raises it);
+    /// source using Java 17 syntax recompiles. Gradle projects are always 17,
+    /// the one bytecode level Codename One builds (Android runs nothing newer);
     /// a Maven or Ant project says so in codenameone_settings.properties, and
     /// 8 remains the default there.
     static String javaLevel(ProjectLayout layout) {
         if (layout.buildSystem() == BuildSystem.GRADLE) {
-            // The release compileJava targets, which a build may raise past 17.
-            String release = System.getProperty("cn1.hotReload.release");
-            return release != null && release.length() > 0 ? release : "17";
+            return "17";
         }
         Properties settings = new Properties();
         File file = layout.settingsFile();

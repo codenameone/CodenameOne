@@ -15,7 +15,7 @@ Choose Gradle when:
 
 Stay with Maven when:
 
-* The application targets Java 8. Gradle projects compile for Java 17 or newer only.
+* The application targets Java 8. Gradle projects compile for Java 17 only, the bytecode level Codename One builds for every platform.
 * It still uses legacy `.cn1lib` files rather than libraries published to a Maven repository.
 * It depends on a goal that has no Gradle task yet.
 

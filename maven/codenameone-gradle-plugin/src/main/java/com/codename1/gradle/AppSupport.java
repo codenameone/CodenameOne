@@ -329,9 +329,7 @@ final class AppSupport {
                     project.provider(() -> hotReloadRoots(main, layout)),
                     project.provider(() -> main.getJava().getClassesDirectory().get().getAsFile().getAbsolutePath()),
                     project.provider(() -> kotlinClasses(project, layout))));
-            // The test recorder saves into the test source set's own directory, and
-            // the direct recompile targets the release compileJava does -- a build
-            // may raise it past 17.
+            // The test recorder saves into the test source set's own directory.
             final SourceSet test = project.getExtensions().getByType(org.gradle.api.plugins.JavaPluginExtension.class)
                     .getSourceSets().getByName(SourceSet.TEST_SOURCE_SET_NAME);
             t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.TEST_ROOT_PROPERTY,
@@ -339,9 +337,6 @@ final class AppSupport {
                             layout.testSourceDir(), layout).getAbsolutePath())));
             t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.ENCODING_PROPERTY,
                     javaEncoding(project, main)));
-            t.getJvmArgumentProviders().add(new SystemPropertyArgument(SimulatorSupport.RELEASE_PROPERTY,
-                    project.provider(() -> String.valueOf(project.getTasks().named(main.getCompileJavaTaskName(),
-                            JavaCompile.class).get().getOptions().getRelease().getOrElse(17)))));
         });
     }
 
@@ -469,19 +464,31 @@ final class AppSupport {
             Provider<Set<ResolvedArtifactResult>> runtimeArtifacts = runtime.getIncoming()
                     .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts();
             Provider<List<String>> encoded = runtimeArtifacts.map(set -> encode(set, "compile"));
-            upload.from(platformProvider.map(p -> {
-                Configuration c = project.getConfigurations().findByName(Cn1libs.configurationName(p));
-                return c == null ? Collections.emptyList() : c;
-            }));
-            t.getArtifacts().set(encoded.zip(platformProvider, (list, p) -> {
-                List<String> all = new ArrayList<String>(list);
-                Configuration c = project.getConfigurations().findByName(Cn1libs.configurationName(p));
+            // Each platform's cn1lib jars, looked up here rather than inside the
+            // lambdas: a lambda holding the Project cannot be stored in the
+            // configuration cache, which has to store these unevaluated when a
+            // dependency is a project of this build (cn1lib(project(":maps"))).
+            final Map<String, org.gradle.api.file.FileCollection> platformFiles =
+                    new java.util.HashMap<String, org.gradle.api.file.FileCollection>();
+            final Map<String, Provider<List<String>>> platformArtifacts =
+                    new java.util.HashMap<String, Provider<List<String>>>();
+            for (String id : Cn1libs.PLATFORMS) {
+                Configuration c = project.getConfigurations().findByName(Cn1libs.configurationName(id));
                 if (c != null) {
-                    all.addAll(encode(c.getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts()
-                            .getArtifacts(), "compile"));
+                    platformFiles.put(id, c.getIncoming().getFiles());
+                    platformArtifacts.put(id, c.getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts()
+                            .getResolvedArtifacts().map(set -> encode(set, "compile")));
                 }
-                return all;
-            }));
+            }
+            final Provider<List<String>> none = project.provider(Collections::<String>emptyList);
+            upload.from(platformProvider.map(p -> platformFiles.containsKey(p)
+                    ? platformFiles.get(p) : Collections.emptyList()));
+            t.getArtifacts().set(encoded.zip(platformProvider.flatMap(p -> platformArtifacts.containsKey(p)
+                    ? platformArtifacts.get(p) : none), (list, extra) -> {
+                        List<String> all = new ArrayList<String>(list);
+                        all.addAll(extra);
+                        return all;
+                    }));
         });
     }
 

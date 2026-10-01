@@ -94,6 +94,21 @@ class Cn1libPomProfilesTest {
     }
 
     @Test
+    void aVersionLeftToDependencyManagementIsResolved() {
+        String parent = "<project><dependencyManagement><dependencies><dependency><groupId>org.example</groupId>"
+                + "<artifactId>sdk</artifactId><version>4.2</version></dependency></dependencies>"
+                + "</dependencyManagement></project>";
+        String pom = "<project><parent><groupId>com.acme</groupId><artifactId>parent</artifactId>"
+                + "<version>1</version></parent><profiles><profile><activation><property>"
+                + "<name>codename1.platform</name><value>android</value></property></activation><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>sdk</artifactId></dependency>"
+                + "</dependencies></profile></profiles></project>";
+        List<Cn1libPomProfiles.Coordinate> deps = Cn1libPomProfiles.read(pom,
+                (g, a, v) -> "parent".equals(a) ? parent : null).get("android");
+        assertEquals("org.example:sdk:4.2", deps.get(0).toNotation());
+    }
+
+    @Test
     void notACn1libOrNotXml() {
         assertTrue(Cn1libPomProfiles.read("<project><groupId>a</groupId></project>", null).isEmpty());
         assertTrue(Cn1libPomProfiles.read("not xml", null).isEmpty());

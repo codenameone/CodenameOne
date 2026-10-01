@@ -228,6 +228,10 @@ public final class GradleConversion {
         ProjectLayout to = ProjectLayouts.of(BuildSystem.GRADLE, ProjectKind.APP, targetDir, targetDir);
         try {
             copyTree(from.settingsFile(), to.settingsFile());
+            // 17, whatever the source project said: Codename One builds Java 17
+            // bytecode only -- Android runs nothing newer, and the compliance check
+            // transpiles newer class files down to 17 on purpose. A higher release
+            // is not a setting to carry over.
             setJava17(to.settingsFile());
             copyTree(from.iconFile(), to.iconFile());
             // The icon the settings name, when it is not icon.png: the setting is kept,

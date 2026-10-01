@@ -261,7 +261,7 @@ Paths below are Maven's; in a Gradle project drop the leading `common/` (and `co
 - **`Cannot find symbol class XxxView`** after using the GUI builder → run `mvn -pl common generate-sources` (Gradle: `./gradlew generateGuiSources`, which also runs before every compile) to regenerate.
 - **`OutOfMemoryError` running `cn1:test`** → bump `<argLine>-Xmx2g</argLine>` in the surefire/cn1 plugin config in `common/pom.xml`.
 - **Build server returns "build args invalid"** → check `codename1.arg.*` keys against [`build-hints.md`](build-hints.md) or the Developer Guide.
-- **`Codename One Gradle projects compile for Java 17 or newer`** → a Gradle build script set a lower `release`; remove it. Java 8 projects need the Maven build.
+- **`Codename One Gradle projects compile for Java 17`** → a Gradle build script set a lower `release`; remove it. Java 8 projects need the Maven build.
 - **`When using gradle 8, you must set the JAVA17_HOME environment variable`** for a local Android build → only happens when Maven itself is running on a JDK older than 17. Re-launch Maven with a JDK 17+ `JAVA_HOME` and the builder reuses it automatically.
 - **`-Dautomated=true` exits 0 even though the build failed** → make sure you're on a recent `cn1.plugin.version`; older versions of the plugin swallowed errors.
 

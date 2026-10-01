@@ -207,6 +207,44 @@ grep -q "Cannot compile CSS for this project" "$WORKDIR/gapp-nocss.log" \
   || { cat "$WORKDIR/gapp-nocss.log"; fail "cn1Css failed for another reason"; }
 mv "$WORKDIR/theme.css.bak" "$GAPP/src/main/css/theme.css"
 
+echo "== a cn1lib of the same build: cn1lib(project(...))"
+generate_gradle_app localconsumer com.acme.localconsumer
+LAPP="$WORKDIR/localconsumer-gradle"
+mkdir -p "$LAPP/localmaps/src/main/java/$GROUP_PATH" "$LAPP/localmaps/src/android/java/$GROUP_PATH"
+cat > "$LAPP/localmaps/build.gradle.kts" <<EOF
+plugins { id("com.codenameone") }
+
+group = "$GROUP"
+version = "$LIBVER"
+EOF
+: > "$LAPP/localmaps/codenameone_library_appended.properties"
+cat > "$LAPP/localmaps/src/main/java/$GROUP_PATH/LocalMaps.java" <<EOF
+package $GROUP;
+
+public class LocalMaps {
+}
+EOF
+cat > "$LAPP/localmaps/src/android/java/$GROUP_PATH/LocalMapsAndroid.java" <<EOF
+package $GROUP;
+
+public class LocalMapsAndroid {
+}
+EOF
+printf '\ninclude("localmaps")\n' >> "$LAPP/settings.gradle.kts"
+python3 - "$LAPP/build.gradle.kts" <<'EOF'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+assert "dependencies {" in text, text
+open(path, "w").write(text.replace("dependencies {", 'dependencies {\n    cn1lib(project(":localmaps"))', 1))
+EOF
+run_gradle "$LAPP" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/lapp-android.log" 2>&1 \
+  || { cat "$WORKDIR/lapp-android.log"; fail "buildAndroid with a project cn1lib"; }
+LJAR=$(staged_jar "$WORKDIR/lapp-android.log")
+assert_zip_has "$LJAR" "^$GROUP_PATH/LocalMaps\.class$"
+assert_zip_has "$LJAR" "^$GROUP_PATH/LocalMapsAndroid\.java$"
+echo "   project cn1lib: classes and android sources staged"
+
 echo "== Maven consumer"
 MAPP="$WORKDIR/libconsumer"
 python3 - "$MAPP" "$LIBREPO" "$GROUP" "$LIBVER" <<'EOF'

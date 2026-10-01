@@ -132,6 +132,7 @@ public final class Cn1libPomProfiles {
             return out;
         }
         Map<String, String> props = properties(project, parents, 0);
+        Map<String, String> managed = managedVersions(project, parents, 0, props);
         for (Element profile : children(child(project, "profiles"), "profile")) {
             Element activation = child(profile, "activation");
             Element property = child(activation, "property");
@@ -142,7 +143,7 @@ public final class Cn1libPomProfiles {
             if (platform == null) {
                 continue;
             }
-            List<Coordinate> deps = shipped(child(profile, "dependencies"), props);
+            List<Coordinate> deps = shipped(child(profile, "dependencies"), props, managed);
             List<Coordinate> existing = out.get(platform);
             if (existing == null) {
                 out.put(platform, deps);
@@ -163,10 +164,41 @@ public final class Cn1libPomProfiles {
         if (project == null) {
             return new ArrayList<Coordinate>();
         }
-        return shipped(child(project, "dependencies"), properties(project, parents, 0));
+        Map<String, String> props = properties(project, parents, 0);
+        return shipped(child(project, "dependencies"), props, managedVersions(project, parents, 0, props));
     }
 
-    private static List<Coordinate> shipped(Element dependencies, Map<String, String> props) {
+    /// The versions `<dependencyManagement>` gives, in the pom and its parents
+    /// (nearest wins), keyed group:artifact. A dependency the pom declares
+    /// without a version takes its version from here, as Maven does; without it
+    /// a third-party platform dependency would reach Gradle versionless.
+    private static Map<String, String> managedVersions(Element project, ParentResolver parents, int depth,
+                                                       Map<String, String> props) {
+        Map<String, String> out = new HashMap<String, String>();
+        Element parent = child(project, "parent");
+        String parentGroup = text(child(parent, "groupId"));
+        String parentArtifact = text(child(parent, "artifactId"));
+        String parentVersion = text(child(parent, "version"));
+        if (parent != null && parents != null && depth < 8 && parentGroup != null && parentArtifact != null
+                && parentVersion != null) {
+            Element parentProject = parse(parents.pom(parentGroup, parentArtifact, parentVersion));
+            if (parentProject != null) {
+                out.putAll(managedVersions(parentProject, parents, depth + 1, props));
+            }
+        }
+        for (Element dep : children(child(child(project, "dependencyManagement"), "dependencies"), "dependency")) {
+            String g = interpolate(text(child(dep, "groupId")), props);
+            String a = interpolate(text(child(dep, "artifactId")), props);
+            String v = interpolate(text(child(dep, "version")), props);
+            if (g != null && a != null && v != null) {
+                out.put(g + ":" + a, v);
+            }
+        }
+        return out;
+    }
+
+    private static List<Coordinate> shipped(Element dependencies, Map<String, String> props,
+                                            Map<String, String> managed) {
         List<Coordinate> deps = new ArrayList<Coordinate>();
         for (Element dep : children(dependencies, "dependency")) {
             String scope = interpolate(text(child(dep, "scope")), props);
@@ -178,10 +210,13 @@ public final class Cn1libPomProfiles {
                 exclusions.add(new String[] {interpolate(text(child(ex, "groupId")), props),
                         interpolate(text(child(ex, "artifactId")), props)});
             }
-            deps.add(new Coordinate(
-                    interpolate(text(child(dep, "groupId")), props),
-                    interpolate(text(child(dep, "artifactId")), props),
-                    interpolate(text(child(dep, "version")), props),
+            String group = interpolate(text(child(dep, "groupId")), props);
+            String artifact = interpolate(text(child(dep, "artifactId")), props);
+            String version = interpolate(text(child(dep, "version")), props);
+            if (version == null) {
+                version = managed.get(group + ":" + artifact);
+            }
+            deps.add(new Coordinate(group, artifact, version,
                     interpolate(text(child(dep, "classifier")), props),
                     interpolate(text(child(dep, "type")), props), exclusions));
         }
