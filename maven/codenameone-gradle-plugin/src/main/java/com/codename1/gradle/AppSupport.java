@@ -150,7 +150,6 @@ final class AppSupport {
         });
         main.getResources().srcDir(css.flatMap(Cn1CssTask::getOutputDirectory));
 
-        final File stubs = new File(layout.buildDir(), "generated/sources/cn1-annotations");
         final Provider<List<String>> compileArtifacts = project.getConfigurations()
                 .getByName(main.getCompileClasspathConfigurationName()).getIncoming()
                 .artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
@@ -181,9 +180,10 @@ final class AppSupport {
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
+                    .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                    compile.getDestinationDirectory().getAsFile(), stubs, layout.projectDir(),
+                    compile.getDestinationDirectory().getAsFile(), stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), roots, "UTF-8", userProperties,
                     // javac's own classpath: in a mixed project it holds Kotlin's
                     // classes, which a Java @RestClient's Kotlin DTO resolves from.
@@ -219,8 +219,10 @@ final class AppSupport {
                     compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(
                             layout.rootDir(), layout.projectDir(), kotlinClasses, project.getName(),
                             main.getCompileClasspath(), compileArtifacts, complianceProperties)
+                            .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
                             .withPendingJavaSources(main.getJava().getSrcDirs()));
-                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses, stubs,
+                    compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(kotlinClasses,
+                            stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(), roots, "UTF-8", userProperties,
                             main.getCompileClasspath())
                             .withPendingJavaSources(main.getJava().getSrcDirs())
@@ -554,6 +556,13 @@ final class AppSupport {
         main.getJava().srcDir(gui.flatMap(com.codename1.gradle.tasks.GenerateGuiSourcesTask::getRadOutputDirectory));
     }
 
+    /// Where the annotation processors write generated stub sources. Asked for
+    /// inside the compile tasks' configuration, after the build script has had
+    /// its say about the build directory.
+    static File stubsDir(ProjectLayout layout) {
+        return new File(layout.buildDir(), "generated/sources/cn1-annotations");
+    }
+
     static void common(com.codename1.gradle.tasks.Cn1Task t, Project project, ProjectLayout layout,
                        CodenameOneExtension ext, Provider<Map<String, String>> userProperties) {
         if (t.getGroup() == null) {
@@ -561,6 +570,7 @@ final class AppSupport {
         }
         t.getRootDirectory().set(layout.rootDir());
         t.getProjectDirectory().set(layout.projectDir());
+        t.getBuildDirectory().set(project.getLayout().getBuildDirectory());
         t.getKind().set(layout.kind().name());
         t.getUserProperties().set(userProperties);
         t.getCodenameOneVersion().set(ext.getVersion());

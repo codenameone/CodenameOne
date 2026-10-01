@@ -79,6 +79,21 @@ class Cn1libPomProfilesTest {
     }
 
     @Test
+    void aProfileDependencysExclusionsAreKept() {
+        String pom = "<project><profiles><profile><activation><property><name>codename1.platform</name>"
+                + "<value>android</value></property></activation><dependencies><dependency>"
+                + "<groupId>com.acme</groupId><artifactId>maps-android</artifactId><version>1</version>"
+                + "<exclusions><exclusion><groupId>com.other</groupId><artifactId>dup</artifactId></exclusion>"
+                + "<exclusion><groupId>*</groupId><artifactId>*</artifactId></exclusion></exclusions>"
+                + "</dependency></dependencies></profile></profiles></project>";
+        List<Cn1libPomProfiles.Coordinate> deps = Cn1libPomProfiles.read(pom, (g, a, v) -> null).get("android");
+        assertEquals(2, deps.get(0).exclusions().size());
+        assertEquals("com.other", deps.get(0).exclusions().get(0)[0]);
+        assertEquals("dup", deps.get(0).exclusions().get(0)[1]);
+        assertEquals("*", deps.get(0).exclusions().get(1)[0]);
+    }
+
+    @Test
     void notACn1libOrNotXml() {
         assertTrue(Cn1libPomProfiles.read("<project><groupId>a</groupId></project>", null).isEmpty());
         assertTrue(Cn1libPomProfiles.read("not xml", null).isEmpty());

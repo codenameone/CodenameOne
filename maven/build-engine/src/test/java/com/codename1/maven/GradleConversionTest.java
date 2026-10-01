@@ -377,7 +377,8 @@ class GradleConversionTest {
         assertTrue(new File(out, "src/main/resources/logo.txt").isFile());
         assertTrue(new File(out, "src/main/java/a/Helper.java").isFile());
         assertTrue(new File(out, "src/test/java/a/ItTest.java").isFile());
-        assertTrue(new File(out, "src/main/java/a/MvnApp.java").isFile(), "the conventional root still comes");
+        assertFalse(new File(out, "src/main/java/a/MvnApp.java").exists(),
+                "<sourceDirectory> replaces src/main/java in Maven, so it is not compiled here either");
     }
 
     @Test
@@ -463,6 +464,34 @@ class GradleConversionTest {
         assertTrue(read(new File(out, "backend/build.gradle.kts")).contains("org.example:payments:3.1"));
         assertTrue(GradleConversion.pomAsGenerated(new File(mavenApp(UNTOUCHED_API), "backend/pom.xml")),
                 "the archetype's own pom is still the skeleton");
+    }
+
+    @Test
+    void whatThePomReplacesIsLeftOutAndTargetPathsAreKept() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies>"
+                + "<dependency><groupId>org.example</groupId><artifactId>driver</artifactId><version>9</version>"
+                + "<scope>runtime</scope></dependency></dependencies>"
+                + "<build><sourceDirectory>src/app</sourceDirectory><resources>"
+                + "<resource><directory>meta</directory><targetPath>META-INF/services</targetPath></resource>"
+                + "</resources></build></project>");
+        touch(mvn, "common/src/app/a/Real.java", "package a; public class Real {}");
+        touch(mvn, "common/src/main/resources/stale.properties", "x=y");
+        touch(mvn, "common/meta/com.example.Spi", "a.Real");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "src/main/java/a/Real.java").isFile());
+        assertFalse(new File(out, "src/main/java/a/MvnApp.java").exists(),
+                "Maven compiled src/app instead of src/main/java");
+        assertFalse(new File(out, "src/main/resources/stale.properties").exists(),
+                "declaring <resources> leaves src/main/resources out");
+        assertTrue(new File(out, "src/main/resources/META-INF/services/com.example.Spi").isFile(),
+                "the resource keeps its targetPath");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("runtimeOnly(\"org.example:driver:9\")"), build);
+        assertTrue(build.contains("testCompileOnly(\"org.example:driver:9\")"),
+                "Maven compiles the tests against runtime dependencies: " + build);
     }
 
     @Test

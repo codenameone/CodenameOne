@@ -137,12 +137,45 @@ final class Cn1libs {
                     }
                     for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
                         if (added.add(e.getKey() + "|" + c.toNotation())) {
-                            target.getDependencies().add(p.getDependencies().create(c.toNotation()));
+                            target.getDependencies().add(withExclusions(p.getDependencies().create(c.toNotation()),
+                                    c.exclusions()));
                         }
                     }
                 }
             }
         });
+    }
+
+    /// `dependency` with the profile's `<exclusions>` applied, as Maven applies
+    /// them: a `*` group or artifact matches any, and `*:*` keeps nothing
+    /// transitive.
+    static org.gradle.api.artifacts.Dependency withExclusions(org.gradle.api.artifacts.Dependency dependency,
+                                                             List<String[]> exclusions) {
+        if (!(dependency instanceof org.gradle.api.artifacts.ModuleDependency)) {
+            return dependency;
+        }
+        org.gradle.api.artifacts.ModuleDependency module = (org.gradle.api.artifacts.ModuleDependency) dependency;
+        for (String[] x : exclusions) {
+            Map<String, String> rule = exclusionRule(x[0], x[1]);
+            if (rule == null) {
+                module.setTransitive(false);
+            } else {
+                module.exclude(rule);
+            }
+        }
+        return module;
+    }
+
+    /// Gradle's exclude rule for a Maven exclusion, or null for `*:*`.
+    static Map<String, String> exclusionRule(String group, String artifact) {
+        Map<String, String> rule = new java.util.LinkedHashMap<String, String>();
+        if (group != null && !"*".equals(group)) {
+            rule.put("group", group);
+        }
+        if (artifact != null && !"*".equals(artifact)) {
+            rule.put("module", artifact);
+        }
+        return rule.isEmpty() ? null : rule;
     }
 
     /// Whether a module's pom is worth reading for platform profiles: anything

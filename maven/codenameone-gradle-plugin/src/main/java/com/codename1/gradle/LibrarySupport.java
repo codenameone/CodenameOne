@@ -199,6 +199,7 @@ final class LibrarySupport {
             compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
                     compile.getDestinationDirectory().getAsFile(), name, main.getCompileClasspath(),
                     compileArtifacts, complianceProperties)
+                    .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
         });
         // A Kotlin library's classes are checked too, as an application's are: in
@@ -210,6 +211,7 @@ final class LibrarySupport {
                     compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
                             AppSupport.kotlinDestinationProvider(compile, layout), name, main.getCompileClasspath(),
                             compileArtifacts, complianceProperties)
+                            .withBuildDirectory(project.getLayout().getBuildDirectory().getAsFile())
                             .withPendingJavaSources(main.getJava().getSrcDirs()));
                 }));
 

@@ -86,6 +86,15 @@ public final class ComplianceAction implements Action<Task> {
         this.projectProperties = new java.util.HashMap<String, String>(projectProperties);
     }
 
+    private Provider<File> buildDirectory;
+
+    /// The project's build directory, read when the action runs (a build
+    /// script can move it), for the report the check writes.
+    public ComplianceAction withBuildDirectory(Provider<File> dir) {
+        this.buildDirectory = dir;
+        return this;
+    }
+
     /// Adds directories of the project's other compiled classes -- Kotlin's,
     /// for the Java pass -- which the checked classes may use.
     public ComplianceAction withSiblingClasses(File... roots) {
@@ -157,7 +166,7 @@ public final class ComplianceAction implements Action<Task> {
                 siblings.add(f);
             }
         }
-        final File buildDir = new File(projectDir, "build");
+        final File buildDir = buildDirectory != null ? buildDirectory.get() : new File(projectDir, "build");
         ProjectHost host = GradleHostFactory.create(task, new GradleLog(task.getLogger()),
                 ProjectLayouts.of(BuildSystem.GRADLE, ProjectKind.APP, rootDir, projectDir), projectName, "",
                 projectProperties, Collections.<String, String>emptyMap(), compileClasspath,

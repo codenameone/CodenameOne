@@ -58,9 +58,23 @@ public final class ProjectLayout {
     private final File rootDir;
     private final File projectDir;
     private final List<File> sourceRootOverride;
+    private final DirectorySource buildDirSource;
+
+    /// Supplies a directory when asked, for one a build tool can move after the
+    /// layout is made. A plain interface rather than a JDK functional one: this
+    /// class also runs inside Codename One tools, on the Codename One runtime.
+    public interface DirectorySource {
+        /// The directory, as of now.
+        File get();
+    }
 
     ProjectLayout(BuildSystem buildSystem, ProjectKind kind, File rootDir, File projectDir,
                   List<File> sourceRootOverride) {
+        this(buildSystem, kind, rootDir, projectDir, sourceRootOverride, null);
+    }
+
+    private ProjectLayout(BuildSystem buildSystem, ProjectKind kind, File rootDir, File projectDir,
+                          List<File> sourceRootOverride, DirectorySource buildDirSource) {
         if (buildSystem == null || kind == null || rootDir == null || projectDir == null) {
             throw new IllegalArgumentException("buildSystem, kind, rootDir and projectDir are required");
         }
@@ -70,6 +84,35 @@ public final class ProjectLayout {
         this.projectDir = projectDir.getAbsoluteFile();
         this.sourceRootOverride = sourceRootOverride == null || sourceRootOverride.isEmpty()
                 ? null : Collections.unmodifiableList(new ArrayList<File>(sourceRootOverride));
+        this.buildDirSource = buildDirSource;
+    }
+
+    /// A copy of this layout whose [buildDir()] -- and everything under it:
+    /// classes, resources, CSS output, the descriptor -- is wherever `source`
+    /// says when asked. Gradle lets a build move its build directory, and does
+    /// so after a plugin has made its layout; a source that reads Gradle's own
+    /// setting follows it.
+    public ProjectLayout withBuildDir(DirectorySource source) {
+        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, sourceRootOverride, source);
+    }
+
+    /// [#withBuildDir(DirectorySource)] with a directory already known.
+    public ProjectLayout withBuildDir(File dir) {
+        return withBuildDir(new FixedDirectory(dir));
+    }
+
+    /// A [DirectorySource] that always answers the same directory.
+    private static final class FixedDirectory implements DirectorySource {
+        private final File dir;
+
+        FixedDirectory(File dir) {
+            this.dir = dir;
+        }
+
+        @Override
+        public File get() {
+            return dir;
+        }
     }
 
     /// A copy of this layout whose [sourceRoots()] are exactly `roots`.
@@ -78,7 +121,7 @@ public final class ProjectLayout {
     /// add one, a Gradle build script can move one) and a tool reading the
     /// directory tree cannot, so the resolved list wins wherever it is known.
     public ProjectLayout withSourceRoots(List<File> roots) {
-        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, roots);
+        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, roots, buildDirSource);
     }
 
     /// The build tool.
@@ -215,6 +258,12 @@ public final class ProjectLayout {
 
     /// The build output directory: `target/` under Maven, `build/` otherwise.
     public File buildDir() {
+        if (buildDirSource != null) {
+            File dir = buildDirSource.get();
+            if (dir != null) {
+                return dir.getAbsoluteFile();
+            }
+        }
         if (buildSystem == BuildSystem.MAVEN) {
             return new File(projectDir, "target");
         }

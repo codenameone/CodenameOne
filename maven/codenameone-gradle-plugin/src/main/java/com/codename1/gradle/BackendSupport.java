@@ -67,14 +67,13 @@ final class BackendSupport {
 
         final SourceSet main = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets()
                 .getByName(SourceSet.MAIN_SOURCE_SET_NAME);
-        final File stubs = new File(layout.buildDir(), "generated/sources/cn1-annotations");
         // The @RestController router and the entry point are generated here, from
         // the compiled classes, exactly as the Maven module's process-annotations
         // execution does.
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                    compile.getDestinationDirectory().getAsFile(), stubs, layout.projectDir(),
+                    compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
                     "UTF-8", userProperties, compile.getClasspath())
                     .withSourceEncoding(AppSupport.javaEncoding(project, main)));
@@ -89,7 +88,7 @@ final class BackendSupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                            AppSupport.kotlinDestinationProvider(compile, layout), stubs,
+                            AppSupport.kotlinDestinationProvider(compile, layout), AppSupport.stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(),
                             project.provider(() -> AppSupport.sourceRoots(main, layout)),
                             "UTF-8", userProperties, main.getCompileClasspath())

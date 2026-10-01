@@ -165,7 +165,7 @@ public abstract class Cn1CssTask extends Cn1Task {
         }
         final Project ant = AntSupport.newProject(layout().projectDir());
         CssCompiler compiler = new CssCompiler(log, ant,
-                () -> AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO));
+                () -> AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO)).buildDirectory(layout().buildDir());
         File l10n = CssCompiler.localizationSibling(layout().l10nDir().getParentFile());
         // Every current theme is compiled below, so start empty: a deleted
         // darktheme.css would otherwise leave darktheme.res in a directory that is

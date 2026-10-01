@@ -50,6 +50,10 @@ public abstract class Cn1Task extends DefaultTask {
     @Internal
     public abstract DirectoryProperty getRootDirectory();
 
+    /// The project's build directory, wherever the build script put it.
+    @Internal
+    public abstract DirectoryProperty getBuildDirectory();
+
     /// This project's directory.
     @Internal
     public abstract DirectoryProperty getProjectDirectory();
@@ -71,7 +75,8 @@ public abstract class Cn1Task extends DefaultTask {
     protected ProjectLayout layout() {
         File root = getRootDirectory().get().getAsFile();
         File dir = getProjectDirectory().get().getAsFile();
-        return ProjectLayouts.of(BuildSystem.GRADLE, ProjectKind.valueOf(getKind().get()), root, dir);
+        ProjectLayout layout = ProjectLayouts.of(BuildSystem.GRADLE, ProjectKind.valueOf(getKind().get()), root, dir);
+        return getBuildDirectory().isPresent() ? layout.withBuildDir(getBuildDirectory().get().getAsFile()) : layout;
     }
 
     /// The engine's logger over this task's.

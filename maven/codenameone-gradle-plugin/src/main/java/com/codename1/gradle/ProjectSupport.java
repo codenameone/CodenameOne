@@ -75,8 +75,13 @@ final class ProjectSupport {
         requireJava17(project);
 
         ProjectKind kind = kind(project);
+        // The build directory as Gradle has it when asked: a build script can move
+        // it (layout.buildDirectory) after this plugin is applied, and every
+        // Codename One output must follow, or `clean` leaves them behind.
+        final org.gradle.api.file.DirectoryProperty buildDirectory = project.getLayout().getBuildDirectory();
         ProjectLayout layout = ProjectLayouts.of(BuildSystem.GRADLE, kind,
-                project.getRootDir(), project.getProjectDir());
+                project.getRootDir(), project.getProjectDir())
+                .withBuildDir(() -> buildDirectory.get().getAsFile());
         Provider<Map<String, String>> userProperties = userProperties(project, ext);
 
         switch (kind) {

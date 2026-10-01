@@ -86,6 +86,16 @@ public final class CssCompiler {
 
     /// A compiler logging to `log`, unzipping through `antProject`, forking
     /// through tasks from `javaFactory`.
+    private File buildDirectory;
+
+    /// The project's build directory, when the build has moved it from the
+    /// conventional one; passed to the compiler process. Null (the default)
+    /// lets the compiler find it from the project layout.
+    public CssCompiler buildDirectory(File dir) {
+        this.buildDirectory = dir;
+        return this;
+    }
+
     public CssCompiler(Log log, Project antProject, JavaFactory javaFactory) {
         this.log = log;
         this.antProject = antProject;
@@ -157,6 +167,11 @@ public final class CssCompiler {
         java.setFork(true);
         java.setFailonerror(true);
         java.createJvmarg().setValue("-Dcli=true");
+        if (buildDirectory != null) {
+            // Where the compiler keeps its checksums and other work files: the
+            // build's own directory, which it cannot find for itself once moved.
+            java.createJvmarg().setValue("-Dcn1.buildDir=" + buildDirectory.getAbsolutePath());
+        }
         java.createArg().setValue("-css");
         java.createArg().setValue("-input");
         java.createArg().setValue(inputs.toString());

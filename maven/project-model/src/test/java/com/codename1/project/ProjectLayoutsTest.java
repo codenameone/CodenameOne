@@ -246,6 +246,21 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void aMovedBuildDirectoryMovesEverythingUnderIt() throws IOException {
+        File root = gradleApp();
+        File out = new File(tmp, "elsewhere");
+        final File[] current = {new File(root, "build")};
+        ProjectLayout l = ProjectLayouts.detect(root).withBuildDir(() -> current[0]);
+        assertEquals(new File(root, "build").getAbsoluteFile(), l.buildDir());
+        current[0] = out;
+        assertEquals(out.getAbsoluteFile(), l.buildDir(), "asked again, it follows the build");
+        assertEquals(new File(out, "classes/java/main").getAbsoluteFile(), l.classesDir());
+        assertEquals(new File(out, "resources/main").getAbsoluteFile(), l.resourcesOutputDir());
+        assertEquals(out.getAbsoluteFile(), l.withSourceRoots(java.util.Collections.<File>emptyList()).buildDir(),
+                "kept by the other copies");
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

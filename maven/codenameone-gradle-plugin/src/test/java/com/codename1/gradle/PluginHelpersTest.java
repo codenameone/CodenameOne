@@ -147,6 +147,14 @@ class PluginHelpersTest {
     }
 
     @Test
+    void mavenExclusionsBecomeGradleExcludeRules() {
+        assertEquals("{group=g, module=a}", String.valueOf(Cn1libs.exclusionRule("g", "a")));
+        assertEquals("{group=g}", String.valueOf(Cn1libs.exclusionRule("g", "*")), "any artifact of the group");
+        assertEquals("{module=a}", String.valueOf(Cn1libs.exclusionRule("*", "a")));
+        assertNull(Cn1libs.exclusionRule("*", "*"), "*:* means nothing transitive");
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

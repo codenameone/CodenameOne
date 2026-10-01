@@ -534,7 +534,19 @@ public class CN1CSSCLI {
     /// `/private/tmp`, so a canonical project dir would no longer prefix an
     /// input given under `/tmp`. The detected directories are therefore
     /// re-expressed as ancestors of `start` in its own spelling.
+    /// The system property a build passes when it has moved the project's build
+    /// directory (Gradle's layout.buildDirectory), which detection by the
+    /// directory tree cannot see.
+    static final String BUILD_DIR_PROPERTY = "cn1.buildDir";
+
     static ProjectLayout getLayout(File start) {
+        ProjectLayout layout = detectLayout(start);
+        String buildDir = System.getProperty(BUILD_DIR_PROPERTY);
+        return layout != null && buildDir != null && buildDir.length() > 0
+                ? layout.withBuildDir(new File(buildDir)) : layout;
+    }
+
+    private static ProjectLayout detectLayout(File start) {
         if (start == null) {
             return null;
         }

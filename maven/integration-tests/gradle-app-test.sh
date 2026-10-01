@@ -130,6 +130,17 @@ done
 echo "== unit tests in the simulator's runner"
 run_gradle "$APP" cn1Test > "$WORKDIR/test.log" 2>&1 || { cat "$WORKDIR/test.log"; fail "cn1Test"; }
 
+echo "== a relocated build directory takes the Codename One outputs with it"
+cp "$APP/build.gradle.kts" "$WORKDIR/build.gradle.kts.bak"
+printf '\nlayout.buildDirectory.set(file("out"))\n' >> "$APP/build.gradle.kts"
+rm -rf "$APP/build" "$APP/out"
+run_gradle "$APP" classes cn1Css > "$WORKDIR/relocated.log" 2>&1 || { cat "$WORKDIR/relocated.log"; fail "building into out/"; }
+[ -d "$APP/out/generated/sources/cn1-svg" ] || { find "$APP/out" -maxdepth 3; fail "transcodeSvg did not follow the build directory"; }
+[ -d "$APP/out/classes/java/main" ] || fail "nothing was compiled into out/"
+[ ! -e "$APP/build" ] || { find "$APP/build" -maxdepth 3; fail "Codename One outputs were left in build/"; }
+cp "$WORKDIR/build.gradle.kts.bak" "$APP/build.gradle.kts"
+rm -rf "$APP/out"
+
 echo "== backend added to an existing app"
 run_gradle "$APP" addBackend > "$WORKDIR/add-backend.log" 2>&1 || { cat "$WORKDIR/add-backend.log"; fail "addBackend"; }
 [ -f "$APP/backend/application.properties" ] || fail "addBackend wrote no backend/application.properties"

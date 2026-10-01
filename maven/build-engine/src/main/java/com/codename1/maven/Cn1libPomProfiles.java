@@ -72,12 +72,27 @@ public final class Cn1libPomProfiles {
         public final String classifier;
         /// The type (`jar` unless the pom says otherwise).
         public final String type;
+        private final List<String[]> exclusions;
+
         Coordinate(String groupId, String artifactId, String version, String classifier, String type) {
+            this(groupId, artifactId, version, classifier, type, null);
+        }
+
+        Coordinate(String groupId, String artifactId, String version, String classifier, String type,
+                   List<String[]> exclusions) {
             this.groupId = groupId;
             this.artifactId = artifactId;
             this.version = version;
             this.classifier = classifier;
             this.type = type == null ? "jar" : type;
+            this.exclusions = exclusions == null ? java.util.Collections.<String[]>emptyList()
+                    : java.util.Collections.unmodifiableList(new ArrayList<String[]>(exclusions));
+        }
+
+        /// The dependency's `<exclusions>`, each {groupId, artifactId}, either
+        /// of which may be Maven's `*` wildcard.
+        public List<String[]> exclusions() {
+            return exclusions;
         }
 
         /// `group:artifact:version[:classifier][@type]`, Gradle's dependency
@@ -158,12 +173,17 @@ public final class Cn1libPomProfiles {
             if ("test".equals(scope) || "provided".equals(scope) || "system".equals(scope)) {
                 continue;
             }
+            List<String[]> exclusions = new ArrayList<String[]>();
+            for (Element ex : children(child(dep, "exclusions"), "exclusion")) {
+                exclusions.add(new String[] {interpolate(text(child(ex, "groupId")), props),
+                        interpolate(text(child(ex, "artifactId")), props)});
+            }
             deps.add(new Coordinate(
                     interpolate(text(child(dep, "groupId")), props),
                     interpolate(text(child(dep, "artifactId")), props),
                     interpolate(text(child(dep, "version")), props),
                     interpolate(text(child(dep, "classifier")), props),
-                    interpolate(text(child(dep, "type")), props)));
+                    interpolate(text(child(dep, "type")), props), exclusions));
         }
         return deps;
     }

@@ -526,11 +526,27 @@ public final class GradleConversion {
         final List<String> includes = new ArrayList<String>();
         final List<String> excludes = new ArrayList<String>();
         final boolean filtering;
+        /// Where under the classpath Maven puts the files (`<targetPath>`),
+        /// '/'-separated, or null for the root.
+        final String targetPath;
 
-        ResourceSpec(File dir, String target, boolean filtering) {
+        ResourceSpec(File dir, String target, boolean filtering, String targetPath) {
             this.dir = dir;
             this.target = target;
             this.filtering = filtering;
+            String t = targetPath == null ? null : targetPath.trim().replace('\\', '/');
+            while (t != null && t.startsWith("/")) {
+                t = t.substring(1);
+            }
+            while (t != null && t.endsWith("/")) {
+                t = t.substring(0, t.length() - 1);
+            }
+            this.targetPath = t == null || t.isEmpty() ? null : t;
+        }
+
+        /// Where a file at `rel` under [#dir] lands under the resources root.
+        String destination(String rel) {
+            return targetPath == null ? rel : targetPath + "/" + rel;
         }
 
         /// Whether `rel` (a '/'-separated path under [#dir]) is packaged: it
@@ -601,6 +617,59 @@ public final class GradleConversion {
         return out;
     }
 
+    /// The conventional roots `pom` replaces: `<sourceDirectory>` and
+    /// `<testSourceDirectory>` stand in for `src/main/java` and `src/test/java`,
+    /// and declaring `<resources>` (`<testResources>`) packages
+    /// `src/main/resources` (`src/test/resources`) only when it is one of them.
+    static List<String> replacedConventionalRoots(File pom) {
+        List<String> out = new ArrayList<String>();
+        Element project = parsePomOrNull(pom);
+        Element build = project == null ? null : child(project, "build");
+        if (build == null) {
+            return out;
+        }
+        File base = pom.getParentFile().getAbsoluteFile();
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        props.put("basedir", base.getAbsolutePath());
+        props.put("project.basedir", base.getAbsolutePath());
+        String[][] kinds = {{"sourceDirectory", null, null, "src/main/java"},
+                {"testSourceDirectory", null, null, "src/test/java"},
+                {null, "resources", "resource", "src/main/resources"},
+                {null, "testResources", "testResource", "src/test/resources"}};
+        for (String[] k : kinds) {
+            List<String> declared = new ArrayList<String>();
+            if (k[0] != null) {
+                String dir = interpolate(text(build, k[0]), props);
+                if (dir == null) {
+                    continue;
+                }
+                declared.add(dir);
+            } else {
+                Element list = child(build, k[1]);
+                if (list == null) {
+                    continue;
+                }
+                for (Element r : children(list, k[2])) {
+                    String dir = interpolate(text(r, "directory"), props);
+                    if (dir != null) {
+                        declared.add(dir);
+                    }
+                }
+            }
+            boolean kept = false;
+            for (String dir : declared) {
+                File f = new File(dir);
+                File abs = (f.isAbsolute() ? f : new File(base, dir)).getAbsoluteFile();
+                String rel = base.toURI().relativize(abs.toURI()).getPath();
+                kept |= k[3].equals(rel.endsWith("/") ? rel.substring(0, rel.length() - 1) : rel);
+            }
+            if (!kept) {
+                out.add(k[3]);
+            }
+        }
+        return out;
+    }
+
     private static void addSpec(List<ResourceSpec> out, File base, Element r, String target,
                                 java.util.Map<String, String> props) {
         String path = interpolate(text(r, "directory"), props);
@@ -609,7 +678,7 @@ public final class GradleConversion {
         }
         File f = new File(path);
         ResourceSpec spec = new ResourceSpec((f.isAbsolute() ? f : new File(base, path)).getAbsoluteFile(), target,
-                "true".equals(text(r, "filtering")));
+                "true".equals(text(r, "filtering")), interpolate(text(r, "targetPath"), props));
         for (String[] list : new String[][] {{"includes", "include"}, {"excludes", "exclude"}}) {
             Element patterns = child(r, list[0]);
             for (Element p : patterns == null ? java.util.Collections.<Element>emptyList()
@@ -678,6 +747,15 @@ public final class GradleConversion {
     private void moveMavenExtraRoots(ProjectLayout from, ProjectLayout to) throws IOException {
         java.util.Map<String, List<File>> roots = extraRoots(from.dependencyFile());
         File src = new File(from.projectDir(), "src").getAbsoluteFile();
+        // First, what the pom replaces rather than adds to, which was copied with
+        // the rest of src/: Maven compiles none of it, so neither may Gradle.
+        for (String replaced : replacedConventionalRoots(from.dependencyFile())) {
+            File copied = new File(to.projectDir(), replaced.replace('/', File.separatorChar));
+            if (copied.exists()) {
+                org.apache.commons.io.FileUtils.deleteDirectory(copied);
+                log.info("Left out " + replaced + ": the pom builds from elsewhere instead");
+            }
+        }
         // Resources, with the pom's rules: a file Maven leaves out -- an
         // environment file, a secret -- is not packaged by the converted build
         // either, whether its directory is the conventional one or not.
@@ -757,17 +835,22 @@ public final class GradleConversion {
                 continue;
             }
             String rel = group.get(0).dir.toURI().relativize(f.toURI()).getPath();
-            boolean packaged = false;
+            // Each entry that packages the file puts it under its own targetPath.
+            java.util.Set<String> destinations = new java.util.LinkedHashSet<String>();
             for (ResourceSpec spec : group) {
-                packaged |= spec.packages(rel);
-            }
-            File target = new File(out, rel);
-            if (conventional) {
-                if (!packaged && target.isFile() && !target.delete()) {
-                    throw new IOException("Could not delete " + target);
+                if (spec.packages(rel)) {
+                    destinations.add(spec.destination(rel));
                 }
-            } else if (packaged) {
-                copyTree(f, target);
+            }
+            if (conventional) {
+                // Copied already, at rel: kept there only if an entry puts it there.
+                File copied = new File(out, rel);
+                if (!destinations.remove(rel) && copied.isFile() && !copied.delete()) {
+                    throw new IOException("Could not delete " + copied);
+                }
+            }
+            for (String destination : destinations) {
+                copyTree(f, new File(out, destination));
             }
         }
     }
@@ -887,9 +970,12 @@ public final class GradleConversion {
             if (trimmed.startsWith("testImplementation(") || trimmed.startsWith("// testImplementation(")) {
                 continue;
             }
-            int testPair = entry.indexOf("\n    testImplementation(");
-            if (testPair >= 0) {
-                entry = entry.substring(0, testPair);
+            for (String pair : new String[] {"\n    testImplementation(", "\n    testCompileOnly(",
+                    "\n    // testImplementation(", "\n    // testCompileOnly("}) {
+                int testPair = entry.indexOf(pair);
+                if (testPair >= 0) {
+                    entry = entry.substring(0, testPair);
+                }
             }
             if (commonArtifact != null && (entry.contains(":" + commonArtifact + ":")
                     || entry.contains(":" + commonArtifact + "\""))) {
@@ -1141,11 +1227,16 @@ public final class GradleConversion {
     /// The Gradle declaration(s) for one pom dependency, or null. A `provided`
     /// one is two: `compileOnly` keeps it out of the application, as Maven does,
     /// and `testImplementation` gives the tests what Maven's test classpath gives
-    /// them, which `compileOnly` alone does not.
+    /// them, which `compileOnly` alone does not. A `runtime` one is likewise
+    /// `runtimeOnly` plus `testCompileOnly`: Maven compiles the tests against it.
     private static String dependencyLine(Element d, java.util.Map<String, String> properties,
                                          java.util.Map<String, String> managed, File pomDir, File targetDir)
             throws IOException {
         String line = declaration(d, properties, managed, pomDir, targetDir);
+        if (line != null && "runtime".equals(text(d, "scope"))) {
+            // Maven's test compile sees runtime dependencies; Gradle's does not.
+            return line + "\n" + line.replace("runtimeOnly(", "testCompileOnly(");
+        }
         if (line == null || !"provided".equals(text(d, "scope"))) {
             return line;
         }
