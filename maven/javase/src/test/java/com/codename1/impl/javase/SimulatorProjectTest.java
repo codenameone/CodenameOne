@@ -151,6 +151,24 @@ public class SimulatorProjectTest {
     /// source using Java 17 syntax fails to recompile and the simulator keeps
     /// running the old class.
     @Test
+    void aGradleLaunchsBuildDirectoryIsWhereTheOutputsAre(@TempDir Path tmp) throws IOException {
+        File root = gradleProject(tmp.toFile());
+        File out = new File(tmp.toFile(), "elsewhere");
+        System.setProperty("user.dir", root.getAbsolutePath());
+        System.setProperty("cn1.buildDir", out.getAbsolutePath());
+        try {
+            SimulatorProject.reset();
+            assertEquals(canonical(out), canonical(SimulatorProject.buildDir(root)),
+                    "simulator.properties is read from under it");
+            assertEquals(canonical(new File(out, "classes/java/main")), canonical(SimulatorProject.classesDir(root)));
+            assertEquals(canonical(new File(out, "resources/main")),
+                    canonical(SimulatorProject.resourcesOutputDir(root)));
+        } finally {
+            System.clearProperty("cn1.buildDir");
+        }
+    }
+
+    @Test
     void hotReloadCompilesAtTheProjectsJavaLevel(@TempDir Path tmp) throws IOException {
         File gradle = gradleProject(new File(tmp.toFile(), "g"));
         assertEquals("17", SourceChangeWatcher.javaLevel(

@@ -145,7 +145,9 @@ final class AppSupport {
             t.getWorkDirectory().set(cssWorkDir(layout));
             Provider<Set<ResolvedArtifactResult>> resolved = project.getConfigurations().getByName("compileClasspath")
                     .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts();
-            t.getLibraryCss().set(resolved.map(AppSupport::cssBundles));
+            // addAll, not set: the CSS of cn1libs that are projects of this build is
+            // added too (Cn1libs), and whichever configures first must not be lost.
+            t.getLibraryCss().addAll(resolved.map(AppSupport::cssBundles));
             t.getLibraryCssFiles().from(resolved.map(set -> filesOf(set, true)));
         });
         main.getResources().srcDir(css.flatMap(Cn1CssTask::getOutputDirectory));
@@ -329,6 +331,11 @@ final class AppSupport {
                     project.provider(() -> hotReloadRoots(main, layout)),
                     project.provider(() -> main.getJava().getClassesDirectory().get().getAsFile().getAbsolutePath()),
                     project.provider(() -> kotlinClasses(project, layout))));
+            // Where the build directory really is: the simulator reads
+            // simulator.properties, the classes and the resources from it, and
+            // would otherwise look in the conventional build/.
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument("cn1.buildDir",
+                    project.getLayout().getBuildDirectory().getAsFile().map(File::getAbsolutePath)));
             // The test recorder saves into the test source set's own directory.
             final SourceSet test = project.getExtensions().getByType(org.gradle.api.plugins.JavaPluginExtension.class)
                     .getSourceSets().getByName(SourceSet.TEST_SOURCE_SET_NAME);

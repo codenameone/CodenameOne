@@ -89,9 +89,23 @@ public final class SimulatorProject {
         File root = canonical(layout.rootDir());
         File project = canonical(layout.projectDir());
         if (dir.equals(project) || dir.equals(root) || root.equals(dir.getParentFile())) {
-            return layout;
+            return withLaunchBuildDir(layout);
         }
         return null;
+    }
+
+    /// The build directory a Gradle launch names (`cn1.buildDir`), which a
+    /// build script can move off the conventional `build/` where detection from
+    /// the file system would look. simulator.properties, the classes and the
+    /// processed resources all live under it.
+    static final String BUILD_DIR_PROPERTY = "cn1.buildDir";
+
+    private static ProjectLayout withLaunchBuildDir(ProjectLayout layout) {
+        String dir = System.getProperty(BUILD_DIR_PROPERTY);
+        if (layout == null || dir == null || dir.length() == 0 || layout.buildSystem() != BuildSystem.GRADLE) {
+            return layout;
+        }
+        return layout.withBuildDir(new File(dir));
     }
 
     /// The layout whose project directory is `projectDir`, or null. For code

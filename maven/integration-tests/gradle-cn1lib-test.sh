@@ -224,6 +224,12 @@ package $GROUP;
 public class LocalMaps {
 }
 EOF
+mkdir -p "$LAPP/localmaps/src/main/css"
+cat > "$LAPP/localmaps/src/main/css/theme.css" <<'EOF'
+LocalMapsLabel {
+    color: #00ff00;
+}
+EOF
 cat > "$LAPP/localmaps/src/android/java/$GROUP_PATH/LocalMapsAndroid.java" <<EOF
 package $GROUP;
 
@@ -243,7 +249,11 @@ run_gradle "$LAPP" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/lapp-andr
 LJAR=$(staged_jar "$WORKDIR/lapp-android.log")
 assert_zip_has "$LJAR" "^$GROUP_PATH/LocalMaps\.class$"
 assert_zip_has "$LJAR" "^$GROUP_PATH/LocalMapsAndroid\.java$"
-echo "   project cn1lib: classes and android sources staged"
+run_gradle "$LAPP" classes cn1Css > "$WORKDIR/lapp-css.log" 2>&1 \
+  || { cat "$WORKDIR/lapp-css.log"; fail "cn1Css with a project cn1lib"; }
+LTHEME=$(find "$LAPP/build" -name theme.res | head -1)
+[ -n "$LTHEME" ] && grep -aq "LocalMapsLabel" "$LTHEME" || fail "the project cn1lib's CSS was not merged into the theme"
+echo "   project cn1lib: classes, android sources and CSS reach the application"
 
 echo "== Maven consumer"
 MAPP="$WORKDIR/libconsumer"

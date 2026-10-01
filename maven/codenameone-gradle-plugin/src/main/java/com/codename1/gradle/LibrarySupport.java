@@ -228,6 +228,16 @@ final class LibrarySupport {
             zip.from(layout.cssDir(), spec -> spec.into(group.map(g -> "META-INF/codenameone/" + g + "/"
                     + name + "-common/css")));
         });
+        if (hasCss) {
+            // The same bundle for an application in this build that declares
+            // cn1lib(project(":this")), which finds no published zip to read.
+            Configuration cssElements = project.getConfigurations().create(Cn1libs.CSS_ELEMENTS, c -> {
+                c.setCanBeConsumed(true);
+                c.setCanBeResolved(false);
+                c.setDescription("The library's cn1css bundle, for applications in this build");
+            });
+            project.getArtifacts().add(cssElements.getName(), css);
+        }
 
         final List<String> platforms = new ArrayList<String>();
         final List<TaskProvider<Jar>> platformJars = new ArrayList<TaskProvider<Jar>>();

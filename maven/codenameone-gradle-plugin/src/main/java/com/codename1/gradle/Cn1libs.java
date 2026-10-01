@@ -84,6 +84,23 @@ final class Cn1libs {
                 c.setDescription("The " + platform + " artifacts of this project's cn1libs");
             });
         }
+        // The CSS of cn1libs that are projects of this build, which publish no
+        // cn1css zip for the compile classpath scan to find. Keyed by project
+        // path: the "group|artifact|version|cn1css|zip|compile" each one's
+        // bundle is known by (artifact being the library's -common module, the
+        // path its zip keeps the stylesheet under). Strings only, so the CSS
+        // task's providers can be stored in the configuration cache.
+        final Map<String, String> projectCss = new java.util.HashMap<String, String>();
+        final Configuration projectCssFiles = project.getConfigurations().create(PROJECT_CSS, c -> {
+            c.setCanBeResolved(true);
+            c.setCanBeConsumed(false);
+            c.setDescription("The CSS bundles of this project's cn1libs that are projects of this build");
+        });
+        project.getTasks().withType(com.codename1.gradle.tasks.Cn1CssTask.class).configureEach(t -> {
+            t.getLibraryCss().addAll(projectCssFiles.getIncoming().artifactView(v -> v.setLenient(true))
+                    .getArtifacts().getResolvedArtifacts().map(set -> encodeProjectCss(set, projectCss)));
+            t.getLibraryCssFiles().from(projectCssFiles);
+        });
         project.afterEvaluate(p -> {
             // Maven activates codename1.platform in EVERY pom of the graph, so every
             // cn1lib the application ends up with contributes its platform jars --
@@ -119,7 +136,7 @@ final class Cn1libs {
             for (org.gradle.api.artifacts.result.ResolvedComponentResult component : components) {
                 if (component.getId() instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
                     addProjectPlatforms(p, (org.gradle.api.artifacts.component.ProjectComponentIdentifier)
-                            component.getId());
+                            component.getId(), projectCss);
                     continue;
                 }
                 if (!(component.getId() instanceof ModuleComponentIdentifier)) {
@@ -193,7 +210,8 @@ final class Cn1libs {
     /// own [#platformElementsName(String)] configuration. A project that is not
     /// a Codename One library has none and adds nothing.
     private static void addProjectPlatforms(Project p,
-                                            org.gradle.api.artifacts.component.ProjectComponentIdentifier id) {
+                                            org.gradle.api.artifacts.component.ProjectComponentIdentifier id,
+                                            Map<String, String> projectCss) {
         Project other = p.findProject(id.getProjectPath());
         if (other == null || other == p) {
             p.getLogger().warn("cn1: " + id.getDisplayName() + " is a project of another build; its platform "
@@ -221,6 +239,39 @@ final class Cn1libs {
             notation.put("configuration", elements);
             target.getDependencies().add(p.getDependencies().project(notation));
         }
+        Configuration css = p.getConfigurations().findByName(PROJECT_CSS);
+        if (css != null && other.getConfigurations().findByName(CSS_ELEMENTS) != null
+                && !projectCss.containsKey(other.getPath())) {
+            projectCss.put(other.getPath(), other.getGroup() + "|" + other.getName() + "-common|"
+                    + other.getVersion() + "|cn1css|zip|compile");
+            Map<String, String> notation = new java.util.HashMap<String, String>();
+            notation.put("path", other.getPath());
+            notation.put("configuration", CSS_ELEMENTS);
+            css.getDependencies().add(p.getDependencies().project(notation));
+        }
+    }
+
+    /// The configuration of an application holding its project cn1libs' CSS.
+    static final String PROJECT_CSS = "cn1libProjectCss";
+    /// The consumable configuration a Gradle cn1lib exposes its cn1css zip in.
+    static final String CSS_ELEMENTS = "cn1libCssElements";
+
+    /// The resolved project CSS bundles as [Cn1CssTask] inputs, each known by
+    /// the coordinates `projectCss` recorded for its project.
+    static List<String> encodeProjectCss(Set<org.gradle.api.artifacts.result.ResolvedArtifactResult> set,
+                                         Map<String, String> projectCss) {
+        List<String> out = new java.util.ArrayList<String>();
+        for (org.gradle.api.artifacts.result.ResolvedArtifactResult r : set) {
+            Object id = r.getId().getComponentIdentifier();
+            if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                String coordinates = projectCss.get(
+                        ((org.gradle.api.artifacts.component.ProjectComponentIdentifier) id).getProjectPath());
+                if (coordinates != null) {
+                    out.add(coordinates + "|" + r.getFile().getAbsolutePath());
+                }
+            }
+        }
+        return out;
     }
 
     /// Whether a module's pom is worth reading for platform profiles: anything
