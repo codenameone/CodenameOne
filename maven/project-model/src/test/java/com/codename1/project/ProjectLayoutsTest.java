@@ -230,6 +230,22 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void aGradleBuildNamingThePluginWinsOverAPomBesideIt() throws IOException {
+        File dual = new File(tmp, "dual");
+        touch(dual, "pom.xml", "<project/>");
+        touch(dual, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");
+        touch(dual, "codenameone_settings.properties");
+        assertEquals(BuildSystem.GRADLE, ProjectLayouts.detect(dual).buildSystem());
+
+        File maven = new File(tmp, "mavenOnly");
+        touch(maven, "pom.xml", "<project/>");
+        touch(maven, "build.gradle", "// an unrelated script\n");
+        touch(maven, "codenameone_settings.properties");
+        assertEquals(BuildSystem.MAVEN, ProjectLayouts.detect(maven).buildSystem(),
+                "a Gradle script that does not name the plugin leaves the pom in charge");
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

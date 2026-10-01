@@ -48,6 +48,19 @@ class GradleConversionTest {
     private static final String UNTOUCHED_API = template("backend/Api.java.txt")
             .replace("${package}", "a.backend").replace("__BACKEND__", ":backend:");
 
+    private static final String GENERATED_BACKEND_POM = "<project><dependencies>"
+            + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-backend</artifactId>"
+            + "</dependency>"
+            + "<dependency><groupId>org.xerial</groupId><artifactId>sqlite-jdbc</artifactId><version>3</version>"
+            + "</dependency>"
+            + "</dependencies><build><plugins><plugin><groupId>com.codenameone</groupId>"
+            + "<artifactId>codenameone-maven-plugin</artifactId></plugin></plugins></build></project>";
+
+    /// [#GENERATED_BACKEND_POM] plus a library of the developer's own.
+    private static final String BACKEND_POM_WITH_PAYMENTS = GENERATED_BACKEND_POM.replace("</dependencies>",
+            "<dependency><groupId>org.example</groupId><artifactId>payments</artifactId><version>3.1</version>"
+                    + "</dependency></dependencies>");
+
     private static String template(String path) {
         try {
             return GradleProjectTemplate.text(path);
@@ -130,12 +143,8 @@ class GradleConversionTest {
         touch(mvn, "android/src/main/java/a/MyNativeImpl.java", "package a; public class MyNativeImpl {}");
         touch(mvn, "android/src/main/resources/android.png", "png");
         touch(mvn, "ios/src/main/objectivec/.gitignore", "");
-        touch(mvn, "backend/pom.xml", "<project><dependencies>"
-                + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-backend</artifactId>"
-                + "</dependency>"
-                + "<dependency><groupId>org.example</groupId><artifactId>payments</artifactId><version>3.1</version>"
-                + "</dependency>"
-                + "</dependencies></project>");
+        // As the archetype writes it: the runtime and the SQLite driver.
+        touch(mvn, "backend/pom.xml", GENERATED_BACKEND_POM);
         touch(mvn, "backend/application.properties", template("backend/application.properties.txt"));
         touch(mvn, "backend/application-dev.properties", template("backend/application-dev.properties.txt"));
         touch(mvn, "backend/src/main/java/a/backend/Api.java", backendApi);
@@ -444,6 +453,19 @@ class GradleConversionTest {
     }
 
     @Test
+    void aBackendWhosePomWasChangedIsKeptEvenWithTheGeneratedCode() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "backend/pom.xml", BACKEND_POM_WITH_PAYMENTS);
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile(),
+                "a library added to the pom is someone's work");
+        assertTrue(read(new File(out, "backend/build.gradle.kts")).contains("org.example:payments:3.1"));
+        assertTrue(GradleConversion.pomAsGenerated(new File(mavenApp(UNTOUCHED_API), "backend/pom.xml")),
+                "the archetype's own pom is still the skeleton");
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
@@ -515,6 +537,7 @@ class GradleConversionTest {
         String api = UNTOUCHED_API.substring(0, end)
                 + "  @GetMapping(\"/orders\") public String o() { return \"\"; }\n}\n";
         File mvn = mavenApp(api);
+        touch(mvn, "backend/pom.xml", BACKEND_POM_WITH_PAYMENTS);
         touch(mvn, "backend/application-prod.properties", "cn1.server.port=80\n");
         converter().convert(mvn, out, "1.0");
         assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile());

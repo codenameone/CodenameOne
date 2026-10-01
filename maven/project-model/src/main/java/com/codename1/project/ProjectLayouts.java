@@ -115,7 +115,10 @@ public final class ProjectLayouts {
         boolean hasPom = new File(dir, "pom.xml").isFile();
         boolean hasCn1Settings = settings.isFile() || libSettings.isFile();
 
-        if (!hasPom && isGradleRoot(dir, hasCn1Settings)) {
+        // A pom beside the Gradle scripts (a dual build, a migration in progress)
+        // leaves the directory to Maven unless a Gradle script names the plugin:
+        // then the Gradle build is the one that runs the simulator.
+        if ((!hasPom || gradleScriptNamesPlugin(dir)) && isGradleRoot(dir, hasCn1Settings)) {
             File root = hasSettingsScript(dir) ? null : includingRoot(dir);
             if (root != null) {
                 // A subproject that applies the plugin in its own build script;
@@ -250,6 +253,16 @@ public final class ProjectLayouts {
         } catch (IOException ex) {
             return "";
         }
+    }
+
+    private static boolean gradleScriptNamesPlugin(File dir) {
+        for (String name : GRADLE_SCRIPTS) {
+            File script = new File(dir, name);
+            if (script.isFile() && mentionsPlugin(script)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasSettingsScript(File dir) {

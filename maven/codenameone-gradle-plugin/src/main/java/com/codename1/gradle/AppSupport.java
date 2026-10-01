@@ -198,6 +198,16 @@ final class AppSupport {
         // steps run over it, so a Kotlin application is checked and processed like a
         // Java one. Wired by name because the Kotlin plugin's types are not on this
         // plugin's classpath.
+        //
+        // Each pass processes its own directory, so a registry built from every
+        // declaration -- Routes, the *Bootstrap classes, the backend's entry point --
+        // is complete only when one language declares that annotation. Declared in
+        // both, each pass writes a partial copy at the same path, and
+        // cn1SplitOutputCheck fails the build naming it rather than letting one copy
+        // win. One pass over both directories is not an option: processing rewrites
+        // the classes it reads in place, so the Java pass would have to write
+        // Kotlin's classes, and a Kotlin-only edit leaves compileJava up to date
+        // with nothing reprocessed.
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);

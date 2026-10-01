@@ -100,6 +100,9 @@ public final class GradleConversion {
         if (profiles != null && profiles.length > 0) {
             return false;
         }
+        if (!pomAsGenerated(new File(backend, "pom.xml"))) {
+            return false;
+        }
         try {
             // Compared as code, not by counting routes: a backend that kept the two
             // generated routes but changed what they do, secured them or added a
@@ -114,6 +117,43 @@ public final class GradleConversion {
         } catch (IOException ex) {
             return false;
         }
+    }
+
+    /// The dependencies and build plugins the archetype's backend pom declares,
+    /// as group:artifact. Kept in step with cn1app-archetype's backend/pom.xml.
+    private static final java.util.Set<String> GENERATED_BACKEND_DEPENDENCIES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("com.codenameone:codenameone-backend", "org.xerial:sqlite-jdbc"));
+    private static final java.util.Set<String> GENERATED_BACKEND_PLUGINS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("com.codenameone:codenameone-maven-plugin"));
+
+    /// Whether a backend's pom is still what the archetype wrote, as far as the
+    /// conversion carries anything over: no dependency, build plugin,
+    /// repository or profile beyond the generated ones. A missing pom counts
+    /// as generated. A changed one is someone's work, and the backend is kept.
+    static boolean pomAsGenerated(File pom) {
+        if (!pom.isFile()) {
+            return true;
+        }
+        Element project = parsePomOrNull(pom);
+        if (project == null || child(project, "repositories") != null || child(project, "profiles") != null) {
+            return false;
+        }
+        Element deps = child(project, "dependencies");
+        for (Element d : deps == null ? java.util.Collections.<Element>emptyList() : children(deps, "dependency")) {
+            if (!GENERATED_BACKEND_DEPENDENCIES.contains(text(d, "groupId") + ":" + text(d, "artifactId"))) {
+                return false;
+            }
+        }
+        Element build = child(project, "build");
+        Element plugins = build == null ? null : child(build, "plugins");
+        for (Element p : plugins == null ? java.util.Collections.<Element>emptyList() : children(plugins, "plugin")) {
+            String group = text(p, "groupId");
+            if (!GENERATED_BACKEND_PLUGINS.contains((group == null ? "org.apache.maven.plugins" : group) + ":"
+                    + text(p, "artifactId"))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Java source reduced to its code: comments, whitespace, the package line
