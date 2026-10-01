@@ -81,8 +81,8 @@ public final class Database {
     /// Db has no isClosed, so closure is recorded where it happens -- and VOLATILE,
     /// because isOpen() reads it without the monitor.
     ///
-    /// close() is synchronized like every other operation on this class, so a
-    /// closing thread publishes this under the lock -- but the pool or health check
+    /// close() holds the connection gate like every other operation on this class,
+    /// so a closing thread publishes this inside it -- but the pool or health check
     /// asking isOpen() never takes that lock, and without a happens-before edge the
     /// memory model lets it keep seeing false indefinitely. The connection is then
     /// handed out again and fails on its next use.
@@ -238,24 +238,29 @@ public final class Database {
     /// The SQLite path delegates to Db, which is synchronized on its own monitor.
     /// Holding this one first is safe -- the order is always Database then Db,
     /// never the reverse -- and Db's monitor is reentrant for the callbacks.
-    public synchronized int execute(String sql, Object[] params) throws IOException {
-        awaitTransactionOwner();
-        // A span per statement when a tracer is installed; see Tracing.startDatabase.
-        Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if (span == null) {
-            return executeUntraced(sql, params);
-        }
-        Throwable failure = null;
+    public int execute(String sql, Object[] params) throws IOException {
+        enter();
         try {
-            return executeUntraced(sql, params);
-        } catch (IOException err) {
-            failure = err;
-            throw err;
-        } catch (RuntimeException err) {
-            failure = err;
-            throw err;
+            awaitTransactionOwner();
+            // A span per statement when a tracer is installed; see Tracing.startDatabase.
+            Span span = Tracing.startDatabase(dialect.getName(), sql);
+            if (span == null) {
+                return executeUntraced(sql, params);
+            }
+            Throwable failure = null;
+            try {
+                return executeUntraced(sql, params);
+            } catch (IOException err) {
+                failure = err;
+                throw err;
+            } catch (RuntimeException err) {
+                failure = err;
+                throw err;
+            } finally {
+                Tracing.endDatabase(span, failure);
+            }
         } finally {
-            Tracing.endDatabase(span, failure);
+            exit();
         }
     }
 
@@ -278,27 +283,32 @@ public final class Database {
     }
 
     /// Runs a query and returns every row as a column-name to value map.
-    public synchronized List query(String sql, Object[] params) throws IOException {
-        awaitTransactionOwner();
-        Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if (span == null) {
-            return queryUntraced(sql, params);
-        }
-        Throwable failure = null;
+    public List query(String sql, Object[] params) throws IOException {
+        enter();
         try {
-            List rows = queryUntraced(sql, params);
-            // Through the guarded hook: a tracer that throws here must not turn a
-            // query that succeeded into a failure, and discard its rows.
-            Tracing.setAttribute(span, "db.response.returned_rows", rows.size());
-            return rows;
-        } catch (IOException err) {
-            failure = err;
-            throw err;
-        } catch (RuntimeException err) {
-            failure = err;
-            throw err;
+            awaitTransactionOwner();
+            Span span = Tracing.startDatabase(dialect.getName(), sql);
+            if (span == null) {
+                return queryUntraced(sql, params);
+            }
+            Throwable failure = null;
+            try {
+                List rows = queryUntraced(sql, params);
+                // Through the guarded hook: a tracer that throws here must not turn a
+                // query that succeeded into a failure, and discard its rows.
+                Tracing.setAttribute(span, "db.response.returned_rows", rows.size());
+                return rows;
+            } catch (IOException err) {
+                failure = err;
+                throw err;
+            } catch (RuntimeException err) {
+                failure = err;
+                throw err;
+            } finally {
+                Tracing.endDatabase(span, failure);
+            }
         } finally {
-            Tracing.endDatabase(span, failure);
+            exit();
         }
     }
 
@@ -326,16 +336,21 @@ public final class Database {
     /// row is missing rather than the null the code above it is already written to
     /// handle. More than one row is a bug in the statement, and it is reported as
     /// one rather than silently discarded.
-    public synchronized Map queryOne(String sql, Object[] params) throws IOException {
-        List rows = query(sql, params);
-        if (rows.isEmpty()) {
-            return null;
+    public Map queryOne(String sql, Object[] params) throws IOException {
+        enter();
+        try {
+            List rows = query(sql, params);
+            if (rows.isEmpty()) {
+                return null;
+            }
+            if (rows.size() > 1) {
+                throw new DataAccessException("Expected at most one row and the query returned "
+                        + rows.size() + ": [" + sql + "]");
+            }
+            return (Map) rows.get(0);
+        } finally {
+            exit();
         }
-        if (rows.size() > 1) {
-            throw new DataAccessException("Expected at most one row and the query returned "
-                    + rows.size() + ": [" + sql + "]");
-        }
-        return (Map) rows.get(0);
     }
 
     /// Runs an INSERT and answers the key the database generated for it.
@@ -364,31 +379,36 @@ public final class Database {
     /// @param sql an INSERT in the portable form, with no RETURNING of its own
     /// @return the generated key, or 0 where the statement inserted no row -- an
     /// ignored conflict, most often -- or where the engine generated none
-    public synchronized long insert(String sql, Object[] params, String idColumn)
+    public long insert(String sql, Object[] params, String idColumn)
             throws IOException {
-        awaitTransactionOwner();
-        // One span for the insert, whatever it runs to learn its key: the
-        // statements it issues through execute and query find this one current
-        // and add none of their own.
-        Span span = Tracing.startDatabase(dialect.getName(), sql);
-        if (span == null) {
+        enter();
+        try {
+            awaitTransactionOwner();
+            // One span for the insert, whatever it runs to learn its key: the
+            // statements it issues through execute and query find this one current
+            // and add none of their own.
+            Span span = Tracing.startDatabase(dialect.getName(), sql);
+            if (span == null) {
+                try {
+                    return insertUntraced(sql, params, idColumn);
+                } catch (IOException err) {
+                    throw DataAccessException.of(err);
+                }
+            }
+            Throwable failure = null;
             try {
                 return insertUntraced(sql, params, idColumn);
             } catch (IOException err) {
+                failure = err;
                 throw DataAccessException.of(err);
+            } catch (RuntimeException err) {
+                failure = err;
+                throw err;
+            } finally {
+                Tracing.endDatabase(span, failure);
             }
-        }
-        Throwable failure = null;
-        try {
-            return insertUntraced(sql, params, idColumn);
-        } catch (IOException err) {
-            failure = err;
-            throw DataAccessException.of(err);
-        } catch (RuntimeException err) {
-            failure = err;
-            throw err;
         } finally {
-            Tracing.endDatabase(span, failure);
+            exit();
         }
     }
 
@@ -704,17 +724,110 @@ public final class Database {
     /// discovering the conflict at the first write; the other two get a plain
     /// BEGIN, which is what they support.
     private boolean managedTransaction;
-    private Thread transactionOwner;
+    /// The [#caller] a transaction is reserved to, or null.
+    private Object transactionOwner;
 
-    // Match monitor acquisition semantics: waiting does not discard an interrupt.
-    private void awaitTransactionOwner() {
+    /// THE CONNECTION GATE, which every operation holds instead of this
+    /// object's monitor.
+    ///
+    /// An operation on a server engine waits on its socket, and on a virtual
+    /// thread that wait PARKS -- the host serves other connections meanwhile. A
+    /// virtual thread holding a monitor cannot park: monitor ownership is the
+    /// host's, so parking would let the next virtual thread on that host into the
+    /// same critical section, and the runtime pins it instead, holding the host
+    /// for the whole query. So the exclusion a connection needs -- one operation
+    /// at a time, and a transaction reserved to its caller -- is a flag, taken and
+    /// given back under a monitor held only for that instant. A virtual thread
+    /// waiting for it naps; anything else waits on the monitor, as before.
+    private final Object gate = new Object();
+    private Object gateOwner;
+    private int gateHolds;
+
+    /// Who is asking: the virtual thread, or the platform thread. Not
+    /// Thread.currentThread() alone, which every virtual thread on a host shares.
+    private static Object caller() {
+        long virtual = VirtualThread.current();
+        return virtual != 0 ? (Object) Long.valueOf(virtual) : Thread.currentThread();
+    }
+
+    /// Takes the gate, reentrantly; waits for it like a monitor, so an
+    /// interrupt is kept for the caller rather than ending the wait.
+    private void enter() {
+        acquire(caller(), 1);
+    }
+
+    private void acquire(Object me, int holds) {
+        boolean virtual = VirtualThread.isVirtual();
         boolean interrupted = false;
-        while (transactionOwner != null && transactionOwner != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals - thread identity
-            try {
-                wait();
-            } catch (InterruptedException error) {
-                interrupted = true;
+        long nap = 1;
+        while (true) {
+            synchronized (gate) {
+                if (gateOwner == null || gateOwner.equals(me)) {
+                    gateOwner = me;
+                    gateHolds += holds;
+                    break;
+                }
+                if (!virtual) {
+                    try {
+                        gate.wait();
+                    } catch (InterruptedException error) {
+                        interrupted = true;
+                    }
+                    continue;
+                }
             }
+            HttpServer.napUntil(System.currentTimeMillis() + nap);
+            nap = Math.min(20, nap * 2);
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void exit() {
+        synchronized (gate) {
+            gateHolds--;
+            if (gateHolds <= 0) {
+                gateHolds = 0;
+                gateOwner = null;
+                gate.notifyAll();
+            }
+        }
+    }
+
+    /// Waits, inside the gate, for another caller's transaction to end -- giving
+    /// the gate up meanwhile, as wait() gives up a monitor, so that caller can
+    /// finish it.
+    private void awaitTransactionOwner() {
+        Object me = caller();
+        boolean virtual = VirtualThread.isVirtual();
+        boolean interrupted = false;
+        long nap = 1;
+        while (true) {
+            int saved;
+            synchronized (gate) {
+                if (transactionOwner == null || transactionOwner.equals(me)) {
+                    break;
+                }
+                saved = gateHolds;
+                gateHolds = 0;
+                gateOwner = null;
+                gate.notifyAll();
+                if (!virtual) {
+                    try {
+                        // Bounded: the owner's commit notifies, and the bound only
+                        // covers a notification that lands between these lines.
+                        gate.wait(50);
+                    } catch (InterruptedException error) {
+                        interrupted = true;
+                    }
+                }
+            }
+            if (virtual) {
+                HttpServer.napUntil(System.currentTimeMillis() + nap);
+                nap = Math.min(20, nap * 2);
+            }
+            acquire(me, saved);
         }
         if (interrupted) {
             Thread.currentThread().interrupt();
@@ -725,36 +838,53 @@ public final class Database {
     /// or close. Other threads' database operations wait for that boundary, as they
     /// do while [#transaction] holds the monitor around its callback.
     /// The owning thread must complete this transaction; do not hand it to another thread.
-    public synchronized void beginExclusiveTransaction() throws IOException {
-        beginTransaction();
+    public void beginExclusiveTransaction() throws IOException {
+        enter();
+        try {
+            beginTransaction();
+        } finally {
+            exit();
+        }
     }
 
     private void transactionFinished() {
         managedTransaction = false;
-        transactionOwner = null;
-        notifyAll();
+        synchronized (gate) {
+            transactionOwner = null;
+            gate.notifyAll();
+        }
     }
 
     /// Whether a transaction opened through this Database API is active.
     /// Waits for another thread's transaction to finish before checking,
     /// like other operations on this connection.
-    public synchronized boolean isInTransaction() {
-        awaitTransactionOwner();
-        return managedTransaction;
+    public boolean isInTransaction() {
+        enter();
+        try {
+            awaitTransactionOwner();
+            return managedTransaction;
+        } finally {
+            exit();
+        }
     }
 
     /// Begins a transaction reserved to the calling thread until commit, rollback,
     /// or close. Other threads wait before using this connection. The initiating
     /// thread must complete the transaction; it cannot be handed to another thread.
     /// SQLite's write lock is acquired immediately.
-    public synchronized void beginTransaction() throws IOException {
-        awaitTransactionOwner();
-        if (managedTransaction) {
-            throw new IOException("Transaction already active");
+    public void beginTransaction() throws IOException {
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (managedTransaction) {
+                throw new IOException("Transaction already active");
+            }
+            control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
+            managedTransaction = true;
+            transactionOwner = caller();
+        } finally {
+            exit();
         }
-        control(sqlite == null ? "BEGIN" : "BEGIN IMMEDIATE");
-        managedTransaction = true;
-        transactionOwner = Thread.currentThread();
     }
 
     /// Begins a transaction like [#beginTransaction], telling the engine
@@ -764,39 +894,59 @@ public final class Database {
     /// MySQL refuse a write inside it, and SQLite takes no write lock up front
     /// (BEGIN DEFERRED rather than IMMEDIATE), so it does not queue other writers
     /// behind a transaction that will never write.
-    public synchronized void beginTransaction(boolean readOnly) throws IOException {
-        if (!readOnly) {
-            beginTransaction();
-            return;
+    public void beginTransaction(boolean readOnly) throws IOException {
+        enter();
+        try {
+            if (!readOnly) {
+                beginTransaction();
+                return;
+            }
+            awaitTransactionOwner();
+            if (managedTransaction) {
+                throw new IOException("Transaction already active");
+            }
+            if (mysql != null) {
+                mysql.beginReadOnly();
+            } else {
+                execute(sqlite == null ? "BEGIN READ ONLY" : "BEGIN DEFERRED", null);
+            }
+            managedTransaction = true;
+            transactionOwner = caller();
+        } finally {
+            exit();
         }
-        awaitTransactionOwner();
-        if (managedTransaction) {
-            throw new IOException("Transaction already active");
-        }
-        if (mysql != null) {
-            mysql.beginReadOnly();
-        } else {
-            execute(sqlite == null ? "BEGIN READ ONLY" : "BEGIN DEFERRED", null);
-        }
-        managedTransaction = true;
-        transactionOwner = Thread.currentThread();
     }
 
     /// Marks a savepoint inside the open transaction, which
     /// [#rollbackToSavepoint] can return to without ending the transaction.
     /// The name must be a plain identifier; it is written into the statement.
-    public synchronized void savepoint(String name) throws IOException {
-        savepointControl("SAVEPOINT", name);
+    public void savepoint(String name) throws IOException {
+        enter();
+        try {
+            savepointControl("SAVEPOINT", name);
+        } finally {
+            exit();
+        }
     }
 
     /// Undoes everything since the savepoint, keeping the transaction open.
-    public synchronized void rollbackToSavepoint(String name) throws IOException {
-        savepointControl("ROLLBACK TO SAVEPOINT", name);
+    public void rollbackToSavepoint(String name) throws IOException {
+        enter();
+        try {
+            savepointControl("ROLLBACK TO SAVEPOINT", name);
+        } finally {
+            exit();
+        }
     }
 
     /// Forgets a savepoint, keeping what was done since it.
-    public synchronized void releaseSavepoint(String name) throws IOException {
-        savepointControl("RELEASE SAVEPOINT", name);
+    public void releaseSavepoint(String name) throws IOException {
+        enter();
+        try {
+            savepointControl("RELEASE SAVEPOINT", name);
+        } finally {
+            exit();
+        }
     }
 
     private void savepointControl(String verb, String name) throws IOException {
@@ -813,46 +963,61 @@ public final class Database {
     }
 
     /// Commits the transaction opened through this API.
-    public synchronized void commitTransaction() throws IOException {
-        awaitTransactionOwner();
-        if (!managedTransaction) {
-            throw new IOException("No active transaction");
+    public void commitTransaction() throws IOException {
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (!managedTransaction) {
+                throw new IOException("No active transaction");
+            }
+            control("COMMIT");
+            transactionFinished();
+        } finally {
+            exit();
         }
-        control("COMMIT");
-        transactionFinished();
     }
 
     /// Rolls back the transaction opened through this API.
-    public synchronized void rollbackTransaction() throws IOException {
-        awaitTransactionOwner();
-        if (!managedTransaction) {
-            throw new IOException("No active transaction");
+    public void rollbackTransaction() throws IOException {
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (!managedTransaction) {
+                throw new IOException("No active transaction");
+            }
+            control("ROLLBACK");
+            transactionFinished();
+        } finally {
+            exit();
         }
-        control("ROLLBACK");
-        transactionFinished();
     }
 
-    public synchronized Object transaction(Work body) throws Exception {
-        beginTransaction();
-        boolean committed = false;
+    public Object transaction(Work body) throws Exception {
+        enter();
         try {
-            Object result = body.run(this);
-            commitTransaction();
-            committed = true;
-            return result;
-        } finally {
-            if (!committed) {
-                try {
-                    rollbackTransaction();
-                } catch (Exception err) {
-                    // Closed, not left for a pool to lend again: a connection
-                    // whose ROLLBACK failed still believes a transaction is open
-                    // and owned, and its next borrower would wait on that owner
-                    // for ever. A pool discards a closed connection.
-                    System.err.println("rollback failed; closing the connection: " + err);
-                    close();
+            beginTransaction();
+            boolean committed = false;
+            try {
+                Object result = body.run(this);
+                commitTransaction();
+                committed = true;
+                return result;
+            } finally {
+                if (!committed) {
+                    try {
+                        rollbackTransaction();
+                    } catch (Exception err) {
+                        // Closed, not left for a pool to lend again: a connection
+                        // whose ROLLBACK failed still believes a transaction is open
+                        // and owned, and its next borrower would wait on that owner
+                        // for ever. A pool discards a closed connection.
+                        System.err.println("rollback failed; closing the connection: " + err);
+                        close();
+                    }
                 }
             }
+        } finally {
+            exit();
         }
     }
 
@@ -877,29 +1042,39 @@ public final class Database {
     /// The id the most recent insert produced, or 0 where the engine has no such
     /// concept. PostgreSQL is the case that has none: use INSERT ... RETURNING.
     ///
-    /// SYNCHRONIZED like every other operation on this class, which is the
+    /// INSIDE THE GATE like every other operation on this class, which is the
     /// point: it was the one that was not. A close on another thread -- a pool
     /// shutting down, a reconnect -- could therefore run between this reading the
     /// engine and the engine reading its own state.
-    public synchronized long lastInsertId() {
-        awaitTransactionOwner();
-        if (sqlite != null) {
-            return sqlite.lastInsertId();
+    public long lastInsertId() {
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (sqlite != null) {
+                return sqlite.lastInsertId();
+            }
+            if (mysql != null) {
+                return mysql.lastInsertId();
+            }
+            return 0;
+        } finally {
+            exit();
         }
-        if (mysql != null) {
-            return mysql.lastInsertId();
-        }
-        return 0;
     }
 
     /// SQLite-only tuning, ignored elsewhere. Write-ahead logging is what lets
     /// readers run while a writer is active, and it has no counterpart on a server
     /// engine that already does.
-    public synchronized void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
-        awaitTransactionOwner();
-        if (sqlite != null) {
-            sqlite.enableWriteAheadLog();
-            sqlite.setBusyTimeout(busyTimeoutMillis);
+    public void tuneForConcurrency(int busyTimeoutMillis) throws IOException {
+        enter();
+        try {
+            awaitTransactionOwner();
+            if (sqlite != null) {
+                sqlite.enableWriteAheadLog();
+                sqlite.setBusyTimeout(busyTimeoutMillis);
+            }
+        } finally {
+            exit();
         }
     }
 
@@ -908,7 +1083,7 @@ public final class Database {
         return sqlite;
     }
 
-    /// SYNCHRONIZED, like execute, query and transaction on this class.
+    /// Inside the connection gate, like execute, query and transaction.
     ///
     /// Without it a shutdown or a reconnect could close the engine while another
     /// handler was inside an operation, so Postgres.close or MySql.close wrote its
@@ -916,19 +1091,24 @@ public final class Database {
     /// the packaged TLS path freed the native session while that thread was reading
     /// through it. The engines' own close() methods were given this lock already;
     /// the facade that fronts them was not, which left the same race one level up.
-    public synchronized void close() {
-        awaitTransactionOwner();
+    public void close() {
+        enter();
         try {
-            if (sqlite != null) {
-                sqliteClosed = true;
-                sqlite.close();
-            } else if (postgres != null) {
-                postgres.close();
-            } else {
-                mysql.close();
+            awaitTransactionOwner();
+            try {
+                if (sqlite != null) {
+                    sqliteClosed = true;
+                    sqlite.close();
+                } else if (postgres != null) {
+                    postgres.close();
+                } else {
+                    mysql.close();
+                }
+            } finally {
+                transactionFinished();
             }
         } finally {
-            transactionFinished();
+            exit();
         }
     }
 
