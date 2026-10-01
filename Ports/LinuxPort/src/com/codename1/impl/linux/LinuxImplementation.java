@@ -128,6 +128,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// which shares its number with the Windows port's so the two desktop wire protocols
     /// do not drift apart.
     private static final int EVENT_MENU_COMMAND = 23;
+    private static final int EVENT_THEME_SETTINGS_CHANGED = 24;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -833,7 +834,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 case EVENT_WINDOW_CLOSE:
                     Desktop.getInstance().windowCloseRequested(windowId);
                     break;
+                case EVENT_THEME_SETTINGS_CHANGED:
+                    Display.getInstance().nativeThemeSettingsChanged();
+                    break;
                 case EVENT_WINDOW_FOCUS:
+                    if (key != 0) { Display.getInstance().nativeThemeSettingsChanged(); }
                     Desktop.getInstance().windowFocusChanged(windowId, key != 0);
                     break;
                 case EVENT_WINDOW_MONITOR:
@@ -3460,6 +3465,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// platform does not know" (null) from "light" (FALSE) -- UIManager's dark-mode
     /// resolution tests for null explicitly -- and on Linux that distinction is real:
     /// a session with no desktop settings daemon has no answer to give.
+    @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        return com.codename1.impl.NativeThemeSettings.parse(LinuxNative.nativeThemeSettings());
+    }
+
     @Override
     public Boolean isDarkMode() {
         int v = LinuxNative.systemColorScheme();

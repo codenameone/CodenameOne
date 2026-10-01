@@ -287,6 +287,8 @@ int cn1LinuxPopEvent(int* out) {
 static volatile int cn1CurrentModifiers = 0;
 
 static GtkWidget* cn1Window = 0;
+/* Set by initDisplay before publishing the GTK window. */
+static pthread_t cn1GtkThread;
 static GtkWidget* cn1DrawingArea = 0;
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
 static GtkWidget* cn1RootBox = 0;       /* GtkBox: optional menu bar above the overlay */
@@ -375,7 +377,8 @@ GtkWidget* cn1LinuxWindowWidget(void) {
 /* Posts fn(arg) onto the GTK main loop and blocks the calling (EDT) thread until
  * it has run. Shared by the services / edit / browser / media units for the GTK
  * calls that must happen on the main thread. In headless mode (no window, no
- * loop) it runs inline so callers never deadlock. */
+ * loop), or when already on the GTK thread, it runs inline. Display initialization
+ * queries theme settings before the main thread starts pumping GTK events. */
 typedef struct {
     void (*fn)(void*);
     void* arg;
@@ -396,7 +399,7 @@ static gboolean cn1MainCallTrampoline(gpointer p) {
 
 void cn1LinuxRunOnMainAndWait(void (*fn)(void*), void* arg) {
     CN1MainCall mc;
-    if (cn1Window == 0) {
+    if (cn1Window == 0 || pthread_equal(pthread_self(), cn1GtkThread)) {
         fn(arg);
         return;
     }
@@ -1054,6 +1057,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
         return;
     }
 
+    cn1GtkThread = pthread_self();
     gtk_init(0, 0);
     cn1Window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(cn1Window), t);
@@ -1841,29 +1845,110 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_captureWindowToPngBytes___R_byt
  * compiles, links, and leaves the Java method looking unused to the dead-code pass,
  * which then removes it. scripts/check-native-signatures.sh is what catches that.
  */
-JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+static gint cn1DesktopColorScheme = -1;
+
+static void cn1ReadDesktopColorScheme(GSettings* settings) {
+    gchar* scheme = g_settings_get_string(settings, "color-scheme");
+    g_atomic_int_set(&cn1DesktopColorScheme, scheme ? (strcmp(scheme, "prefer-dark") == 0 ? 1 : 0) : -1);
+    g_free(scheme);
+}
+
+static void cn1DesktopColorSchemeChanged(GSettings* settings, gchar* key, gpointer data) {
+    (void)key; (void)data;
+    cn1ReadDesktopColorScheme(settings);
+    cn1LinuxPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+}
+
+static void cn1ObserveDesktopColorScheme(void* unused) {
+    (void)unused;
     GSettingsSchemaSource* source = g_settings_schema_source_get_default();
-    if (source == NULL) {
-        return -1;
-    }
+    if (!source) return;
     GSettingsSchema* schema = g_settings_schema_source_lookup(source,
             "org.gnome.desktop.interface", TRUE);
-    if (schema == NULL) {
-        return -1;
-    }
-    int result = -1;
-    /* has_key as well as the schema lookup: color-scheme arrived in GNOME 42, and the
-     * schema exists without it on older desktops. g_settings_get_string on a missing key
-     * aborts the same way a missing schema does. */
+    if (!schema) return;
+    /* Older GNOME schemas do not contain color-scheme. Never read a missing key. */
     if (g_settings_schema_has_key(schema, "color-scheme")) {
-        GSettings* settings = g_settings_new("org.gnome.desktop.interface");
-        gchar* scheme = g_settings_get_string(settings, "color-scheme");
-        if (scheme != NULL) {
-            result = strcmp(scheme, "prefer-dark") == 0 ? 1 : 0;
-            g_free(scheme);
-        }
-        g_object_unref(settings);
+        /* Retained for the process lifetime so change notifications stay connected.
+           Constructed on the GTK context independently of palette/font snapshots. */
+        GSettings* settings = g_settings_new_full(schema, NULL, NULL);
+        g_signal_connect(settings, "changed::color-scheme", G_CALLBACK(cn1DesktopColorSchemeChanged), NULL);
+        /* Reading after connecting enables GSettings change delivery for this key. */
+        cn1ReadDesktopColorScheme(settings);
     }
     g_settings_schema_unref(schema);
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_systemColorScheme___R_int(CODENAME_ONE_THREAD_STATE) {
+    static gsize initialized;
+    if (g_once_init_enter(&initialized)) {
+        cn1LinuxRunOnMainAndWait(cn1ObserveDesktopColorScheme, NULL);
+        g_once_init_leave(&initialized, 1);
+    }
+    /* Style resolution queries this frequently. Only observer installation needs
+       a GTK thread round trip; notifications publish later values atomically. */
+    return g_atomic_int_get(&cn1DesktopColorScheme);
+}
+
+/* Settings and GTK style contexts must only be read on the GTK main thread. */
+static void cn1ThemeSettingsNotify(GObject* object, GParamSpec* property, gpointer data) {
+    (void)object; (void)property; (void)data;
+    cn1LinuxPushEvent(CN1_EVENT_THEME_SETTINGS_CHANGED, 0, 0, 0);
+}
+
+static void cn1ReadThemeSettings(void* out) {
+    GString* result = (GString*)out;
+    GtkSettings* settings = gtk_settings_get_default();
+    if (!settings || !cn1Window) return;
+    static GtkSettings* observed;
+    if (observed != settings) {
+        if (observed) {
+            g_signal_handlers_disconnect_by_func(observed, G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+            g_object_unref(observed);
+        }
+        observed = (GtkSettings*)g_object_ref(settings);
+        g_signal_connect(settings, "notify::gtk-font-name", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-xft-dpi", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-theme-name", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+        g_signal_connect(settings, "notify::gtk-application-prefer-dark-theme", G_CALLBACK(cn1ThemeSettingsNotify), NULL);
+    }
+    gchar* fontName = NULL;
+    g_object_get(settings, "gtk-font-name", &fontName, NULL);
+    if (fontName) {
+        PangoFontDescription* font = pango_font_description_from_string(fontName);
+        const char* family = pango_font_description_get_family(font);
+        double size = (double)pango_font_description_get_size(font) / PANGO_SCALE;
+        if (!pango_font_description_get_size_is_absolute(font)) {
+            double dpi = gdk_screen_get_resolution(gtk_widget_get_screen(cn1Window));
+            size *= (dpi > 0 ? dpi : 96) / 72.0;
+        }
+        if (family && size > 0) g_string_append_printf(result, "fontFamily=%s\nfontSize=%g\n", family, size);
+        pango_font_description_free(font);
+        g_free(fontName);
+    }
+    GtkStyleContext* context = gtk_widget_get_style_context(cn1Window);
+    const char* tokens[] = {"accent-color", "accent-fg-color", "selection-color", "window-bg-color",
+        "text-color", "view-bg-color", "text-secondary-color", "separator-color"};
+    const char* names[] = {"theme_selected_bg_color", "theme_selected_fg_color", "theme_selected_bg_color",
+        "theme_bg_color", "theme_fg_color", "theme_base_color", "insensitive_fg_color", "borders"};
+    /* GTK exposes the active palette only. Supply it to the corresponding appearance,
+       never overwrite the other appearance with an invented light/dark variant. */
+    GdkRGBA bg;
+    gboolean dark = gtk_style_context_lookup_color(context, "theme_bg_color", &bg)
+            && (bg.red + bg.green + bg.blue) < 1.5;
+    for (unsigned i = 0; i < sizeof(tokens) / sizeof(tokens[0]); ++i) {
+        GdkRGBA color;
+        if (gtk_style_context_lookup_color(context, names[i], &color) && color.alpha >= 0.999) {
+            g_string_append_printf(result, "%s%s=%02x%02x%02x\n", tokens[i], dark ? "-dark" : "",
+                (unsigned)(color.red * 255 + 0.5), (unsigned)(color.green * 255 + 0.5),
+                (unsigned)(color.blue * 255 + 0.5));
+        }
+    }
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_nativeThemeSettings___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    GString* buffer = g_string_new(NULL);
+    cn1LinuxRunOnMainAndWait(cn1ReadThemeSettings, buffer);
+    JAVA_OBJECT result = newStringFromCString(threadStateData, buffer->str);
+    g_string_free(buffer, TRUE);
     return result;
 }

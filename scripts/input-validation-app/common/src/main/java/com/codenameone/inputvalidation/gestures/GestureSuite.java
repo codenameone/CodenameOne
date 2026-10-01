@@ -45,6 +45,11 @@ public final class GestureSuite {
     /// tap before it can type anything, which took three and a half seconds
     /// on a simulator busy serving XCUITest accessibility snapshots.
     private static final long DEFAULT_STEP_TIMEOUT_MS = 30000L;
+    // XCUITest can still be waiting for the preceding long-press action to idle
+    // when this step becomes ready. The iOS 18.5 CI log spent 28 seconds there,
+    // exhausting the old 30-second budget before the first browser focus tap.
+    // Allow that handoff plus the driver's bounded 25-second real-key retry loop.
+    private static final long IOS_BROWSER_STEP_TIMEOUT_MS = 90000L;
     /// Non-iOS drivers retain the automatic exit. On iOS, XCUITest owns
     /// termination so completion cannot race a key still being synthesized.
     private static final long SUITE_EXIT_DELAY_MS = 8000L;
@@ -112,7 +117,9 @@ public final class GestureSuite {
         });
         this.targetArea.revalidate();
         log("CN1IV:READY:" + step.name());
-        this.activeTimeout = UITimer.timer((int) DEFAULT_STEP_TIMEOUT_MS, false, this.form, () -> {
+        long timeout = "ios".equals(CN.getPlatformName()) && "browserkeytype".equals(step.name())
+                ? IOS_BROWSER_STEP_TIMEOUT_MS : DEFAULT_STEP_TIMEOUT_MS;
+        this.activeTimeout = UITimer.timer((int) timeout, false, this.form, () -> {
             if (stepToken != activeStepToken) {
                 return;
             }

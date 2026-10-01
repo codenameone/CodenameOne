@@ -3258,6 +3258,14 @@ int isPainted() {
 #if !TARGET_OS_OSX
 @implementation CodenameOne_GLViewController
 
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    com_codename1_impl_ios_IOSImplementation_nativeThemeSettingsChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+#endif
+
+
 @synthesize displayLink, currentMutableImage, animating;
 static CodenameOne_GLViewController *sharedSingleton;
 +(BOOL)isDrawTextureSupported {
