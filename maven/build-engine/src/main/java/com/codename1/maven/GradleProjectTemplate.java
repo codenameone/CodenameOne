@@ -87,10 +87,16 @@ public final class GradleProjectTemplate {
     ///
     /// @param projectName the root project's name
     /// @param cn1Version the plugin (and framework) version to declare
+    /// `value` as the inside of a Kotlin string literal: a main class may hold a
+    /// `$` (`Price$Tracker`), which Kotlin would read as a template.
+    static String kotlinString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$");
+    }
+
     public static void writeScaffolding(File dir, String projectName, String cn1Version, Shape shape)
             throws IOException {
         write(new File(dir, "settings.gradle.kts"), text("settings.gradle.kts.txt")
-                .replace("__CN1_VERSION__", cn1Version).replace("__PROJECT_NAME__", projectName));
+                .replace("__CN1_VERSION__", cn1Version).replace("__PROJECT_NAME__", kotlinString(projectName)));
         write(new File(dir, "build.gradle.kts"),
                 text(shape == Shape.BACKEND_ONLY ? "backend/build.gradle.kts.txt" : "app/build.gradle.kts.txt"));
         write(new File(dir, "gradle.properties"), text("gradle.properties.txt"));

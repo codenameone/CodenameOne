@@ -280,6 +280,19 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void aGradlePathTheBuildSetsWinsOverTheDirectory() throws IOException {
+        File root = new File(tmp, "decoupled");
+        touch(root, "settings.gradle.kts", "include(\":app\")\n");
+        touch(root, "clients/mobile/build.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");
+        touch(root, "clients/mobile/codenameone_settings.properties");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "clients/mobile"));
+        assertEquals(":app:cn1Compile", l.withGradlePath(":app").gradleTaskPath("cn1Compile"));
+        assertEquals("cn1Compile", l.withGradlePath(":").gradleTaskPath("cn1Compile"), "the root project");
+        assertEquals(":app:cn1Compile", l.withGradlePath(":app").withBuildDir(new File(tmp, "out"))
+                .gradleTaskPath("cn1Compile"), "kept by the other copies");
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

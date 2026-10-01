@@ -100,12 +100,23 @@ public final class SimulatorProject {
     /// processed resources all live under it.
     static final String BUILD_DIR_PROPERTY = "cn1.buildDir";
 
+    /// The Gradle project path a launch names (`cn1.gradleProjectPath`), which a
+    /// build can decouple from the directory the path would otherwise follow.
+    static final String GRADLE_PATH_PROPERTY = "cn1.gradleProjectPath";
+
     private static ProjectLayout withLaunchBuildDir(ProjectLayout layout) {
-        String dir = System.getProperty(BUILD_DIR_PROPERTY);
-        if (layout == null || dir == null || dir.length() == 0 || layout.buildSystem() != BuildSystem.GRADLE) {
+        if (layout == null || layout.buildSystem() != BuildSystem.GRADLE) {
             return layout;
         }
-        return layout.withBuildDir(new File(dir));
+        String dir = System.getProperty(BUILD_DIR_PROPERTY);
+        if (dir != null && dir.length() > 0) {
+            layout = layout.withBuildDir(new File(dir));
+        }
+        String path = System.getProperty(GRADLE_PATH_PROPERTY);
+        if (path != null && path.length() > 0) {
+            layout = layout.withGradlePath(path);
+        }
+        return layout;
     }
 
     /// The layout whose project directory is `projectDir`, or null. For code

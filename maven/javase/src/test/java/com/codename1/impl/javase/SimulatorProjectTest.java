@@ -163,8 +163,13 @@ public class SimulatorProjectTest {
             assertEquals(canonical(new File(out, "classes/java/main")), canonical(SimulatorProject.classesDir(root)));
             assertEquals(canonical(new File(out, "resources/main")),
                     canonical(SimulatorProject.resourcesOutputDir(root)));
+            System.setProperty("cn1.gradleProjectPath", ":app");
+            SimulatorProject.reset();
+            assertEquals(":app:cn1Compile", SimulatorProject.current().gradleTaskPath("cn1Compile"),
+                    "the launch's project path, not one derived from the directory");
         } finally {
             System.clearProperty("cn1.buildDir");
+            System.clearProperty("cn1.gradleProjectPath");
         }
     }
 

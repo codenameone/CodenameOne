@@ -59,6 +59,7 @@ public final class ProjectLayout {
     private final File projectDir;
     private final List<File> sourceRootOverride;
     private final DirectorySource buildDirSource;
+    private final String gradlePath;
 
     /// Supplies a directory when asked, for one a build tool can move after the
     /// layout is made. A plain interface rather than a JDK functional one: this
@@ -70,11 +71,11 @@ public final class ProjectLayout {
 
     ProjectLayout(BuildSystem buildSystem, ProjectKind kind, File rootDir, File projectDir,
                   List<File> sourceRootOverride) {
-        this(buildSystem, kind, rootDir, projectDir, sourceRootOverride, null);
+        this(buildSystem, kind, rootDir, projectDir, sourceRootOverride, null, null);
     }
 
     private ProjectLayout(BuildSystem buildSystem, ProjectKind kind, File rootDir, File projectDir,
-                          List<File> sourceRootOverride, DirectorySource buildDirSource) {
+                          List<File> sourceRootOverride, DirectorySource buildDirSource, String gradlePath) {
         if (buildSystem == null || kind == null || rootDir == null || projectDir == null) {
             throw new IllegalArgumentException("buildSystem, kind, rootDir and projectDir are required");
         }
@@ -85,6 +86,14 @@ public final class ProjectLayout {
         this.sourceRootOverride = sourceRootOverride == null || sourceRootOverride.isEmpty()
                 ? null : Collections.unmodifiableList(new ArrayList<File>(sourceRootOverride));
         this.buildDirSource = buildDirSource;
+        this.gradlePath = gradlePath;
+    }
+
+    /// A copy of this layout whose Gradle project path (`:app`) is `path`, which
+    /// a build can decouple from the directory (`project(":app").projectDir =
+    /// file("clients/mobile")`); [#gradleTaskPath(String)] then uses it.
+    public ProjectLayout withGradlePath(String path) {
+        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, sourceRootOverride, buildDirSource, path);
     }
 
     /// A copy of this layout whose [buildDir()] -- and everything under it:
@@ -93,7 +102,7 @@ public final class ProjectLayout {
     /// so after a plugin has made its layout; a source that reads Gradle's own
     /// setting follows it.
     public ProjectLayout withBuildDir(DirectorySource source) {
-        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, sourceRootOverride, source);
+        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, sourceRootOverride, source, gradlePath);
     }
 
     /// [#withBuildDir(DirectorySource)] with a directory already known.
@@ -121,7 +130,7 @@ public final class ProjectLayout {
     /// add one, a Gradle build script can move one) and a tool reading the
     /// directory tree cannot, so the resolved list wins wherever it is known.
     public ProjectLayout withSourceRoots(List<File> roots) {
-        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, roots, buildDirSource);
+        return new ProjectLayout(buildSystem, kind, rootDir, projectDir, roots, buildDirSource, gradlePath);
     }
 
     /// The build tool.
@@ -489,6 +498,9 @@ public final class ProjectLayout {
     /// `task` qualified with this project's Gradle path, so it runs in the
     /// right project when invoked from [rootDir()].
     public String gradleTaskPath(String task) {
+        if (gradlePath != null && gradlePath.length() > 0) {
+            return ":".equals(gradlePath) ? task : gradlePath + ":" + task;
+        }
         if (projectDir.equals(rootDir)) {
             return task;
         }

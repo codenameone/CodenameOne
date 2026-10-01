@@ -536,6 +536,16 @@ class GradleConversionTest {
     }
 
     @Test
+    void aMainClassWithADollarStaysALiteralName() throws Exception {
+        assertEquals("Price\\$Tracker", GradleProjectTemplate.kotlinString("Price$Tracker"));
+        File ant = antApp();
+        touch(ant, "codenameone_settings.properties", "codename1.mainName=Price$Tracker\ncodename1.packageName=a\n");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(ant, out, "1.0");
+        assertTrue(read(new File(out, "settings.gradle.kts")).contains("rootProject.name = \"Price\\$Tracker\""));
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

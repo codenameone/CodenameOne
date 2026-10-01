@@ -336,6 +336,11 @@ final class AppSupport {
             // would otherwise look in the conventional build/.
             t.getJvmArgumentProviders().add(new SystemPropertyArgument("cn1.buildDir",
                     project.getLayout().getBuildDirectory().getAsFile().map(File::getAbsolutePath)));
+            // And the project's Gradle path, which hot reload's build-tool fallback
+            // runs cn1Compile under; a build can decouple it from the directory.
+            final String gradlePath = project.getPath();
+            t.getJvmArgumentProviders().add(new SystemPropertyArgument("cn1.gradleProjectPath",
+                    project.provider(() -> gradlePath)));
             // The test recorder saves into the test source set's own directory.
             final SourceSet test = project.getExtensions().getByType(org.gradle.api.plugins.JavaPluginExtension.class)
                     .getSourceSets().getByName(SourceSet.TEST_SOURCE_SET_NAME);
