@@ -287,6 +287,8 @@ int cn1LinuxPopEvent(int* out) {
 static volatile int cn1CurrentModifiers = 0;
 
 static GtkWidget* cn1Window = 0;
+/* Set by initDisplay before publishing the GTK window. */
+static pthread_t cn1GtkThread;
 static GtkWidget* cn1DrawingArea = 0;
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
 static GtkWidget* cn1RootBox = 0;       /* GtkBox: optional menu bar above the overlay */
@@ -375,7 +377,8 @@ GtkWidget* cn1LinuxWindowWidget(void) {
 /* Posts fn(arg) onto the GTK main loop and blocks the calling (EDT) thread until
  * it has run. Shared by the services / edit / browser / media units for the GTK
  * calls that must happen on the main thread. In headless mode (no window, no
- * loop) it runs inline so callers never deadlock. */
+ * loop), or when already on the GTK thread, it runs inline. Display initialization
+ * queries theme settings before the main thread starts pumping GTK events. */
 typedef struct {
     void (*fn)(void*);
     void* arg;
@@ -396,7 +399,7 @@ static gboolean cn1MainCallTrampoline(gpointer p) {
 
 void cn1LinuxRunOnMainAndWait(void (*fn)(void*), void* arg) {
     CN1MainCall mc;
-    if (cn1Window == 0) {
+    if (cn1Window == 0 || pthread_equal(pthread_self(), cn1GtkThread)) {
         fn(arg);
         return;
     }
@@ -1054,6 +1057,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
         return;
     }
 
+    cn1GtkThread = pthread_self();
     gtk_init(0, 0);
     cn1Window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(cn1Window), t);

@@ -359,6 +359,67 @@ int main(int argc, char** argv) {
                 subprocess.run([str(executable)] + ([] if variant == "supported" else ["unavailable"]),
                                env=env, check=True)
 
+    def test_gtk_dispatch_during_startup_and_from_worker(self):
+        if not shutil.which("pkg-config") or subprocess.call(["pkg-config", "--exists", "glib-2.0"]) != 0:
+            self.skipTest("GLib development tools unavailable")
+        source = (ROOT / "Ports/LinuxPort/nativeSources/cn1_linux_window.c").read_text()
+        start = source.index("typedef struct {", source.index("/* Posts fn(arg) onto the GTK main loop"))
+        end = source.index("/* (Re)allocates the back-buffer", start)
+        harness = r'''
+#include <glib.h>
+#include <pthread.h>
+#include <assert.h>
+#include <unistd.h>
+static void* cn1Window;
+static pthread_t cn1GtkThread;
+static gint parked, resumed, finished;
+static int scheduled, callbacks;
+#define CN1_YIELD_THREAD g_atomic_int_inc(&parked)
+#define CN1_RESUME_THREAD g_atomic_int_inc(&resumed)
+static guint gdk_threads_add_idle(GSourceFunc callback, gpointer data) {
+    scheduled++;
+    return g_idle_add(callback, data);
+}
+BRIDGE
+static void callback(void* arg) {
+    assert(pthread_equal(pthread_self(), cn1GtkThread));
+    assert(arg == &callbacks);
+    callbacks++;
+}
+static void* worker(void* unused) {
+    cn1LinuxRunOnMainAndWait(callback, &callbacks);
+    g_atomic_int_set(&finished, 1);
+    return NULL;
+}
+int main(void) {
+    alarm(5); // A same-thread dispatch deadlock must fail promptly.
+    cn1GtkThread = pthread_self();
+    cn1LinuxRunOnMainAndWait(callback, &callbacks); // Headless, no window.
+    assert(callbacks == 1 && scheduled == 0);
+    cn1Window = &callbacks;
+    // Display.init installs the theme here, before there is an event loop.
+    cn1LinuxRunOnMainAndWait(callback, &callbacks);
+    assert(callbacks == 2 && scheduled == 0);
+    pthread_t thread;
+    assert(pthread_create(&thread, NULL, worker, NULL) == 0);
+    while (!g_atomic_int_get(&finished)) {
+        g_main_context_iteration(NULL, FALSE);
+        g_usleep(1000);
+    }
+    pthread_join(thread, NULL);
+    assert(callbacks == 3 && scheduled == 1);
+    assert(parked == 1 && resumed == 1); // Retain the VM's GC handshake on worker waits.
+    return 0;
+}
+'''.replace("BRIDGE", source[start:end])
+        flags = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "glib-2.0"], text=True))
+        with tempfile.TemporaryDirectory(prefix="cn1-gtk-dispatch-") as directory:
+            path = pathlib.Path(directory)
+            executable = path / "dispatch"
+            (path / "dispatch.c").write_text(harness)
+            subprocess.run(["cc", "-pthread", str(path / "dispatch.c"), *flags, "-o", str(executable)], check=True)
+            subprocess.run([str(executable)], check=True, timeout=10)
+
 
 if __name__ == "__main__":
     unittest.main()
