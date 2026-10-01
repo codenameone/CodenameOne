@@ -14,87 +14,15 @@ name: Test Mac Catalyst UI build scripts
 # reusable _build-ios-port.yml workflow) so cache hits across the three
 # Mac/iOS workflows on the same SHA stay fast.
 
+# Automatic triggers and changed-file selection are owned by scripts-ios.yml.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '55 1 * * *'
-  pull_request:
-    paths:
-      - '.github/workflows/scripts-mac-catalyst.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-ios-port.sh'
-      - 'scripts/build-mac-catalyst-app.sh'
-      - 'scripts/run-mac-catalyst-ui-tests.sh'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/mac-catalyst/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'scripts/common/java/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/iOSPort/**'
-      - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
-      - 'vm/**'
-      - '!vm/**/*.md'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'vm/backend/demo/cn1ss/**'
-  push:
-    branches: [ master ]
-    paths:
-      - '.github/workflows/scripts-mac-catalyst.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-ios-port.sh'
-      - 'scripts/build-mac-catalyst-app.sh'
-      - 'scripts/run-mac-catalyst-ui-tests.sh'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/mac-catalyst/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'scripts/common/java/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'CodenameOne/src/**'
-      - 'Ports/iOSPort/**'
-      - 'native-themes/ios-modern/**'
-      - 'vm/**'
-      - 'tests/**'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'vm/backend/demo/cn1ss/**'
+  workflow_call:
+    inputs:
+      port_prepared:
+        type: boolean
+        default: false
+
 env:
   # A method the translator culled as unreachable is still emitted as a stub,
   # because dispatch tables name it. With this on, the stub aborts with the
@@ -105,14 +33,22 @@ env:
   # binaries should be the ones customers get.
   CN1_CULL_TRAP: '1'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: catalyst-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-port:
+    if: ${{ !inputs.port_prepared }}
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
     # via the cn1-built cache; first runner to land a fresh SHA populates it
     # and the others skip the rebuild.
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-mac-catalyst:
+    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') }}
     needs: build-port
     permissions:
       contents: read
@@ -123,10 +59,6 @@ jobs:
     # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
     # SIGKILL the screenshot run mid-post-processing on slow runners.
     timeout-minutes: 90
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-mac-catalyst-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -185,14 +117,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -268,7 +192,7 @@ jobs:
         timeout-minutes: 45
 
       - name: Upload Mac Catalyst port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-mac-catalyst
@@ -283,7 +207,7 @@ jobs:
         # Reuses the existing metal-screenshot-summary.py helper because
         # the JSON schema is identical -- the summary text says "iOS
         # Metal" so the wrapper here overrides the headline manually.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           COMPARE_JSON: ${{ github.workspace }}/artifacts/mac-catalyst-ui-tests/screenshot-compare.json
           COMMENT_MD: ${{ github.workspace }}/artifacts/mac-catalyst-ui-tests/screenshot-comment.md
@@ -311,7 +235,7 @@ jobs:
           fi
 
       - name: Upload Mac Catalyst artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: mac-catalyst-ui-tests

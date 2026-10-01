@@ -1,17 +1,10 @@
 name: _Build iOS port (reusable)
 
-# Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-ios-port.sh
-# once per workflow run, populating shared caches that downstream test jobs (in
-# scripts-ios.yml, scripts-ios-native.yml, ios-packaging.yml) restore via the
-# same cache keys.
-#
-# A separate "cn1-built" cache is keyed on the CN1 source hash with no restore-
-# keys (exact match only). On hit, the entire setup-workspace + build-ios-port
-# sequence is skipped — the iOS port artifact in ~/.m2/repository/com/codenameone
-# is already correct for the current source state.
-#
-# This cache is shared across all three iOS workflows on the same branch, so
-# whichever workflow runs first populates it and the others skip the rebuild.
+# The iOS coordinator calls this once and shares its artifact with UI,
+# notification, packaging and Catalyst consumers in the SAME run. Standalone
+# diagnostic dispatches can still call it themselves. Caches only accelerate
+# later runs; an exact artifact remains the required handoff, even on a cold
+# cache or when entries are evicted while consumers wait for a runner.
 
 on:
   workflow_call:
@@ -26,9 +19,6 @@ jobs:
     timeout-minutes: 60
     outputs:
       cn1_built_cache_key: ${{ steps.cn1_built_key.outputs.key }}
-    concurrency:
-      group: mac-ios-port-${{ github.workflow }}-${{ github.ref_name }}
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
 

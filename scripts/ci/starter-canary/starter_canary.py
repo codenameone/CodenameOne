@@ -303,8 +303,10 @@ def seed_token(project, mvn, email, token, plugin_version):
             "could not read the Maven plugin version out of the served starter pom, "
             "so the build client cannot be authenticated with a pinned plugin."
         )
+    # Preserve Maven diagnostics for the redacted failure/timeout report. Quiet
+    # mode previously left a ten-minute stall with no evidence of its cause.
     run(
-        [mvn, "-B", "-q",
+        [mvn, "-B",
          f"com.codenameone:codenameone-maven-plugin:{plugin_version}:set-user-token",
          f"-Dtoken={token}", f"-Duser={email}"],
         cwd=project,
@@ -334,6 +336,10 @@ def child_environment():
     env = dict(os.environ)
     for name in SENSITIVE_ENV:
         env.pop(name, None)
+    # The first invocation also downloads Maven itself. Keep wrapper download
+    # diagnostics so a timeout can distinguish bootstrap from plugin resolution.
+    # Use true, never debug: shell tracing would print credential arguments.
+    env["MVNW_VERBOSE"] = "true"
     return env
 
 

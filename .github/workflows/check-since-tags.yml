@@ -29,6 +29,12 @@ on:
       - 'scripts/check-since-tags.sh'
       - '.github/workflows/check-since-tags.yml'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-since-tags:
     runs-on: ubuntu-24.04

@@ -69,7 +69,9 @@ permissions:
   packages: read
 
 concurrency:
-  group: purchase-e2e-${{ github.workflow }}-${{ github.ref_name }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -134,9 +136,6 @@ jobs:
       contents: read
     runs-on: macos-15
     timeout-minutes: 45
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
-      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
 
@@ -225,7 +224,7 @@ jobs:
         timeout-minutes: 25
 
       - name: Upload native iOS purchase artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-purchase-tests
@@ -356,7 +355,7 @@ jobs:
           force-avd-creation: true
           script: cd "${{ steps.build-android-app.outputs.gradle_project_dir }}" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.codenameone.examples.purchasetest.PurchaseBillingInstrumentationTest
       - name: Upload Android purchase test report
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: android-purchase-tests

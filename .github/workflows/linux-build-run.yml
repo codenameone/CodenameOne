@@ -82,7 +82,9 @@ on:
       - '!native-themes/gnome-adwaita/**/*.md'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -390,7 +392,7 @@ jobs:
             --hello-app LinuxHelloMain
 
       - name: Upload screenshot artifact (${{ matrix.arch }})
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-screenshot-raw-${{ matrix.arch }}
@@ -406,7 +408,7 @@ jobs:
       # they are compressed, capped, and collected ONLY when one exists, which means
       # only when the suite actually crashed.
       - name: Package core dump for offline autopsy
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           set -u
           shopt -s nullglob
@@ -447,7 +449,7 @@ jobs:
           TXT
 
       - name: Upload core dump
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-core-${{ matrix.arch }}
@@ -459,7 +461,7 @@ jobs:
       # GTK window showing a Form -- not the headless suite). Download and run it
       # on a Linux desktop to smoke-test the native port on real hardware.
       - name: Upload windowed demo binary (${{ matrix.arch }})
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-demo-${{ matrix.arch }}
@@ -538,7 +540,7 @@ jobs:
                 -Dsurefire.failIfNoSpecifiedTests=false
             '
       - name: Upload musl screenshots
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-screenshot-raw-musl
@@ -697,7 +699,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then echo "Linux screenshot gate failed."; exit 1; fi
 
       - name: Upload Linux port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: port-status-linux
@@ -715,11 +717,11 @@ jobs:
       # columns until it aged out. The report is already on disk in this job, so
       # publish it directly and depend on no event.
       #
-      # if: always() for the same reason the job itself runs on failure -- a
+      # if: ${{ !cancelled() }} for the same reason the job itself runs on failure -- a
       # report recording real failures is the one the table most needs.
       - name: Publish the Linux reports to the data branch
         if: >-
-          always() && github.ref == 'refs/heads/master' &&
+          !cancelled() && github.ref == 'refs/heads/master' &&
           (github.event_name == 'push' || github.event_name == 'schedule' ||
           github.event_name == 'workflow_dispatch')
         env:

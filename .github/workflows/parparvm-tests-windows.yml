@@ -70,11 +70,9 @@ on:
       - '!vm/**/docs/**'
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -563,7 +561,7 @@ jobs:
       # Preserve the native cn1WindowsLog output so the offscreen-capture path is
       # confirmable on the green x64 gate too (compare against the arm64 leg).
       - name: Collect native windows log (x64)
-        if: always()
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
@@ -591,7 +589,7 @@ jobs:
             --hello-app WinHelloMain
 
       - name: Upload screenshot artifact (x64)
-        if: always()
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-x64
@@ -768,7 +766,7 @@ jobs:
       # so the raw dir is never empty (the arm64 artifact would otherwise not be
       # produced when the suite stalls before writing any PNG).
       - name: Collect native windows log (arm64)
-        if: always()
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
@@ -796,7 +794,7 @@ jobs:
             --hello-app WinHelloMain
 
       - name: Upload screenshot artifact (arm64)
-        if: always()
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-arm64
@@ -819,7 +817,7 @@ jobs:
     name: screenshot-comment (x64)
     needs: windows-port-screenshot
     if: >-
-      always() &&
+      !cancelled() &&
       needs.windows-port-screenshot.result != 'cancelled' &&
       needs.windows-port-screenshot.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -907,7 +905,7 @@ jobs:
       # native-build diagnostics out of the publisher/backfill port-status-*
       # selection so a green native run cannot hide a shipping-pipeline failure.
       - name: Upload Windows native x64 diagnostics
-        if: always()
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-native-x64-diagnostics
@@ -918,11 +916,11 @@ jobs:
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
     needs: windows-port-screenshot-arm64
-    # The capture job uploads its raw evidence with if: always(). Normalize it
+    # The capture job uploads its raw evidence with if: ${{ !cancelled() }}. Normalize it
     # even when capture failed so diagnostics remain available. The failed
     # capture still remains a blocking red check.
     if: >-
-      always() &&
+      !cancelled() &&
       needs.windows-port-screenshot-arm64.result != 'cancelled' &&
       needs.windows-port-screenshot-arm64.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -1004,7 +1002,7 @@ jobs:
           if [ "$fail" -ne 0 ]; then echo "Windows arm64 screenshot gate failed."; exit 1; fi
 
       - name: Upload Windows ARM64 port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: port-status-windows-arm64

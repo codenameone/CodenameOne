@@ -55,6 +55,10 @@ on:
       - 'tests/**'
       - '!tests/**/*.md'
       - 'maven/**'
+      - '!maven/cn1-ai-*/**'
+      - '!maven/cn1-admob/**'
+      - '!maven/cn1-applovin/**'
+      - '!maven/cn1-unity-levelplay/**'
       - '!maven/core-unittests/**'
       - '!docs/**'
       # The screenshot transport is now a Codename One backend application, so the
@@ -93,6 +97,10 @@ on:
       - 'vm/**'
       - 'tests/**'
       - 'maven/**'
+      - '!maven/cn1-ai-*/**'
+      - '!maven/cn1-admob/**'
+      - '!maven/cn1-applovin/**'
+      - '!maven/cn1-unity-levelplay/**'
       - '!maven/core-unittests/**'
       # The screenshot transport is now a Codename One backend application, so the
       # two files that are ONLY exercised here have to trigger this leg: the
@@ -116,11 +124,16 @@ env:
   # binaries should be the ones customers get.
   CN1_CULL_TRAP: '1'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-port:
-    # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
-    # via the cn1-built cache; first runner to land a fresh SHA populates it
-    # and the others skip the rebuild.
+    # AppKit has its own source hash and producer; it does not invalidate
+    # the iOS coordinator's bundle.
     uses: ./.github/workflows/_build-mac-port.yml
 
   build-macos:
@@ -135,10 +148,6 @@ jobs:
     # SIGKILL the screenshot run mid-post-processing on slow runners. Plus 50 for the
     # ParparVM vs JDK 25 performance gate.
     timeout-minutes: 140
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-macos-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -189,14 +198,6 @@ jobs:
       # before it compiles a line.
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -291,7 +292,7 @@ jobs:
         timeout-minutes: 45
 
       - name: Upload macOS port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-macos
@@ -306,7 +307,7 @@ jobs:
         # Reuses the existing metal-screenshot-summary.py helper because
         # the JSON schema is identical -- the summary text says "iOS
         # Metal" so the wrapper here overrides the headline manually.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           COMPARE_JSON: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-compare.json
           COMMENT_MD: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-comment.md
@@ -334,7 +335,7 @@ jobs:
           fi
 
       - name: Upload macOS artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: macos-ui-tests
