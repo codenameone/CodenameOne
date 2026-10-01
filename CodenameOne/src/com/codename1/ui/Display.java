@@ -1025,6 +1025,35 @@ public final class Display extends CN1Constants {
         this.darkMode = darkMode;
     }
 
+    /// Internal platform snapshot used by native-theme inheritance.
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        return impl.getNativeThemeSettings();
+    }
+
+    private boolean nativeThemeRefreshPending;
+
+    /// Port notification for OS theme changes and resume. Coalesces onto the CN1 EDT.
+    public void nativeThemeSettingsChanged() {
+        if (!isInitialized()) {
+            return;
+        }
+        synchronized (this) {
+            if (nativeThemeRefreshPending) {
+                return;
+            }
+            nativeThemeRefreshPending = true;
+        }
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (Display.this) {
+                    nativeThemeRefreshPending = false;
+                }
+                UIManager.getInstance().refreshNativeThemeSettings();
+            }
+        });
+    }
+
     /// Returns true if the user has selected larger type fonts in the system settings.
     ///
     /// #### Returns

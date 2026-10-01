@@ -33,6 +33,8 @@ This tool will allow you to choose from a growing selection of project templates
 
 The starter projects are based on the <<cn1app-archetype>>.
 
+The initializr also offers Gradle as the build tool. A Gradle project is a single directory with a one-line settings file, and it gets native or backend directories only once it needs them. See <<gradle-project-workflow>> for when to choose it and how it maps to the Maven workflow in this chapter.
+
 [TIP]
 ====
 The following tutorials provide step-by-step instructions for getting started with bare-bones app templates. Those tutorials are a better starting place for Codename One development than this manual, as they're written in tutorial form.

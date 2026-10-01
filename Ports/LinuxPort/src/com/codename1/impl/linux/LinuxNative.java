@@ -62,6 +62,8 @@ public final class LinuxNative {
     /// event carries that.
     public static native int currentModifiers();
 
+    public static native String nativeThemeSettings();
+
     public static native void nativeLog(String message);
     /**
      * The desktop's colour scheme: 1 dark, 0 light, -1 unknown.

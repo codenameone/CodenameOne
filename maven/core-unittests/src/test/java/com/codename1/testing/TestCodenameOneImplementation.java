@@ -1650,6 +1650,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         largerTextEnabled = false;
         largerTextScale = 1f;
         nativeTheme = null;
+        nativeThemeSettings = new com.codename1.impl.NativeThemeSettings();
+        nativeDarkMode = Boolean.FALSE;
         cameraImpl = null;
         arImpl = null;
         visionImplCreationHook = null;
@@ -3208,6 +3210,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public boolean isLargerTextEnabled() {
         return largerTextEnabled;
     }
+
+    @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        return nativeThemeSettings.copy();
+    }
+
+    @Override
+    public Boolean isDarkMode() {
+        return nativeDarkMode;
+    }
+
+    public Boolean nativeDarkMode = Boolean.FALSE;
+
+    public com.codename1.impl.NativeThemeSettings nativeThemeSettings = new com.codename1.impl.NativeThemeSettings();
 
     @Override
     public float getLargerTextScale() {

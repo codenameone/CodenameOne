@@ -19,6 +19,8 @@ on:
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
       - 'maven/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
       # annotations, marked @SharedWithBackend and listed by
@@ -55,6 +57,8 @@ on:
       # break this matrix, but almost every PR touches core and this is a long
       # job. The translated tests in pr.yml catch a core break first.
       - 'maven/codenameone-maven-plugin/**'
+      - 'maven/build-engine/**'
+      - 'maven/project-model/**'
       - 'maven/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
       # annotations, marked @SharedWithBackend and listed by

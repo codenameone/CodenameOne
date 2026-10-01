@@ -43,14 +43,16 @@ to a predictable path for the comparison tool to read.
 2. **Build the screen** from the layout map.
 
 3. **Capture the render.** Either drive the simulator and use *Simulator menu -> Save Screenshot*,
-   or copy `templates/MockupComparisonTest.java` into `common/src/test/java/<pkg>/`, point it at
+   or copy `templates/MockupComparisonTest.java` into `common/src/test/java/<pkg>/` (`src/test/java/<pkg>/`
+   in a Gradle project), point it at
    your screen, and run it:
    ```bash
    mvn -pl common test -Dtest=MockupComparisonTest
+   # Gradle: ./gradlew test --tests '*MockupComparisonTest'
    # writes target/mockup-compare/home.png
    ```
 
-4. **Score against the mockup.** Put mockups in `common/src/test/resources/mockups/`:
+4. **Score against the mockup.** Put mockups in `common/src/test/resources/mockups/` (`src/test/resources/mockups/` under Gradle):
    ```bash
    java .claude/skills/codename-one/tools/CompareToMockup.java \
         target/mockup-compare/home.png \
@@ -185,6 +187,7 @@ layout, text). Three self-contained tools read that model:
 
 ```bash
 CP="common/target/classes:$(mvn -q -pl common dependency:build-classpath -Dmdep.outputFile=/dev/stdout | tail -1)"
+# Gradle: CP="$(./gradlew -q printSimulatorClasspath)"   (the task is in tools/README.md)
 java -cp "$CP" tools/DumpForm.java com.example.MyApp --out target/form-model.tsv   # capture (desktop mode)
 java tools/DescribeForm.java   target/form-model.tsv   # concise designer-language outline of the screen
 java tools/AlignmentCheck.java target/form-model.tsv   # the alignment grid + elements nudged just off it

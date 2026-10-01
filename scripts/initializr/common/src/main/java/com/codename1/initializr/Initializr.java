@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr;
 
 import static com.codename1.ui.CN.*;
@@ -94,6 +116,10 @@ public class Initializr extends Lifecycle {
         final boolean[] includeLocalizationBundles = new boolean[]{false};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_17};
+        final ProjectOptions.BuildTool[] buildTool = new ProjectOptions.BuildTool[]{ProjectOptions.BuildTool.MAVEN};
+        final ProjectOptions.ProjectType[] projectType = new ProjectOptions.ProjectType[]{ProjectOptions.ProjectType.APP};
+        // {Java 17, Java 8}: the build panel disables Java 8 while Gradle is selected.
+        final RadioButton[] javaButtons = new RadioButton[2];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
 
@@ -101,6 +127,7 @@ public class Initializr extends Lifecycle {
         final Label ideSubtitle = panelSubtitle(IDE.INTELLIJ.name());
         final Label localeSubtitle = panelSubtitle("No bundles");
         final Label javaSubtitle = panelSubtitle(ProjectOptions.JavaVersion.JAVA_17.label);
+        final Label buildSubtitle = panelSubtitle(ProjectOptions.BuildTool.MAVEN.label);
 
         appNameField.setUIID("InitializrField");
         packageField.setUIID("InitializrField");
@@ -118,7 +145,8 @@ public class Initializr extends Lifecycle {
 
         final Runnable refresh = new Runnable() {
             public void run() {
-                ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion);
+                ProjectOptions options = currentOptions(includeLocalizationBundles, previewLanguage, javaVersion)
+                        .withBuild(buildTool[0], projectType[0]);
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
 
@@ -127,6 +155,9 @@ public class Initializr extends Lifecycle {
                         ? "Bundles . " + previewLanguage[0].label
                         : "No bundles");
                 javaSubtitle.setText(javaVersion[0].label);
+                buildSubtitle.setText(buildTool[0] == ProjectOptions.BuildTool.GRADLE
+                        ? buildTool[0].label + " . " + projectType[0].label
+                        : buildTool[0].label);
 
                 String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
                 bundleInfo.setText("Bundle: " + (appName.length() == 0 ? "App" : appName) + ".zip");
@@ -148,14 +179,20 @@ public class Initializr extends Lifecycle {
         Container localePanel = makePanel("Localization", localeSubtitle, true, false,
                 createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh), form);
         Container javaPanel = makePanel("Java Version", javaSubtitle, true, false,
-                createJavaOptionsPanel(javaVersion, refresh), form);
+                createJavaOptionsPanel(javaVersion, javaButtons, refresh), form);
+        Container buildPanel = makePanel("Build Tool", buildSubtitle, true, false,
+                createBuildToolPanel(buildTool, projectType, javaVersion, javaButtons, refresh), form);
         Container settingsPanel = makePanel("Current Settings", panelSubtitle("Generated artifacts"), true, true,
                 BoxLayout.encloseY(summaryLabel), form);
 
         // ----- live preview (stacked at the end of the single column) -----
         Container previewWrap = createPreviewWrap(previewPanel);
 
-        Container column = BoxLayout.encloseY(hero, essentials, idePanel, localePanel,
+        // Gradle is offered once the plugin is published at the version the
+        // generated projects use; until then the Maven default stands alone.
+        buildPanel.setHidden(!GeneratorModel.isGradleOffered());
+        buildPanel.setVisible(GeneratorModel.isGradleOffered());
+        Container column = BoxLayout.encloseY(hero, essentials, idePanel, buildPanel, localePanel,
                 javaPanel, settingsPanel, previewWrap);
         column.setUIID("InitializrColumn");
         column.setScrollableY(true);
@@ -179,7 +216,8 @@ public class Initializr extends Lifecycle {
             }
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
-            ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion);
+            ProjectOptions options = downloadOptions(includeLocalizationBundles, previewLanguage, javaVersion)
+                    .withBuild(buildTool[0], projectType[0]);
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
@@ -390,7 +428,8 @@ public class Initializr extends Lifecycle {
         return BoxLayout.encloseY(includeBundles, labeledField("Preview Language", languagePicker));
     }
 
-    private Container createJavaOptionsPanel(ProjectOptions.JavaVersion[] javaVersion, Runnable onSelectionChanged) {
+    private Container createJavaOptionsPanel(ProjectOptions.JavaVersion[] javaVersion, RadioButton[] buttons,
+                                             Runnable onSelectionChanged) {
         Container selector = new Container(new GridLayout(2, 1));
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
@@ -399,6 +438,7 @@ public class Initializr extends Lifecycle {
         for (int i = 0; i < versions.length; i++) {
             final ProjectOptions.JavaVersion version = versions[i];
             RadioButton button = new RadioButton(labels[i]);
+            buttons[i] = button;
             button.setToggle(true);
             button.setUIID("InitializrChoice");
             group.add(button);
@@ -414,6 +454,86 @@ public class Initializr extends Lifecycle {
             });
         }
         return selector;
+    }
+
+    /// Maven or Gradle, and for Gradle what the project holds. Gradle projects are
+    /// Java 17 only, so choosing Gradle selects Java 17 and disables Java 8. A
+    /// Maven project always carries the backend module behind a profile, so the
+    /// project type is only offered for Gradle.
+    private Container createBuildToolPanel(ProjectOptions.BuildTool[] buildTool,
+                                           ProjectOptions.ProjectType[] projectType,
+                                           ProjectOptions.JavaVersion[] javaVersion,
+                                           RadioButton[] javaButtons, Runnable onSelectionChanged) {
+        Container tools = new Container(new GridLayout(1, 2));
+        tools.setUIID("InitializrChoicesGrid");
+        ButtonGroup toolGroup = new ButtonGroup();
+
+        Container types = new Container(new GridLayout(3, 1));
+        types.setUIID("InitializrChoicesGrid");
+        ButtonGroup typeGroup = new ButtonGroup();
+        final RadioButton[] typeButtons = new RadioButton[ProjectOptions.ProjectType.values().length];
+        for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
+            RadioButton button = new RadioButton(type.label);
+            typeButtons[type.ordinal()] = button;
+            button.setToggle(true);
+            button.setUIID("InitializrChoice");
+            typeGroup.add(button);
+            types.add(button);
+            if (type == projectType[0]) {
+                button.setSelected(true);
+            }
+            button.addActionListener(evt -> {
+                if (button.isSelected()) {
+                    projectType[0] = type;
+                    onSelectionChanged.run();
+                }
+            });
+        }
+        SpanLabel hint = new SpanLabel("Gradle projects target Java 17. Every Maven project already "
+                + "includes an optional backend module.");
+        hint.setUIID("InitializrTip");
+        hint.setTextUIID("InitializrTip");
+        final Container typeSection = BoxLayout.encloseY(labeledField("Project Type", types));
+        typeSection.setHidden(true);
+        typeSection.setVisible(false);
+
+        for (ProjectOptions.BuildTool tool : ProjectOptions.BuildTool.values()) {
+            RadioButton button = new RadioButton(tool.label);
+            button.setToggle(true);
+            button.setUIID("InitializrChoice");
+            toolGroup.add(button);
+            tools.add(button);
+            if (tool == buildTool[0]) {
+                button.setSelected(true);
+            }
+            button.addActionListener(evt -> {
+                if (!button.isSelected()) {
+                    return;
+                }
+                buildTool[0] = tool;
+                boolean gradle = tool == ProjectOptions.BuildTool.GRADLE;
+                typeSection.setHidden(!gradle);
+                typeSection.setVisible(gradle);
+                if (gradle) {
+                    javaVersion[0] = ProjectOptions.JavaVersion.JAVA_17;
+                    if (javaButtons[0] != null) {
+                        javaButtons[0].setSelected(true);
+                    }
+                }
+                if (javaButtons[1] != null) {
+                    javaButtons[1].setEnabled(!gradle);
+                }
+                if (!gradle && projectType[0] == ProjectOptions.ProjectType.BACKEND_ONLY) {
+                    // Maven has no backend-only project, and the type is hidden
+                    // now, so a stale choice would fail generation with no way to
+                    // correct it. Every Maven project carries the backend anyway.
+                    projectType[0] = ProjectOptions.ProjectType.APP;
+                    typeGroup.setSelected(typeButtons[ProjectOptions.ProjectType.APP.ordinal()]);
+                }
+                onSelectionChanged.run();
+            });
+        }
+        return BoxLayout.encloseY(tools, typeSection, hint);
     }
 
     private Container createPreviewWrap(TemplatePreviewPanel previewPanel) {
@@ -650,6 +770,8 @@ public class Initializr extends Lifecycle {
                 + "Package  " + safePackage + "\n"
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
                 + "IDE      " + ide.name() + "\n"
+                + "Build    " + options.buildTool.label
+                + (options.isGradle() ? " (" + options.projectType.label + ")" : "") + "\n"
                 + "Java     " + options.javaVersion.label + "\n"
                 + "Bundles  " + (options.includeLocalizationBundles ? "INCLUDED" : "NONE") + "\n"
                 + "Preview  " + options.previewLanguage.label;

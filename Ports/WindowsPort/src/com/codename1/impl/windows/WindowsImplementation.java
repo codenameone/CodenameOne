@@ -115,6 +115,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// A native menu bar item was chosen; the key field carries the command id
     /// setNativeCommands handed out. Must match CN1_EVENT_MENU_COMMAND in cn1_windows.h.
     private static final int EVENT_MENU_COMMAND = 23;
+    private static final int EVENT_THEME_SETTINGS_CHANGED = 24;
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
@@ -855,7 +856,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_WINDOW_CLOSE:
                     Desktop.getInstance().windowCloseRequested(windowId);
                     break;
+                case EVENT_THEME_SETTINGS_CHANGED:
+                    Display.getInstance().nativeThemeSettingsChanged();
+                    break;
                 case EVENT_WINDOW_FOCUS:
+                    if (key != 0) { Display.getInstance().nativeThemeSettingsChanged(); }
                     Desktop.getInstance().windowFocusChanged(windowId, key != 0);
                     break;
                 case EVENT_WINDOW_MONITOR:
@@ -3469,6 +3474,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
     /// Returns Boolean rather than boolean because the contract distinguishes "the
     /// platform does not know" (null) from "light" (FALSE), and callers such as
     /// UIManager's dark-mode resolution treat the two differently.
+    @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        return com.codename1.impl.NativeThemeSettings.parse(WindowsNative.nativeThemeSettings());
+    }
+
     @Override
     public Boolean isDarkMode() {
         return WindowsNative.systemUsesDarkTheme() ? Boolean.TRUE : Boolean.FALSE;

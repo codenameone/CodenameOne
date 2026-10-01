@@ -49,6 +49,8 @@
  */
 
 #Constants {
+    /* Marks bundled defaults eligible for optional OS settings inheritance. */
+    nativeThemeDefaultsBool: true;
     /* WinUI resource names in brackets. The accent is the one thing a Windows user really
        does personalise, so it is bound: a port reading UISettings.GetColorValue(Accent) can
        push the real one in with a single addThemeProps call. #0078D4 is the system default

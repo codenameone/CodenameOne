@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- CopySpec.from(), include() and filesMatching() configure the spec they are
+         called on and return it for chaining. SpotBugs's database marks them
+         side-effect free, so calling them for their effect reads as a discarded
+         result. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.gradle.LibrarySupport"/>
+            <Class name="com.codename1.gradle.ProjectSupport"/>
+        </Or>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+    </Match>
+    <!-- The compile classpath is a lazy Gradle FileCollection, deliberately shared:
+         it must stay the live view of the configuration, resolved when the action
+         runs, and a copy would resolve it at configuration time. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.gradle.tasks.ComplianceAction"/>
+            <Class name="com.codename1.gradle.tasks.ProcessAnnotationsAction"/>
+        </Or>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Field name="compileClasspath"/>
+    </Match>
+    <!-- The source set's classes directories, the same lazy, deliberately shared
+         FileCollection: it names Kotlin's destination wherever the build put it,
+         which is only known once the Kotlin plugin has configured its task. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.gradle.tasks.ComplianceAction"/>
+                <Method name="withSiblingClasses"/>
+                <Field name="siblingClassDirs"/>
+            </And>
+            <And>
+                <Class name="com.codename1.gradle.tasks.SplitOutputCheck"/>
+                <Method name="&lt;init&gt;"/>
+                <Field name="classesDirs"/>
+            </And>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

@@ -95,7 +95,9 @@ class ProjectIoTest {
      */
     @Test
     void windowsPathsBecomeUsableFileUrls() {
-        assertEquals("file://C:/Users/dev/app/src/main/guibuilder",
+        // file:///C:/..., the one form the four desktop tools share: a standard URI,
+        // which JavaSEPort.unfile maps back to C:/... (see ProjectIO.fsUrl).
+        assertEquals("file:///C:/Users/dev/app/src/main/guibuilder",
                 ProjectIO.fsUrl("C:\\Users\\dev\\app\\src\\main\\guibuilder"));
         assertEquals("file:///home/dev/app", ProjectIO.fsUrl("/home/dev/app"));
         assertEquals("file:///home/dev/app", ProjectIO.fsUrl("file:///home/dev/app"));

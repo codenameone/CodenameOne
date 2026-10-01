@@ -1,0 +1,7 @@
+// Optional: the plugin is applied from settings.gradle.kts.
+//
+//   ./gradlew runBackend       run on this JVM (starts in seconds)
+//   ./gradlew backendPackage   build a single native binary
+dependencies {
+    // implementation("org.example:library:1.0")
+}

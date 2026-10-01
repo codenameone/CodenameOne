@@ -23,34 +23,17 @@
 package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
-import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.tools.ant.taskdefs.Java;
 
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.prefs.Preferences;
 
 /**
  * Launches the standalone Certificate Wizard for a Codename One project.
@@ -59,6 +42,9 @@ import java.util.prefs.Preferences;
  */
 @Mojo(name = "certificatewizard")
 public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
+    /// How the wizard starts, shared with the Gradle plugin's `certificateWizard` task.
+    private static final DesktopTool TOOL = DesktopTool.CERTIFICATE_WIZARD;
+
     private static final String LAUNCHED_PROPERTY =
             "com.codename1.maven.OpenCertificateWizardMojo.launched";
 
@@ -111,52 +97,28 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         }
         outputDir.mkdirs();
 
-        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
-        String effectiveToken = firstNonEmpty(token, "");
-        String effectiveUser = firstNonEmpty(user, prefs.get("user", null), "");
-        String cachedToken = firstNonEmpty(prefs.get("token", null), "");
-        if (effectiveToken.length() == 0 && isUsableJwt(cachedToken)) {
-            effectiveToken = cachedToken;
-            getLog().debug("Using cached Codename One signing API JWT");
-        }
-        if (login && effectiveToken.length() == 0) {
-            LoginResult result = interactiveLogin();
-            if (result != null) {
-                effectiveToken = result.token;
-                effectiveUser = firstNonEmpty(user, result.user, effectiveUser);
-                prefs.put("token", effectiveToken);
-                if (effectiveUser.length() > 0) {
-                    prefs.put("user", effectiveUser);
-                }
-            }
-        }
-
-        File runtimeDir = new File(System.getProperty("user.home"), ".certificateWizard");
-        runtimeDir.mkdirs();
+        // See CodenameOneLogin, shared with the Gradle plugin.
+        CodenameOneLogin.LoginResult signIn = new CodenameOneLogin(MavenLog.of(getLog()))
+                .resolve(token, user, login, loginTimeoutSeconds, baseUrl);
+        String effectiveToken = signIn.token;
+        String effectiveUser = signIn.user;
+        File runtimeDir = TOOL.runtimeDir();
         File inputFile = new File(runtimeDir, "certificatewizard.input");
         File outputFile = new File(runtimeDir, UUID.randomUUID().toString() + ".output");
         writeBinding(inputFile, projectDir, outputDir, outputFile, effectiveUser, effectiveToken);
 
-        ToolClasspath toolClasspath = getCertificateWizardClasspath();
+        List<File> classpath = resolveDesktopTool(TOOL, pluginVersion(),
+                "To work on the wizard itself, run:\n"
+                + "    cd scripts/certificatewizard && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
+                + "    java -cp \"javase/target/codenameone-certificatewizard-*.jar:javase/target/libs/*\" "
+                + "com.codename1.certificatewizard.CertificateWizardLauncher");
         getLog().info("Launching certificate wizard bound to " + projectDir);
         if (effectiveToken.length() == 0) {
             getLog().warn("No Codename One bearer token was found. The wizard will open in offline mode unless "
                     + "you pass -Dtoken=<keycloak-jwt> or allow -Dcertificatewizard.login=true.");
         }
 
-        if (shouldSpawn()) {
-            launchDetached(toolClasspath, runtimeDir, inputFile, projectDir);
-            return;
-        }
-
-        Java java = createJava();
-        java.setFork(true);
-        java.setJvm(namedJavaLauncher(runtimeDir).getAbsolutePath());
-        java.setClassname("com.codename1.certificatewizard.CertificateWizardLauncher");
-        java.createClasspath().setPath(joinClasspath(toolClasspath.files));
-        configureDesktopIdentity(java, toolClasspath.primaryJar, runtimeDir);
-        java.createJvmarg().setValue("-Dcertificatewizard.input=" + inputFile.getAbsolutePath());
-        java.executeJava();
+        launchDesktopTool(TOOL, classpath, inputFile, projectDir, shouldSpawn(), null);
     }
 
     @Override
@@ -183,12 +145,6 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         return false;
     }
 
-    private void configureDesktopIdentity(Java java, File jar, File runtimeDir) {
-        for (String arg : desktopIdentityArgs(jar, runtimeDir)) {
-            java.createJvmarg().setValue(arg);
-        }
-    }
-
     private boolean shouldSpawn() {
         String legacySpawn = System.getProperty("spawn");
         if (legacySpawn != null) {
@@ -197,72 +153,12 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         return spawn;
     }
 
-    private void launchDetached(ToolClasspath toolClasspath, File runtimeDir, File inputFile, File projectDir)
-            throws MojoExecutionException {
-        File log = new File(runtimeDir, "certificatewizard.log");
-        List<String> command = new ArrayList<String>();
-        command.add(namedJavaLauncher(runtimeDir).getAbsolutePath());
-        command.addAll(desktopIdentityArgs(toolClasspath.primaryJar, runtimeDir));
-        command.add("-Dcertificatewizard.input=" + inputFile.getAbsolutePath());
-        command.add("-cp");
-        command.add(joinClasspath(toolClasspath.files));
-        command.add("com.codename1.certificatewizard.CertificateWizardLauncher");
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(projectDir);
-        pb.redirectErrorStream(true);
-        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-        try {
-            pb.start();
-            getLog().info("Certificate Wizard launched in the background. Log: " + log.getAbsolutePath());
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to launch Certificate Wizard", ex);
-        }
-    }
-
-    private String javaExecutable() {
-        String executable = isWindows() ? "javaw.exe" : "java";
-        return new File(new File(System.getProperty("java.home"), "bin"), executable).getAbsolutePath();
-    }
-
     File namedJavaLauncher(File runtimeDir) {
-        File java = new File(javaExecutable());
-        if (isWindows()) {
-            // Never copy javaw.exe out of the JDK: a copied launcher loses the JDK's
-            // bin directory as its DLL search anchor, so dependent native libraries
-            // can bind to wrong DLLs from System32/PATH and break rendering
-            // (issue #5443). Launch the real javaw.exe instead.
-            return java;
-        }
-        File launcher = new File(runtimeDir, "Certificate Wizard");
-        try {
-            Files.deleteIfExists(launcher.toPath());
-            Files.createSymbolicLink(launcher.toPath(), java.toPath());
-            return launcher;
-        } catch (IOException | UnsupportedOperationException | SecurityException ex) {
-            getLog().debug("Unable to create Certificate Wizard launcher symlink: " + ex.getMessage());
-            return java;
-        }
+        return TOOL.javaLauncher(runtimeDir, MavenLog.of(getLog()));
     }
 
     List<String> desktopIdentityArgs(File jar, File runtimeDir) {
-        List<String> args = new ArrayList<String>();
-        args.add("-Dapple.awt.application.name=Certificate Wizard");
-        args.add("-Dcom.apple.mrj.application.apple.menu.about.name=Certificate Wizard");
-        args.add("-Dsun.awt.application.name=Certificate Wizard");
-        args.add("-Dsun.awt.X11.XWMClass=CertificateWizard");
-        if (isJava9OrNewer()) {
-            args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
-            args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
-        }
-        if (!isMacOs()) {
-            return args;
-        }
-        args.add("-Xdock:name=Certificate Wizard");
-        File icon = extractWizardIcon(jar, runtimeDir);
-        if (icon != null && icon.isFile()) {
-            args.add("-Xdock:icon=" + icon.getAbsolutePath());
-        }
-        return args;
+        return TOOL.identityArgs(jar, runtimeDir, MavenLog.of(getLog()));
     }
 
     static boolean isMacOs() {
@@ -279,94 +175,7 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
     }
 
     File extractWizardIcon(File jar, File runtimeDir) {
-        File iconFile = new File(runtimeDir, "certificate-wizard-icon.png");
-        try (JarFile jf = new JarFile(jar)) {
-            JarEntry entry = jf.getJarEntry("icon.png");
-            if (entry == null) {
-                getLog().debug("Certificate wizard jar does not contain icon.png");
-                return null;
-            }
-            try (InputStream in = jf.getInputStream(entry)) {
-                FileUtils.copyInputStreamToFile(in, iconFile);
-            }
-            return iconFile;
-        } catch (IOException ex) {
-            getLog().debug("Unable to extract certificate wizard dock icon: " + ex.getMessage());
-            return null;
-        }
-    }
-
-    private LoginResult interactiveLogin() {
-        if (loginTimeoutSeconds <= 0) {
-            return null;
-        }
-        String key = UUID.randomUUID().toString();
-        long deadline = System.currentTimeMillis() + loginTimeoutSeconds * 1000L;
-        try {
-            String root = normalizeBaseUrl(baseUrl);
-            String redirect = root + "/loggedIn.html";
-            String loginUrl = root + "/appsec/7.0/set-user?redirect=" + enc(redirect)
-                    + "&loginKey=" + enc(key);
-            getLog().info("Opening Codename One sign-in for certificate wizard authentication");
-            getLog().info(loginUrl);
-            openBrowser(loginUrl);
-            while (System.currentTimeMillis() < deadline) {
-                LoginResult result = pollLogin(root, key);
-                if (result != null) {
-                    getLog().info("Received Codename One signing API token for " + result.user);
-                    return result;
-                }
-                try {
-                    Thread.sleep(2000L);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    return null;
-                }
-            }
-            getLog().warn("Timed out waiting for Codename One browser login");
-        } catch (Exception ex) {
-            getLog().warn("Unable to complete browser login: " + ex.getMessage());
-        }
-        return null;
-    }
-
-    private LoginResult pollLogin(String root, String key) throws IOException {
-        URL url = new URL(root + "/poll-user?ver=2&loginKey=" + enc(key));
-        HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        try {
-            con.setConnectTimeout(10000);
-            con.setReadTimeout(10000);
-            con.setRequestMethod("GET");
-            int code = con.getResponseCode();
-            if (code == 404) {
-                return null;
-            }
-            if (code != 200) {
-                getLog().debug("Codename One login poll returned HTTP " + code);
-                return null;
-            }
-            String body = IOUtils.toString(con.getInputStream(), StandardCharsets.UTF_8).trim();
-            if (body.length() == 0) {
-                return null;
-            }
-            String[] lines = body.split("\\r?\\n", 2);
-            String receivedToken = lines[0].trim();
-            if (receivedToken.length() == 0) {
-                return null;
-            }
-            String receivedUser = lines.length > 1 ? lines[1].trim() : "";
-            return new LoginResult(receivedToken, receivedUser);
-        } finally {
-            con.disconnect();
-        }
-    }
-
-    private void openBrowser(String url) throws Exception {
-        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            Desktop.getDesktop().browse(new URI(url));
-        } else {
-            getLog().warn("Desktop browsing is not available. Open the URL above in a browser to continue.");
-        }
+        return TOOL.extractIcon(jar, runtimeDir, MavenLog.of(getLog()));
     }
 
     private void writeBinding(File inputFile, File projectDir, File outDir, File outputFile,
@@ -386,82 +195,6 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         }
     }
 
-    private ToolClasspath getCertificateWizardClasspath() throws MojoExecutionException, MojoFailureException {
-        Artifact artifact = getArtifact("com.codenameone", "codenameone-certificatewizard");
-        if (artifact == null) {
-            artifact = repositorySystem.createArtifact(
-                    "com.codenameone", "codenameone-certificatewizard", pluginVersion(), "jar");
-        }
-        ToolClasspath classpath = resolveToolClasspath(artifact);
-        if (classpath.primaryJar == null || classpath.files.isEmpty()) {
-            throw new MojoFailureException(
-                    "Could not resolve the certificate wizard "
-                    + "(com.codenameone:codenameone-certificatewizard:" + pluginVersion()
-                    + ").\n"
-                    + "It is distributed through Maven Central alongside the Codename One plugin.\n"
-                    + "To work on the wizard itself, run:\n"
-                    + "    cd scripts/certificatewizard && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
-                    + "    java -cp \"javase/target/codenameone-certificatewizard-*.jar:javase/target/libs/*\" "
-                    + "com.codename1.certificatewizard.CertificateWizardLauncher");
-        }
-        return classpath;
-    }
-
-    private ToolClasspath resolveToolClasspath(Artifact artifact) {
-        List<File> files = new ArrayList<File>();
-        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
-                .setLocalRepository(localRepository)
-                .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
-                .setResolveTransitively(true)
-                .setArtifact(artifact));
-        File primary = addArtifactFile(files, artifact);
-        if (result != null && result.getArtifacts() != null) {
-            for (Artifact resolved : result.getArtifacts()) {
-                File file = addArtifactFile(files, resolved);
-                if (primary == null && resolved != null
-                        && "com.codenameone".equals(resolved.getGroupId())
-                        && "codenameone-certificatewizard".equals(resolved.getArtifactId())) {
-                    primary = file;
-                }
-            }
-        }
-        return new ToolClasspath(primary, files);
-    }
-
-    private static File addArtifactFile(List<File> files, Artifact artifact) {
-        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) {
-            return null;
-        }
-        File file = artifact.getFile().getAbsoluteFile();
-        if (!file.exists()) {
-            return null;
-        }
-        if (!files.contains(file)) {
-            files.add(file);
-        }
-        return file;
-    }
-
-    private static String joinClasspath(List<File> files) {
-        StringBuilder out = new StringBuilder();
-        for (File file : files) {
-            if (out.length() > 0) {
-                out.append(File.pathSeparator);
-            }
-            out.append(file.getAbsolutePath());
-        }
-        return out.toString();
-    }
-
-    private static final class ToolClasspath {
-        final File primaryJar;
-        final List<File> files;
-
-        ToolClasspath(File primaryJar, List<File> files) {
-            this.primaryJar = primaryJar;
-            this.files = files;
-        }
-    }
 
     private String pluginVersion() {
         if (pluginArtifacts != null) {
@@ -476,103 +209,7 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
                 project.getProperties().getProperty("cn1.version", "8.0-SNAPSHOT"));
     }
 
-    private static String firstNonEmpty(String a, String b, String c) {
-        if (a != null && a.trim().length() > 0) {
-            return a.trim();
-        }
-        if (b != null && b.trim().length() > 0) {
-            return b.trim();
-        }
-        return c == null ? "" : c;
-    }
-
-    private static String firstNonEmpty(String a, String b) {
-        return firstNonEmpty(a, b, "");
-    }
-
-    private static String normalizeBaseUrl(String url) {
-        String out = url == null || url.trim().length() == 0
-                ? "https://cloud.codenameone.com" : url.trim();
-        while (out.endsWith("/")) {
-            out = out.substring(0, out.length() - 1);
-        }
-        return out;
-    }
-
-    private static String enc(String s) throws IOException {
-        return URLEncoder.encode(s, "UTF-8");
-    }
-
     static boolean isUsableJwt(String token) {
-        long expiresAt = jwtExpiresAt(token);
-        return expiresAt > System.currentTimeMillis() + 120000L;
-    }
-
-    static long jwtExpiresAt(String token) {
-        if (token == null) {
-            return -1L;
-        }
-        String[] parts = token.split("\\.", -1);
-        if (parts.length < 2) {
-            return -1L;
-        }
-        try {
-            byte[] decoded = Base64.getUrlDecoder().decode(padBase64(parts[1]));
-            String payload = new String(decoded, StandardCharsets.UTF_8);
-            long exp = numericJsonClaim(payload, "exp");
-            return exp <= 0L ? -1L : exp * 1000L;
-        } catch (RuntimeException ex) {
-            return -1L;
-        }
-    }
-
-    private static long numericJsonClaim(String json, String name) {
-        String quoted = "\"" + name + "\"";
-        int idx = json.indexOf(quoted);
-        if (idx < 0) {
-            return -1L;
-        }
-        int colon = json.indexOf(':', idx + quoted.length());
-        if (colon < 0) {
-            return -1L;
-        }
-        int start = colon + 1;
-        while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
-            start++;
-        }
-        int end = start;
-        while (end < json.length() && Character.isDigit(json.charAt(end))) {
-            end++;
-        }
-        if (end == start) {
-            return -1L;
-        }
-        try {
-            return Long.parseLong(json.substring(start, end));
-        } catch (NumberFormatException ex) {
-            return -1L;
-        }
-    }
-
-    private static String padBase64(String value) {
-        int remainder = value.length() % 4;
-        if (remainder == 0) {
-            return value;
-        }
-        StringBuilder out = new StringBuilder(value);
-        for (int i = remainder; i < 4; i++) {
-            out.append('=');
-        }
-        return out.toString();
-    }
-
-    private static final class LoginResult {
-        final String token;
-        final String user;
-
-        LoginResult(String token, String user) {
-            this.token = token;
-            this.user = user == null ? "" : user;
-        }
+        return CodenameOneLogin.isUsableJwt(token);
     }
 }

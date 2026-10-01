@@ -29,6 +29,8 @@ From the project root:
 mvn -pl common cn1:debug -Djpda.address=8000
 ```
 
+In a **Gradle** project the same thing is `./gradlew debug`: the simulator starts suspended and listens on port **5005** (not configurable through `jpda.address`), so every `8000` below becomes `5005` and every `-sourcepath common/src/main/java` becomes `-sourcepath src/main/java`.
+
 Output looks like:
 
 ```

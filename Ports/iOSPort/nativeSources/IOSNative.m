@@ -8037,12 +8037,15 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_ST
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {}
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MPMoviePlayer / AVKit video peer functions)
 
+static void cn1ObserveSystemColors(void);
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_OSX
     // Asked of the system rather than inferred. The Catalyst path derives dark
     // mode from the content pane's luma because it has no reliable way to read
     // the host appearance; AppKit just answers, including when the user changes
     // it while the application is running.
+    cn1ObserveSystemColors();
     return CN1MacHostIsDarkMode() ? JAVA_TRUE : JAVA_FALSE;
 #else
 #if !TARGET_OS_WATCH
@@ -8541,7 +8544,117 @@ void com_codename1_impl_ios_IOSNative_bonjourPublishStop___long(CN1_THREAD_STATE
 #endif
 }
 
+/* OS theme snapshots are captured on the Apple UI thread; Java receives values only. */
+static void cn1NativeThemeDidChange(NSNotification* notification) {
+    (void)notification;
+    com_codename1_impl_ios_IOSImplementation_nativeThemeSettingsChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+static void cn1ObserveSystemColors(void) {
+#if TARGET_OS_OSX
+    static dispatch_once_t observing;
+    dispatch_once(&observing, ^{
+        [[NSNotificationCenter defaultCenter] addObserverForName:NSSystemColorsDidChangeNotification
+            object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
+    });
+#endif
+}
+
+static void cn1ObserveContentSizeChanges(void) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    static dispatch_once_t observing;
+    dispatch_once(&observing, ^{
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIContentSizeCategoryDidChangeNotification
+            object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
+    });
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_String(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    __block NSString* snapshot = nil;
+    void (^readSettings)(void) = ^{
+        NSMutableString* values = [NSMutableString string];
+#if TARGET_OS_OSX
+        cn1ObserveSystemColors();
+        [values appendFormat:@"fontFamily=native:\nfontSize=%g\n", [NSFont systemFontSize] * (scaleValue > 0 ? scaleValue : 1)];
+        if (@available(macOS 10.14, *)) {
+            for (int dark = 0; dark < 2; ++dark) {
+                NSAppearance* appearance = [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+                void (^readColors)(void) = ^{
+                    NSArray* tokens = @[@"accent-color", @"selection-color", @"window-bg-color", @"control-bg-color",
+                        @"view-bg-color", @"text-color", @"text-secondary-color", @"separator-color"];
+                    NSArray* colors = @[[NSColor controlAccentColor], [NSColor selectedTextBackgroundColor],
+                        [NSColor windowBackgroundColor], [NSColor controlBackgroundColor], [NSColor textBackgroundColor],
+                        [NSColor labelColor], [NSColor secondaryLabelColor], [NSColor separatorColor]];
+                    for (NSUInteger i = 0; i < tokens.count; ++i) {
+                        NSColor* color = [colors[i] colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
+                        if (!color) continue;
+                        // Flatten semantic translucent colors onto the matching window surface.
+                        NSColor* background = [[NSColor windowBackgroundColor] colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
+                        CGFloat a = color.alphaComponent;
+                        unsigned r = (unsigned)lround(255 * (color.redComponent*a + background.redComponent*(1-a)));
+                        unsigned g = (unsigned)lround(255 * (color.greenComponent*a + background.greenComponent*(1-a)));
+                        unsigned b = (unsigned)lround(255 * (color.blueComponent*a + background.blueComponent*(1-a)));
+                        [values appendFormat:@"%@%@=%02x%02x%02x\n", tokens[i], dark ? @"-dark" : @"", r, g, b];
+                    }
+                };
+                if (@available(macOS 11.0, *)) {
+                    [appearance performAsCurrentDrawingAppearance:readColors];
+                } else {
+                    // Catalina supports semantic colors but not the block appearance API.
+                    NSAppearance* previous = [[NSAppearance currentAppearance] retain];
+                    @try {
+                        [NSAppearance setCurrentAppearance:appearance];
+                        readColors();
+                    } @finally {
+                        [NSAppearance setCurrentAppearance:previous];
+                        [previous release];
+                    }
+                }
+            }
+        }
+#elif !TARGET_OS_WATCH && !TARGET_OS_TV
+        cn1ObserveContentSizeChanges();
+        // systemFontSize is the unscaled baseline also used by getLargerTextScale.
+        [values appendFormat:@"fontFamily=native:\nfontSize=%g\n", [UIFont systemFontSize] * (scaleValue > 0 ? scaleValue : 1)];
+        if (@available(iOS 13.0, *)) {
+            for (int dark = 0; dark < 2; ++dark) {
+                UITraitCollection* traits = [UITraitCollection traitCollectionWithUserInterfaceStyle:
+                        dark ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight];
+                NSArray* tokens = @[@"accent-color", @"window-bg-color", @"view-bg-color", @"control-bg-color",
+                    @"text-color", @"text-secondary-color", @"separator-color"];
+                NSArray* colors = @[[UIColor systemBlueColor], [UIColor systemBackgroundColor],
+                    [UIColor secondarySystemBackgroundColor], [UIColor secondarySystemBackgroundColor],
+                    [UIColor labelColor], [UIColor secondaryLabelColor], [UIColor separatorColor]];
+                UIColor* background = [[UIColor systemBackgroundColor] resolvedColorWithTraitCollection:traits];
+                CGFloat br=0, bg=0, bb=0, ba=0;
+                [background getRed:&br green:&bg blue:&bb alpha:&ba];
+                for (NSUInteger i = 0; i < tokens.count; ++i) {
+                    UIColor* color = [colors[i] resolvedColorWithTraitCollection:traits];
+                    CGFloat r=0, g=0, b=0, a=0;
+                    if (![color getRed:&r green:&g blue:&b alpha:&a]) continue;
+                    [values appendFormat:@"%@%@=%02x%02x%02x\n", tokens[i], dark ? @"-dark" : @"",
+                        (unsigned)lround(255*(r*a+br*(1-a))), (unsigned)lround(255*(g*a+bg*(1-a))),
+                        (unsigned)lround(255*(b*a+bb*(1-a)))];
+                }
+            }
+        }
+#endif
+        snapshot = [values copy];
+    };
+    if ([NSThread isMainThread]) readSettings();
+    else dispatch_sync(dispatch_get_main_queue(), readSettings);
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG snapshot);
+    [snapshot release];
+    POOL_END();
+    return result;
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // Subscribe even at the normal size, before optional palette/font snapshots.
+    cn1ObserveContentSizeChanges();
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];
@@ -8561,6 +8674,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    cn1ObserveContentSizeChanges();
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];

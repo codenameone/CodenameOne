@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 NATIVE = ROOT / 'Ports/iOSPort/nativeSources'
 source = (NATIVE / 'IOSNative.m').read_text()
 delegate = (NATIVE / 'CodenameOne_GLAppDelegate.m').read_text()
-builder = (ROOT / 'maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java').read_text()
+builder = (ROOT / 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java').read_text()
 
 # Use the template's flag and the builder's actual disabling replacement. The builder switches
 # defines through Executor.replaceMarker, which matches the whole name (a plain String.replace

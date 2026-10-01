@@ -20,6 +20,17 @@ mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
 
 `-Dcodename1.platform=backend` is required: the module sits in a Maven profile.
 
+In a **Gradle** project the same two commands are tasks. The backend is the
+`backend` subproject of an app (`./gradlew addBackend` creates it), or the root
+project of a backend-only application, where you drop the `:backend:` prefix:
+
+```bash
+CN1_PROFILE=dev ./gradlew :backend:runBackend
+./gradlew :backend:backendPackage
+```
+
+Everything else in this file applies to both build tools.
+
 ## Rules that differ from a normal Java server
 
 - **Java 8 language level, backend class library only.** The native build compiles
@@ -220,7 +231,7 @@ Custom instruments: `Metrics.counter(...)`, `Metrics.histogram(...)`,
   `OTEL_EXPORTER_OTLP_ENDPOINT` at a collector.
 - Management endpoints: `/manage/health`, `/manage/metrics`, `/manage/prometheus`,
   `/manage/jobs`, `/manage/managed`, and `POST /manage/managed/{bean}/{operation}`.
-  Always present in the `cn1:backend` dev run. A **packaged** binary contains them
+  Always present in the `cn1:backend` / `runBackend` dev run. A **packaged** binary contains them
   only if the build asked -- `@EnableManagement` on a class or
   `cn1.management.enabled=true` in a properties file -- otherwise the code is not
   in the binary at all. Outside dev they also need `cn1.management.token` (env).
@@ -228,7 +239,7 @@ Custom instruments: `Metrics.counter(...)`, `Metrics.histogram(...)`,
 
 ## MCP: the running backend as a tool server
 
-On the dev profile, `cn1:backend` serves MCP at `http://127.0.0.1:8080/mcp` and
+On the dev profile, `cn1:backend` (Gradle: `runBackend`) serves MCP at `http://127.0.0.1:8080/mcp` and
 prints the URL at start-up. Register it once:
 
 ```bash
@@ -306,6 +317,7 @@ The `test` profile is a development profile: in-memory SQLite, tables created.
 ## Loop before reporting "done"
 
 1. `CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend`
+   (Gradle: `CN1_PROFILE=dev ./gradlew :backend:runBackend`)
 2. `backend_routes` / `backend_beans` — the wiring is what you meant.
 3. `backend_call` each changed endpoint; `backend_requests` with `failuresOnly`.
 4. `backend_sql` to confirm what was written.

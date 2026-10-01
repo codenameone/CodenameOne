@@ -47,6 +47,8 @@
  */
 
 #Constants {
+    /* Marks bundled defaults eligible for optional OS settings inheritance. */
+    nativeThemeDefaultsBool: true;
     /* libadwaita named colours, light. Overridable at runtime: each var(--name, fallback)
        bakes the fallback in as the default and emits a @cn1-bind constant, so a port that
        reads the user's real accent through gtk_style_context_lookup_color can push it in

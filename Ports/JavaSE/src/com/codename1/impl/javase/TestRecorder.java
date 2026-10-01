@@ -63,7 +63,7 @@ public class TestRecorder extends javax.swing.JFrame {
     /** Creates new form TestRecorder */
     public TestRecorder() {
         initComponents();
-        File f = new File("codenameone_settings.properties");
+        File f = JavaSEPort.projectSettingsFile();
         if (!f.exists()) {
             saveRecording.setEnabled(false);
         }
@@ -663,7 +663,16 @@ public class TestRecorder extends javax.swing.JFrame {
 
 private void saveRecordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveRecordingActionPerformed
     updateTestCode();
-    File test = new File("test");
+    // Ant keeps tests in test/; Maven and Gradle in src/test/java of the
+    // project directory, where their builds compile them from.
+    com.codename1.project.ProjectLayout layout = SimulatorProject.current();
+    File test = layout != null ? layout.testSourceDir() : new File("test");
+    // A Gradle launch names the test source set's real directory, which a
+    // sourceSets block can move; a test saved elsewhere would never run.
+    String configured = System.getProperty("cn1.hotReload.testRoot");
+    if (configured != null && configured.length() > 0) {
+        test = new File(configured);
+    }
     test.mkdirs();
     File tpack = new File(test, testsPackage.getText().replace('.', File.separatorChar));
     tpack.mkdirs();

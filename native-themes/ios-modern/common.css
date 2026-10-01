@@ -64,6 +64,14 @@
  */
 
 #Constants {
+    /* Marks bundled defaults eligible for optional OS settings inheritance. */
+    nativeThemeDefaultsBool: true;
+    --window-bg-color: #f2f2f7;
+    --window-bg-color-dark: #1c1c1e;
+    --text-secondary-color: #3c3c43;
+    --text-secondary-color-dark: #ebebf5;
+    --text-color: #000000;
+    --text-color-dark: #ffffff;
     /* Accent palette overridable at runtime via addThemeProps. The
        light values feed the default rules; the -dark counterparts feed
        the corresponding $Dark<UIID> entries the dark @media block
@@ -315,14 +323,14 @@
 }
 
 Component {
-    color: #000000;
+    color: var(--text-color, #000000);
     background-color: #ffffff;
     padding: 0;
     margin: 0;
 }
 
-Form { background-color: #f2f2f7; padding: 0; margin: 0; }
-ContentPane { background-color: #f2f2f7; padding: 0; margin: 0; }
+Form { background-color: var(--window-bg-color, #f2f2f7); padding: 0; margin: 0; }
+ContentPane { background-color: var(--window-bg-color, #f2f2f7); padding: 0; margin: 0; }
 /* Container has no surface of its own; specific UIIDs that need a
    fill (Form, Dialog, Tab, etc.) declare it explicitly. Transparent
    default means a SpanLabel / FlowLayout / generic wrapper inside a
@@ -337,14 +345,14 @@ Container { background-color: transparent; padding: 0; margin: 0; }
    styled with UIID="Label" so this transparency also fixes the
    visible block behind dialog body text. */
 Label {
-    color: #000000;
+    color: var(--text-color, #000000);
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     font-family: "native:MainRegular";
 }
 
-SecondaryLabel { cn1-derive: Label; color: #3c3c43; }
+SecondaryLabel { cn1-derive: Label; color: var(--text-secondary-color, #3c3c43); }
 TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
 /* SpanLabel + its inner SpanLabelText render transparent so when
    placed on a translucent surface (Dialog, PopupContent) the
@@ -494,7 +502,7 @@ TextField {
     border-radius: 1.4mm;
     backdrop-filter: blur(20px);
 }
-TextField.pressed { background-color: #f2f2f7; border: 0.25mm solid rgba(0,0,0,0.05); border-radius: 1.4mm; }
+TextField.pressed { background-color: var(--window-bg-color, #f2f2f7); border: 0.25mm solid rgba(0,0,0,0.05); border-radius: 1.4mm; }
 /* The native disabled field barely changes: same cell, text dims slightly. */
 TextField.disabled { color: rgba(0,0,0,0.4); background-color: #ffffff; border: 0.25mm solid rgba(0,0,0,0.03); border-radius: 1.4mm; }
 
@@ -502,7 +510,7 @@ TextField.disabled { color: rgba(0,0,0,0.4); background-color: #ffffff; border: 
    rendered as a bare label. Give it the same contrasting-glass cell chrome as a
    TextField so it reads as a tappable field. */
 Picker { cn1-derive: TextField; color: #000000; text-align: left; }
-Picker.pressed { cn1-derive: TextField; background-color: #f2f2f7; }
+Picker.pressed { cn1-derive: TextField; background-color: var(--window-bg-color, #f2f2f7); }
 Picker.disabled { cn1-derive: TextField; color: rgba(0,0,0,0.3); }
 
 TextArea {
@@ -1007,7 +1015,7 @@ MultiLine4 {
 Dialog {
     /* iOS alert surface: an opaque light-grey card (secondary system background)
        so the card reads clearly, with a rounded corner. */
-    background-color: #f2f2f7;
+    background-color: var(--window-bg-color, #f2f2f7);
     color: #000000;
     padding: 0;
     margin: 0;
@@ -1061,8 +1069,8 @@ FloatingActionButton.pressed { background-color: var(--accent-pressed-color, #00
    bubbles centre with the muted secondary text colour. The TextArea
    inside each bubble (ChatBubbleText) inherits via cn1-derive so the
    text colour matches the bubble's foreground. */
-ChatView { background-color: #f2f2f7; padding: 0; margin: 0; }
-ChatViewMessages { background-color: #f2f2f7; padding: 1mm; margin: 0; }
+ChatView { background-color: var(--window-bg-color, #f2f2f7); padding: 0; margin: 0; }
+ChatViewMessages { background-color: var(--window-bg-color, #f2f2f7); padding: 1mm; margin: 0; }
 ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
 ChatBubbleUser {
     background-color: var(--accent-color, #007aff);
@@ -1094,7 +1102,7 @@ ChatTypingIndicator {
 ChatInput { background-color: #ffffff; padding: 1mm 2mm; margin: 0; }
 ChatInputField {
     cn1-derive: TextField;
-    background-color: #f2f2f7;
+    background-color: var(--window-bg-color, #f2f2f7);
     padding: 2mm 3mm;
     margin: 0.5mm;
     border-radius: 3mm;
@@ -1188,12 +1196,12 @@ TableHeader.disabled { margin: 0; color: #6c6c70; font-family: "native:MainBold"
    Where a state is meant to differ it is declared above and left alone here. */
 
 @media (prefers-color-scheme: dark) {
-    Component { color: #ffffff; background-color: #000000; }
-    Form { background-color: #1c1c1e; padding: 0; margin: 0; }
-    ContentPane { background-color: #1c1c1e; padding: 0; margin: 0; }
+    Component { color: var(--text-color-dark, #ffffff); background-color: #000000; }
+    Form { background-color: var(--window-bg-color-dark, #1c1c1e); padding: 0; margin: 0; }
+    ContentPane { background-color: var(--window-bg-color-dark, #1c1c1e); padding: 0; margin: 0; }
 
-    Label { color: #ffffff; background-color: transparent; }
-    SecondaryLabel { color: #ebebf5; background-color: transparent; }
+    Label { color: var(--text-color-dark, #ffffff); background-color: transparent; }
+    SecondaryLabel { color: var(--text-secondary-color-dark, #ebebf5); background-color: transparent; }
     TertiaryLabel { color: #8e8e93; background-color: transparent; }
     SpanLabel { color: #ffffff; background-color: transparent; }
     SpanLabelText { color: #ffffff; background-color: transparent; }
@@ -1358,7 +1366,7 @@ TableHeader.disabled { margin: 0; color: #6c6c70; font-family: "native:MainBold"
        stripes bleed through and obscure the text. DialogBody /
        Title / ContentPane / CommandArea stay transparent so the
        Dialog surface is the single colour they all share. */
-    Dialog { background-color: #1c1c1e; color: #ffffff; }
+    Dialog { background-color: var(--window-bg-color-dark, #1c1c1e); color: #ffffff; }
     DialogBody { background-color: transparent; color: #8e8e93; }
     DialogTitle { color: #ffffff; background-color: transparent; }
     DialogContentPane { background-color: transparent; }
@@ -1371,14 +1379,14 @@ TableHeader.disabled { margin: 0; color: #6c6c70; font-family: "native:MainBold"
     FloatingActionButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
     FloatingActionButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }
 
-    ChatView { background-color: #1c1c1e; }
-    ChatViewMessages { background-color: #1c1c1e; }
+    ChatView { background-color: var(--window-bg-color-dark, #1c1c1e); }
+    ChatViewMessages { background-color: var(--window-bg-color-dark, #1c1c1e); }
     ChatBubbleUser { background-color: var(--accent-color-dark, #0a84ff); color: #ffffff; }
     ChatBubbleAssistant { background-color: #2c2c2e; color: #ffffff; }
     ChatBubbleSystem { color: #8e8e93; }
     ChatBubbleText { color: #ffffff; background-color: transparent; }
     ChatTypingIndicator { color: #8e8e93; }
-    ChatInput { background-color: #1c1c1e; }
+    ChatInput { background-color: var(--window-bg-color-dark, #1c1c1e); }
     ChatInputField { background-color: #2c2c2e; color: #ffffff; border-radius: 3mm; }
     /* Attach (+) and voice (Mic) mirror the dark regular Button (blue glyph on a
        dark glass pill) -- and must keep the SAME capsule shape as the light

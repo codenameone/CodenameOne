@@ -10,6 +10,67 @@ ramps, and state-specific styles are all reachable from your own
 The legacy iOS 7 (iOS) and Holo Light (Android) themes remain the
 default so existing apps see no behavior change.
 
+=== Inheriting OS colors and fonts
+
+Modern native themes can optionally follow the user's operating-system settings.
+Colors and fonts are independent opt-ins; both are off by default. Enable them in
+an application theme that includes the native theme:
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=native-theme-os-settings,indent=0]
+----
+
+Alternatively, configure the `UIManager` before loading the application theme:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NativeThemesJava001Snippet.java[tag=native-theme-os-settings,indent=0]
+----
+
+An explicit theme constant takes precedence over its Java setter when the theme
+is built. After changing a setter on an already loaded theme, call
+`UIManager.refreshTheme()` and refresh/revalidate the visible form. A theme
+constant set to `false` must also be changed or removed before a setter can enable
+that option.
+
+Color inheritance feeds the theme's semantic palette bindings. Font inheritance
+uses the normal OS UI font family and size while retaining the native theme's
+relative heading sizes and styles. Explicit application style properties and
+palette constants override these inherited defaults. Bundled application fonts
+and icon fonts aren't replaced. Legacy hand-authored native themes don't carry
+the inheritance metadata and retain their existing appearance.
+
+The existing larger-text accessibility option remains independent. It scales
+eligible fonts after OS font inheritance, so enabling both doesn't apply the OS
+text-size multiplier twice. Existing dark-mode selection remains independent too.
+
+Settings changes and application activation trigger a coalesced theme refresh.
+The framework preserves application overrides, refreshes visible styles and
+layout, and restores bundled defaults when settings become unavailable or an
+inheritance option is disabled. Unsupported settings fall back individually.
+
+[cols="1,3", options="header"]
+|===
+|Port |Settings source
+|Windows native |Windows UISettings accent/selection palette, high-contrast system
+colors, and the nonclient message font. Normal Fluent surfaces retain their
+bundled colors where no corresponding OS value is exposed.
+|macOS native |AppKit semantic colors and normal system UI typography.
+|Linux native |The active GTK palette and GTK font setting. Only available named
+colors are inherited; the opposite appearance retains its bundled palette.
+|Android |Platform normal text appearance and, on Android 12 or newer, public
+dynamic-color resources. Older versions retain the bundled palette.
+|iOS |UIKit semantic colors on iOS 13 or newer and normal system UI typography.
+|JavaSE |Available AWT desktop properties; the simulator uses explicit simulated
+settings rather than the host's palette.
+|===
+
+In the simulator, use *Simulate > OS Theme Settings* to choose an accent and UI
+font or reset the simulated settings. These controls exercise the app's opt-ins;
+they don't enable inheritance for the app. Tests can supply a deterministic
+snapshot with `JavaSEPort.setSimulatorNativeThemeSettings(...)`.
+
 === Selecting a theme
 
 Three build hints control the platform native theme. None of them

@@ -79,7 +79,11 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         // project whose pom never binds this mojo. See that class.
         // Parameters live on AbstractCN1Mojo so the self-repair and the
         // placeholder diagnostic resolve the same configuration this goal does.
-        newSvgTranscodeRunner().run();
+        try {
+            newSvgTranscodeRunner().run();
+        } catch (com.codename1.builders.BuildException ex) {
+            throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
+        }
         registerSourceRoot(svgOutputDir());
     }
 }
