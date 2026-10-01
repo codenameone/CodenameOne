@@ -104,8 +104,8 @@ public class IconRenderElement extends RenderElement {
             return null;
         }
         Label l = new Label("", "FlutterIcon");
-        l.getAllStyles().setPadding(0, 0, 0, 0);
-        l.getAllStyles().setMargin(0, 0, 0, 0);
+        stylesToSet(l).setPadding(0, 0, 0, 0);
+        stylesToSet(l).setMargin(0, 0, 0, 0);
         applyIcon(l);
         return l;
     }
@@ -128,7 +128,7 @@ public class IconRenderElement extends RenderElement {
         com.codename1.flutter.Color fg = effectiveColor(themed);
         if (fg != null) {
             s.setFgColor(fg.rgb());
-            l.getAllStyles().setFgColor(fg.rgb());
+            stylesToSet(l).setFgColor(fg.rgb());
         }
         s.setBgTransparency(0);
         try {

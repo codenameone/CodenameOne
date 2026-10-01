@@ -116,6 +116,43 @@ class ZOrderTest {
         assertEquals(List.of("a", "b3", "c"), attachTags());
     }
 
+    /// A first build attaches by appending: Element.anchorForSlot answers "append"
+    /// without searching when the host's last component already precedes the new
+    /// child, and updateChildren skips the reorder walk when there were no old
+    /// children. Nesting is where either shortcut would go wrong if its tree-order
+    /// test were.
+    @Test
+    void nestedInitialMountAttachesInTreeOrder() {
+        owner = new BuildOwner();
+        host = new RenderHost();
+        Column inner = new Column();
+        inner.children(DartList.of((Widget) new MarkerBox("b2"), new MarkerBox("b3")));
+        Column middle = new Column();
+        middle.children(DartList.of((Widget) new MarkerBox("b1"), inner));
+        Column col = new Column();
+        col.children(DartList.of((Widget) new MarkerBox("a"), middle, new MarkerBox("c")));
+        FlutterUI.mount(col, host, owner);
+        assertEquals(List.of("a", "b1", "b2", "b3", "c"), attachTags());
+    }
+
+    /// Children inflated into a parent that had none, after a LATER sibling is already
+    /// attached: the append shortcut must not apply, and the search must put them
+    /// before that sibling.
+    @Test
+    void childrenGainedLaterLandBeforeTheLaterSibling() {
+        Column empty = new Column();
+        empty.children(DartList.<Widget>of());
+        Toggler.TogglerState state = mount(empty);
+        assertEquals(List.of("a", "c"), attachTags());
+
+        final Column filled = new Column();
+        filled.children(DartList.of((Widget) new MarkerBox("x"), new MarkerBox("y")));
+        state.setState(() -> state.child = filled);
+        owner.flushSync();
+
+        assertEquals(List.of("a", "x", "y", "c"), attachTags());
+    }
+
     @Test
     void replacementOfTheFirstChildInsertsAtTheFront() {
         owner = new BuildOwner();

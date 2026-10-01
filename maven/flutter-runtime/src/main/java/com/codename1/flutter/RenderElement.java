@@ -286,6 +286,20 @@ public abstract class RenderElement extends Element {
                 || !c.isEnabled();
     }
 
+    /// The style an element writes its component's look into.
+    ///
+    /// getAllStyles() for a component that can change state, so every state it can
+    /// paint in carries the change. For one that cannot -- by the same test as
+    /// neutralising above -- its unselected style, which is the only one Codename One
+    /// will ever paint it from. getAllStyles() is not a cheap accessor: on first use it
+    /// builds the selected, pressed and disabled styles out of the theme and a proxy
+    /// over all four, and every text, icon, image, divider and gesture box in the tree
+    /// asked for it while mounting. Measured on the gallery's start-up, those styles
+    /// were about a fifth of everything mounting did, for states nothing can enter.
+    public static com.codename1.ui.plaf.Style stylesToSet(Component c) {
+        return canChangeState(c) ? c.getAllStyles() : c.getUnselectedStyle();
+    }
+
     private static boolean needsNeutralizing(Component c) {
         if (!canChangeState(c)) {
             return false;

@@ -357,18 +357,34 @@ public final class FlutterUI {
      * it to avoid restyling the host app.
      */
     private static void installMaterialBaseTheme() {
+        // The runtime's own entries -- the Flutter* UIID derives and the scroll physics
+        // constants -- go in WITH the base theme rather than as two addThemeProps calls
+        // after it. Each addThemeProps is a whole theme rebuild: it re-merges, drops
+        // every cached style and derived font, rebuilds the default styles and runs the
+        // look and feel's refresh again, and the first frame paid for that three times
+        // to end where one install ends. Merged first, the overlay still wins over the
+        // base theme key for key, exactly as layering it did.
+        java.util.Hashtable<String, Object> overlay = flutterUiidDerives();
+        overlay.putAll(scrollPhysicsProps());
         try {
             com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(
                     "/CN1FlutterMaterialTheme.res");
             String[] names = r.getThemeResourceNames();
             if (names.length > 0) {
-                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+                java.util.Hashtable theme = r.getTheme(names[0]);
+                theme.putAll(overlay);
+                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(theme);
+                return;
             }
         } catch (Throwable t) {
             com.codename1.io.Log.p("Flutter runtime: could not install Material base theme: " + t);
         }
-        installFlutterUiidDerives();
-        installFlutterScrollPhysics();
+        // No base theme: the runtime's entries still go on top of whatever is there.
+        try {
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(overlay);
+        } catch (Throwable t) {
+            com.codename1.io.Log.p("Flutter runtime: could not install UIID derives: " + t);
+        }
     }
 
     /**
@@ -431,14 +447,6 @@ public final class FlutterUI {
         return physics;
     }
 
-    private static void installFlutterScrollPhysics() {
-        try {
-            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(scrollPhysicsProps());
-        } catch (Throwable t) {
-            com.codename1.io.Log.p("Flutter runtime: could not install scroll physics: " + t);
-        }
-    }
-
     /**
      * The Flutter* UIIDs have no entries in the theme, so without these
      * derive mappings every Flutter component falls back to the tiny default
@@ -446,70 +454,66 @@ public final class FlutterUI {
      * margins) is still zeroed programmatically by the render elements —
      * only fonts and colors flow in from the derived UIIDs.
      */
-    private static void installFlutterUiidDerives() {
-        try {
-            java.util.Hashtable<String, Object> derives = new java.util.Hashtable<String, Object>();
-            String[][] map = {
-                    {"FlutterText", "Label"},
-                    {"FlutterIcon", "Label"},
-                    {"FlutterImage", "Label"},
-                    {"FlutterDivider", "Label"},
-                    {"FlutterElevatedButton", "Button"},
-                    {"FlutterTextButton", "Button"},
-                    {"FlutterOutlinedButton", "Button"},
-                    {"FlutterIconButton", "Button"},
-                    {"FlutterCard", "Container"},
-                    {"FlutterScroll", "Container"},
-                    {"FlutterGesture", "Container"},
-                    {"FlutterAppBar", "TitleArea"},
-                    {"FlutterTextField", "TextField"},
-                    {"FlutterCheckbox", "CheckBox"},
-                    {"FlutterSwitch", "Switch"},
-                    {"FlutterRadio", "RadioButton"},
-                    {"FlutterSlider", "Slider"},
-                    {"FlutterListTile", "Container"},
-                    {"FlutterBottomNavigationBar", "Container"},
-                    {"FlutterDrawer", "Container"},
-            };
-            for (String[] m : map) {
-                derives.put(m[0] + ".derive", m[1]);
-            }
-            // Every Flutter UIID gets a zero margin, in all four states.
-            //
-            // These UIIDs derive from Codename One base UIIDs, so they inherit a
-            // margin meant for Codename One layouts -- Container's 2px, Switch's
-            // 10/15 -- which Flutter geometry must not have: the widget tree
-            // decides its own spacing. RenderElement.neutralizeCn1Behaviors was
-            // already forcing it to zero, but per COMPONENT, and getAllStyles()
-            // creates the selected, pressed and disabled styles plus a proxy to
-            // do it: five Style objects each, ~1900 during the first frame of
-            // the gallery, on the one primitive ParparVM is slowest at.
-            //
-            // Declaring it in the theme instead makes the components arrive
-            // already correct, so the per-component undo can be skipped
-            // entirely. Same rendered result -- the runtime set these to zero
-            // anyway -- for none of the allocation.
-            String[] uiids = {
-                    "FlutterText", "FlutterIcon", "FlutterImage", "FlutterDivider",
-                    "FlutterElevatedButton", "FlutterTextButton", "FlutterOutlinedButton",
-                    "FlutterIconButton", "FlutterCard", "FlutterScroll", "FlutterGesture",
-                    "FlutterAppBar", "FlutterTextField", "FlutterCheckbox", "FlutterSwitch",
-                    "FlutterRadio", "FlutterSlider", "FlutterListTile",
-                    "FlutterBottomNavigationBar", "FlutterDrawer",
-                    // Not derived above -- they take the theme's default UIID, which
-                    // is where Container's 2px margin comes from.
-                    "FlutterBox", "FlutterEffect", "FlutterScaffold", "FlutterCustomPaint",
-            };
-            for (String u : uiids) {
-                derives.put(u + ".margin", "0,0,0,0");
-                derives.put(u + ".sel#margin", "0,0,0,0");
-                derives.put(u + ".press#margin", "0,0,0,0");
-                derives.put(u + ".dis#margin", "0,0,0,0");
-            }
-            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(derives);
-        } catch (Throwable t) {
-            com.codename1.io.Log.p("Flutter runtime: could not install UIID derives: " + t);
+    static java.util.Hashtable<String, Object> flutterUiidDerives() {
+        java.util.Hashtable<String, Object> derives = new java.util.Hashtable<String, Object>();
+        String[][] map = {
+                {"FlutterText", "Label"},
+                {"FlutterIcon", "Label"},
+                {"FlutterImage", "Label"},
+                {"FlutterDivider", "Label"},
+                {"FlutterElevatedButton", "Button"},
+                {"FlutterTextButton", "Button"},
+                {"FlutterOutlinedButton", "Button"},
+                {"FlutterIconButton", "Button"},
+                {"FlutterCard", "Container"},
+                {"FlutterScroll", "Container"},
+                {"FlutterGesture", "Container"},
+                {"FlutterAppBar", "TitleArea"},
+                {"FlutterTextField", "TextField"},
+                {"FlutterCheckbox", "CheckBox"},
+                {"FlutterSwitch", "Switch"},
+                {"FlutterRadio", "RadioButton"},
+                {"FlutterSlider", "Slider"},
+                {"FlutterListTile", "Container"},
+                {"FlutterBottomNavigationBar", "Container"},
+                {"FlutterDrawer", "Container"},
+        };
+        for (String[] m : map) {
+            derives.put(m[0] + ".derive", m[1]);
         }
+        // Every Flutter UIID gets a zero margin, in all four states.
+        //
+        // These UIIDs derive from Codename One base UIIDs, so they inherit a
+        // margin meant for Codename One layouts -- Container's 2px, Switch's
+        // 10/15 -- which Flutter geometry must not have: the widget tree
+        // decides its own spacing. RenderElement.neutralizeCn1Behaviors was
+        // already forcing it to zero, but per COMPONENT, and getAllStyles()
+        // creates the selected, pressed and disabled styles plus a proxy to
+        // do it: five Style objects each, ~1900 during the first frame of
+        // the gallery, on the one primitive ParparVM is slowest at.
+        //
+        // Declaring it in the theme instead makes the components arrive
+        // already correct, so the per-component undo can be skipped
+        // entirely. Same rendered result -- the runtime set these to zero
+        // anyway -- for none of the allocation.
+        String[] uiids = {
+                "FlutterText", "FlutterIcon", "FlutterImage", "FlutterDivider",
+                "FlutterElevatedButton", "FlutterTextButton", "FlutterOutlinedButton",
+                "FlutterIconButton", "FlutterCard", "FlutterScroll", "FlutterGesture",
+                "FlutterAppBar", "FlutterTextField", "FlutterCheckbox", "FlutterSwitch",
+                "FlutterRadio", "FlutterSlider", "FlutterListTile",
+                "FlutterBottomNavigationBar", "FlutterDrawer",
+                // Not derived above -- they take the theme's default UIID, which
+                // is where Container's 2px margin comes from.
+                "FlutterBox", "FlutterEffect", "FlutterScaffold", "FlutterCustomPaint",
+        };
+        for (String u : uiids) {
+            derives.put(u + ".margin", "0,0,0,0");
+            derives.put(u + ".sel#margin", "0,0,0,0");
+            derives.put(u + ".press#margin", "0,0,0,0");
+            derives.put(u + ".dis#margin", "0,0,0,0");
+        }
+        return derives;
     }
 
     /**

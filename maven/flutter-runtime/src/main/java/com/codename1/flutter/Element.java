@@ -808,7 +808,7 @@ public abstract class Element implements BuildContext {
     /// is what appending already does.
     private int anchorForSlot(int slot) {
         RenderHost childHost = hostForNewChild(slot);
-        if (childHost == null) {
+        if (childHost == null || precedesNewChild(childHost.lastAttached(), slot)) {
             return -1;
         }
         // The next element in TREE order after where this child goes: first among our own
@@ -829,6 +829,54 @@ public abstract class Element implements BuildContext {
             node = node.parent();
         }
         return -1;
+    }
+
+    /// Whether {@code last} -- the element at the END of the host's attach order -- comes
+    /// before a new child of this element at {@code slot} in tree order, so that
+    /// appending is already where the search below would put the child.
+    ///
+    /// The host keeps its components in tree order; that is what this anchoring, the
+    /// replacement anchor in updateChild and reorderToTreeOrder exist to maintain. So
+    /// when its last component precedes the new child, none follows it, and the search
+    /// -- which walks every ancestor and visits each one's children, allocating a visitor
+    /// per level, for EVERY element inflated -- can only answer -1. On a first build that
+    /// is nearly every call: the gallery inflated 1066 elements at start-up and this
+    /// search was a fifth of the time spent mounting them.
+    ///
+    /// "Before" is the same relation the search uses: below the two paths' common
+    /// ancestor, the child on {@code last}'s side has a slot no greater than the one on
+    /// ours. An ancestor of the new child, or this element itself, precedes it. When the
+    /// two are not in one tree the answer is false, and the search decides as before.
+    private boolean precedesNewChild(Element last, int slot) {
+        if (last == null) {
+            return true;
+        }
+        Element a = last;
+        Element b = this;
+        Element aChild = null;
+        Element bChild = null;
+        while (a != null && b != null && a.depth > b.depth) {
+            aChild = a;
+            a = a.parent;
+        }
+        while (a != null && b != null && b.depth > a.depth) {
+            bChild = b;
+            b = b.parent;
+        }
+        while (a != null && b != null && a != b) {
+            aChild = a;
+            a = a.parent;
+            bChild = b;
+            b = b.parent;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        if (aChild == null) {
+            // last is this element or one of its ancestors.
+            return true;
+        }
+        return aChild.slot <= (bChild == null ? slot : bChild.slot);
     }
 
     /// The earliest attach index, in {@code host}, of a child of {@code parent} whose slot
@@ -1039,7 +1087,16 @@ public abstract class Element implements BuildContext {
         // components) but those components still sit at their OLD flat
         // container indices; move them so paint order and hit-testing match
         // the new tree order.
-        reattachInTreeOrder(result);
+        //
+        // A first build has no survivors to move. Every child was inflated fresh, in
+        // slot order, with no later sibling yet in existence, so each subtree's
+        // components were attached where tree order puts them -- and the walk here
+        // (a set of every component in the host, then every element under every
+        // child) would only confirm it. It ran once per multi-child element, over that
+        // element's whole subtree, which over a first frame is quadratic in its depth.
+        if (!oldChildren.isEmpty()) {
+            reattachInTreeOrder(result);
+        }
         return result;
     }
 

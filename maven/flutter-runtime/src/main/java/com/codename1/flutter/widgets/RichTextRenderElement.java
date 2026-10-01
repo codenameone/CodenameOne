@@ -69,9 +69,9 @@ public class RichTextRenderElement extends RenderElement {
         }
         RichTextComponent c = new RichTextComponent();
         c.setUIID("FlutterRichText");
-        c.getAllStyles().setPadding(0, 0, 0, 0);
-        c.getAllStyles().setMargin(0, 0, 0, 0);
-        c.getAllStyles().setBgTransparency(0);
+        stylesToSet(c).setPadding(0, 0, 0, 0);
+        stylesToSet(c).setMargin(0, 0, 0, 0);
+        stylesToSet(c).setBgTransparency(0);
         applyContent(c);
         return c;
     }

@@ -64,8 +64,8 @@ public class TextRenderElement extends RenderElement {
     @Override
     protected Component createComponent() {
         WrappedLabel l = new WrappedLabel(data());
-        l.getAllStyles().setPadding(0, 0, 0, 0);
-        l.getAllStyles().setMargin(0, 0, 0, 0);
+        stylesToSet(l).setPadding(0, 0, 0, 0);
+        stylesToSet(l).setMargin(0, 0, 0, 0);
         applyStyle(l);
         return l;
     }
@@ -181,13 +181,13 @@ public class TextRenderElement extends RenderElement {
                         && ts.getFontWeight() != null && ts.getFontWeight().isBold()
                         ? Font.STYLE_BOLD : Font.STYLE_PLAIN;
                 try {
-                    l.getAllStyles().setFont(base.derive(sizePx, weight));
+                    stylesToSet(l).setFont(base.derive(sizePx, weight));
                 } catch (Exception err) {
                     // fonts that can't derive keep the base font
                 }
             }
             if (ts.getColor() != null) {
-                l.getAllStyles().setFgColor(ts.getColor().rgb());
+                stylesToSet(l).setFgColor(ts.getColor().rgb());
             }
         }
         TextAlign a = text().getTextAlign();
@@ -205,7 +205,7 @@ public class TextRenderElement extends RenderElement {
                     cn1Align = Component.LEFT;
                     break;
             }
-            l.getAllStyles().setAlignment(cn1Align);
+            stylesToSet(l).setAlignment(cn1Align);
         }
     }
 

@@ -157,6 +157,12 @@ public class RenderHost {
         return attachOrder;
     }
 
+    /// The element at the end of the attach order, or null when nothing is attached.
+    public RenderElement lastAttached() {
+        int n = attachOrder.size();
+        return n == 0 ? null : attachOrder.get(n - 1);
+    }
+
     /**
      * Points the attach cursor at a flat-container index: subsequent
      * {@link #attach} calls insert sequentially there instead of appending.

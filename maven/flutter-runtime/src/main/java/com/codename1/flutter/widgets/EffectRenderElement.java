@@ -350,9 +350,9 @@ public abstract class EffectRenderElement extends RenderElement {
                 }
             });
             setUIID("FlutterEffect");
-            getAllStyles().setPadding(0, 0, 0, 0);
-            getAllStyles().setMargin(0, 0, 0, 0);
-            getAllStyles().setBgTransparency(0);
+            stylesToSet(this).setPadding(0, 0, 0, 0);
+            stylesToSet(this).setMargin(0, 0, 0, 0);
+            stylesToSet(this).setBgTransparency(0);
         }
 
         @Override

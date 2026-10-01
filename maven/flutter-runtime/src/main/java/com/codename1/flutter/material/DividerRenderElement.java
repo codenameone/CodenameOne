@@ -134,8 +134,8 @@ public class DividerRenderElement extends RenderElement {
             return null;
         }
         Label strip = new Label("", "FlutterDivider");
-        strip.getAllStyles().setPadding(0, 0, 0, 0);
-        strip.getAllStyles().setMargin(0, 0, 0, 0);
+        stylesToSet(strip).setPadding(0, 0, 0, 0);
+        stylesToSet(strip).setMargin(0, 0, 0, 0);
         applyStyle(strip);
         return strip;
     }
@@ -146,8 +146,8 @@ public class DividerRenderElement extends RenderElement {
     }
 
     private void applyStyle(Component strip) {
-        strip.getAllStyles().setBgColor(colorRgb());
-        strip.getAllStyles().setBgTransparency(255);
+        stylesToSet(strip).setBgColor(colorRgb());
+        stylesToSet(strip).setBgTransparency(255);
     }
 
     @Override

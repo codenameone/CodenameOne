@@ -80,8 +80,8 @@ public class ImageRenderElement extends RenderElement {
             return null;
         }
         FittedImage l = new FittedImage();
-        l.getAllStyles().setPadding(0, 0, 0, 0);
-        l.getAllStyles().setMargin(0, 0, 0, 0);
+        stylesToSet(l).setPadding(0, 0, 0, 0);
+        stylesToSet(l).setMargin(0, 0, 0, 0);
         loadImage(l);
         return l;
     }

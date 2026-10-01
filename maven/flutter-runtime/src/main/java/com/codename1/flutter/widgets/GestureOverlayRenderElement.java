@@ -228,9 +228,9 @@ public class GestureOverlayRenderElement extends RenderElement {
             setUIID("FlutterGesture");
             setGrabsPointerEvents(true);
             setFocusable(false);
-            getAllStyles().setBgTransparency(0);
-            getAllStyles().setPadding(0, 0, 0, 0);
-            getAllStyles().setMargin(0, 0, 0, 0);
+            stylesToSet(this).setBgTransparency(0);
+            stylesToSet(this).setPadding(0, 0, 0, 0);
+            stylesToSet(this).setMargin(0, 0, 0, 0);
         }
 
         @Override
