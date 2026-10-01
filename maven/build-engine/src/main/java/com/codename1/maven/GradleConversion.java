@@ -493,7 +493,9 @@ public final class GradleConversion {
             return out;
         }
         File base = pom.getParentFile();
-        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        // The pom's own properties first: a root may be named through one
+        // (<sourceDirectory>${generated.sources}</sourceDirectory>).
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>(pomProperties(pom, 0));
         props.put("basedir", base.getAbsolutePath());
         props.put("project.basedir", base.getAbsolutePath());
         addRoot(out.get("main"), base, interpolate(text(build, "sourceDirectory"), props));
@@ -588,7 +590,9 @@ public final class GradleConversion {
             return out;
         }
         File base = pom.getParentFile();
-        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        // The pom's own properties first: a root may be named through one
+        // (<sourceDirectory>${generated.sources}</sourceDirectory>).
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>(pomProperties(pom, 0));
         props.put("basedir", base.getAbsolutePath());
         props.put("project.basedir", base.getAbsolutePath());
         for (String[] kind : new String[][] {{"resources", "resource", "main"},
@@ -639,7 +643,9 @@ public final class GradleConversion {
             return out;
         }
         File base = pom.getParentFile().getAbsoluteFile();
-        java.util.Map<String, String> props = new java.util.HashMap<String, String>();
+        // The pom's own properties first: a root may be named through one
+        // (<sourceDirectory>${generated.sources}</sourceDirectory>).
+        java.util.Map<String, String> props = new java.util.HashMap<String, String>(pomProperties(pom, 0));
         props.put("basedir", base.getAbsolutePath());
         props.put("project.basedir", base.getAbsolutePath());
         String[][] kinds = {{"sourceDirectory", null, null, "src/main/java"},
@@ -668,6 +674,12 @@ public final class GradleConversion {
             }
             boolean kept = false;
             for (String dir : declared) {
+                if (dir.contains("${")) {
+                    // Not resolvable here: where Maven compiles from is unknown, so
+                    // the conventional tree is kept rather than deleted on a guess.
+                    kept = true;
+                    continue;
+                }
                 File f = new File(dir);
                 File abs = (f.isAbsolute() ? f : new File(base, dir)).getAbsoluteFile();
                 String rel = base.toURI().relativize(abs.toURI()).getPath();
@@ -1245,7 +1257,7 @@ public final class GradleConversion {
         String line = declaration(d, properties, managed, pomDir, targetDir);
         // Scope and type through the pom's properties, as Maven's effective model
         // has them: a <scope>${...}</scope> resolving to test must not ship.
-        String scope = interpolate(text(d, "scope"), properties);
+        String scope = effectiveScope(d, properties, managed);
         if (line != null && "runtime".equals(scope)) {
             // Maven's test compile sees runtime dependencies; Gradle's does not.
             return line + "\n" + line.replace("runtimeOnly(", "testCompileOnly(");
@@ -1262,7 +1274,7 @@ public final class GradleConversion {
         String g = interpolate(text(d, "groupId"), properties);
         String a = interpolate(text(d, "artifactId"), properties);
         String v = text(d, "version");
-        String scope = interpolate(text(d, "scope"), properties);
+        String scope = effectiveScope(d, properties, managed);
         String type = interpolate(text(d, "type"), properties);
         String classifier = interpolate(text(d, "classifier"), properties);
         if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)) {
@@ -1437,6 +1449,22 @@ public final class GradleConversion {
     /// The versions `<dependencyManagement>` gives, as `group:artifact`, from
     /// the pom and its parents on disk (nearest wins). Imported BOMs are not
     /// followed.
+    /// The prefix [#managedVersions(File, int)] keys a managed scope under, beside
+    /// the group:artifact keys of the managed versions.
+    static final String SCOPE_KEY = "scope|";
+
+    /// A dependency's scope as Maven's effective model has it: its own, through
+    /// the pom's properties, else the one dependency management gives it.
+    private static String effectiveScope(Element d, java.util.Map<String, String> properties,
+                                         java.util.Map<String, String> managed) {
+        String scope = interpolate(text(d, "scope"), properties);
+        if (scope != null) {
+            return scope;
+        }
+        return managed.get(SCOPE_KEY + interpolate(text(d, "groupId"), properties) + ":"
+                + interpolate(text(d, "artifactId"), properties));
+    }
+
     static java.util.Map<String, String> managedVersions(File pom, int depth) {
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
         Element project;
@@ -1459,10 +1487,17 @@ public final class GradleConversion {
             for (Node n = deps.getFirstChild(); n != null; n = n.getNextSibling()) {
                 if (n instanceof Element && "dependency".equals(((Element) n).getTagName())) {
                     Element d = (Element) n;
+                    String key = interpolate(text(d, "groupId"), props) + ":"
+                            + interpolate(text(d, "artifactId"), props);
                     String version = interpolate(text(d, "version"), props);
                     if (version != null && !version.contains("${")) {
-                        out.put(interpolate(text(d, "groupId"), props) + ":"
-                                + interpolate(text(d, "artifactId"), props), version);
+                        out.put(key, version);
+                    }
+                    // A managed scope too, which Maven injects into a dependency that
+                    // declares none (kept under its own key; see managedScope).
+                    String scope = interpolate(text(d, "scope"), props);
+                    if (scope != null && !scope.contains("${") && !"import".equals(scope)) {
+                        out.put(SCOPE_KEY + key, scope);
                     }
                 }
             }

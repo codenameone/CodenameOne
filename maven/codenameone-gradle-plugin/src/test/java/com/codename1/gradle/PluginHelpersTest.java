@@ -166,6 +166,35 @@ class PluginHelpersTest {
     }
 
     @Test
+    void aProjectCn1libIsPublishedAsItsLibPom() throws Exception {
+        String pom = "<project><dependencies>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>maps-common</artifactId><version>1</version>"
+                + "</dependency>"
+                + "<dependency><groupId>com.acme</groupId><artifactId>charts-lib</artifactId><version>2</version>"
+                + "</dependency>"
+                + "<dependency><groupId>org.example</groupId><artifactId>plain</artifactId><version>3</version>"
+                + "</dependency></dependencies></project>";
+        org.w3c.dom.Element project = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new org.xml.sax.InputSource(new java.io.StringReader(pom))).getDocumentElement();
+        java.util.Map<String, String> cn1libs = new java.util.HashMap<String, String>();
+        cn1libs.put("com.acme:maps", "maps-lib");
+        cn1libs.put("com.acme:maps-common", "maps-lib");
+        cn1libs.put("com.acme:charts-lib", "charts-lib");
+        LibrarySupport.markCn1libDependencies(project, cn1libs);
+        org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
+        assertEquals("maps-lib", text(deps.item(0), "artifactId"), "a project cn1lib is its -lib pom");
+        assertEquals("pom", text(deps.item(0), "type"));
+        assertEquals("charts-lib", text(deps.item(1), "artifactId"));
+        assertEquals("pom", text(deps.item(1), "type"));
+        assertNull(text(deps.item(2), "type"), "an ordinary library is left alone");
+    }
+
+    private static String text(org.w3c.dom.Node dep, String name) {
+        org.w3c.dom.NodeList v = ((org.w3c.dom.Element) dep).getElementsByTagName(name);
+        return v.getLength() == 0 ? null : v.item(0).getTextContent();
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

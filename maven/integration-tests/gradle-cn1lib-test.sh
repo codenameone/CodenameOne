@@ -258,6 +258,45 @@ run_gradle "$LAPP" classes cn1Css > "$WORKDIR/lapp-css.log" 2>&1 \
 LTHEME=$(find "$LAPP/build" -name theme.res | head -1)
 [ -n "$LTHEME" ] && grep -aq "LocalMapsLabel" "$LTHEME" || fail "the project cn1lib's CSS was not merged into the theme"
 echo "   project cn1lib: classes, android sources and CSS reach the application"
+# A library of the same build that uses that one is published depending on its
+# -lib pom, which is what Maven consumers resolve; Gradle would name the project.
+mkdir -p "$LAPP/localwidgets/src/main/java/$GROUP_PATH"
+cat > "$LAPP/localwidgets/build.gradle.kts" <<EOF
+plugins { id("com.codenameone") }
+
+group = "$GROUP"
+version = "$LIBVER"
+
+dependencies {
+    cn1lib(project(":localmaps"))
+}
+
+publishing {
+    repositories { maven(url = uri("$WORKDIR/localrepo")) }
+}
+EOF
+: > "$LAPP/localwidgets/codenameone_library_appended.properties"
+cat > "$LAPP/localwidgets/src/main/java/$GROUP_PATH/LocalWidgets.java" <<EOF
+package $GROUP;
+
+public class LocalWidgets {
+    LocalMaps maps;
+}
+EOF
+printf '\ninclude("localwidgets")\n' >> "$LAPP/settings.gradle.kts"
+run_gradle "$LAPP" :localwidgets:publish > "$WORKDIR/lwidgets-publish.log" 2>&1 \
+  || { cat "$WORKDIR/lwidgets-publish.log"; fail "publishing a cn1lib that uses a project cn1lib"; }
+WPOM="$WORKDIR/localrepo/$GROUP_PATH/localwidgets-common/$LIBVER/localwidgets-common-$LIBVER.pom"
+python3 - "$WPOM" <<'PY' || { cat "$WPOM"; fail "the published pom does not name localmaps-lib as a pom"; }
+import sys, xml.etree.ElementTree as ET
+ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+root = ET.parse(sys.argv[1]).getroot()
+for d in root.findall('m:dependencies/m:dependency', ns):
+    if d.findtext('m:artifactId', namespaces=ns) == 'localmaps-lib':
+        sys.exit(0 if d.findtext('m:type', namespaces=ns) == 'pom' else 1)
+sys.exit(1)
+PY
+echo "   a cn1lib using a project cn1lib publishes a dependency on its -lib pom"
 
 echo "== Maven consumer"
 MAPP="$WORKDIR/libconsumer"

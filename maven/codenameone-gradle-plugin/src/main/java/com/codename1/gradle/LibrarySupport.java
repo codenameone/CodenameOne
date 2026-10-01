@@ -82,12 +82,24 @@ final class LibrarySupport {
     }
 
     /// Adds `<type>pom</type>` to the dependencies on `cn1libs` (group:artifact).
-    static void markCn1libDependencies(org.w3c.dom.Element project, Set<String> cn1libs) {
+    ///
+    /// `cn1libs` maps each group:artifact to the artifact a consumer must depend
+    /// on: the same one for a published cn1lib (its `-lib`), the `-lib` of a
+    /// project of this build (`cn1lib(project(":maps"))`), which Gradle writes
+    /// under the project's name or its `-common` publication instead.
+    static void markCn1libDependencies(org.w3c.dom.Element project, Map<String, String> cn1libs) {
         org.w3c.dom.NodeList deps = project.getElementsByTagName("dependency");
         for (int i = 0; i < deps.getLength(); i++) {
             org.w3c.dom.Element dep = (org.w3c.dom.Element) deps.item(i);
             String key = childText(dep, "groupId") + ":" + childText(dep, "artifactId");
-            if (!cn1libs.contains(key) || dep.getElementsByTagName("type").getLength() > 0) {
+            String artifact = cn1libs.get(key);
+            if (artifact == null) {
+                continue;
+            }
+            if (!artifact.equals(childText(dep, "artifactId"))) {
+                dep.getElementsByTagName("artifactId").item(0).setTextContent(artifact);
+            }
+            if (dep.getElementsByTagName("type").getLength() > 0) {
                 continue;
             }
             // Plain createElement: Gradle's pom DOM is not namespace aware, and a
@@ -338,11 +350,16 @@ final class LibrarySupport {
         // ordinary (jar) dependencies; Maven consumers need <type>pom</type>, the
         // shape cn1lib-archetype's common module uses, or they look for a jar the
         // -lib artifact does not have.
-        final Provider<Set<String>> usedCn1libs = project.provider(() -> {
-            Set<String> out = new java.util.HashSet<String>();
+        final Provider<Map<String, String>> usedCn1libs = project.provider(() -> {
+            Map<String, String> out = new java.util.HashMap<String, String>();
             for (org.gradle.api.artifacts.Dependency d
                     : project.getConfigurations().getByName(Cn1libs.DECLARED).getAllDependencies()) {
-                out.add(d.getGroup() + ":" + d.getName());
+                if (d instanceof org.gradle.api.artifacts.ProjectDependency) {
+                    out.put(d.getGroup() + ":" + d.getName(), d.getName() + "-lib");
+                    out.put(d.getGroup() + ":" + d.getName() + "-common", d.getName() + "-lib");
+                } else {
+                    out.put(d.getGroup() + ":" + d.getName(), d.getName());
+                }
             }
             return out;
         });

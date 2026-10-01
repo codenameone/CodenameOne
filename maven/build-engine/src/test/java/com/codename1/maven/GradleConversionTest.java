@@ -546,6 +546,43 @@ class GradleConversionTest {
     }
 
     @Test
+    void rootsNamedThroughPropertiesResolveAndAnUnknownOneDeletesNothing() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><properties><gen>generated-by-hand</gen></properties>"
+                + "<build><sourceDirectory>${gen}</sourceDirectory></build></project>");
+        touch(mvn, "common/generated-by-hand/a/Gen.java", "package a; public class Gen {}");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "src/main/java/a/Gen.java").isFile(), "the property resolves");
+
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><build><sourceDirectory>${undefined.dir}</sourceDirectory>"
+                + "</build></project>");
+        File again = new File(tmp.toFile(), "again");
+        converter().convert(mvn, again, "1.0");
+        assertTrue(new File(again, "src/main/java/a/MvnApp.java").isFile(),
+                "a root that cannot be resolved does not cost the conventional sources");
+    }
+
+    @Test
+    void aScopeFromDependencyManagementApplies() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version><dependencyManagement><dependencies><dependency>"
+                + "<groupId>org.example</groupId><artifactId>servlet</artifactId><version>4</version>"
+                + "<scope>provided</scope></dependency></dependencies></dependencyManagement></project>");
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies><dependency><groupId>org.example</groupId>"
+                + "<artifactId>servlet</artifactId></dependency></dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("compileOnly(\"org.example:servlet:4\")"), build);
+        assertFalse(build.contains("\n    implementation(\"org.example:servlet"), "not shipped: " + build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
