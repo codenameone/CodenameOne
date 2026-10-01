@@ -1681,6 +1681,17 @@ public class AppBuilder {
         }
     }
 
+    /// One property of a settings file, or null.
+    private static String settingsProperty(File settings, String key) throws IOException {
+        java.util.Properties p = new java.util.Properties();
+        if (settings.isFile()) {
+            try (java.io.InputStream in = new java.io.FileInputStream(settings)) {
+                p.load(in);
+            }
+        }
+        return p.getProperty(key);
+    }
+
     private void createAntProject() throws IOException, LibraryPropertiesException, BuildExecutionException, BuildFailureException {
         File cn1dir = workDirectory();
         File antProject = new File(cn1dir, "antProject");
@@ -1696,6 +1707,17 @@ public class AppBuilder {
 
         File codenameOneSettingsCopy = new File(antProject, codenameOneSettings.getName());
         FileUtils.copyFile(codenameOneSettings, codenameOneSettingsCopy);
+        // build.xml hands every target icon="${codename1.icon}", resolved against
+        // this staging project: an icon the settings name at another relative path
+        // (branding/app.png) has to be staged there too, or the build cannot read it.
+        String customIcon = settingsProperty(codenameOneSettings, "codename1.icon");
+        if (customIcon != null && customIcon.trim().length() > 0 && !new File(customIcon.trim()).isAbsolute()
+                && !"icon.png".equals(customIcon.trim())) {
+            File source = new File(getCN1ProjectDir(), customIcon.trim());
+            if (source.isFile()) {
+                FileUtils.copyFile(source, new File(antProject, customIcon.trim()));
+            }
+        }
         FileUtils.copyInputStreamToFile(AppBuilder.class.getResourceAsStream("buildxml-template.xml"), new File(antProject, "build.xml"));
         File distDir = new File(antProject, "dist");
         distDir.mkdirs();

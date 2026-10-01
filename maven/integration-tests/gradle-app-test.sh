@@ -127,6 +127,20 @@ for spec in \
   echo "   $task: $(unzip -Z1 "$jar" | wc -l | tr -d ' ') entries in $(basename "$jar")"
 done
 
+echo "== a custom icon reaches the cloud build"
+# build.xml hands every target icon="${codename1.icon}", resolved against the
+# staged project, so an icon at another path has to be staged there.
+mkdir -p "$APP/branding"
+cp "$APP/icon.png" "$APP/branding/app.png" 2>/dev/null || printf 'png' > "$APP/branding/app.png"
+cp "$APP/codenameone_settings.properties" "$WORKDIR/settings.bak"
+printf '\ncodename1.icon=branding/app.png\n' >> "$APP/codenameone_settings.properties"
+run_gradle "$APP" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/icon-stage.log" 2>&1 \
+  || { cat "$WORKDIR/icon-stage.log"; fail "staging with a custom icon"; }
+find "$APP/build" -path "*antProject/branding/app.png" | grep -q . \
+  || { find "$APP/build" -name app.png; fail "the custom icon was not staged for the cloud build"; }
+cp "$WORKDIR/settings.bak" "$APP/codenameone_settings.properties"
+rm -rf "$APP/branding"
+
 echo "== unit tests in the simulator's runner"
 run_gradle "$APP" cn1Test > "$WORKDIR/test.log" 2>&1 || { cat "$WORKDIR/test.log"; fail "cn1Test"; }
 

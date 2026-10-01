@@ -488,7 +488,7 @@ public final class GradleConversion {
         out.put("main", new ArrayList<File>());
         out.put("test", new ArrayList<File>());
         Element project = parsePomOrNull(pom);
-        Element build = project == null ? null : child(project, "build");
+        Element build = project == null ? null : effectiveBuild(pom, project);
         if (build == null) {
             return out;
         }
@@ -585,7 +585,7 @@ public final class GradleConversion {
     static List<ResourceSpec> resourceSpecs(File pom) {
         List<ResourceSpec> out = new ArrayList<ResourceSpec>();
         Element project = parsePomOrNull(pom);
-        Element build = project == null ? null : child(project, "build");
+        Element build = project == null ? null : effectiveBuild(pom, project);
         if (build == null) {
             return out;
         }
@@ -638,7 +638,7 @@ public final class GradleConversion {
     static List<String> replacedConventionalRoots(File pom) {
         List<String> out = new ArrayList<String>();
         Element project = parsePomOrNull(pom);
-        Element build = project == null ? null : child(project, "build");
+        Element build = project == null ? null : effectiveBuild(pom, project);
         if (build == null) {
             return out;
         }
@@ -734,6 +734,53 @@ public final class GradleConversion {
             }
         }
         return path.matches(re.toString());
+    }
+
+    /// `pom`'s `<build>` as Maven sees it with its local parents: the nearest
+    /// `<sourceDirectory>`, `<testSourceDirectory>`, `<resources>` and
+    /// `<testResources>` declared in the chain (a child's replaces its
+    /// parent's), and the plugins of every pom in the chain, since a parent's
+    /// build-helper executions run in the child. Paths stay as written; they
+    /// resolve against the child, as Maven interpolates `${project.basedir}`.
+    /// Null when no pom in the chain has a `<build>`.
+    static Element effectiveBuild(File pom, Element project) {
+        List<Element> chain = new ArrayList<Element>();
+        Element current = project;
+        File currentPom = pom;
+        for (int depth = 0; current != null && depth < 8; depth++) {
+            Element build = child(current, "build");
+            if (build != null) {
+                chain.add(build);
+            }
+            Element parent = child(current, "parent");
+            File parentPom = parent == null ? null : parentPom(currentPom, parent);
+            current = parentPom == null ? null : parsePomOrNull(parentPom);
+            currentPom = parentPom;
+        }
+        if (chain.isEmpty()) {
+            return null;
+        }
+        org.w3c.dom.Document doc = project.getOwnerDocument();
+        Element merged = doc.createElement("build");
+        for (String name : new String[] {"sourceDirectory", "testSourceDirectory", "resources", "testResources"}) {
+            for (Element build : chain) {
+                Element declared = child(build, name);
+                if (declared != null) {
+                    merged.appendChild(doc.importNode(declared, true));
+                    break;
+                }
+            }
+        }
+        Element plugins = doc.createElement("plugins");
+        for (Element build : chain) {
+            Element declared = child(build, "plugins");
+            for (Element plugin : declared == null ? java.util.Collections.<Element>emptyList()
+                    : children(declared, "plugin")) {
+                plugins.appendChild(doc.importNode(plugin, true));
+            }
+        }
+        merged.appendChild(plugins);
+        return merged;
     }
 
     private static void addRoot(List<File> out, File base, String path) {

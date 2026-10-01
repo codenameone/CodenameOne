@@ -583,6 +583,25 @@ class GradleConversionTest {
     }
 
     @Test
+    void sourceRootsAParentPomDeclaresApplyToTheChild() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version><build><sourceDirectory>src/app</sourceDirectory><plugins><plugin>"
+                + "<groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals><configuration><sources>"
+                + "<source>extra</source></sources></configuration></execution></executions></plugin></plugins>"
+                + "</build></project>");
+        touch(mvn, "common/src/app/a/Inherited.java", "package a; public class Inherited {}");
+        touch(mvn, "common/extra/a/Helper.java", "package a; public class Helper {}");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        assertTrue(new File(out, "src/main/java/a/Inherited.java").isFile(), "the parent's sourceDirectory");
+        assertTrue(new File(out, "src/main/java/a/Helper.java").isFile(), "the parent's build-helper source");
+        assertFalse(new File(out, "src/main/java/a/MvnApp.java").exists(),
+                "the inherited sourceDirectory replaces src/main/java");
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
