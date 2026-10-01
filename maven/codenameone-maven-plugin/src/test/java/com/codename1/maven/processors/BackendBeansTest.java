@@ -518,6 +518,77 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void twoClassesFoldingToOneCodecNameFailTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Outer_Inner", PKG + "public class Outer_Inner { public int a; }\n");
+        s.put("com.example.Outer", PKG + "public class Outer {\n"
+                + "    public static class Inner { public int b; }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/a\") public Outer_Inner a() { return null; }\n"
+                + "    @GetMapping(\"/b\") public Outer.Inner b() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("would both get the JSON codec "
+                + "com.example.Outer_InnerCn1Json. Rename one of them."));
+    }
+
+    @Test
+    public void aProjectClassWithAGeneratedNameFailsTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Foo", PKG + "@Service public class Foo {\n"
+                + "    @Timed(\"foo.work\") public void work() { }\n"
+                + "}\n");
+        // Exactly the support class the build would generate for Foo's aspects.
+        s.put("com.example.FooCn1Aspects", PKG + "public class FooCn1Aspects { }\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("com.example.FooCn1Aspects already exists, and the "
+                + "class the build generates under that name would replace it"));
+    }
+
+    @Test
+    public void aSubclassReachingTheTypeThroughADependencyIsDispatched() throws Exception {
+        // The library is compiled on its own and seen only on the classpath, the
+        // way a dependency jar is.
+        Map<String, String> lib = new LinkedHashMap<String, String>();
+        lib.put("com.lib.LibraryBase", "package com.lib;\n"
+                + "public class LibraryBase { public String base = \"b\"; }\n");
+        lib.put("com.lib.LibraryResult", "package com.lib;\n"
+                + "public class LibraryResult extends LibraryBase { public String mid = \"m\"; }\n");
+        File libClasses = compile(lib);
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.AppResult", PKG + "public class AppResult extends "
+                + "com.lib.LibraryResult { public String app = \"a\"; }\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/r\") public com.lib.LibraryBase r() { return new AppResult(); }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(backendClasspath());
+        cp.add(libClasses);
+        JavaSourceCompiler.compile(s, classes, cp);
+        ProcessorContext ctx = process(classes, new RestControllerAnnotationProcessor(),
+                libClasses);
+        assertNoErrors(ctx);
+        String base = BackendJsonCodecs.of(ctx).sources().get("com.lib.LibraryBaseCn1Json");
+        assertNotNull(base);
+        assertTrue("the project subclass was left out of the dispatch:\n" + base,
+                base.contains("v instanceof com.example.AppResult"));
+    }
+
+    @Test
+    public void aServerWithOnlyManagementStillGetsAnEntryPoint() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Ops", PKG + "@Configuration @EnableManagement public class Ops { }\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        assertTrue("@EnableManagement alone produced nothing runnable",
+                new File(classes, "com/example/BackendApplication.class").isFile());
+    }
+
+    @Test
     public void aClassNoCodecCanBeWrittenForIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Page", PKG + "public class Page<T> { public List<T> items; }\n");

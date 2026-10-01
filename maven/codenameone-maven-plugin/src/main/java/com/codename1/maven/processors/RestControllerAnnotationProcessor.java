@@ -1308,8 +1308,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // that the build succeeds and produces nothing runnable. The same goes
         // for one whose only work is scheduled jobs, MCP tools or managed
         // resources -- the management endpoints serve those.
+        // And one that asked only for the management endpoints: health, metrics
+        // and Prometheus are a server's whole job for a sidecar.
+        settings = BackendSettings.resolve(ctx);
+        if (ctx.hasErrors()) {
+            return;
+        }
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasTools() && !beans.hasManaged()) {
+                && !beans.hasTools() && !beans.hasManaged() && !settings.management) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
             // early without this left the marker naming a bootstrap that still
@@ -1329,7 +1335,6 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         resolveTelemetry(ctx);
-        settings = BackendSettings.resolve(ctx);
         if (ctx.hasErrors()) {
             return;
         }
@@ -1379,6 +1384,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // may have added classes, and the dispatcher compiled last must know them.
         if (codecs != null || ctx.getAttribute("cn1.backend.jsonCodecs") != null) {
             Map<String, String> codecSources = codecs(ctx).sources();
+            if (ctx.hasErrors()) {
+                return;
+            }
             for (String codec : codecSources.keySet()) {
                 if (isNotOurOwnOutput(ctx, codec)) {
                     ctx.error(codec + " already exists, and the JSON codec generated under "

@@ -2695,17 +2695,24 @@ final class BackendBeans {
             }
         }
         if (toolCodecs) {
-            Map<String, String> codecSources = BackendJsonCodecs.of(ctx).sources();
-            for (String codec : codecSources.keySet()) {
-                AnnotatedClass existing = ctx.lookup(codec.replace('.', '/'));
-                if (existing != null && !existing.getClassAnnotations().containsKey(
-                        "Lcom/codename1/backend/annotations/Generated;")) {
-                    ctx.error(codec + " already exists, and the JSON codec generated under "
-                            + "that name would replace it. Rename that class.");
-                    return;
-                }
+            sources.putAll(BackendJsonCodecs.of(ctx).sources());
+            if (ctx.hasErrors()) {
+                return;
             }
-            sources.putAll(codecSources);
+        }
+        // EVERY name about to be generated -- aspects, proxies, tool and managed
+        // adapters, codecs -- checked against the project's own classes. A class
+        // of the application's that happened to have one of these names would be
+        // overwritten in the output directory by what is compiled here, silently,
+        // and code compiled against the original would fail at run time.
+        for (String generated : sources.keySet()) {
+            AnnotatedClass existing = ctx.lookup(generated.replace('.', '/'));
+            if (existing != null && !existing.getClassAnnotations().containsKey(
+                    "Lcom/codename1/backend/annotations/Generated;")) {
+                ctx.error(existing, generated + " already exists, and the class the build "
+                        + "generates under that name would replace it. Rename that class.");
+                return;
+            }
         }
         if (sources.isEmpty()) {
             if (woven > 0) {

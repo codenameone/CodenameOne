@@ -431,7 +431,10 @@ final class BackendJsonCodecs {
                     depth.put(c.getBinaryName(), Integer.valueOf(d));
                     break;
                 }
-                AnnotatedClass up = ctx.lookup(parent);
+                // The compile classpath too: a project subclass can reach the
+                // declared type through a dependency's class, and stopping at it
+                // dropped the subclass from dispatch -- its fields silently unwritten.
+                AnnotatedClass up = RestControllerAnnotationProcessor.resolveClass(ctx, parent);
                 parent = up == null ? null : up.getSuperInternalName();
             }
         }
@@ -966,11 +969,22 @@ final class BackendJsonCodecs {
     /// value dispatcher when one of them needs it.
     Map<String, String> sources() {
         Map<String, String> out = new LinkedHashMap<String, String>();
+        Map<String, String> owners = new LinkedHashMap<String, String>();
         for (Dto dto : dtos.values()) {
             if (dto.problem != null || (!dto.write && !dto.read)) {
                 continue;
             }
-            out.put(codecBinary(dto.binary), codecSource(dto));
+            String codec = codecBinary(dto.binary);
+            String other = owners.get(codec);
+            if (other != null) {
+                // Outer_Inner and Outer.Inner in one package fold to one codec
+                // name; generating both would let one replace the other.
+                ctx.error(dto.cls, source(dto.binary) + " and " + source(other) + " would both "
+                        + "get the JSON codec " + codec + ". Rename one of them.");
+                continue;
+            }
+            owners.put(codec, dto.binary);
+            out.put(codec, codecSource(dto));
         }
         if (valuesUsed) {
             out.put(VALUES, valuesSource());
