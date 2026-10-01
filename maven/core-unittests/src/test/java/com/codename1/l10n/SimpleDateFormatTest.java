@@ -245,4 +245,31 @@ class SimpleDateFormatTest extends UITestBase {
             java.util.TimeZone.setDefault(saved);
         }
     }
+    @Test
+    void parsesInTheZoneItIsGiven() throws Exception {
+        java.util.TimeZone saved = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"));
+        try {
+            java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+            c.clear();
+            c.set(2024, java.util.Calendar.JANUARY, 1, 0, 0, 0);
+            SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            assertEquals(c.getTime().getTime(), f.parse("2024-01-01 00:00").getTime(),
+                    "text without a zone is read in the formatter's zone, not the device's");
+            // Summer, so the device zone's DST cannot leak into a zone without one.
+            c.set(2024, java.util.Calendar.JULY, 1, 12, 0, 0);
+            assertEquals(c.getTime().getTime(), f.parse("2024-07-01 12:00").getTime());
+            assertEquals("2024-07-01 12:00", f.format(f.parse("2024-07-01 12:00")), "round trip");
+
+            java.util.Calendar ny = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("America/New_York"));
+            ny.clear();
+            ny.set(2024, java.util.Calendar.JULY, 1, 12, 0, 0);
+            assertEquals(ny.getTime().getTime(),
+                    new SimpleDateFormat("yyyy-MM-dd HH:mm").parse("2024-07-01 12:00").getTime(),
+                    "without one, the device's zone");
+        } finally {
+            java.util.TimeZone.setDefault(saved);
+        }
+    }
 }

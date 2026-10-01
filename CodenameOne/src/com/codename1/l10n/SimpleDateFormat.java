@@ -587,7 +587,9 @@ public class SimpleDateFormat extends DateFormat {
             }
         }
 
-        TimeZone localTimezone = Calendar.getInstance().getTimeZone();
+        // Text without a zone of its own is read in the formatter's zone, the one
+        // setTimeZone configured, so parse round-trips what format wrote.
+        TimeZone localTimezone = getTimeZone();
         calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone
         calendar.setTimeZone(localTimezone);
         if (pmMinutes != 0) {
@@ -695,7 +697,7 @@ public class SimpleDateFormat extends DateFormat {
     ///
     /// - `source`
     int getLocalDSTOffset(Calendar source) {
-        TimeZone localTimezone = Calendar.getInstance().getTimeZone();
+        TimeZone localTimezone = getTimeZone();
         int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;
         return getOffsetInMinutes(source, localTimezone) - rawOffset;
     }
