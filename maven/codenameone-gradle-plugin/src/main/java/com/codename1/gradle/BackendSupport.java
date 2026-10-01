@@ -74,12 +74,12 @@ final class BackendSupport {
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                    compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
+                    compile.getDestinationDirectory().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), AppSupport.sourceRoots(main, layout),
                     "UTF-8", userProperties, compile.getClasspath())
                     .withSourceEncoding(AppSupport.javaEncoding(project, main)));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
-                    compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
+                    compile.getDestinationDirectory().getAsFile(), main.getOutput().getClassesDirs()));
         });
         // Kotlin controllers and entities are processed like Java ones: in a pure
         // Kotlin backend compileJava has no sources and would generate no router or
@@ -89,7 +89,7 @@ final class BackendSupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                            AppSupport.kotlinDestination(compile, layout), stubs,
+                            AppSupport.kotlinDestinationProvider(compile, layout), stubs,
                             layout.projectDir(), layout.settingsFile(), AppSupport.sourceRoots(main, layout),
                             "UTF-8", userProperties, main.getCompileClasspath())
                             .withPendingJavaSources(main.getJava().getSrcDirs())

@@ -132,6 +132,10 @@ final class AppSupport {
         TaskProvider<Cn1CssTask> css = project.getTasks().register("cn1Css", Cn1CssTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setDescription("Compiles src/main/css into theme.res");
+            // A theme can reference transcoded SVG and Lottie assets, whose
+            // placeholders transcodeSvg writes; on a clean build they must exist
+            // before the stylesheet is compiled.
+            t.dependsOn(svg);
             // i18n too: the CSS compiler bundles whichever of the two exists, as the
             // Maven build does (CssCompiler.localizationSibling).
             t.getSources().from(layout.cssDir(), layout.l10nDir(),
@@ -175,11 +179,11 @@ final class AppSupport {
             // Kotlin's classes (compiled first, into a directory of their own) are
             // the Java pass's siblings, so Java calling Kotlin resolves.
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
-                    layout.projectDir(), compile.getDestinationDirectory().get().getAsFile(), project.getName(),
+                    layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
-                    compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
+                    compile.getDestinationDirectory().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), roots, "UTF-8", userProperties,
                     // javac's own classpath: in a mixed project it holds Kotlin's
                     // classes, which a Java @RestClient's Kotlin DTO resolves from.
@@ -187,7 +191,7 @@ final class AppSupport {
                     .withSourceEncoding(javaEncoding(project, main)));
             // Last: in a Java and Kotlin project, both passes have run by now.
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
-                    compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
+                    compile.getDestinationDirectory().getAsFile(), main.getOutput().getClassesDirs()));
         });
 
         // Kotlin compiles into a directory of its own, before javac. The same two
@@ -198,7 +202,7 @@ final class AppSupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
                     processingInputs(compile, layout, userProperties);
-                    File kotlinClasses = kotlinDestination(compile, layout);
+                    Provider<File> kotlinClasses = kotlinDestinationProvider(compile, layout);
                     List<String> roots = sourceRoots(main, layout);
                     // javac has not run yet, so the Java classes Kotlin calls are
                     // known by their sources.
@@ -572,6 +576,21 @@ final class AppSupport {
             c.setCanBeConsumed(false);
             c.setDescription(description);
         });
+    }
+
+    /// [#kotlinDestination(org.gradle.api.Task, ProjectLayout)], lazily: the task's own
+    /// `destinationDirectory` provider, which follows a build script that sets
+    /// it after the plugin configured the task.
+    static Provider<File> kotlinDestinationProvider(final org.gradle.api.Task compile, final ProjectLayout layout) {
+        try {
+            Object dir = compile.getClass().getMethod("getDestinationDirectory").invoke(compile);
+            if (dir instanceof org.gradle.api.file.DirectoryProperty) {
+                return ((org.gradle.api.file.DirectoryProperty) dir).getAsFile();
+            }
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            compile.getLogger().info("cn1: " + compile.getPath() + " did not report its destination: " + ex);
+        }
+        return compile.getProject().provider(() -> kotlinDestination(compile, layout));
     }
 
     /// Where a Kotlin compile task writes its classes: the task's own

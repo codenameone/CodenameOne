@@ -139,6 +139,14 @@ class PluginHelpersTest {
     }
 
     @Test
+    void aPlatformPomDependencyIsWrittenAsMavenReadsIt() {
+        assertEquals("    <dependency>\n      <groupId>g</groupId>\n      <artifactId>a</artifactId>\n"
+                + "      <version>1</version>\n    </dependency>\n", LibrarySupport.dependencyXml("g", "a", "1", "compile"));
+        org.junit.jupiter.api.Assertions.assertTrue(LibrarySupport.dependencyXml("g", "a", "1", "runtime")
+                .contains("<scope>runtime</scope>"));
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

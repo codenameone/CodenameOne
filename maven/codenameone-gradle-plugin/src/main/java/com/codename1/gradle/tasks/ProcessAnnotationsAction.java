@@ -47,7 +47,8 @@ import java.util.Properties;
 /// output directory would be an overlapping output, which defeats up-to-date
 /// checks and the build cache for both.
 public final class ProcessAnnotationsAction implements Action<Task> {
-    private final File classesDir;
+    /// Resolved when the action runs; see [ComplianceAction].
+    private final org.gradle.api.provider.Provider<File> classesDir;
     private final File stubDir;
     private final File projectDir;
     private final File settingsFile;
@@ -64,7 +65,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     ///        `codenameone { }` settings, read when the action runs: a build
     ///        that realizes the compile task before its `codenameone { }` block
     ///        must not process annotations for a stale main class
-    public ProcessAnnotationsAction(File classesDir, File stubDir, File projectDir, File settingsFile,
+    public ProcessAnnotationsAction(org.gradle.api.provider.Provider<File> classesDir, File stubDir, File projectDir, File settingsFile,
                                     List<String> sourceRoots, String encoding,
                                     org.gradle.api.provider.Provider<Map<String, String>> userProperties,
                                     FileCollection compileClasspath) {
@@ -163,6 +164,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
 
     @Override
     public void execute(Task task) {
+        File classesDir = this.classesDir.get();
         Properties raw = null;
         if (settingsFile.isFile()) {
             raw = new Properties();

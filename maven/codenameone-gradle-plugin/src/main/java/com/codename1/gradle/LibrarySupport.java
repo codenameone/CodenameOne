@@ -121,6 +121,19 @@ final class LibrarySupport {
         }
     }
 
+    /// One `<dependency>` element, indented for the `<dependencies>` of a
+    /// platform pom. `compile` is Maven's default and is left implicit.
+    static String dependencyXml(String group, String artifact, String version, String scope) {
+        return "    <dependency>\n      <groupId>" + xmlEscape(group) + "</groupId>\n      <artifactId>"
+                + xmlEscape(artifact) + "</artifactId>\n      <version>" + xmlEscape(version) + "</version>\n"
+                + ("compile".equals(scope) ? "" : "      <scope>" + xmlEscape(scope) + "</scope>\n")
+                + "    </dependency>\n";
+    }
+
+    private static String xmlEscape(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private static String childText(org.w3c.dom.Element parent, String name) {
         org.w3c.dom.NodeList n = parent.getElementsByTagName(name);
         return n.getLength() == 0 ? null : n.item(0).getTextContent().trim();
@@ -184,7 +197,7 @@ final class LibrarySupport {
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             compile.getInputs().property("cn1SkipComplianceCheck", String.valueOf(skip));
             compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
-                    compile.getDestinationDirectory().get().getAsFile(), name, main.getCompileClasspath(),
+                    compile.getDestinationDirectory().getAsFile(), name, main.getCompileClasspath(),
                     compileArtifacts, complianceProperties)
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
         });
@@ -195,7 +208,7 @@ final class LibrarySupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     compile.getInputs().property("cn1SkipComplianceCheck", String.valueOf(skip));
                     compile.doLast("cn1Compliance", new ComplianceAction(layout.rootDir(), layout.projectDir(),
-                            AppSupport.kotlinDestination(compile, layout), name, main.getCompileClasspath(),
+                            AppSupport.kotlinDestinationProvider(compile, layout), name, main.getCompileClasspath(),
                             compileArtifacts, complianceProperties)
                             .withPendingJavaSources(main.getJava().getSrcDirs()));
                 }));
@@ -281,6 +294,33 @@ final class LibrarySupport {
                 a.setExtension("zip");
             });
         });
+        // What the JavaSE code itself uses (javaseImplementation, javaseRuntimeOnly):
+        // the -javase pom must name it, or an application gets the jar without the
+        // libraries it calls and the simulator fails on a missing class.
+        final Provider<String> frameworkVersion = ext.getVersion();
+        final Provider<List<String>> javaseDependencies = project.provider(() -> {
+            List<String> out = new ArrayList<String>();
+            for (String[] cfg : new String[][] {{javase.getImplementationConfigurationName(), "compile"},
+                    {javase.getRuntimeOnlyConfigurationName(), "runtime"}}) {
+                for (org.gradle.api.artifacts.Dependency d
+                        : project.getConfigurations().getByName(cfg[0]).getDependencies()) {
+                    if (!(d instanceof org.gradle.api.artifacts.ExternalModuleDependency) || d.getGroup() == null) {
+                        continue;
+                    }
+                    String v = d.getVersion();
+                    if ((v == null || v.isEmpty()) && PluginInfo.GROUP.equals(d.getGroup())) {
+                        v = frameworkVersion.get();
+                    }
+                    if (v == null || v.isEmpty()) {
+                        project.getLogger().warn("cn1: " + d.getGroup() + ":" + d.getName() + " has no version, "
+                                + "so the published " + name + "-javase pom cannot name it");
+                        continue;
+                    }
+                    out.add(dependencyXml(d.getGroup(), d.getName(), v, cfg[1]));
+                }
+            }
+            return out;
+        });
         for (int i = 0; i < platforms.size(); i++) {
             final String platform = platforms.get(i);
             final TaskProvider<Jar> jar = platformJars.get(i);
@@ -293,9 +333,14 @@ final class LibrarySupport {
                             // platform modules do.
                             StringBuilder sb = xml.asString();
                             int end = sb.lastIndexOf("</project>");
-                            sb.insert(end, "  <dependencies>\n    <dependency>\n      <groupId>" + group.get()
-                                    + "</groupId>\n      <artifactId>" + name + "-common</artifactId>\n      <version>"
-                                    + version.get() + "</version>\n    </dependency>\n  </dependencies>\n");
+                            StringBuilder deps = new StringBuilder("  <dependencies>\n")
+                                    .append(dependencyXml(group.get(), name + "-common", version.get(), "compile"));
+                            if ("javase".equals(platform)) {
+                                for (String d : javaseDependencies.get()) {
+                                    deps.append(d);
+                                }
+                            }
+                            sb.insert(end, deps.append("  </dependencies>\n").toString());
                         });
                     });
         }

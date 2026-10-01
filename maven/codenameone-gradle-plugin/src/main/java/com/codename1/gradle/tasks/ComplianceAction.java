@@ -55,7 +55,9 @@ import java.util.Set;
 public final class ComplianceAction implements Action<Task> {
     private final File rootDir;
     private final File projectDir;
-    private final File classesDir;
+    /// Resolved when the action runs: a build may set the compile task's
+    /// destination after the plugin configured it.
+    private final Provider<File> classesDir;
     private final String projectName;
     private final FileCollection compileClasspath;
     private final Provider<List<String>> artifacts;
@@ -72,7 +74,7 @@ public final class ComplianceAction implements Action<Task> {
     ///        `codenameone-core` and `java-runtime` apart. Strings, not
     ///        `ResolvedArtifactResult`s: Gradle 8.5, the minimum supported, cannot
     ///        store those in the configuration cache.
-    public ComplianceAction(File rootDir, File projectDir, File classesDir, String projectName,
+    public ComplianceAction(File rootDir, File projectDir, Provider<File> classesDir, String projectName,
                             FileCollection compileClasspath, Provider<List<String>> artifacts,
                             Map<String, String> projectProperties) {
         this.rootDir = rootDir;
@@ -129,6 +131,7 @@ public final class ComplianceAction implements Action<Task> {
 
     @Override
     public void execute(Task task) {
+        File classesDir = this.classesDir.get();
         List<String> encoded = artifacts.get();
         // The check indexes dependencies from the resolved module artifacts, which a
         // project(":shared") or files(...) dependency is not; those are on javac's

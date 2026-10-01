@@ -50,19 +50,21 @@ public final class SplitOutputCheck implements Action<Task> {
     /// The ORM enhancer's bookkeeping, which each directory keeps for itself.
     static final String PER_DIRECTORY = "META-INF/cn1/orm-enhanced-dependencies.list";
 
-    private final File javaClasses;
+    private final org.gradle.api.provider.Provider<File> javaClasses;
     private final org.gradle.api.file.FileCollection classesDirs;
 
     /// @param javaClasses javac's destination
     /// @param classesDirs every classes directory of the source set, Kotlin's
     ///        among them wherever the build put it
-    public SplitOutputCheck(File javaClasses, org.gradle.api.file.FileCollection classesDirs) {
+    public SplitOutputCheck(org.gradle.api.provider.Provider<File> javaClasses,
+                            org.gradle.api.file.FileCollection classesDirs) {
         this.javaClasses = javaClasses;
         this.classesDirs = classesDirs;
     }
 
     @Override
     public void execute(Task task) {
+        File javaClasses = this.javaClasses.get();
         List<String> both = new ArrayList<String>();
         for (File other : classesDirs) {
             if (!other.getAbsoluteFile().equals(javaClasses.getAbsoluteFile())) {
