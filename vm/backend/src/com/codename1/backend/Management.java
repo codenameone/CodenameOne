@@ -85,11 +85,14 @@ public final class Management implements HttpServer.Handler {
                     + "endpoints off.");
         }
         String path = config.getRoutePath(PATH, "/manage");
-        while (path.endsWith("/")) {
-            path = path.substring(0, path.length() - 1);
-        }
+        // Checked BEFORE the trailing slashes go: "/" -- the endpoints at the
+        // server's root -- trims to the empty prefix, which matches /health,
+        // /metrics and the rest exactly, and is no reason to refuse.
         if (!path.startsWith("/")) {
             throw new IOException(PATH + " must start with /");
+        }
+        while (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
         }
         return new Management(path, token, development);
     }

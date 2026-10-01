@@ -1658,6 +1658,15 @@ final class BackendBeans {
                             + "the reader would get a pending task; return the value itself.");
                     continue;
                 }
+                if (BackendSources.gaugeRead(ret, "v") == null) {
+                    // Published as a gauge, so a number or a boolean -- what the
+                    // annotation promises. Anything else was listed under
+                    // /manage/managed but silently missing from the metrics.
+                    ctx.error(cls, "@ManagedAttribute " + where + " returns "
+                            + ret.getClassName() + "; an attribute is a gauge, so it returns "
+                            + "a number or a boolean, primitive or boxed.");
+                    continue;
+                }
                 if (managed.attributeNames.contains(attributeName(m.getName()))) {
                     ctx.error(cls, "@ManagedAttribute " + where + " has the attribute name "
                             + attributeName(m.getName()) + ", which another getter of "

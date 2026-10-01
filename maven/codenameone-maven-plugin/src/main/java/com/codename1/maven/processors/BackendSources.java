@@ -727,7 +727,7 @@ final class BackendSources {
     }
 
     /// A double from a getter's value, or null when it has none.
-    private static String gaugeRead(Type t, String call) {
+    static String gaugeRead(Type t, String call) {
         switch (t.getSort()) {
             case Type.BOOLEAN: return call + " ? 1 : 0";
             case Type.BYTE:

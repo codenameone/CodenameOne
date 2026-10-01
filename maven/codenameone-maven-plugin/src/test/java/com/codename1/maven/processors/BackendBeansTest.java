@@ -638,6 +638,31 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aManagedAttributeThatIsNotAGaugeFailsTheBuild() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Cache", PKG + "@Component @ManagedResource(objectName = \"cache\")\n"
+                + "public class Cache {\n"
+                + "    @ManagedAttribute public String getName() { return \"c\"; }\n"
+                + "    @ManagedAttribute public int getSize() { return 1; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@ManagedAttribute com.example.Cache.getName returns "
+                + "java.lang.String; an attribute is a gauge"));
+        assertFalse("a numeric attribute was refused: " + errors, errors.contains("getSize"));
+    }
+
+    @Test
+    public void aServerThatOnlyServesFilesStillGetsAnEntryPoint() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Site", PKG
+                + "@Configuration @StaticFilesConfig(root = \"www\") public class Site { }\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        assertTrue("@StaticFilesConfig alone produced nothing runnable",
+                new File(classes, "com/example/BackendApplication.class").isFile());
+    }
+
+    @Test
     public void aClassNoCodecCanBeWrittenForIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Page", PKG + "public class Page<T> { public List<T> items; }\n");

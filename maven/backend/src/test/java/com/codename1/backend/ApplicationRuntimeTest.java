@@ -1279,6 +1279,27 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("management mounted at the root answers its endpoints there")
+    void managementAtTheRoot() throws Exception {
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty(Management.PATH, "/");
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return null;
+                    }
+                }).start();
+        try {
+            assertEquals(200, open(port, "/health").getResponseCode());
+            assertEquals(200, open(port, "/metrics").getResponseCode());
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("compiled-in settings are the bottom layer: a properties value overrides them")
     void compiledSettingsSitUnderTheFiles() throws Exception {
         HttpServer.Handler none = new HttpServer.Handler() {

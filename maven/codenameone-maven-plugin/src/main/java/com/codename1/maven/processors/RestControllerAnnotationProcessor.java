@@ -1314,8 +1314,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (ctx.hasErrors()) {
             return;
         }
+        // And one that only serves files: a static root configured in source or
+        // in a properties file is a server the runtime builds a router for.
+        boolean staticFiles = settings.values.containsKey("cn1.static.root")
+                || applicationPropertyKnown(ctx, "cn1.static.root");
         if (controllers.isEmpty() && webSockets.isEmpty() && !beans.hasJobs()
-                && !beans.hasTools() && !beans.hasManaged() && !settings.management) {
+                && !beans.hasTools() && !beans.hasManaged() && !settings.management
+                && !staticFiles) {
             // NOTHING LEFT, so a marker from an earlier build has to go. Maven
             // keeps target/classes across a build without clean, and returning
             // early without this left the marker naming a bootstrap that still
