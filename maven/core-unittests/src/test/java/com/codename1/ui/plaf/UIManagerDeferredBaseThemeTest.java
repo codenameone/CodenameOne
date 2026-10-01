@@ -52,6 +52,7 @@ public class UIManagerDeferredBaseThemeTest extends UITestBase {
             runs++;
             Hashtable<String, Object> base = new Hashtable<String, Object>();
             base.put("@deferredBaseMarker", "base");
+            base.put("name", "DeferredBase");
             base.put("DeferredProbe.fgColor", "112233");
             manager.setThemeProps(base);
         }
@@ -71,7 +72,7 @@ public class UIManagerDeferredBaseThemeTest extends UITestBase {
 
     @Test
     public void everyKindOfReadTriggersIt() {
-        String[] kinds = {"style", "selected", "constant", "boolean", "image", "laf"};
+        String[] kinds = {"style", "selected", "constant", "boolean", "image", "laf", "name", "zoom"};
         for (String kind : kinds) {
             UIManager m = UIManager.createInstance();
             Base base = new Base(m);
@@ -86,6 +87,11 @@ public class UIManagerDeferredBaseThemeTest extends UITestBase {
                 m.isThemeConstant("x", false);
             } else if ("image".equals(kind)) {
                 m.getThemeImageConstant("x");
+            } else if ("name".equals(kind)) {
+                assertEquals("DeferredBase", m.getThemeName(), "the name of the theme that will be installed");
+            } else if ("zoom".equals(kind)) {
+                // Zooming must scale the base theme, not an empty table it then replaces.
+                m.zoomFonts(1.5f);
             } else {
                 m.getLookAndFeel();
             }

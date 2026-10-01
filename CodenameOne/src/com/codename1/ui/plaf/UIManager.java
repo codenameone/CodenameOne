@@ -857,6 +857,8 @@ public class UIManager {
     ///
     /// the name of the current theme for theme switching UI's
     public String getThemeName() {
+        // The name of a deferred base theme is only known once it is installed.
+        ensureBaseTheme();
         if (themeProps != null) {
             return (String) themeProps.get("name");
         }
@@ -1907,6 +1909,9 @@ public class UIManager {
         if (factor == 1f) {
             return;
         }
+        // Scale the base theme itself; a deferred one installed after this call
+        // would otherwise come in at its original size.
+        ensureBaseTheme();
         for (Map.Entry<String, Object> entry : themeProps.entrySet()) {
             if (!entry.getKey().endsWith(Style.FONT)) {
                 continue;
