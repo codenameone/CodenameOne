@@ -60,6 +60,12 @@ public class OtelServer {
         db.execute("INSERT INTO pets (id, name) VALUES (7, 'Rex')", null);
         Backend.builder()
                 .tracing(new OtlpTracer("oteltest"))
+                // Both off at run time -- this profile is not a development one and
+                // there is no tool -- but LINKED, which is what BackendOtelTest
+                // needs: the control that proves its management and MCP symbol
+                // spellings match something.
+                .management()
+                .mcp(null)
                 .webSockets(new Backend.WebSocketEndpoints() {
                     public void register(HttpServer.WebSocketRegistry registry,
                                          DataSource dataSource, EntityManager entities) {

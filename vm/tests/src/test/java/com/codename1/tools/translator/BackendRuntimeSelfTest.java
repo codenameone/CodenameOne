@@ -26,6 +26,7 @@ package com.codename1.tools.translator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -87,6 +88,15 @@ class BackendRuntimeSelfTest {
         run.environment().put("CN1_WEB_MAX_RESPONSE_MB", "1");
         run.environment().put("CN1_TLS_HANDSHAKE_MS", "1500");
         run.environment().put("CN1_HTTP_MAX_RESPONSE_MB", "1");
+        // A certificate for 127.0.0.1, so the self-test can stand up a local TLS
+        // peer and prove an outbound TLS read parks its virtual thread. Optional:
+        // without openssl the check says it skipped rather than failing here.
+        Path cert = work.resolve("peer-cert.pem");
+        Path key = work.resolve("peer-key.pem");
+        if (makeLoopbackCertificate(work, cert, key)) {
+            run.environment().put("CN1_SELFTEST_TLS_CERT", cert.toString());
+            run.environment().put("CN1_SELFTEST_TLS_KEY", key.toString());
+        }
         if (System.getenv("CN1_SELFTEST_NETWORK") != null) {
             run.environment().put("CN1_SELFTEST_NETWORK", "1");
             String bundle = caBundle();
@@ -109,6 +119,29 @@ class BackendRuntimeSelfTest {
         int passed = passedCount(output);
         assertTrue(passed >= 80,
                 "expected the full set of checks, only " + passed + " ran:\n" + tail(output));
+    }
+
+    /**
+     * A self-signed certificate whose subjectAltName is the loopback ADDRESS, so a
+     * client verifying against it as its CA bundle does a real verification --
+     * chain and name -- rather than one switched off for the test.
+     */
+    private static boolean makeLoopbackCertificate(Path work, Path cert, Path key)
+            throws Exception {
+        ProcessBuilder openssl = new ProcessBuilder("openssl", "req", "-x509", "-newkey",
+                "rsa:2048", "-keyout", key.toString(), "-out", cert.toString(),
+                "-days", "1", "-nodes", "-subj", "/CN=127.0.0.1",
+                "-addext", "subjectAltName=IP:127.0.0.1");
+        openssl.redirectErrorStream(true);
+        openssl.redirectOutput(work.resolve("openssl.log").toFile());
+        Process made;
+        try {
+            made = openssl.start();
+        } catch (IOException noOpenssl) {
+            return false;
+        }
+        return made.waitFor(60, TimeUnit.SECONDS) && made.exitValue() == 0
+                && Files.exists(cert) && Files.exists(key);
     }
 
     /** Reads "passed=N" out of the self-test's own summary line. */

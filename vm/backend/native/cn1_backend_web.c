@@ -36,13 +36,180 @@
  * that ships enabled.
  */
 #include "cn1_globals.h"
+#include "cn1_virtual_thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #ifndef _WIN32
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
+#include <poll.h>
 #endif
 #include <curl/curl.h>
+
+#ifndef _WIN32
+/* Defined in cn1_backend_server.c, beside the virtual-thread scheduler. */
+int cn1BackendVtWait(int count, const int* fds, const int* events, long long timeoutMillis);
+/* Defined there too: on a virtual thread that holds no monitor. */
+int cn1BackendCanPark(void);
+
+/* The most sockets one transfer holds at once -- two while libcurl races an IPv4
+ * and an IPv6 connect, plus its resolver's wake-up pair. The same bound as a
+ * virtual thread's wait record. */
+#define CN1_WEB_MAX_SOCKETS 8
+
+/* What libcurl has asked to be told about, kept by its socket and timer
+ * callbacks. Lives on the calling virtual thread's own stack for one transfer. */
+typedef struct {
+    curl_socket_t fd[CN1_WEB_MAX_SOCKETS];
+    int what[CN1_WEB_MAX_SOCKETS];
+    int count;
+    long timeoutMillis;
+} CN1WebWatch;
+
+static int cn1WebSocketCallback(CURL* easy, curl_socket_t s, int what, void* userp,
+                                void* socketp) {
+    CN1WebWatch* w = (CN1WebWatch*)userp;
+    int i;
+    (void)easy; (void)socketp;
+    for(i = 0 ; i < w->count ; i++) {
+        if(w->fd[i] == s) {
+            break;
+        }
+    }
+    if(what == CURL_POLL_REMOVE) {
+        if(i < w->count) {
+            w->count--;
+            w->fd[i] = w->fd[w->count];
+            w->what[i] = w->what[w->count];
+        }
+        return 0;
+    }
+    if(i == w->count) {
+        if(w->count >= CN1_WEB_MAX_SOCKETS) {
+            return -1;          /* libcurl fails the transfer rather than losing one */
+        }
+        w->fd[i] = s;
+        w->count++;
+    }
+    w->what[i] = what;
+    return 0;
+}
+
+static int cn1WebTimerCallback(CURLM* multi, long timeoutMillis, void* userp) {
+    (void)multi;
+    ((CN1WebWatch*)userp)->timeoutMillis = timeoutMillis;
+    return 0;
+}
+
+/*
+ * curl_easy_perform for a VIRTUAL thread: the same transfer, driven through the
+ * multi interface so that every wait parks this virtual thread on its host's
+ * poller instead of blocking the host inside libcurl's own poll(). A call to a
+ * slow API from a handler then costs one virtual thread, not one of the hosts --
+ * of which there is one per core, so a handful of slow calls used to stop the
+ * server answering anything.
+ *
+ * libcurl reports which sockets it wants watched, and for what, through the
+ * socket callback, and when it next needs a turn regardless through the timer
+ * callback; the wait asks the host for exactly that, and afterwards a zero-time
+ * poll says which socket woke it, so libcurl is told precisely what happened.
+ * Everything the transfer does -- the connect and CONNECTTIMEOUT, TLS, redirects,
+ * LOW_SPEED_TIME -- is libcurl's own logic unchanged. Falls back to the blocking
+ * call when the multi handle cannot be had.
+ */
+static CURLcode cn1WebPerformParked(CURL* curl) {
+    CURLM* multi = curl_multi_init();
+    CN1WebWatch watch;
+    CURLcode rc = CURLE_FAILED_INIT;
+    CURLMsg* msg;
+    int running = 0;
+    int left;
+    if(multi == NULL) {
+        return curl_easy_perform(curl);
+    }
+    memset(&watch, 0, sizeof(watch));
+    watch.timeoutMillis = -1;
+    curl_multi_setopt(multi, CURLMOPT_SOCKETFUNCTION, cn1WebSocketCallback);
+    curl_multi_setopt(multi, CURLMOPT_SOCKETDATA, &watch);
+    curl_multi_setopt(multi, CURLMOPT_TIMERFUNCTION, cn1WebTimerCallback);
+    curl_multi_setopt(multi, CURLMOPT_TIMERDATA, &watch);
+    if(curl_multi_add_handle(multi, curl) != CURLM_OK) {
+        curl_multi_cleanup(multi);
+        return curl_easy_perform(curl);
+    }
+    curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
+    while(running) {
+        int fds[CN1_WEB_MAX_SOCKETS];
+        int events[CN1_WEB_MAX_SOCKETS];
+        struct pollfd probe[CN1_WEB_MAX_SOCKETS];
+        int n = watch.count;
+        int i;
+        int ready = 0;
+        long long timeout = (long long)watch.timeoutMillis;
+        if(timeout == 0) {
+            watch.timeoutMillis = -1;
+            curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
+            continue;
+        }
+        if(n == 0 && timeout < 0) {
+            /* Nothing to watch and no timer, which libcurl should never leave
+               us with while a transfer runs; look again shortly rather than
+               waiting for ever on nothing. */
+            timeout = 10;
+        }
+        for(i = 0 ; i < n ; i++) {
+            fds[i] = (int)watch.fd[i];
+            events[i] = ((watch.what[i] & CURL_POLL_IN) ? 1 : 0)
+                      | ((watch.what[i] & CURL_POLL_OUT) ? 2 : 0);
+            probe[i].fd = fds[i];
+            probe[i].events = (short)(((events[i] & 1) ? POLLIN : 0)
+                                      | ((events[i] & 2) ? POLLOUT : 0));
+            probe[i].revents = 0;
+        }
+        /* Ask first, as every other wait here does: a socket that is already
+           ready costs no park. */
+        if(n > 0) {
+            ready = poll(probe, (nfds_t)n, 0);
+        }
+        if(ready <= 0) {
+            cn1BackendVtWait(n, fds, events, timeout);
+            if(n > 0) {
+                for(i = 0 ; i < n ; i++) {
+                    probe[i].revents = 0;
+                }
+                ready = poll(probe, (nfds_t)n, 0);
+            }
+        }
+        if(ready > 0) {
+            for(i = 0 ; i < n ; i++) {
+                int mask = 0;
+                if(probe[i].revents & (POLLIN | POLLHUP)) {
+                    mask |= CURL_CSELECT_IN;
+                }
+                if(probe[i].revents & POLLOUT) {
+                    mask |= CURL_CSELECT_OUT;
+                }
+                if(probe[i].revents & (POLLERR | POLLNVAL)) {
+                    mask |= CURL_CSELECT_ERR;
+                }
+                if(mask != 0) {
+                    curl_multi_socket_action(multi, (curl_socket_t)fds[i], mask, &running);
+                }
+            }
+        } else {
+            curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
+        }
+    }
+    while((msg = curl_multi_info_read(multi, &left)) != NULL) {
+        if(msg->msg == CURLMSG_DONE) {
+            rc = msg->data.result;
+        }
+    }
+    curl_multi_remove_handle(multi, curl);
+    curl_multi_cleanup(multi);
+    return rc;
+}
+#endif
 
 typedef struct {
     char* data;
@@ -519,9 +686,19 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)bodyLength);
     }
 
-    /* The transfer blocks; yield so the concurrent collector is not stalled by it. */
+    /* The transfer blocks; yield so the concurrent collector is not stalled by it.
+       On a virtual thread it PARKS instead of blocking, so its host goes on
+       running every other virtual thread; see cn1WebPerformParked. */
     CN1_YIELD_THREAD;
+#ifndef _WIN32
+    if(cn1BackendCanPark()) {
+        rc = cn1WebPerformParked(curl);
+    } else {
+        rc = curl_easy_perform(curl);
+    }
+#else
     rc = curl_easy_perform(curl);
+#endif
     CN1_RESUME_THREAD;
 
     if(rc == CURLE_OK) {

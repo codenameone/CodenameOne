@@ -35,6 +35,15 @@
  * Every blocking call is bracketed with CN1_YIELD_THREAD / CN1_RESUME_THREAD.
  * Without that, a thread parked in recv() is a thread the concurrent collector
  * cannot mark past, so one idle connection would stall GC for the whole process.
+ *
+ * THE DESCRIPTOR IS NON-BLOCKING, and every wait goes through cn1BackendAwaitFd.
+ * On a virtual thread that PARKS: the host registers the descriptor with its own
+ * poller and runs other virtual threads until it is ready, which is what makes a
+ * slow database query cost one virtual thread rather than one host -- and there
+ * is one host per core. On any other thread the same call polls, which holds the
+ * thread exactly as the blocking recv() it replaced did. A pooled connection is
+ * opened on one kind of thread and used on another, so the mode is the
+ * descriptor's for its whole life and the wait is chosen per call.
  */
 #include "cn1_globals.h"
 #include <stdio.h>
@@ -56,6 +65,12 @@ typedef int cn1_socklen;
 #include <signal.h>
 #define CN1_CLOSE_SOCKET close
 typedef socklen_t cn1_socklen;
+
+/* Defined in cn1_backend_server.c, beside the virtual-thread scheduler. */
+#define CN1_NET_EVENT_READ  1
+#define CN1_NET_EVENT_WRITE 2
+int cn1BackendAwaitFd(int fd, int events, long long deadline);
+long long cn1BackendDeadline(long long millis);
 #endif
 
 static int cn1BackendFd(JAVA_LONG handle) {
@@ -94,8 +109,9 @@ static int cn1ConnectPending(void) {
  * misconfiguration looks like a slow start in development and a hung process in
  * production.
  *
- * The socket goes back to blocking before returning: every read and write after
- * this expects that. The deadline is per address, so a host resolving to several
+ * On Windows the socket goes back to blocking before returning, which its reads
+ * and writes expect; everywhere else it stays non-blocking, as the reads and
+ * writes there expect (see the top of this file). The deadline is per address, so a host resolving to several
  * can take the timeout once for each -- which is the point, since the reachable
  * one is usually not the first.
  */
@@ -127,6 +143,38 @@ static void cn1IgnoreSigPipe(void) {
 }
 #endif
 
+#ifndef _WIN32
+/*
+ * The same, for every other platform: a non-blocking connect whose wait parks a
+ * virtual thread and polls anywhere else, with no deadline when none was asked
+ * for. The descriptor is LEFT non-blocking -- the reads and writes below expect
+ * that -- where the Windows arm puts it back.
+ */
+static int cn1ConnectWithTimeout(int fd, const struct sockaddr* addr, cn1_socklen len,
+                                 int timeoutMillis) {
+    int err = 0;
+    cn1_socklen errLen = (cn1_socklen)sizeof(err);
+    int ready;
+    if(cn1SetNonBlocking(fd, 1) != 0) {
+        return -1;
+    }
+    if(connect(fd, addr, len) == 0) {
+        return 0;
+    }
+    if(!cn1ConnectPending()) {
+        return -1;
+    }
+    ready = cn1BackendAwaitFd(fd, CN1_NET_EVENT_WRITE,
+                              cn1BackendDeadline((long long)timeoutMillis));
+    if(ready <= 0) {
+        return -1;                      /* timed out, or the wait itself failed */
+    }
+    if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&err, &errLen) != 0 || err != 0) {
+        return -1;
+    }
+    return 0;
+}
+#else
 static int cn1ConnectWithTimeout(int fd, const struct sockaddr* addr, cn1_socklen len,
                                  int timeoutMillis) {
     int err = 0;
@@ -178,6 +226,7 @@ static int cn1ConnectWithTimeout(int fd, const struct sockaddr* addr, cn1_sockle
     cn1SetNonBlocking(fd, 0);
     return 0;
 }
+#endif
 
 JAVA_LONG com_codename1_backend_Tcp_connectImpl___java_lang_String_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT host, JAVA_INT port, JAVA_INT timeoutMillis) {
     struct addrinfo hints;
@@ -297,24 +346,63 @@ JAVA_INT com_codename1_backend_Tcp_readImpl___long_byte_1ARRAY_int_int_R_int(COD
         return -2;
     }
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
-    /*
-     * This blocks, and on a virtual thread it blocks the HOST.
-     *
-     * CN1_YIELD_THREAD releases the thread to the COLLECTOR; it is not a park. The
-     * server's own readImpl parks on EAGAIN because its descriptor is registered in
-     * a host's poller, which is what resumes it. An outbound socket is in no poller,
-     * so there is nothing to wake it and yielding here would spin.
-     *
-     * The consequence is real: with one host per core, as many concurrent slow
-     * database reads as there are cores occupy every host, and unrelated HTTP
-     * connections stop being served. Making this park means giving outbound
-     * descriptors the same poller registration inbound ones have -- a scheduler
-     * feature, not a local change -- and until that exists the guide says so under
-     * "Limits worth knowing" rather than the mode quietly not holding.
-     */
+#ifdef _WIN32
     CN1_YIELD_THREAD;
     n = (long)recv(fd, (char*)&data[offset], (size_t)length, 0);
     CN1_RESUME_THREAD;
+#else
+    /*
+     * PARKS on a virtual thread rather than blocking its host. The descriptor is
+     * non-blocking, so recv() answers EAGAIN when nothing has arrived, and the
+     * wait goes to cn1BackendAwaitFd: the host registers this descriptor with its
+     * poller and resumes this virtual thread when it is readable, running every
+     * other one meanwhile. Before this, as many slow database reads as there are
+     * hosts -- one per core -- stopped the server answering anything at all.
+     *
+     * SO_RCVTIMEO, which setReadTimeoutImpl sets, no longer bounds a non-blocking
+     * recv, so it is read back here and becomes the wait's deadline: running out
+     * answers -2, as the blocking recv timing out did.
+     *
+     * The data pointer is taken again after every wait. The array is an ordinary
+     * Java object and the wait is where the collector can run, as the inbound
+     * readImpl says; this reads into the CALLER'S array, never into a host's
+     * shared buffer, so another virtual thread resumed meanwhile cannot touch it.
+     */
+    {
+        long long deadline = 0;
+        int timed = 0;
+        CN1_YIELD_THREAD;
+        for(;;) {
+            int ready;
+            n = (long)recv(fd, (char*)&data[offset], (size_t)length, 0);
+            if(n >= 0) {
+                break;
+            }
+            if(errno == EINTR) {
+                continue;
+            }
+            if(errno != EAGAIN && errno != EWOULDBLOCK) {
+                break;
+            }
+            if(!timed) {
+                struct timeval tv;
+                cn1_socklen tvLen = (cn1_socklen)sizeof(tv);
+                timed = 1;
+                if(getsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, &tvLen) == 0) {
+                    deadline = cn1BackendDeadline((long long)tv.tv_sec * 1000LL
+                                                  + (long long)(tv.tv_usec / 1000));
+                }
+            }
+            ready = cn1BackendAwaitFd(fd, CN1_NET_EVENT_READ, deadline);
+            data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+            if(ready <= 0) {
+                n = -1;
+                break;
+            }
+        }
+        CN1_RESUME_THREAD;
+    }
+#endif
     if(n == 0) {
         return -1; /* orderly shutdown by the peer */
     }
@@ -333,6 +421,45 @@ JAVA_INT com_codename1_backend_Tcp_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
     }
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
     CN1_YIELD_THREAD;
+#ifndef _WIN32
+    {
+        /* The send side of the read above: a full send buffer is EAGAIN on this
+           non-blocking descriptor, and the wait parks a virtual thread until the
+           peer drains it, bounded by SO_SNDTIMEO as the blocking send was. */
+        long long deadline = 0;
+        int timed = 0;
+        while(written < length) {
+            long n = (long)send(fd, (const char*)&data[offset + written],
+                    (size_t)(length - written), CN1_OUT_SEND_FLAGS);
+            if(n > 0) {
+                written += (JAVA_INT)n;
+                continue;
+            }
+            if(n < 0 && errno == EINTR) {
+                continue;
+            }
+            if(n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                int ready;
+                if(!timed) {
+                    struct timeval tv;
+                    cn1_socklen tvLen = (cn1_socklen)sizeof(tv);
+                    timed = 1;
+                    if(getsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, &tvLen) == 0) {
+                        deadline = cn1BackendDeadline((long long)tv.tv_sec * 1000LL
+                                                      + (long long)(tv.tv_usec / 1000));
+                    }
+                }
+                ready = cn1BackendAwaitFd(fd, CN1_NET_EVENT_WRITE, deadline);
+                data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+                if(ready > 0) {
+                    continue;
+                }
+            }
+            CN1_RESUME_THREAD;
+            return -1;
+        }
+    }
+#else
     /* send() may accept less than asked; loop so the Java side can treat a short
        write as a hard failure rather than having to retry it itself. */
     while(written < length) {
@@ -344,6 +471,7 @@ JAVA_INT com_codename1_backend_Tcp_writeImpl___long_byte_1ARRAY_int_int_R_int(CO
         }
         written += (JAVA_INT)n;
     }
+#endif
     CN1_RESUME_THREAD;
     return written;
 }

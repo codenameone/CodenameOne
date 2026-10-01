@@ -46,6 +46,8 @@ struct cn1VirtualThread {
     struct cn1VirtualThread* registryPrev;
     void*  vmState;     /* this virtual thread's ThreadLocalData */
     int    yieldReason; /* CN1_VT_YIELD_* -- why it last gave up its host */
+    int    monitors;    /* monitors held; while above zero it is PINNED -- see
+                         * cn1VirtualThreadPinned */
     int    running;     /* executing on some OS thread right now */
     /*
      * The collector's claim on this virtual thread's pending-allocation table.
@@ -76,6 +78,9 @@ struct cn1VirtualThread {
 };
 
 static __thread struct cn1VirtualThread* cn1CurrentVirtualThread = 0;
+/* &cn1CurrentVirtualThread->monitors while a virtual thread runs, else 0: what
+ * monitorEnter and monitorExit count through, at one TLS load each. */
+__thread int* cn1VirtualThreadMonitorCount = 0;
 
 /*
  * Every live virtual thread, so the collector can find the parked ones.
@@ -371,6 +376,7 @@ void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
         co->sp = cn1VirtualThreadPrime(co->stackHigh, co, (void*)cn1VirtualThreadTrampoline);
     }
     cn1CurrentVirtualThread = co;
+    cn1VirtualThreadMonitorCount = &co->monitors;
     /* NOTE, and this is a KNOWN GAP rather than an oversight -- see the block above
      * cn1SpawnVirtualThread in nativeMethods.m. The attached VM state is NOT marked
      * threadActive here. Marking it looks obviously right and is a collector HANG:
@@ -383,6 +389,7 @@ void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
     cn1VirtualThreadSwitch(&co->returnSp, co->sp);
     __atomic_store_n(&co->running, 0, __ATOMIC_SEQ_CST);
     cn1CurrentVirtualThread = previous;
+    cn1VirtualThreadMonitorCount = previous != 0 ? &previous->monitors : 0;
 }
 
 /* One pause instruction where the architecture has one; a plain no-op otherwise. */
@@ -432,8 +439,15 @@ int cn1VirtualThreadYieldReason(struct cn1VirtualThread* vt) {
     return vt == 0 ? CN1_VT_YIELD_IO : vt->yieldReason;
 }
 
+int cn1VirtualThreadPinned(void) {
+    struct cn1VirtualThread* vt = cn1CurrentVirtualThread;
+    return vt != 0 && vt->monitors > 0;
+}
+
 int cn1VirtualThreadYieldIfVirtual(void) {
-    if(cn1CurrentVirtualThread == 0) {
+    /* Pinned: answered as "not virtual", so the caller waits the way a platform
+     * thread does, holding the host -- see cn1VirtualThreadPinned. */
+    if(cn1CurrentVirtualThread == 0 || cn1CurrentVirtualThread->monitors > 0) {
         return 0;
     }
     cn1VirtualThreadSetYieldReason(CN1_VT_YIELD_RUNNABLE);

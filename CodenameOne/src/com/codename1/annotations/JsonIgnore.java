@@ -29,6 +29,11 @@ import java.lang.annotation.Target;
 
 /// Excludes a `@Mapped` field from the JSON projection. The same field still
 /// participates in XML mapping unless `@XmlTransient` is also present.
+///
+/// The server's generated codecs honour it too: a field that points back at its
+/// owner is the usual candidate, since writing both ends of that loop never
+/// finishes.
+@com.codename1.impl.SharedWithBackend
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface JsonIgnore {

@@ -171,6 +171,15 @@ public class BackendPackageMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.checkedCasts", defaultValue = "true")
     private boolean checkedCasts;
 
+    /**
+     * Whether the packaged server carries the development MCP tools. Off by
+     * default: they read the database and call the server on an agent's behalf,
+     * and a production binary should not contain them at all -- not merely have
+     * them switched off. {@code cn1:backend} runs the JVM build, which has them.
+     */
+    @Parameter(property = "cn1.backend.devTools", defaultValue = "false")
+    private boolean devTools;
+
     public void execute() throws MojoExecutionException, MojoFailureException {
         File jdk = resolveJdk();
         File work = new File(project.getBuild().getDirectory(), "cn1-backend");
@@ -250,6 +259,7 @@ public class BackendPackageMojo extends AbstractMojo {
                     + err.getMessage(), err);
         }
         RestControllerAnnotationProcessor processor = new RestControllerAnnotationProcessor();
+        processor.setDevTools(devTools);
         ProcessorContext ctx = new ProcessorContext(classes, new File(work, "stubs"), index,
                 getLog(), project.getBasedir(), new Properties(), mainClass,
                 java.util.Collections.<String>emptyList(), "UTF-8",
@@ -297,6 +307,8 @@ public class BackendPackageMojo extends AbstractMojo {
                     processor.processClass(cls, ctx);
                 }
             }
+            // finish() runs the bean pass -- the wiring, the rewritten classes and
+            // the classes generated beside them -- into this same tree.
             processor.finish(ctx);
             entities.enhance(ctx);
         } catch (ProcessingException err) {
@@ -304,7 +316,7 @@ public class BackendPackageMojo extends AbstractMojo {
                     + err.getMessage(), err);
         }
         if (ctx.hasErrors()) {
-            StringBuilder sb = new StringBuilder("@RestController could not be processed:");
+            StringBuilder sb = new StringBuilder("The backend's annotations could not be processed:");
             for (ProcessorContext.ProcessingError e : ctx.getErrors()) {
                 sb.append("\n  ").append(e);
             }

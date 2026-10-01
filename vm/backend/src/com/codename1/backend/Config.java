@@ -68,7 +68,12 @@ import java.util.Properties;
 ///
 /// 5. `application.properties`;
 ///
-/// 6. the default the caller passed in.
+/// 6. what the build compiled in from the settings annotations --
+///   `@ServerConfig`, `@SessionConfig` and the rest of
+///   `com.codename1.backend.annotations` -- so a file or the environment can
+///   still change anything the source says;
+///
+/// 7. the default the caller passed in.
 ///
 /// A value may reference an environment variable as `${NAME}` or
 /// `${NAME:fallback}`. That resolution happens when the value is READ
@@ -154,18 +159,47 @@ public final class Config {
         "cn1.otel.queue.size", "OTEL_BSP_MAX_QUEUE_SIZE",
         "cn1.otel.batch.size", "OTEL_BSP_MAX_EXPORT_BATCH_SIZE",
         "cn1.otel.export.delayMillis", "OTEL_BSP_SCHEDULE_DELAY",
+        "cn1.otel.metrics.endpoint", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "cn1.otel.metrics.headers", "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+        "cn1.otel.metrics.protocol", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+        "cn1.otel.metrics.intervalMillis", "OTEL_METRIC_EXPORT_INTERVAL",
     };
 
     private final Properties profileFile;
     private final Properties baseFile;
+    private final Properties compiled;
     private final String profile;
     private final List loadedFrom;
 
     private Config(Properties baseFile, Properties profileFile, String profile, List loadedFrom) {
+        this(baseFile, profileFile, new Properties(), profile, loadedFrom);
+    }
+
+    private Config(Properties baseFile, Properties profileFile, Properties compiled,
+                   String profile, List loadedFrom) {
         this.baseFile = baseFile;
         this.profileFile = profileFile;
+        this.compiled = compiled;
         this.profile = profile;
         this.loadedFrom = loadedFrom;
+    }
+
+    /// This configuration over a bottom layer of compiled-in values: pairs of
+    /// key and value, in that order, which every other layer overrides. The
+    /// generated entry point passes what the settings annotations say.
+    public Config withCompiledDefaults(String[] keysAndValues) {
+        if (keysAndValues == null || keysAndValues.length == 0) {
+            return this;
+        }
+        if (keysAndValues.length % 2 != 0) {
+            throw new IllegalArgumentException("Compiled settings come in key and value pairs");
+        }
+        Properties merged = new Properties();
+        merged.putAll(compiled);
+        for (int iter = 0 ; iter < keysAndValues.length ; iter += 2) {
+            merged.setProperty(keysAndValues[iter], keysAndValues[iter + 1]);
+        }
+        return new Config(baseFile, profileFile, merged, profile, loadedFrom);
     }
 
     /// Reads the configuration for this process: the active profile, then the two
@@ -246,6 +280,55 @@ public final class Config {
         return get(key, null);
     }
 
+    /// A path a handler of the server's own answers, in the canonical form every
+    /// request target is compared in: escaped unreserved characters decoded,
+    /// other escapes upper-cased. Compared as configured, `/%6dcp` was announced
+    /// and never matched a request, which reaches handlers as `/mcp`.
+    public String getRoutePath(String key, String fallback) throws IOException {
+        String value = get(key, fallback);
+        return value == null ? null : HttpServer.canonicalDeclaredPath(value.trim());
+    }
+
+    /// A secret that clients present in a request header -- a bearer token -- or
+    /// null when no layer has one.
+    ///
+    /// Refused when no request could carry it exactly: the request parser rejects
+    /// a control character in a header value and trims surrounding spaces and
+    /// tabs, so a token read with a secret file's trailing newline would answer
+    /// every request 401 while the server looked healthy. The value stays out of
+    /// the message; it is a secret.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the value holds a control character, or leading or
+    /// trailing whitespace
+    public String getHeaderSecret(String key) throws IOException {
+        String value = get(key);
+        if (value == null || value.length() == 0 || sendableFieldValue(value)) {
+            return value;
+        }
+        throw new IOException(key + " holds a control character or leading or trailing "
+                + "whitespace, so no request can carry it in a header; remove it (a secret "
+                + "file's trailing newline is the usual cause)");
+    }
+
+    /// Whether a request header could carry this value exactly: no control
+    /// character but tab, and no space or tab at either end, which the request
+    /// parser trims as surrounding whitespace.
+    static boolean sendableFieldValue(String value) {
+        int last = value.length() - 1;
+        for (int iter = 0 ; iter <= last ; iter++) {
+            char c = value.charAt(iter);
+            if ((c < 0x20 && c != '\t') || c == 0x7f) {
+                return false;
+            }
+            if ((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// The value for `key`, or `fallback` when no layer has one.
     public String get(String key, String fallback) throws IOException {
         String raw = raw(key);
@@ -305,6 +388,27 @@ public final class Config {
         return out.toString();
     }
 
+    /// Every key the properties files and the compiled-in settings set, sorted,
+    /// for a development listing. The environment is not enumerated: it holds
+    /// far more than this server's settings, and secrets that are none of its
+    /// business.
+    public List keys() {
+        java.util.TreeSet names = new java.util.TreeSet();
+        java.util.Enumeration e = compiled.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        e = baseFile.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        e = profileFile.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
+        return new ArrayList(names);
+    }
+
     /// The value as written, before any ${} in it is resolved.
     private String raw(String key) {
         String value = fromProcess(key);
@@ -323,7 +427,11 @@ public final class Config {
         if (value != null) {
             return value;
         }
-        return baseFile.getProperty(key);
+        value = baseFile.getProperty(key);
+        if (value != null) {
+            return value;
+        }
+        return compiled.getProperty(key);
     }
 
     /// A system property of that name, then the environment variable it maps to.

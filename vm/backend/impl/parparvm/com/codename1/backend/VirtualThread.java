@@ -50,6 +50,18 @@ public final class VirtualThread {
         return createImpl(fd, stackBytes);
     }
 
+    /// A virtual thread that runs a background task: when first resumed it calls
+    /// `Tasks.runVirtual(token)`. It has no descriptor --
+    /// [#descriptorOf] answers -1 -- so its host runs it from the ring and
+    /// never parks it on the poller.
+    ///
+    /// #### Returns
+    ///
+    /// a handle, or 0 if the stack could not be allocated
+    public static long createTask(long token, int stackBytes) {
+        return createTaskImpl(token, stackBytes);
+    }
+
     /// [#resume]: the connection is done and the handle should be freed.
     public static final int FINISHED = 0;
     /// [#resume]: waiting for bytes; its descriptor goes back to the poller.
@@ -61,10 +73,36 @@ public final class VirtualThread {
     /// poller instead would wait for a client that is waiting for the response
     /// this virtual thread owes it, and the connection would hang for ever.
     public static final int RUNNABLE = 2;
+    /// [#resume]: parked on an OUTBOUND descriptor -- a database socket, a TLS
+    /// peer, an HTTP call -- rather than on its own. The host registers the
+    /// descriptors [#waitCount] names with its poller and resumes it when one is
+    /// ready or [#waitTimeout] runs out, running other virtual threads meanwhile.
+    public static final int WAITING = 3;
 
-    /// Run it until it parks, yields or finishes. One of the three constants.
+    /// Run it until it parks, yields or finishes. One of the four constants.
     public static int resume(long handle) {
         return resumeImpl(handle);
+    }
+
+    /// How many descriptors a virtual thread that answered [#WAITING] waits on;
+    /// 0 for none, which is a wait on the timeout alone.
+    public static int waitCount(long handle) {
+        return waitCountImpl(handle);
+    }
+
+    /// The `index`-th descriptor a [#WAITING] virtual thread waits on.
+    public static int waitDescriptor(long handle, int index) {
+        return waitDescriptorImpl(handle, index);
+    }
+
+    /// What it waits for on that descriptor: [Reactor#READ], [Reactor#WRITE] or both.
+    public static int waitEvents(long handle, int index) {
+        return waitEventsImpl(handle, index);
+    }
+
+    /// How long it is willing to wait, in milliseconds from now, or -1 for no bound.
+    public static long waitTimeout(long handle) {
+        return waitTimeoutImpl(handle);
     }
 
     /// The descriptor this virtual thread serves, or -1.
@@ -87,7 +125,18 @@ public final class VirtualThread {
         yieldImpl();
     }
 
-    /// Whether the caller is running on a virtual thread rather than a host thread.
+    /// The handle of the virtual thread the caller runs on, or 0 on a host or
+    /// platform thread. What a waiter hands its host so it can nap rather than
+    /// be resumed again at once.
+    public static long current() {
+        return currentImpl();
+    }
+
+    /// Whether the caller is running on a virtual thread that may park -- one
+    /// that holds no monitor. A virtual thread inside `synchronized` is PINNED to
+    /// its host and answers false: it waits the way a platform thread does,
+    /// because switching out would let another virtual thread on the same host
+    /// into the same critical section, monitor ownership being the host's.
     public static boolean isVirtual() {
         return isVirtualImpl();
     }
@@ -101,10 +150,16 @@ public final class VirtualThread {
     }
 
     private static native long createImpl(int fd, int stackBytes);
+    private static native long createTaskImpl(long token, int stackBytes);
     private static native int resumeImpl(long handle);
+    private static native int waitCountImpl(long handle);
+    private static native int waitDescriptorImpl(long handle, int index);
+    private static native int waitEventsImpl(long handle, int index);
+    private static native long waitTimeoutImpl(long handle);
     private static native int descriptorImpl(long handle);
     private static native void freeImpl(long handle);
     private static native boolean isVirtualImpl();
+    private static native long currentImpl();
     private static native boolean supportedImpl();
     private static native void yieldImpl();
     private static native void reportImpl();

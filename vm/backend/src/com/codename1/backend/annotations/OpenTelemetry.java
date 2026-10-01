@@ -64,4 +64,18 @@ public @interface OpenTelemetry {
     /// or `cn1.otel.service.name` names another. Empty means `unknown_service`,
     /// which is what every OpenTelemetry SDK reports when nobody said.
     String serviceName() default "";
+
+    /// The collector's base URL, `cn1.otel.endpoint`, compiled in below
+    /// `OTEL_EXPORTER_OTLP_ENDPOINT` and the properties files. Empty sets nothing.
+    String endpoint() default "";
+
+    /// `cn1.otel.protocol`: `http/protobuf` or `http/json`. Empty sets nothing.
+    String protocol() default "";
+
+    /// `cn1.otel.sampler`, such as `traceidratio`. Empty sets nothing.
+    String sampler() default "";
+
+    /// `cn1.otel.sampler.arg`: the ratio for the ratio samplers. Empty sets
+    /// nothing.
+    String samplerArg() default "";
 }

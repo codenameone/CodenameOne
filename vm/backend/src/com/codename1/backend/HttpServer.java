@@ -114,6 +114,20 @@ public final class HttpServer {
         private byte[] canonicalTarget;
         private int canonicalLength;
         private boolean canonicalChecked;
+        /// The sessions of the server serving this request; set by Backend.
+        Sessions sessions;
+        /// See [#endedSessions].
+        private List endedSessions;
+        /// The sessions this request counts as using; see Sessions.enter.
+        List sessionsInUse;
+        /// The id each of those sessions had when this request found it, so its
+        /// end can tell a rotation of its own from one another request made.
+        Map sessionIdsFound;
+        /// This request's session once looked up; see [#getSession(boolean)].
+        private HttpSession session;
+        private boolean sessionResolved;
+        /// The request's `@RequestScope` beans, by the slot the build gave each.
+        private Object[] scopedBeans;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
                 int headerCount, String body) {
@@ -541,6 +555,100 @@ public final class HttpServer {
             this.slices = null;
             this.body = null;
             this.headers = null;
+            this.session = null;
+            this.sessionResolved = false;
+            this.scopedBeans = null;
+            this.sessions = null;
+            this.endedSessions = null;
+            this.sessionsInUse = null;
+            this.sessionIdsFound = null;
+        }
+
+        /// The session of this request, creating one if it has none.
+        public HttpSession getSession() {
+            return getSession(true);
+        }
+
+        /// The session this request belongs to: the one its cookie names, or, with
+        /// `create` set and no valid cookie, a new one the response will
+        /// send a cookie for. Null when there is none and `create` is false.
+        /// See [Sessions] for the cookie and where sessions are kept.
+        public HttpSession getSession(boolean create) {
+            if (sessionResolved && session != null && !session.isValid()) {
+                // Invalidated earlier in this request: it is not the session any
+                // more. Kept aside so the end of the request still deletes it and
+                // clears its cookie; a lookup now answers as if there were none,
+                // and create starts a new one.
+                if (endedSessions == null) {
+                    endedSessions = new ArrayList(1);
+                }
+                endedSessions.add(session);
+                session = null;
+            }
+            if (sessionResolved && (session != null || !create)) {
+                return session;
+            }
+            if (sessions == null) {
+                // Sessions are stored, and their cookie sent, when a Backend
+                // finishes the request; a bare HttpServer has nothing that would,
+                // so a session here would silently never persist.
+                throw new IllegalStateException("Sessions need a server started with "
+                        + "Backend.builder(), which stores them and sends their cookie");
+            }
+            Sessions owner = sessions;
+            String presented = sessionResolved ? null
+                    : Sessions.cookieValue(getHeader("cookie"), owner.getCookieName());
+            try {
+                session = owner.find(presented, create);
+            } catch (IOException err) {
+                throw new IllegalStateException("The session store failed: "
+                        + err.getMessage(), err);
+            }
+            sessionResolved = true;
+            if (session != null) {
+                // Found under the cookie it was looked up by; a session this
+                // request created was found under its own id.
+                owner.enter(this, session, session.isNew() || presented == null
+                        ? session.getId() : presented);
+            }
+            return session;
+        }
+
+        /// The value of one cookie the client sent, or null.
+        public String getCookie(String name) {
+            return Sessions.cookieValue(getHeader("cookie"), name);
+        }
+
+        /// The session, if this request looked it up.
+        HttpSession resolvedSession() {
+            return session;
+        }
+
+        /// The sessions this request invalidated and then replaced, oldest first,
+        /// or null. All of them: one request can end a session, start another and
+        /// end that too, and each has to be deleted when it finishes.
+        List endedSessions() {
+            return endedSessions;
+        }
+
+        /// This request's `@RequestScope` beans, grown to hold at least
+        /// `count`. Called by generated code.
+        public Object[] scopedBeans(int count) {
+            if (scopedBeans == null || scopedBeans.length < count) {
+                Object[] grown = new Object[count];
+                if (scopedBeans != null) {
+                    System.arraycopy(scopedBeans, 0, grown, 0, scopedBeans.length);
+                }
+                scopedBeans = grown;
+            }
+            return scopedBeans;
+        }
+
+        /// The request's beans, handed over for destruction and forgotten.
+        Object[] takeScopedBeans() {
+            Object[] out = scopedBeans;
+            scopedBeans = null;
+            return out;
         }
 
         /// The body, once it has been read. The only field that is not known when
@@ -570,6 +678,13 @@ public final class HttpServer {
             this.canonicalTarget = null;
             this.canonicalLength = 0;
             this.canonicalChecked = false;
+            this.session = null;
+            this.sessionResolved = false;
+            this.scopedBeans = null;
+            this.sessions = null;
+            this.endedSessions = null;
+            this.sessionsInUse = null;
+            this.sessionIdsFound = null;
         }
 
         /// For HTTP/2, whose headers arrive already decoded from the HPACK state --
@@ -855,6 +970,26 @@ public final class HttpServer {
             this.extraHeaders = null;
         }
 
+        /// Closes the file this response would have sent, for one that will never
+        /// be written: the writer is what normally closes it, and a response
+        /// replaced by a 500 never reaches the writer.
+        void discard() {
+            if (fileFd >= 0) {
+                StaticFiles.closeFile(fileFd);
+                fileFd = -1;
+            }
+        }
+
+        /// Serialises a deferred JSON body now, into an ordinary one, so the
+        /// object graph may change after this without changing the response.
+        void serializeDeferredJson() {
+            if (hasDeferredJson) {
+                body = bytes(Json.write(deferredJson));
+                deferredJson = null;
+                hasDeferredJson = false;
+            }
+        }
+
         /// Re-points this Response. Every field is assigned with no "unchanged"
         /// case: a field left behind describes the PREVIOUS response on this
         /// connection, and deferredJson is the one that would hurt -- it makes the
@@ -899,6 +1034,20 @@ public final class HttpServer {
             this.extraHeaders = extraHeaders;
         }
 
+        /// This response with other extra headers, as a NEW object. For a header
+        /// the server adds to one request's answer -- a session cookie -- because
+        /// the Response a handler returns may be a constant shared by every
+        /// request, and writing into it would hand one client's cookie to the next.
+        /// Only one of the two is ever sent, so a file descriptor it carries still
+        /// has exactly one owner.
+        Response withHeaders(Map headers) {
+            Response copy = new Response(status, contentType, body, fileFd, fileOffset,
+                    fileLength, headers);
+            copy.deferredJson = deferredJson;
+            copy.hasDeferredJson = hasDeferredJson;
+            return copy;
+        }
+
         /// A response whose body is a file. The server sends it with sendfile where
         /// the platform has it, so the bytes never enter user space, and CLOSES the
         /// descriptor when it is done -- a handler that returned one must not.
@@ -939,6 +1088,20 @@ public final class HttpServer {
 
         public int getStatus() {
             return status;
+        }
+
+        /// Adds a response header and returns this Response. A copy is made
+        /// rather than writing into the map the Response was built with, which
+        /// may be a caller's constant; a header the server owns -- Date,
+        /// Content-Length -- is refused when the response is written.
+        public Response header(String name, String value) {
+            Map copy = new LinkedHashMap();
+            if (extraHeaders != null) {
+                copy.putAll(extraHeaders);
+            }
+            copy.put(name, value);
+            extraHeaders = copy;
+            return this;
         }
 
         private static byte[] bytes(String s) {
@@ -1617,6 +1780,17 @@ public final class HttpServer {
     public static HttpServer start(String host, int port, int backlog, int workerCount,
                                    Handler handler, Tls tls, WebSocketRoutes webSockets)
             throws IOException {
+        return start(host, port, backlog, workerCount, handler, tls, webSockets, null);
+    }
+
+    /// [#start(String,int,int,int,Handler,Tls,WebSocketRoutes)], tracing its
+    /// requests with `tracer` from the first one it accepts. Set afterwards, a
+    /// request accepted in between found no tracer of this server's and was
+    /// reported to the process-wide one -- another server's service and
+    /// credentials. Tracing.NONE marks a server that traces nothing.
+    static HttpServer start(String host, int port, int backlog, int workerCount,
+                            Handler handler, Tls tls, WebSocketRoutes webSockets,
+                            Tracer tracer) throws IOException {
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -1691,6 +1865,9 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
+        if (tracer != null) {
+            server.serverTracer = tracer;
+        }
         // Before any thread that could accept a connection exists. A callback that
         // throws takes the whole start down rather than leaving a server running
         // with half its routes -- the same answer a Handlers factory gets.
@@ -1748,6 +1925,15 @@ public final class HttpServer {
             try {
                 for (int iter = 0 ; iter < hostCount ; iter++) {
                     server.vtHosts[iter] = new VtHost(iter == 0 ? reactor : Reactor.create());
+                    // So a background task handed to this host runs now rather
+                    // than after the host's poll times out. Without one the task
+                    // still runs, just up to a poll interval later.
+                    int[] wake = Reactor.createWakePipe();
+                    if (wake != null) {
+                        server.vtHosts[iter].wakeRead = wake[0];
+                        server.vtHosts[iter].wakeWrite = wake[1];
+                        server.vtHosts[iter].poller.add(wake[0], Reactor.READ);
+                    }
                 }
                 server.pollers = new Thread[hostCount];
                 for (int iter = 0 ; iter < hostCount ; iter++) {
@@ -1800,6 +1986,11 @@ public final class HttpServer {
         server.releaseVirtualThreadSlot();
     }
 
+    /// Whether this server speaks TLS, so a client of it must use https.
+    public boolean isSecure() {
+        return tls != null;
+    }
+
     public int getPort() {
         return listener.getPort();
     }
@@ -1836,6 +2027,9 @@ public final class HttpServer {
         out.put("openStaticFiles", Integer.valueOf(StaticFiles.openFileCount()));
         // Only when tracing is on, so a server that does not trace reports
         // exactly what it always has.
+        // The process's tracer: one process runs one Backend (Backend.claimProcess),
+        // so it is this server's. Two servers with different tracers in one JVM
+        // is not a supported shape and is refused at start.
         Tracing.metrics(out);
         return out;
     }
@@ -1948,6 +2142,11 @@ public final class HttpServer {
         // A quarter of the drain window at most, so the goodbyes cannot eat the
         // time the requests in flight were promised.
         closeWebSocketsForShutdown(Math.max(1, Math.min(drainMillis / 4, 2000)));
+        // Background tasks on virtual threads get the same window as the requests:
+        // each host keeps resuming its own after the loop below ends -- a yielded
+        // task can only ever run on the host it started on -- and the sweep waits
+        // for them before it frees anything.
+        taskDrainDeadline = System.currentTimeMillis() + drainMillis;
         running = false;
         reactor.remove(listener.getFd());
         listener.close();
@@ -1981,6 +2180,7 @@ public final class HttpServer {
                 break;
             }
         }
+        awaitTaskDrain(callerFd);
         // Whatever is still open at the deadline is an idle keep-alive connection or
         // a request that overran; both have to be closed rather than held forever.
         //
@@ -2141,6 +2341,9 @@ public final class HttpServer {
     /// Set while a websocket callback is running, so stop() called from inside one
     /// can discount the turn that callback is itself holding.
     private static final ThreadLocal SERVING_WS = new ThreadLocal();
+    /// Set while a websocket handshake runs application code -- the router,
+    /// getSubprotocols(), onOpen() -- holding only its connection.
+    private static final ThreadLocal SERVING_UPGRADE = new ThreadLocal();
 
     /// The headers a refusal this server invented may carry: none of the handler's.
     ///
@@ -2153,6 +2356,14 @@ public final class HttpServer {
     /// and nothing the handler wrote belongs to it.
     private static List refusalHeaders() {
         return new ArrayList();
+    }
+
+    /// Whether the calling thread is serving a request or a websocket callback of
+    /// some server -- work a stop() drain waits for.
+    static boolean servingOnThisThread() {
+        return SERVING_FD.get() != null || Boolean.TRUE.equals(SERVING_WS.get())
+                || Boolean.TRUE.equals(SERVING_H2.get())
+                || Boolean.TRUE.equals(SERVING_UPGRADE.get());
     }
 
     /// workOutstanding(), minus what the calling handler is itself holding.
@@ -2170,6 +2381,13 @@ public final class HttpServer {
         if (Boolean.TRUE.equals(SERVING_WS.get())) {
             return inFlightRequests.get() > 0 || activeRequests.get() > 0
                     || http2Turns.get() > 0 || webSocketTurns.get() > 1
+                    || pendingWork.get() > 0;
+        }
+        if (Boolean.TRUE.equals(SERVING_UPGRADE.get())) {
+            // A handshake holds its connection and nothing else: no request is
+            // in flight for it and no websocket turn is running yet.
+            return inFlightRequests.get() > 0 || activeRequests.get() > 1
+                    || http2Turns.get() > 0 || webSocketTurns.get() > 0
                     || pendingWork.get() > 0;
         }
         if (callerFd < 0) {
@@ -2233,6 +2451,9 @@ public final class HttpServer {
         VtHost[] hosts = vtHosts;
         if (hosts != null) {
             for (VtHost host : hosts) {
+                if (host != null) {
+                    releaseTaskInbox(host);
+                }
                 // Host 0 SHARES the main reactor (see start()), so closing every
                 // host's poller and then the reactor would close that one twice --
                 // a double free of one descriptor, not the release of two.
@@ -2356,6 +2577,378 @@ public final class HttpServer {
     private static final java.util.concurrent.atomic.AtomicBoolean VT_SLOT_TAKEN =
             new java.util.concurrent.atomic.AtomicBoolean();
 
+    /// Background tasks waiting for a virtual thread, by the token its body asks with.
+    private static final Map VIRTUAL_TASKS = new java.util.HashMap();
+    private static long nextVirtualTask;
+    /// Round-robin cursor over the hosts for new tasks.
+    private static int nextTaskHost;
+
+    /// Whether a background task handed to [#submitVirtualTask] would get a
+    /// virtual thread: this build has them and a server is running on them.
+    static boolean acceptsVirtualTasks() {
+        HttpServer server = ACTIVE_SERVER;
+        return server != null && server.running && server.vtHosts != null;
+    }
+
+    /// The tracer this server's requests report to, when it has one of its own.
+    /// Rather than whichever tracer is installed process-wide -- which, with two
+    /// servers, is the one that started last. Set by start() before any worker
+    /// can accept.
+    private volatile Tracer serverTracer; //NOPMD AvoidUsingVolatile - written before the workers start, read by every worker
+
+    /// The server holding the virtual-thread slot, or null.
+    static HttpServer activeServer() {
+        return ACTIVE_SERVER;
+    }
+
+    /// Queues `task` on a host of `server`, which must be the server
+    /// that owns the virtual-thread slot; false -- run it elsewhere -- when it is
+    /// not, is stopping, or runs no virtual threads.
+    ///
+    /// The host is woken through its pipe and creates the virtual thread itself,
+    /// because a virtual thread's VM state belongs to the host that runs it.
+    static boolean submitVirtualTask(Runnable task, HttpServer server) {
+        if (task == null || server == null || server != ACTIVE_SERVER || !server.running
+                || server.vtHosts == null) {
+            return false;
+        }
+        VtHost[] hosts = server.vtHosts;
+        long token;
+        VtHost host;
+        synchronized (VIRTUAL_TASKS) {
+            token = ++nextVirtualTask;
+            VIRTUAL_TASKS.put(Long.valueOf(token), task);
+            // Reduced to THIS server's hosts: the cursor is static and survives a
+            // restart, and a server started again with fewer hosts indexed past
+            // the end of its array with the old one's.
+            int index = nextTaskHost % hosts.length;
+            nextTaskHost = index + 1 >= hosts.length ? 0 : index + 1;
+            host = hosts[index];
+            if (host != null) {
+                VIRTUAL_TASK_HOSTS.put(Long.valueOf(token), host);
+            }
+        }
+        if (host == null) {
+            takeVirtualTask(token);
+            return false;
+        }
+        synchronized (host.inbox) {
+            // Rechecked under the lock releaseTaskInbox takes: a shutdown that won
+            // the race has already drained this inbox and closed its wake pipe,
+            // and a token added after that would sit there with no host to run
+            // it -- its executor's count stuck, its Future never done.
+            if (host.inboxClosed) {
+                takeVirtualTask(token);
+                return false;
+            }
+            host.inbox.add(Long.valueOf(token));
+            // Under the same lock that closes the pipe: released first, a
+            // submitter paused here could write after the descriptor was closed
+            // and its number reused -- the wake byte landing in another socket.
+            if (host.wakeWrite >= 0) {
+                Reactor.wake(host.wakeWrite);
+            }
+        }
+        return true;
+    }
+
+    /// At shutdown: the tasks still queued on a host go to a platform thread
+    /// rather than being lost with it, and its wake pipe is closed.
+    private static void releaseTaskInbox(VtHost host) {
+        Long[] tokens;
+        synchronized (host.inbox) {
+            tokens = (Long[]) host.inbox.toArray(new Long[host.inbox.size()]);
+            host.inbox.clear();
+            host.inboxClosed = true;
+            // Closed under the lock a submitter wakes the host under, so no wake
+            // can be written between the close and the -1.
+            if (host.wakeRead >= 0) {
+                ServerSocket.closeFd(host.wakeRead);
+                ServerSocket.closeFd(host.wakeWrite);
+                host.wakeRead = -1;
+                host.wakeWrite = -1;
+            }
+        }
+        for (Long element : tokens) {
+            Runnable task = takeVirtualTask(element.longValue());
+            if (task != null) {
+                TaskExecutor.fallBack(task);
+            }
+        }
+    }
+
+    /// The task a virtual thread's body runs, handed over once.
+    static Runnable takeVirtualTask(long token) {
+        synchronized (VIRTUAL_TASKS) {
+            VIRTUAL_TASK_HOSTS.remove(Long.valueOf(token));
+            return (Runnable) VIRTUAL_TASKS.remove(Long.valueOf(token));
+        }
+    }
+
+    /// The host each queued virtual task was given to, by token.
+    private static final Map VIRTUAL_TASK_HOSTS = new java.util.HashMap();
+    /// The host running the calling virtual task, while it runs; see awaitTaskDrain.
+    private static final ThreadLocal TASK_HOST = new ThreadLocal();
+
+    /// Runs the virtual task queued under `token`, on the virtual thread made
+    /// for it, remembering its host: a stop() it calls must not wait for that
+    /// host's drain, which cannot start until the stop returns.
+    static void runVirtualTask(long token) {
+        Runnable task;
+        Object host;
+        synchronized (VIRTUAL_TASKS) {
+            host = VIRTUAL_TASK_HOSTS.remove(Long.valueOf(token));
+            task = (Runnable) VIRTUAL_TASKS.remove(Long.valueOf(token));
+        }
+        if (task == null) {
+            return;
+        }
+        TASK_HOST.set(host);
+        try {
+            task.run();
+        } finally {
+            TASK_HOST.set(null);
+        }
+    }
+
+    /// Gives the tasks queued on `me` their virtual threads and puts them on
+    /// the run ring. A task that cannot have one -- no stack to be had -- goes to
+    /// a platform thread instead: it is not the task's fault, and this host must
+    /// not run it inline, where a long task would stall every connection it owns.
+    private void drainTaskInbox(VtHost me) {
+        Long[] tokens;
+        synchronized (me.inbox) {
+            if (me.inbox.isEmpty()) {
+                return;
+            }
+            tokens = (Long[]) me.inbox.toArray(new Long[me.inbox.size()]);
+            me.inbox.clear();
+        }
+        for (Long element : tokens) {
+            long token = element.longValue();
+            Runnable queued;
+            synchronized (VIRTUAL_TASKS) {
+                queued = (Runnable) VIRTUAL_TASKS.get(Long.valueOf(token));
+            }
+            long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
+            if (handle != 0 && queued != null) {
+                // Kept so a task abandoned at shutdown can still be told.
+                me.tasks.put(Long.valueOf(handle), queued);
+            }
+            if (handle != 0) {
+                me.taskTokens.put(Long.valueOf(handle), element);
+            }
+            if (handle == 0) {
+                Runnable task = takeVirtualTask(token);
+                if (task != null) {
+                    TaskExecutor.fallBack(task);
+                }
+                continue;
+            }
+            me.ringAdd(handle);
+        }
+    }
+
+    /// Gives a task's virtual thread its turn. A task has no descriptor, so every
+    /// answer but FINISHED puts it back on the ring: a yield -- which the VM
+    /// reports as parked-on-I/O when nothing says otherwise -- would otherwise
+    /// leave it waiting on a poller that will never report it.
+    private void advanceTask(VtHost me, long handle) {
+        int state = VirtualThread.resume(handle);
+        if (state == VirtualThread.FINISHED) {
+            me.tasks.remove(Long.valueOf(handle));
+            me.taskTokens.remove(Long.valueOf(handle));
+            VirtualThread.free(handle);
+            return;
+        }
+        if (state == VirtualThread.WAITING) {
+            parkWaiter(me, handle, true);
+            return;
+        }
+        ringOrNap(me, handle);
+    }
+
+    /// Parks a virtual thread that answered WAITING: its outbound descriptors go
+    /// on this host's poller, and it comes back to the ring when one is ready or
+    /// its timeout runs out. Until then this host runs everybody else -- which is
+    /// the whole point: a slow database query or HTTP call used to hold the host
+    /// inside recv(), and there is one host per core.
+    ///
+    /// A wait with no descriptors is a wait on the timeout alone -- libcurl
+    /// between retries -- and is a nap.
+    private static void parkWaiter(VtHost me, long handle, boolean task) {
+        int count = VirtualThread.waitCount(handle);
+        long timeout = VirtualThread.waitTimeout(handle);
+        long deadline = timeout < 0 ? 0 : System.currentTimeMillis() + timeout;
+        if (count == 0) {
+            if (deadline == 0) {
+                me.ringAdd(handle);
+            } else {
+                me.napping.put(Long.valueOf(handle), Long.valueOf(deadline));
+            }
+            return;
+        }
+        for (int iter = 0 ; iter < count ; iter++) {
+            int fd = VirtualThread.waitDescriptor(handle, iter);
+            try {
+                me.poller.add(fd, VirtualThread.waitEvents(handle, iter));
+            } catch (IOException err) {
+                // Cannot be watched: undo what was registered and let it run. It
+                // re-tests its descriptor with a zero-time poll when resumed, so
+                // it sees a real error for itself rather than hanging here.
+                for (int undo = 0 ; undo < iter ; undo++) {
+                    int registered = VirtualThread.waitDescriptor(handle, undo);
+                    me.poller.remove(registered);
+                    me.setWaiter(registered, 0);
+                }
+                me.ringAdd(handle);
+                return;
+            }
+            me.setWaiter(fd, handle);
+        }
+        me.addWaiter(handle, deadline, task);
+    }
+
+    /// Ends the wait of the virtual thread at `index`: its descriptors come off
+    /// the poller BEFORE it runs, so none is ever registered while the virtual
+    /// thread could close it, and it goes back on the ring. Any of its other
+    /// descriptors still waiting in `ready` from this same poll are blanked, or
+    /// the loop would take one for a new connection.
+    private static void wakeWaiterAt(VtHost me, int index, int[] ready, int from, int n) {
+        long handle = me.waiters[index];
+        int count = VirtualThread.waitCount(handle);
+        for (int iter = 0 ; iter < count ; iter++) {
+            int fd = VirtualThread.waitDescriptor(handle, iter);
+            me.poller.remove(fd);
+            me.setWaiter(fd, 0);
+            for (int later = from ; later < n ; later++) {
+                if (ready[later] == fd) {
+                    ready[later] = -1;
+                }
+            }
+        }
+        me.removeWaiterAt(index);
+        me.ringAdd(handle);
+    }
+
+    /// Wakes the waiters whose timeout has run out by `now` -- the call they are
+    /// in fails with its ordinary deadline error -- and answers the earliest
+    /// deadline still ahead, or Long.MAX_VALUE for none.
+    private static long wakeExpiredWaiters(VtHost me, long now) {
+        long earliest = Long.MAX_VALUE;
+        int iter = 0;
+        while (iter < me.waiterCount) {
+            long at = me.waiterDeadlines[iter];
+            if (at != 0 && at <= now) {
+                // Swapped with the last, so the same index is looked at again.
+                wakeWaiterAt(me, iter, null, 0, 0);
+                continue;
+            }
+            if (at != 0 && at < earliest) {
+                earliest = at;
+            }
+            iter++;
+        }
+        return earliest;
+    }
+
+    /// For a stopping host, which no longer runs its poll loop but still owes its
+    /// background tasks their finish: waits up to `timeoutMillis` for a waiting
+    /// TASK's descriptor and wakes it. Connection waiters are left where they
+    /// are -- stop() reclaims those, and from another thread. Any other
+    /// descriptor that reports is taken off the poller, since nothing will serve
+    /// it now and a level-triggered set would report it on every call.
+    private static void pumpTaskWaiters(VtHost me, int timeoutMillis) {
+        int[] ready = new int[READY_CAPACITY];
+        int n;
+        try {
+            n = me.poller.await(ready, timeoutMillis);
+        } catch (IOException err) {
+            n = 0;
+        }
+        for (int iter = 0 ; iter < n ; iter++) {
+            int fd = ready[iter];
+            if (fd < 0) {
+                continue;
+            }
+            if (fd == me.wakeRead) {
+                Reactor.drainWake(fd);
+                continue;
+            }
+            int index = me.waiterIndex(me.waiterFor(fd));
+            if (index >= 0 && me.waiterIsTask[index]) {
+                wakeWaiterAt(me, index, ready, iter + 1, n);
+            } else if (index < 0) {
+                me.poller.remove(fd);
+                me.setArmed(fd, false);
+            }
+        }
+        long now = System.currentTimeMillis();
+        int iter = 0;
+        while (iter < me.waiterCount) {
+            long at = me.waiterDeadlines[iter];
+            if (me.waiterIsTask[iter] && at != 0 && at <= now) {
+                wakeWaiterAt(me, iter, null, 0, 0);
+                continue;
+            }
+            iter++;
+        }
+    }
+
+    /// Naps a virtual thread asked for, by handle, until when. Written by the
+    /// virtual thread just before it yields and read by its host just after,
+    /// on the same OS thread; a map because every host shares it.
+    private static final java.util.HashMap NAP_REQUESTS = new java.util.HashMap();
+
+    /// Yields the calling virtual thread until `untilMillis`, or thereabouts:
+    /// its host leaves it off the run ring until then. A plain yield when the
+    /// caller is not a virtual thread. For waiters -- an @Async Future polled
+    /// from a handler -- that would otherwise be resumed again immediately.
+    static void napUntil(long untilMillis) {
+        long self = VirtualThread.current();
+        if (self != 0) {
+            synchronized (NAP_REQUESTS) {
+                NAP_REQUESTS.put(Long.valueOf(self), Long.valueOf(untilMillis));
+            }
+        }
+        VirtualThread.yieldNow();
+    }
+
+    /// Puts a virtual thread that yielded back on the ring -- or, when it asked
+    /// to nap and the time is still ahead, on this host's nap table instead.
+    private void ringOrNap(VtHost me, long handle) {
+        Long until;
+        synchronized (NAP_REQUESTS) {
+            until = (Long) NAP_REQUESTS.remove(Long.valueOf(handle));
+        }
+        if (until != null && until.longValue() > System.currentTimeMillis()) {
+            me.napping.put(Long.valueOf(handle), until);
+            return;
+        }
+        me.ringAdd(handle);
+    }
+
+    /// Moves the naps due by `now` back to the ring; answers the earliest
+    /// still ahead, or Long.MAX_VALUE for none.
+    private static long wakeNappers(VtHost me, long now) {
+        if (me.napping.isEmpty()) {
+            return Long.MAX_VALUE;
+        }
+        long earliest = Long.MAX_VALUE;
+        java.util.Iterator it = me.napping.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry e = (Map.Entry) it.next();
+            long until = ((Long) e.getValue()).longValue();
+            if (until <= now) {
+                it.remove();
+                me.ringAdd(((Long) e.getKey()).longValue());
+            } else if (until < earliest) {
+                earliest = until;
+            }
+        }
+        return earliest;
+    }
+
     /// What a connection's virtual thread runs. Reached from native code only,
     /// which is also what keeps it from being dead-code eliminated.
     ///
@@ -2411,8 +3004,124 @@ public final class HttpServer {
         int ringHead = 0;
         int ringCount = 0;
 
+        /// Tokens of background tasks other threads handed to this host. The one
+        /// piece of a host that another thread writes, so it is locked; the host
+        /// takes the whole list at once, at the top of its loop.
+        final ArrayList inbox = new ArrayList();
+        /// The wake pipe polled with the connections, or -1 where there is none.
+        int wakeRead = -1;
+        int wakeWrite = -1;
+
         boolean ringEmpty() {
             return ringCount == 0;
+        }
+
+        /// Set, under the inbox lock, once a stopping host has finished its tasks.
+        boolean tasksDrained;
+
+        /// Set, under the inbox lock, once shutdown has drained it for good.
+        boolean inboxClosed;
+
+        /// The task each background virtual thread on this host runs, by handle.
+        /// Touched only by the host thread.
+        final java.util.HashMap tasks = new java.util.HashMap();
+        /// Each task handle's token in VIRTUAL_TASKS. A task abandoned before its
+        /// first turn never reached Tasks.runVirtual, which is what removes it,
+        /// so the abandon has to -- or the static map keeps the task, its
+        /// arguments and the beans it captured for the life of the process.
+        final java.util.HashMap taskTokens = new java.util.HashMap();
+        /// Virtual threads napping until a time, by handle, OFF the run ring: a
+        /// waiter that is resumed again at once only to find nothing done yet
+        /// keeps its host polling with a zero timeout, one core busy for as long
+        /// as it waits. Touched only by the host thread.
+        final java.util.HashMap napping = new java.util.HashMap();
+
+        /// Virtual threads parked on an OUTBOUND descriptor -- a database socket,
+        /// a TLS peer, libcurl's -- by that descriptor. Registered with this
+        /// host's poller only for as long as the wait lasts, so an entry here and
+        /// a registration there always come and go together. Touched only by the
+        /// host thread.
+        long[] waiterByFd = new long[64];
+        /// The waiting virtual threads themselves, with when each stops waiting
+        /// (0 for never) and whether it is a background task rather than a
+        /// connection -- recorded at park time, because a stopping server frees
+        /// connection handles from another thread and asking a freed one is a
+        /// use-after-free. Unordered; removal swaps in the last entry.
+        long[] waiters = new long[16];
+        long[] waiterDeadlines = new long[16];
+        boolean[] waiterIsTask = new boolean[16];
+        int waiterCount;
+
+        long waiterFor(int fd) {
+            return fd >= 0 && fd < waiterByFd.length ? waiterByFd[fd] : 0;
+        }
+
+        void setWaiter(int fd, long handle) {
+            if (fd < 0) {
+                return;
+            }
+            if (fd >= waiterByFd.length) {
+                int size = waiterByFd.length;
+                while (size <= fd) {
+                    size = size * 2;
+                }
+                long[] grown = new long[size];
+                System.arraycopy(waiterByFd, 0, grown, 0, waiterByFd.length);
+                waiterByFd = grown;
+            }
+            waiterByFd[fd] = handle;
+        }
+
+        void addWaiter(long handle, long deadline, boolean task) {
+            if (waiterCount == waiters.length) {
+                int size = waiters.length * 2;
+                long[] grownWaiters = new long[size];
+                long[] grownDeadlines = new long[size];
+                boolean[] grownTasks = new boolean[size];
+                System.arraycopy(waiters, 0, grownWaiters, 0, waiterCount);
+                System.arraycopy(waiterDeadlines, 0, grownDeadlines, 0, waiterCount);
+                System.arraycopy(waiterIsTask, 0, grownTasks, 0, waiterCount);
+                waiters = grownWaiters;
+                waiterDeadlines = grownDeadlines;
+                waiterIsTask = grownTasks;
+            }
+            waiters[waiterCount] = handle;
+            waiterDeadlines[waiterCount] = deadline;
+            waiterIsTask[waiterCount] = task;
+            waiterCount++;
+        }
+
+        void removeWaiterAt(int index) {
+            waiterCount--;
+            waiters[index] = waiters[waiterCount];
+            waiterDeadlines[index] = waiterDeadlines[waiterCount];
+            waiterIsTask[index] = waiterIsTask[waiterCount];
+            waiters[waiterCount] = 0;
+        }
+
+        int waiterIndex(long handle) {
+            for (int iter = 0 ; iter < waiterCount ; iter++) {
+                if (waiters[iter] == handle) {
+                    return iter;
+                }
+            }
+            return -1;
+        }
+
+        int taskWaiters() {
+            int count = 0;
+            for (int iter = 0 ; iter < waiterCount ; iter++) {
+                if (waiterIsTask[iter]) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        boolean hasQueuedTasks() {
+            synchronized (inbox) {
+                return !inbox.isEmpty();
+            }
         }
 
         void ringAdd(long handle) {
@@ -2678,26 +3387,205 @@ public final class HttpServer {
         return vtHosts[index];
     }
 
+    /// Until when a stopping host keeps running its background tasks.
+    private volatile long taskDrainDeadline; //NOPMD AvoidUsingVolatile - set by stop(), read by every host thread
+
+    /// After the loop: the background tasks this host is running, run to the end
+    /// or to the drain deadline. Only they are resumed -- no polling, no
+    /// connections, which stop() is taking down -- and a host that exits with a
+    /// yielded task still in its ring would leave that task's Future unfinished
+    /// and its executor's active count stuck forever.
+    private void drainTasksAfterStop(VtHost me) {
+        try {
+            while (System.currentTimeMillis() < taskDrainDeadline) {
+                drainTaskInbox(me);
+                // Napping tasks are still running ones; the drain resumes them too.
+                wakeNappers(me, Long.MAX_VALUE);
+                int budget = me.ringCount;
+                int tasks = 0;
+                while (budget-- > 0 && !me.ringEmpty()) {
+                    long handle = me.ringTake();
+                    if (VirtualThread.descriptorOf(handle) < 0) {
+                        advanceTask(me, handle);
+                        tasks++;
+                    } else {
+                        // A connection's: stop() reclaims those.
+                        me.ringAdd(handle);
+                    }
+                }
+                if (tasks == 0 && !me.hasQueuedTasks()) {
+                    // A task parked on a database or HTTP call is still running;
+                    // wait for its descriptor rather than abandoning it.
+                    if (me.taskWaiters() == 0) {
+                        return;
+                    }
+                    pumpTaskWaiters(me, (int) Math.max(1, Math.min(50,
+                            taskDrainDeadline - System.currentTimeMillis())));
+                }
+            }
+            // Out of time. A task that never had its first turn has no frames:
+            // its stack is freed and its Future failed. One that STARTED is never
+            // freed -- free() does not unwind, so its finally blocks and monitor
+            // exits would never run, and a lock it holds would stay owned by a
+            // thread that no longer exists. It goes on running past the deadline
+            // instead, as a platform task that overruns does; the drain is over
+            // for the rest of the stop either way.
+            int abandoned = 0;
+            int overrunning = 0;
+            wakeNappers(me, Long.MAX_VALUE);
+            int left = me.ringCount;
+            while (left-- > 0 && !me.ringEmpty()) {
+                long handle = me.ringTake();
+                if (VirtualThread.descriptorOf(handle) >= 0) {
+                    me.ringAdd(handle);
+                    continue;
+                }
+                Long token = (Long) me.taskTokens.get(Long.valueOf(handle));
+                // Present only until runVirtual takes it on the task's first turn.
+                Runnable unstarted = token == null ? null : takeVirtualTask(token.longValue());
+                if (unstarted == null) {
+                    me.ringAdd(handle);
+                    overrunning++;
+                    continue;
+                }
+                Runnable task = (Runnable) me.tasks.remove(Long.valueOf(handle));
+                me.taskTokens.remove(Long.valueOf(handle));
+                VirtualThread.free(handle);
+                TaskExecutor.abandoned(task != null ? task : unstarted);
+                abandoned++;
+            }
+            // Parked on outbound I/O means STARTED: those overrun like any other.
+            overrunning += me.taskWaiters();
+            if (abandoned > 0) {
+                System.err.println(abandoned + " background task(s) on virtual threads did "
+                        + "not start within the shutdown window and were dropped");
+            }
+            if (overrunning > 0) {
+                System.err.println(overrunning + " background task(s) on virtual threads are "
+                        + "still running past the shutdown window; they are left to finish");
+                synchronized (me.inbox) {
+                    me.tasksDrained = true;
+                }
+                finishOverrunningTasks(me);
+            }
+        } finally {
+            synchronized (me.inbox) {
+                me.tasksDrained = true;
+            }
+        }
+    }
+
+    /// Resumes a stopped host's started tasks until each has finished, so every
+    /// one unwinds -- its finally blocks run, its monitors are released -- rather
+    /// than having its stack freed from under it.
+    private void finishOverrunningTasks(VtHost me) {
+        while (true) {
+            // A napping task is a running one: back on the ring each pass.
+            wakeNappers(me, Long.MAX_VALUE);
+            if (me.ringEmpty()) {
+                if (me.taskWaiters() == 0) {
+                    return;
+                }
+                pumpTaskWaiters(me, 50);
+                continue;
+            }
+            int budget = me.ringCount;
+            int tasks = 0;
+            while (budget-- > 0 && !me.ringEmpty()) {
+                long handle = me.ringTake();
+                if (VirtualThread.descriptorOf(handle) < 0) {
+                    advanceTask(me, handle);
+                    tasks++;
+                } else {
+                    me.ringAdd(handle);
+                }
+            }
+            if (tasks == 0) {
+                if (me.taskWaiters() == 0) {
+                    return;
+                }
+                pumpTaskWaiters(me, 50);
+            }
+        }
+    }
+
+    /// Waits, until the drain deadline, for every host to finish its tasks --
+    /// except the host running a handler that called stop(): it cannot reach its
+    /// drain until this returns, so waiting for it waited out the whole window,
+    /// which the drain above already goes out of its way not to do.
+    private void awaitTaskDrain(int callerFd) {
+        VtHost[] hosts = vtHosts;
+        if (hosts == null) {
+            return;
+        }
+        // The caller's host: a handler's is the owner of its descriptor, a
+        // virtual task's the host it was given to. Either cannot drain until
+        // this returns, and waiting for it waited out the whole window.
+        VtHost callersHost = callerFd >= 0 ? ownerOf(callerFd) : (VtHost) TASK_HOST.get();
+        while (System.currentTimeMillis() < taskDrainDeadline + 50) {
+            boolean all = true;
+            for (VtHost element : hosts) {
+                if (element != null && element != callersHost) { //NOPMD CompareObjectsWithEquals - hosts are compared by identity
+                    synchronized (element.inbox) {
+                        all &= element.tasksDrained;
+                    }
+                }
+            }
+            if (all) {
+                return;
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     /// One host thread: run whoever is ready, then poll for more.
     ///
     /// Everything it touches belongs to it. The run queue is a plain LinkedList
     /// because no other thread can reach it, and the descriptor table is a plain
-    /// long\[\] for the same reason -- affinity is what buys that, and it is worth
+    /// long[] for the same reason -- affinity is what buys that, and it is worth
     /// more than the lock it saves, because it is also what makes the VM's
     /// per-thread allocator state correct under a parked virtual thread.
     private void runVirtualThreadHost(int index) {
         VtHost me = vtHosts[index];
+        try {
+            runVirtualThreadHostLoop(me, index);
+        } finally {
+            // Every way out, the early returns on a failed poller included, or
+            // stop() would wait out the whole window for a flag never set.
+            drainTasksAfterStop(me);
+        }
+    }
+
+    private void runVirtualThreadHostLoop(VtHost me, int index) {
         int[] ready = new int[READY_CAPACITY];
         int listenFd = listener.getFd();
         boolean owner = (index == 0);       // only one host accepts
         while (running) {
+            drainTaskInbox(me);
             // Runnable virtual threads first: they wait for a turn, not for the
             // network, so polling before running them would delay them by the
             // whole poll timeout.
             boolean ranSome = drainRunnable(me);
+            long nextNap = wakeNappers(me, System.currentTimeMillis());
+            // Outbound waits whose timeout ran out go back to the ring, and the
+            // poll below sleeps no longer than the next one is due.
+            nextNap = Math.min(nextNap, wakeExpiredWaiters(me, System.currentTimeMillis()));
+            int timeout = 250;
+            if (ranSome || !me.ringEmpty()) {
+                timeout = 0;
+            } else if (nextNap != Long.MAX_VALUE) {
+                // Sleep in the poll until the earliest nap is due, not the full
+                // idle interval: the napper wakes on time, and nothing spins.
+                timeout = (int) Math.max(0, Math.min(250, nextNap - System.currentTimeMillis()));
+            }
             int n;
             try {
-                n = me.poller.await(ready, (ranSome || !me.ringEmpty()) ? 0 : 250);
+                n = me.poller.await(ready, timeout);
                 // On ELAPSED TIME, not on an idle poll. Sweeping only when a poll
                 // came back empty meant a host that always had at least one event
                 // never swept at all -- and a client can keep that true with a
@@ -2718,6 +3606,11 @@ public final class HttpServer {
             }
             for (int iter = 0 ; iter < n ; iter++) {
                 int fd = ready[iter];
+                if (fd == me.wakeRead && fd >= 0) {
+                    // A task was queued; the top of the loop picks it up.
+                    Reactor.drainWake(fd);
+                    continue;
+                }
                 if (owner && fd == listenFd) {
                     acceptAll();
                     try {
@@ -2727,6 +3620,19 @@ public final class HttpServer {
                             System.err.println("could not re-arm the listener: " + err);
                         }
                         return;
+                    }
+                    continue;
+                }
+                // An OUTBOUND descriptor a virtual thread is parked on. Checked
+                // before advance(), which would take a descriptor it has no handle
+                // for as a newly accepted connection.
+                long waiter = me.waiterFor(fd);
+                if (waiter != 0) {
+                    int slot = me.waiterIndex(waiter);
+                    if (slot >= 0) {
+                        wakeWaiterAt(me, slot, ready, iter + 1, n);
+                    } else {
+                        me.setWaiter(fd, 0);
                     }
                     continue;
                 }
@@ -2742,7 +3648,12 @@ public final class HttpServer {
         while (budget-- > 0 && !me.ringEmpty()) {
             long handle = me.ringTake();
             any = true;
-            advance(me, VirtualThread.descriptorOf(handle), handle);
+            int fd = VirtualThread.descriptorOf(handle);
+            if (fd < 0) {
+                advanceTask(me, handle);
+            } else {
+                advance(me, fd, handle);
+            }
         }
         return any;
     }
@@ -2815,6 +3726,20 @@ public final class HttpServer {
             VirtualThread.free(handle);
             return;
         }
+        if (state == VirtualThread.WAITING) {
+            // Parked on an OUTBOUND descriptor -- the handler is inside a database
+            // or HTTP call. Its own connection comes off the poller for the same
+            // reason the RUNNABLE path below takes it off: readable bytes from
+            // the client must not resume a virtual thread that is waiting on
+            // something else, and a level-triggered set would report them on
+            // every poll. The next ordinary park re-arms it. No idle deadline
+            // either: the handler is working, and the call it is in carries its
+            // own timeout.
+            me.poller.remove(fd);
+            me.setArmed(fd, false);
+            parkWaiter(me, handle, false);
+            return;
+        }
         if (state == VirtualThread.RUNNABLE) {
             // Take it out of the poller for as long as it sits in the ring. It is
             // neither running nor parked, so a readable descriptor would otherwise
@@ -2824,7 +3749,7 @@ public final class HttpServer {
             // disarming as it delivered.
             me.poller.remove(fd);
             me.setArmed(fd, false);
-            me.ringAdd(handle);
+            ringOrNap(me, handle);
             return;
         }
         // Parked on I/O: start its clock. Nothing else will, and without it a
@@ -3131,6 +4056,21 @@ public final class HttpServer {
     /// means the request was refused with a status and the connection is still an
     /// ordinary HTTP one.
     private boolean tryUpgrade(Conn conn, int fd, long session, Request request, Span span) {
+        // Marked for the handshake: the router, getSubprotocols() and onOpen() are
+        // application code, and a stop() from one of them must defer its
+        // teardown and discount this connection, as from any other callback --
+        // unmarked, it waited out the drain on its own connection and then tore
+        // down the beans and the pool under the callback it was called from.
+        SERVING_UPGRADE.set(Boolean.TRUE);
+        try {
+            return tryUpgradeMarked(conn, fd, session, request, span);
+        } finally {
+            SERVING_UPGRADE.set(null);
+        }
+    }
+
+    private boolean tryUpgradeMarked(Conn conn, int fd, long session, Request request,
+                                     Span span) {
         // THE CANONICAL PATH, which is what pathIs compares for every HTTP route.
         // Taking the raw target substring instead meant `/ch%61t` missed the
         // websocket route for `/chat` and fell through to the catch-all router or
@@ -3276,6 +4216,8 @@ public final class HttpServer {
         // its child -- and not the session, which can last for hours. Messages
         // after this are not spans of their own.
         Tracing.endServer(span, 101, onOpenError);
+        // The session is not the handshake: its turns are marked by the pump.
+        SERVING_UPGRADE.set(null);
         runWebSocket(fd, socket);
         return true;
     }
@@ -4578,7 +5520,7 @@ public final class HttpServer {
                 // the upgrade is done, and a refusal ends here with the status it
                 // wrote. Returning before this point left every handshake, and
                 // everything onOpen called out to, untraced.
-                Span handshake = Tracing.startServer(request, tls != null);
+                Span handshake = Tracing.startServer(request, tls != null, serverTracer);
                 conn.writtenStatus = -1;
                 boolean upgraded;
                 try {
@@ -4611,19 +5553,37 @@ public final class HttpServer {
             // one on this connection. Ended after the write, in the finally below,
             // so the span covers the response reaching the socket and a write that
             // fails is recorded as the failure it is.
-            Span span = Tracing.startServer(request, tls != null);
+            Span span = Tracing.startServer(request, tls != null, serverTracer);
             int sentStatus = -1;
-            Exception handlerError = null;
+            Throwable handlerError = null;
             try {
                 try {
                     response = handler.handle(request);
                     if (response == null) {
                         response = Response.text(404, "not found");
                     }
-                } catch (Exception err) {
+                } catch (Throwable err) {
+                    rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
                     response = Response.text(500, "internal error");
+                }
+                // A deferred JSON body is rendered HERE, into the connection's
+                // reusable buffer the writer then sends from, rather than inside
+                // the write: rendering runs the application's own code -- a
+                // Json.Writable, a generated codec refusing a cycle -- and a throw
+                // there is the handler's failure, owed a 500. Thrown from inside
+                // the write it dropped the connection with nothing sent.
+                if (response.hasDeferredJson) {
+                    try {
+                        conn.bodySink.reset();
+                        Json.write(response.deferredJson, conn.bodySink);
+                    } catch (Throwable err) {
+                        rethrowIfFatal(err);
+                        System.err.println("handler failed: " + err);
+                        handlerError = err;
+                        response = Response.text(500, "internal error");
+                    }
                 }
                 // Read before the write: writing releases what the Response held.
                 int status = response.status;
@@ -4983,8 +5943,8 @@ public final class HttpServer {
                 // request, and ENDS when its stream closes (see http2Spans).
                 // server.address is set here as for HTTP/1: :authority was copied
                 // into these headers as "host" above, which is what startServer reads.
-                Span span = Tracing.startServer(request, tls != null);
-                Exception handlerError = null;
+                Span span = Tracing.startServer(request, tls != null, serverTracer);
+                Throwable handlerError = null;
                 // -1 until the response has been SUBMITTED to the session, as on the
                 // HTTP/1 path: a respond() that throws is a response the peer never
                 // got, and must not be reported as the status the handler chose.
@@ -5000,10 +5960,23 @@ public final class HttpServer {
                     if (response == null) {
                         response = Response.text(404, "not found");
                     }
-                } catch (Exception err) {
+                } catch (Throwable err) {
+                    rethrowIfFatal(err);
                     System.err.println("handler failed: " + err);
                     handlerError = err;
                     response = Response.text(500, "internal error");
+                }
+                // Rendered now for the same reason as on HTTP/1: a deferred JSON
+                // body runs the application's code, and a throw there is a 500.
+                if (response.hasDeferredJson) {
+                    try {
+                        response.serializeDeferredJson();
+                    } catch (Throwable err) {
+                        rethrowIfFatal(err);
+                        System.err.println("handler failed: " + err);
+                        handlerError = err;
+                        response = Response.text(500, "internal error");
+                    }
                 }
                 try {
                     boolean headOnly = "HEAD".equals(stream.getMethod());
@@ -5023,21 +5996,28 @@ public final class HttpServer {
                         java.util.Iterator it = response.extraHeaders.keySet().iterator();
                         while (it.hasNext()) {
                             Object key = it.next();
-                            Object value = response.extraHeaders.get(key);
-                            if (key != null && value != null) {
-                                String name = String.valueOf(key);
-                                String text = String.valueOf(value);
-                                // The native side splits this block on '\n', so a newline
-                                // here is another field exactly as it is over HTTP/1.1.
-                                if (isServerOwnedHeader(name)) {
-                                    System.err.println("dropped a response header the "
-                                            + "server owns: " + sanitizeForLog(name));
-                                } else if (isHeaderName(name) && isHeaderSafe(text)) {
-                                    extra.add(name + ": " + text);
-                                } else {
-                                    System.err.println("dropped a response header whose name "
-                                            + "is not a token or whose value carries a control "
-                                            + "character: " + sanitizeForLog(name));
+                            // A List is several fields of one name -- Set-Cookie is the
+                            // header that needs it, since a cookie cannot share a line.
+                            Object raw = response.extraHeaders.get(key);
+                            List several = raw instanceof List ? (List) raw : null;
+                            int count = several == null ? 1 : several.size();
+                            for (int each = 0 ; each < count ; each++) {
+                                Object value = several == null ? raw : several.get(each);
+                                if (key != null && value != null) {
+                                    String name = String.valueOf(key);
+                                    String text = String.valueOf(value);
+                                    // The native side splits this block on '\n', so a newline
+                                    // here is another field exactly as it is over HTTP/1.1.
+                                    if (isServerOwnedHeader(name)) {
+                                        System.err.println("dropped a response header the "
+                                                + "server owns: " + sanitizeForLog(name));
+                                    } else if (isHeaderName(name) && isHeaderSafe(text)) {
+                                        extra.add(name + ": " + text);
+                                    } else {
+                                        System.err.println("dropped a response header whose name "
+                                                + "is not a token or whose value carries a control "
+                                                + "character: " + sanitizeForLog(name));
+                                    }
                                 }
                             }
                         }
@@ -5309,7 +6289,22 @@ public final class HttpServer {
         }
         int status = sent && entry[1] instanceof Integer ? ((Integer) entry[1]).intValue() : -1;
         Tracing.endServer((Span) entry[0], status,
-                entry[2] instanceof Exception ? (Exception) entry[2] : null);
+                entry[2] instanceof Throwable ? (Throwable) entry[2] : null);
+    }
+
+    /// Rethrows what a handler threw when the process cannot go on serving
+    /// after it; anything else becomes a 500.
+    ///
+    /// As Spring Boot's embedded Tomcat does: a handler's Error -- an
+    /// AssertionError, a NoClassDefFoundError, a StackOverflowError out of a
+    /// deep recursion -- is answered 500 like any exception, where it used to
+    /// drop the connection with no answer at all. What Tomcat rethrows,
+    /// VirtualMachineError other than a stack overflow, is rethrown here too:
+    /// after running out of memory there is nothing a 500 can promise.
+    static void rethrowIfFatal(Throwable err) {
+        if (err instanceof VirtualMachineError && !(err instanceof StackOverflowError)) {
+            throw (VirtualMachineError) err;
+        }
     }
 
     /// The HTTP/2 connection preface, sent by a client that opens with h2.
@@ -6897,15 +7892,12 @@ public final class HttpServer {
 
     private void writeHeadAndBody(Conn conn, int fd, long session, Response response,
             boolean keepAlive, boolean headOnly) throws IOException {
-        // A deferred JSON body is serialised FIRST: Content-Length has to be
-        // written before it, and the only honest way to know it is to have the
-        // bytes. Into a second reusable buffer rather than the head's, because
-        // the head is not built yet.
+        // A deferred JSON body was rendered before this was called -- see the
+        // caller -- into a second reusable buffer rather than the head's, because
+        // Content-Length has to be written before it and the head is not built yet.
         byte[] deferred = null;
         int deferredLength = 0;
         if (response.hasDeferredJson) {
-            conn.bodySink.reset();
-            Json.write(response.deferredJson, conn.bodySink);
             deferred = conn.bodySink.bytes();
             deferredLength = conn.bodySink.length();
         }
@@ -6992,29 +7984,35 @@ public final class HttpServer {
             java.util.Iterator it = response.extraHeaders.keySet().iterator();
             while (it.hasNext()) {
                 Object key = it.next();
-                Object value = response.extraHeaders.get(key);
-                if (key != null && value != null) {
-                    String name = String.valueOf(key);
-                    String text = String.valueOf(value);
-                    // A CR or LF here ENDS the field and starts another, so a value
-                    // built from request data -- a decoded query parameter reaches a
-                    // handler with real CRLF in it if the client sent %0d%0a -- lets
-                    // the client write its own headers, or a second response. That is
-                    // response splitting, and it is a cache-poisoning primitive.
-                    // Dropped rather than escaped: there is no correct escaping, and a
-                    // header the handler could not have meant is not worth sending.
-                    if (isServerOwnedHeader(name)) {
-                        System.err.println("dropped a response header the server owns: "
-                                + sanitizeForLog(name));
-                    } else if (isHeaderName(name) && isHeaderSafe(text)) {
-                        conn.put("\r\n");
-                        conn.put(name);
-                        conn.put(": ");
-                        conn.put(text);
-                    } else {
-                        System.err.println("dropped a response header whose name is "
-                                + "not a token or whose value carries a control character: "
-                                + sanitizeForLog(name));
+                // A List is several fields of one name; see the HTTP/2 writer.
+                Object raw = response.extraHeaders.get(key);
+                List several = raw instanceof List ? (List) raw : null;
+                int count = several == null ? 1 : several.size();
+                for (int each = 0 ; each < count ; each++) {
+                    Object value = several == null ? raw : several.get(each);
+                    if (key != null && value != null) {
+                        String name = String.valueOf(key);
+                        String text = String.valueOf(value);
+                        // A CR or LF here ENDS the field and starts another, so a value
+                        // built from request data -- a decoded query parameter reaches a
+                        // handler with real CRLF in it if the client sent %0d%0a -- lets
+                        // the client write its own headers, or a second response. That is
+                        // response splitting, and it is a cache-poisoning primitive.
+                        // Dropped rather than escaped: there is no correct escaping, and a
+                        // header the handler could not have meant is not worth sending.
+                        if (isServerOwnedHeader(name)) {
+                            System.err.println("dropped a response header the server owns: "
+                                    + sanitizeForLog(name));
+                        } else if (isHeaderName(name) && isHeaderSafe(text)) {
+                            conn.put("\r\n");
+                            conn.put(name);
+                            conn.put(": ");
+                            conn.put(text);
+                        } else {
+                            System.err.println("dropped a response header whose name is "
+                                    + "not a token or whose value carries a control character: "
+                                    + sanitizeForLog(name));
+                        }
                     }
                 }
             }
