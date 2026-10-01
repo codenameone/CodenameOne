@@ -1586,7 +1586,7 @@
    },
    "objectAllocation": {
     "all": {
-     "memory": 0.26,
+     "memory": 0.403,
      "runs": 1,
      "time": 5.86,
      "tolerance": {
