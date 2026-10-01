@@ -4,7 +4,7 @@
 Native sources in a cn1lib are shipped, never built by us. Two workflows close
 that gap by compiling them -- ai-cn1lib-native-check.yml and
 ad-cn1lib-ios-native-check.yml -- but a workflow only covers the libraries
-named in its matrix, so a new cn1lib is uncovered by default and nothing says
+named in its matrix or explicit probe steps, so a new cn1lib is uncovered by default and nothing says
 so. That is exactly how cn1-admob and cn1-unity-levelplay shipped Objective-C
 that had never been through a compiler.
 
@@ -131,6 +131,10 @@ def compiles_cn1lib_natives(body):
     are what separate a native check from any other job that happens to loop
     over libraries. Applied per job, because one file can hold both.
     """
+    if 'python3 scripts/ci/check-ios-cn1lib.py ' in body:
+        with open(os.path.join(REPO, 'scripts/ci/check-ios-cn1lib.py'), encoding='utf-8') as probe:
+            driver = probe.read()
+        return 'ios/src/main/objectivec' in driver and "'xcodebuild'" in driver
     return 'ios/src/main/objectivec' in body and 'xcodebuild' in body
 
 
@@ -150,6 +154,7 @@ def covered_libraries():
         for body in jobs(text):
             if not compiles_cn1lib_natives(body):
                 continue
+            found.update(re.findall(r'run: python3 scripts/ci/check-ios-cn1lib\.py (cn1-[\w-]+)\s*$', body, re.M))
             found.update(MATRIX_ENTRY.findall(body))
             for group in MATRIX_LIST.findall(body):
                 found.update(part.strip() for part in group.split(','))

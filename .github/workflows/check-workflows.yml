@@ -26,6 +26,12 @@ on:
     branches:
       - master
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-workflows:
     runs-on: ubuntu-24.04
@@ -37,6 +43,12 @@ jobs:
       # that starts failing is information rather than noise.
       - name: Validate every workflow file
         run: scripts/check-workflows.sh
+
+      - name: Check CI selection and obsolete-run cancellation
+        run: |
+          python3 scripts/ci/test_select_cn1lib_checks.py
+          python3 scripts/ci/test_select_apple_checks.py
+          node --test scripts/ci/test-cancel-stale-pr-runs.js
 
       # Same reasoning one level up: build-ios-metal-27 and fidelity-ios-metal-27
       # are COPIES of the jobs beside them, and a copy nobody checks drifts. Both

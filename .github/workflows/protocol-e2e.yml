@@ -26,6 +26,12 @@ on:
       - '.github/workflows/protocol-e2e.yml'
   workflow_dispatch:
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   protocol-e2e:
     runs-on: ubuntu-24.04
@@ -69,7 +75,7 @@ jobs:
           scripts/protocol-e2e/run-protocol-e2e.sh
 
       - name: Upload server log
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: protocol-e2e-server-log

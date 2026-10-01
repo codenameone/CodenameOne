@@ -1,62 +1,36 @@
 name: Test iOS packaging
 
+# Automatic triggers and changed-file selection are owned by scripts-ios.yml.
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/ios-packaging.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'Ports/iOSPort/**'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/run-ios-device-release-build.sh'
-      - 'scripts/check-ios-private-api.py'
-      - 'scripts/check-ios-sdk-deltas.py'
-      - 'scripts/run-ios-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
-      - 'scripts/hellocodenameone/**'
-      - '!docs/**'
-  push:
-    branches: [ master ]
-    paths:
-      - '.github/workflows/ios-packaging.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'Ports/iOSPort/**'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/run-ios-device-release-build.sh'
-      - 'scripts/check-ios-private-api.py'
-      - 'scripts/check-ios-sdk-deltas.py'
-      - 'scripts/run-ios-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
-      - 'scripts/hellocodenameone/**'
-      - '!docs/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      port_prepared:
+        type: boolean
+        default: false
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: packaging-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-port:
+    if: ${{ !inputs.port_prepared }}
     uses: ./.github/workflows/_build-ios-port.yml
 
   packaging:
+    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') }}
     needs: build-port
     permissions:
       contents: read
     runs-on: macos-15
-    # Headroom for the single native xcodebuild compile of the translated app, which grew with
-    # the gaming runtime added to core and is slower on the Xcode 26.3 / iOS 26.2 toolchain.
-    timeout-minutes: 120
+    # This job runs device Release, simulator UI, and notification builds in
+    # sequence. On a cold runner all tests passed after 119m44s, leaving only
+    # 16s of the old two-hour budget for artifact upload and cache saves. Keep
+    # the individual step limits below and allow 30m of finalization headroom.
+    timeout-minutes: 150
     # Exercises both CocoaPods and SPM in a single Xcode project. Catches
     # regressions in either dependency manager (each pathway runs end to end)
     # and additionally validates that they coexist correctly. Also turns on
@@ -133,14 +107,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -283,7 +249,7 @@ jobs:
         timeout-minutes: 45
 
       - name: Upload packaging artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-packaging
