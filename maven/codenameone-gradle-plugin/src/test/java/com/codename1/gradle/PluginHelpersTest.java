@@ -155,6 +155,17 @@ class PluginHelpersTest {
     }
 
     @Test
+    void declarationsOfOneLibraryDifferingInExclusionsAreKeptApart() {
+        java.util.List<String[]> none = Collections.emptyList();
+        java.util.List<String[]> one = Collections.singletonList(new String[] {"x", "y"});
+        java.util.List<String[]> two = Arrays.asList(new String[] {"x", "y"}, new String[] {"p", "q"});
+        java.util.List<String[]> twoReordered = Arrays.asList(new String[] {"p", "q"}, new String[] {"x", "y"});
+        org.junit.jupiter.api.Assertions.assertNotEquals(Cn1libs.exclusionKey(none), Cn1libs.exclusionKey(one),
+                "a path that excludes nothing is a second edge, not a duplicate");
+        assertEquals(Cn1libs.exclusionKey(two), Cn1libs.exclusionKey(twoReordered), "order does not matter");
+    }
+
+    @Test
     void aPublishedDependencyKeepsItsExclusions() {
         String xml = LibrarySupport.exclusionsXml(LibrarySupport.dependencyXml("g", "a", "1", "compile"),
                 java.util.Collections.singletonList(new String[] {"x", "y"}));

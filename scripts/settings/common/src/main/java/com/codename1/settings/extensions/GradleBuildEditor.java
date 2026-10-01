@@ -173,9 +173,22 @@ public final class GradleBuildEditor implements DependencyEditor {
         // which is what the Maven property does in the archetype's POM, so the
         // coordinate is written without one.
         if (version.length() > 0 && !version.startsWith("${")) {
-            coords.append(':').append(version);
+            coords.append(':').append(gradleVersion(version));
         }
         return configuration + "(\"" + escape(coords.toString()) + "\")";
+    }
+
+    /// `version` as Gradle spells it. Maven's LATEST and RELEASE meta-versions
+    /// mean nothing to Gradle, which looks for a release literally called
+    /// "LATEST" and fails to resolve it; its own form is `latest.release`. LATEST
+    /// becomes that too rather than `latest.integration`: the catalog means "the
+    /// newest published release", and an installed add-on should not start
+    /// following a snapshot that happens to sit in the same repository.
+    static String gradleVersion(String version) {
+        if ("LATEST".equals(version) || "RELEASE".equals(version)) {
+            return "latest.release";
+        }
+        return version;
     }
 
     private static String escape(String s) {

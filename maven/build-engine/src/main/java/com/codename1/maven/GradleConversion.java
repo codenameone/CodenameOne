@@ -174,6 +174,14 @@ public final class GradleConversion {
     /// Java source reduced to its code: comments, whitespace, the package line
     /// and the template placeholders gone, so the generated file and the
     /// template compare equal whatever package they are in.
+    ///
+    /// The regexes do not know about string literals, deliberately. They can only
+    /// hide an edit made entirely of comment syntax typed inside a literal of the
+    /// generated starter (`"ok"` changed to `"ok/*x*/"`), and nothing else: any
+    /// other change still differs. That is not a case worth a Java lexer here,
+    /// and its cost is bounded -- the Maven project is never modified, the
+    /// conversion says it left the backend behind, and `-Dcn1.includeBackend`
+    /// carries it over.
     static String javaCode(String source) {
         String t = source.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//[^\n]*", "");
         t = t.replaceAll("(?m)^\\s*package\\s+[^;]+;", "").replace("__BACKEND__", "");
@@ -296,6 +304,10 @@ public final class GradleConversion {
             File backend = from.backendDir();
             boolean hasBackend = backend != null && new File(backend, ProjectLayout.BACKEND_SETTINGS_FILE).isFile()
                     && (includeUntouchedBackend || !isUntouchedSkeleton(backend));
+            if (!hasBackend && backend != null && new File(backend, ProjectLayout.BACKEND_SETTINGS_FILE).isFile()) {
+                log.info("Left " + backend + " behind: it is still the generated skeleton. ./gradlew addBackend "
+                        + "creates it again, and -Dcn1.includeBackend=true carries it over.");
+            }
             if (hasBackend) {
                 File target = new File(to.rootDir(), "backend");
                 copyTree(new File(backend, "src"), new File(target, "src"));

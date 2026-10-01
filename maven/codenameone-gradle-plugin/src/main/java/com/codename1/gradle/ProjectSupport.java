@@ -99,8 +99,14 @@ final class ProjectSupport {
 
     /// The kind from the `codename1.kind` Gradle property, else from the
     /// project's files.
+    ///
+    /// The property is read for the root project only. A `-P` or root
+    /// `gradle.properties` value is visible in every subproject, so read there it
+    /// would also turn the `backend` the settings plugin includes into a second
+    /// application -- no `runBackend`, and app tasks pointed at the backend's
+    /// directory. A subproject is always told apart by its own marker file.
     static ProjectKind kind(Project project) {
-        Object explicit = project.findProperty("codename1.kind");
+        Object explicit = project == project.getRootProject() ? project.findProperty("codename1.kind") : null;
         if (explicit != null) {
             try {
                 return ProjectKind.valueOf(String.valueOf(explicit).trim().toUpperCase(java.util.Locale.ROOT));

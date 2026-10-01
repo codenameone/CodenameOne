@@ -61,6 +61,13 @@ public final class GradleHostFactory {
                                      FileCollection frameworkJars, String codenameOneVersion) {
         List<String> elements = new ArrayList<String>();
         for (File f : classpath) {
+            // A dependency declared <type>pom</type> -- how a cn1lib depends on
+            // another cn1lib's -lib -- resolves in Gradle to the .pom file itself.
+            // Maven never puts such a dependency on the classpath, only what it
+            // brings in, and the build would try to open the pom as a jar.
+            if (f.isFile() && f.getName().endsWith(".pom")) {
+                continue;
+            }
             elements.add(f.getAbsolutePath());
         }
         Map<String, File> framework = new LinkedHashMap<String, File>();

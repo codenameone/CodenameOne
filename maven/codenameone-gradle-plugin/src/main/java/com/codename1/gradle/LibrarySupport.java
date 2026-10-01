@@ -363,6 +363,15 @@ final class LibrarySupport {
             }
             return out;
         });
+        // No Gradle module metadata for the common jar. Gradle prefers a .module
+        // to the pom, and the one java-library writes names a project cn1lib by
+        // its jar (maps-common) where the pom, rewritten above, names its -lib:
+        // a Gradle application then got the inner library's classes but none of
+        // its platform jars. The pom is what Maven consumers read, so with the
+        // metadata gone both build tools resolve the same Maven-shaped graph.
+        project.getTasks().withType(org.gradle.api.publish.tasks.GenerateModuleMetadata.class)
+                .matching(t -> "generateMetadataFileForCn1libCommonPublication".equals(t.getName()))
+                .configureEach(t -> t.setEnabled(false));
         publishing.getPublications().create("cn1libCommon", MavenPublication.class, pub -> {
             pub.setArtifactId(name + "-common");
             pub.from(project.getComponents().getByName("java"));

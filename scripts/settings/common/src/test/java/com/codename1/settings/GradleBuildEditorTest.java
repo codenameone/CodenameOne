@@ -192,6 +192,17 @@ public class GradleBuildEditorTest {
         assertTrue(GradleBuildEditor.containsDependency(updated, dep));
     }
 
+    /// The catalog's Maven LATEST is a literal version to Gradle, which fails
+    /// to resolve it; Gradle's own spelling of "newest release" is written.
+    @Test
+    public void mavenMetaVersionsBecomeGradlesLatestRelease() {
+        MavenDependency dep = new MavenDependency("com.codenameone", "cn1-ai-whisper-lib", "LATEST", "pom");
+        String updated = GradleBuildEditor.addDependency("dependencies {\n}\n", dep);
+        assertEquals("dependencies {\n    cn1lib(\"com.codenameone:cn1-ai-whisper-lib:latest.release\")\n}\n",
+                updated);
+        assertTrue(GradleBuildEditor.containsDependency(updated, dep));
+    }
+
     @Test
     public void keepsCrlfLineEndingsOnRemoval() {
         String script = "dependencies {\r\n    implementation(\"com.example:lib:1.2\")\r\n"

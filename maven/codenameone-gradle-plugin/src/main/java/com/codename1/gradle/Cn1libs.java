@@ -158,7 +158,12 @@ final class Cn1libs {
                         continue;
                     }
                     for (Cn1libPomProfiles.Coordinate c : e.getValue()) {
-                        if (added.add(e.getKey() + "|" + c.toNotation())) {
+                        // Keyed by the exclusions too: two cn1libs may reach one
+                        // library, only one of them excluding something under it.
+                        // Maven keeps a transitive dependency any path leaves in, and
+                        // so does Gradle when both edges are declared -- dropping
+                        // the second edge would let the first one's exclusion win.
+                        if (added.add(e.getKey() + "|" + c.toNotation() + "|" + exclusionKey(c.exclusions()))) {
                             target.getDependencies().add(withExclusions(p.getDependencies().create(c.toNotation()),
                                     c.exclusions()));
                         }
@@ -166,6 +171,17 @@ final class Cn1libs {
                 }
             }
         });
+    }
+
+    /// The exclusions as one order-independent string, for telling apart two
+    /// declarations of one coordinate.
+    static String exclusionKey(List<String[]> exclusions) {
+        List<String> parts = new java.util.ArrayList<String>();
+        for (String[] x : exclusions) {
+            parts.add(x[0] + ":" + x[1]);
+        }
+        java.util.Collections.sort(parts);
+        return String.join(",", parts);
     }
 
     /// `dependency` with the profile's `<exclusions>` applied, as Maven applies

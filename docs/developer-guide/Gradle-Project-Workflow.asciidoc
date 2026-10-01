@@ -100,7 +100,7 @@ include::../demos/gradle/gradle-project-workflow.kts[tag=gradle-settings,indent=
 
 The plugin, applied from the settings file, adds the repository the framework is published to (and Maven Central for other libraries), applies itself to the project and to `backend/` when there is one, and builds against its own version. There's one version number to bump.
 
-A project's kind comes from the files the other build tools already use: `codenameone_settings.properties` makes it an application, `codenameone_library_appended.properties` a cn1lib, and `application.properties` without a settings file a backend. The `codename1.kind` Gradle property (`APP`, `LIB` or `BACKEND`) overrides the detection.
+A project's kind comes from the files the other build tools already use: `codenameone_settings.properties` makes it an application, `codenameone_library_appended.properties` a cn1lib, and `application.properties` without a settings file a backend. The `codename1.kind` Gradle property (`APP`, `LIB` or `BACKEND`) overrides the detection for the root project. Subprojects, such as an application's `backend`, are always detected from their own files, because a Gradle property set on the command line or in `gradle.properties` reaches every project of the build.
 
 The generated `gradle.properties` turns on the configuration cache and the build cache, which is what makes a second `./gradlew run` start in about a second:
 

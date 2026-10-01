@@ -220,6 +220,10 @@ plugins { id("com.codenameone") }
 
 group = "$GROUP"
 version = "$LIBVER"
+
+publishing {
+    repositories { maven(url = uri("$WORKDIR/localrepo")) }
+}
 EOF
 : > "$LAPP/localmaps/codenameone_library_appended.properties"
 cat > "$LAPP/localmaps/src/main/java/$GROUP_PATH/LocalMaps.java" <<EOF
@@ -284,7 +288,7 @@ public class LocalWidgets {
 }
 EOF
 printf '\ninclude("localwidgets")\n' >> "$LAPP/settings.gradle.kts"
-run_gradle "$LAPP" :localwidgets:publish > "$WORKDIR/lwidgets-publish.log" 2>&1 \
+run_gradle "$LAPP" :localmaps:publish :localwidgets:publish > "$WORKDIR/lwidgets-publish.log" 2>&1 \
   || { cat "$WORKDIR/lwidgets-publish.log"; fail "publishing a cn1lib that uses a project cn1lib"; }
 WPOM="$WORKDIR/localrepo/$GROUP_PATH/localwidgets-common/$LIBVER/localwidgets-common-$LIBVER.pom"
 python3 - "$WPOM" <<'PY' || { cat "$WPOM"; fail "the published pom does not name localmaps-lib as a pom"; }
@@ -297,6 +301,30 @@ for d in root.findall('m:dependencies/m:dependency', ns):
 sys.exit(1)
 PY
 echo "   a cn1lib using a project cn1lib publishes a dependency on its -lib pom"
+# A Gradle application resolves the same publication. Gradle prefers a module's
+# .module metadata to its pom, and java-library's names localmaps by its plain
+# -common jar: the classes arrive but none of the inner library's platform jars.
+# The cn1lib publishes no metadata, so Gradle reads the pom Maven reads.
+WAPP="$WORKDIR/widgetsconsumer-gradle"
+generate_gradle_app widgetsconsumer com.acme.widgetsconsumer
+python3 - "$WAPP/build.gradle.kts" "$WORKDIR/localrepo" "$GROUP:localwidgets-lib:$LIBVER" <<'EOF'
+import sys
+path, repo, coord = sys.argv[1:]
+text = open(path).read()
+marker = "dependencies {"
+assert marker in text, text
+text = text.replace(marker, marker + '\n    cn1lib("%s")' % coord, 1)
+text = 'repositories { maven(url = uri("%s")) }\n\n' % repo + text
+open(path, "w").write(text)
+EOF
+run_gradle "$WAPP" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/wapp-android.log" 2>&1 \
+  || { cat "$WORKDIR/wapp-android.log"; fail "a Gradle app using a published cn1lib that uses a project cn1lib"; }
+WJAR=$(staged_jar "$WORKDIR/wapp-android.log")
+assert_zip_has "$WJAR" "^$GROUP_PATH/LocalWidgets\.class$"
+assert_zip_has "$WJAR" "^$GROUP_PATH/LocalMaps\.class$"
+assert_zip_has "$WJAR" "^$GROUP_PATH/LocalMapsAndroid\.java$"
+[ -z "$(find "$WORKDIR/localrepo" -name '*.module')" ] || fail "a cn1lib published Gradle module metadata"
+echo "   a Gradle app resolves it, the project cn1lib's classes and android sources included"
 
 echo "== Maven consumer"
 MAPP="$WORKDIR/libconsumer"
