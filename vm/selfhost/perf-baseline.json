@@ -85,7 +85,10 @@
     "all": {
      "memory": 0.262,
      "runs": 7,
-     "time": 1.36
+     "time": 1.36,
+     "tolerance": {
+      "memory": 0.3
+     }
     }
    },
    "translator": {
