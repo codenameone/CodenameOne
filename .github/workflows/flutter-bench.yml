@@ -400,11 +400,14 @@ jobs:
     # comment as well would leave the failure with no explanation attached.
     if: always()
     runs-on: ubuntu-latest
-    # Write access for the scheduled publication to the port-status-data
-    # branch. Job-scoped, and job permissions replace the workflow's, so the
-    # comment's permission is restated.
+    # Read-only contents: on a pull request this job runs the pull request's own
+    # files (run_bench.py, publish-quality-comment.js with an authenticated
+    # client), so it must never hold a token that can write the repository. The
+    # master-only publication that needs contents: write is its own job,
+    # publish-status, which a pull_request event never reaches. Job permissions
+    # replace the workflow's, so the comment's permission is restated.
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
@@ -436,6 +439,40 @@ jobs:
               reportPath: 'flutter-benchmark.md',
             });
 
+      - name: Upload the rendered report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-benchmark-report
+          path: flutter-benchmark.md
+
+  # The only job holding contents: write. It runs for a scheduled or dispatched
+  # run of master alone -- never for a pull_request event -- so the code it
+  # executes is master's, not a contributor's.
+  publish-status:
+    name: Publish port status
+    needs: measure
+    # Only a run of every platform: port status shows all of them, and a dispatch
+    # for a subset would publish a table missing the rest.
+    if: >-
+      always() &&
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect every platform's result
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-bench-*
+          path: results
+          merge-multiple: true
+
       # Published to the data branch the website build reads, the way every
       # port's own status is. Writing it into docs/website in this job's
       # checkout, as this step used to, put it where nothing would ever see it:
@@ -443,12 +480,6 @@ jobs:
       # Master-only, like the port reports, so a branch's numbers never reach
       # the public page.
       - name: Publish the benchmark to the port status data
-        # Only a run of every platform: port status shows all of them, and a dispatch
-        # for a subset would publish a table missing the rest.
-        if: >-
-          github.ref == 'refs/heads/master' &&
-          (github.event_name == 'schedule' ||
-           (github.event_name == 'workflow_dispatch' && (inputs.platforms == 'all' || inputs.platforms == '')))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -458,9 +489,3 @@ jobs:
           python3 scripts/flutter-bench/publish_benchmark.py \
               "${RUNNER_TEMP}/port-status/flutter_benchmark.json" "${{ github.repository }}"
 
-      - name: Upload the rendered report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter-benchmark-report
-          path: flutter-benchmark.md
