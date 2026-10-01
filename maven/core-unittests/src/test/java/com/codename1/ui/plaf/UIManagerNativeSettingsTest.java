@@ -309,6 +309,58 @@ class UIManagerNativeSettingsTest extends UITestBase {
         assertEquals(0x112233, ((RoundBorder) button.getUnselectedStyle().getBorder()).getColor());
     }
 
+    @Test
+    void sharedBorderRestoresWithoutAFallbackPaletteConstant() {
+        manager.setUseNativeColors(true);
+        Hashtable theme = nativeTheme();
+        theme.remove("@accent-color");
+        RoundBorder border = RoundBorder.create().color(0x112233);
+        for (String prefix : new String[]{"Button.", "Button.sel#"}) {
+            theme.put(prefix + "bgColor", "112233");
+            theme.put("@cn1-bind:" + prefix + "bgColor", "accent-color");
+            theme.put(prefix + "border", border);
+        }
+        manager.setThemeProps(theme);
+        assertEquals(0x00aa44, border.getColor());
+        implementation.nativeThemeSettings = new NativeThemeSettings().color("accent-color", 0x556677);
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x556677, border.getColor());
+        implementation.nativeThemeSettings = new NativeThemeSettings();
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x112233, border.getColor());
+        assertEquals(0x112233, manager.getComponentStyle("Button").getBgColor());
+
+        implementation.nativeThemeSettings = new NativeThemeSettings().color("accent-color", 0x778899);
+        manager.refreshNativeThemeSettings();
+        assertEquals(0x778899, border.getColor());
+        manager.setUseNativeColors(false);
+        manager.refreshTheme();
+        assertEquals(0x112233, border.getColor());
+        assertEquals(0x112233, manager.getComponentSelectedStyle("Button").getBgColor());
+    }
+
+    @Test
+    void borderRestorationPreservesApplicationMutationsAndReleasesOldThemes() {
+        manager.setUseNativeColors(true);
+        Hashtable theme = nativeTheme();
+        theme.remove("@accent-color");
+        RoundBorder border = RoundBorder.create().color(0x112233);
+        theme.put("Button.bgColor", "112233");
+        theme.put("@cn1-bind:Button.bgColor", "accent-color");
+        theme.put("Button.border", border);
+        manager.setThemeProps(theme);
+        border.color(0xff00ff);
+        manager.setUseNativeColors(false);
+        manager.refreshTheme();
+        assertEquals(0xff00ff, border.getColor());
+
+        manager.setUseNativeColors(true);
+        manager.refreshTheme();
+        assertEquals(0x00aa44, border.getColor());
+        manager.setThemeProps(nativeTheme());
+        assertEquals(0xff00ff, border.getColor(), "Old resources must not retain the OS tint");
+    }
+
     @com.codename1.junit.FormTest
     void appearanceChangesRefreshVisibleStylesWithoutOptionalSettings() {
         Hashtable theme = nativeTheme();

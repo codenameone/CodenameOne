@@ -421,7 +421,17 @@ jobs:
       - name: Sync Vale styles
         run: |
           set -euo pipefail
-          vale sync --config docs/developer-guide/.vale.ini
+          # Package downloads can return transient GitHub release HTTP 5xx errors.
+          # Keep the lint gate strict if all three sync attempts fail.
+          for attempt in 1 2 3; do
+            if vale sync --config docs/developer-guide/.vale.ini; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
 
       - name: Run Vale style linter
         run: |

@@ -74,6 +74,73 @@ int main(void) {
                 subprocess.run([str(executable)], check=True)
 
     @unittest.skipUnless(shutil.which("xcrun"), "Apple toolchain unavailable")
+    def test_dynamic_type_notifications_without_native_snapshot(self):
+        source = (ROOT / "Ports/iOSPort/nativeSources/IOSNative.m").read_text()
+        start = source.index("static void cn1NativeThemeDidChange(")
+        end = source.index("JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings", start)
+        helpers = source[start:end]
+        start = source.index("JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled")
+        end = source.index("\n#if TARGET_OS_WATCH", start)
+        # Run the actual iOS observer and accessibility entry points with a fake
+        # UIFont on Foundation. No palette snapshot is called anywhere in this test.
+        harness = r'''
+#import <Foundation/Foundation.h>
+#include <assert.h>
+#undef TARGET_OS_OSX
+#define TARGET_OS_OSX 0
+#define TARGET_OS_WATCH 0
+#define TARGET_OS_TV 0
+#define CN1_THREAD_STATE_MULTI_ARG
+#define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG
+#define JAVA_OBJECT id
+#define JAVA_BOOLEAN BOOL
+#define JAVA_FLOAT float
+#define JAVA_FALSE NO
+static NSString* UIContentSizeCategoryDidChangeNotification = @"ContentSizeChanged";
+static NSString* UIFontTextStyleBody = @"Body";
+static CGFloat preferredSize = 17;
+@interface CN1Font : NSObject
+@property(nonatomic, readonly) CGFloat pointSize;
++ (CGFloat)systemFontSize;
++ (CN1Font*)preferredFontForTextStyle:(NSString*)style;
+@end
+@implementation CN1Font
++ (CGFloat)systemFontSize { return 17; }
++ (CN1Font*)preferredFontForTextStyle:(NSString*)style { return [[[CN1Font alloc] init] autorelease]; }
+- (CGFloat)pointSize { return preferredSize; }
+@end
+static int notifications;
+static void com_codename1_impl_ios_IOSImplementation_nativeThemeSettingsChanged__(void) { notifications++; }
+HELPERS
+ACCESSIBILITY
+int main(void) {
+    @autoreleasepool {
+        // Registration must happen even when the initial size is not enlarged.
+        assert(!com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(nil));
+        preferredSize = 34;
+        [[NSNotificationCenter defaultCenter] postNotificationName:UIContentSizeCategoryDidChangeNotification object:nil];
+        assert(notifications == 1);
+        assert(com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(nil));
+        assert(com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(nil) == 2);
+        // Querying both entry points must still install only one observer.
+        preferredSize = 17;
+        [[NSNotificationCenter defaultCenter] postNotificationName:UIContentSizeCategoryDidChangeNotification object:nil];
+        assert(notifications == 2);
+        assert(!com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(nil));
+        assert(com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(nil) == 1);
+    }
+    return 0;
+}
+'''.replace("HELPERS", helpers).replace("ACCESSIBILITY", source[start:end])
+        with tempfile.TemporaryDirectory(prefix="cn1-dynamic-type-") as directory:
+            path = pathlib.Path(directory)
+            (path / "settings.m").write_text(harness)
+            executable = path / "settings"
+            subprocess.run(["xcrun", "clang", "-fblocks", "-framework", "Foundation",
+                            str(path / "settings.m"), "-o", str(executable)], check=True)
+            subprocess.run([str(executable)], check=True)
+
+    @unittest.skipUnless(shutil.which("xcrun"), "Apple toolchain unavailable")
     def test_uikit_bridge_compiles(self):
         source = (ROOT / "Ports/iOSPort/nativeSources/IOSNative.m").read_text()
         start = source.index("static void cn1NativeThemeDidChange(")

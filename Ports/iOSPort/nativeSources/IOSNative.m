@@ -8547,6 +8547,16 @@ static void cn1NativeThemeDidChange(NSNotification* notification) {
     com_codename1_impl_ios_IOSImplementation_nativeThemeSettingsChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+static void cn1ObserveContentSizeChanges(void) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    static dispatch_once_t observing;
+    dispatch_once(&observing, ^{
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIContentSizeCategoryDidChangeNotification
+            object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
+    });
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
@@ -8597,11 +8607,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_S
             }
         }
 #elif !TARGET_OS_WATCH && !TARGET_OS_TV
-        static dispatch_once_t observing;
-        dispatch_once(&observing, ^{
-            [[NSNotificationCenter defaultCenter] addObserverForName:UIContentSizeCategoryDidChangeNotification
-                object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification* n) { cn1NativeThemeDidChange(n); }];
-        });
+        cn1ObserveContentSizeChanges();
         // systemFontSize is the unscaled baseline also used by getLargerTextScale.
         [values appendFormat:@"fontFamily=native:\nfontSize=%g\n", [UIFont systemFontSize] * (scaleValue > 0 ? scaleValue : 1)];
         if (@available(iOS 13.0, *)) {
@@ -8638,6 +8644,8 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativeThemeSettings___R_java_lang_S
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    // Subscribe even at the normal size, before optional palette/font snapshots.
+    cn1ObserveContentSizeChanges();
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];
@@ -8657,6 +8665,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    cn1ObserveContentSizeChanges();
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];

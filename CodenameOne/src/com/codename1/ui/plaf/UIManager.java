@@ -179,6 +179,8 @@ public class UIManager {
     private final java.util.Set<String> applicationConstants = new java.util.HashSet<String>();
     private final Map<String, Object> nativeOriginals = new HashMap<String, Object>();
     private final Map<String, Object> nativeDerived = new HashMap<String, Object>();
+    private final Map<RoundBorder, Integer> nativeBorderOriginals = new HashMap<RoundBorder, Integer>();
+    private final Map<RoundBorder, Integer> nativeBorderDerived = new HashMap<RoundBorder, Integer>();
     private float nativeBaseFontSize;
     private com.codename1.impl.NativeThemeSettings nativeSettings;
     private float nativeSettingsTextScale = 1f;
@@ -243,6 +245,7 @@ public class UIManager {
     }
 
     private void restoreNativeThemeValues() {
+        restoreNativeBorderColors();
         for (Map.Entry<String, Object> entry : nativeOriginals.entrySet()) {
             // Ownership is by identity: an equal application replacement must survive.
             if (themeProps.get(entry.getKey()) == nativeDerived.get(entry.getKey())) { //NOPMD CompareObjectsWithEquals
@@ -251,6 +254,18 @@ public class UIManager {
         }
         nativeOriginals.clear();
         nativeDerived.clear();
+    }
+
+    private void restoreNativeBorderColors() {
+        for (Map.Entry<RoundBorder, Integer> entry : nativeBorderOriginals.entrySet()) {
+            RoundBorder border = entry.getKey();
+            // Preserve an application mutation made after the inherited tint.
+            if (border.getColor() == nativeBorderDerived.get(border).intValue()) {
+                border.color(entry.getValue().intValue());
+            }
+        }
+        nativeBorderOriginals.clear();
+        nativeBorderDerived.clear();
     }
 
     private void recordNativeThemeOwnership(Hashtable incoming) {
@@ -313,7 +328,7 @@ public class UIManager {
                 String value = nativeSettings.getColor((String) binding);
                 if (value != null && themeProps.containsKey(key)) {
                     rememberNativeValue(key, value);
-                    syncBoundRoundBorderColor(key, value);
+                    syncBoundRoundBorderColor(key, value, true);
                 }
             }
         }
@@ -2272,6 +2287,7 @@ public class UIManager {
 
     void setThemePropsImpl(Hashtable themeProps) {
         if (!refreshingTheme && buildThemeDepth == 0) {
+            restoreNativeBorderColors();
             nativeFontKeys.clear();
             nativeColorKeys.clear();
             nativeBorderKeys.clear();
@@ -2518,7 +2534,7 @@ public class UIManager {
                 }
             }
             themeProps.put(themeKey, overrideValue);
-            syncBoundRoundBorderColor(themeKey, overrideValue);
+            syncBoundRoundBorderColor(themeKey, overrideValue, false);
         }
     }
 
@@ -2527,7 +2543,7 @@ public class UIManager {
     /// border when a compiler-emitted background-color binding is applied.
     /// This avoids switching the border into UIID painter mode, which is not
     /// supported consistently across ports and can change circle/pill geometry.
-    private void syncBoundRoundBorderColor(String themeKey, String colorValue) {
+    private void syncBoundRoundBorderColor(String themeKey, String colorValue, boolean nativeInheritance) {
         final String suffix = "bgColor";
         if (!themeKey.endsWith(suffix)) {
             return;
@@ -2540,7 +2556,16 @@ public class UIManager {
         }
         Object border = themeProps.get(borderKey);
         if (border instanceof RoundBorder) {
-            ((RoundBorder) border).color(Integer.parseInt(colorValue, 16));
+            RoundBorder round = (RoundBorder) border;
+            int color = Integer.parseInt(colorValue, 16);
+            if (nativeInheritance) {
+                // Multiple state keys can share the same serialized border instance.
+                if (!nativeBorderOriginals.containsKey(round)) {
+                    nativeBorderOriginals.put(round, round.getColor());
+                }
+                nativeBorderDerived.put(round, color);
+            }
+            round.color(color);
         }
     }
 
