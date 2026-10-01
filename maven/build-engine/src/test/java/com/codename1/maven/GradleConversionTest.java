@@ -521,6 +521,21 @@ class GradleConversionTest {
     }
 
     @Test
+    void aPropertyAnActiveProfileDefinesResolves() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><dependencies><dependency><groupId>org.example</groupId>"
+                + "<artifactId>driver</artifactId><version>${driver.version}</version></dependency></dependencies>"
+                + "<profiles><profile><id>defaults</id><activation><activeByDefault>true</activeByDefault>"
+                + "</activation><properties><driver.version>3.4</driver.version></properties></profile>"
+                + "</profiles></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("implementation(\"org.example:driver:3.4\")"), build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

@@ -1505,13 +1505,13 @@ public final class GradleConversion {
                 props.putAll(pomProperties(parentPom, depth + 1));
             }
         }
-        Element own = child(project, "properties");
-        if (own != null) {
-            for (Node n = own.getFirstChild(); n != null; n = n.getNextSibling()) {
-                if (n instanceof Element) {
-                    String value = n.getTextContent();
-                    props.put(((Element) n).getTagName(), value == null ? "" : value.trim());
-                }
+        putProperties(child(project, "properties"), props);
+        // Then the profiles a plain build turns on, which override the pom's own
+        // properties as Maven's effective model does: a dependency versioned by a
+        // property an activeByDefault profile defines resolves.
+        for (java.util.Map.Entry<Element, Activation> e : profileStates(project, pom, props).entrySet()) {
+            if (e.getValue() == Activation.ON) {
+                putProperties(child(e.getKey(), "properties"), props);
             }
         }
         String groupId = text(project, "groupId");
@@ -1528,6 +1528,18 @@ public final class GradleConversion {
         props.put("project.version", version != null ? version : text(parent == null ? project : parent, "version"));
         props.put("project.artifactId", text(project, "artifactId"));
         return props;
+    }
+
+    private static void putProperties(Element properties, java.util.Map<String, String> props) {
+        if (properties == null) {
+            return;
+        }
+        for (Node n = properties.getFirstChild(); n != null; n = n.getNextSibling()) {
+            if (n instanceof Element) {
+                String value = n.getTextContent();
+                props.put(((Element) n).getTagName(), value == null ? "" : value.trim());
+            }
+        }
     }
 
     private static String interpolate(String value, java.util.Map<String, String> properties) {

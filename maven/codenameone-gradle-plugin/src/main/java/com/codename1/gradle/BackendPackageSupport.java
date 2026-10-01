@@ -70,6 +70,10 @@ final class BackendPackageSupport {
             t.setDescription("Builds the backend as a single native binary");
             t.dependsOn(main.getClassesTaskName());
             t.getToolchain().from(runtime);
+            // The compile classpath, as Maven's backend-package resolves (scope
+            // compile), not the runtime one: the binary is translated by ParparVM,
+            // which loads nothing by name (Class.forName is banned in the backend),
+            // so a runtimeOnly library -- a JDBC driver, say -- could not run in it.
             t.getCompileClasspath().from(main.getCompileClasspath());
             t.getArtifacts().set(project.getConfigurations().getByName(main.getCompileClasspathConfigurationName())
                     .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()

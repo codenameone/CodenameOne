@@ -597,8 +597,10 @@ public class AppBuilder {
         // Every embedded app extension needs a profile of its own, and the app's profile says
         // whether it can stand in for one. Run after check() so an unreadable or expired
         // profile is reported as itself rather than as an extension problem.
+        // The directory holding app_extensions, where packaging takes them from:
+        // the ios module under Maven, src/ios under Gradle, native/ios under Ant.
         report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
-                baseDir()));
+                host.layout().iosAppExtensionsDir().getParentFile()));
         report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release));
         report(IOSProvisioningPreflight.checkContinuitySync(mergedSettings, release));
     }
