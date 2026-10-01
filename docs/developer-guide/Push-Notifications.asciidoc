@@ -26,7 +26,7 @@ Use the following identifiers for their separate purposes:
 |===
 |Value |Where to find it |Where to use it
 |Application UUID |*Push > Overview > Server API > Copy ID* |The `appId` field in a V3 server send. It isn't the mobile package name, Apple bundle ID, or client binding key.
-|Client binding key |*Push > Overview > Client binding* |`PushClient.builder()` and client registration. It cannot authorize a server send.
+|Client binding key |*Push > Overview > Client binding* |`PushClient.builder()` and client registration. It can't authorize a server send.
 |Server API key |*Account > Server API keys* |`Authorization: Bearer` or `X-API-Key` on your server. Create it with the `push` scope; the classic push token is a separate credential.
 |===
 
@@ -41,13 +41,13 @@ image::img/push-v3-console-overview.png[Push Overview with client binding and pr
 . Open the downloaded service-account JSON file locally and copy the complete JSON object.
 . In *Push > Settings > Native push providers > Android*, paste it into *Credential JSON* and select *Save Firebase Cloud Messaging credential*.
 
-The server credential contains `project_id`, `client_email`, and `private_key`. Android's `google-services.json` configures the mobile app and cannot authenticate server sends. Keep the service-account private key on the server; don't bundle it into the app or paste it into a support thread.
+The server credential contains `project_id`, `client_email`, and `private_key`. Android's `google-services.json` configures the mobile app and can't authenticate server sends. Keep the service-account private key on the server; don't bundle it into the app or paste it into a support thread.
 
 ==== iOS: APNs key and credential JSON
 
 Create an APNs authentication key in https://developer.apple.com/help/account/capabilities/communicate-with-apns-using-authentication-tokens/[Apple Developer Certificates, Identifiers & Profiles]. Download its `.p8` file and note the key ID and your Apple team ID. Use the bundle ID of the installed app as `topic`.
 
-The Console's *Credential JSON* field expects a JSON object containing those values. It does not accept the raw `.p8` file by itself. Replace the placeholders in this example:
+The Console's *Credential JSON* field expects a JSON object containing those values. It doesn't accept the raw `.p8` file by itself. Replace the placeholders in this example:
 
 [source,json]
 ----
@@ -126,7 +126,7 @@ Don't place secrets or irreplaceable data in a notification. Providers, operatin
 
 === Send from a server
 
-Open *Account > Server API keys*, enter a key name, select the `push` scope, and select *Create server key*. Copy the key when it is shown; it will not be displayed again. Keep it on your server. Authenticate with `Authorization: Bearer YOUR_SERVER_API_KEY` or `X-API-Key: YOUR_SERVER_API_KEY`; the existing classic push token won't authenticate V3 requests.
+Open *Account > Server API keys*, enter a key name, select the `push` scope, and select *Create server key*. Copy the key when it's shown; it won't be displayed again. Keep it on your server. Authenticate with `Authorization: Bearer YOUR_SERVER_API_KEY` or `X-API-Key: YOUR_SERVER_API_KEY`; the existing classic push token won't authenticate V3 requests.
 
 Copy the selected application's UUID from *Push > Overview > Server API > Copy ID*. Put that UUID in `appId`, then submit a typed message and one or more provider targets to `POST /api/v3/push/messages`:
 
@@ -153,7 +153,7 @@ There are two migration paths. Choose one wire format for each request:
 |Move the server to V3 |`https://cloud.codenameone.com/api/v3/push/messages`, with a JSON body |Use a server API key with `push` scope, the application UUID, saved provider credentials, and `message.classic` for installed `PushCallback` apps.
 |===
 
-For the classic path, change only the host of the existing `/push/push` URL. Keep fields such as `token`, `device`, `type`, `body`, `auth`, `cert`, `certPassword`, and `production`. Do not post these form fields to `/api/v3/push/messages`. A Java URL string must contain the plain URL, without Markdown brackets or parentheses.
+For the classic path, change only the host of the existing `/push/push` URL. Keep fields such as `token`, `device`, `type`, `body`, `auth`, `cert`, `certPassword`, and `production`. Don't post these form fields to `/api/v3/push/messages`. A Java URL string must contain the plain URL, without Markdown brackets or parentheses.
 
 For a server-only V3 migration, configure credentials for the same Firebase project and Apple bundle ID/environment as the installed apps. Keep existing device keys and select the explicit classic payload:
 
@@ -173,8 +173,8 @@ Before changing production traffic, send to installed Android and iOS test apps.
 HTTP `202` means the request was admitted to the durable queue. Its JSON response contains `deliveryIds` and `quota`; it doesn't mean the provider or device has accepted the message yet. Use delivery feedback and analytics for later outcomes.
 
 * *401*: check the server API key, its `push` scope, and the authentication header. A classic push token or client binding key isn't a V3 server key.
-* *400*: read the JSON error, check that `appId` is the selected application UUID, and check the request or credential format. For the classic endpoint, `credential URL returned HTTP 404` means a URL supplied in `auth` or `cert` could not be fetched. Firebase `auth` can also contain the complete service-account JSON directly.
-* *406 after a notification arrives*: this is not a successful API response, and changing the message format or resending can duplicate the notification. Report the UTC request time, endpoint, response body, and `CF-RAY` header when present, without including credentials or device tokens. The expected successful V3 response remains `202` with delivery IDs.
+* *400*: read the JSON error, check that `appId` is the selected application UUID, and check the request or credential format. For the classic endpoint, `credential URL returned HTTP 404` means a URL supplied in `auth` or `cert` couldn't be fetched. Firebase `auth` can also contain the complete service-account JSON directly.
+* *406 after a notification arrives*: this isn't a successful API response, and changing the message format or resending can duplicate the notification. Report the UTC request time, endpoint, response body, and `CF-RAY` header when present, without including credentials or device tokens. The expected successful V3 response remains `202` with delivery IDs.
 
 === Learn which sends failed
 
