@@ -1632,9 +1632,13 @@ public class Parser extends ClassVisitor {
         // natives as the compiler will: without a feature the builder left switched off.
         // See NativeFeatureFilter.
         if (NativeFeatureFilter.enabled()) {
+            long filterStart = System.currentTimeMillis();
             String[][] filtered = NativeFeatureFilter.filterAll(nativeSources, nativeHeaders);
             nativeSources = filtered[0];
             nativeHeaders = filtered[1];
+            if (ByteCodeTranslator.verbose) {
+                System.out.println("native feature filter in " + (System.currentTimeMillis() - filterStart) + " ms");
+            }
         }
     }
 

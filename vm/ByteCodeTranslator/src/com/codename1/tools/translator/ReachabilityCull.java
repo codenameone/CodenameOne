@@ -88,6 +88,10 @@ final class ReachabilityCull {
     /// see Allocation. -Dcn1.cullRta=false keeps the signature-only answer.
     static int run(List<ByteCodeClass> classes, MethodDependencyGraph graph, String[] nativeSources,
             String[] nativeHeaders) {
+        // Phase times for the verbose log. Both perf-gate arms print them, so a regression
+        // in the translator's own cost can be placed without a profiler: on the self-hosted
+        // -O3 binary a sampling profile cannot name the functions (see vm/CLAUDE.md).
+        long tStart = System.currentTimeMillis();
         // Every candidate method, indexed by the lookup signature a call names.
         Map<String, List<BytecodeMethod>> bySignature = new HashMap<String, List<BytecodeMethod>>();
         Map<BytecodeMethod, ByteCodeClass> owner = new IdentityHashMap<BytecodeMethod, ByteCodeClass>();
@@ -137,32 +141,47 @@ final class ReachabilityCull {
         // whose held-method stubs keep such a callee declared for the body that names it.
         NativeBodies scoped = null;
         Map<String, BytecodeMethod> bySymbol = null;
-        NativeSymbolIndex rootIndex = null;
+        NativeTokenIndex rootIndex = null;
+        long tSetup = System.currentTimeMillis();
+        long tBodies = tSetup;
         NativeSymbolIndex fullIndex = null;
         boolean rta = nativeHeaders != null
                 && !"false".equalsIgnoreCase(Util.getProperty("cn1.cullRta", "true"));
         if (rta && nativeSources != null && NativeBodies.enabled()) {
             bySymbol = new HashMap<String, BytecodeMethod>();
             Set<String> natives = new java.util.HashSet<String>();
+            // The index answers two questions: a method's symbol (isScopedRoot) and a
+            // class's name (Allocation). The shorter of the two bounds every query.
+            int minQuery = Integer.MAX_VALUE;
+            for (ByteCodeClass c : classes) {
+                if (!c.isEliminated()) {
+                    minQuery = Math.min(minQuery, c.getClsName().length());
+                }
+            }
             for (BytecodeMethod m : owner.keySet()) {
                 String s = symbolOf(m);
+                minQuery = Math.min(minQuery, s.length());
                 bySymbol.put(s, m);
                 if (m.isNative() && !isRuntimeClass(m.getClsName())) {
                     natives.add(s);
                 }
             }
             scoped = NativeBodies.parse(nativeSources, natives);
+            tBodies = System.currentTimeMillis();
             String[] rootAndHeaders = new String[scoped.rootText.length + nativeHeaders.length];
             System.arraycopy(scoped.rootText, 0, rootAndHeaders, 0, scoped.rootText.length);
             System.arraycopy(nativeHeaders, 0, rootAndHeaders, scoped.rootText.length, nativeHeaders.length);
-            rootIndex = new NativeSymbolIndex(rootAndHeaders);
+            rootIndex = new NativeTokenIndex(rootAndHeaders, minQuery);
             fullIndex = Parser.getNativeSymbolIndex(nativeSources);
         }
+        long tTokens = System.currentTimeMillis();
         Allocation alloc = rta
-                ? new Allocation(classes, scoped != null ? scoped.rootText : nativeSources, nativeHeaders,
+                ? new Allocation(classes, scoped != null ? scoped.rootText : nativeSources, nativeHeaders, rootIndex,
                         children, called, live, work)
                 : null;
+        long tAlloc = System.currentTimeMillis();
         StaticCalls staticCalls = new StaticCalls(classes);
+        long tIndex = System.currentTimeMillis();
         CFlow cFlow = scoped != null ? new CFlow(scoped, bySymbol, alloc) : null;
 
         for (Map.Entry<BytecodeMethod, ByteCodeClass> e : owner.entrySet()) {
@@ -283,6 +302,7 @@ final class ReachabilityCull {
         // it has to be emitted; nothing allocates its class, so it can never run. Its body
         // becomes the culled stub -- the one CN1_CULL_TRAP makes abort -- and what that
         // body called stops counting as called.
+        long tWalk = System.currentTimeMillis();
         Set<BytecodeMethod> stubbed = alloc == null ? Collections.<BytecodeMethod>emptySet()
                 : alloc.stillHeld();
         boolean dumpHeld = alloc != null && Util.getProperty("cn1.cullRtaHeld", null) != null;
@@ -321,6 +341,15 @@ final class ReachabilityCull {
             m.setEliminated(true);
             graph.removeMethod(m);
             eliminated++;
+        }
+        if (ByteCodeTranslator.verbose) {
+            System.out.println("reachability cull phases (ms): setup " + (tSetup - tStart)
+                    + ", symbols + native bodies " + (tBodies - tSetup)
+                    + ", token index " + (tTokens - tBodies)
+                    + ", allocation " + (tAlloc - tTokens)
+                    + ", static calls " + (tIndex - tAlloc)
+                    + ", walk " + (tWalk - tIndex)
+                    + ", eliminate " + (System.currentTimeMillis() - tWalk));
         }
         return eliminated;
     }
@@ -437,6 +466,8 @@ final class ReachabilityCull {
                 !"false".equalsIgnoreCase(Util.getProperty("cn1.cullStaticOwner", "true"));
         private final Map<String, ByteCodeClass> byName = new HashMap<String, ByteCodeClass>();
         private final Map<BytecodeMethod, Object> perCaller = new IdentityHashMap<BytecodeMethod, Object>();
+        private final Map<BytecodeMethod, String> keyOf = new IdentityHashMap<BytecodeMethod, String>();
+        private final Map<String, String> mangled = new HashMap<String, String>();
 
         StaticCalls(List<ByteCodeClass> classes) {
             for (ByteCodeClass c : classes) {
@@ -453,7 +484,12 @@ final class ReachabilityCull {
                 o = index(caller);
                 perCaller.put(caller, o);
             }
-            List<String> owners = ((Map<String, List<String>>) o).get(target.getMethodName() + target.getSignature());
+            String key = keyOf.get(target);
+            if (key == null) {
+                key = target.getMethodName() + target.getSignature();
+                keyOf.put(target, key);
+            }
+            List<String> owners = ((Map<String, List<String>>) o).get(key);
             if (owners == null) {
                 // Only virtual, special or interface calls name it: none reaches a static.
                 return false;
@@ -464,7 +500,12 @@ final class ReachabilityCull {
                 return true;
             }
             for (String owner : owners) {
-                ByteCodeClass c = byName.get(Allocation.mangleName(owner));
+                String name = mangled.get(owner);
+                if (name == null) {
+                    name = Allocation.mangleName(owner);
+                    mangled.put(owner, name);
+                }
+                ByteCodeClass c = byName.get(name);
                 if (c == null) {
                     return true;
                 }
@@ -544,7 +585,7 @@ final class ReachabilityCull {
 
     /// isRoot, with only the natives' text outside a port's Java native bodies rooting
     /// anything, and such a native itself live only once something calls it.
-    private static boolean isScopedRoot(BytecodeMethod m, ByteCodeClass c, NativeSymbolIndex rootIndex) {
+    private static boolean isScopedRoot(BytecodeMethod m, ByteCodeClass c, NativeTokenIndex rootIndex) {
         String name = m.getMethodName();
         if (m.isMain() || "__CLINIT__".equals(name) || "finalize".equals(name)) {
             return true;
@@ -585,36 +626,43 @@ final class ReachabilityCull {
     static void markCalled(BytecodeMethod m, ByteCodeClass c, Set<BytecodeMethod> called,
             Set<BytecodeMethod> live, ArrayDeque<BytecodeMethod> work,
             Map<ByteCodeClass, List<ByteCodeClass>> children, Allocation alloc, boolean gated) {
-        ArrayDeque<Object[]> pending = new ArrayDeque<Object[]>();
-        pending.add(new Object[] {m, c, gated ? Boolean.TRUE : Boolean.FALSE});
-        while (!pending.isEmpty()) {
-            Object[] p = pending.poll();
-            BytecodeMethod pm = (BytecodeMethod) p[0];
-            ByteCodeClass pc = (ByteCodeClass) p[1];
-            if (called.contains(pm)) {
-                continue;
-            }
-            if (alloc != null && Boolean.TRUE.equals(p[2]) && !alloc.admits(pm, pc)) {
-                continue;
-            }
-            called.add(pm);
-            if (live.add(pm)) {
-                work.add(pm);
-            }
-            // isMethodUsedByBaseClassOrInterface: an override is kept when the method it
-            // overrides -- matched by name, as the cull matches it -- is called.
-            List<ByteCodeClass> kids = pc == null ? null : children.get(pc);
-            if (kids == null) {
-                continue;
-            }
-            String name = pm.getMethodName();
-            for (ByteCodeClass k : kids) {
-                for (BytecodeMethod km : k.getMethods()) {
-                    if (!km.isEliminated() && name.equals(km.getMethodName()) && !called.contains(km)) {
-                        pending.add(new Object[] {km, k, Boolean.TRUE});
+        // Most calls change nothing -- the target is already called, or held -- so the
+        // queue of overrides to follow is only created once there is one. Overrides are
+        // always gated; the order they are visited in is first in, first out either way.
+        ArrayDeque<Object[]> pending = null;
+        BytecodeMethod pm = m;
+        ByteCodeClass pc = c;
+        boolean pg = gated;
+        while (true) {
+            if (!called.contains(pm) && (alloc == null || !pg || alloc.admits(pm, pc))) {
+                called.add(pm);
+                if (live.add(pm)) {
+                    work.add(pm);
+                }
+                // isMethodUsedByBaseClassOrInterface: an override is kept when the method it
+                // overrides -- matched by name, as the cull matches it -- is called.
+                List<ByteCodeClass> kids = pc == null ? null : children.get(pc);
+                if (kids != null) {
+                    String name = pm.getMethodName();
+                    for (ByteCodeClass k : kids) {
+                        for (BytecodeMethod km : k.getMethods()) {
+                            if (!km.isEliminated() && name.equals(km.getMethodName()) && !called.contains(km)) {
+                                if (pending == null) {
+                                    pending = new ArrayDeque<Object[]>();
+                                }
+                                pending.add(new Object[] {km, k});
+                            }
+                        }
                     }
                 }
             }
+            if (pending == null || pending.isEmpty()) {
+                return;
+            }
+            Object[] p = pending.poll();
+            pm = (BytecodeMethod) p[0];
+            pc = (ByteCodeClass) p[1];
+            pg = true;
         }
     }
 
@@ -711,13 +759,18 @@ final class ReachabilityCull {
         private final Set<ByteCodeClass> touched = Collections.newSetFromMap(
                 new IdentityHashMap<ByteCodeClass, Boolean>());
         private final List<BytecodeMethod> forNameSites = new ArrayList<BytecodeMethod>();
+        /// mangle() memoized: the scan of every live method mangles the same few hundred
+        /// class names over and over, three String copies each.
+        private final Map<String, String> mangled = new HashMap<String, String>();
         private final Map<ByteCodeClass, List<ByteCodeClass>> children;
         private final Set<BytecodeMethod> called;
         private final Set<BytecodeMethod> live;
         private final ArrayDeque<BytecodeMethod> work;
 
+        /// @param index the index over exactly `nativeSources` plus `nativeHeaders` when the
+        ///     caller already built one -- the scoped root index is that same text -- or null
         Allocation(List<ByteCodeClass> classes, String[] nativeSources, String[] nativeHeaders,
-                Map<ByteCodeClass, List<ByteCodeClass>> children,
+                NativeTokenIndex index, Map<ByteCodeClass, List<ByteCodeClass>> children,
                 Set<BytecodeMethod> called, Set<BytecodeMethod> live, ArrayDeque<BytecodeMethod> work) {
             this.children = children;
             this.called = called;
@@ -738,17 +791,26 @@ final class ReachabilityCull {
             for (String r : RUNTIME_ROOTS) {
                 allocate(r);
             }
-            String[] all = new String[(nativeSources == null ? 0 : nativeSources.length) + nativeHeaders.length];
-            int n = 0;
-            if (nativeSources != null) {
-                for (String s : nativeSources) {
+            NativeTokenIndex natives = index;
+            if (natives == null) {
+                String[] all = new String[(nativeSources == null ? 0 : nativeSources.length) + nativeHeaders.length];
+                int n = 0;
+                if (nativeSources != null) {
+                    for (String s : nativeSources) {
+                        all[n++] = s;
+                    }
+                }
+                for (String s : nativeHeaders) {
                     all[n++] = s;
                 }
+                int minQuery = Integer.MAX_VALUE;
+                for (ByteCodeClass c : classes) {
+                    if (!c.isEliminated()) {
+                        minQuery = Math.min(minQuery, c.getClsName().length());
+                    }
+                }
+                natives = new NativeTokenIndex(all, minQuery);
             }
-            for (String s : nativeHeaders) {
-                all[n++] = s;
-            }
-            NativeSymbolIndex natives = new NativeSymbolIndex(all);
             for (ByteCodeClass c : classes) {
                 if (!c.isEliminated() && natives.contains(c.getClsName())) {
                     allocate(c.getClsName());
@@ -861,14 +923,14 @@ final class ReachabilityCull {
                 Class<?> k = i.getClass();
                 if (k == com.codename1.tools.translator.bytecodes.TypeInstruction.class) {
                     if (i.getOpcode() == org.objectweb.asm.Opcodes.NEW) {
-                        allocate(mangle(((com.codename1.tools.translator.bytecodes.TypeInstruction) i).getTypeName()));
+                        allocate(mangleCached(((com.codename1.tools.translator.bytecodes.TypeInstruction) i).getTypeName()));
                     }
                 } else if (k == com.codename1.tools.translator.bytecodes.Ldc.class) {
                     Object v = ((com.codename1.tools.translator.bytecodes.Ldc) i).getValue();
                     if (v instanceof org.objectweb.asm.Type) {
                         org.objectweb.asm.Type t = (org.objectweb.asm.Type) v;
                         if (t.getSort() == org.objectweb.asm.Type.OBJECT) {
-                            allocate(mangle(t.getInternalName()));
+                            allocate(mangleCached(t.getInternalName()));
                         }
                     } else if (v instanceof String) {
                         String s = (String) v;
@@ -882,7 +944,7 @@ final class ReachabilityCull {
                 } else if (k == com.codename1.tools.translator.bytecodes.Field.class) {
                     int op = i.getOpcode();
                     if (op == org.objectweb.asm.Opcodes.GETSTATIC || op == org.objectweb.asm.Opcodes.PUTSTATIC) {
-                        touch(byName.get(mangle(((com.codename1.tools.translator.bytecodes.Field) i).getOwner())));
+                        touch(byName.get(mangleCached(((com.codename1.tools.translator.bytecodes.Field) i).getOwner())));
                     }
                 } else if (k != com.codename1.tools.translator.bytecodes.BasicInstruction.class
                         && k != com.codename1.tools.translator.bytecodes.Invoke.class
@@ -983,6 +1045,15 @@ final class ReachabilityCull {
 
         static String mangleName(String internal) {
             return mangle(internal);
+        }
+
+        private String mangleCached(String internal) {
+            String m = mangled.get(internal);
+            if (m == null) {
+                m = mangle(internal);
+                mangled.put(internal, m);
+            }
+            return m;
         }
 
         /// "a/b/C$D" or "a.b.C$D" -> "a_b_C_D", the translator's class naming.

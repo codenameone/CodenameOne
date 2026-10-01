@@ -150,7 +150,9 @@ final class NativeFeatureFilter {
         if (text.indexOf(SWITCH) < 0 && text.indexOf(OWN) < 0) {
             return text;
         }
-        StringBuilder b = new StringBuilder(text.length());
+        // Copied only from the first line actually dropped: most texts lose nothing, and
+        // rebuilding an unchanged megabyte of C on every round was most of this pass.
+        StringBuilder b = null;
         // One entry per open conditional: the state of the branch being read.
         List<int[]> stack = new ArrayList<int[]>();
         int dropping = 0;
@@ -203,14 +205,19 @@ final class NativeFeatureFilter {
             // Inside a dropped branch only the conditional structure itself is kept; a
             // #define there is exactly what must disappear.
             if (dropping == 0 || (d != null && isConditional(d[0]))) {
-                b.append(text, pos, end);
+                if (b != null) {
+                    b.append(text, pos, end);
+                }
+            } else if (b == null) {
+                b = new StringBuilder(text.length());
+                b.append(text, 0, pos);
             }
-            if (end < text.length()) {
+            if (b != null && end < text.length()) {
                 b.append('\n');
             }
             pos = end + 1;
         }
-        return stack.isEmpty() ? b.toString() : text;
+        return b != null && stack.isEmpty() ? b.toString() : text;
     }
 
     private static boolean isConditional(String kind) {
