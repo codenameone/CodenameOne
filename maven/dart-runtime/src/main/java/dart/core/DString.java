@@ -179,6 +179,16 @@ public final class DString {
         return s.lastIndexOf(other);
     }
 
+    /**
+     * Dart's {@code lastIndexOf(pattern, start)}: the last match starting at or before
+     * {@code start}, which must lie in 0..length. Java clamps an out-of-range start
+     * instead of throwing, so it is range-checked as {@link #indexOf(String, String, long)} is.
+     */
+    public static long lastIndexOf(String s, String other, long start) {
+        RangeError.checkValueInInterval(start, 0, s.length(), "start");
+        return s.lastIndexOf(other, (int) start);
+    }
+
     /** Dart's {@code indexOf(Pattern)} for a RegExp: where the first match starts. */
     public static long indexOf(String s, RegExp pattern) {
         return indexOf(s, pattern, 0);
@@ -196,7 +206,13 @@ public final class DString {
      * at which the pattern matches starting exactly there, as Dart defines it.
      */
     public static long lastIndexOf(String s, RegExp pattern) {
-        for (int i = s.length(); i >= 0; i--) {
+        return lastIndexOf(s, pattern, s.length());
+    }
+
+    /** Dart's {@code lastIndexOf(Pattern, start)} for a RegExp: searching back from start. */
+    public static long lastIndexOf(String s, RegExp pattern, long start) {
+        RangeError.checkValueInInterval(start, 0, s.length(), "start");
+        for (int i = (int) start; i >= 0; i--) {
             RegExpMatch m = pattern.matchFrom(s, i);
             if (m != null && m.start() == i) {
                 return i;

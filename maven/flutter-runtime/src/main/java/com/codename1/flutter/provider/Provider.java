@@ -43,6 +43,8 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
     protected Object value;
     protected Object create;
     protected boolean lazy = true;
+    /** The Dart {@code T} of {@code Provider<T>}, when the transpiler knows it; else null. */
+    protected Class<?> providedType;
 
     public void value(Object v) {
         this.value = v;
@@ -60,6 +62,17 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
         return value;
     }
 
+    /**
+     * The provider's declared type ({@code Provider<T>}), threaded in by the transpiler as
+     * Java erases it. With it the provider matches a lookup for T even while its value is
+     * null; without it only a non-null value can say what it provides. Answers this
+     * provider, so it chains onto a {@code .value(...)} named constructor.
+     */
+    public Provider providedType(Class<?> v) {
+        this.providedType = v;
+        return this;
+    }
+
     @Override
     public com.codename1.flutter.Element createElement() {
         return new ProviderElement(this);
@@ -67,7 +80,21 @@ public class Provider extends SingleChildWidget implements InheritedValueProvide
 
     @Override
     public Object providedValueFor(Class<?> type) {
-        return value != null && type.isInstance(value) ? value : null;
+        return providesType(type) ? value : null;
+    }
+
+    @Override
+    public boolean providesType(Class<?> type) {
+        if (type == null) {
+            return false;
+        }
+        if (value != null) {
+            return type.isInstance(value);
+        }
+        // A null value matches by the declared type. Not for an Object lookup -- the
+        // default of a Consumer whose type was not known -- which means "the nearest
+        // model", and a null is no model: it would shadow the real one further out.
+        return providedType != null && type != Object.class && type.isAssignableFrom(providedType);
     }
 
     /** The {@code Provider.value(value: ...)} named constructor. */

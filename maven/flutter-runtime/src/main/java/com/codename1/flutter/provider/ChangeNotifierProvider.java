@@ -46,6 +46,13 @@ public class ChangeNotifierProvider extends Provider {
         return new ChangeNotifierProviderElement(this);
     }
 
+    /** {@link Provider#providedType(Class)}, answering this type so a chain keeps it. */
+    @Override
+    public ChangeNotifierProvider providedType(Class<?> v) {
+        super.providedType(v);
+        return this;
+    }
+
     /** The {@code ChangeNotifierProvider.value(value: ...)} named constructor. */
     public static ChangeNotifierProvider value(Key key, Object value, Widget child) {
         ChangeNotifierProvider p = new ChangeNotifierProvider();

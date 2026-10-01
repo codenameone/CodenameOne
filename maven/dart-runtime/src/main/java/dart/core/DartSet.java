@@ -229,6 +229,20 @@ public class DartSet<E> extends LinkedHashSet<E> {
         }
     }
 
+    /**
+     * Dart's {@code Set.retainWhere(test)}: keeps only the matching elements. The
+     * transpiler routes it here for a Set as it does for a List, and only DartList
+     * declared it, so every Set call site failed to compile.
+     */
+    public void retainWhere(Funcs.Func1<E, Boolean> test) {
+        java.util.Iterator<E> it = iterator();
+        while (it.hasNext()) {
+            if (!Boolean.TRUE.equals(test.call(it.next()))) {
+                it.remove();
+            }
+        }
+    }
+
     // --- Iterable combinators (delegate to the lazy view) ---------------
 
     public E first() {

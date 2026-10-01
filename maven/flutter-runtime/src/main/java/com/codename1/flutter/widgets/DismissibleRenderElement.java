@@ -444,10 +444,13 @@ public class DismissibleRenderElement extends RenderElement {
      * Boolean was looked at: an asynchronous "no", or a failed confirmation, dismissed the
      * row at once and ran onDismissed anyway. A Future now decides when it completes (an
      * error vetoes), and the row holds where it was dragged until then, as in Flutter. No
-     * callback, or an answer that is neither, is consent.
+     * callback is consent; otherwise only {@code true} is. The answer is a
+     * {@code Future<bool?>}, and Flutter reads it as {@code result ?? false}: a null --
+     * a dialog closed without choosing -- used to count as consent and dismissed the row.
+     * Package visible for DismissibleConfirmTest.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private void confirm(DismissDirection dir, final dart.runtime.Funcs.VoidFunc1<Boolean> decide) {
+    void confirm(DismissDirection dir, final dart.runtime.Funcs.VoidFunc1<Boolean> decide) {
         dart.runtime.Funcs.Func1<DismissDirection, Object> c = dismissible().getConfirmDismiss();
         if (c == null) {
             decide.call(Boolean.TRUE);
@@ -465,7 +468,7 @@ public class DismissibleRenderElement extends RenderElement {
             ((dart.async.Future) answer).then(new dart.runtime.Funcs.VoidFunc1<Object>() {
                 @Override
                 public void call(Object v) {
-                    onEdt(decide, Boolean.valueOf(!(v instanceof Boolean) || ((Boolean) v).booleanValue()));
+                    onEdt(decide, Boolean.valueOf(Boolean.TRUE.equals(v)));
                 }
             }).catchError(new dart.runtime.Funcs.VoidFunc1<Object>() {
                 @Override
@@ -476,7 +479,7 @@ public class DismissibleRenderElement extends RenderElement {
             });
             return;
         }
-        decide.call(Boolean.valueOf(!(answer instanceof Boolean) || ((Boolean) answer).booleanValue()));
+        decide.call(Boolean.valueOf(Boolean.TRUE.equals(answer)));
     }
 
     private static void onEdt(final dart.runtime.Funcs.VoidFunc1<Boolean> decide, final Boolean ok) {

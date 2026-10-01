@@ -35,6 +35,8 @@ import dart.runtime.Funcs;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -184,5 +186,47 @@ class ProviderTypeLookupTest {
         root.update(after);
         owner.flushSync();
         assertTrue(seen[0] == second, "the Consumer shows the new model, got " + seen[0]);
+    }
+    @Test
+    @DisplayName("a typed Provider holding null is found, shadows an outer one, and rebuilds when it gets a value")
+    void aTypedNullProviderMatchesAndSubscribes() {
+        final Object[] seen = {"never built"};
+        Consumer<EmailStore> c = recorder(EmailStore.class, seen);
+        Provider inner = Provider.value(null, null, c).providedType(EmailStore.class);
+        Provider outer = new Provider();
+        outer.value(new EmailStore());
+        outer.child(inner);
+        BuildOwner owner = new BuildOwner();
+        com.codename1.flutter.Element root = FlutterUI.mount(outer, new RenderHost(), owner);
+        assertNull(seen[0], "the nearer Provider<EmailStore?> answers null, not the outer store");
+
+        EmailStore arrived = new EmailStore();
+        Provider innerAfter = Provider.value(null, arrived, c).providedType(EmailStore.class);
+        Provider outerAfter = new Provider();
+        outerAfter.value(outer.getValue());
+        outerAfter.child(innerAfter);
+        root.update(outerAfter);
+        owner.flushSync();
+        assertSame(arrived, seen[0], "the Consumer subscribed while the value was null, so it rebuilt");
+    }
+
+    @Test
+    @DisplayName("an untyped lookup still skips a null provider for the nearest real model")
+    void anUntypedLookupSkipsANullProvider() {
+        final Object[] seen = new Object[1];
+        Consumer<Object> c = new Consumer<Object>();
+        c.builder(new Funcs.Func3<BuildContext, Object, Widget, Widget>() {
+            @Override
+            public Widget call(BuildContext context, Object value, Widget child) {
+                seen[0] = value;
+                return new ProbeBox(1, 1);
+            }
+        });
+        Provider inner = Provider.value(null, null, c).providedType(EmailStore.class);
+        Provider outer = new Provider();
+        outer.value(new EmailStore());
+        outer.child(inner);
+        FlutterUI.mount(outer, new RenderHost(), new BuildOwner());
+        assertTrue(seen[0] instanceof EmailStore, "got " + seen[0]);
     }
 }

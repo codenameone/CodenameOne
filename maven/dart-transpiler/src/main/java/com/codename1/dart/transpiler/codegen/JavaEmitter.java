@@ -2401,7 +2401,8 @@ public final class JavaEmitter {
                 String jt = javaType(v.type, true, ctx);
                 String nm = ctx.declareShadowSafe(v.name, v.type);
                 binds.add(jt + " " + nm + " = (" + jt + ") " + subj + ";");
-                return subj + " instanceof " + jt;
+                // Tested erased: Java has no instanceof for a parameterized type.
+                return subj + " instanceof " + erasedJavaType(v.type, ctx);
             }
             TypeRef bt = v.type != null ? v.type : subjType;
             String jt = javaType(bt, false, ctx);
@@ -2429,12 +2430,13 @@ public final class JavaEmitter {
             CastPattern c = (CastPattern) p;
             String jt = javaType(c.type, true, ctx);
             String cast = "((" + jt + ") " + subj + ")";
-            return joinAnd(subj + " instanceof " + jt, patternMatch(c.inner, cast, c.type, ctx, binds));
+            return joinAnd(subj + " instanceof " + erasedJavaType(c.type, ctx),
+                    patternMatch(c.inner, cast, c.type, ctx, binds));
         }
         if (p instanceof ObjectPattern) {
             ObjectPattern o = (ObjectPattern) p;
             String jt = javaType(o.type, true, ctx);
-            String cond = subj + " instanceof " + jt;
+            String cond = subj + " instanceof " + erasedJavaType(o.type, ctx);
             String cast = "((" + jt + ") " + subj + ")";
             for (PatternField f : o.fields) {
                 String access = cast + "." + fieldAccess(o.type, f.name) + "()";
@@ -2529,7 +2531,7 @@ public final class JavaEmitter {
 
     private String instanceofCheck(String subj, TypeRef type, Ctx ctx) {
         if (isReferenceType(type)) {
-            return subj + " instanceof " + javaType(type, true, ctx);
+            return subj + " instanceof " + erasedJavaType(type, ctx);
         }
         // primitive-typed variable pattern over a dynamic subject: check the boxed form
         String boxed = type.is("bool") ? "Boolean"
@@ -2804,8 +2806,15 @@ public final class JavaEmitter {
                     // stub named ctors are declared as static methods
                     Ast.MethodDecl m = stubs.findMethod(cc.type.name, cc.ctorName, false);
                     if (m != null && m.isStatic) {
-                        return new Out(stubSimpleName(cc.type.name, ctx) + "." + cc.ctorName + "("
-                                + stubMethodArgs(m, cc.args, ctx) + ")", m.returnType);
+                        String call = stubSimpleName(cc.type.name, ctx) + "." + cc.ctorName + "("
+                                + stubMethodArgs(m, cc.args, ctx) + ")";
+                        // `Provider<T>.value(...)`: the T a null value cannot show.
+                        String token = publishesValueByType(cc.type.name)
+                                ? providedTypeToken(cc.type.args, ctx) : null;
+                        if (token != null) {
+                            call += ".providedType(" + token + ")";
+                        }
+                        return new Out(call, m.returnType);
                     }
                 }
                 diags.error(e, "E0126", "Cannot resolve named constructor " + cc.type.name + "." + cc.ctorName);
@@ -2841,6 +2850,25 @@ public final class JavaEmitter {
         if (e instanceof IncDec) {
             IncDec id = (IncDec) e;
             Out target = emitExpr(id.operand, null, ctx);
+            if (id.operand instanceof PropertyGet
+                    && target.code.endsWith("." + ((PropertyGet) id.operand).name + "()")) {
+                // `x.prop++` through a getter/setter pair (an app or stub property): the
+                // read is a call, and `x.prop()++` is not Java. Lowered as `x.prop += 1`,
+                // which writes through the setter. Like any setter assignment it is a
+                // statement; its value is not available.
+                Assign inc = new Assign().at(id.file, id.line, id.col);
+                inc.lhs = id.operand;
+                inc.op = id.increment ? "+=" : "-=";
+                IntLit one = new IntLit().at(id.file, id.line, id.col);
+                one.value = 1;
+                inc.rhs = one;
+                Out write = emitAssign(inc, ctx);
+                // No setter found: emitAssign wrote the read back as an assignment
+                // target; keep the historical form rather than that.
+                if (!write.code.startsWith(target.code + " ")) {
+                    return write;
+                }
+            }
             if (target.code.endsWith("()") && target.code.contains(".get$")) {
                 String base = target.code.substring(0, target.code.lastIndexOf(".get$"));
                 String prop = target.code.substring(target.code.lastIndexOf(".get$") + 5, target.code.length() - 2);
@@ -2901,19 +2929,97 @@ public final class JavaEmitter {
                 // so `min(1, 2) is int` tests the Long it is.
                 subject = "((Object) " + paren(o.code) + ")";
             }
-            String check = subject + " instanceof " + javaType(t.type, true, ctx);
+            String check;
+            if (t.type.is("Null")) {
+                // `x is Null` holds only for null; it mapped to Object, which is the opposite.
+                check = subject + " == null";
+            } else if (t.type.nullable) {
+                // `x is int?` holds for null too. The subject is evaluated once, inside the
+                // helper, so `next() is int?` does not call next() twice.
+                ctx.importClass("dart.runtime.DartRuntime");
+                check = "DartRuntime.isOrNull(" + subject + ", " + erasedJavaType(t.type, ctx) + ".class)";
+            } else {
+                // Erased: `x is List<String>` cannot name its arguments in a Java instanceof.
+                check = subject + " instanceof " + erasedJavaType(t.type, ctx);
+            }
             return new Out(t.negated ? "!(" + check + ")" : "(" + check + ")", TypeRef.BOOL);
         }
         if (e instanceof AsCast) {
-            AsCast c = (AsCast) e;
-            Out o = emitExpr(c.operand, null, ctx);
-            return new Out("((" + javaType(c.type, true, ctx) + ") " + o.code + ")", c.type);
+            return emitAsCast((AsCast) e, ctx);
         }
         if (e instanceof Lambda) {
             return emitLambda((Lambda) e, expected, ctx);
         }
         diags.error(e, "E0128", "Unsupported expression in emitter: " + e.getClass().getSimpleName());
         return new Out("null", TypeRef.DYNAMIC);
+    }
+
+    /**
+     * The Java class an {@code is}/{@code as} test checks against: the type's Java form
+     * with its type arguments dropped, since Java can neither test nor cast-check a
+     * parameterized type at runtime ({@code instanceof DartList<String>} does not
+     * compile). The class itself is kept -- List&lt;int&gt; stays DartLongList -- because
+     * that is the class a value of that type is held in, and the one a promoted use casts to.
+     */
+    private String erasedJavaType(TypeRef t, Ctx ctx) {
+        String jt = javaType(t, true, ctx);
+        int lt = jt.indexOf('<');
+        return lt < 0 ? jt : jt.substring(0, lt);
+    }
+
+    /** A type that is a type VARIABLE here ({@code T}): it has no class to test against. */
+    private boolean isTypeVariable(TypeRef t, Ctx ctx) {
+        if (t == null || !t.args.isEmpty() || t.funcReturn != null || t.name == null
+                || t.name.indexOf('.') >= 0) {
+            return false;
+        }
+        String n = t.name;
+        if (n.equals("int") || n.equals("double") || n.equals("num") || n.equals("bool")
+                || n.equals("String") || n.equals("Object") || n.equals("dynamic") || n.equals("var")
+                || n.equals("Null") || n.equals("void") || n.equals("Function")) {
+            return false;
+        }
+        if (program.resolveClass(n, ctx.library()) != null || program.classesByName.containsKey(n)
+                || program.enums.containsKey(n) || program.typedefs.containsKey(n)
+                || stubs.isStubClass(n) || stubs.isStubEnum(n) || typedefSig(n) != null) {
+            return false;
+        }
+        String jt = javaType(t, true, ctx);
+        return jt.equals(n);
+    }
+
+    /**
+     * {@code value as T}. A failed cast is Dart's TypeError, so it goes through
+     * DartRuntime.as, which tests with isInstance and throws one. A plain Java cast threw
+     * ClassCastException, which {@code on TypeError} never caught -- and on iOS threw
+     * nothing, because ParparVM does not check casts. {@code as T?} lets null through.
+     */
+    private Out emitAsCast(AsCast c, Ctx ctx) {
+        Out o = emitExpr(c.operand, null, ctx);
+        String jt = javaType(c.type, true, ctx);
+        TypeRef target = c.type;
+        boolean unchecked = target.is("dynamic") || target.is("var")
+                || (target.is("Object") && target.nullable)
+                // No class to test a type variable against; Dart reifies it, Java erases it.
+                || isTypeVariable(target, ctx)
+                // An upcast to the static type it already has cannot fail.
+                || (o.type != null && !isDynamic(o.type) && o.type.args.isEmpty() && target.args.isEmpty()
+                    && o.type.name != null && o.type.name.equals(target.name)
+                    && (target.nullable || !o.type.nullable));
+        if (unchecked) {
+            return new Out("((" + jt + ") " + o.code + ")", c.type);
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        String erased = erasedJavaType(target, ctx);
+        String operand = o.code;
+        if (o.type != null && !o.type.nullable
+                && (o.type.is("int") || o.type.is("double") || o.type.is("bool"))) {
+            operand = "(Object) " + paren(o.code);
+        }
+        String call = "DartRuntime.as(" + operand + ", " + erased + ".class, " + target.nullable + ", "
+                + quote(target.toString()) + ")";
+        // The helper answers the erased class; a parameterized target narrows it unchecked.
+        return new Out(jt.equals(erased) ? call : "((" + jt + ") " + call + ")", c.type);
     }
 
     private Out emitString(StringLit s, Ctx ctx) {
@@ -4203,6 +4309,23 @@ public final class JavaEmitter {
         return id;
     }
 
+    /**
+     * The receiver of a read-modify-write through a getter/setter pair, which names it
+     * twice: kept as written when naming it again has no effect (a local, {@code this}, a
+     * field chain), otherwise evaluated once into a local ahead of the statement, as the
+     * compound index assignment does with its receiver.
+     */
+    private String receiverOnce(Out tgt, Ctx ctx) {
+        if (tgt.code.matches("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*")
+                || (tgt.type != null && isClassRef(tgt.type))) {
+            return tgt.code;
+        }
+        String tmp = ctx.newTemp();
+        TypeRef t = tgt.type == null ? TypeRef.DYNAMIC : tgt.type;
+        ctx.writer().line(javaType(t, false, ctx) + " " + tmp + " = " + tgt.code + ";");
+        return tmp;
+    }
+
     private static Assign plainAssign(Assign a, Expr lhs) {
         Assign plain = new Assign().at(a.file, a.line, a.col);
         plain.lhs = lhs;
@@ -4344,19 +4467,28 @@ public final class JavaEmitter {
                 Ast.MethodDecl setter = stubs.findSetter(tgt.type.name, pg.name);
                 if (setter != null) {
                     TypeRef pt = setter.params.isEmpty() ? TypeRef.DYNAMIC : setter.params.get(0).type;
+                    String recv = a.op.equals("=") ? tgt.code : receiverOnce(tgt, ctx);
                     String val = a.op.equals("=")
                             ? coerce(emitExpr(a.rhs, pt, ctx), pt, ctx)
-                            : compoundValue(tgt.code + "." + pg.name + "()", pt, a, ctx);
-                    return new Out(tgt.code + "." + pg.name + "(" + val + ")", pt);
+                            : compoundValue(recv + "." + pg.name + "()", pt, a, ctx);
+                    return new Out(recv + "." + pg.name + "(" + val + ")", pt);
                 }
             }
             // App class (or its supers) declaring `set prop(v)` — emitted as the overloaded
             // instance method `prop(v)`, so `x.prop = v` becomes `x.prop(v)` (never `x.prop() = v`).
-            if (a.op.equals("=") && tgt.type != null) {
+            // A compound `x.prop += v` reads through the getter, `x.prop(x.prop() + v)`, as the
+            // stub branch above does; it fell through to `x.prop() += v`, which is not Java.
+            // (`??=` never gets here: it is rewritten to a plain `=` under a null test.)
+            if (tgt.type != null) {
                 ClassDecl tc = program.resolveClass(tgt.type.name, ctx.library());
                 Ast.MethodDecl setter = findAppSetter(tc, pg.name);
                 if (setter != null) {
                     TypeRef pt = setter.params.isEmpty() ? TypeRef.DYNAMIC : setter.params.get(0).type;
+                    if (!a.op.equals("=")) {
+                        String recv = receiverOnce(tgt, ctx);
+                        return new Out(recv + "." + pg.name + "("
+                                + compoundValue(recv + "." + pg.name + "()", pt, a, ctx) + ")", pt);
+                    }
                     Out rhs = emitExpr(a.rhs, pt, ctx);
                     return new Out(tgt.code + "." + pg.name + "(" + coerce(rhs, pt, ctx) + ")", pt);
                 }
@@ -5692,6 +5824,15 @@ public final class JavaEmitter {
                 }
                 return new Out("DString.indexOf(" + args + ")", TypeRef.INT);
             }
+            if (n.equals("lastIndexOf")) {
+                // Unlowered, it reached Java's String.lastIndexOf: an int result, no
+                // RegExp pattern, and a long start that did not compile.
+                String args = target.code + ", " + emitExpr(pos.get(0), null, ctx).code;
+                if (pos.size() > 1) {
+                    args += ", " + emitExpr(pos.get(1), TypeRef.INT, ctx).code;
+                }
+                return new Out("DString.lastIndexOf(" + args + ")", TypeRef.INT);
+            }
             if (n.equals("replaceFirst")) {
                 // Unresolved before: DString's overloads were never reached.
                 String start = pos.size() > 2 ? ", " + emitExpr(pos.get(2), TypeRef.INT, ctx).code : "";
@@ -6454,18 +6595,38 @@ public final class JavaEmitter {
      */
     private void emitProvidedTypeToken(String tmp, String className, List<TypeRef> typeArgs,
             Ctx ctx) {
-        if (!readsProvidedValueByType(className) || typeArgs.isEmpty()) {
+        if (!readsProvidedValueByType(className) && !publishesValueByType(className)) {
             return;
+        }
+        String token = providedTypeToken(typeArgs, ctx);
+        if (token != null) {
+            ctx.writer().line(tmp + ".providedType(" + token + ");");
+        }
+    }
+
+    /**
+     * Providers that PUBLISH by type. Given their {@code T}, one holding null still
+     * matches a lookup for T, so the reader subscribes and rebuilds when the value
+     * arrives; without it the lookup went past the provider as if it were not there.
+     */
+    private static boolean publishesValueByType(String className) {
+        return className.equals("Provider") || className.equals("ChangeNotifierProvider");
+    }
+
+    /** {@code A.class} for the first type argument when it is a plain class, else null. */
+    private String providedTypeToken(List<TypeRef> typeArgs, Ctx ctx) {
+        if (typeArgs == null || typeArgs.isEmpty() || typeArgs.get(0) == null) {
+            return null;
         }
         TypeRef a = typeArgs.get(0);
-        if (a == null) {
-            return;
+        if (isTypeVariable(a, ctx)) {
+            return null;
         }
-        String javaName = javaType(a, false, ctx);
+        String javaName = javaType(a, true, ctx);
         if (javaName == null || javaName.indexOf('<') >= 0 || javaName.equals("Object")) {
-            return;
+            return null;
         }
-        ctx.writer().line(tmp + ".providedType(" + javaName + ".class);");
+        return javaName + ".class";
     }
 
     private Out emitCtorCall(String className, List<TypeRef> typeArgs, Args args, Node posNode, Ctx ctx) {

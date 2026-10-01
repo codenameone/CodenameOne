@@ -36,4 +36,16 @@ public interface InheritedValueProvider {
      * The published value when it is assignable to {@code type}, otherwise null.
      */
     Object providedValueFor(Class<?> type);
+
+    /**
+     * Whether this provider answers a lookup for {@code type} -- decided separately from
+     * the value, because a provider can match and publish null ({@code Provider<User?>}
+     * before sign-in). Read from the value alone, such a provider was skipped: the lookup
+     * went past it to an outer one, or to nothing, and never subscribed, so the reader
+     * was not rebuilt when the value arrived. The default keeps the value-based answer
+     * for providers with no type of their own.
+     */
+    default boolean providesType(Class<?> type) {
+        return providedValueFor(type) != null;
+    }
 }

@@ -521,8 +521,19 @@ public final class FlutterUI {
      * in a regular CN1 component hierarchy.
      */
     public static Container wrap(Widget w) {
+        return wrap(w, null);
+    }
+
+    /**
+     * As {@link #wrap(Widget)}, with the tree's ancestor lookups continuing from
+     * {@code contextFallback} past its own root -- how a dialog, mounted as an
+     * unrelated root, still sees the app's Theme, providers and localizations, as
+     * {@link #mountInNewForm(Widget, Element)} does for a pushed route.
+     */
+    public static Container wrap(Widget w, Element contextFallback) {
         RenderHost host = new RenderHost();
-        EmbeddedRoot c = new EmbeddedRoot(new FlutterRootLayout(host), startupTrace(), w, host);
+        EmbeddedRoot c = new EmbeddedRoot(new FlutterRootLayout(host), startupTrace(), w, host,
+                contextFallback);
         host.container(c);
         c.mountTree();
         return c;
@@ -557,16 +568,19 @@ public final class FlutterUI {
     private static final class EmbeddedRoot extends TimedRootContainer {
         private final Widget widget;
         private final RenderHost host;
+        private final Element contextFallback;
         private final EmbeddedLifetime lifetime = new EmbeddedLifetime();
 
-        EmbeddedRoot(com.codename1.ui.layouts.Layout layout, boolean timed, Widget widget, RenderHost host) {
+        EmbeddedRoot(com.codename1.ui.layouts.Layout layout, boolean timed, Widget widget, RenderHost host,
+                Element contextFallback) {
             super(layout, timed);
             this.widget = widget;
             this.host = host;
+            this.contextFallback = contextFallback;
         }
 
         void mountTree() {
-            mount(widget, host, new BuildOwner());
+            mount(widget, host, new BuildOwner(), contextFallback);
             lifetime.mounted();
         }
 

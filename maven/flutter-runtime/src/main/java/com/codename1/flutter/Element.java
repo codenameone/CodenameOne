@@ -340,8 +340,10 @@ public abstract class Element implements BuildContext {
         while (a != null) {
             if (a.widget instanceof InheritedValueProvider) {
                 providers++;
-                Object v = ((InheritedValueProvider) a.widget).providedValueFor(type);
-                if (v != null) {
+                InheritedValueProvider p = (InheritedValueProvider) a.widget;
+                // Matched by type, not by a non-null value: a matching provider may hold null.
+                if (p.providesType(type)) {
+                    Object v = p.providedValueFor(type);
                     // Remember that WE read this, so a change to the model can come back
                     // and rebuild us. Without it a provider could notice its model change
                     // and rebuild itself and nothing else: its build returns the same

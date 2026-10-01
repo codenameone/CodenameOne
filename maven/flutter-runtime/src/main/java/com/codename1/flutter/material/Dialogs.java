@@ -70,7 +70,7 @@ public final class Dialogs {
      * and code after an awaited dialog ran while it was still open.
      */
     public static dart.async.Future<Object> showDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder) {
-        return present(builder, BorderLayout.CENTER, false);
+        return present(context, builder, BorderLayout.CENTER, false);
     }
 
     /**
@@ -86,17 +86,22 @@ public final class Dialogs {
      */
     public static dart.async.Future<Object> showModalPopup(BuildContext context,
             Funcs.Func1<BuildContext, Widget> builder) {
-        return present(builder, BorderLayout.SOUTH, true, true);
+        return present(context, builder, BorderLayout.SOUTH, true, true);
     }
 
-    private static dart.async.Future<Object> present(Funcs.Func1<BuildContext, Widget> builder, String position,
-            boolean dismissOnOutsideTouch) {
-        return present(builder, position, dismissOnOutsideTouch, false);
+    private static dart.async.Future<Object> present(BuildContext context, Funcs.Func1<BuildContext, Widget> builder,
+            String position, boolean dismissOnOutsideTouch) {
+        return present(context, builder, position, dismissOnOutsideTouch, false);
     }
 
-    private static dart.async.Future<Object> present(Funcs.Func1<BuildContext, Widget> builder, String position,
-            boolean dismissOnOutsideTouch, boolean stretch) {
+    private static dart.async.Future<Object> present(BuildContext context, Funcs.Func1<BuildContext, Widget> builder,
+            String position, boolean dismissOnOutsideTouch, boolean stretch) {
         DialogWidget rootWidget = new DialogWidget(builder);
+        // The dialog mounts as a root of its own, so its builder's Theme.of, Provider.of
+        // and Localizations lookups found nothing above it. In Flutter a dialog is a route
+        // built under the navigator; it continues from the same element a pushed route
+        // does.
+        Element inheritFrom = com.codename1.flutter.navigation.Navigator.pushingElement(context);
         final DialogEntry e = new DialogEntry();
         if (Display.isInitialized()) {
             // Codename One disposes a dialog itself when it is touched outside its bounds,
@@ -112,7 +117,7 @@ public final class Dialogs {
                 }
             };
             d.setDisposeWhenPointerOutOfBounds(dismissOnOutsideTouch);
-            Container c = FlutterUI.wrap(rootWidget);
+            Container c = FlutterUI.wrap(rootWidget, inheritFrom);
             d.add(BorderLayout.CENTER, c);
             e.dialog = d;
             e.root = ((FlutterRootLayout) c.getLayout()).host().rootElement();
@@ -129,7 +134,7 @@ public final class Dialogs {
             }
         } else {
             RenderHost host = new RenderHost();
-            e.root = FlutterUI.mount(rootWidget, host, new BuildOwner());
+            e.root = FlutterUI.mount(rootWidget, host, new BuildOwner(), inheritFrom);
             dialogStack.add(e);
         }
         return e.result.future();

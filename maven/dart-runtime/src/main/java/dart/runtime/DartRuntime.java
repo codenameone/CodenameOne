@@ -92,6 +92,35 @@ public final class DartRuntime {
     }
 
     /**
+     * Dart's {@code value is T?}: true for null as well as for a {@code type}. A helper
+     * rather than {@code v == null || v instanceof T} so the subject is evaluated once.
+     */
+    public static boolean isOrNull(Object value, Class<?> type) {
+        return value == null || type.isInstance(value);
+    }
+
+    /**
+     * Dart's {@code value as T}, checked: a value that is not a {@code type} throws
+     * Dart's TypeError, which {@code on TypeError catch} can handle. A bare Java cast
+     * threw ClassCastException instead, and on iOS threw nothing at all -- ParparVM's
+     * CHECKCAST is unchecked, so the wrong object flowed on. The test is therefore an
+     * explicit isInstance, never a cast whose failure is caught. {@code nullable} is
+     * {@code as T?}, which lets null through; {@code dartType} names T in the message.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T as(Object value, Class<T> type, boolean nullable, String dartType) {
+        if (value == null) {
+            if (nullable) {
+                return null;
+            }
+        } else if (type.isInstance(value)) {
+            return (T) value;
+        }
+        throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
+                + dartType + "' in type cast");
+    }
+
+    /**
      * Dart's {@code ==} between reference values: null-safe, delegates to
      * equals (user {@code operator ==} overrides equals).
      */

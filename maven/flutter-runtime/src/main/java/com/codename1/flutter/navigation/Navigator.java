@@ -600,9 +600,10 @@ public class Navigator extends StatelessWidget {
         return new BoundState(context);
     }
 
-    /** The element a push should inherit from, or null when unknown. Package visible so
-     *  RouteInheritanceTest can pin the rule without mounting and showing a Form. */
-    static com.codename1.flutter.Element pushingElement(BuildContext context) {
+    /** The element a push should inherit from, or null when unknown. Public so a dialog,
+     *  which Flutter also builds under the navigator, mounts under the same scopes; and
+     *  RouteInheritanceTest pins the rule without mounting and showing a Form. */
+    public static com.codename1.flutter.Element pushingElement(BuildContext context) {
         // A route inherits from the NAVIGATOR, never from the widget that pushed it.
         // In Flutter the route's subtree is built by the Navigator and sits directly
         // under it, so the only ancestors it ever sees are the ones above the
