@@ -684,6 +684,19 @@ final class BackendSources {
             if (Type.getReturnType(m.getDescriptor()).getSort() == Type.VOID) {
                 sb.append("                ").append(call).append(";\n");
                 sb.append("                return null;\n");
+            } else if (mg.operationWrites.get(i) != null) {
+                sb.append("            {\n");
+                sb.append("                final ")
+                  .append(BackendJsonCodecs.source(mg.operationReturnTypes.get(i)))
+                  .append(" result = ").append(call).append(";\n");
+                sb.append("                return new com.codename1.backend.Json.Writable() {\n");
+                sb.append("                    public void writeTo(com.codename1.backend.ByteSink out) {\n");
+                for (String line : mg.operationWrites.get(i).split("\n")) {
+                    sb.append("                        ").append(line).append('\n');
+                }
+                sb.append("                    }\n");
+                sb.append("                };\n");
+                sb.append("            }\n");
             } else {
                 sb.append("                return ").append(call).append(";\n");
             }

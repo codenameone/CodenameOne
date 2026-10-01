@@ -239,6 +239,142 @@
     }
    }
   },
+  "linux-x64@amd-epyc-9v45-96-core-processor": {
+   "arrayRandom": {
+    "all": {
+     "memory": 0.207,
+     "runs": 1,
+     "time": 1.023,
+     "tolerance": {
+      "time": 0.45
+     }
+    }
+   },
+   "arraySequential": {
+    "all": {
+     "memory": 0.356,
+     "runs": 1,
+     "time": 3.38,
+     "tolerance": {
+      "time": 0.3
+     }
+    }
+   },
+   "hashMapChurn": {
+    "all": {
+     "memory": 0.091,
+     "runs": 1,
+     "time": 1.206,
+     "tolerance": {
+      "memory": 0.25,
+      "time": 0.55
+     }
+    }
+   },
+   "hello": {
+    "all": {
+     "memory": 0.86,
+     "runs": 1,
+     "time": 0.952,
+     "tolerance": {
+      "memory": 0.2,
+      "time": 0.5
+     }
+    }
+   },
+   "intArithmetic": {
+    "all": {
+     "memory": 0.074,
+     "runs": 1,
+     "time": 0.999,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   },
+   "longArithmetic": {
+    "all": {
+     "memory": 0.074,
+     "runs": 1,
+     "time": 0.994,
+     "tolerance": {
+      "memory": 0.5
+     }
+    }
+   },
+   "mathTranscendental": {
+    "all": {
+     "memory": 0.076,
+     "runs": 1,
+     "time": 1.192,
+     "tolerance": {
+      "memory": 0.4,
+      "time": 0.3
+     }
+    }
+   },
+   "objectAllocation": {
+    "all": {
+     "memory": 0.363,
+     "runs": 1,
+     "time": 5.571,
+     "tolerance": {
+      "memory": 0.3,
+      "time": 0.5
+     }
+    }
+   },
+   "quicksort": {
+    "all": {
+     "memory": 0.111,
+     "runs": 1,
+     "time": 1.056,
+     "tolerance": {
+      "memory": 0.25
+     }
+    }
+   },
+   "recursion": {
+    "all": {
+     "memory": 0.075,
+     "runs": 1,
+     "time": 1.35,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "stringBuilding": {
+    "all": {
+     "memory": 0.259,
+     "runs": 1,
+     "time": 1.557,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "memory": 0.539,
+     "runs": 1,
+     "time": 0.495,
+     "tolerance": {
+      "time": 0.2
+     }
+    }
+   },
+   "valueEscape": {
+    "all": {
+     "memory": 0.042,
+     "runs": 1,
+     "time": 0.101,
+     "tolerance": {
+      "memory": 0.55
+     }
+    }
+   }
+  },
   "linux-x64@amd-epyc-9v74-80-core-processor": {
    "arrayRandom": {
     "all": {

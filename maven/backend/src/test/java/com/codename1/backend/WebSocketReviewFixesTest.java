@@ -104,6 +104,59 @@ class WebSocketReviewFixesTest {
     }
 
     @Test
+    @DisplayName("a fallback router authenticates a handshake by its session")
+    void aFallbackRouterSeesTheSession() throws Exception {
+        final String[] seen = new String[1];
+        final java.util.concurrent.CountDownLatch routed =
+                new java.util.concurrent.CountDownLatch(1);
+        Backend backend = Backend.builder().port(0).quiet()
+                .handler(new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        request.getSession(true).setAttribute("user", "ada");
+                        return HttpServer.Response.text(200, "signed in");
+                    }
+                })
+                .webSockets(new Backend.WebSocketEndpoints() {
+                    public void register(HttpServer.WebSocketRegistry registry,
+                                         DataSource dataSource,
+                                         com.codename1.backend.orm.EntityManager entities) {
+                        registry.fallback(new HttpServer.WebSocketHandler() {
+                            public WebSocket open(HttpServer.Request request) {
+                                // The upgrade bypasses the request wrapper; this threw
+                                // IllegalStateException with no sessions attached.
+                                HttpSession session = request.getSession(false);
+                                seen[0] = session == null ? "none"
+                                        : String.valueOf(session.getAttribute("user"));
+                                routed.countDown();
+                                return session == null ? null : silent();
+                            }
+                        });
+                    }
+                })
+                .start();
+        try {
+            int port = backend.getServer().getPort();
+            java.net.HttpURLConnection login = (java.net.HttpURLConnection)
+                    new java.net.URL("http://127.0.0.1:" + port + "/login").openConnection();
+            assertEquals(200, login.getResponseCode());
+            String cookie = login.getHeaderField("Set-Cookie");
+            assertTrue(cookie != null && cookie.indexOf('=') > 0, String.valueOf(cookie));
+            String pair = cookie.substring(0, cookie.indexOf(';') < 0 ? cookie.length()
+                    : cookie.indexOf(';'));
+            RawWebSocketClient client = new RawWebSocketClient(port, "/live",
+                    "Cookie: " + pair + "\r\n");
+            try {
+                assertTrue(routed.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                assertEquals("ada", seen[0]);
+            } finally {
+                client.close();
+            }
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
     @DisplayName("an ordinary request to a websocket-only server is a 404, not a crash")
     void webSocketOnlyServerAnswersHttpWithNotFound() throws Exception {
         Backend backend = Backend.builder().port(0).quiet()

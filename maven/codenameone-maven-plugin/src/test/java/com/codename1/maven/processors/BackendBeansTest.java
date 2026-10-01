@@ -589,6 +589,55 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void aManagedOperationReturnsItsDtoAsJson() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Tag", PKG + "public class Tag { public String name; }\n");
+        s.put("com.example.Reports", PKG
+                + "@Component @ManagedResource(objectName = \"reports\")\n"
+                + "public class Reports {\n"
+                + "    @ManagedOperation public Tag latest() {\n"
+                + "        Tag t = new Tag(); t.name = \"q3\"; return t;\n"
+                + "    }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Backend.Application app = (Backend.Application) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        settings.setProperty("cn1.management.token", "t0k");
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().management()
+                .application(app).start();
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port
+                    + "/manage/managed/reports/latest").openConnection();
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Authorization", "Bearer t0k");
+            c.setRequestProperty("Content-Type", "application/json");
+            c.getOutputStream().write("{}".getBytes("UTF-8"));
+            c.getOutputStream().close();
+            String body = read(c);
+            // An object, not the quoted toString() of one.
+            assertTrue(body, body.contains("\"result\":{\"name\":\"q3\"}"));
+        } finally {
+            backend.stop();
+        }
+
+        s.put("com.example.Reports", PKG
+                + "@Component @ManagedResource(objectName = \"reports\")\n"
+                + "public class Reports {\n"
+                + "    @ManagedOperation public StringBuilder latest() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("@ManagedOperation com.example.Reports.latest "
+                + "returns java.lang.StringBuilder, which cannot be written as JSON"));
+    }
+
+    @Test
     public void aClassNoCodecCanBeWrittenForIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Page", PKG + "public class Page<T> { public List<T> items; }\n");

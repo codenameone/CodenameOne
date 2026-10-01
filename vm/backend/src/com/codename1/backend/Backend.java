@@ -645,6 +645,17 @@ public final class Backend {
                                                   final Tasks.Registry tasks,
                                                   final Tracer tracer,
                                                   final InFlight inFlight) {
+        return withTasks(registry, tasks, tracer, inFlight, null);
+    }
+
+    /// And with the server's sessions on the handshake a fallback router sees:
+    /// the upgrade does not pass through Serving, and a router that
+    /// authenticates the handshake with getSession(false) found none attached.
+    static HttpServer.WebSocketRegistry withTasks(final HttpServer.WebSocketRegistry registry,
+                                                  final Tasks.Registry tasks,
+                                                  final Tracer tracer,
+                                                  final InFlight inFlight,
+                                                  final Sessions sessions) {
         return new HttpServer.WebSocketRegistry() {
             @Override
             public void route(String path, WebSocket endpoint) {
@@ -663,11 +674,20 @@ public final class Backend {
                         if (inFlight != null) {
                             inFlight.enter();
                         }
+                        Object previousServing = null;
+                        if (sessions != null) {
+                            request.sessions = sessions;
+                            previousServing = HttpSession.enterRequest(request);
+                        }
                         try {
                             WebSocket endpoint = router.open(request);
                             return endpoint == null ? null
                                     : new TaskBound(endpoint, tasks, tracer, inFlight);
                         } finally {
+                            if (sessions != null) {
+                                finishHandshakeSessions(sessions, request);
+                                HttpSession.leaveRequest(previousServing);
+                            }
                             if (inFlight != null) {
                                 inFlight.leave();
                             }
@@ -677,6 +697,31 @@ public final class Backend {
                 });
             }
         };
+    }
+
+    /// Stores and releases what a websocket handshake did to sessions, as a
+    /// request's end does: a session it loaded is released, and one it changed,
+    /// ended or started is stored. The upgrade's response is the server's own,
+    /// so no cookie is set on it; a handshake authenticates an existing session.
+    static void finishHandshakeSessions(Sessions sessions, HttpServer.Request request) {
+        List ended = request.endedSessions();
+        for (int e = 0 ; ended != null && e < ended.size() ; e++) {
+            try {
+                sessions.finish(request, (HttpSession) ended.get(e), null);
+            } catch (Exception err) {
+                System.err.println("Could not end a session a websocket handshake ended: "
+                        + err);
+            }
+        }
+        HttpSession session = request.resolvedSession();
+        if (session != null) {
+            try {
+                sessions.finish(request, session, null);
+            } catch (Exception err) {
+                System.err.println("Could not store the session of a websocket handshake: "
+                        + err);
+            }
+        }
     }
 
     /// An endpoint whose every callback runs carrying its server's executors and
@@ -1905,7 +1950,7 @@ public final class Backend {
                             // Every endpoint's callbacks carry this server's
                             // executors, as its HTTP requests do.
                             HttpServer.WebSocketRegistry registry = withTasks(direct, tasks,
-                                    active != null ? active : Tracing.NONE, inFlight);
+                                    active != null ? active : Tracing.NONE, inFlight, sessions);
                             // The same two arguments a Handlers factory gets,
                             // and for the same reason: an endpoint that needs
                             // the database declares it rather than reaching

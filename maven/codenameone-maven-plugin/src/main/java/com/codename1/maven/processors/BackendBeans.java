@@ -235,6 +235,11 @@ final class BackendBeans {
         final List<MethodInfo> operations = new ArrayList<MethodInfo>();
         final List<String> operationDescriptions = new ArrayList<String>();
         final List<List<String>> operationParams = new ArrayList<List<String>>();
+        /// Per operation: its declared return type and the statements writing
+        /// `result` through the JSON codecs, or nulls when the value is sent as
+        /// it is -- nothing, a String, a primitive or its box.
+        final List<String> operationReturnTypes = new ArrayList<String>();
+        final List<String> operationWrites = new ArrayList<String>();
         String adapterBinary;
     }
 
@@ -1712,10 +1717,32 @@ final class BackendBeans {
                         break;
                     }
                 }
+                // The result goes out as JSON. Json.write knows no class of the
+                // application's own and would send its toString(), so anything
+                // beyond a scalar is written by the codecs -- or refused here.
+                String returnType = null;
+                String returnWrite = null;
+                Type returned = Type.getReturnType(m.getDescriptor());
+                if (ok && returned.getSort() != Type.VOID && !bindable(returned)) {
+                    String sig = m.getSignature();
+                    returnType = RestClientAnnotationProcessor.javaTypeFor(returned,
+                            sig == null ? null : sig.substring(sig.lastIndexOf(')') + 1));
+                    String why = BackendJsonCodecs.of(ctx).checkWrite(returnType);
+                    if (why != null) {
+                        ctx.error(cls, "@ManagedOperation " + where + " returns " + returnType
+                                + ", which cannot be written as JSON: it holds " + why + ".");
+                        ok = false;
+                    } else {
+                        returnWrite = BackendJsonCodecs.of(ctx).writeStatements(returnType,
+                                "result", "0", "");
+                    }
+                }
                 if (ok) {
                     managed.operations.add(m);
                     managed.operationDescriptions.add(op.getStringOrDefault("description", ""));
                     managed.operationParams.add(names);
+                    managed.operationReturnTypes.add(returnWrite == null ? null : returnType);
+                    managed.operationWrites.add(returnWrite);
                 }
             }
         }
@@ -2692,6 +2719,10 @@ final class BackendBeans {
             for (Tool t : b.tools) {
                 toolCodecs |= t.returnType != null || t.paramTypes.size()
                         > Collections.frequency(t.paramTypes, null);
+            }
+            if (b.managed != null) {
+                toolCodecs |= b.managed.operationWrites.size()
+                        > Collections.frequency(b.managed.operationWrites, null);
             }
         }
         if (toolCodecs) {
