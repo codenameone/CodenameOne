@@ -1098,9 +1098,12 @@
    },
    "objectAllocation": {
     "all": {
-     "memory": 0.463,
-     "runs": 7,
-     "time": 2.732
+     "memory": 0.454,
+     "runs": 5,
+     "time": 2.808,
+     "tolerance": {
+      "time": 0.45
+     }
     }
    },
    "quicksort": {
