@@ -52,7 +52,10 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     private final File stubDir;
     private final File projectDir;
     private final File settingsFile;
-    private final List<String> sourceRoots;
+    /// Resolved when the action runs: a build can change the source set's
+    /// directories after the compile task was configured, and the processors
+    /// treat a class with no source under these roots as a stale output.
+    private final org.gradle.api.provider.Provider<List<String>> sourceRoots;
     private final String encoding;
     private final org.gradle.api.provider.Provider<Map<String, String>> userProperties;
     private final FileCollection compileClasspath;
@@ -66,14 +69,14 @@ public final class ProcessAnnotationsAction implements Action<Task> {
     ///        that realizes the compile task before its `codenameone { }` block
     ///        must not process annotations for a stale main class
     public ProcessAnnotationsAction(org.gradle.api.provider.Provider<File> classesDir, File stubDir, File projectDir, File settingsFile,
-                                    List<String> sourceRoots, String encoding,
+                                    org.gradle.api.provider.Provider<List<String>> sourceRoots, String encoding,
                                     org.gradle.api.provider.Provider<Map<String, String>> userProperties,
                                     FileCollection compileClasspath) {
         this.classesDir = classesDir;
         this.stubDir = stubDir;
         this.projectDir = projectDir;
         this.settingsFile = settingsFile;
-        this.sourceRoots = new ArrayList<String>(sourceRoots);
+        this.sourceRoots = sourceRoots;
         this.encoding = encoding;
         this.userProperties = userProperties;
         this.compileClasspath = compileClasspath;
@@ -200,7 +203,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         }
         try {
             new AnnotationProcessing(new GradleLog(task.getLogger()), classesDir, stubDir, projectDir, raw,
-                    mainClass, sourceRoots, encoding, classpath).run();
+                    mainClass, new ArrayList<String>(sourceRoots.get()), encoding, classpath).run();
         } catch (BuildExecutionException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }

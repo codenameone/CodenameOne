@@ -131,6 +131,14 @@ public abstract class Cn1CssTask extends Cn1Task {
         Log log = log();
         File out = getOutputDirectory().get().getAsFile();
         File cssDir = layout().cssDir();
+        File work = getWorkDirectory().get().getAsFile();
+        // Gone before any early return: with CSS switched off or theme.css removed,
+        // a list from an earlier run would keep the simulator's live reload merging
+        // stylesheets the build no longer uses.
+        File simulatorInputs = new File(work, SIMULATOR_INPUTS);
+        if (simulatorInputs.exists() && !simulatorInputs.delete()) {
+            throw new GradleException("Could not delete " + simulatorInputs);
+        }
         // Effective, not the file alone: codename1.cssTheme set in gradle.properties,
         // with -P/-D or in codenameone { buildHints } counts as it does for the
         // simulator and the native builds.
@@ -143,11 +151,6 @@ public abstract class Cn1CssTask extends Cn1Task {
             log.warn("CSS compilation skipped because " + layout().themeCss() + " does not exist");
             clear(out);
             return;
-        }
-        File work = getWorkDirectory().get().getAsFile();
-        File simulatorInputs = new File(work, SIMULATOR_INPUTS);
-        if (simulatorInputs.exists() && !simulatorInputs.delete()) {
-            throw new GradleException("Could not delete " + simulatorInputs);
         }
         List<CssCompiler.LibraryCss> libraries = new ArrayList<CssCompiler.LibraryCss>();
         for (String encoded : getLibraryCss().get()) {

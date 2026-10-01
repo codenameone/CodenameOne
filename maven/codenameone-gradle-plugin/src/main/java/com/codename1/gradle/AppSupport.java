@@ -172,7 +172,7 @@ final class AppSupport {
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
             processingInputs(compile, layout, userProperties);
-            List<String> roots = sourceRoots(main, layout);
+            Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
             // Compliance first (it caps and rewrites classes in place), then the
             // annotation processors, which stamp the result -- the order the Maven
             // poms bind process-classes in.
@@ -213,7 +213,7 @@ final class AppSupport {
                     compile.getInputs().property("cn1SkipComplianceCheck", skipInput);
                     processingInputs(compile, layout, userProperties);
                     Provider<File> kotlinClasses = kotlinDestinationProvider(compile, layout);
-                    List<String> roots = sourceRoots(main, layout);
+                    Provider<List<String>> roots = project.provider(() -> sourceRoots(main, layout));
                     // javac has not run yet, so the Java classes Kotlin calls are
                     // known by their sources.
                     compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(

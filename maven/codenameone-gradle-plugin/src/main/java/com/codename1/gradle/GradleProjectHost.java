@@ -279,7 +279,30 @@ final class GradleProjectHost implements ProjectHost {
         for (String element : classpath) {
             t = Math.max(t, lastModified(new File(element)));
         }
+        // The icon, which lives outside src/ and off the classpath: a new one
+        // must not leave the APK or generated project with the old.
+        t = Math.max(t, iconFile().lastModified());
         return Math.max(t, hintsChangedAt());
+    }
+
+    /// The icon the build uses: `codename1.icon` (a -P/-D override first, then
+    /// the settings file) relative to the project, else the layout's icon.png.
+    File iconFile() {
+        String icon = userProperties == null ? null : userProperties.getProperty("codename1.icon");
+        if (icon == null && layout.settingsFile().isFile()) {
+            Properties settings = new Properties();
+            try (java.io.InputStream in = new java.io.FileInputStream(layout.settingsFile())) {
+                settings.load(in);
+                icon = settings.getProperty("codename1.icon");
+            } catch (IOException ex) {
+                icon = null;
+            }
+        }
+        if (icon == null || icon.trim().isEmpty()) {
+            return layout.iconFile();
+        }
+        File f = new File(icon.trim());
+        return f.isAbsolute() ? f : new File(layout.projectDir(), icon.trim());
     }
 
     /// When the build hints last changed, as the fingerprint file's timestamp.
