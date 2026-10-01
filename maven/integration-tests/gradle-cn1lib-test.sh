@@ -91,7 +91,9 @@ repositories { maven(url = uri("$LIBREPO")) }
 dependencies {
     cn1lib("$GROUP:inner-lib:$LIBVER")
     // Used by the JavaSE implementation alone: the -javase pom must name it.
-    javaseImplementation("$GROUP:inner-common:$LIBVER")
+    javaseImplementation("$GROUP:inner-common:$LIBVER") {
+        exclude(group = "org.example", module = "unwanted")
+    }
 }
 
 publishing {
@@ -127,6 +129,8 @@ run_gradle "$LIB" publish > "$WORKDIR/publish.log" 2>&1 || { cat "$WORKDIR/publi
 P="$LIBREPO/$GROUP_PATH"
 grep -q "<artifactId>inner-common</artifactId>" "$P/greeter-javase/$LIBVER/greeter-javase-$LIBVER.pom" \
   || { cat "$P/greeter-javase/$LIBVER/greeter-javase-$LIBVER.pom"; fail "the -javase pom omits javaseImplementation"; }
+grep -q "<artifactId>unwanted</artifactId>" "$P/greeter-javase/$LIBVER/greeter-javase-$LIBVER.pom" \
+  || { cat "$P/greeter-javase/$LIBVER/greeter-javase-$LIBVER.pom"; fail "the -javase pom drops the exclusion"; }
 for f in greeter-common/$LIBVER/greeter-common-$LIBVER.jar \
          greeter-common/$LIBVER/greeter-common-$LIBVER-cn1css.zip \
          greeter-android/$LIBVER/greeter-android-$LIBVER.jar \

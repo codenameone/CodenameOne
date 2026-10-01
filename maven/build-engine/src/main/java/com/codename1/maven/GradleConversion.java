@@ -1210,7 +1210,7 @@ public final class GradleConversion {
                 Element d = (Element) n;
                 String key = interpolate(text(d, "groupId"), properties) + ":"
                         + interpolate(text(d, "artifactId"), properties) + ":" + text(d, "classifier") + ":"
-                        + text(d, "type");
+                        + interpolate(text(d, "type"), properties);
                 out.remove(key);
                 out.put(key, d);
             }
@@ -1243,11 +1243,14 @@ public final class GradleConversion {
                                          java.util.Map<String, String> managed, File pomDir, File targetDir)
             throws IOException {
         String line = declaration(d, properties, managed, pomDir, targetDir);
-        if (line != null && "runtime".equals(text(d, "scope"))) {
+        // Scope and type through the pom's properties, as Maven's effective model
+        // has them: a <scope>${...}</scope> resolving to test must not ship.
+        String scope = interpolate(text(d, "scope"), properties);
+        if (line != null && "runtime".equals(scope)) {
             // Maven's test compile sees runtime dependencies; Gradle's does not.
             return line + "\n" + line.replace("runtimeOnly(", "testCompileOnly(");
         }
-        if (line == null || !"provided".equals(text(d, "scope"))) {
+        if (line == null || !"provided".equals(scope)) {
             return line;
         }
         return line + "\n" + line.replace("compileOnly(", "testImplementation(");
@@ -1259,8 +1262,8 @@ public final class GradleConversion {
         String g = interpolate(text(d, "groupId"), properties);
         String a = interpolate(text(d, "artifactId"), properties);
         String v = text(d, "version");
-        String scope = text(d, "scope");
-        String type = text(d, "type");
+        String scope = interpolate(text(d, "scope"), properties);
+        String type = interpolate(text(d, "type"), properties);
         String classifier = interpolate(text(d, "classifier"), properties);
         if (g == null || a == null || "com.codenameone".equals(g) && PLUGIN_SUPPLIED.contains(a)) {
             return null;

@@ -81,14 +81,25 @@ final class SettingsSupport {
         org.gradle.api.initialization.resolve.DependencyResolutionManagement management = resolution(project);
         org.gradle.api.initialization.resolve.RepositoriesMode mode = management == null ? null
                 : management.getRepositoriesMode().getOrNull();
-        if (mode == org.gradle.api.initialization.resolve.RepositoriesMode.PREFER_SETTINGS
-                || mode == org.gradle.api.initialization.resolve.RepositoriesMode.FAIL_ON_PROJECT_REPOS) {
-            // The settings script governs resolution: project repositories are
-            // ignored, or fail the build outright, so none is added.
+        boolean settingsDeclare = management != null && !management.getRepositories().isEmpty();
+        boolean strict = mode == org.gradle.api.initialization.resolve.RepositoriesMode.PREFER_SETTINGS
+                || mode == org.gradle.api.initialization.resolve.RepositoriesMode.FAIL_ON_PROJECT_REPOS;
+        if (!Boolean.TRUE.equals(marker) && (strict || settingsDeclare)) {
+            // The settings script governs resolution -- a strict mode ignores or
+            // forbids project repositories, and under the default mode any project
+            // repository would make Gradle drop the settings' ones (a corporate
+            // mirror with them). So none is added; if the settings name no Codename
+            // One repository, say what to add rather than fail later on an
+            // unresolvable framework.
+            if (!namesCodenameOneRepository(management, project.getProviders().gradleProperty("codename1.repository"))) {
+                project.getLogger().warn("cn1: settings.gradle(.kts) declares the repositories, and none is the "
+                        + "Codename One repository, which publishes the framework. Add "
+                        + "maven(\"" + PluginInfo.REPOSITORY_URL + "\") to its dependencyResolutionManagement, "
+                        + "or apply com.codenameone in the settings plugins block, which does.");
+            }
             return;
         }
-        boolean settingsDeclare = management != null && !management.getRepositories().isEmpty();
-        if (!Boolean.TRUE.equals(marker) && project.getRepositories().isEmpty() && !settingsDeclare) {
+        if (!Boolean.TRUE.equals(marker) && project.getRepositories().isEmpty()) {
             addRepositories(project.getRepositories(), project.getProviders().gradleProperty("codename1.repository"));
             return;
         }
@@ -114,6 +125,31 @@ final class SettingsSupport {
         } catch (ReflectiveOperationException | RuntimeException ex) {
             return null;
         }
+    }
+
+    /// Whether the settings' repositories include the Codename One one (or the
+    /// `codename1.repository` override).
+    static boolean namesCodenameOneRepository(
+            org.gradle.api.initialization.resolve.DependencyResolutionManagement management,
+            Provider<String> override) {
+        if (management == null) {
+            return false;
+        }
+        URI wanted = toUri(override.isPresent() ? override.get() : PluginInfo.REPOSITORY_URL);
+        for (org.gradle.api.artifacts.repositories.ArtifactRepository r : management.getRepositories()) {
+            if (r instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository
+                    && sameRepository(((org.gradle.api.artifacts.repositories.MavenArtifactRepository) r).getUrl(),
+                            wanted)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean sameRepository(URI a, URI b) {
+        String x = a.toString();
+        String y = b.toString();
+        return (x.endsWith("/") ? x : x + "/").equals(y.endsWith("/") ? y : y + "/");
     }
 
     private static URI toUri(String url) {

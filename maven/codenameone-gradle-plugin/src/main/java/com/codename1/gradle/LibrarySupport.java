@@ -130,6 +130,48 @@ final class LibrarySupport {
                 + "    </dependency>\n";
     }
 
+    /// `dependencyXml` with the declaration's exclusions, as Maven writes them,
+    /// so a consumer of the pom drops what the library dropped. A
+    /// non-transitive declaration is the `*:*` exclusion.
+    static String withExclusions(String dependencyXml, org.gradle.api.artifacts.Dependency d) {
+        if (!(d instanceof org.gradle.api.artifacts.ModuleDependency)) {
+            return dependencyXml;
+        }
+        org.gradle.api.artifacts.ModuleDependency module = (org.gradle.api.artifacts.ModuleDependency) d;
+        List<String[]> rules = new ArrayList<String[]>();
+        if (!module.isTransitive()) {
+            rules.add(new String[] {"*", "*"});
+        } else {
+            for (org.gradle.api.artifacts.ExcludeRule r : module.getExcludeRules()) {
+                rules.add(new String[] {orAny(r.getGroup()), orAny(r.getModule())});
+            }
+        }
+        return exclusionsXml(dependencyXml, rules);
+    }
+
+    /// Maven's `*` for an exclusion part Gradle leaves out. Gradle declares the
+    /// getters non-null, but a group-only or module-only exclude answers null.
+    private static String orAny(Object part) {
+        return part == null ? "*" : part.toString();
+    }
+
+    /// `dependencyXml` with an `<exclusions>` element for `rules` ({group,
+    /// artifact}), placed before its closing tag; unchanged when there are none.
+    static String exclusionsXml(String dependencyXml, List<String[]> rules) {
+        if (rules.isEmpty()) {
+            return dependencyXml;
+        }
+        StringBuilder sb = new StringBuilder("      <exclusions>\n");
+        for (String[] r : rules) {
+            sb.append("        <exclusion>\n          <groupId>").append(xmlEscape(r[0]))
+                    .append("</groupId>\n          <artifactId>").append(xmlEscape(r[1]))
+                    .append("</artifactId>\n        </exclusion>\n");
+        }
+        sb.append("      </exclusions>\n");
+        int close = dependencyXml.lastIndexOf("    </dependency>");
+        return dependencyXml.substring(0, close) + sb + dependencyXml.substring(close);
+    }
+
     private static String xmlEscape(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
@@ -346,7 +388,7 @@ final class LibrarySupport {
                                 + "so the published " + name + "-javase pom cannot name it");
                         continue;
                     }
-                    out.add(dependencyXml(d.getGroup(), d.getName(), v, cfg[1]));
+                    out.add(withExclusions(dependencyXml(d.getGroup(), d.getName(), v, cfg[1]), d));
                 }
             }
             return out;

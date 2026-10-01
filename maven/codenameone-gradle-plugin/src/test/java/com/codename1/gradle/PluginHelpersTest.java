@@ -155,6 +155,17 @@ class PluginHelpersTest {
     }
 
     @Test
+    void aPublishedDependencyKeepsItsExclusions() {
+        String xml = LibrarySupport.exclusionsXml(LibrarySupport.dependencyXml("g", "a", "1", "compile"),
+                java.util.Collections.singletonList(new String[] {"x", "y"}));
+        org.junit.jupiter.api.Assertions.assertTrue(xml.contains("<exclusions>\n        <exclusion>\n"
+                + "          <groupId>x</groupId>\n          <artifactId>y</artifactId>\n"), xml);
+        org.junit.jupiter.api.Assertions.assertTrue(xml.endsWith("      </exclusions>\n    </dependency>\n"), xml);
+        assertEquals(LibrarySupport.dependencyXml("g", "a", "1", "compile"), LibrarySupport.exclusionsXml(
+                LibrarySupport.dependencyXml("g", "a", "1", "compile"), java.util.Collections.<String[]>emptyList()));
+    }
+
+    @Test
     void backendArgumentsSplitOnWhitespace() {
         assertEquals(Arrays.asList("-Xmx1g", "-Dx=y"), BackendSupport.split("  -Xmx1g \t -Dx=y "));
         assertEquals(Collections.emptyList(), BackendSupport.split("   "));

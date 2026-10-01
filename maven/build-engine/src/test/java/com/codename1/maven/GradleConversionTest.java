@@ -507,6 +507,20 @@ class GradleConversionTest {
     }
 
     @Test
+    void aScopeGivenByAPropertyIsTheScopeMavenUses() throws Exception {
+        File mvn = mavenApp(UNTOUCHED_API);
+        touch(mvn, "common/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
+                + "<version>1.0</version></parent><properties><fixtures.scope>test</fixtures.scope></properties>"
+                + "<dependencies><dependency><groupId>org.example</groupId><artifactId>fixtures</artifactId>"
+                + "<version>1</version><scope>${fixtures.scope}</scope></dependency></dependencies></project>");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(mvn, out, "1.0");
+        String build = read(new File(out, "build.gradle.kts"));
+        assertTrue(build.contains("testImplementation(\"org.example:fixtures:1\")"), build);
+        assertFalse(build.contains("\n    implementation(\"org.example:fixtures"), "not shipped: " + build);
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());
