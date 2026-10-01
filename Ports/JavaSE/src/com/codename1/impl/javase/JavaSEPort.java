@@ -3187,11 +3187,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static String resolveDesktopNativeThemeResource(String platformName, String mode, String legacyResource) {
         mode = mode == null ? null : mode.trim();
-        if ((mode == null || mode.isEmpty()) && "custom".equalsIgnoreCase(sharedNativeThemeHint())) {
-            // nativeTheme=custom asks for no platform theme anywhere, and the desktop is part
-            // of anywhere -- the same reasoning that lets nativeTheme=native reach it.
-            mode = "custom";
-        }
         // A null theme basename can mean either custom or legacy. Keep that distinction
         // at both installation paths so the simulator does not reintroduce a framework base.
         // Custom means no framework base; legacy still uses the stub's historical resource.

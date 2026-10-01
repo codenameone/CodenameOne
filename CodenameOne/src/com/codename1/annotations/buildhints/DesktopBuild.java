@@ -56,8 +56,7 @@ import java.lang.annotation.Target;
 /// *unchanged* is the default and is deliberate: it is whatever the application was
 /// built and tested against before these themes existed, because flipping it would
 /// move every screen of every desktop application already shipped. `custom` differs
-/// from it by installing no framework theme at all; the native Linux and Windows
-/// builds also leave their bundled theme out of the application.
+/// from it by installing no framework theme at all.
 ///
 /// #### How that relates to the other theme hints
 ///
@@ -71,10 +70,9 @@ import java.lang.annotation.Target;
 /// | `mac.themeMode` | the native macOS build, a separate target from the JavaSE desktop application | [Mac#themeMode()] |
 /// | `nativeTheme` | the default for the three above, where they are unset | [Build#nativeTheme()] |
 ///
-/// Two values in that last row also reach the desktop.
-/// `nativeTheme = ThemeMode.NATIVE` is the single hint for "look like the
-/// platform, everywhere", and `nativeTheme = ThemeMode.CUSTOM` the single hint for
-/// "no platform theme, anywhere". `ThemeMode.MODERN` reaches iOS and Android only: it
+/// The one value in that last row that also reaches the desktop is
+/// `nativeTheme = ThemeMode.NATIVE`, which is the single hint for "look like the
+/// platform, everywhere". `ThemeMode.MODERN` reaches iOS and Android only: it
 /// shipped years before the desktop themes, so an application that set it for its
 /// phone builds never asked for its desktop screens to be redrawn. `themeMode` here
 /// outranks both.
@@ -123,7 +121,6 @@ public @interface DesktopBuild {
     /// `legacy`, which is also the default, keeps whatever the application was built
     /// and tested against before these themes existed, and `custom` installs no
     /// framework theme at all so the application's own is the only one loaded.
-    /// Unset, it follows `nativeTheme` when that is `native` or `custom`.
     ///
     /// The per-value and per-platform tables, and how this relates to the iOS,
     /// Android, macOS and cross-platform theme hints, are on the `@DesktopBuild`

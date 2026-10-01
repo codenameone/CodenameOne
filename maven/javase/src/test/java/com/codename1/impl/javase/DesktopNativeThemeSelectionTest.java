@@ -61,14 +61,7 @@ class DesktopNativeThemeSelectionTest {
                     System.setProperty(hint, mode);
                     for (String host : new String[]{"win", "mac", "linux"}) {
                         assertNull(resolver.invoke(null, host), hint + "=" + mode);
-                        // custom is "no platform theme, anywhere", so the packaged app drops
-                        // its legacy base too; the other two leave the desktop as it was.
-                        assertEquals("custom".equals(mode) ? null : "/NativeTheme.res",
-                                JavaSEPort.resolvePackagedDesktopNativeTheme(host, new Properties()),
-                                hint + "=" + mode);
-                        assertEquals("custom".equals(mode) ? null : "/iOS7Theme.res",
-                                JavaSEPort.resolveSimulatorDesktopNativeTheme(host, null, null),
-                                hint + "=" + mode);
+                        assertEquals("/NativeTheme.res", JavaSEPort.resolvePackagedDesktopNativeTheme(host, new Properties()));
                     }
                     if ("custom".equals(mode)) {
                         assertNull(resolver.invoke(null, "ios"));
@@ -95,10 +88,10 @@ class DesktopNativeThemeSelectionTest {
         }
     }
 
-    /// nativeTheme=native is the cross-platform value that also SELECTS a desktop theme
-    /// (custom reaches the desktop too, but only to install none). The test above pins
-    /// the other half of the rule -- that modern and legacy do not -- and the two
-    /// together are the whole contract, so neither is complete without the other.
+    /// nativeTheme=native is the one cross-platform value that also reaches desktop.
+    /// The test above pins the other half of the rule -- that modern, legacy and custom
+    /// do not -- and the two together are the whole contract, so neither is complete
+    /// without the other.
     @Test
     void theSharedNativeValueAlsoSelectsTheDesktopTheme() throws Exception {
         String[] keys = {"codename1.arg.desktop.themeMode", "codename1.arg.nativeTheme",
