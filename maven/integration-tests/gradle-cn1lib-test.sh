@@ -196,6 +196,16 @@ run_gradle "$GAPP" buildAndroid -Pcodename1.stageOnly=true > "$WORKDIR/gapp-andr
 run_gradle "$GAPP" buildIos -Pcodename1.stageOnly=true > "$WORKDIR/gapp-ios.log" 2>&1 \
   || { cat "$WORKDIR/gapp-ios.log"; fail "Gradle consumer buildIos"; }
 check_consumer "Gradle app" "$(staged_jar "$WORKDIR/gapp-android.log")" "$(staged_jar "$WORKDIR/gapp-ios.log")"
+# Without a theme.css of its own the library's CSS cannot be compiled; the build
+# must say so, as Maven's does, instead of dropping the library's styles.
+mv "$GAPP/src/main/css/theme.css" "$WORKDIR/theme.css.bak"
+if run_gradle "$GAPP" cn1Css > "$WORKDIR/gapp-nocss.log" 2>&1; then
+  cat "$WORKDIR/gapp-nocss.log"
+  fail "cn1Css succeeded without the theme.css the library's CSS needs"
+fi
+grep -q "Cannot compile CSS for this project" "$WORKDIR/gapp-nocss.log" \
+  || { cat "$WORKDIR/gapp-nocss.log"; fail "cn1Css failed for another reason"; }
+mv "$WORKDIR/theme.css.bak" "$GAPP/src/main/css/theme.css"
 
 echo "== Maven consumer"
 MAPP="$WORKDIR/libconsumer"

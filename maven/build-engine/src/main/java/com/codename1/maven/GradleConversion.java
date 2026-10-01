@@ -230,6 +230,12 @@ public final class GradleConversion {
             copyTree(from.settingsFile(), to.settingsFile());
             setJava17(to.settingsFile());
             copyTree(from.iconFile(), to.iconFile());
+            // The icon the settings name, when it is not icon.png: the setting is kept,
+            // so the file it names must come along, at the same relative path.
+            String icon = settings.getProperty("codename1.icon");
+            if (icon != null && icon.trim().length() > 0 && !new File(icon.trim()).isAbsolute()) {
+                copyTree(new File(from.projectDir(), icon.trim()), new File(to.projectDir(), icon.trim()));
+            }
             if (from.buildSystem() == BuildSystem.ANT) {
                 convertAntSources(from, to);
                 if ("true".equals(settings.getProperty("codename1.cssTheme", "false"))) {

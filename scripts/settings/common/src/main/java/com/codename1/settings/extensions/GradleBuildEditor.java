@@ -208,6 +208,12 @@ public final class GradleBuildEditor implements DependencyEditor {
                 // A named block (constraints, components...): not a declaration.
                 continue;
             }
+            // Only a declaration that puts the library on the application's
+            // classpath counts: testImplementation or compileOnly does not install
+            // it, and uninstalling must not remove one of those instead.
+            if (!installs(configuration(s, statement[0]), dependency)) {
+                continue;
+            }
             // Only the declaration's own coordinate counts, not strings in its
             // configuration block ({ exclude(...) }).
             int headEnd = brace >= 0 ? brace : statement[1];
@@ -218,6 +224,38 @@ public final class GradleBuildEditor implements DependencyEditor {
             }
         }
         return null;
+    }
+
+    /// The configuration a declaration at `start` names: its leading
+    /// identifier (`implementation(...)`, Groovy's `implementation '...'`) or
+    /// the quoted name of Kotlin's `"implementation"(...)` form; "" if neither.
+    static String configuration(String s, int start) {
+        int i = start;
+        while (i < s.length() && (s.charAt(i) == ' ' || s.charAt(i) == '\t' || s.charAt(i) == '\n'
+                || s.charAt(i) == '\r')) {
+            i++;
+        }
+        if (i < s.length() && s.charAt(i) == '"') {
+            int close = s.indexOf('"', i + 1);
+            return close < 0 ? "" : s.substring(i + 1, close);
+        }
+        int end = i;
+        while (end < s.length() && (isNameStart(s.charAt(end)) || s.charAt(end) >= '0' && s.charAt(end) <= '9')) {
+            end++;
+        }
+        return s.substring(i, end);
+    }
+
+    /// Whether declaring `dependency` in `configuration` installs it: a cn1lib
+    /// (`pom` type) only through `cn1lib`, which brings its platform jars too; a
+    /// library through `implementation`, `api` or `cn1lib` (which the
+    /// application's implementation extends).
+    static boolean installs(String configuration, MavenDependency dependency) {
+        if ("pom".equals(dependency.type())) {
+            return "cn1lib".equals(configuration);
+        }
+        return "implementation".equals(configuration) || "api".equals(configuration)
+                || "cn1lib".equals(configuration);
     }
 
     /// Whether `head` is a bare (possibly dotted) name -- a block such as

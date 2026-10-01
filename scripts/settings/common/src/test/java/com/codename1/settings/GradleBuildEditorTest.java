@@ -105,6 +105,21 @@ public class GradleBuildEditorTest {
                 "dependencies {\n    implementation(\"com.example:library:1.2\")\n}\n", JAR));
     }
 
+    /// A test-only or compile-only declaration does not install the library:
+    /// containsDependency says so, removal leaves it alone, and an add writes the
+    /// real declaration.
+    @Test
+    public void onlyAnInstallingConfigurationCounts() {
+        String script = "dependencies {\n    testImplementation(\"com.example:lib:1.2\")\n"
+                + "    \"compileOnly\"(\"com.example:lib:1.2\")\n}\n";
+        assertFalse(GradleBuildEditor.containsDependency(script, JAR));
+        assertEquals(script, GradleBuildEditor.removeDependency(script, JAR));
+        assertTrue(GradleBuildEditor.addDependency(script, JAR).contains("    implementation(\"com.example:lib:1.2\")"));
+        assertTrue(GradleBuildEditor.containsDependency(
+                "dependencies {\n    \"implementation\"(\"com.example:lib:1.2\")\n}\n", JAR),
+                "Kotlin's quoted configuration name");
+    }
+
     /// A constraint is a rule about versions, not a dependency: it neither counts
     /// as installed nor is what an uninstall removes, and an install adds a real
     /// declaration beside it.

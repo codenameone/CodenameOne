@@ -306,14 +306,18 @@ final class LibrarySupport {
                     {javase.getRuntimeOnlyConfigurationName(), "runtime"}}) {
                 for (org.gradle.api.artifacts.Dependency d
                         : project.getConfigurations().getByName(cfg[0]).getDependencies()) {
-                    if (!(d instanceof org.gradle.api.artifacts.ExternalModuleDependency) || d.getGroup() == null) {
+                    // A project of the same build (project(":desktop-helper")) is published
+                    // too, under its group, name and version -- what Gradle reports for it
+                    // and what java-library publishes it as.
+                    if (!(d instanceof org.gradle.api.artifacts.ExternalModuleDependency
+                            || d instanceof org.gradle.api.artifacts.ProjectDependency) || d.getGroup() == null) {
                         continue;
                     }
                     String v = d.getVersion();
                     if ((v == null || v.isEmpty()) && PluginInfo.GROUP.equals(d.getGroup())) {
                         v = frameworkVersion.get();
                     }
-                    if (v == null || v.isEmpty()) {
+                    if (v == null || v.isEmpty() || "unspecified".equals(v)) {
                         project.getLogger().warn("cn1: " + d.getGroup() + ":" + d.getName() + " has no version, "
                                 + "so the published " + name + "-javase pom cannot name it");
                         continue;

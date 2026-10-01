@@ -151,6 +151,13 @@ public final class ProjectLayouts {
         }
 
         if (hasCn1Settings) {
+            // A subproject with no build script of its own -- the root build or a
+            // convention plugin applies com.codenameone to it -- is still Gradle's,
+            // when a build above includes it. An Ant project has its build.xml.
+            File root = new File(dir, "build.xml").isFile() ? null : includingRoot(dir);
+            if (root != null) {
+                return new ProjectLayout(BuildSystem.GRADLE, gradleKind(dir), root, dir, null);
+            }
             return new ProjectLayout(BuildSystem.ANT, settings.isFile() ? ProjectKind.APP : ProjectKind.LIB,
                     dir, dir, null);
         }

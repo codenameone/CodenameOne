@@ -261,6 +261,25 @@ class ProjectLayoutsTest {
     }
 
     @Test
+    void aSubprojectWithNoBuildScriptOfItsOwnIsStillGradles() throws IOException {
+        File root = new File(tmp, "central");
+        touch(root, "settings.gradle.kts", "include(\"app\")\n");
+        touch(root, "build.gradle.kts", "subprojects { apply(plugin = \"com.codenameone\") }\n");
+        touch(root, "app/codenameone_settings.properties");
+        ProjectLayout l = ProjectLayouts.detect(new File(root, "app"));
+        assertEquals(BuildSystem.GRADLE, l.buildSystem());
+        assertEquals(root.getCanonicalFile(), l.rootDir());
+        assertEquals(new File(root, "app").getCanonicalFile(), l.projectDir());
+
+        File ant = new File(tmp, "antInside");
+        touch(ant, "settings.gradle.kts", "include(\"app\")\n");
+        touch(ant, "app/build.xml", "<project/>");
+        touch(ant, "app/codenameone_settings.properties");
+        assertEquals(BuildSystem.ANT, ProjectLayouts.detect(new File(ant, "app")).buildSystem(),
+                "an Ant project keeps its build.xml");
+    }
+
+    @Test
     void gradleCn1lib() throws IOException {
         File root = new File(tmp, "lib");
         touch(root, "settings.gradle.kts", "plugins { id(\"com.codenameone\") version \"1.0\" }\n");

@@ -495,6 +495,18 @@ class GradleConversionTest {
     }
 
     @Test
+    void theIconTheSettingsNameComesAlong() throws Exception {
+        File ant = antApp();
+        touch(ant, "codenameone_settings.properties", "codename1.mainName=AntApp\ncodename1.packageName=a\n"
+                + "codename1.icon=branding/app.png\n");
+        touch(ant, "branding/app.png", "png");
+        File out = new File(tmp.toFile(), "out");
+        converter().convert(ant, out, "1.0");
+        assertTrue(new File(out, "branding/app.png").isFile());
+        assertTrue(read(new File(out, "codenameone_settings.properties")).contains("codename1.icon=branding/app.png"));
+    }
+
+    @Test
     void aJavaOnlyProjectGetsNoKotlinPlugin() throws Exception {
         File ant = antApp();
         assertTrue(new File(ant, "src/a/Helper.kt").delete());

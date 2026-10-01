@@ -75,6 +75,12 @@ final class BackendPackageSupport {
                     .getIncoming().artifactView(v -> v.setLenient(true)).getArtifacts().getResolvedArtifacts()
                     .map(set -> AppSupport.encode(set, "compile")));
             t.getSources().from(main.getJava().getSrcDirs());
+            // What annotation processors (annotationProcessor(...)) generated: the
+            // packager compiles the sources again, without javac's processor path,
+            // so it needs their output the way runBackend has it from the classes.
+            t.getSources().from(project.getTasks().named(main.getCompileJavaTaskName(),
+                    org.gradle.api.tasks.compile.JavaCompile.class)
+                    .flatMap(c -> c.getOptions().getGeneratedSourceOutputDirectory()));
             t.getSourceEncoding().set(AppSupport.javaEncoding(project, main));
             t.getProcessedResources().from(project.provider(() -> main.getOutput().getResourcesDir()));
             t.getProcessedResources().builtBy(main.getProcessResourcesTaskName());

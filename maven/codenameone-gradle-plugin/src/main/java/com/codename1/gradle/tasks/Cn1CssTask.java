@@ -147,7 +147,11 @@ public abstract class Cn1CssTask extends Cn1Task {
             clear(out);
             return;
         }
-        if (!layout().themeCss().isFile()) {
+        // With no theme.css of the project's own there is nothing to compile --
+        // unless a cn1lib brings CSS, which cannot be compiled alone: the compiler
+        // below then fails and says so, as the Maven build does, rather than the
+        // library's styles silently disappearing.
+        if (!layout().themeCss().isFile() && getLibraryCss().get().isEmpty()) {
             log.warn("CSS compilation skipped because " + layout().themeCss() + " does not exist");
             clear(out);
             return;
@@ -166,6 +170,17 @@ public abstract class Cn1CssTask extends Cn1Task {
         final Project ant = AntSupport.newProject(layout().projectDir());
         CssCompiler compiler = new CssCompiler(log, ant,
                 () -> AntSupport.createJava(ant, log, AntSupport.LEVEL_INFO)).buildDirectory(layout().buildDir());
+        if (!layout().themeCss().isFile()) {
+            // Only cn1libs bring CSS. Extracting them says whether any has a
+            // stylesheet; if so, Maven refuses this project, and so does this build.
+            if (!compiler.inputs(libraries, "", null).isEmpty()) {
+                throw new GradleException("Cannot compile CSS for this project. It has no " + layout().themeCss()
+                        + ", but it uses cn1libs whose CSS needs it. Add that file (it can be empty).");
+            }
+            log.warn("CSS compilation skipped because " + layout().themeCss() + " does not exist");
+            clear(out);
+            return;
+        }
         File l10n = CssCompiler.localizationSibling(layout().l10nDir().getParentFile());
         // Every current theme is compiled below, so start empty: a deleted
         // darktheme.css would otherwise leave darktheme.res in a directory that is
