@@ -67,6 +67,17 @@
 #define CN1_HAVE_KQUEUE 1
 #endif
 
+/*
+ * Whether the running code may PARK: it is on a virtual thread that holds no
+ * monitor. A pinned virtual thread -- one inside `synchronized` -- waits the way a
+ * platform thread does instead, holding its host; see cn1VirtualThreadPinned for
+ * why switching out there would let another virtual thread into the same
+ * critical section. Every park in the backend asks this, never "am I virtual".
+ */
+int cn1BackendCanPark(void) {
+    return cn1VirtualThreadCurrent() != 0 && !cn1VirtualThreadPinned();
+}
+
 /* Mirrors the Java side; keep in sync with Reactor. */
 #define CN1_EVENT_READ  1
 #define CN1_EVENT_WRITE 2
@@ -549,7 +560,7 @@ JAVA_INT com_codename1_backend_ServerSocket_awaitReadableImpl___int_int_R_int(CO
     // rather than hold the host thread for the timeout. The scheduler only
     // resumes a parked virtual thread once the poller reports its descriptor
     // ready, so coming back IS the readiness answer.
-    if(cn1VirtualThreadCurrent() != 0) {
+    if(cn1BackendCanPark()) {
         // ASK FIRST, and this poll is an optimisation rather than the waste it
         // looks like in a syscall census.
         //
@@ -708,7 +719,7 @@ JAVA_INT com_codename1_backend_ServerSocket_readImpl___int_byte_1ARRAY_int_int_R
         //
         // On a platform thread there is no one to hand the host to, so the old
         // answer stands: report the deadline and let the caller decide.
-        if(cn1VirtualThreadCurrent() == 0) {
+        if(!cn1BackendCanPark()) {
             break;
         }
         // The array may MOVE while we are parked -- a collection can run, and the
@@ -1462,7 +1473,7 @@ int cn1BackendVtWait(int count, const int* fds, const int* events, long long tim
     struct cn1VirtualThread* vt = cn1VirtualThreadCurrent();
     struct cn1BackendVtArg* a;
     int i;
-    if(vt == 0) {
+    if(vt == 0 || cn1VirtualThreadPinned()) {
         return 0;
     }
     a = (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
@@ -1534,7 +1545,7 @@ int cn1BackendAwaitFd(int fd, int events, long long deadline) {
         p.fd = fd;
         p.events = want;
         p.revents = 0;
-        if(cn1VirtualThreadCurrent() != 0) {
+        if(cn1BackendCanPark()) {
             /* Ask first: an answer that is already there costs no park, and a
                park is a poller round trip plus a resume. */
             rc = poll(&p, 1, 0);
@@ -1658,7 +1669,7 @@ JAVA_BOOLEAN com_codename1_backend_VirtualThread_supportedImpl___R_boolean(CODEN
 }
 
 JAVA_BOOLEAN com_codename1_backend_VirtualThread_isVirtualImpl___R_boolean(CODENAME_ONE_THREAD_STATE) {
-    return cn1VirtualThreadCurrent() != 0 ? JAVA_TRUE : JAVA_FALSE;
+    return cn1BackendCanPark() ? JAVA_TRUE : JAVA_FALSE;
 }
 
 /* The running virtual thread's handle -- the same pointer create() handed out --
@@ -1679,7 +1690,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_currentImpl___R_long(CODENAME_ONE_
  * connection to honour it rather than stepping aside.
  */
 JAVA_VOID com_codename1_backend_VirtualThread_yieldImpl__(CODENAME_ONE_THREAD_STATE) {
-    if(cn1VirtualThreadCurrent() != 0) {
+    if(cn1BackendCanPark()) {
         // Marked inactive across the switch for the same reason the keep-alive
         // park is: a virtual thread that is not on a host cannot answer the
         // collector, and a collector waiting for it stops the whole server.

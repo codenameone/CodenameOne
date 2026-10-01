@@ -428,9 +428,11 @@ final class BackendSources {
         sb.append("        java.util.Map properties = new java.util.LinkedHashMap();\n");
         StringBuilder required = new StringBuilder();
         for (int i = 0; i < args.length; i++) {
+            String schema = t.paramSchema.get(i) != null ? t.paramSchema.get(i)
+                    : jsonType(args[i]);
             sb.append("        properties.put(").append(quote(t.paramNames.get(i)))
               .append(", com.codename1.backend.mcp.McpArgs.property(")
-              .append(quote(jsonType(args[i]))).append(", ")
+              .append(quote(schema)).append(", ")
               .append(quote(t.paramDescriptions.get(i))).append(", ")
               .append(enumConstants(args[i])).append("));\n");
             if (t.paramRequired.get(i).booleanValue()) {
@@ -443,6 +445,33 @@ final class BackendSources {
         sb.append("        return com.codename1.backend.mcp.McpArgs.object(properties, ")
           .append("new String[] {").append(required).append("});\n    }\n\n");
         sb.append("    public Object call(java.util.Map arguments) throws Exception {\n");
+        for (int i = 0; i < args.length; i++) {
+            if (t.paramRead.get(i) == null) {
+                continue;
+            }
+            // Read through the codecs; what they refuse is an IllegalArgumentException,
+            // which the server sends the agent as a tool error naming the argument.
+            String argType = BackendJsonCodecs.source(t.paramTypes.get(i));
+            String argName = quote(t.paramNames.get(i));
+            sb.append("        ").append(argType).append(" arg").append(i).append(" = null;\n");
+            sb.append("        {\n");
+            sb.append("            Object j = arguments.get(").append(argName).append(");\n");
+            sb.append("            if (j == null && !arguments.containsKey(").append(argName)
+              .append(")) {\n");
+            if (t.paramRequired.get(i).booleanValue()) {
+                sb.append("                throw new IllegalArgumentException(")
+                  .append(quote("Missing required argument \"" + t.paramNames.get(i) + "\""))
+                  .append(");\n");
+            }
+            sb.append("            } else {\n");
+            sb.append("                ").append(argType).append(" target = null;\n");
+            for (String line : t.paramRead.get(i).split("\n")) {
+                sb.append("                ").append(line).append('\n');
+            }
+            sb.append("                arg").append(i).append(" = target;\n");
+            sb.append("            }\n");
+            sb.append("        }\n");
+        }
         StringBuilder call = new StringBuilder("target.")
                 .append(BackendBeans.bridged(t.method) ? BackendWeaver.bridge(t.method.getName())
                         : t.method.getName()).append('(');
@@ -450,12 +479,22 @@ final class BackendSources {
             if (i > 0) {
                 call.append(", ");
             }
-            call.append(convert(args[i], "arguments", t.paramNames.get(i),
-                    t.paramRequired.get(i).booleanValue()));
+            call.append(t.paramRead.get(i) != null ? "arg" + i : convert(args[i], "arguments",
+                    t.paramNames.get(i), t.paramRequired.get(i).booleanValue()));
         }
         call.append(')');
         if (Type.getReturnType(t.method.getDescriptor()).getSort() == Type.VOID) {
             sb.append("        ").append(call).append(";\n        return \"done\";\n");
+        } else if (t.returnType != null) {
+            sb.append("        final ").append(BackendJsonCodecs.source(t.returnType))
+              .append(" result = ").append(call).append(";\n");
+            sb.append("        return new com.codename1.backend.Json.Writable() {\n");
+            sb.append("            public void writeTo(com.codename1.backend.ByteSink out) {\n");
+            for (String line : t.returnWrite.split("\n")) {
+                sb.append("                ").append(line).append('\n');
+            }
+            sb.append("            }\n");
+            sb.append("        };\n");
         } else {
             sb.append("        return ").append(call).append(";\n");
         }

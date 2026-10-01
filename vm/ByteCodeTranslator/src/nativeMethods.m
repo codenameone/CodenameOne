@@ -3012,6 +3012,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->ownerThread = CN1_MONITOR_SELF();
         data->counter++;
+        cn1VirtualThreadMonitorEntered();
     } else {
         // The reentrancy identity MUST be the pthread, not threadStateData->threadId:
         // one pthread can legitimately run under two ThreadLocalData structs (the
@@ -3028,6 +3029,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         // we already own the lock...
         if(currentlyHeldBy == own) {
             data->counter++;
+            cn1VirtualThreadMonitorEntered();
             return;
         }
         // NO try-lock fast path here. It was tried and reverted; do not restore
@@ -3057,6 +3059,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->counter++;
         data->ownerThread = own;
+        cn1VirtualThreadMonitorEntered();
         CN1_GC_WAIT_UNBLOCKED(threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
 
@@ -3087,6 +3090,7 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
     struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
+    cn1VirtualThreadMonitorExited();
     data->counter--;
     if(data->counter > 0) {
         return;

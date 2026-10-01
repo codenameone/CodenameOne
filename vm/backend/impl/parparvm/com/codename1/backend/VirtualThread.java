@@ -132,7 +132,11 @@ public final class VirtualThread {
         return currentImpl();
     }
 
-    /// Whether the caller is running on a virtual thread rather than a host thread.
+    /// Whether the caller is running on a virtual thread that may park -- one
+    /// that holds no monitor. A virtual thread inside `synchronized` is PINNED to
+    /// its host and answers false: it waits the way a platform thread does,
+    /// because switching out would let another virtual thread on the same host
+    /// into the same critical section, monitor ownership being the host's.
     public static boolean isVirtual() {
         return isVirtualImpl();
     }

@@ -447,6 +447,77 @@ public class BackendBeansTest {
     }
 
     @Test
+    public void anMcpToolReadsAndWritesItsTypesThroughTheCodecs() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Tag", PKG + "public class Tag { public String name; }\n");
+        s.put("com.example.Shop", PKG
+                + "@Service public class Shop {\n"
+                + "    @McpTool(description = \"Totals the ids under a tag\")\n"
+                + "    public Tag total(@McpParam(\"ids\") List<Integer> ids,\n"
+                + "                     @McpParam(\"tag\") Tag tag) {\n"
+                + "        int sum = 0;\n"
+                + "        for (Integer id : ids) { sum += id.intValue(); }\n"
+                + "        Tag out = new Tag(); out.name = tag.name + sum; return out;\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/x\") public String x() { return \"x\"; }\n"
+                + "}\n");
+        File classes = compile(s);
+        assertNoErrors(process(classes));
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        Backend.Application app = (Backend.Application) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend backend = Backend.builder(Config.of(settings, "dev")).quiet().mcp(null)
+                .application(app).start();
+        try {
+            String tools = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":"
+                    + "\"tools/list\"}");
+            assertTrue(tools, tools.contains("\"ids\":{\"type\":\"array\""));
+            assertTrue(tools, tools.contains("\"tag\":{\"type\":\"object\""));
+            // List<Integer> holds Integers, not the parser's Longs, and the Tag
+            // that comes back is an object, not its toString().
+            String call = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"total\",\"arguments\":"
+                    + "{\"ids\":[1,2],\"tag\":{\"name\":\"x\"}}}}");
+            assertTrue(call, call.contains("\"text\":\"{\\\"name\\\":\\\"x3\\\"}\""));
+            assertTrue(call, call.contains("\"isError\":false"));
+            String wrong = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"total\",\"arguments\":"
+                    + "{\"ids\":[\"a\"],\"tag\":{}}}}");
+            assertTrue(wrong, wrong.contains("$.ids[0]: expected a whole number"));
+            assertTrue(wrong, wrong.contains("\"isError\":true"));
+            String missing = post(port, "/mcp", "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":"
+                    + "\"tools/call\",\"params\":{\"name\":\"total\",\"arguments\":"
+                    + "{\"ids\":[]}}}");
+            assertTrue(missing, missing.contains("Missing required argument \\\"tag\\\""));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void anMcpToolTheCodecsCannotServeIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Shop", PKG
+                + "@Service public class Shop {\n"
+                + "    @McpTool(description = \"a\")\n"
+                + "    public String a(@McpParam(\"ids\") int[] ids) { return \"a\"; }\n"
+                + "    @McpTool(description = \"b\")\n"
+                + "    public StringBuilder b() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("Parameter 1 of @McpTool"));
+        assertTrue(errors, errors.contains("an array, which has no JSON form here"));
+        assertTrue(errors, errors.contains("returns java.lang.StringBuilder, which cannot be "
+                + "written as JSON"));
+    }
+
+    @Test
     public void aClassNoCodecCanBeWrittenForIsABuildError() throws Exception {
         Map<String, String> s = new LinkedHashMap<String, String>();
         s.put("com.example.Page", PKG + "public class Page<T> { public List<T> items; }\n");

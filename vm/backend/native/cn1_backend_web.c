@@ -49,6 +49,8 @@
 #ifndef _WIN32
 /* Defined in cn1_backend_server.c, beside the virtual-thread scheduler. */
 int cn1BackendVtWait(int count, const int* fds, const int* events, long long timeoutMillis);
+/* Defined there too: on a virtual thread that holds no monitor. */
+int cn1BackendCanPark(void);
 
 /* The most sockets one transfer holds at once -- two while libcurl races an IPv4
  * and an IPv6 connect, plus its resolver's wake-up pair. The same bound as a
@@ -689,7 +691,7 @@ JAVA_LONG com_codename1_backend_Web_performImpl___java_lang_String_java_lang_Str
        running every other virtual thread; see cn1WebPerformParked. */
     CN1_YIELD_THREAD;
 #ifndef _WIN32
-    if(cn1VirtualThreadCurrent() != 0) {
+    if(cn1BackendCanPark()) {
         rc = cn1WebPerformParked(curl);
     } else {
         rc = curl_easy_perform(curl);

@@ -1095,7 +1095,7 @@ public final class HttpServer {
         /// may be a caller's constant; a header the server owns -- Date,
         /// Content-Length -- is refused when the response is written.
         public Response header(String name, String value) {
-            Map copy = new java.util.LinkedHashMap();
+            Map copy = new LinkedHashMap();
             if (extraHeaders != null) {
                 copy.putAll(extraHeaders);
             }

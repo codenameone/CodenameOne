@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Tcp;
@@ -65,6 +66,7 @@ public class DbCheck {
         rejectsAnUntrustedCertificate(url);
         refusesCleartextPasswordWithoutTls();
         aQueryParksItsVirtualThread(url);
+        concurrentPoolOpensDoNotWedgeTheHost(url);
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -688,6 +690,70 @@ public class DbCheck {
         check("another request is served while a query waits", "free", verdict);
         check("the query ran on a virtual thread where there are any",
                 String.valueOf(VirtualThread.supported()), onVirtual[0]);
+    }
+
+    /**
+     * Several requests opening pool connections at once, on ONE host.
+     *
+     * <p>Opening a connection to a server engine parks the virtual thread -- the
+     * connect, the authentication round trips. The pool once did that while
+     * holding its monitor, so the next request on the same host blocked the
+     * host's OS thread on that monitor, and the opener, which can only resume on
+     * that host, never ran again to release it: every request wedged. Four
+     * requests each hold a connection across a short sleep, so three of them open
+     * one lazily while the others are mid-open.
+     */
+    private static void concurrentPoolOpensDoNotWedgeTheHost(final String url) throws Exception {
+        final boolean postgres = url.startsWith("postgres");
+        if(!postgres && !url.startsWith("mysql") && !url.startsWith("mariadb")) {
+            note("the concurrent-open check needs a server engine");
+            return;
+        }
+        final String sleep = postgres ? "SELECT pg_sleep(0.5)" : "SELECT SLEEP(0.5)";
+        final DataSource pool = DataSource.open(url, 4, 5000, 10000);
+        final int requests = 4;
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16,
+                VirtualThread.supported() ? 1 : requests, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                Database db = pool.borrow();
+                try {
+                    db.query(sleep, new Object[0]);
+                } finally {
+                    pool.release(db);
+                }
+                return HttpServer.Response.text(200, "ok");
+            }
+        });
+        final String[] answers = new String[requests];
+        try {
+            final int port = server.getPort();
+            Thread[] callers = new Thread[requests];
+            for(int iter = 0 ; iter < requests ; iter++) {
+                final int slot = iter;
+                callers[iter] = new Thread(new Runnable() {
+                    public void run() {
+                        try {
+                            answers[slot] = get(port, "/q");
+                        } catch (Exception failed) {
+                            answers[slot] = "failed: " + failed;
+                        }
+                    }
+                });
+                callers[iter].start();
+            }
+            for(int iter = 0 ; iter < requests ; iter++) {
+                callers[iter].join(20000);
+            }
+        } finally {
+            server.stop(2000);
+            pool.close();
+        }
+        StringBuilder all = new StringBuilder();
+        for(int iter = 0 ; iter < requests ; iter++) {
+            all.append(answers[iter]).append(iter < requests - 1 ? "," : "");
+        }
+        check("requests opening pool connections at once on one host all finish",
+                "ok,ok,ok,ok", all.toString());
     }
 
     /** One GET, answered with the response body. */

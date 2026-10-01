@@ -4611,6 +4611,104 @@ public class SelfTest {
      * before answering "pong" as an HTTP response -- or, with a negative delay,
      * never answers and holds the connection open for a while.
      */
+    private static final Object PIN_LOCK = new Object();
+    private static final int[] PIN_INSIDE = new int[2];   // now, most at once
+
+    /// A virtual thread inside `synchronized` must not give up its host.
+    ///
+    /// Monitor ownership is the OS thread, and every virtual thread on a host
+    /// shares it. One that parked on a socket while holding a monitor let the next
+    /// virtual thread on that host through the reentrancy check and into the same
+    /// critical section -- two inside a synchronized block at once. Two requests
+    /// on a ONE-host server each wait on a slow socket inside one block; pinned,
+    /// never more than one is inside, and the second still completes after.
+    private static void aVirtualThreadHoldingAMonitorIsPinned() throws Exception {
+        if(!VirtualThread.supported()) {
+            note("pinning check skipped: this runtime has no virtual threads");
+            return;
+        }
+        final ServerSocket slow = ServerSocket.bind("127.0.0.1", 0, 8);
+        Thread peer = servePeer(slow, 600, 2);
+        final int slowPort = slow.getPort();
+        PIN_INSIDE[0] = 0;
+        PIN_INSIDE[1] = 0;
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                synchronized (PIN_LOCK) {
+                    PIN_INSIDE[0]++;
+                    if(PIN_INSIDE[0] > PIN_INSIDE[1]) {
+                        PIN_INSIDE[1] = PIN_INSIDE[0];
+                    }
+                    try {
+                        Tcp out = Tcp.connect("127.0.0.1", slowPort, 5000);
+                        try {
+                            byte[] ask = "GET / HTTP/1.1\r\nHost: x\r\n\r\n".getBytes("UTF-8");
+                            out.write(ask, 0, ask.length);
+                            byte[] chunk = new byte[256];
+                            while(out.read(chunk, 0, chunk.length) > 0) {
+                                // drain the slow answer
+                            }
+                        } finally {
+                            out.close();
+                        }
+                    } finally {
+                        PIN_INSIDE[0]--;
+                    }
+                }
+                return HttpServer.Response.text(200, "pong");
+            }
+        });
+        final String[] answers = new String[2];
+        try {
+            final int port = server.getPort();
+            Thread[] callers = new Thread[2];
+            for(int iter = 0 ; iter < 2 ; iter++) {
+                final int slot = iter;
+                callers[iter] = new Thread(new Runnable() {
+                    public void run() {
+                        try {
+                            answers[slot] = pinGet(port);
+                        } catch (Exception failed) {
+                            answers[slot] = "failed: " + failed;
+                        }
+                    }
+                });
+                callers[iter].start();
+            }
+            for(int iter = 0 ; iter < 2 ; iter++) {
+                callers[iter].join(20000);
+            }
+        } finally {
+            server.stop(2000);
+            slow.close();
+        }
+        peer.join(10000);
+        check("two virtual threads are never inside one monitor at once", "1",
+                String.valueOf(PIN_INSIDE[1]));
+        check("both requests that waited inside the monitor finish", "pong,pong",
+                answers[0] + "," + answers[1]);
+    }
+
+    private static String pinGet(int port) throws Exception {
+        Tcp conn = Tcp.connect("127.0.0.1", port, 15000);
+        try {
+            byte[] request = "GET /pin HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+                    .getBytes("UTF-8");
+            conn.write(request, 0, request.length);
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[1024];
+            int n;
+            while((n = conn.read(chunk, 0, chunk.length)) > 0) {
+                all.write(chunk, 0, n);
+            }
+            String text = new String(all.toByteArray(), "UTF-8");
+            int at = text.indexOf("\r\n\r\n");
+            return at < 0 ? text : text.substring(at + 4);
+        } finally {
+            conn.close();
+        }
+    }
+
     private static Thread servePeer(final ServerSocket listener, final int delayMillis,
                                     final int connections) {
         Thread acceptor = new Thread(new Runnable() {
@@ -6136,6 +6234,7 @@ public class SelfTest {
         caseVariantHeadersSignAsOneField();
         aLateBodyIsNotServedAnotherConnectionsBytes();
         anOutboundWaitLeavesTheHostFree();
+        aVirtualThreadHoldingAMonitorIsPinned();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
         aMountDeclaredWithAnEscapeIsStillReachable();

@@ -133,6 +133,58 @@ final class BackendJsonCodecs {
         this.ctx = ctx;
     }
 
+    private static final String ATTRIBUTE = "cn1.backend.jsonCodecs";
+
+    /// The build's one set of codecs, shared by the router and the bean
+    /// processors: an MCP tool and a route that use one class must use one codec,
+    /// and the value dispatcher has to know every class either of them writes.
+    static BackendJsonCodecs of(ProcessorContext ctx) {
+        Object existing = ctx.getAttribute(ATTRIBUTE);
+        if (existing instanceof BackendJsonCodecs) {
+            return (BackendJsonCodecs) existing;
+        }
+        BackendJsonCodecs created = new BackendJsonCodecs(ctx);
+        ctx.setAttribute(ATTRIBUTE, created);
+        return created;
+    }
+
+    /// The JSON Schema type of a value this set reads into `type`, or "" when
+    /// any JSON value will do.
+    String schemaType(String type) {
+        String t = strip(type);
+        Kind kind = t == null ? null : kindOf(t);
+        if (kind == null || kind == Kind.ANY) {
+            return "";
+        }
+        switch (kind) {
+            case COLLECTION:
+            case RAW_LIST:
+                return "array";
+            case MAP:
+            case RAW_MAP:
+            case DTO:
+                return "object";
+            case PRIMITIVE:
+            case BOX:
+                if ("boolean".equals(t) || "java.lang.Boolean".equals(t)) {
+                    return "boolean";
+                }
+                if ("double".equals(t) || "float".equals(t) || "java.lang.Double".equals(t)
+                        || "java.lang.Float".equals(t)) {
+                    return "number";
+                }
+                return "char".equals(t) || "java.lang.Character".equals(t) ? "string"
+                        : "integer";
+            default:
+                return "string";
+        }
+    }
+
+    /// `s` as a Java string literal.
+    static String javaString(String s) {
+        return quote(s);
+    }
+
     /// Null when a value of `javaType` can be written as JSON, or why not.
     String checkWrite(String javaType) {
         return check(javaType, false, new HashSet<String>());

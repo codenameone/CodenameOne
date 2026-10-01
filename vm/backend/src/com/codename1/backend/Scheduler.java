@@ -463,13 +463,13 @@ public final class Scheduler {
                 + "locked_by = ? WHERE name = ? AND lock_until <= ?",
                 new Object[] {Long.valueOf(until), Long.valueOf(now), lease, job.lock, Long.valueOf(now)});
         if (updated > 0) {
-            return lease;
+            return liveOrNull(job, lease, until);
         }
         try {
             locks.execute("INSERT INTO " + LOCK_TABLE + " (name, lock_until, locked_at, "
                     + "locked_by) VALUES (?, ?, ?, ?)",
                     new Object[] {job.lock, Long.valueOf(until), Long.valueOf(now), lease});
-            return lease;
+            return liveOrNull(job, lease, until);
         } catch (IOException failed) {
             // Only a row that exists means another instance holds the claim.
             // Anything else -- a dropped connection, a missing permission -- is
@@ -487,6 +487,24 @@ public final class Scheduler {
             }
             throw failed;
         }
+    }
+
+    /// The lease, if it is still live by the database's clock now that the claim
+    /// is written; null when it is not.
+    ///
+    /// `until` was computed from a clock read BEFORE the write, and the write can
+    /// wait -- for a pool connection, for a row lock -- for as long as the lease
+    /// itself. A claim that lands already expired is one another replica may take
+    /// the moment it lands, so running on it would run the job twice. Read after
+    /// the write, a live lease cannot have been taken meanwhile: its row said
+    /// "held" for that whole interval.
+    private String liveOrNull(Job job, String lease, long until) throws IOException {
+        if (databaseNow() < until) {
+            return lease;
+        }
+        System.err.println("Scheduled job " + job.name + " skipped: its lock " + job.lock
+                + " was claimed after its lease had already run out");
+        return null;
     }
 
     /// Gives up `lease`'s claim -- and only that one: after an expiry the row

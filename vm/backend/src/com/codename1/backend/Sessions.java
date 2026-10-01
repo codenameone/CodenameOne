@@ -1197,6 +1197,14 @@ public final class Sessions {
                 spare.append(')');
             }
             //
+            // A session in use on ANOTHER replica is protected only by the grace
+            // below, not by a lease, and that is deliberate. A request that outlives
+            // the grace past its session's expiry loses the row to another
+            // replica's purge, as it does under Spring Session's JDBC store, which
+            // deletes at expiry with no grace at all. A cross-replica lease would
+            // cost a write per request to every session, which is the overhead
+            // Spring avoids by the same choice.
+            //
             // Decimal multipliers, never integer ones: max_inactive is an INTEGER
             // column, and PostgreSQL multiplies INTEGER by an integer literal in
             // 32 bits, so a 30-day timeout overflowed and every purge failed.

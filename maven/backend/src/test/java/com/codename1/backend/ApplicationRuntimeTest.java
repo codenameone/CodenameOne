@@ -1738,6 +1738,53 @@ class ApplicationRuntimeTest {
     }
 
     @Test
+    @DisplayName("a claim written after its lease ran out does not run the job")
+    void aClaimThatLandsExpiredIsNotALease(@org.junit.jupiter.api.io.TempDir java.io.File dir)
+            throws Exception {
+        final String path = new java.io.File(dir, "late.db").getAbsolutePath();
+        DataSource pool = DataSource.open(path, 2, 5000, 10000);
+        try {
+            Scheduler scheduler = new Scheduler(pool);
+            Runnable nothing = new Runnable() {
+                public void run() {
+                }
+            };
+            Scheduler.Job job = new Scheduler.Job("late", Scheduler.FIXED_DELAY, null, 1000, 0,
+                    null, Tasks.PLATFORM, "late", 300, nothing);
+            // Creates the table and the row, then frees it.
+            scheduler.release(job, scheduler.claim(job));
+            // Another writer holds the database for longer than the lease, so the
+            // claim's write waits past it, as a replica waiting on a lock would.
+            final java.util.concurrent.CountDownLatch holding =
+                    new java.util.concurrent.CountDownLatch(1);
+            Thread blocker = new Thread() {
+                public void run() {
+                    try {
+                        Database db = Database.open(path);
+                        db.execute("BEGIN IMMEDIATE", null);
+                        holding.countDown();
+                        Thread.sleep(700);
+                        db.execute("COMMIT", null);
+                        db.close();
+                    } catch (Exception err) {
+                        holding.countDown();
+                    }
+                }
+            };
+            blocker.start();
+            assertTrue(holding.await(5, TimeUnit.SECONDS));
+            long started = System.currentTimeMillis();
+            assertNull(scheduler.claim(job),
+                    "a claim written after its lease had run out was returned as a lease");
+            assertTrue(System.currentTimeMillis() - started >= 300,
+                    "the claim did not wait on the held lock, so this proved nothing");
+            blocker.join(5000);
+        } finally {
+            pool.close();
+        }
+    }
+
+    @Test
     @DisplayName("an expired run releases only its own lease, not a later run's")
     void anExpiredRunDoesNotReleaseItsSuccessor(@org.junit.jupiter.api.io.TempDir java.io.File dir)
             throws Exception {
@@ -1749,13 +1796,15 @@ class ApplicationRuntimeTest {
                 public void run() {
                 }
             };
+            // Long enough to still be live once the claim is written -- a claim
+            // that lands already expired is refused -- and short enough to run out.
             Scheduler.Job slow = new Scheduler.Job("slow", Scheduler.FIXED_DELAY, null, 1000, 0,
-                    null, Tasks.PLATFORM, "shared", 1, nothing);
+                    null, Tasks.PLATFORM, "shared", 200, nothing);
             Scheduler.Job next = new Scheduler.Job("next", Scheduler.FIXED_DELAY, null, 1000, 0,
                     null, Tasks.PLATFORM, "shared", 60000, nothing);
             String expired = scheduler.claim(slow);
             assertNotNull(expired);
-            Thread.sleep(20);                        // the 1ms lease runs out
+            Thread.sleep(260);                       // the lease runs out
             String current = scheduler.claim(next);
             assertNotNull(current, "an expired lease was not taken over");
             scheduler.release(slow, expired);        // the overrun finally ends

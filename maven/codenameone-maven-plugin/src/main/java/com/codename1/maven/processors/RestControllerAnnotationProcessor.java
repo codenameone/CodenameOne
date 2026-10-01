@@ -282,7 +282,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
     private BackendJsonCodecs codecs(ProcessorContext ctx) {
         if (codecs == null) {
-            codecs = new BackendJsonCodecs(ctx);
+            codecs = BackendJsonCodecs.of(ctx);
         }
         return codecs;
     }
@@ -1375,8 +1375,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "would replace it. Rename that class.");
             return;
         }
-        if (codecs != null) {
-            Map<String, String> codecSources = codecs.sources();
+        // The shared set, not only this processor's: the bean processor's tools
+        // may have added classes, and the dispatcher compiled last must know them.
+        if (codecs != null || ctx.getAttribute("cn1.backend.jsonCodecs") != null) {
+            Map<String, String> codecSources = codecs(ctx).sources();
             for (String codec : codecSources.keySet()) {
                 if (isNotOurOwnOutput(ctx, codec)) {
                     ctx.error(codec + " already exists, and the JSON codec generated under "

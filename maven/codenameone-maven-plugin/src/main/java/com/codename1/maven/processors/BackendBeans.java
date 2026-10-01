@@ -203,6 +203,18 @@ final class BackendBeans {
         final List<String> paramNames = new ArrayList<String>();
         final List<String> paramDescriptions = new ArrayList<String>();
         final List<Boolean> paramRequired = new ArrayList<Boolean>();
+        /// Per parameter: the statements reading it through the JSON codecs into
+        /// `target`, or null for a plain scalar McpArgs converts.
+        final List<String> paramRead = new ArrayList<String>();
+        /// Per parameter: its declared type with arguments, when read by a codec.
+        final List<String> paramTypes = new ArrayList<String>();
+        /// Per parameter: the JSON Schema type a codec-read one is described with.
+        final List<String> paramSchema = new ArrayList<String>();
+        /// The return type, when the result is written by a codec; null for
+        /// void and String, which are sent as they are.
+        String returnType;
+        /// The statements writing `result` into `out`, with [#returnType].
+        String returnWrite;
         String adapterBinary;
 
         Tool(MethodInfo method, String name, String description) {
@@ -1464,6 +1476,13 @@ final class BackendBeans {
                 continue;
             }
             Type[] args = Type.getArgumentTypes(m.getDescriptor());
+            // The GENERIC types: the descriptor erases List<Integer> to List, and
+            // an adapter that handed over the parser's list would give the tool
+            // Longs where it declared Integers -- a ClassCastException on its
+            // first read, for a call that was perfectly valid.
+            String[] generic = RestClientAnnotationProcessor.parseGenericParameterSignatures(
+                    m.getSignature(), args.length);
+            BackendJsonCodecs codecs = BackendJsonCodecs.of(ctx);
             boolean ok = true;
             for (int i = 0; i < args.length; i++) {
                 AnnotationValues p = parameterAnnotations(m, i).get(MCP_PARAM);
@@ -1474,12 +1493,22 @@ final class BackendBeans {
                     ok = false;
                     continue;
                 }
-                if (!toolArgument(args[i])) {
-                    ctx.error(cls, "Parameter " + (i + 1) + " of @McpTool " + where + " is a "
-                            + args[i].getClassName() + "; a tool argument is a String, a "
-                            + "number, a boolean, an enum, a Map or a List.");
-                    ok = false;
-                    continue;
+                String declared = null;
+                if (!bindable(args[i])) {
+                    // Anything but a scalar is read the way a request body is,
+                    // through the codecs -- as Spring AI reads a tool's arguments
+                    // through Jackson -- so collections are filled with what they
+                    // declare and a class of the application's own is built.
+                    declared = RestClientAnnotationProcessor.javaTypeFor(args[i],
+                            generic == null ? null : generic[i]);
+                    String why = codecs.checkRead(declared);
+                    if (why != null) {
+                        ctx.error(cls, "Parameter " + (i + 1) + " of @McpTool " + where + " is "
+                                + declared + ", which a tool call's arguments cannot be read "
+                                + "into: it holds " + why + ".");
+                        ok = false;
+                        continue;
+                    }
                 }
                 String paramName = p.getString("value");
                 if (paramName == null || paramName.trim().length() == 0
@@ -1496,23 +1525,35 @@ final class BackendBeans {
                 tool.paramNames.add(paramName);
                 tool.paramDescriptions.add(p.getStringOrDefault("description", ""));
                 tool.paramRequired.add(Boolean.valueOf(p.getBoolOrDefault("required", true)));
+                tool.paramTypes.add(declared);
+                tool.paramSchema.add(declared == null ? null : codecs.schemaType(declared));
+                tool.paramRead.add(declared == null ? null : codecs.readStatements(declared,
+                        "j", "com.codename1.backend.JsonCodec.Path.ROOT",
+                        BackendJsonCodecs.javaString(paramName), "-1", "0", "target", ""));
+            }
+            Type returned = Type.getReturnType(m.getDescriptor());
+            if (ok && returned.getSort() != Type.VOID
+                    && !"java/lang/String".equals(returned.getSort() == Type.OBJECT
+                    ? returned.getInternalName() : "")) {
+                // Written by a codec, as a route's result is: Json.write knows no
+                // class of the application's own and would send its toString().
+                String sig = m.getSignature();
+                String declared = RestClientAnnotationProcessor.javaTypeFor(returned,
+                        sig == null ? null : sig.substring(sig.lastIndexOf(')') + 1));
+                String why = codecs.checkWrite(declared);
+                if (why != null) {
+                    ctx.error(cls, "@McpTool " + where + " returns " + declared + ", which "
+                            + "cannot be written as JSON: it holds " + why + ".");
+                    ok = false;
+                } else {
+                    tool.returnType = declared;
+                    tool.returnWrite = codecs.writeStatements(declared, "result", "0", "");
+                }
             }
             if (ok) {
                 bean.tools.add(tool);
             }
         }
-    }
-
-    boolean toolArgument(Type t) {
-        if (bindable(t)) {
-            return true;
-        }
-        if (t.getSort() != Type.OBJECT) {
-            return false;
-        }
-        String n = t.getInternalName();
-        return n.equals("java/util/Map") || n.equals("java/util/List")
-                || n.equals("java/util/Collection") || n.equals("java/lang/Object");
     }
 
     private void collectManaged(Bean bean) {
@@ -2602,6 +2643,29 @@ final class BackendBeans {
                 b.managed.adapterBinary = qualify(pkg, baseName(b.type) + "Cn1Managed");
                 sources.put(b.managed.adapterBinary, writer.managed(b));
             }
+        }
+        // The codecs the tools use, compiled with them: the adapters name them.
+        // The router processor compiles the same set again later, grown by its
+        // own routes, over these.
+        boolean toolCodecs = false;
+        for (Bean b : beans) {
+            for (Tool t : b.tools) {
+                toolCodecs |= t.returnType != null || t.paramTypes.size()
+                        > Collections.frequency(t.paramTypes, null);
+            }
+        }
+        if (toolCodecs) {
+            Map<String, String> codecSources = BackendJsonCodecs.of(ctx).sources();
+            for (String codec : codecSources.keySet()) {
+                AnnotatedClass existing = ctx.lookup(codec.replace('.', '/'));
+                if (existing != null && !existing.getClassAnnotations().containsKey(
+                        "Lcom/codename1/backend/annotations/Generated;")) {
+                    ctx.error(codec + " already exists, and the JSON codec generated under "
+                            + "that name would replace it. Rename that class.");
+                    return;
+                }
+            }
+            sources.putAll(codecSources);
         }
         if (sources.isEmpty()) {
             if (woven > 0) {
