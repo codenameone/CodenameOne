@@ -600,4 +600,4 @@ The generated barebones starter is intentionally tiny — typically a `Form` wit
 
 ## When to reach for the GUI builder
 
-CN1 has an optional GUI builder (`*.gui` XML) that generates view classes. It's powerful but the Java-first approach above is usually cleaner for new screens. If a project already uses GUI builder XML, edit those files and run `mvn -pl common generate-sources` to regenerate the Java.
+CN1 has an optional GUI builder (`*.gui` XML) that generates view classes. It's powerful but the Java-first approach above is usually cleaner for new screens. If a project already uses GUI builder XML, edit those files and run `mvn -pl common generate-sources` (Gradle: `./gradlew generateGuiSources`) to regenerate the Java.

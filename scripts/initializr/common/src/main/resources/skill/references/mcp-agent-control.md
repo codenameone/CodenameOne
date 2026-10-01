@@ -8,7 +8,7 @@ This is the loop to reach for when a screen "looks right" in a screenshot but yo
 
 Two halves, both one-time:
 
-1. **Serve.** Run the simulator (`mvn -pl common cn1:run`), then in its menu bar choose **MCP -> Expose This Tool To Agents**. The simulator starts an MCP server on `127.0.0.1:8765`.
+1. **Serve.** Run the simulator (`./gradlew run`, or `mvn -pl common cn1:run` in a Maven project), then in its menu bar choose **MCP -> Expose This Tool To Agents**. The simulator starts an MCP server on `127.0.0.1:8765`.
 2. **Register.** In the same menu choose **MCP -> Install in MCP Hosts...**. This writes a server entry into the configuration of every MCP host it finds on the machine:
 
    | Host | Configuration it writes |

@@ -59,9 +59,10 @@ public class Simulator {
      * @param projectDir
      */
     private static void loadSimulatorProperties(File projectDir) {
-       if (!MavenUtils.isRunningInMaven()) {
-           // simulator.properties file is only for maven.
-           // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder.
+       if (!MavenUtils.isRunningInMaven() && !SimulatorProject.isGradle()) {
+           // simulator.properties file is only for maven and gradle.
+           // The PrepareSimulatorClassPathMojo writes the simulator.properties file in the target/codenameone folder;
+           // the Gradle plugin writes the same file to build/codenameone.
            return;
        }
        if (System.getProperty("cn1.simulator.properties.loaded") != null) {
@@ -69,7 +70,7 @@ public class Simulator {
            return;
        }
        System.setProperty("cn1.simulator.properties.loaded", "true");
-       File simulatorProperties = new File(projectDir, "target" + File.separator + "codenameone" + File.separator + "simulator.properties");
+       File simulatorProperties = new File(SimulatorProject.buildDir(projectDir), "codenameone" + File.separator + "simulator.properties");
        if (simulatorProperties.exists()) {
            Properties props = new Properties();
            try (FileInputStream fis = new FileInputStream(simulatorProperties)) {
@@ -145,17 +146,20 @@ public class Simulator {
         final boolean usingHotswapAgent = inputArgs.toString().indexOf("-XX:HotswapAgent") > 0;
         File cn1Props = new File("codenameone_settings.properties");
         if (!cn1Props.exists()) {
-            cn1Props = new File("common" + File.separator + "codenameone_settings.properties");
-
-        }
-        if (!cn1Props.exists()) {
-            cn1Props = new File(".." + File.separator + "common" + File.separator + "codenameone_settings.properties").getAbsoluteFile();
-
+            // `common/` and `../common` for Maven, the root for Ant and Gradle:
+            // the project model knows each layout, see SimulatorProject.
+            cn1Props = SimulatorProject.settingsFile().getAbsoluteFile();
         }
         if (cn1Props.exists()) {
-            File commonClasses = new File(cn1Props.getParentFile(), "target" + File.separator + "classes");
+            File projectDir = cn1Props.getAbsoluteFile().getParentFile();
+            File commonClasses = SimulatorProject.classesDir(projectDir);
             if (commonClasses.exists()) {
                 files.add(commonClasses.getAbsoluteFile());
+            }
+            // Gradle keeps processed resources apart from the classes.
+            File commonResources = SimulatorProject.resourcesOutputDir(projectDir);
+            if (!commonResources.equals(commonClasses) && commonResources.exists()) {
+                files.add(commonResources.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
             publishAnnotationBuildHints(cn1Props.getParentFile(), classPathStr);
@@ -168,9 +172,7 @@ public class Simulator {
         for (int iter = 0; iter < len; iter++) {
             files.add(new File(t.nextToken()).getAbsoluteFile());
         }
-        File javase = new File("native" + File.separator + "javase");
-        File libJavase = new File("lib" + File.separator + "impl" + File.separator + "native" + File.separator + "javase");
-        for (File dir : new File[]{javase, libJavase}) {
+        for (File dir : SimulatorProject.legacyNativeJarDirs()) {
             if (dir.exists()) {
                 
                 for (File jar : dir.listFiles()) {
@@ -365,6 +367,10 @@ public class Simulator {
         private File findHotswapPropertiesFile() {
         
             try {
+                File gradleProps = SimulatorProject.gradleHotswapProperties();
+                if (gradleProps != null) {
+                    return gradleProps.exists() ? gradleProps : null;
+                }
                 File currDir = new File(System.getProperty("user.dir")).getCanonicalFile();
                 while (!new File(currDir, "javase").exists()) {
                     currDir = currDir.getParentFile();
@@ -887,8 +893,12 @@ public class Simulator {
         }
         // Only when the classpath carries none: a launch that did not pass the
         // module's output directory at all still finds a conventional build.
-        File conventional = new File(projectDir, "target" + File.separator + "classes"
-                + File.separator + resource);
+        File conventional = new File(SimulatorProject.classesDir(projectDir), resource);
+        if (!conventional.isFile()) {
+            // Gradle keeps processed resources out of the classes directory;
+            // under Ant and Maven this is the same file as above.
+            conventional = new File(SimulatorProject.resourcesOutputDir(projectDir), resource);
+        }
         java.util.Properties loaded = conventional.isFile() ? readProperties(conventional) : null;
         if (loaded != null) {
             FoundManifest found =

@@ -26,6 +26,8 @@ package com.codename1.designer;
 
 import com.codename1.analytics.AnalyticsService;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
+import com.codename1.project.ProjectLayout;
+import com.codename1.project.ProjectLayouts;
 import com.l2fprod.common.swing.JOutlookBar;
 import com.codename1.ui.resource.util.BlockingAction;
 import com.codename1.ui.resource.util.QuitAction;
@@ -204,6 +206,32 @@ public class ResourceEditorView extends FrameView {
 
     public static File getBaseDir(){
         return baseResDir;
+    }
+
+    /// The project `resFile` is the main resource file of -- a file directly in
+    /// the project's resources directory (`src/` under Ant, `src/main/resources`
+    /// under Maven and Gradle) -- or null.
+    private static ProjectLayout projectOfResourceFile(File resFile) {
+        ProjectLayout layout = ProjectLayouts.detect(resFile);
+        if (layout == null || resFile.getParentFile() == null) {
+            return null;
+        }
+        try {
+            if (resFile.getParentFile().getCanonicalFile().equals(layout.resourcesDir().getCanonicalFile())) {
+                return layout;
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+        return null;
+    }
+
+    /// The directory the project's `codenameone_settings.properties` lives in.
+    /// For an Ant project's `src/theme.res` that is the grandparent, which is
+    /// all this used to assume; any other location keeps that assumption.
+    private static File projectDirOfResourceFile(File resFile) {
+        ProjectLayout layout = projectOfResourceFile(resFile);
+        return layout != null ? layout.projectDir() : resFile.getParentFile().getParentFile();
     }
 
     public static File getTemporarySaveOfCurrentFile() {
@@ -4095,13 +4123,17 @@ public static void openInIDE(File f, int lineNumber) {
             platformOverrides.setSelectedIndex(0);
             if(selection != null) {
                 try {
-                    baseResDir = new File(selection.getParentFile().getParentFile(), "src");
+                    // Where fonts referenced by name are looked up. Ant keeps them in
+                    // src/ beside the .res; Maven and Gradle in src/main/resources.
+                    ProjectLayout selectionLayout = projectOfResourceFile(selection);
+                    baseResDir = selectionLayout != null ? selectionLayout.resourcesDir()
+                            : new File(selection.getParentFile().getParentFile(), "src");
                     JavaSEPortWithSVGSupport.setBaseResourceDir(baseResDir);
                     loadedFile = selection;
 
                     loadedResources.openFileWithXMLSupport(selection);
                     //loadedResources.openFile(new FileInputStream(selection));
-                    File codenameone_settings = new File(selection.getParentFile().getParentFile(), "codenameone_settings.properties");
+                    File codenameone_settings = new File(projectDirOfResourceFile(selection), ProjectLayout.SETTINGS_FILE);
                     if(codenameone_settings.exists()) {
                         projectGeneratorSettings = new Properties();
                         InputStream i = new FileInputStream(codenameone_settings);
@@ -4171,7 +4203,7 @@ public static void openInIDE(File f, int lineNumber) {
         Properties p = projectGeneratorSettings;
         if(p != null) {
             p.setProperty("mainForm", mainForm);
-            File codenameone_settings = new File(ResourceEditorView.getLoadedFile().getParentFile().getParentFile(), "codenameone_settings.properties");
+            File codenameone_settings = new File(projectDirOfResourceFile(ResourceEditorView.getLoadedFile()), ProjectLayout.SETTINGS_FILE);
             if(codenameone_settings.exists()) {
                 OutputStream o = null;
                 try {
@@ -4288,7 +4320,7 @@ public static void openInIDE(File f, int lineNumber) {
 
                     // generate the code for the resource editor
                     if(projectGeneratorSettings != null) {
-                        File f = new File(loadedFile.getParentFile().getParentFile(), projectGeneratorSettings.getProperty("baseClass"));
+                        File f = new File(projectDirOfResourceFile(loadedFile), projectGeneratorSettings.getProperty("baseClass"));
                         if(f.exists()) {
                             String formName = projectGeneratorSettings.getProperty("mainForm");
                             if(loadedResources.getResourceObject(formName) == null) {

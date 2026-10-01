@@ -24,6 +24,7 @@ on:
       - 'Ports/JavaSE/src/**'
       - 'maven/css-compiler/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
   push:
     branches:
       - master
@@ -40,6 +41,7 @@ on:
       - 'Ports/JavaSE/src/**'
       - 'maven/css-compiler/**'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+      - 'maven/build-engine/src/main/java/com/codename1/maven/**'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;

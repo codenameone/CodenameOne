@@ -178,6 +178,17 @@
             <artifactId>codenameone-build-hint-catalog</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!--
+            Where the running project keeps its settings, sources, CSS and
+            compiled classes, for Ant, Maven and Gradle alike. The simulator's
+            hot reload, CSS watcher and component inspector ask it rather than
+            each assuming the Maven layout. Plain Java with no dependencies.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-project-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>

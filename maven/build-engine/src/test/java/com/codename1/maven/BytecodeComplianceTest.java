@@ -1,0 +1,1081 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+class BytecodeComplianceTest {
+    @Test
+    void detectsForbiddenMethodReferenceWithSourceDetails(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+
+        writeClass(outputDir, "app/Caller", "forbidden/Api", "m", "()V");
+        Path runtimeDir = tempDir.resolve("runtime");
+        Files.createDirectories(runtimeDir);
+        writeJavaLangObject(runtimeDir);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> runtimeIndex = buildClassIndex(mojo, Collections.singletonList(runtimeDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, runtimeIndex, Collections.<String, Object>emptyMap());
+
+        assertEquals(1, violations.size());
+        Object violation = violations.get(0);
+        assertEquals("app/Caller", field(violation, "sourceClass"));
+        assertEquals("run()V", field(violation, "sourceMethod"));
+        assertEquals("forbidden/Api#m()V", field(violation, "referencedMember"));
+    }
+
+    @Test
+    void allowsMethodReferenceWhenPresentInAllowedApiIndex(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeClass(outputDir, "app/Caller", "allowed/Api", "m", "()V");
+        writeApiClass(allowedDir, "allowed/Api", "m", "()V");
+        writeJavaLangObject(allowedDir);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+        assertTrue(violations.isEmpty(), "Expected no violations when method exists in allowed API index");
+    }
+
+    @Test
+    void allowsMethodReferenceWhenPresentInProjectDependencyIndex(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path dependencyDir = tempDir.resolve("dependency");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(dependencyDir);
+
+        writeClass(outputDir, "app/Caller", "dep/Helper", "ok", "()V");
+        writeApiClass(dependencyDir, "dep/Helper", "ok", "()V");
+        writeJavaLangObject(dependencyDir);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> dependencyIndex = buildClassIndex(mojo, Collections.singletonList(dependencyDir.toFile()));
+
+        List<?> violations = scanProjectClasses(mojo, outputDir, Collections.<String, Object>emptyMap(), dependencyIndex);
+        assertTrue(violations.isEmpty(), "Expected no violations when method exists in project/dependency index");
+    }
+
+
+    /// Gradle's Kotlin pass runs before javac, so the project's Java classes are
+    /// known only by their sources; a reference to one, or to a class nested in
+    /// one, is the project's own. Anything else is still checked.
+    @Test
+    void pendingProjectClassesAreTheProjectsOwn(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        writeClass(outputDir, "app/KotlinCaller", "app/JavaHelper", "help", "()V");
+        writeClass(outputDir, "app/KotlinNested", "app/JavaHelper$Inner", "help", "()V");
+        writeClass(outputDir, "app/KotlinForbidden", "forbidden/Api", "m", "()V");
+
+        Path runtimeDir = tempDir.resolve("runtime");
+        Files.createDirectories(runtimeDir);
+        writeJavaLangObject(runtimeDir);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty())
+                .pendingProjectClasses(Collections.singleton("app/JavaHelper"));
+        Map<String, ?> runtimeIndex = buildClassIndex(mojo, Collections.singletonList(runtimeDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, runtimeIndex, Collections.<String, Object>emptyMap());
+
+        assertEquals(1, violations.size(), String.valueOf(violations));
+        assertEquals("forbidden/Api#m()V", field(violations.get(0), "referencedMember"));
+    }
+
+    @Test
+    void allowsInheritedMethodAcrossProjectAndAllowedIndexes(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Path dependencyDir = tempDir.resolve("dependency");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+        Files.createDirectories(dependencyDir);
+
+        writeClass(outputDir, "app/Caller", "dep/Sub", "inherited", "()V");
+        writeApiClass(allowedDir, "allowed/Base", "inherited", "()V");
+        writeJavaLangObject(allowedDir);
+        writeSubclass(dependencyDir, "dep/Sub", "allowed/Base");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        Map<String, ?> dependencyIndex = buildClassIndex(mojo, Collections.singletonList(dependencyDir.toFile()));
+
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, dependencyIndex);
+        assertTrue(violations.isEmpty(), "Expected no violations when owner inherits allowed member through superclass in allowed index");
+    }
+
+
+    @Test
+    void rewritesClassMajorVersionAboveJava17(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeClassWithVersion(outputDir, "app/TooNew", Opcodes.V17 + 1);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        int rewritten = enforceMaxClassVersion(mojo, outputDir.toFile(), Opcodes.V17);
+
+        assertEquals(1, rewritten, "Expected one class to be rewritten");
+        assertEquals(Opcodes.V17, readMajorVersion(classFile), "Expected rewritten class major version to be Java 17 (61)");
+    }
+
+    @Test
+    void rewritesStringSplitInvocations(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeStringApiUsageClass(outputDir, "app/StringApiUser");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        byte[] rewritten = Files.readAllBytes(classFile);
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "split", "(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    @Test
+    void rewritesStringReplaceAllInvocations(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeStringRegexInvocationClass(outputDir, "app/StringReplaceAllUser", "replaceAll");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        byte[] rewritten = Files.readAllBytes(classFile);
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceAll", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    @Test
+    void rewritesStringReplaceFirstInvocations(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeStringRegexInvocationClass(outputDir, "app/StringReplaceFirstUser", "replaceFirst");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        byte[] rewritten = Files.readAllBytes(classFile);
+        assertTrue(containsMethodInsn(rewritten, "com/codename1/impl/JdkApiRewriteHelper", "replaceFirst", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", Opcodes.INVOKESTATIC));
+    }
+
+    @Test
+    void allowsRewriteHelperCallsAfterSplitRewrite(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        writeStringApiUsageClass(outputDir, "app/StringApiUser");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        applyInvocationRewrites(mojo, outputDir.toFile());
+
+        List<?> violations = scanProjectClasses(mojo, outputDir, Collections.<String, Object>emptyMap(), Collections.<String, Object>emptyMap());
+        assertFalse(hasViolationForReferencePrefix(violations, "com/codename1/impl/JdkApiRewriteHelper#"),
+                "Expected no violations for internal rewrite helper callsites after rewrite");
+    }
+
+    @Test
+    void skipsModuleInfoAndMultiReleaseJarEntries(@TempDir Path tempDir) throws Exception {
+        Path jarFile = tempDir.resolve("deps.jar");
+        writeJar(jarFile,
+                new JarEntryBytes("module-info.class", new byte[]{0x1, 0x2, 0x3}),
+                new JarEntryBytes("META-INF/versions/21/bad/TooNew.class", new byte[]{0x4, 0x5, 0x6}),
+                new JarEntryBytes("good/Api.class", classBytes("good/Api")));
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> index = buildClassIndex(mojo, Collections.singletonList(jarFile.toFile()));
+
+        assertEquals(1, index.size(), "Expected only the real API class to be indexed");
+        assertTrue(index.containsKey("good/Api"), "Expected valid class entry to be indexed");
+    }
+
+    @Test
+    void skipsUnreadableJarClassEntriesInsteadOfFailing(@TempDir Path tempDir) throws Exception {
+        Path jarFile = tempDir.resolve("deps.jar");
+        writeJar(jarFile,
+                new JarEntryBytes("good/Api.class", classBytes("good/Api")),
+                new JarEntryBytes("broken/Broken.class", new byte[]{0x1, 0x2, 0x3, 0x4}));
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> index = buildClassIndex(mojo, Collections.singletonList(jarFile.toFile()));
+
+        assertTrue(index.containsKey("good/Api"), "Expected valid class to be indexed");
+        assertEquals(1, index.size(), "Expected invalid class entry to be skipped");
+    }
+
+    @Test
+    void buildFailureSummaryUsesReadableBulletFormat(@TempDir Path tempDir) throws Exception {
+        Path reportFile = tempDir.resolve("codenameone").resolve("compliance_check.txt");
+        Files.createDirectories(reportFile.getParent());
+        Files.write(reportFile, new byte[0]);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        setField(mojo, "complianceOutputFile", reportFile.toFile());
+        List<Object> violations = new ArrayList<Object>();
+        violations.add(newViolation("app/Caller", "run()V", "forbidden/Api#m()V", null, "app/Caller.class"));
+
+        String summary = buildFailureSummary(mojo, violations);
+        assertTrue(summary.contains("Compliance check failed with 1 forbidden API reference."), "Expected count in summary");
+        assertTrue(summary.contains("First 1 violation(s):"), "Expected first violations header");
+        assertTrue(summary.contains("\n - app/Caller#run()V -> forbidden/Api#m()V (app/Caller.class)"), "Expected bullet line with source path");
+        assertFalse(summary.contains(" | "), "Expected no pipe-delimited single-line formatting");
+    }
+
+    @Test
+    void includesProvidedScopeDependenciesInComplianceScan(@TempDir Path tempDir) throws Exception {
+        Path providedJar = tempDir.resolve("provided.jar");
+        writeJar(providedJar, new JarEntryBytes("dep/ProvidedApi.class", classBytes("dep/ProvidedApi")));
+
+        TestProjectHost host = TestProjectHost.empty();
+        host.artifacts.add(TestProjectHost.artifact("dep-provided", "provided", providedJar.toFile()));
+        BytecodeCompliance mojo = new BytecodeCompliance(host);
+
+        List<?> jars = getDependencyJarsForScanning(mojo);
+        assertEquals(1, jars.size(), "Expected provided-scope jar to be included for compliance scanning");
+    }
+
+    @Test
+    void includesCn1libArtifactsInComplianceScan(@TempDir Path tempDir) throws Exception {
+        Path cn1lib = tempDir.resolve("maps.cn1lib");
+        writeJar(cn1lib, new JarEntryBytes("dep/MapContainer.class", classBytes("dep/MapContainer")));
+
+        TestProjectHost host = TestProjectHost.empty();
+        host.artifacts.add(TestProjectHost.artifact("maps-lib", "compile", cn1lib.toFile()));
+        BytecodeCompliance mojo = new BytecodeCompliance(host);
+
+        List<?> jars = getDependencyJarsForScanning(mojo);
+        assertEquals(1, jars.size(), "Expected .cn1lib artifact to be included for compliance scanning");
+    }
+
+    @Test
+    void indexesClassesInsideNestedArchivesInCn1lib(@TempDir Path tempDir) throws Exception {
+        Path cn1lib = tempDir.resolve("maps.cn1lib");
+        byte[] nestedZipBytes = zipBytes(new JarEntryBytes("dep/NestedApi.class", classBytes("dep/NestedApi")));
+        writeJar(cn1lib, new JarEntryBytes("META-INF/cn1lib/nativejavase.zip", nestedZipBytes));
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> index = buildClassIndex(mojo, Collections.singletonList(cn1lib.toFile()));
+        assertTrue(index.containsKey("dep/NestedApi"), "Expected class in nested cn1lib archive to be indexed");
+    }
+
+    @Test
+    void allowsSimdAllocaValuePassedToSimdMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaOk", AllocaUsage.SIMD_METHOD);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertFalse(hasViolationForReferencePrefix(violations, "SIMD alloca value"),
+                "Expected no SIMD alloca violations when scratch arrays stay within Simd calls");
+    }
+
+    @Test
+    void rejectsSimdAllocaValuePassedToNonSimdMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaBadCall", AllocaUsage.NON_SIMD_METHOD);
+        writeByteArrayConsumer(outputDir, "app/Helper");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        Map<String, ?> projectIndex = buildClassIndex(mojo, Collections.singletonList(outputDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, projectIndex);
+
+        assertTrue(hasViolationForReferencePrefix(violations, "SIMD alloca value passed to non-Simd method app/Helper#consume([B)V"),
+                "Expected SIMD alloca verifier to reject non-Simd method calls");
+    }
+
+    @Test
+    void rejectsSimdAllocaValueReturnedFromMethod(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeSimdApi(allowedDir);
+        writeAllocaCaller(outputDir, "app/AllocaBadReturn", AllocaUsage.RETURN_VALUE);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertTrue(hasViolationForReferencePrefix(violations, "SIMD alloca value returned from method"),
+                "Expected SIMD alloca verifier to reject returning scratch arrays");
+    }
+
+    /**
+     * The rule has always named all eight wrappers, but only Integer was ever exercised.
+     * ParparVM now returns a tagged immediate from valueOf for Long, Double, Float,
+     * Character and Short as well, and a monitor attached to an immediate is never
+     * reclaimed -- there is no object death to trigger removal -- so this build-time
+     * refusal is the only thing standing between an application and an unbounded
+     * side-table leak. A rule that is only proven for one of the types it claims to cover
+     * is not a rule anyone should rely on, so prove it for each.
+     *
+     * A loop rather than @ParameterizedTest: this module depends on junit-jupiter-api and
+     * -engine only, and adding junit-jupiter-params to a Maven plugin's pom for one test is
+     * not worth it. The assertion message carries the wrapper so a failure still names it.
+     */
+    @Test
+    void rejectsSynchronizationOnEveryPrimitiveWrapper(@TempDir Path tempDir) throws Exception {
+        String[][] wrappers = {
+                { "java/lang/Integer", "(I)Ljava/lang/Integer;" },
+                { "java/lang/Long", "(J)Ljava/lang/Long;" },
+                { "java/lang/Double", "(D)Ljava/lang/Double;" },
+                { "java/lang/Float", "(F)Ljava/lang/Float;" },
+                { "java/lang/Character", "(C)Ljava/lang/Character;" },
+                { "java/lang/Short", "(S)Ljava/lang/Short;" },
+                { "java/lang/Byte", "(B)Ljava/lang/Byte;" },
+                { "java/lang/Boolean", "(Z)Ljava/lang/Boolean;" }
+        };
+        for (int i = 0; i < wrappers.length; i++) {
+            String owner = wrappers[i][0];
+            String descriptor = wrappers[i][1];
+            String simpleName = owner.substring(owner.lastIndexOf('/') + 1);
+
+            Path outputDir = tempDir.resolve(simpleName + "-classes");
+            Path allowedDir = tempDir.resolve(simpleName + "-allowed");
+            Files.createDirectories(outputDir);
+            Files.createDirectories(allowedDir);
+
+            writeJavaLangObject(allowedDir);
+            writePrimitiveWrapperApi(allowedDir, owner, "valueOf", descriptor);
+            writePrimitiveWrapperSynchronizedClass(outputDir, "app/" + simpleName + "LockUser",
+                    owner, "valueOf", descriptor);
+
+            BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+            Map<String, ?> allowedIndex = buildClassIndex(mojo,
+                    Collections.singletonList(allowedDir.toFile()));
+            List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex,
+                    Collections.<String, Object>emptyMap());
+
+            assertTrue(hasViolationForReferencePrefix(violations,
+                            "Synchronization on primitive wrapper " + owner),
+                    "Expected synchronization on " + owner + " to be rejected");
+        }
+    }
+
+    @Test
+    void allowsSynchronizationOnDedicatedObjectLock(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeObjectSynchronizedClass(outputDir, "app/ObjectLockUser");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertFalse(hasViolationForReferencePrefix(violations, "Synchronization on primitive wrapper"),
+                "Expected synchronization on a normal Object lock to remain allowed");
+    }
+
+    @Test
+    void recognizesAllSimdAllocaHelperNames() throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("isSimdAllocaMethod", String.class, String.class, String.class);
+        method.setAccessible(true);
+
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteFilled", "(IB)[B")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)[I")).booleanValue());
+        assertTrue(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaFloatZeroed", "(I)[F")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "alloca", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocate", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocation", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaByteZeroed", "(I)I")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocaIntFilled", "(II)Ljava/lang/Object;")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "com/codename1/util/Simd", "allocByte", "(I)[B")).booleanValue());
+        assertFalse(((Boolean) method.invoke(null, "app/Other", "allocaByte", "(I)[B")).booleanValue());
+    }
+
+    @Test
+    void rerunsComplianceCheckWhenClassesRecompiledWithoutSourceChange(@TempDir Path tempDir) throws Exception {
+        BytecodeCompliance mojo = newMojoForSkipCheck(tempDir);
+        long markerTime = markerFile(mojo).lastModified();
+
+        Path classFile = writeClassWithVersion(outputDir(mojo), "app/Stable", Opcodes.V1_8);
+        assertTrue(classFile.toFile().setLastModified(markerTime - 60000));
+        assertFalse(hasChangedSinceLastCheck(mojo),
+                "Expected skip when classes are older than the last compliance check");
+
+        // The rewrites mutate target/classes in place; a recompile with
+        // unchanged sources regenerates the classes and must invalidate the
+        // skip or the rewrites are silently lost.
+        assertTrue(classFile.toFile().setLastModified(markerTime + 60000));
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when classes are newer than the last compliance check");
+    }
+
+    @Test
+    void rerunsComplianceCheckWhenKotlinIncrementalClassesAreNewer(@TempDir Path tempDir) throws Exception {
+        BytecodeCompliance mojo = newMojoForSkipCheck(tempDir);
+        long markerTime = markerFile(mojo).lastModified();
+
+        Path kotlinIcDir = tempDir.resolve("ios").resolve("target")
+                .resolve("kotlin-ic").resolve("compile").resolve("classes");
+        Path kotlinClass = writeClassWithVersion(kotlinIcDir, "app/FromKotlinIc", Opcodes.V1_8);
+        assertTrue(kotlinClass.toFile().setLastModified(markerTime + 60000));
+
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when the Kotlin incremental output tree has classes newer than the last check");
+    }
+
+    @Test
+    void rerunsComplianceCheckAfterPreviousFailureReport(@TempDir Path tempDir) throws Exception {
+        BytecodeCompliance mojo = newMojoForSkipCheck(tempDir);
+        java.io.File marker = markerFile(mojo);
+        long markerTime = marker.lastModified();
+        Files.write(marker.toPath(),
+                "Codename One compliance check failed.\nProject: test\n".getBytes("UTF-8"));
+        assertTrue(marker.setLastModified(markerTime));
+
+        assertTrue(hasChangedSinceLastCheck(mojo),
+                "Expected re-run when the previous check recorded violations, even with nothing newer");
+    }
+
+    private BytecodeCompliance newMojoForSkipCheck(Path tempDir) throws Exception {
+        Path iosDir = tempDir.resolve("ios");
+        Path commonDir = tempDir.resolve("common");
+        Files.createDirectories(iosDir.resolve("target").resolve("codenameone"));
+        Files.createDirectories(commonDir);
+
+        long base = System.currentTimeMillis();
+        Path settings = commonDir.resolve("codenameone_settings.properties");
+        Files.write(settings, new byte[0]);
+        assertTrue(settings.toFile().setLastModified(base - 120000));
+
+        Path marker = iosDir.resolve("target").resolve("codenameone").resolve("compliance_check.txt");
+        Files.write(marker, "Completed compliance check on test\n".getBytes("UTF-8"));
+        assertTrue(marker.toFile().setLastModified(base));
+
+        // What the Maven plugin answers for the ios module of this layout: its own
+        // target/, and the common module's sources (the settings file here).
+        TestProjectHost host = TestProjectHost.empty();
+        host.buildDir = iosDir.resolve("target").toFile();
+        host.outputDir = iosDir.resolve("target").resolve("classes").toFile();
+        host.sourcesModified = settings.toFile().lastModified();
+        BytecodeCompliance mojo = new BytecodeCompliance(host);
+        setField(mojo, "complianceOutputFile", marker.toFile());
+        return mojo;
+    }
+
+    private java.io.File markerFile(BytecodeCompliance mojo) throws Exception {
+        return (java.io.File) field(mojo, "complianceOutputFile");
+    }
+
+    private Path outputDir(BytecodeCompliance mojo) throws Exception {
+        return java.nio.file.Paths.get(((TestProjectHost) field(mojo, "host")).outputDir.getPath());
+    }
+
+    private boolean hasChangedSinceLastCheck(BytecodeCompliance mojo) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("hasChangedSinceLastCheck");
+        method.setAccessible(true);
+        return ((Boolean) method.invoke(mojo)).booleanValue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, ?> buildClassIndex(BytecodeCompliance mojo, List<java.io.File> roots) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("buildClassIndex", List.class);
+        method.setAccessible(true);
+        return (Map<String, ?>) method.invoke(mojo, roots);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<?> scanProjectClasses(BytecodeCompliance mojo, Path outputDir, Map<String, ?> allowedIndex, Map<String, ?> projectAndDependencyIndex) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("scanProjectClasses", java.io.File.class, Map.class, Map.class);
+        method.setAccessible(true);
+        return (List<?>) method.invoke(mojo, outputDir.toFile(), allowedIndex, projectAndDependencyIndex);
+    }
+
+    private Object field(Object target, String name) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
+    private boolean hasViolationForReferencePrefix(List<?> violations, String prefix) throws Exception {
+        for (Object violation : violations) {
+            Object referenced = field(violation, "referencedMember");
+            if (referenced != null && referenced.toString().startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void setField(Object target, String name, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private String buildFailureSummary(BytecodeCompliance mojo, List<?> violations) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("buildFailureSummary", List.class);
+        method.setAccessible(true);
+        return (String) method.invoke(mojo, violations);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<?> getDependencyJarsForScanning(BytecodeCompliance mojo) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("getDependencyJarsForScanning");
+        method.setAccessible(true);
+        return (List<?>) method.invoke(mojo);
+    }
+
+    private Object newViolation(String sourceClass, String sourceMethod, String referencedMember, String suggestion, String sourcePath) throws Exception {
+        Class<?> violationClass = Class.forName("com.codename1.maven.BytecodeCompliance$Violation");
+        java.lang.reflect.Constructor<?> ctor = violationClass.getDeclaredConstructor(String.class, String.class, String.class, String.class, String.class);
+        ctor.setAccessible(true);
+        return ctor.newInstance(sourceClass, sourceMethod, referencedMember, suggestion, sourcePath);
+    }
+
+
+    /**
+     * Capping a class version invalidates the build hint manifest's digest, and
+     * re-stamping repairs it.
+     *
+     * <p>The manifest records the main class's own bytes so the simulator, which
+     * has no bytecode reader, can tell a current manifest from a leftover. Both
+     * rewrites in this mojo change those bytes in place, so a manifest written
+     * before them describes a class that no longer exists on disk: the simulator
+     * reads it as stale and publishes none of the annotated hints. Whichever of
+     * this goal and process-annotations runs last has to leave the stamp
+     * describing the class that is actually there.</p>
+     */
+    @Test
+    void rewritingAClassInvalidatesTheBuildHintStampUntilItIsTakenAgain(@TempDir Path tempDir)
+            throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeClassWithVersion(outputDir, "app/TooNew", Opcodes.V17 + 1);
+
+        Path manifest = outputDir.resolve("META-INF/codenameone/build-hints.properties");
+        Files.createDirectories(manifest.getParent());
+        Files.write(manifest,
+                ("cn1.buildHints.mainClass=app.TooNew\n"
+                        + "cn1.buildHints.classDigest=" + sha256Of(classFile.toFile()) + "\n"
+                        + "codename1.arg.desktop.titleBar=NATIVE\n").getBytes("ISO-8859-1"));
+        String before = digestIn(manifest);
+        assertEquals(sha256Of(classFile.toFile()), before, "the stamp should start out correct");
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        assertEquals(1, enforceMaxClassVersion(mojo, outputDir.toFile(), Opcodes.V17));
+
+        assertFalse(sha256Of(classFile.toFile()).equals(before),
+                "capping the version should have changed the class on disk");
+
+        com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .restampClassDigest(outputDir.toFile());
+
+        assertEquals(sha256Of(classFile.toFile()), digestIn(manifest),
+                "the stamp still describes the class as it was before the rewrite");
+        assertTrue(new String(Files.readAllBytes(manifest), "ISO-8859-1")
+                        .contains("codename1.arg.desktop.titleBar=NATIVE"),
+                "re-stamping must leave the hints alone");
+    }
+
+    private static String digestIn(Path manifest) throws Exception {
+        java.util.Properties p = new java.util.Properties();
+        java.io.InputStream in = Files.newInputStream(manifest);
+        try {
+            p.load(in);
+        } finally {
+            in.close();
+        }
+        return p.getProperty("cn1.buildHints.classDigest");
+    }
+
+    private static String sha256Of(java.io.File f) throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        md.update(Files.readAllBytes(f.toPath()));
+        StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest()) {
+            hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+            hex.append(Character.forDigit(b & 0xF, 16));
+        }
+        return hex.toString();
+    }
+
+    private int enforceMaxClassVersion(BytecodeCompliance mojo, java.io.File outputDir, int maxVersion) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("enforceMaxClassVersion", java.io.File.class, int.class);
+        method.setAccessible(true);
+        return ((Integer) method.invoke(mojo, outputDir, maxVersion)).intValue();
+    }
+
+    private void applyInvocationRewrites(BytecodeCompliance mojo, java.io.File outputDir) throws Exception {
+        Method method = BytecodeCompliance.class.getDeclaredMethod("applyInvocationRewrites", java.io.File.class);
+        method.setAccessible(true);
+        method.invoke(mojo, outputDir);
+    }
+
+    private int readMajorVersion(Path classFile) throws Exception {
+        byte[] bytes = Files.readAllBytes(classFile);
+        return ((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF);
+    }
+
+    private Path writeClassWithVersion(Path root, String className, int version) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(version, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        writer.visitEnd();
+        Path classFile = root.resolve(className + ".class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, writer.toByteArray());
+        return classFile;
+    }
+
+    private Path writeStringApiUsageClass(Path root, String className) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitLdcInsn("a,b");
+        run.visitLdcInsn(",");
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "split", "(Ljava/lang/String;)[Ljava/lang/String;", false);
+        run.visitInsn(Opcodes.POP);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 0);
+        run.visitEnd();
+
+        writer.visitEnd();
+        Path classFile = root.resolve(className + ".class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, writer.toByteArray());
+        return classFile;
+    }
+
+    private Path writeStringRegexInvocationClass(Path root, String className, String methodName) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitLdcInsn("aaa");
+        run.visitLdcInsn("a");
+        run.visitLdcInsn("b");
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", methodName, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", false);
+        run.visitInsn(Opcodes.POP);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(3, 0);
+        run.visitEnd();
+
+        writer.visitEnd();
+        Path classFile = root.resolve(className + ".class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, writer.toByteArray());
+        return classFile;
+    }
+
+    private boolean containsMethodInsn(byte[] classBytes, final String owner, final String name, final String descriptor, final int opcode) {
+        final boolean[] found = new boolean[]{false};
+        ClassReader reader = new ClassReader(classBytes);
+        reader.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String methodName, String methodDescriptor, String signature, String[] exceptions) {
+                return new MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitMethodInsn(int seenOpcode, String seenOwner, String seenName, String seenDescriptor, boolean isInterface) {
+                        if (seenOpcode == opcode && owner.equals(seenOwner) && name.equals(seenName) && descriptor.equals(seenDescriptor)) {
+                            found[0] = true;
+                        }
+                    }
+                };
+            }
+        }, 0);
+        return found[0];
+    }
+
+    private void writeClass(Path root, String className, String owner, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitMethodInsn(Opcodes.INVOKESTATIC, owner, methodName, descriptor, false);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(0, 1);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeAllocaCaller(Path root, String className, AllocaUsage usage) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", usage == AllocaUsage.RETURN_VALUE ? "()[B" : "()V", null, null);
+        run.visitCode();
+        run.visitTypeInsn(Opcodes.NEW, "com/codename1/util/Simd");
+        run.visitInsn(Opcodes.DUP);
+        run.visitMethodInsn(Opcodes.INVOKESPECIAL, "com/codename1/util/Simd", "<init>", "()V", false);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitIntInsn(Opcodes.BIPUSH, 16);
+        run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "com/codename1/util/Simd", "allocaByte", "(I)[B", false);
+        if (usage == AllocaUsage.RETURN_VALUE) {
+            run.visitInsn(Opcodes.ARETURN);
+            run.visitMaxs(2, 1);
+            run.visitEnd();
+            writer.visitEnd();
+            writeBytes(root, className, writer.toByteArray());
+            return;
+        }
+        run.visitVarInsn(Opcodes.ASTORE, 1);
+        if (usage == AllocaUsage.SIMD_METHOD) {
+            run.visitVarInsn(Opcodes.ALOAD, 0);
+            run.visitVarInsn(Opcodes.ALOAD, 1);
+            run.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "com/codename1/util/Simd", "consume", "([B)V", false);
+        } else {
+            run.visitVarInsn(Opcodes.ALOAD, 1);
+            run.visitMethodInsn(Opcodes.INVOKESTATIC, "app/Helper", "consume", "([B)V", false);
+        }
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 2);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    /** The 1 constant in the argument type the given valueOf descriptor expects. */
+    private static int constantForDescriptor(String descriptor) {
+        char arg = descriptor.charAt(1);
+        if (arg == 'J') {
+            return Opcodes.LCONST_1;
+        }
+        if (arg == 'D') {
+            return Opcodes.DCONST_1;
+        }
+        if (arg == 'F') {
+            return Opcodes.FCONST_1;
+        }
+        return Opcodes.ICONST_1;
+    }
+
+    private void writePrimitiveWrapperSynchronizedClass(Path root, String className, String owner, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        // The constant has to match the wrapper's own valueOf argument, or the analyzer sees
+        // a type-incorrect frame instead of the MONITORENTER this test is about. Long and
+        // double occupy two stack slots, which is why maxStack below is 4 rather than 2.
+        run.visitInsn(constantForDescriptor(descriptor));
+        run.visitMethodInsn(Opcodes.INVOKESTATIC, owner, methodName, descriptor, false);
+        run.visitInsn(Opcodes.DUP);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitInsn(Opcodes.MONITORENTER);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitInsn(Opcodes.MONITOREXIT);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(4, 1);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeObjectSynchronizedClass(Path root, String className) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitTypeInsn(Opcodes.NEW, "java/lang/Object");
+        run.visitInsn(Opcodes.DUP);
+        run.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        run.visitInsn(Opcodes.DUP);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitInsn(Opcodes.MONITORENTER);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitInsn(Opcodes.MONITOREXIT);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 1);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+
+    private void writeSubclass(Path root, String className, String superName) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, superName, null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writePrimitiveWrapperApi(Path root, String className, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
+
+        MethodVisitor valueOf = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, methodName, descriptor, null, null);
+        valueOf.visitCode();
+        valueOf.visitInsn(Opcodes.ACONST_NULL);
+        valueOf.visitInsn(Opcodes.ARETURN);
+        valueOf.visitMaxs(1, 1);
+        valueOf.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeApiClass(Path root, String className, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor api = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, methodName, descriptor, null, null);
+        api.visitCode();
+        api.visitInsn(Opcodes.RETURN);
+        api.visitMaxs(0, 0);
+        api.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeSimdApi(Path root) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "com/codename1/util/Simd", null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor alloca = writer.visitMethod(Opcodes.ACC_PUBLIC, "allocaByte", "(I)[B", null, null);
+        alloca.visitCode();
+        alloca.visitInsn(Opcodes.ACONST_NULL);
+        alloca.visitInsn(Opcodes.ARETURN);
+        alloca.visitMaxs(1, 2);
+        alloca.visitEnd();
+
+        MethodVisitor consume = writer.visitMethod(Opcodes.ACC_PUBLIC, "consume", "([B)V", null, null);
+        consume.visitCode();
+        consume.visitInsn(Opcodes.RETURN);
+        consume.visitMaxs(0, 2);
+        consume.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, "com/codename1/util/Simd", writer.toByteArray());
+    }
+
+    private void writeByteArrayConsumer(Path root, String className) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        MethodVisitor consume = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "consume", "([B)V", null, null);
+        consume.visitCode();
+        consume.visitInsn(Opcodes.RETURN);
+        consume.visitMaxs(0, 1);
+        consume.visitEnd();
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+
+    private void writeJavaLangObject(Path root) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "java/lang/Object", null, null, null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(0, 1);
+        init.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, "java/lang/Object", writer.toByteArray());
+    }
+
+    private void writeBytes(Path root, String className, byte[] bytes) throws Exception {
+        Path classFile = root.resolve(className + ".class");
+        Files.createDirectories(classFile.getParent());
+        Files.write(classFile, bytes);
+    }
+
+    private byte[] classBytes(String className) {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    private void writeJar(Path jarPath, JarEntryBytes... entries) throws Exception {
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jarPath))) {
+            for (JarEntryBytes entry : entries) {
+                out.putNextEntry(new JarEntry(entry.path));
+                out.write(entry.bytes);
+                out.closeEntry();
+            }
+        }
+    }
+
+    private byte[] zipBytes(JarEntryBytes... entries) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (JarOutputStream out = new JarOutputStream(bytes)) {
+            for (JarEntryBytes entry : entries) {
+                out.putNextEntry(new JarEntry(entry.path));
+                out.write(entry.bytes);
+                out.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    private static class JarEntryBytes {
+        private final String path;
+        private final byte[] bytes;
+
+        private JarEntryBytes(String path, byte[] bytes) {
+            this.path = path;
+            this.bytes = bytes;
+        }
+    }
+
+    private enum AllocaUsage {
+        SIMD_METHOD,
+        NON_SIMD_METHOD,
+        RETURN_VALUE
+    }
+}

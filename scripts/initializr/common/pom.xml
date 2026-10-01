@@ -477,6 +477,31 @@
                             </target>
                         </configuration>
                     </execution>
+                    <!--
+                      Build gradle.zip from the ONE Gradle project template: the
+                      directory maven/build-engine ships for the Maven plugin's
+                      -Dcn1.buildTool=gradle generator and the Gradle plugin's
+                      addBackend task. GeneratorModel renders its tokens and
+                      renames its files, so a Gradle project from the Initializr
+                      is the same as one from either plugin, with no second copy
+                      of the template to drift. Flat for the same classloader
+                      reason as skill.zip. Unix modes are not stored here:
+                      ProjectZipPermissions marks gradlew executable by name.
+                    -->
+                    <execution>
+                        <id>package-gradle-template</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <zip destfile="${project.build.outputDirectory}/gradle.zip">
+                                    <fileset dir="${project.basedir}/../../../maven/build-engine/src/main/resources/com/codename1/project/templates/gradle"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 

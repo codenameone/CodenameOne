@@ -27,18 +27,24 @@ include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generat
 This will generate the following files (if they don't exist yet).
 
 Java SE::
-`Java SE/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
-ios::
+`javase/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
+iOS::
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.h`
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m`
-android::
+Android::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
-android (optional Kotlin)::
+Android (optional Kotlin)::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.kt`
 JavaScript::
-`JavaScript/src/main/JavaScript/com_mycompany_myapp_MyNativeImpl.js`
-ios (optional Swift)::
+`javascript/src/main/javascript/com_mycompany_myapp_MyNative.js`
+iOS (optional Swift)::
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
+Native Windows::
+`win/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
+Native Linux::
+`linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
 
 Open and edit these files to implement your native interface methods as desired.
+
+A Gradle project runs the same generator as `./gradlew generateNativeInterfaces`, and writes the stubs under `src/<platform>/<lang>` instead; see <<gradle-native-interfaces>>.
 

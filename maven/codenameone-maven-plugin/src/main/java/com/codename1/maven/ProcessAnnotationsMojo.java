@@ -22,11 +22,6 @@
  */
 package com.codename1.maven;
 
-import com.codename1.maven.annotations.AnnotatedClass;
-import com.codename1.maven.annotations.AnnotationProcessor;
-import com.codename1.maven.annotations.ClassScanner;
-import com.codename1.maven.annotations.ProcessingException;
-import com.codename1.maven.annotations.ProcessorContext;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -37,17 +32,9 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
-import java.util.ServiceLoader;
-import java.util.Set;
 
 /// PROCESS_CLASSES Mojo. ASM-scans the project's compiled `.class` files,
 /// dispatches each annotated class to the registered `AnnotationProcessor`s,
@@ -98,190 +85,19 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             return;
         }
 
-        List<AnnotationProcessor> processors = loadProcessors();
-        if (processors.isEmpty()) {
-            getLog().debug("cn1: no AnnotationProcessor services registered — nothing to do");
-            return;
-        }
-
-        Map<String, AnnotatedClass> index;
         try {
-            index = ClassScanner.scan(outputDirectory);
-        } catch (ProcessingException e) {
-            throw new MojoExecutionException("Failed to scan compiled classes under "
-                    + outputDirectory + ": " + e.getMessage(), e);
+            new AnnotationProcessing(MavenLog.of(getLog()), outputDirectory, stubSourceDirectory,
+                    getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName(),
+                    // The roots Maven is actually compiling, and the charset javac is
+                    // given; see AnnotationProcessing.
+                    compileSourceRoots(project, userProperties()),
+                    sourceEncodingOf(project, userProperties()),
+                    compileClasspathOf(project)).run();
+        } catch (com.codename1.build.BuildFailureException e) {
+            throw new MojoFailureException(e.getMessage(), e.getCause() == null ? e : e.getCause());
+        } catch (com.codename1.build.BuildExecutionException e) {
+            throw new MojoExecutionException(e.getMessage(), e.getCause() == null ? e : e.getCause());
         }
-
-        ProcessorContext ctx = new ProcessorContext(outputDirectory, stubSourceDirectory,
-                index, getLog(), getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName(),
-                // The roots Maven is actually compiling, so a processor asking
-                // whether a class still has a source is not guessing at the
-                // layout.
-                compileSourceRoots(project, userProperties()),
-                // The charset javac is given, so a processor reading a source
-                // back decodes the text that was actually compiled rather than
-                // one of the single-byte encodings that all decode without
-                // error and disagree about every non-ASCII character.
-                sourceEncodingOf(project, userProperties()),
-                // Where the build hint annotations are, so the processor reads
-                // what a member sets from the annotation rather than from a
-                // generated table naming each of them.
-                compileClasspathOf(project));
-
-        // start()
-        for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
-            AnnotationProcessor p = it.next();
-            try {
-                p.start(ctx);
-            } catch (ProcessingException e) {
-                throw new MojoFailureException(
-                        "Annotation processor " + p.getClass().getName() + " start failed: "
-                                + e.getMessage(), e);
-            }
-        }
-
-        // processClass() — dispatched only when the class carries an annotation
-        // the processor declares interest in, anywhere in the class.
-        //
-        // The test is against getAllAnnotationDescriptors(), not
-        // getClassAnnotations(): a class whose only annotation sits on a method
-        // has an empty class-annotation map, so gating on that map alone would
-        // silently skip it. That is not hypothetical — it is exactly the shape
-        // of the documented static-factory @Route form and of an @AppIntent
-        // handler, and such a class would be dropped with no error anywhere.
-        for (AnnotatedClass cls : index.values()) {
-            Set<String> present = cls.getAllAnnotationDescriptors();
-            if (present.isEmpty()) continue;
-            for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
-                AnnotationProcessor p = it.next();
-                if (intersects(p.getAnnotationDescriptors(), present)) {
-                    try {
-                        p.processClass(cls, ctx);
-                    } catch (ProcessingException e) {
-                        throw new MojoFailureException(
-                                "Annotation processor " + p.getClass().getName() + " failed on class "
-                                        + cls.getBinaryName() + ": " + e.getMessage(), e);
-                    }
-                }
-            }
-        }
-
-        // finish()
-        for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
-            AnnotationProcessor p = it.next();
-            try {
-                p.finish(ctx);
-            } catch (ProcessingException e) {
-                throw new MojoFailureException(
-                        "Annotation processor " + p.getClass().getName() + " finish failed: "
-                                + e.getMessage(), e);
-            }
-        }
-
-        // Fail-fast: surface every recoverable error and abort if any.
-        if (ctx.hasErrors()) {
-            StringBuilder sb = new StringBuilder("Codename One annotation processing failed:\n");
-            List<ProcessorContext.ProcessingError> errs = ctx.getErrors();
-            for (int i = 0; i < errs.size(); i++) {
-                sb.append("  - ").append(errs.get(i)).append('\n');
-            }
-            sb.append("Aborting before any generated class is written, so the build output reflects the source.");
-            throw new MojoFailureException(sb.toString());
-        }
-
-        // Flush emitted bytecode.
-        Map<String, byte[]> emitted = ctx.getEmittedClasses();
-        for (Map.Entry<String, byte[]> e : emitted.entrySet()) {
-            File target = new File(outputDirectory, e.getKey() + ".class");
-            File parent = target.getParentFile();
-            if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                throw new MojoExecutionException("Could not create " + parent);
-            }
-            try {
-                FileOutputStream fos = new FileOutputStream(target);
-                try {
-                    fos.write(e.getValue());
-                } finally {
-                    fos.close();
-                }
-            } catch (IOException ioe) {
-                throw new MojoExecutionException("Could not write generated class " + target, ioe);
-            }
-        }
-
-        for (AnnotationProcessor processor : processors) {
-            if (processor instanceof com.codename1.maven.processors.OrmAnnotationProcessor) {
-                try { ((com.codename1.maven.processors.OrmAnnotationProcessor) processor).enhance(ctx); }
-                catch (ProcessingException error) { throw new MojoFailureException(error.getMessage(),error); }
-            }
-        }
-
-        if (!emitted.isEmpty()) {
-            getLog().info("cn1: emitted " + emitted.size() + " generated class(es) under "
-                    + outputDirectory);
-        }
-
-        // Flush generated resources. These ride the project jar to the native
-        // builders -- including a cloud build server, which receives the whole
-        // artifact -- so they are how build-time metadata reaches the iOS and
-        // Android sides. Written after the error check for the same reason the
-        // classes are: a failed validation must not leave a manifest behind.
-        Map<String, byte[]> resources = ctx.getEmittedResources();
-        for (Map.Entry<String, byte[]> e : resources.entrySet()) {
-            File target = new File(outputDirectory, e.getKey());
-            File parent = target.getParentFile();
-            if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                throw new MojoExecutionException("Could not create " + parent);
-            }
-            try {
-                FileOutputStream fos = new FileOutputStream(target);
-                try {
-                    fos.write(e.getValue());
-                } finally {
-                    fos.close();
-                }
-            } catch (IOException ioe) {
-                throw new MojoExecutionException("Could not write generated resource " + target, ioe);
-            }
-        }
-
-        if (!resources.isEmpty()) {
-            getLog().info("cn1: emitted " + resources.size() + " generated resource(s) under "
-                    + outputDirectory);
-        }
-
-        // The build hint manifest records the main class's own bytes so the
-        // simulator, which has no bytecode reader, can tell a current manifest
-        // from one an earlier build left behind. A processor may REPLACE that
-        // class through emitClass -- BindingAnnotationProcessor does, for a
-        // two-way @Bindable setter -- and those are flushed above, after every
-        // finish(). So the stamp is corrected here, which is the first moment
-        // the class on disk is final. A no-op when there is no manifest.
-        try {
-            com.codename1.maven.processors.BuildHintAnnotationProcessor
-                    .restampClassDigest(outputDirectory);
-        } catch (IOException ioe) {
-            throw new MojoExecutionException(
-                    "Could not stamp the build hint manifest under " + outputDirectory, ioe);
-        }
-    }
-
-    private static boolean intersects(Set<String> a, Set<String> b) {
-        if (a == null || b == null || a.isEmpty() || b.isEmpty()) return false;
-        if (a.size() > b.size()) {
-            for (String s : b) if (a.contains(s)) return true;
-        } else {
-            for (String s : a) if (b.contains(s)) return true;
-        }
-        return false;
-    }
-
-    private List<AnnotationProcessor> loadProcessors() {
-        ServiceLoader<AnnotationProcessor> sl = ServiceLoader.load(
-                AnnotationProcessor.class, AnnotationProcessor.class.getClassLoader());
-        List<AnnotationProcessor> out = new ArrayList<AnnotationProcessor>();
-        for (AnnotationProcessor p : sl) out.add(p);
-        return Collections.unmodifiableList(out);
     }
 
     /// Loads `codenameone_settings.properties` exactly as it sits on disk.

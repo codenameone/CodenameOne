@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -12,17 +34,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Validates that a Codename One theme.css file compiles cleanly via the
-/// `com.codename1.ui.css.CSSThemeCompiler` API. Run **with** the codename-one
-/// jars on the classpath; the tool auto-discovers the latest version in
-/// ~/.m2/repository.
+/// `com.codename1.ui.css.CSSThemeCompiler` API. The tool auto-discovers the
+/// latest codename-one jars in the local Maven repository (~/.m2/repository) or
+/// the Gradle cache (~/.gradle/caches), whichever build filled them.
 ///
-/// Usage:
+/// Usage, from the project root:
 ///
-///     java tools/IsCssValid.java common/src/main/css/theme.css
+///     java tools/IsCssValid.java                               # finds the project's theme.css
+///     java tools/IsCssValid.java src/main/css/theme.css        # Gradle project
+///     java tools/IsCssValid.java common/src/main/css/theme.css # Maven project
 ///
-/// The tool locates `~/.m2/repository/com/codenameone/codenameone-core/<latest>/
-/// codenameone-core-<latest>.jar` (and a matching `java-runtime` jar) and runs
-/// the compiler via reflection. No need to pre-set `-cp` — the tool builds the
+/// With no argument it uses `src/main/css/theme.css` (a Gradle project) or
+/// `common/src/main/css/theme.css` (a Maven project) under the current directory.
+/// It locates the newest `codenameone-core` jar (and a matching `java-runtime`
+/// jar) and runs the compiler via reflection. No need to pre-set `-cp` -- the tool builds the
 /// classpath internally.
 ///
 /// Exit codes:
@@ -32,11 +57,16 @@ import java.util.List;
 ///   2 — discovery / classpath / usage error
 public class IsCssValid {
     public static void main(String[] args) throws Exception {
-        if (args.length != 1) {
-            System.err.println("Usage: java IsCssValid.java <path/to/theme.css>");
+        if (args.length > 1) {
+            System.err.println("Usage: java IsCssValid.java [path/to/theme.css]");
             System.exit(2);
         }
-        Path cssFile = Paths.get(args[0]);
+        Path cssFile = args.length == 1 ? Paths.get(args[0]) : findThemeCss();
+        if (cssFile == null) {
+            System.err.println("No theme.css found at src/main/css/theme.css (Gradle) or "
+                    + "common/src/main/css/theme.css (Maven). Pass its path.");
+            System.exit(2);
+        }
         if (!Files.isRegularFile(cssFile)) {
             System.err.println("Not a file: " + cssFile);
             System.exit(2);
@@ -46,7 +76,8 @@ public class IsCssValid {
         Path coreJar = findLatestJar("codenameone-core");
         Path runtimeJar = findLatestJar("java-runtime");
         if (coreJar == null) {
-            System.err.println("Could not locate codenameone-core jar in ~/.m2. Run `mvn -pl common compile` first.");
+            System.err.println("Could not locate a codenameone-core jar in ~/.m2 or the Gradle cache. Build the "
+                    + "project once first (`./gradlew classes` or `mvn -pl common compile`).");
             System.exit(2);
         }
         System.err.println("[IsCssValid] using core=" + coreJar
@@ -94,32 +125,61 @@ public class IsCssValid {
         System.out.println("VALID");
     }
 
+    /// A jar of a com.codenameone artifact, with the version it was published as.
+    record Candidate(String version, Path jar) { }
+
+    /// The newest jar of a com.codenameone artifact in either local cache: the
+    /// Maven repository (~/.m2/repository, filled by a Maven build) or the Gradle
+    /// cache ($GRADLE_USER_HOME, default ~/.gradle, filled by a Gradle build). A
+    /// project built with either tool therefore works without further setup.
     private static Path findLatestJar(String artifactId) throws IOException {
-        Path baseDir = Paths.get(System.getProperty("user.home"),
-                ".m2", "repository", "com", "codenameone", artifactId);
-        if (!Files.isDirectory(baseDir)) return null;
-        List<Path> candidates = new ArrayList<>();
+        List<Candidate> candidates = new ArrayList<>();
+        String home = System.getProperty("user.home");
+        collect(Paths.get(home, ".m2", "repository", "com", "codenameone", artifactId), artifactId, false, candidates);
+        String gradleHome = System.getenv("GRADLE_USER_HOME");
+        Path gradleBase = gradleHome != null && !gradleHome.isEmpty() ? Paths.get(gradleHome) : Paths.get(home, ".gradle");
+        collect(gradleBase.resolve(Paths.get("caches", "modules-2", "files-2.1", "com.codenameone", artifactId)),
+                artifactId, true, candidates);
+        if (candidates.isEmpty()) return null;
+        candidates.sort((a, b) -> compareVersions(b.version(), a.version()));
+        return candidates.get(0).jar();
+    }
+
+    /// Adds the jars under `baseDir/<version>/` (Maven) or
+    /// `baseDir/<version>/<sha1>/` (Gradle) to `out`.
+    private static void collect(Path baseDir, String artifactId, boolean hashed, List<Candidate> out) throws IOException {
+        if (!Files.isDirectory(baseDir)) return;
         try (DirectoryStream<Path> versions = Files.newDirectoryStream(baseDir)) {
             for (Path versionDir : versions) {
                 if (!Files.isDirectory(versionDir)) continue;
-                try (DirectoryStream<Path> jars = Files.newDirectoryStream(versionDir,
-                        artifactId + "-*.jar")) {
-                    for (Path jar : jars) {
-                        String n = jar.getFileName().toString();
-                        if (n.endsWith("-sources.jar") || n.endsWith("-javadoc.jar")) continue;
-                        candidates.add(jar);
+                List<Path> dirs = new ArrayList<>();
+                if (hashed) {
+                    try (DirectoryStream<Path> hashes = Files.newDirectoryStream(versionDir)) {
+                        for (Path h : hashes) if (Files.isDirectory(h)) dirs.add(h);
+                    }
+                } else {
+                    dirs.add(versionDir);
+                }
+                for (Path dir : dirs) {
+                    try (DirectoryStream<Path> jars = Files.newDirectoryStream(dir, artifactId + "-*.jar")) {
+                        for (Path jar : jars) {
+                            String n = jar.getFileName().toString();
+                            if (n.endsWith("-sources.jar") || n.endsWith("-javadoc.jar")) continue;
+                            out.add(new Candidate(versionDir.getFileName().toString(), jar));
+                        }
                     }
                 }
             }
         }
-        if (candidates.isEmpty()) return null;
-        candidates.sort((a, b) -> compareVersions(versionOf(b), versionOf(a)));
-        return candidates.get(0);
     }
 
-    private static String versionOf(Path jar) {
-        Path versionDir = jar.getParent();
-        return versionDir == null ? "" : versionDir.getFileName().toString();
+    /// The app's theme.css in whichever layout the current directory has.
+    private static Path findThemeCss() {
+        for (String candidate : new String[] {"src/main/css/theme.css", "common/src/main/css/theme.css"}) {
+            Path p = Paths.get(candidate);
+            if (Files.isRegularFile(p)) return p;
+        }
+        return null;
     }
 
     private static int compareVersions(String left, String right) {

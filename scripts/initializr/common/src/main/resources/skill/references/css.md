@@ -1,6 +1,8 @@
 # Codename One CSS Reference
 
-`common/src/main/css/theme.css` is the entry point. The CN1 plugin's CSS compiler (`compile-css` goal, runs in `process-resources`) parses it and bakes the result into `common/target/classes/theme.res`. The runtime then loads styles by UIID from that binary resource — no CSS exists at runtime.
+`src/main/css/theme.css` of the app is the entry point: `common/src/main/css/theme.css` in a Maven project, `src/main/css/theme.css` at the root of a Gradle project. The CN1 plugin's CSS compiler (the `cn1:css` goal in `process-resources` under Maven, the `cn1Css` task under Gradle) parses it and bakes the result into `theme.res` (`common/target/classes/` under Maven, the build directory under Gradle). The runtime then loads styles by UIID from that binary resource — no CSS exists at runtime.
+
+Paths in the rest of this file are Maven's; in a Gradle project drop the leading `common/`.
 
 This is **not** web CSS. It is a deliberate subset designed for native rendering on mobile. Treat any unfamiliar property as "probably unsupported" until you check.
 
@@ -557,7 +559,7 @@ Painters are for **drawing** (custom backgrounds, decorations), not for animatin
 | Padding ignored on the Form | You're setting padding on the Form itself; set it on its ContentPane or wrap content in your own UIID. |
 | Border radius animates jaggy | Border radius is rasterized at compile when using image fallbacks; switch to `RoundRectBorder` and animate via `Form.animateLayout(...)`. |
 | `text-align` does nothing | Add the `align` fallback (the initializr appends one automatically for `text-align`). |
-| New CSS only takes effect after restart | The build cache may be stale — `mvn -pl common clean compile`. |
+| New CSS only takes effect after restart | The build cache may be stale — `mvn -pl common clean compile` (Gradle: `./gradlew clean cn1Css`). |
 | 9-piece border looks blurry on iPhone Pro | Expected — 9-piece images are rasterized at the bundled resolution. Use a vector border (`RoundBorder`/`RoundRectBorder`) instead. |
 | Custom TTF doesn't render on device but works in simulator | The `@font-face` `src:` filename and the JS-side `Font.createTrueTypeFont(name, file)` filename must match exactly, and the file must end up packaged with the app. Re-check spelling and confirm the file is under `common/src/main/css/` (beside `theme.css` or in a subdirectory of it). |
 | Build fails with "Invalid @font-face rules" | Read the listed reasons — a container the runtime can't load (`.woff`; `.ttf` and `.otf` are both fine), a font outside `common/src/main/css/`, a missing file, a file that isn't a readable font, a font with no PostScript name, or two rules whose files share a name. |

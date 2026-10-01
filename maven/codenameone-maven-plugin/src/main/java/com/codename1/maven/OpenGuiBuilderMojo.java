@@ -29,9 +29,6 @@ package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.repository.ArtifactRepository;
-import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
-import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.execution.MavenSession;
@@ -44,7 +41,6 @@ import org.apache.tools.ant.taskdefs.Java;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -69,8 +65,10 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
     /** The editor is compiled for this Java release, so an older forked JVM cannot load it. */
     private static final int REQUIRED_JAVA_VERSION = 8;
 
-    /** {@code --add-exports} is a Java 9 option; passing it to an 8 JVM stops it from starting. */
-    private static final int MODULE_OPTIONS_VERSION = 9;
+    /// How the editor starts, shared with the Gradle plugin's `guibuilder` task.
+    /// It passes `--add-exports` only on Java 9 and newer: the option stops an 8
+    /// JVM before it prints anything the user would see.
+    private static final DesktopTool TOOL = DesktopTool.GUI_BUILDER;
 
     /** The invocation the guard belongs to. */
     @Parameter(defaultValue = "${session}", readonly = true)
@@ -106,29 +104,14 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
         File cssFile = new File(projectDir, "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
         guiDir.mkdirs();
 
-        File runtimeDir = new File(System.getProperty("user.home"), ".codenameoneGUIBuilder");
-        runtimeDir.mkdirs();
-        File input = new File(runtimeDir, "guibuilder-" + UUID.randomUUID() + ".input");
+        File input = new File(TOOL.runtimeDir(), "guibuilder-" + UUID.randomUUID() + ".input");
         writeBinding(input, projectDir, guiDir, sourceDir, cssFile);
 
-        ToolClasspath classpath = getGuiBuilderClasspath();
+        List<File> classpath = resolveDesktopTool(TOOL, pluginVersion(),
+                "To work on the editor, run:\n"
+                + "    cd scripts/guibuilder && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase");
         getLog().info("Launching Codename One GUI Builder bound to " + projectDir);
-        if (shouldSpawn()) {
-            launchDetached(classpath, runtimeDir, input, projectDir);
-            return;
-        }
-        Java java = createJava();
-        java.setFork(true);
-        java.setClassname("com.codename1.guibuilder.CodenameOneGUIBuilderLauncher");
-        java.createClasspath().setPath(joinClasspath(classpath.files));
-        for (String arg : desktopIdentityArgs()) {
-            java.createJvmarg().setValue(arg);
-        }
-        java.createJvmarg().setValue("-Dguibuilder.input=" + input.getAbsolutePath());
-        for (String arg : forwardedGuiBuilderProperties()) {
-            java.createJvmarg().setValue(arg);
-        }
-        java.executeJava();
+        launchDesktopTool(TOOL, classpath, input, projectDir, shouldSpawn(), null);
     }
 
     /**
@@ -218,15 +201,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
      * forwarded.
      */
     List<String> forwardedGuiBuilderProperties() {
-        List<String> args = new ArrayList<String>();
-        for (String key : System.getProperties().stringPropertyNames()) {
-            if (key.startsWith("guibuilder.")
-                    && !key.equals("guibuilder.input")
-                    && !key.equals("guibuilder.spawn")) {
-                args.add("-D" + key + "=" + System.getProperty(key));
-            }
-        }
-        return args;
+        return TOOL.forwardedProperties();
     }
 
     /**
@@ -234,25 +209,8 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
      * JavaSE port needs on Java 9 and newer, matching cn1:settings and cn1:certificate-wizard.
      */
     List<String> desktopIdentityArgs() {
-        List<String> args = new ArrayList<String>();
-        args.add("-Dapple.awt.application.name=Codename One GUI Builder");
-        args.add("-Dcom.apple.mrj.application.apple.menu.about.name=Codename One GUI Builder");
-        args.add("-Dsun.awt.application.name=Codename One GUI Builder");
-        args.add("-Dsun.awt.X11.XWMClass=CodenameOneGUIBuilder");
-        if (javaFeatureVersion() >= MODULE_OPTIONS_VERSION) {
-            // On 8 these packages are already reachable and the option itself is unrecognized,
-            // which stops the forked JVM before it prints anything the user would see.
-            args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
-            args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
-        }
-        if (isMacOs()) {
-            args.add("-Xdock:name=Codename One GUI Builder");
-        }
-        return args;
-    }
-
-    private static boolean isMacOs() {
-        return System.getProperty("os.name", "").toLowerCase().contains("mac");
+        // The GUI Builder ships no dock icon, so no jar or runtime directory is needed.
+        return TOOL.identityArgs(null, null, MavenLog.of(getLog()));
     }
 
     @Override
@@ -291,88 +249,6 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
         }
     }
 
-    private void launchDetached(ToolClasspath classpath, File runtimeDir, File input, File projectDir)
-            throws MojoExecutionException {
-        List<String> command = new ArrayList<String>();
-        command.add(javaExecutable());
-        command.addAll(desktopIdentityArgs());
-        command.add("-Dguibuilder.input=" + input.getAbsolutePath());
-        command.addAll(forwardedGuiBuilderProperties());
-        command.add("-cp");
-        command.add(joinClasspath(classpath.files));
-        command.add("com.codename1.guibuilder.CodenameOneGUIBuilderLauncher");
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.directory(projectDir);
-        builder.redirectErrorStream(true);
-        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(runtimeDir, "guibuilder.log")));
-        try {
-            builder.start();
-            getLog().info("GUI Builder launched in the background. Log: " + new File(runtimeDir, "guibuilder.log"));
-        } catch (IOException ex) {
-            throw new MojoExecutionException("Failed to launch Codename One GUI Builder", ex);
-        }
-    }
-
-    private ToolClasspath getGuiBuilderClasspath() throws MojoExecutionException, MojoFailureException {
-        Artifact artifact = getArtifact("com.codenameone", "codenameone-guibuilder");
-        if (artifact == null) {
-            artifact = repositorySystem.createArtifact("com.codenameone", "codenameone-guibuilder", pluginVersion(), "jar");
-        }
-        List<File> files = new ArrayList<File>();
-        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
-                .setLocalRepository(localRepository)
-                .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
-                .setResolveTransitively(true)
-                // Maven documents -o as "work offline"; the legacy resolver does not read the
-                // session flag by itself, so without this mvn -o cn1:guibuilder still reaches the
-                // network and can refresh a snapshot over the jar this build just produced.
-                .setOffline(offline)
-                .setArtifact(artifact));
-        addArtifact(files, artifact);
-        if (result != null && result.getArtifacts() != null) {
-            for (Artifact resolved : result.getArtifacts()) addArtifact(files, resolved);
-        }
-        // A cached main jar with a missing transitive dependency leaves this list nonempty, and in
-        // detached mode the goal would report a successful launch while the process died in
-        // guibuilder.log with a NoClassDefFoundError nobody goes looking for.
-        String incomplete = resolutionFailure(result);
-        if (incomplete != null) {
-            throw new MojoFailureException("The GUI Builder could not be fully resolved: " + incomplete
-                    + "\nRun mvn -U cn1:guibuilder to refresh it, or drop -o if you are building offline.");
-        }
-        if (files.isEmpty()) {
-            throw new MojoFailureException("Could not resolve the GUI Builder (com.codenameone:codenameone-guibuilder:"
-                    + pluginVersion() + "). It is distributed through Maven Central alongside the Codename One plugin.\n"
-                    + "To work on the editor, run:\n"
-                    + "    cd scripts/guibuilder && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase");
-        }
-        return new ToolClasspath(files);
-    }
-
-    /**
-     * Describes what the resolver could not produce, or null when the result is complete.
-     *
-     * @param result the resolution result to inspect
-     * @return a human readable description of the first problem found
-     */
-    static String resolutionFailure(ArtifactResolutionResult result) {
-        if (result == null) return null;
-        if (result.hasMissingArtifacts()) {
-            return "missing " + result.getMissingArtifacts();
-        }
-        if (result.hasExceptions()) {
-            Exception first = (Exception) result.getExceptions().get(0);
-            return first.getMessage();
-        }
-        return null;
-    }
-
-    private static void addArtifact(List<File> files, Artifact artifact) {
-        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) return;
-        File file = artifact.getFile().getAbsoluteFile();
-        if (file.exists() && !files.contains(file)) files.add(file);
-    }
-
     private String pluginVersion() {
         if (pluginArtifacts != null) {
             for (Artifact artifact : pluginArtifacts) {
@@ -384,22 +260,4 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
                 project.getProperties().getProperty("cn1.version", "8.0-SNAPSHOT"));
     }
 
-    private String javaExecutable() {
-        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
-        return new File(new File(System.getProperty("java.home"), "bin"), windows ? "javaw.exe" : "java").getAbsolutePath();
-    }
-
-    private static String joinClasspath(List<File> files) {
-        StringBuilder value = new StringBuilder();
-        for (File file : files) {
-            if (value.length() > 0) value.append(File.pathSeparator);
-            value.append(file.getAbsolutePath());
-        }
-        return value.toString();
-    }
-
-    private static final class ToolClasspath {
-        final List<File> files;
-        ToolClasspath(List<File> files) { this.files = files; }
-    }
 }

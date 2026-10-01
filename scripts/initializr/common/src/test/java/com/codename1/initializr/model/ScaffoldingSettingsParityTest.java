@@ -75,6 +75,9 @@ public class ScaffoldingSettingsParityTest extends AbstractTest {
 
     private static final String SETTINGS_ENTRY = "common/codenameone_settings.properties";
 
+    /// Where a Gradle download keeps the same file: the app is the root project.
+    private static final String GRADLE_SETTINGS_ENTRY = "codenameone_settings.properties";
+
     @Override
     public boolean runTest() throws Exception {
         File archetypeFile = locateArchetypeSettings();
@@ -88,17 +91,29 @@ public class ScaffoldingSettingsParityTest extends AbstractTest {
             return true;
         }
 
+        String archetype = readFile(archetypeFile);
+        // Maven and Gradle downloads take the file from the same common.zip entry,
+        // so both must match the archetype; checking the Gradle one guards the
+        // mapping that moves it to the root.
+        return compare(archetype, ProjectOptions.defaults(), SETTINGS_ENTRY)
+                && compare(archetype, ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.GRADLE,
+                        ProjectOptions.ProjectType.APP), GRADLE_SETTINGS_ENTRY);
+    }
+
+    private boolean compare(String archetype, ProjectOptions options, String settingsEntry) throws Exception {
         String appName = "ParityGuardApp";
         String packageName = "com.acme.parityguard";
 
-        // Generate through the REAL initializr generator (default options => Java 17 barebones).
-        byte[] zip = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, appName, packageName);
-        Map<String, byte[]> entries = readZipEntries(zip);
-        byte[] generated = entries.get(SETTINGS_ENTRY);
-        assertNotNull(generated, "Generated initializr project must contain " + SETTINGS_ENTRY);
+        // Generate through the REAL initializr generator (Java 17 barebones).
+        ByteArrayOutputStream zipOut = new ByteArrayOutputStream();
+        GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, appName, packageName, options).writeProjectZip(zipOut);
+        Map<String, byte[]> entries = readZipEntries(zipOut.toByteArray());
+        byte[] generated = entries.get(settingsEntry);
+        assertNotNull(generated, "Generated " + options.buildTool.label + " initializr project must contain "
+                + settingsEntry);
 
         Set<String> initializrEntries = parseSettings(StringUtil.newString(generated), appName, packageName);
-        Set<String> archetypeEntries = parseSettings(readFile(archetypeFile), "${mainName}", "${package}");
+        Set<String> archetypeEntries = parseSettings(archetype, "${mainName}", "${package}");
 
         assertFalse(initializrEntries.isEmpty(), "No codename1.* settings parsed from the generated initializr project");
         assertFalse(archetypeEntries.isEmpty(), "No codename1.* settings parsed from the archetype template");
@@ -111,7 +126,8 @@ public class ScaffoldingSettingsParityTest extends AbstractTest {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Default initializr and default Maven scaffolding must produce identical ");
+        sb.append("Default initializr (").append(options.buildTool.label).append(" download, ").append(settingsEntry);
+        sb.append(") and default Maven archetype scaffolding must produce identical ");
         sb.append("codenameone_settings.properties, but their build-hint sets differ.\n");
         if (!missing.isEmpty()) {
             sb.append("\nPresent in the Maven archetype but MISSING from the initializr common.zip:\n");
@@ -214,12 +230,6 @@ public class ScaffoldingSettingsParityTest extends AbstractTest {
         } finally {
             in.close();
         }
-    }
-
-    private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        GeneratorModel.create(ide, template, appName, packageName).writeProjectZip(output);
-        return output.toByteArray();
     }
 
     private static Map<String, byte[]> readZipEntries(byte[] zipData) throws IOException {

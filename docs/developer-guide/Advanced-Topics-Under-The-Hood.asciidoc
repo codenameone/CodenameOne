@@ -409,29 +409,44 @@ The implementation of this interface is identical for Android (Java/Kotlin) & Ja
 For iOS native interfaces you can implement the generated `...Impl` class in Objective-C _or_ Swift. +
 For Android native interfaces you can implement the generated `...Impl` class in Java _or_ Kotlin.
 
-[cols="1,3",options="header"]
+[cols="1,3,3",options="header"]
 |===
 | Platform
-| Typical file locations for native interface implementations
+| Maven project
+| Gradle project
 
 | Android (Java/Kotlin)
 | `android/src/main/java/com/mycompany/myapp/MyNativeImpl.java` +
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.kt`
+| `src/android/java/com/mycompany/myapp/MyNativeImpl.java` +
+`src/android/java/com/mycompany/myapp/MyNativeImpl.kt`
 
 | iOS (Objective-C/Swift)
 | `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.h` +
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m` +
 `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
+| `src/ios/objectivec/com_mycompany_myapp_MyNativeImpl.h` +
+`src/ios/objectivec/com_mycompany_myapp_MyNativeImpl.m` +
+`src/ios/objectivec/com_mycompany_myapp_MyNativeImpl.swift`
+
+| Java SE (simulator and desktop)
+| `javase/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
+| `src/javase/java/com/mycompany/myapp/MyNativeImpl.java`
 
 | Native Windows (win32, C)
 | `win/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
+| `src/win/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
 
 | Native Linux (C)
 | `linux/src/main/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
+| `src/linux/c/com/mycompany/myapp/MyNativeImplCodenameOne.c`
 
 | JavaScript
 | `javascript/src/main/javascript/com_mycompany_myapp_MyNative.js`
+| `src/javascript/javascript/com_mycompany_myapp_MyNative.js`
 |===
+
+A Gradle project creates each of these directories only when `./gradlew generateNativeInterfaces` first writes a stub into it; see <<gradle-native-interfaces>>.
 
 NOTE: The native Windows and native Linux ports compile your app to C (no JVM), so
 their native interface implementations are plain C, generated alongside the others

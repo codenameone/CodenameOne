@@ -115,7 +115,9 @@ NON_RESOLVED_SCOPES = ("test", "provided", "system")
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 MOJO = os.path.join(REPO_ROOT, "maven", "codenameone-maven-plugin", "src", "main",
                     "java", "com", "codename1", "maven", "AbstractCN1Mojo.java")
-PLUGIN_SRC = os.path.join(REPO_ROOT, "maven", "codenameone-maven-plugin", "src", "main", "java")
+# The build engine was split out of the plugin; getArtifact calls live in both.
+PLUGIN_SRCS = [os.path.join(REPO_ROOT, "maven", "codenameone-maven-plugin", "src", "main", "java"),
+               os.path.join(REPO_ROOT, "maven", "build-engine", "src", "main", "java")]
 
 
 def fail(message):
@@ -141,7 +143,7 @@ def read_classifiers():
     """artifactId -> [classifier], from the plugin's own getArtifact calls."""
     found = {}
     pattern = re.compile(r'getArtifact\(\s*"com\.codenameone"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)')
-    for path in glob.glob(os.path.join(PLUGIN_SRC, "**", "*.java"), recursive=True):
+    for path in (p for src in PLUGIN_SRCS for p in glob.glob(os.path.join(src, "**", "*.java"), recursive=True)):
         with open(path, "r") as handle:
             for artifact, classifier in pattern.findall(handle.read()):
                 found.setdefault(artifact, [])

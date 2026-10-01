@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.project.ProjectLayout;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -121,7 +122,7 @@ public class CSSWatcher implements Runnable {
         File cn1Home = new File(userHome, ".codenameone");
         File updateStatusProps = new File(cn1Home, "UpdateStatus.properties");
         
-        File cn1Props = new File("codenameone_settings.properties");
+        File cn1Props = JavaSEPort.projectSettingsFile();
         if (cn1Props.exists()) {
             java.util.Properties cn1Properties = new Properties();
             try (InputStream input = new FileInputStream(cn1Props)) {
@@ -206,6 +207,13 @@ public class CSSWatcher implements Runnable {
         out.add(new File(workingDirectory, "src/main/i18n"));
         out.add(new File(workingDirectory, "../common/src/main/l10n"));
         out.add(new File(workingDirectory, "../common/src/main/i18n"));
+        // Last, the project model's own answer, for a launch directory none of
+        // the guesses above fit (a Maven project started at its root).
+        ProjectLayout layout = SimulatorProject.current();
+        if (layout != null) {
+            out.add(layout.l10nDir());
+            out.add(new File(layout.l10nDir().getParentFile(), "i18n"));
+        }
     }
 
     /**
@@ -273,6 +281,8 @@ public class CSSWatcher implements Runnable {
             
         }
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
+        // Maven and Gradle launches both pass codename1.css.compiler.args.*
+        // (read below), so this relative css/ is only ever Ant's.
         final File srcFile = new File("css", themePrefix + "theme.css");
         String overrideInputs = System.getProperty("codename1.css.compiler.args.input", null);
         if (overrideInputs != null) {
@@ -527,6 +537,10 @@ public class CSSWatcher implements Runnable {
     }
 
     private static File getCSSSourceDirectory() {
+        ProjectLayout layout = SimulatorProject.current();
+        if (layout != null && layout.cssDir().isDirectory()) {
+            return layout.cssDir();
+        }
         File cssDir = new File(JavaSEPort.getCWD(), "src" + File.separator + "main" + File.separator + "css");
         if (cssDir.isDirectory()) return cssDir;
         return  new File(JavaSEPort.getCWD(), "css");

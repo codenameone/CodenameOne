@@ -49,7 +49,9 @@ def select(paths, libraries=None):
             result['android'].update(AI)
             result['desktop'].update(AI)
             result['ios_ai'].update(AI)
-        if path == 'maven/pom.xml' or path.startswith('maven/codenameone-maven-plugin/'):
+        # The build engine and project model are the plugin's own code, moved out of it.
+        if path == 'maven/pom.xml' or path.startswith(('maven/codenameone-maven-plugin/', 'maven/build-engine/',
+                                                       'maven/project-model/')):
             result['package'].update(PACKAGES)
         if path.startswith(('CodenameOne/src/', 'Ports/Android/', 'scripts/cn1lib-api-check/')) or path in (
                 'scripts/check-cn1lib-android-api.py', '.ci/container/Dockerfile'):

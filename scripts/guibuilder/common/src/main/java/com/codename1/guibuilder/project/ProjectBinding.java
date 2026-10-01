@@ -29,13 +29,63 @@ public final class ProjectBinding {
     private String sourceDir;
     private String cssFile;
     private String initialForm;
+    private String buildSystem;
+    private String kind;
+    private String rootDir;
+    private String dependencyFile;
 
     public String projectDir() { return projectDir; }
-    public String guiDir() { return guiDir; }
-    public String sourceDir() { return sourceDir; }
-    public String cssFile() { return cssFile; }
+
+    /// The `.gui` directory: `guiDir=` when the launcher named it, otherwise
+    /// the conventional one for the binding's `buildSystem=` (`res/guibuilder`
+    /// under Ant, `src/main/guibuilder` under Maven's `common/` and Gradle), so
+    /// a bare project descriptor is enough to open a project.
+    public String guiDir() {
+        if (guiDir != null || projectDir == null || buildSystem == null) return guiDir;
+        return projectDir + (isAnt() ? "/res/guibuilder" : "/src/main/guibuilder");
+    }
+
+    /// The Java source root, `sourceDir=` or else the build system's convention.
+    public String sourceDir() {
+        if (sourceDir != null || projectDir == null || buildSystem == null) return sourceDir;
+        return projectDir + (isAnt() ? "/src" : "/src/main/java");
+    }
+
+    /// The theme stylesheet, `cssFile=` or else the build system's convention.
+    public String cssFile() {
+        if (cssFile != null || projectDir == null || buildSystem == null) return cssFile;
+        return projectDir + (isAnt() ? "/css/theme.css" : "/src/main/css/theme.css");
+    }
+
     public String initialForm() { return initialForm; }
-    public boolean isValid() { return projectDir != null && guiDir != null; }
+    public boolean isValid() { return projectDir != null && guiDir() != null; }
+
+    /// `ANT`, `MAVEN` or `GRADLE`: the standard `buildSystem=` key of the
+    /// project descriptor the build writes, or null when the launcher did not
+    /// say (a Maven launcher that predates the key).
+    public String buildSystem() {
+        return buildSystem;
+    }
+
+    /// `APP`, `LIB` or `BACKEND`, or null when the launcher did not say.
+    public String kind() {
+        return kind;
+    }
+
+    /// The top of the build (Maven multi-module root, Gradle root project or
+    /// Ant project), falling back to [projectDir()] when the launcher did not
+    /// say.
+    public String rootDir() {
+        return rootDir != null && rootDir.length() > 0 ? rootDir : projectDir;
+    }
+
+    /// The build file the project's dependencies are declared in (the
+    /// `pom.xml` or `build.gradle.kts`), or null when the launcher did not say.
+    public String dependencyFile() {
+        return dependencyFile;
+    }
+
+    private boolean isAnt() { return "ANT".equals(buildSystem); }
 
     public static ProjectBinding parse(String content) {
         ProjectBinding binding = new ProjectBinding();
@@ -62,6 +112,18 @@ public final class ProjectBinding {
                     break;
                 case "initialForm":
                     binding.initialForm = field;
+                    break;
+                case "buildSystem":
+                    binding.buildSystem = field;
+                    break;
+                case "kind":
+                    binding.kind = field;
+                    break;
+                case "rootDir":
+                    binding.rootDir = field;
+                    break;
+                case "dependencyFile":
+                    binding.dependencyFile = field;
                     break;
                 default:
                     break;

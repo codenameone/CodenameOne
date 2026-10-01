@@ -1,7 +1,7 @@
 name: Starter launchers
 on:
   pull_request:
-    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', 'scripts/sync-initializr-launchers.py', 'scripts/tests/**', 'scripts/initializr/common/src/main/**', '.github/workflows/starter-launchers.yml']
+    paths: ['maven/cn1app-archetype/src/main/resources/archetype-resources/**', 'scripts/test-starter-launchers.py', 'scripts/sync-initializr-launchers.py', 'scripts/tests/**', 'scripts/initializr/common/src/main/**', 'maven/build-engine/src/main/resources/com/codename1/project/templates/gradle/**', '.github/workflows/starter-launchers.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -61,7 +61,7 @@ trap 'rm -rf "$WORK"' EXIT
 # it can be compiled out of the tree like this rather than through the whole
 # plugin build.
 mkdir -p "$WORK/src/com/codename1/util" "$WORK/classes" "$WORK/out"
-cp maven/codenameone-maven-plugin/src/main/java/com/codename1/util/IOSVpnTunnelExtensionBuilder.java \
+cp maven/build-engine/src/main/java/com/codename1/util/IOSVpnTunnelExtensionBuilder.java \
    "$WORK/src/com/codename1/util/"
 cat > "$WORK/src/Emit.java" <<'JAVA'
 import com.codename1.util.IOSVpnTunnelExtensionBuilder;
