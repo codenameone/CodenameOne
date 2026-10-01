@@ -57,6 +57,12 @@ on:
     types: [published]
   workflow_dispatch:
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -529,7 +535,7 @@ jobs:
 
       - name: Summarize AsciiDoc linter findings
         id: summarize_asciidoc_lint
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           python3 scripts/developer-guide/summarize_reports.py ascii \
             --report "${ASCII_DOC_LINT_REPORT}" \
@@ -538,7 +544,7 @@ jobs:
 
       - name: Summarize Vale findings
         id: summarize_vale
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           python3 scripts/developer-guide/summarize_reports.py vale \
             --report "${VALE_REPORT}" \
@@ -547,7 +553,7 @@ jobs:
 
       - name: Summarize unused image findings
         id: summarize_unused_images
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           python3 scripts/developer-guide/summarize_reports.py unused-images \
             --report "${UNUSED_IMAGES_JSON}" \
@@ -557,7 +563,7 @@ jobs:
 
       - name: Summarize paragraph capitalization findings
         id: summarize_paragraph_cap
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           python3 scripts/developer-guide/summarize_reports.py paragraph-capitalization \
             --report "${PARAGRAPH_CAP_REPORT}" \
@@ -566,14 +572,14 @@ jobs:
 
       - name: Summarize LanguageTool findings
         id: summarize_languagetool
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           python3 scripts/developer-guide/summarize_reports.py languagetool \
             --report "${LANGUAGETOOL_REPORT}" \
             --output "${GITHUB_OUTPUT}"
 
       - name: Upload HTML artifact
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-html
@@ -581,7 +587,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload PDF artifact
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-pdf
@@ -589,7 +595,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload AsciiDoc linter report
-        if: always() && env.ASCII_DOC_LINT_REPORT != ''
+        if: ${{ !cancelled() && env.ASCII_DOC_LINT_REPORT != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-asciidoc-lint
@@ -597,7 +603,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Vale report
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-vale-report
@@ -607,7 +613,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload unused image report
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-unused-images
@@ -617,7 +623,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload paragraph capitalization report
-        if: always() && env.PARAGRAPH_CAP_REPORT != ''
+        if: ${{ !cancelled() && env.PARAGRAPH_CAP_REPORT != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-paragraph-capitalization
@@ -625,7 +631,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload LanguageTool report
-        if: always() && env.LANGUAGETOOL_REPORT != ''
+        if: ${{ !cancelled() && env.LANGUAGETOOL_REPORT != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-languagetool
@@ -633,7 +639,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Fail build on developer guide quality issues
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           FAIL=0
@@ -668,7 +674,7 @@ jobs:
           echo "Developer guide quality gates passed (vale issues=${VALE_ISSUE_COUNT:-0}, asciidoctor status=${ASCII_DOC_LINT_STATUS:-0}, unused-image status=${UNUSED_IMAGES_STATUS:-0}, languagetool count=${LANGUAGETOOL_COUNT:-0})."
 
       - name: Comment with artifact download links
-        if: ${{ always() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
         uses: actions/github-script@v9
         env:
           ASCII_SUMMARY: ${{ steps.summarize_asciidoc_lint.outputs.summary }}

@@ -13,7 +13,9 @@ permissions:
 # each master run is its own group -- superseding applies to PR iteration only, never to
 # the branch's own history.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 on:
@@ -131,7 +133,7 @@ jobs:
         run: python scripts/run-javase-cef-ffmpeg-smoke.py
 
       - name: Upload smoke artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: javase-cef-ffmpeg-smoke-${{ runner.os }}

@@ -392,7 +392,7 @@ public class MapView extends Container implements MapSurface {
     protected void paintBackground(Graphics g) {
         engine.setViewport(getWidth(), getHeight());
         g.translate(getX(), getY());
-        engine.paint(g, 0, 0, getWidth(), getHeight());
+        engine.paintTiles(g, 0, 0, getWidth(), getHeight());
         drawOverlays(g);
         g.translate(-getX(), -getY());
     }
@@ -408,6 +408,9 @@ public class MapView extends Container implements MapSurface {
         for (Object polylineObj : polylines) {
             drawPolyline(g, (Polyline) polylineObj);
         }
+        // Street and place names go over shapes, so a route does not hide the
+        // names of the roads it follows, and under the pins.
+        engine.paintLabels(g);
         for (Object markerObj : markers) {
             drawMarker(g, (Marker) markerObj);
         }

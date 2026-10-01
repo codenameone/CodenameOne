@@ -57,6 +57,7 @@ on:
       - 'scripts/check-native-peer-returns.py'
       - 'scripts/check-cn1lib-android-api.py'
       - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/ci/select-cn1lib-checks.py'
       - 'scripts/check-cn1lib-native-sources.py'
       - 'scripts/cn1lib-api-check/**'
       # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
@@ -124,6 +125,7 @@ on:
       - 'scripts/check-native-peer-returns.py'
       - 'scripts/check-cn1lib-android-api.py'
       - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/ci/select-cn1lib-checks.py'
       - 'scripts/check-cn1lib-native-sources.py'
       - 'scripts/cn1lib-api-check/**'
       # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
@@ -153,11 +155,9 @@ env:
   CN1_NATIVE_VERIFY: strict
 
 concurrency:
-  # Cancel superseded runs of this workflow for the same PR branch
-  # (github.head_ref is set on pull_request events). On push to master
-  # head_ref is empty, so the group falls back to the unique run_id and
-  # every master commit is still tested in full -- no coverage lost.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -321,104 +321,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
-          set -euo pipefail
-          # This job runs inside the pr-ci-container, where GitHub's
-          # checkout safe.directory entry can be written under a different
-          # HOME than this shell step uses. Mark the workspace safe before
-          # diffing the PR so unrelated cn1libs are not rebuilt.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-          all_libs=(
-            cn1-ai-whisper
-            cn1-ai-stablediffusion
-            cn1-admob
-            cn1-applovin
-            cn1-unity-levelplay
-            cn1-ads-mock
-          )
-          ai_libs=(
-            cn1-ai-whisper
-            cn1-ai-stablediffusion
-          )
-
-          selected_libs=()
-          add_lib() {
-            local lib="$1"
-            local selected_lib
-            [ -d "maven/$lib" ] || return 0
-            for selected_lib in "${selected_libs[@]}"; do
-              [ "$selected_lib" = "$lib" ] && return 0
-            done
-            selected_libs+=("$lib")
-          }
-          add_all() {
-            local lib
-            for lib in "${all_libs[@]}"; do add_lib "$lib"; done
-          }
-          add_ai() {
-            local lib
-            for lib in "${ai_libs[@]}"; do add_lib "$lib"; done
-          }
-
-          changed_files=""
-          if [ -n "${BASE_SHA:-}" ] && [[ "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
-            git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
-            changed_files="$(git diff --name-only "$BASE_SHA" HEAD || true)"
-          fi
-          if [ -z "$changed_files" ]; then
-            echo "Unable to determine changed files; building all AI/ad cn1libs."
-            add_all
-          else
-            while IFS= read -r file; do
-              case "$file" in
-                maven/pom.xml|maven/codenameone-maven-plugin/*|maven/build-engine/*|maven/project-model/*)
-                  add_all
-                  ;;
-                scripts/gen-ai-cn1libs.py)
-                  add_ai
-                  ;;
-                maven/cn1-ai-*/*|maven/cn1-admob/*|maven/cn1-applovin/*|maven/cn1-unity-levelplay/*|maven/cn1-ads-mock/*|maven/cn1-ads-mock)
-                  lib="${file#maven/}"
-                  lib="${lib%%/*}"
-                  add_lib "$lib"
-                  ;;
-              esac
-            done <<< "$changed_files"
-          fi
-
-          libs=()
-          modules=()
-          for lib in "${all_libs[@]}"; do
-            selected="false"
-            for selected_lib in "${selected_libs[@]}"; do
-              if [ "$selected_lib" = "$lib" ]; then
-                selected="true"
-                break
-              fi
-            done
-            if [ "$selected" = "true" ]; then
-              libs+=("$lib")
-              if [ "$lib" = "cn1-ads-mock" ]; then
-                modules+=("$lib")
-              else
-                modules+=("$lib/common")
-              fi
-            fi
-          done
-
-          {
-            printf 'libs='
-            (IFS=,; printf '%s' "${libs[*]:-}")
-            printf '\nmodules='
-            (IFS=,; printf '%s' "${modules[*]:-}")
-            printf '\n'
-          } >> "$GITHUB_OUTPUT"
-
-          if [ ${#libs[@]} -eq 0 ]; then
-            echo "No AI/ad cn1lib changes detected; skipping cn1lib packaging step."
-          else
-            echo "AI/ad cn1libs selected for packaging: ${libs[*]}"
-          fi
+          python3 scripts/ci/select-cn1lib-checks.py
       - name: Build changed/impacted AI and ad cn1libs
         if: ${{ matrix.java-version == 8 && steps.cn1libs.outputs.modules != '' }}
         # Exercises every cn1-ai-* and ad-provider multi-module project:
@@ -557,7 +461,7 @@ jobs:
         if: ${{ matrix.java-version == 8 }}
         run: python3 scripts/check-cn1lib-native-coverage.py
       - name: Install C compilers for the cn1lib native source check
-        if: ${{ matrix.java-version == 8 }}
+        if: ${{ matrix.java-version == 8 && steps.cn1libs.outputs.desktop != '' }}
         # gcc for the Linux glue and the mingw-w64 cross compiler for the
         # Windows glue, whose _WIN32 half (windows.h, LoadLibraryA,
         # GetProcAddress) does not exist for a host target -- compiled as host
@@ -571,19 +475,25 @@ jobs:
       # glue the native win32/Linux ports compile into the app, and the
       # JavaScript port implementations, which have no build step at all.
       - name: Check cn1lib desktop and JavaScript native sources
-        if: ${{ matrix.java-version == 8 }}
-        run: python3 scripts/check-cn1lib-native-sources.py --require-all
+        if: ${{ matrix.java-version == 8 && steps.cn1libs.outputs.desktop != '' }}
+        env:
+          SELECTED_LIBS: ${{ steps.cn1libs.outputs.desktop }}
+        run: |
+          IFS=',' read -r -a libs <<< "$SELECTED_LIBS"
+          python3 scripts/check-cn1lib-native-sources.py --require-all "${libs[@]}"
       # The Android half of the same gap: compile every cn1lib's Android
       # sources against the artifacts its android.gradleDep pins. Runs on the
       # JDK the Android build uses, because the pinned SDKs ship class files
       # javac 8 cannot read.
       - name: Check cn1lib Android sources against pinned SDKs
-        if: ${{ matrix.java-version == 8 }}
+        if: ${{ matrix.java-version == 8 && steps.cn1libs.outputs.android != '' }}
         env:
+          SELECTED_LIBS: ${{ steps.cn1libs.outputs.android }}
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
+          IFS=',' read -r -a libs <<< "$SELECTED_LIBS"
           JAVA17_HOME="${JAVA_HOME_17}" \
-            python3 scripts/check-cn1lib-android-api.py --require-all
+            python3 scripts/check-cn1lib-android-api.py --require-all "${libs[@]}"
       - name: Check native method signatures
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -690,7 +600,7 @@ jobs:
           JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
             mvn -B -pl common test -Dcn1.certificatewizard.skipTests=false
       - name: Generate static analysis HTML summaries
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
           QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
@@ -699,7 +609,7 @@ jobs:
           QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
         run: python3 .github/scripts/generate-quality-report.py
       - name: Collect quality artifacts
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         run: |
           set -euo pipefail
           mkdir -p quality-artifacts/static-analysis
@@ -750,14 +660,14 @@ jobs:
             echo "No quality artifacts were generated." > quality-artifacts/README.txt
           fi
       - name: Upload quality artifacts
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         id: upload-quality-artifacts
         uses: actions/upload-artifact@v7
         with:
           name: quality-artifacts
           path: quality-artifacts
       - name: Publish quality report previews
-        if: ${{ always() && matrix.java-version == 8 && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ !cancelled() && matrix.java-version == 8 && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         id: publish-quality-previews
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -832,7 +742,7 @@ jobs:
             echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
           fi
       - name: Generate quality report summary
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
           QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
           # Every project listed here must produce a SpotBugs report and that
@@ -857,7 +767,7 @@ jobs:
           JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
         run: python3 .github/scripts/generate-quality-report.py
       - name: Upload quality report summary
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         uses: actions/upload-artifact@v7
         with:
           name: quality-report
@@ -865,10 +775,10 @@ jobs:
       # Guards the property that the step below cannot fail this build. It
       # could, and did: a 504 publishing a green report failed the job.
       - name: Check the quality comment publisher cannot fail a build
-        if: ${{ always() && matrix.java-version == 8 }}
+        if: ${{ !cancelled() && matrix.java-version == 8 }}
         run: node .github/scripts/test-publish-quality-comment.mjs
       - name: Publish quality report comment
-        if: ${{ always() && github.event_name == 'pull_request' && matrix.java-version == 8 && hashFiles('quality-report.md') != '' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.java-version == 8 && hashFiles('quality-report.md') != '' }}
         uses: actions/github-script@v9
         with:
           # Retried rather than fatal on a transient 5xx. The publisher

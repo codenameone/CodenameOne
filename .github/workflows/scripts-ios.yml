@@ -1,9 +1,6 @@
 name: Test iOS UI build scripts
 
 on:
-  # Manual dispatch: this PR's changed-file count exceeds GitHub's paths-filter
-  # diff limit, so pull_request triggers stopped firing -- dispatch with
-  #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
     inputs:
       watch_only:
@@ -12,139 +9,157 @@ on:
         default: false
         type: boolean
   schedule:
-    - cron: '15 1 * * *'
+  - cron: 15 1 * * *
   pull_request:
     paths:
-      - '.github/workflows/scripts-ios.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-ios-port.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/check-ios-framework-links.py'
-      - 'scripts/check-ios-sdk-deltas.py'
-      - 'scripts/check-ios-private-api.py'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/run-ios-ui-tests.sh'
-      # The iOS legs boot their simulator through this helper and read its
-      # `udid` output, so a change to it alone must exercise them.
-      - 'scripts/ci/boot-ios-simulator.sh'
-      - 'scripts/run-watch-ui-tests.sh'
-      - 'scripts/run-tv-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/notification-tests/native-tests/**'
-      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
-      - 'scripts/ios/notification-tests/**'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/ios/screenshots-metal/**'
-      - 'scripts/ios/screenshots-metal-27/**'
-      - 'scripts/ios/screenshots-watch/**'
-      - 'scripts/ios/screenshots-tv/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/iOSPort/**'
-      - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
-      - 'vm/**'
-      - '!vm/**/*.md'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'vm/backend/demo/cn1ss/**'
-      - 'scripts/lib/cn1ss.sh'
+    - .github/workflows/scripts-ios.yml
+    - .github/workflows/_build-ios-port.yml
+    - scripts/setup-workspace.sh
+    - scripts/build-ios-port.sh
+    - scripts/build-ios-app.sh
+    - scripts/check-ios-framework-links.py
+    - scripts/check-ios-sdk-deltas.py
+    - scripts/check-ios-private-api.py
+    - scripts/lib/xcode.sh
+    - scripts/run-ios-ui-tests.sh
+    - scripts/ci/boot-ios-simulator.sh
+    - scripts/run-watch-ui-tests.sh
+    - scripts/run-tv-ui-tests.sh
+    - scripts/run-ios-native-tests.sh
+    - scripts/ios/notification-tests/native-tests/**
+    - scripts/ios/notification-tests/install-native-notification-tests.sh
+    - scripts/ios/notification-tests/**
+    - scripts/hellocodenameone/**
+    - scripts/ios/tests/**
+    - scripts/ios/screenshots-metal/**
+    - scripts/ios/screenshots-metal-27/**
+    - scripts/ios/screenshots-watch/**
+    - scripts/ios/screenshots-tv/**
+    - scripts/templates/**
+    - CodenameOne/src/**
+    - Ports/iOSPort/**
+    - native-themes/ios-modern/**
+    - vm/**
+    - tests/**
+    - maven/**
+    - vm/backend/demo/cn1ss/**
+    - scripts/lib/cn1ss.sh
+    - .github/workflows/scripts-ios-native.yml
+    - scripts/ios/create-shared-scheme.py
+    - .github/workflows/ios-packaging.yml
+    - maven/codenameone-maven-plugin/**
+    - vm/ByteCodeTranslator/**
+    - scripts/run-ios-device-release-build.sh
+    - scripts/ios/**
+    - .github/workflows/scripts-mac-catalyst.yml
+    - scripts/build-mac-catalyst-app.sh
+    - scripts/run-mac-catalyst-ui-tests.sh
+    - scripts/mac-catalyst/**
+    - scripts/common/java/**
+    - '!**/*.md'
+    - '!maven/cn1-ai-*/**'
+    - '!maven/cn1-admob/**'
+    - '!maven/cn1-applovin/**'
+    - '!maven/cn1-unity-levelplay/**'
+    - .github/ci/apple-checks.json
+    - scripts/ci/select-apple-checks.py
+    - scripts/ci/select-cn1lib-checks.py
   push:
-    branches: [ master ]
+    branches:
+    - master
     paths:
-      - '.github/workflows/scripts-ios.yml'
-      - '.github/workflows/_build-ios-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-ios-port.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/check-ios-framework-links.py'
-      - 'scripts/check-ios-sdk-deltas.py'
-      - 'scripts/check-ios-private-api.py'
-      - 'scripts/lib/xcode.sh'
-      - 'scripts/run-ios-ui-tests.sh'
-      # The iOS legs boot their simulator through this helper and read its
-      # `udid` output, so a change to it alone must exercise them.
-      - 'scripts/ci/boot-ios-simulator.sh'
-      - 'scripts/run-watch-ui-tests.sh'
-      - 'scripts/run-tv-ui-tests.sh'
-      - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/notification-tests/native-tests/**'
-      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
-      - 'scripts/ios/notification-tests/**'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/ios/screenshots-metal/**'
-      - 'scripts/ios/screenshots-metal-27/**'
-      - 'scripts/ios/screenshots-watch/**'
-      - 'scripts/ios/screenshots-tv/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/iOSPort/**'
-      - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
-      - 'vm/**'
-      - '!vm/**/*.md'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'vm/backend/demo/cn1ss/**'
-      - 'scripts/lib/cn1ss.sh'
+    - .github/workflows/scripts-ios.yml
+    - .github/workflows/_build-ios-port.yml
+    - scripts/setup-workspace.sh
+    - scripts/build-ios-port.sh
+    - scripts/build-ios-app.sh
+    - scripts/check-ios-framework-links.py
+    - scripts/check-ios-sdk-deltas.py
+    - scripts/check-ios-private-api.py
+    - scripts/lib/xcode.sh
+    - scripts/run-ios-ui-tests.sh
+    - scripts/ci/boot-ios-simulator.sh
+    - scripts/run-watch-ui-tests.sh
+    - scripts/run-tv-ui-tests.sh
+    - scripts/run-ios-native-tests.sh
+    - scripts/ios/notification-tests/native-tests/**
+    - scripts/ios/notification-tests/install-native-notification-tests.sh
+    - scripts/ios/notification-tests/**
+    - scripts/hellocodenameone/**
+    - scripts/ios/tests/**
+    - scripts/ios/screenshots-metal/**
+    - scripts/ios/screenshots-metal-27/**
+    - scripts/ios/screenshots-watch/**
+    - scripts/ios/screenshots-tv/**
+    - scripts/templates/**
+    - CodenameOne/src/**
+    - Ports/iOSPort/**
+    - native-themes/ios-modern/**
+    - vm/**
+    - tests/**
+    - maven/**
+    - vm/backend/demo/cn1ss/**
+    - scripts/lib/cn1ss.sh
+    - .github/workflows/scripts-ios-native.yml
+    - scripts/ios/create-shared-scheme.py
+    - .github/workflows/ios-packaging.yml
+    - maven/codenameone-maven-plugin/**
+    - vm/ByteCodeTranslator/**
+    - scripts/run-ios-device-release-build.sh
+    - scripts/ios/**
+    - .github/workflows/scripts-mac-catalyst.yml
+    - scripts/build-mac-catalyst-app.sh
+    - scripts/run-mac-catalyst-ui-tests.sh
+    - scripts/mac-catalyst/**
+    - scripts/common/java/**
+    - '!**/*.md'
+    - '!maven/cn1-ai-*/**'
+    - '!maven/cn1-admob/**'
+    - '!maven/cn1-applovin/**'
+    - '!maven/cn1-unity-levelplay/**'
+    - .github/ci/apple-checks.json
+    - scripts/ci/select-apple-checks.py
+    - scripts/ci/select-cn1lib-checks.py
+
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  select:
+    runs-on: ubuntu-24.04
+    outputs:
+      ios: ${{ steps.plan.outputs.ios }}
+      native: ${{ steps.plan.outputs.native }}
+      packaging: ${{ steps.plan.outputs.packaging }}
+      catalyst: ${{ steps.plan.outputs.catalyst }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: plan
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: python3 scripts/ci/select-apple-checks.py
+
   build-port:
+    needs: select
+    if: needs.select.outputs.any == 'true'
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-ios-metal:
-    if: ${{ !inputs.watch_only }}
+    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
     # The iOS renderer job. Metal is the only iOS rendering backend -- the
     # OpenGL ES 2 pipeline and the job that exercised it are gone -- so this
     # runs on every pull request rather than only on the nightly schedule.
-    needs: build-port
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: macos-15
     timeout-minutes: 75
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-metal-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -215,14 +230,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -411,7 +418,7 @@ jobs:
         timeout-minutes: 65
 
       - name: Upload iOS Metal port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-ios-metal
@@ -435,7 +442,7 @@ jobs:
         # Deliberately NOT expressed as a count against the reference directory:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
           # screenshot step's own env block, and step env does not reach other
@@ -472,7 +479,7 @@ jobs:
         # captured. The Python helper lives in scripts/ci/ because
         # embedding Python heredocs inside a YAML "run: |" block is
         # fragile -- unindented Python breaks the block scalar.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal/screenshot-compare.json
           COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal/screenshot-comment.md
@@ -500,7 +507,7 @@ jobs:
           fi
 
       - name: Upload iOS Metal artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal
@@ -517,7 +524,7 @@ jobs:
 
 
   build-ios-metal-27:
-    if: ${{ !inputs.watch_only }}
+    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
     # The SAME suite as build-ios-metal, on the Xcode 27 / iOS 27 hosted image and
     # against its own baselines. A copy rather than a move: build-ios-metal keeps
     # gating the toolchain we actually pin (CN1_XCODE_MAJOR=26), which is what
@@ -532,17 +539,13 @@ jobs:
     # `xcode-27` is a PUBLIC PREVIEW image (actions/runner-images#14404) whose
     # capacity is still being balanced, so read a queue here as the image rather
     # than as a fault in the change under test.
-    needs: build-port
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: xcode-27
     timeout-minutes: 75
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-metal27-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -624,14 +627,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -860,7 +855,7 @@ jobs:
         # Deliberately NOT expressed as a count against the reference directory:
         # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
         # reference set, which is exactly the situation a seeding run is in.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
           # screenshot step's own env block, and step env does not reach other
@@ -897,7 +892,7 @@ jobs:
         # captured. The Python helper lives in scripts/ci/ because
         # embedding Python heredocs inside a YAML "run: |" block is
         # fragile -- unindented Python breaks the block scalar.
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-compare.json
           COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-comment.md
@@ -925,7 +920,7 @@ jobs:
           fi
 
       - name: Upload iOS Metal artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal-27
@@ -940,6 +935,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   build-ios-watch:
+    if: needs.select.outputs.ios == 'true'
     # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
     # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
     # generates the <Main>Watch target alongside the iOS app. This job renders
@@ -948,17 +944,13 @@ jobs:
     # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
     # Isolated in its own job (like build-ios-metal) so the watch result is a
     # distinct check and a regression there doesn't mask the iOS path.
-    needs: build-port
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: macos-15
     timeout-minutes: 60
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-watch-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -1009,14 +1001,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -1085,7 +1069,7 @@ jobs:
         timeout-minutes: 90
 
       - name: Upload watchOS port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-watchos
@@ -1094,7 +1078,7 @@ jobs:
           retention-days: 14
 
       - name: Upload watch artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: watch-ui-tests
@@ -1108,7 +1092,7 @@ jobs:
           retention-days: 14
 
   build-ios-tv:
-    if: ${{ !inputs.watch_only }}
+    if: ${{ !inputs.watch_only && needs.select.outputs.ios == 'true' }}
     # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
     # from codename1.tvMain in the sample, so build-ios-app.sh generates the
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
@@ -1120,17 +1104,13 @@ jobs:
     # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice
     # compiles end-to-end and the golden set is seeded from a CI capture (see
     # Ports/iOSPort/nativeSources/TVOS_PORT.md). A mismatch fails the job.
-    needs: build-port
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: macos-15
     timeout-minutes: 60
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-tv-${{ github.ref_name }}
-      cancel-in-progress: true
-
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       # The device runner reports logical test failures through CN1SS log
@@ -1177,14 +1157,6 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache codenameone-tools
-        uses: actions/cache@v5
-        with:
-          path: ${{ runner.temp }}/codenameone-tools
-          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-cn1-tools-
 
       - name: Cache Maven repository
         uses: actions/cache@v5
@@ -1273,7 +1245,7 @@ jobs:
         timeout-minutes: 45
 
       - name: Upload tvOS port status
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-tvos
@@ -1282,7 +1254,7 @@ jobs:
           retention-days: 14
 
       - name: Upload tv artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: tv-ui-tests
@@ -1294,3 +1266,31 @@ jobs:
             artifacts/xcodebuild-list.txt
           if-no-files-found: warn
           retention-days: 14
+
+  native:
+    needs: [select, build-port]
+    if: ${{ !inputs.watch_only && needs.select.outputs.native == 'true' }}
+    uses: ./.github/workflows/scripts-ios-native.yml
+    with:
+      port_prepared: true
+    secrets: inherit
+
+  packaging:
+    needs: [select, build-port]
+    if: ${{ !inputs.watch_only && needs.select.outputs.packaging == 'true' }}
+    uses: ./.github/workflows/ios-packaging.yml
+    with:
+      port_prepared: true
+    secrets: inherit
+
+  catalyst:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    needs: [select, build-port]
+    if: ${{ !inputs.watch_only && needs.select.outputs.catalyst == 'true' }}
+    uses: ./.github/workflows/scripts-mac-catalyst.yml
+    with:
+      port_prepared: true
+    secrets: inherit

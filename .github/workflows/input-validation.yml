@@ -36,6 +36,12 @@ on:
       - 'scripts/build-ios-app.sh'
   workflow_dispatch: {}
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-port:
     # Reused by `ios` so the iOS port .jar / native sources are available in
@@ -49,9 +55,6 @@ jobs:
       contents: read
     runs-on: macos-15
     timeout-minutes: 35
-    concurrency:
-      group: mac-ci-${{ github.workflow }}-ios-${{ github.ref_name }}
-      cancel-in-progress: true
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -189,7 +192,7 @@ jobs:
         timeout-minutes: 25
 
       - name: Upload iOS artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: input-validation-ios

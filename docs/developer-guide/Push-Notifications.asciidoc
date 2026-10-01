@@ -1,7 +1,7 @@
 == Push notifications
 
 [[push-notifications-section,Codename One Push Notifications]]
-Codename One push uses a typed message envelope and an explicit client binding. Your main application class doesn't implement a push interface. The same application code receives messages from Android, iOS, Huawei devices, and supported web browsers.
+For new integrations, Codename One push uses a typed message envelope and an explicit client binding. Your main application class doesn't implement a push interface. Existing applications using `PushCallback` can keep that integration; see <<push-classic-server-migration,Migrate an existing push server>> before changing their payload format. The same application code receives messages from Android, iOS, Huawei devices, and supported web browsers.
 
 You can use the managed BuildCloud service or install an adapter for custom native push. A custom-provider adapter is a low-level escape hatch: it bypasses BuildCloud registration and delivery completely, so your server owns tokens, credentials, targeting, retries, and provider errors.
 
@@ -13,24 +13,62 @@ image::img/push-delivery-modes.svg[How registration and delivery flow in managed
 
 === Create and configure an application
 
-Open the Codename One Console and select *Push*. Create one Push application for each logical application and environment. For example, keep production and staging separate so credentials, audiences, and analytics remain isolated.
+Open the https://cloud.codenameone.com/console/[Codename One Console] in the organization that owns the application. Create one Push application for each logical application and environment. Keep production and staging separate so credentials, audiences, and analytics remain isolated.
 
-The *Overview* page displays the client binding key and one readiness card for every supported provider. Copy the key into `PushClient.builder()`. Select any readiness card, including a green *Ready* card, to open *Settings* on that provider's tab.
+. Open *Push > Settings*. Enter a name under *Applications* and select *Create application*.
+. Use the *Selected application* picker at the top of the Push page to select that application. Settings can also list applications registered by the classic API. If the application isn't among those loaded, use *Load more* in Settings, then return to the picker.
+. Open the Android or iOS provider tab under *Native push providers*, paste the credential JSON described below, and save it.
+. Check *Configured* in Settings or *Ready* under *Push > Overview > Channel readiness* for the same selected application. These labels mean a credential is stored; a real test send is still needed to verify provider authentication and device delivery.
 
-.Push Overview shows the copyable application key and actionable provider readiness
+Use the following identifiers for their separate purposes:
+
+[cols="1,2,3",options="header"]
+|===
+|Value |Where to find it |Where to use it
+|Application UUID |*Push > Overview > Server API > Copy ID* |The `appId` field in a V3 server send. It isn't the mobile package name, Apple bundle ID, or client binding key.
+|Client binding key |*Push > Overview > Client binding* |`PushClient.builder()` and client registration. It can't authorize a server send.
+|Server API key |*Account > Server API keys* |`Authorization: Bearer` or `X-API-Key` on your server. Create it with the `push` scope; the classic push token is a separate credential.
+|===
+
+Select any readiness card, including a green *Ready* card, to open Settings on that provider's tab.
+
+.Push Overview shows the client binding and provider readiness cards
 image::img/push-v3-console-overview.png[Push Overview with client binding and provider readiness cards,scaledwidth=95%]
 
-Complete the provider setup tabs you need:
+==== Android: Firebase service-account JSON
 
-* *Android / FCM*: upload the Firebase service-account JSON file. The server uses the FCM HTTP v1 API.
-* *iOS / APNs*: save the Apple team ID, key ID, bundle ID, and `.p8` signing key. Token authentication replaces expiring push certificates.
+. In the Firebase project used by the installed Android app, open *Project settings > Service accounts* and select *Generate new private key*.
+. Open the downloaded service-account JSON file locally and copy the complete JSON object.
+. In *Push > Settings > Native push providers > Android*, paste it into *Credential JSON* and select *Save Firebase Cloud Messaging credential*.
+
+The server credential contains `project_id`, `client_email`, and `private_key`. Android's `google-services.json` configures the mobile app and can't authenticate server sends. Keep the service-account private key on the server; don't bundle it into the app or paste it into a support thread.
+
+==== iOS: APNs key and credential JSON
+
+Create an APNs authentication key in https://developer.apple.com/help/account/capabilities/communicate-with-apns-using-authentication-tokens/[Apple Developer Certificates, Identifiers & Profiles]. Download its `.p8` file and note the key ID and your Apple team ID. Use the bundle ID of the installed app as `topic`.
+
+The Console's *Credential JSON* field expects a JSON object containing those values. It doesn't accept the raw `.p8` file by itself. Replace the placeholders in this example:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-007,indent=0]
+----
+
+`privateKey` contains the entire `.p8` text, including the BEGIN/END lines. Within the JSON string, encode each line break as `\n`; literal line breaks inside a quoted JSON value are invalid. Use `environment: "production"` for App Store and TestFlight installations, and `"sandbox"` for development-signed installations. The bundle ID, Apple team, environment, and device token must belong to the same app installation.
+
+In *Push > Settings > Native push providers > iOS*, paste the completed object and select *Save Apple Push Notification service credential*. Token authentication uses the APNs signing key instead of an expiring push certificate.
+
+==== Other providers and saved status
+
 * *Huawei*: save the AppGallery Connect application ID and client secret. Add `agconnect-services.json` to the project.
 * *Windows / WNS*: save the Package SID and client secret associated with the Store identity.
 * *Web Push*: save the VAPID public and private keys and subject.
 
 The managed backend includes WNS delivery for explicit Windows targets. It doesn't revive or generate bindings for the unsupported UWP port.
 
-Credentials are encrypted in the BuildCloud secrets vault and are write-only. The setup UI shows whether each provider is configured but never reads a secret back. Rotate a credential by saving its replacement.
+Credentials are encrypted in the BuildCloud secrets vault and are write-only. The input is cleared after saving and stays blank when you return to the page. Check the saved-status label for the same selected application instead of expecting the secret to reappear. If the status says *Not configured* or *Status unavailable*, check the selected application and organization and report any error. Rotate a credential by saving its replacement.
+
+==== Prepare a new client build
 
 Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. On Android, include `google-services.json`, `agconnect-services.json`, or both. A build with both configurations uses FCM when Google Play Services are available on the device and falls back to Huawei Push Kit otherwise. No provider-selection build hint is required. The `android.messagingService=fcm` and `android.messagingService=huawei` hints remain available only when an application intentionally needs to force one provider.
 
@@ -88,7 +126,9 @@ Don't place secrets or irreplaceable data in a notification. Providers, operatin
 
 === Send from a server
 
-Create an API key with the `push` scope in the Console. Submit a typed message and one or more provider targets to `POST /api/v3/push/messages`:
+Open *Account > Server API keys*, enter a key name, select the `push` scope, and select *Create server key*. Copy the key when it's shown; it won't be displayed again. Keep it on your server. Authenticate with `Authorization: Bearer YOUR_SERVER_API_KEY` or `X-API-Key: YOUR_SERVER_API_KEY`; the existing classic push token won't authenticate V3 requests.
+
+Copy the selected application's UUID from *Push > Overview > Server API > Copy ID*. Put that UUID in `appId`, then submit a typed message and one or more provider targets to `POST /api/v3/push/messages`:
 
 [source,bash]
 ----
@@ -100,6 +140,41 @@ A successful admission returns HTTP `202` with durable delivery IDs. Invalid tar
 The complete request, response, authentication, error, target, and message schemas are in the https://cloud.codenameone.com/openapi/push-v3.yaml[Push sending OpenAPI 3.0 specification]. Import that file into Swagger UI, an OpenAPI code generator, or an API client instead of reproducing DTOs from this chapter.
 
 Use the Console for operator-driven messages, stored audiences, campaigns, analytics, and automations.
+
+[[push-classic-server-migration]]
+=== Migrate an existing push server
+
+There are two migration paths. Choose one wire format for each request:
+
+[cols="1,2,2",options="header"]
+|===
+|Path |Endpoint and request |Authentication and installed apps
+|Keep the classic API |`https://cloud.codenameone.com/push/push`, with the existing form-encoded fields |Keep the classic `token`, provider credentials, and installed `PushCallback` apps.
+|Move the server to V3 |`https://cloud.codenameone.com/api/v3/push/messages`, with a JSON body |Use a server API key with `push` scope, the application UUID, saved provider credentials, and `message.classic` for installed `PushCallback` apps.
+|===
+
+For the classic path, change only the host of the existing `/push/push` URL. Keep fields such as `token`, `device`, `type`, `body`, `auth`, `cert`, `certPassword`, and `production`. Don't post these form fields to `/api/v3/push/messages`. A Java URL string must contain the plain URL, without Markdown brackets or parentheses.
+
+For a server-only V3 migration, configure credentials for the same Firebase project and Apple bundle ID/environment as the installed apps. Keep existing device keys and select the explicit classic payload:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-008,indent=0]
+----
+
+Send this JSON with the same headers as the V3 curl example above. Replace each target with a real device key for that provider. Existing `cn1-fcm-`, `cn1-gcm-`, and `cn1-ios-` prefixes are accepted. Keep the numeric push `type` and body encoding used by your existing sender; the example uses type `1` for a simple message.
+
+`message.classic` produces the fields consumed by installed `PushCallback` clients. It doesn't require `platform.fcm`/`platform.apns` overrides, a `PushClient` integration, or a new mobile release. Don't combine `classic` with the ordinary V3 message fields. Use ordinary V3 messages for clients that have adopted `PushClient`.
+
+Before changing production traffic, send to installed Android and iOS test apps. Verify foreground delivery, background delivery, notification taps, and any other push types your application uses.
+
+==== Interpret the response
+
+HTTP `202` means the request was admitted to the durable queue. Its JSON response contains `deliveryIds` and `quota`; it doesn't mean the provider or device has accepted the message yet. Use delivery feedback and analytics for later outcomes.
+
+* *401*: check the server API key, its `push` scope, and the authentication header. A classic push token or client binding key isn't a V3 server key.
+* *400*: read the JSON error, check that `appId` is the selected application UUID, and check the request or credential format. For the classic endpoint, `credential URL returned HTTP 404` means a URL supplied in `auth` or `cert` couldn't be fetched. Firebase `auth` can also contain the complete service-account JSON directly.
+* *406 after a notification arrives*: this isn't a successful API response, and changing the message format or resending can duplicate the notification. Report the UTC request time, endpoint, response body, and `CF-RAY` header when present, without including credentials or device tokens. The expected successful V3 response remains `202` with delivery IDs.
 
 === Learn which sends failed
 

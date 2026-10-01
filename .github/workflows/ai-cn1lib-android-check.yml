@@ -20,6 +20,12 @@ on:
       - 'maven/cn1-ai-**'
       - 'scripts/gen-ai-cn1libs.py'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-native-check:
     runs-on: ubuntu-24.04

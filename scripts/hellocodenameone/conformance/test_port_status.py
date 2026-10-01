@@ -1411,10 +1411,10 @@ class PortStatusTest(unittest.TestCase):
         )
 
         by_id = {port["id"]: port for port in self.manifest["ports"]}
-        # Each has its own workflow, because backfill attributes reports by the
-        # workflow file name.
+        # Backfill attributes reports to their automatic producer. Catalyst now
+        # shares the iOS coordinator; AppKit retains its performance-gated run.
         self.assertEqual("scripts-macos.yml", by_id["macos"]["workflow"])
-        self.assertEqual("scripts-mac-catalyst.yml", by_id["mac-catalyst"]["workflow"])
+        self.assertEqual("scripts-ios.yml", by_id["mac-catalyst"]["workflow"])
 
         # And its own goldens. A Catalyst window is a UIWindowScene fed an
         # off-screen raster and an AppKit one owns a real CAMetalLayer, so the

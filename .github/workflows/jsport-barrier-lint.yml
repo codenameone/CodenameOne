@@ -22,6 +22,12 @@ name: JS port barrier-read lint
       - 'scripts/lint/jsport-canvas-barrier-reads.py'
       - '.github/workflows/jsport-barrier-lint.yml'
 
+concurrency:
+  # Only the latest revision needs validation. PR numbers keep forks isolated;
+  # event names keep a manual/scheduled run from cancelling a push or PR run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   barrier-lint:
     name: JS port canvas barrier-read lint

@@ -52,7 +52,7 @@
       "id": "mac-catalyst",
       "name": "macOS (Mac Catalyst)",
       "detail": "Legacy Mac Catalyst build",
-      "workflow": "scripts-mac-catalyst.yml"
+      "workflow": "scripts-ios.yml"
     },
     {
       "id": "javascript",
