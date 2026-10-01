@@ -76,7 +76,7 @@ final class BackendSupport {
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
                     layout.settingsFile(), AppSupport.sourceRoots(main, layout),
-                    "UTF-8", userProperties, main.getCompileClasspath())
+                    "UTF-8", userProperties, compile.getClasspath())
                     .withSourceEncoding(AppSupport.javaEncoding(project, main)));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(
                     compile.getDestinationDirectory().get().getAsFile(), main.getOutput().getClassesDirs()));
@@ -124,6 +124,13 @@ final class BackendSupport {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Adds a backend/ subproject to this application");
             t.getRootDirectory().set(layout.rootDir());
+            // Whether the settings plugin really ran, which includes backend/ and
+            // applies itself there: a settings script can name the plugin without
+            // applying it (pluginManagement { plugins { id(...) version ... } }).
+            org.gradle.api.plugins.ExtraPropertiesExtension extra =
+                    project.getGradle().getExtensions().getExtraProperties();
+            t.getSettingsPluginApplied().set(extra.has(SettingsSupport.APPLIED_MARKER)
+                    && Boolean.TRUE.equals(extra.get(SettingsSupport.APPLIED_MARKER)));
             t.getPackageName().set(project.provider(() -> {
                 String pkg = AppSettings.read(layout.settingsFile()).getProperty("codename1.packageName", "app");
                 return pkg + ".backend";
@@ -137,6 +144,10 @@ final class BackendSupport {
         /// The root project directory.
         @Internal
         public abstract DirectoryProperty getRootDirectory();
+
+        /// Whether `com.codenameone` was applied in the settings script.
+        @Input
+        public abstract Property<Boolean> getSettingsPluginApplied();
 
         /// The package of the generated `Api` controller.
         @Input
@@ -177,7 +188,7 @@ final class BackendSupport {
             if (settings.isFile()) {
                 try {
                     String text = new String(Files.readAllBytes(settings.toPath()), StandardCharsets.UTF_8);
-                    if (!text.contains("com.codenameone")) {
+                    if (!getSettingsPluginApplied().get()) {
                         // The settings plugin includes backend/ and applies itself there.
                         // A build that applies the plugin from the root build script has
                         // neither, so the backend is included here and applies the plugin

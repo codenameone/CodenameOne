@@ -268,7 +268,18 @@ public final class GradleConversion {
             if (from.buildSystem() == BuildSystem.MAVEN) {
                 List<String> deps = dependencyLines(from.dependencyFile(), targetDir,
                         hasSuffix(new File(targetDir, "src"), ".kt"));
-                writeRepositories(new File(targetDir, "build.gradle.kts"), repositoryUrls(from.dependencyFile()));
+                // The JavaSE module's repositories too: its dependencies are converted
+                // as javaseImplementation below and must resolve from the same places.
+                List<String> repositories = new ArrayList<String>(repositoryUrls(from.dependencyFile()));
+                File javasePom = new File(from.rootDir(), NativePlatform.JAVASE.id() + File.separator + "pom.xml");
+                if (javasePom.isFile()) {
+                    for (String url : repositoryUrls(javasePom)) {
+                        if (!repositories.contains(url)) {
+                            repositories.add(url);
+                        }
+                    }
+                }
+                writeRepositories(new File(targetDir, "build.gradle.kts"), repositories);
                 if (!deps.isEmpty()) {
                     warnUnresolved(deps, "common/pom.xml");
                     writeDependencies(new File(targetDir, "build.gradle.kts"), deps, "common/pom.xml");

@@ -180,7 +180,10 @@ final class AppSupport {
                     .withSiblingClasses(main.getOutput().getClassesDirs()));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().get().getAsFile(), stubs, layout.projectDir(),
-                    layout.settingsFile(), roots, "UTF-8", userProperties, main.getCompileClasspath())
+                    layout.settingsFile(), roots, "UTF-8", userProperties,
+                    // javac's own classpath: in a mixed project it holds Kotlin's
+                    // classes, which a Java @RestClient's Kotlin DTO resolves from.
+                    compile.getClasspath())
                     .withSourceEncoding(javaEncoding(project, main)));
             // Last: in a Java and Kotlin project, both passes have run by now.
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(

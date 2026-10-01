@@ -415,7 +415,8 @@ class GradleConversionTest {
                 + "<dependency><groupId>org.example</groupId><artifactId>util</artifactId><version>2.0</version>"
                 + "</dependency></dependencies></project>");
         touch(mvn, "javase/pom.xml", "<project><parent><groupId>com.acme</groupId><artifactId>mvnapp</artifactId>"
-                + "<version>1.0</version></parent><dependencies>"
+                + "<version>1.0</version></parent><repositories><repository><id>desk</id>"
+                + "<url>https://maven.desktop.example/repo</url></repository></repositories><dependencies>"
                 + "<dependency><groupId>com.acme</groupId><artifactId>mvnapp-common</artifactId><version>1.0</version>"
                 + "</dependency>"
                 + "<dependency><groupId>com.codenameone</groupId><artifactId>codenameone-javase</artifactId>"
@@ -433,6 +434,8 @@ class GradleConversionTest {
         converter().convert(mvn, out, "1.0");
         String build = read(new File(out, "build.gradle.kts"));
         assertTrue(build.contains("    javaseImplementation(\"org.example:desktop-only:3\")"), build);
+        assertTrue(build.contains("maven(url = uri(\"https://maven.desktop.example/repo\"))"),
+                "where the JavaSE dependency resolves from: " + build);
         assertFalse(build.contains("mvnapp-common"), "the application's own module is not a dependency: " + build);
         assertFalse(build.contains("junit-jupiter"), "the platform modules' tests are not converted: " + build);
         assertFalse(build.contains("javaseImplementation(\"org.example:util"), "already common's: " + build);
