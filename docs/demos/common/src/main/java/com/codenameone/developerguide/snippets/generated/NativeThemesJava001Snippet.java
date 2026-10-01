@@ -107,4 +107,12 @@ class NativeThemesJava001Snippet {
         }
         // end::native-themes-java-001[]
     }
+    void inheritNativeThemeSettings() {
+        // tag::native-theme-os-settings[]
+        UIManager ui = UIManager.getInstance();
+        ui.setUseNativeColors(true);
+        ui.setUseNativeFonts(true);
+        ui.setUseLargerTextScale(true);
+        // end::native-theme-os-settings[]
+    }
 }

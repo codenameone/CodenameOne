@@ -67,6 +67,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The backend's JVM database driver, so the bean tests can run the
+             generated wiring of a transactional service against a real SQLite. -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

@@ -5,6 +5,20 @@ They are compiled by `scripts/build-native-themes.sh` (which invokes the thin
 `maven/css-compiler` jar with `strictNoCef=true`) into `.res` files under the
 repo's `Themes/` directory, alongside the legacy hand-authored themes.
 
+## Optional OS defaults
+
+Bundled themes declare `nativeThemeDefaultsBool: true`. This internal marker lets
+UIManager distinguish their defaults from application overrides during live OS
+settings updates. Keep it in bundled theme sources; do not add it to application
+themes. `Label.font` is the body-size reference for proportional font inheritance
+(the default `font` entry is the fallback for a theme without `Label.font`).
+
+Applications opt in independently with `useNativeColorsBool` and
+`useNativeFontsBool`; both default to false. Larger-text scaling retains its
+existing, separate control. Semantic colors must use `var(--token, fallback)`
+bindings to participate. Keep every fallback identical when adding a binding, and
+preserve intentional differences between iOS generation layers.
+
 ## Layout
 
 ```

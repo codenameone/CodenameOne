@@ -32,17 +32,18 @@ import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.annotations.ResponseStatus;
 import com.codename1.backend.annotations.RestController;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 // tag::backend-first-server[]
 @RestController
 @RequestMapping("/notes")
 public class Notes {
-    private final Map<Long, Map> store = new ConcurrentHashMap<Long, Map>();
+    private final Map<Long, Map> store =
+            Collections.synchronizedMap(new LinkedHashMap<Long, Map>());
     private final AtomicLong nextId = new AtomicLong(1);
 
     @GetMapping("/healthz")
@@ -58,11 +59,13 @@ public class Notes {
     @GetMapping
     public List list(@RequestParam(value = "limit", defaultValue = "20") int limit) {
         List page = new ArrayList();
-        for (Map note : store.values()) {
-            if (page.size() >= limit) {
-                break;
+        synchronized (store) {                   // iterating needs the map's own lock
+            for (Map note : store.values()) {
+                if (page.size() >= limit) {
+                    break;
+                }
+                page.add(note);
             }
-            page.add(note);
         }
         return page;
     }

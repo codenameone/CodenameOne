@@ -24,6 +24,12 @@ their own conventions; the canonical source of truth is `.agent-skills/`.
   attach a Java debugger to the device build and drive it over MCP the same way;
   see `.agent-skills/codename-one/references/on-device-debugging.md`.
 - Native cloud builds use `mvn -pl <ios|android|javascript|javase> package -Dcodename1.platform=... -Dcodename1.buildTarget=...`.
+- The server side lives in `backend/` (Spring-style `@RestController` / `@Service`,
+  resolved at build time). Run it with
+  `CN1_PROFILE=dev mvn -pl backend -Dcodename1.platform=backend cn1:backend`; it then
+  serves MCP tools at `http://127.0.0.1:8080/mcp` for inspecting and exercising it.
+  See `.agent-skills/codename-one/references/backend.md`, and
+  `references/full-stack-loop.md` for changes that span the app and the server.
 
 When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the
 reference table at the bottom.

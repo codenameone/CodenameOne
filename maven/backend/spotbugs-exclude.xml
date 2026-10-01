@@ -125,4 +125,15 @@
         <Method name="asBooleanObject" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
+    <!--
+      The tz database is where the host keeps its zones: a zone the file for
+      which is missing is one this runtime cannot really use, so checking that
+      path is the point, not a portability slip. Absent (Windows, a minimal
+      image), the check is skipped.
+    -->
+    <Match>
+        <Class name="com.codename1.backend.CronSchedule" />
+        <Method name="knownZone" />
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+    </Match>
 </FindBugsFilter>

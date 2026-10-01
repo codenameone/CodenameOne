@@ -20,33 +20,28 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.developerguide.backend;
+package com.codename1.backend.annotations;
 
-import com.codename1.backend.Backend;
-import com.codename1.backend.HttpServer;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/** The Backend chapter's server examples, compiled so they cannot drift. */
-public final class ServerSnippets {
-
-    private ServerSnippets() {
-    }
-
-    public static void serve() throws Exception {
-// tag::backend-builder[]
-Backend.builder()
-        .port(9000)                       // otherwise cn1.server.port, or PORT, or 8080
-        .handler(new Health())
-        .run();
-// end::backend-builder[]
-    }
-
-    /** A handler with nothing injected into it, for the example above. */
-    public static final class Health implements HttpServer.Handler {
-        public HttpServer.Response handle(HttpServer.Request request) throws Exception {
-            if (!"/healthz".equals(request.getTarget())) {
-                return null;              // null means "not mine", and then a 404
-            }
-            return new HttpServer.Response(200, "text/plain", "ok".getBytes("UTF-8"));
-        }
-    }
+/// Injects a configuration value.
+///
+/// `${key}` reads `key` from [com.codename1.backend.Config] -- a system
+/// property, the environment, the profile's properties file or the base one, in
+/// that order -- and `${key:fallback}` supplies a value when none of them has
+/// it. The text around a reference is kept, so `"${host}:${port}"` works. A
+/// String, a primitive or its box, or an enum can receive one; the conversion is
+/// written into the generated entry point.
+///
+/// A key nobody sets, with no fallback, is a start-up error naming the key: a
+/// missing setting is the deployment's mistake, and start-up is where it is
+/// cheap to see.
+@Retention(RetentionPolicy.CLASS)
+@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.METHOD})
+public @interface Value {
+    /// The expression, such as `${mail.host:localhost}`.
+    String value();
 }

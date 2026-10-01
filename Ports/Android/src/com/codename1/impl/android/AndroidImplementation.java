@@ -2038,6 +2038,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        com.codename1.impl.NativeThemeSettings result = new com.codename1.impl.NativeThemeSettings();
+        android.content.Context context = getContext();
+        if (context == null) { return result; }
+        // Resolve normal-size platform text appearance in an unscaled configuration.
+        // Dividing scaledDensity is not sufficient with Android's nonlinear font scaling.
+        if (android.os.Build.VERSION.SDK_INT >= 17) {
+            Configuration config = new Configuration(context.getResources().getConfiguration());
+            config.fontScale = 1f;
+            android.content.Context normal = context.createConfigurationContext(config);
+            android.content.res.TypedArray text = normal.obtainStyledAttributes(
+                    android.R.style.TextAppearance_DeviceDefault,
+                    new int[] {android.R.attr.textSize});
+            try {
+                float size = text.getDimension(0, 0);
+                result.font("native:", size);
+            } finally {
+                text.recycle();
+            }
+        }
+        // Public dynamic-color resources are available on Android 12+. Resolve by
+        // name so old SDK builds and vendors with partial support retain fallbacks.
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            String[][] colors = {
+                {"accent-color", "system_accent1_600"},
+                {"accent-color-dark", "system_accent1_200"},
+                {"accent-on-color", "system_accent1_0"},
+                {"accent-on-color-dark", "system_accent1_800"},
+                {"accent-container-color", "system_accent1_100"},
+                {"accent-container-color-dark", "system_accent1_700"},
+                {"accent-on-container-color", "system_accent1_900"},
+                {"accent-on-container-color-dark", "system_accent1_100"},
+                {"accent-pressed-color", "system_accent1_200"},
+                {"accent-pressed-color-dark", "system_accent1_700"},
+                {"selection-color", "system_accent1_200"},
+                {"selection-color-dark", "system_accent1_700"},
+                {"window-bg-color", "system_neutral1_10"},
+                {"window-bg-color-dark", "system_neutral1_900"},
+                {"view-bg-color", "system_neutral1_10"},
+                {"view-bg-color-dark", "system_neutral1_900"},
+                {"text-color", "system_neutral1_900"},
+                {"text-color-dark", "system_neutral1_100"},
+                {"text-secondary-color", "system_neutral2_700"},
+                {"text-secondary-color-dark", "system_neutral2_200"},
+                {"separator-color", "system_neutral2_500"},
+                {"separator-color-dark", "system_neutral2_600"}
+            };
+            android.content.res.Resources resources = context.getResources();
+            for (String[] color : colors) {
+                int id = resources.getIdentifier(color[1], "color", "android");
+                if (id != 0) { result.color(color[0], resources.getColor(id)); }
+            }
+        }
+        return result;
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return getLargerTextScale() > 1.0f;
     }

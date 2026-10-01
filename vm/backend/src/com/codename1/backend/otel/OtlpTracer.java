@@ -130,6 +130,31 @@ public final class OtlpTracer implements Tracer {
         return tracer.open(config) ? tracer : null;
     }
 
+    /// The OTLP resource this process reports as: `service.name` and the
+    /// configured resource attributes. Shared by the trace and metric exporters,
+    /// which must describe the same service.
+    static Map resource(Config config, String defaultServiceName) throws IOException {
+        Map resourceAttributes = new LinkedHashMap();
+        parsePairs(config.get(RESOURCE_ATTRIBUTES), resourceAttributes, RESOURCE_ATTRIBUTES);
+        // Each source in turn, a blank one counting as absent: tested raw, a name
+        // of " " was chosen and then trimmed to an empty service.name, where the
+        // specification wants unknown_service.
+        Object fromResource = resourceAttributes.get("service.name");
+        String service = nonBlank(config.get(SERVICE_NAME));
+        if (service == null) {
+            service = nonBlank(fromResource == null ? null : String.valueOf(fromResource));
+        }
+        if (service == null) {
+            service = nonBlank(defaultServiceName);
+        }
+        resourceAttributes.put("service.name", service == null ? "unknown_service" : service);
+        resourceAttributes.put("telemetry.sdk.name", "codenameone");
+        resourceAttributes.put("telemetry.sdk.language", "java");
+        Map resource = new LinkedHashMap();
+        resource.put("attributes", keyValues(resourceAttributes));
+        return resource;
+    }
+
     @Override
     public boolean open(Config config) throws IOException {
         if (config.getBoolean(DISABLED, false)) {
@@ -173,24 +198,7 @@ public final class OtlpTracer implements Tracer {
         String tracesHeaders = config.get(TRACES_HEADERS);
         parseHeaders(tracesHeaders != null ? tracesHeaders : config.get(HEADERS), headers);
 
-        Map resourceAttributes = new LinkedHashMap();
-        parsePairs(config.get(RESOURCE_ATTRIBUTES), resourceAttributes, RESOURCE_ATTRIBUTES);
-        // Each source in turn, a blank one counting as absent: tested raw, a name
-        // of " " was chosen and then trimmed to an empty service.name, where the
-        // specification wants unknown_service.
-        Object fromResource = resourceAttributes.get("service.name");
-        String service = nonBlank(config.get(SERVICE_NAME));
-        if (service == null) {
-            service = nonBlank(fromResource == null ? null : String.valueOf(fromResource));
-        }
-        if (service == null) {
-            service = nonBlank(defaultServiceName);
-        }
-        resourceAttributes.put("service.name", service == null ? "unknown_service" : service);
-        resourceAttributes.put("telemetry.sdk.name", "codenameone");
-        resourceAttributes.put("telemetry.sdk.language", "java");
-        Map resource = new LinkedHashMap();
-        resource.put("attributes", keyValues(resourceAttributes));
+        Map resource = resource(config, defaultServiceName);
 
         int queue = positive(config, QUEUE_SIZE, 2048);
         int batch = Math.min(queue, positive(config, BATCH_SIZE, 512));
@@ -211,40 +219,15 @@ public final class OtlpTracer implements Tracer {
                         + "ASCII characters a URL path allows (percent-encode anything "
                         + "else); it is '" + configuredPath + "'");
             }
-            String token = config.get(RELAY_TOKEN);
-            if (token != null && token.length() > 0 && !sendableFieldValue(token)) {
-                // Refused here because no client could ever present it: the request
-                // parser refuses a control character in a header value and trims
-                // surrounding spaces and tabs, so a trailing newline from a mounted
-                // secret made every relay export a 401 the app drops silently. The
-                // value itself stays out of the message -- it is a secret.
-                throw new IOException(RELAY_TOKEN + " holds a control character or "
-                        + "leading or trailing whitespace, so no request can carry it "
-                        + "in a header; remove it (a secret file's trailing newline is "
-                        + "the usual cause)");
-            }
+            // Refused there when no client could ever present it: a trailing
+            // newline from a mounted secret made every relay export a 401 the app
+            // drops silently.
+            String token = config.getHeaderSecret(RELAY_TOKEN);
             relay = new OtlpRelay(path, token, relayBytes,
                     positive(config, RELAY_MAX_SPANS, 1000), corsOrigin(config),
                     exporter);
         }
         exporter.start();
-        return true;
-    }
-
-    /// Whether a request header could carry this value exactly: no control
-    /// character but tab, and no space or tab at either end, which the request
-    /// parser trims as surrounding whitespace.
-    static boolean sendableFieldValue(String value) {
-        int last = value.length() - 1;
-        for (int iter = 0 ; iter <= last ; iter++) {
-            char c = value.charAt(iter);
-            if ((c < 0x20 && c != '\t') || c == 0x7f) {
-                return false;
-            }
-            if ((iter == 0 || iter == last) && (c == ' ' || c == '\t')) {
-                return false;
-            }
-        }
         return true;
     }
 
@@ -633,7 +616,7 @@ public final class OtlpTracer implements Tracer {
     }
 
     /// `value` trimmed, or null when that leaves nothing.
-    private static String nonBlank(String value) {
+    static String nonBlank(String value) {
         if (value == null) {
             return null;
         }
@@ -868,6 +851,11 @@ public final class OtlpTracer implements Tracer {
     /// appending to the whole string put the path inside the key's value and sent
     /// the export to the base path with a corrupted credential.
     static String appendTracesPath(String base) {
+        return appendSignalPath(base, "/v1/traces");
+    }
+
+    /// The generic endpoint plus a signal's path, appended to the PATH.
+    static String appendSignalPath(String base, String signal) {
         int cut = base.length();
         int query = base.indexOf('?');
         int fragment = base.indexOf('#');
@@ -881,10 +869,10 @@ public final class OtlpTracer implements Tracer {
         while (path.endsWith("/")) {
             path = path.substring(0, path.length() - 1);
         }
-        return path + "/v1/traces" + base.substring(cut);
+        return path + signal + base.substring(cut);
     }
 
-    private static int positive(Config config, String key, int fallback) throws IOException {
+    static int positive(Config config, String key, int fallback) throws IOException {
         int value = config.getInt(key, fallback);
         if (value <= 0) {
             throw new IOException(key + " must be a positive number and is " + value);
@@ -913,7 +901,7 @@ public final class OtlpTracer implements Tracer {
     }
 
     /// OTEL_EXPORTER_OTLP_HEADERS: `name=value,...`, values percent-encoded.
-    private static void parseHeaders(String text, List out) throws IOException {
+    static void parseHeaders(String text, List out) throws IOException {
         Map pairs = new LinkedHashMap();
         parsePairs(text, pairs, HEADERS);
         Iterator it = pairs.entrySet().iterator();

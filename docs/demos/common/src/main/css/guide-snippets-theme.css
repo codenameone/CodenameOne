@@ -840,3 +840,13 @@ Button.hover {
     background-color: #f6f6f6;
 }
 /* end::native-themes-css-hover[] */
+
+/* tag::native-theme-os-settings[] */
+#Constants {
+    includeNativeBool: true;
+    useNativeColorsBool: true;
+    useNativeFontsBool: true;
+    useLargerTextScaleBool: true;
+}
+
+/* end::native-theme-os-settings[] */

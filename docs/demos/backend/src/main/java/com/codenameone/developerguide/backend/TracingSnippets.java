@@ -22,13 +22,10 @@
  */
 package com.codenameone.developerguide.backend;
 
-import com.codename1.backend.Config;
-import com.codename1.backend.Tracing;
 import com.codename1.backend.annotations.GetMapping;
 import com.codename1.backend.annotations.OpenTelemetry;
 import com.codename1.backend.annotations.PathVariable;
 import com.codename1.backend.annotations.RestController;
-import com.codename1.backend.otel.OtlpTracer;
 
 /// The Backend chapter's tracing examples, compiled so they cannot drift. This
 /// module runs no annotation processing, which is what lets `@OpenTelemetry` appear
@@ -49,12 +46,6 @@ public static class NotesController {
     }
 }
 // end::backend-otel-annotation[]
-    }
-
-    public static void installByHand() throws Exception {
-// tag::backend-otel-install[]
-Tracing.install(OtlpTracer.open(Config.load(), "notes"));
-// end::backend-otel-install[]
     }
 
 }

@@ -40,6 +40,8 @@ public final class WindowsNative {
     /* ---------------------------------------------------------- lifecycle */
 
     /** Writes a line to the native debug log (OutputDebugString + stderr). */
+    public static native String nativeThemeSettings();
+
     public static native void nativeLog(String message);
 
     /**

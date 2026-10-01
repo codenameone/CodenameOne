@@ -213,6 +213,15 @@ public final class ProcessorContext {
         return Collections.unmodifiableMap(emittedResources);
     }
 
+    private final Map<String, Object> attributes = new LinkedHashMap<String, Object>();
+
+    /// Shares a result between processors of one run -- the backend's bean graph
+    /// is computed once and read by the processor that writes the entry point.
+    public void setAttribute(String key, Object value) { attributes.put(key, value); }
+
+    /// A value set by [#setAttribute] in this run, or null.
+    public Object getAttribute(String key) { return attributes.get(key); }
+
     public boolean hasErrors() { return !errors.isEmpty(); }
     public List<ProcessingError> getErrors() { return Collections.unmodifiableList(errors); }
     public Map<String, byte[]> getEmittedClasses() { return Collections.unmodifiableMap(emittedClasses); }

@@ -246,6 +246,7 @@ public final class IOSNative {
     
     native boolean isLargerTextEnabled();
     native float getLargerTextScale();
+    native String nativeThemeSettings();
     native boolean isHighContrastEnabled();
     native boolean isDifferentiateWithoutColorEnabled();
     native boolean isReduceMotionEnabled();

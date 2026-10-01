@@ -651,7 +651,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean osDarkModeResolved;
     private static Boolean osDarkMode;
 
-    private static Boolean osDarkMode() {
+    private static synchronized Boolean osDarkMode() {
         if (!osDarkModeResolved) {
             osDarkModeResolved = true;
             try {
@@ -670,6 +670,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return osDarkMode;
+    }
+
+    // AWT settings listeners and activation run outside the CN1 EDT. Invalidate
+    // under the same lock as the query before queuing the EDT theme refresh.
+    static void desktopThemeSettingsChanged() {
+        synchronized (JavaSEPort.class) {
+            osDarkModeResolved = false;
+            osDarkMode = null;
+        }
+        Display.getInstance().nativeThemeSettingsChanged();
     }
 
     /// Runs a short OS query and returns its standard output, or null when it failed or did
@@ -8568,6 +8578,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         final JMenu largerTextMenu = installLargerTextMenu(simulateMenu, pref, frm);
+        simulateMenu.add(installNativeThemeSettingsMenu());
         final JMenu accessibilityPreferencesMenu = installAccessibilityPreferencesMenu(pref);
 
         final JMenu notificationBackgroundMenu = installNotificationBackgroundSimulationMenu(simulateMenu);
@@ -9665,6 +9676,53 @@ public class JavaSEPort extends CodenameOneImplementation {
         return Math.min(h1, w1);
     }
     
+    private JMenu installNativeThemeSettingsMenu() {
+        JMenu menu = new JMenu("OS Theme Settings");
+        JMenuItem reset = new JMenuItem("Reset simulated settings");
+        reset.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                setSimulatorNativeThemeSettings(null);
+            }
+        });
+        menu.add(reset);
+        JMenuItem accent = new JMenuItem("Accent color...");
+        accent.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                java.awt.Color color = javax.swing.JColorChooser.showDialog(canvas, "Simulated OS accent", java.awt.Color.BLUE);
+                if (color != null) {
+                    com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                            ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                    settings.color("accent-color", color.getRGB()).color("accent-color-dark", color.getRGB());
+                    setSimulatorNativeThemeSettings(settings);
+                }
+            }
+        });
+        menu.add(accent);
+        JMenuItem font = new JMenuItem("UI font...");
+        font.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                String family = javax.swing.JOptionPane.showInputDialog(canvas, "OS UI font family", "Dialog");
+                if (family == null || family.trim().length() == 0) { return; }
+                String size = javax.swing.JOptionPane.showInputDialog(canvas, "Normal size in CN1 pixels", "16");
+                if (size == null) { return; }
+                try {
+                    float pixels = Float.parseFloat(size);
+                    if (!(pixels > 0 && pixels < 10000)) { throw new NumberFormatException(); }
+                    com.codename1.impl.NativeThemeSettings settings = simulatorNativeThemeSettings == null
+                            ? new com.codename1.impl.NativeThemeSettings() : simulatorNativeThemeSettings.copy();
+                    setSimulatorNativeThemeSettings(settings.font(family.trim(), pixels));
+                } catch (NumberFormatException invalid) {
+                    javax.swing.JOptionPane.showMessageDialog(canvas, "Enter a positive font size below 10000.");
+                }
+            }
+        });
+        menu.add(font);
+        return menu;
+    }
+
     private JMenu installLargerTextMenu(JMenu parent, final Preferences pref, final JFrame frm) {
         // Standard iOS Dynamic Type stops with their actual body-text point sizes.
         // The simulator returns ratio = bodyPt / 17pt, matching what iOS reports.
@@ -10770,6 +10828,87 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.NativeThemeSettings getNativeThemeSettings() {
+        if (simulatorNativeThemeSettings != null) { return simulatorNativeThemeSettings.copy(); }
+        com.codename1.impl.NativeThemeSettings result = new com.codename1.impl.NativeThemeSettings();
+        if (isSimulator()) { return result; }
+        final java.awt.Toolkit toolkit = java.awt.Toolkit.getDefaultToolkit();
+        if (!nativeThemeDesktopListenersInstalled) {
+            nativeThemeDesktopListenersInstalled = true;
+            final String[] properties = {"win.messagebox.font", "win.itemHighlightColor",
+                    "win.text.textColor", "win.frame.backgroundColor", "gnome.Gtk/FontName", "gnome.Xft/DPI"};
+            final java.beans.PropertyChangeListener listener = new java.beans.PropertyChangeListener() {
+                public void propertyChange(java.beans.PropertyChangeEvent event) {
+                    desktopThemeSettingsChanged();
+                }
+            };
+            for (String property : properties) { toolkit.addPropertyChangeListener(property, listener); }
+            addDeinitializeHook(new Runnable() {
+                public void run() {
+                    for (String property : properties) { toolkit.removePropertyChangeListener(property, listener); }
+                    nativeThemeDesktopListenersInstalled = false;
+                }
+            });
+        }
+        readDesktopThemeFont(result, toolkit.getDesktopProperty("win.messagebox.font"),
+                toolkit.getDesktopProperty("gnome.Gtk/FontName"), toolkit.getDesktopProperty("gnome.Xft/DPI"));
+        String[][] properties = {{"selection-color", "win.itemHighlightColor"},
+                {"text-color", "win.text.textColor"}, {"window-bg-color", "win.frame.backgroundColor"}};
+        for (String[] pair : properties) {
+            Object color = toolkit.getDesktopProperty(pair[1]);
+            if (color instanceof java.awt.Color) {
+                result.color(pair[0], ((java.awt.Color) color).getRGB());
+            }
+        }
+        return result;
+    }
+
+    // Package visibility allows deterministic tests without a running desktop session.
+    static void readDesktopThemeFont(com.codename1.impl.NativeThemeSettings result,
+            Object windowsFont, Object gtkFontName, Object gtkDpi) {
+        if (windowsFont instanceof java.awt.Font) {
+            java.awt.Font font = (java.awt.Font) windowsFont;
+            result.font(font.getFamily(), font.getSize2D());
+        } else if (gtkFontName instanceof String) {
+            // Pango descriptions end in a point size (or an absolute px size).
+            java.util.regex.Matcher match = java.util.regex.Pattern.compile(
+                    "^(.+?)\\s+(\\d+(?:\\.\\d+)?)(px)?$").matcher(((String) gtkFontName).trim());
+            if (!match.matches()) {
+                return;
+            }
+            String family = match.group(1).replaceFirst(
+                    "(?i)(?:\\s+(?:bold|italic|oblique|regular|normal|light|medium|semibold|condensed))+$", "");
+            float size = Float.parseFloat(match.group(2));
+            if (match.group(3) == null) {
+                // XSettings publishes DPI as a fixed-point integer with 10 fractional bits.
+                float dpi = gtkDpi instanceof Number ? ((Number) gtkDpi).floatValue() / 1024f : 96f;
+                if (!(dpi > 0) || Float.isInfinite(dpi)) {
+                    dpi = 96f;
+                }
+                size *= dpi / 72f;
+            }
+            result.font(family, size);
+        }
+    }
+
+    private boolean nativeThemeDesktopListenersInstalled;
+    private com.codename1.impl.NativeThemeSettings simulatorNativeThemeSettings;
+
+    /// Deterministic OS settings for simulator previews/tests; null restores host defaults.
+    public void setSimulatorNativeThemeSettings(com.codename1.impl.NativeThemeSettings settings) {
+        simulatorNativeThemeSettings = settings == null ? null : settings.copy();
+        Display.getInstance().nativeThemeSettingsChanged();
+    }
+
+    @Override
+    public Object loadNativeThemeFont(String family, String template, float size, int style) {
+        if ("native:".equals(family)) {
+            return super.loadNativeThemeFont(family, template, size, style);
+        }
+        return deriveTrueTypeFont(new java.awt.Font(family, java.awt.Font.PLAIN, 1), size, style);
+    }
+
+    @Override
     public boolean isLargerTextEnabled() {
         return largerTextEnabled;
     }
@@ -11511,6 +11650,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowActivated(WindowEvent e) {
+                    desktopThemeSettingsChanged();
                     mainSurfaceFocusChanged(true);
                 }
 

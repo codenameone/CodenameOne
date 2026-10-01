@@ -30,6 +30,10 @@ import java.lang.annotation.Target;
 /// Renames a `@Mapped` field in the JSON projection. The default JSON key is
 /// the field name; `@JsonProperty` lets a field map to `snake_case` or any
 /// alternative spelling without touching the Java identifier.
+///
+/// The server's generated codecs read it too, so a class shared between an app
+/// and its backend has one JSON form on both sides.
+@com.codename1.impl.SharedWithBackend
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.FIELD)
 public @interface JsonProperty {

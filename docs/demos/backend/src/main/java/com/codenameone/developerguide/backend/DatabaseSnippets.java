@@ -34,10 +34,9 @@ public final class DatabaseSnippets {
     private DatabaseSnippets() {
     }
 
-    public static List open() throws IOException {
+    public static List open(DataSource db) throws IOException {
 // tag::backend-database[]
-DataSource db = DataSource.open(System.getenv("DATABASE_URL"));   // or ":memory:"
-
+// db is the pool the server opened from cn1.datasource.url and injected
 List rows = db.query("SELECT id, body FROM note WHERE id > ?",
                      new Object[] { Integer.valueOf(10) });
 // end::backend-database[]

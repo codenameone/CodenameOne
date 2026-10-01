@@ -122,6 +122,41 @@ int  cn1VirtualThreadYieldReason(struct cn1VirtualThread* vt);
  */
 int cn1VirtualThreadYieldIfVirtual(void);
 
+/**
+ * PINNING: whether the current virtual thread holds a monitor, and so must not
+ * give up its host.
+ *
+ * Monitor ownership is the pthread (see monitorEnter in nativeMethods.m), and every
+ * virtual thread on a host shares that pthread. A virtual thread that switched out
+ * inside `synchronized` would let the next one on the same host through the
+ * reentrancy check and into the same critical section -- mutual exclusion silently
+ * gone, not a deadlock. So, as a JVM pins a virtual thread holding a monitor, a
+ * pinned one never parks: every place that would park it -- a socket wait, a
+ * collector handshake, a nap -- waits the way a platform thread does, holding its
+ * host until the monitor is released. Code that waits on I/O while synchronized
+ * still works; it only stops sharing its host while it does.
+ */
+int cn1VirtualThreadPinned(void);
+
+/* The running virtual thread's monitor count, or 0 off one. */
+extern __thread int* cn1VirtualThreadMonitorCount;
+
+/** monitorEnter's half of [cn1VirtualThreadPinned]: one TLS load off a virtual thread. */
+static inline void cn1VirtualThreadMonitorEntered(void) {
+    int* count = cn1VirtualThreadMonitorCount;
+    if(count != 0) {
+        (*count)++;
+    }
+}
+
+/** monitorExit's half. */
+static inline void cn1VirtualThreadMonitorExited(void) {
+    int* count = cn1VirtualThreadMonitorCount;
+    if(count != 0 && *count > 0) {
+        (*count)--;
+    }
+}
+
 /** The virtual thread running on this thread, or 0 when on the thread's own stack. */
 struct cn1VirtualThread* cn1VirtualThreadCurrent(void);
 
@@ -246,6 +281,9 @@ void cn1VirtualThreadStackBounds(struct cn1VirtualThread* co, void** low, void**
 struct cn1VirtualThread;
 
 static inline int   cn1VirtualThreadYieldIfVirtual(void) { return 0; }
+static inline int   cn1VirtualThreadPinned(void) { return 0; }
+static inline void  cn1VirtualThreadMonitorEntered(void) { }
+static inline void  cn1VirtualThreadMonitorExited(void) { }
 static inline void  cn1VirtualThreadGcScanBegin(void) { }
 static inline void  cn1VirtualThreadGcScanEnd(void) { }
 static inline struct cn1VirtualThread* cn1VirtualThreadCurrent(void) { return 0; }

@@ -255,8 +255,9 @@ public final class EntityManager {
         if (transactionScoped) {
             // Already inside one. Every engine refuses a nested BEGIN, and a
             // service method that works alone should not break when another one
-            // calls it.
-            return body.run(this);
+            // calls it. A failure still dooms the thread's transaction, as it
+            // would roll this back alone.
+            return joinedRun(body, this);
         }
         if (pinned != null) {
             // Pinned, but by the CALLER rather than by a transaction: this is
@@ -265,7 +266,28 @@ public final class EntityManager {
             // BEGIN left the writes before a failure committed.
             return pinned.transaction(new ScopedWork(body, dialect, tables));
         }
+        Database joined = com.codename1.backend.Transactions.joined(pool);
+        if (joined != null) {
+            // Inside a @Transactional method: join its transaction, as a manager
+            // already inside one does above.
+            return joinedRun(body, new EntityManager(null, joined, dialect, tables, true));
+        }
         return pool.withConnection(new InTransaction(new ScopedWork(body, dialect, tables)));
+    }
+
+    /// Runs `body` as part of the thread's transaction; if it throws, that
+    /// transaction can no longer commit -- a caller catching the exception would
+    /// otherwise commit what the body wrote before failing.
+    private static Object joinedRun(Work body, EntityManager manager) throws Exception {
+        try {
+            return body.run(manager);
+        } catch (Exception err) {
+            com.codename1.backend.Transactions.markRollbackOnly();
+            throw err;
+        } catch (Error err) {
+            com.codename1.backend.Transactions.markRollbackOnly();
+            throw err;
+        }
     }
 
     /// Opens a transaction on a borrowed connection and runs the work inside it.

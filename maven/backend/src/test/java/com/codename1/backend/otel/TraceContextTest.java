@@ -165,7 +165,10 @@ class TraceContextTest {
                     + refused.getMessage());
             tracer.shutdown(0);
         }
-        assertTrue(OtlpTracer.sendableFieldValue("s3cret with\tinner space"));
+        java.util.Properties inner = new java.util.Properties();
+        inner.setProperty(OtlpTracer.RELAY_TOKEN, "s3cret with\tinner space");
+        assertEquals("s3cret with\tinner space", com.codename1.backend.Config.of(inner, "test")
+                .getHeaderSecret(OtlpTracer.RELAY_TOKEN));
     }
 
     @Test

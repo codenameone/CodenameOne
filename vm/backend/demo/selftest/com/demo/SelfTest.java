@@ -41,6 +41,7 @@ import com.codename1.backend.Reactor;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
+import com.codename1.backend.JsonCodec;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.StaticFiles;
@@ -224,6 +225,8 @@ public class SelfTest {
         web();
         clientTls();
         rotatedCaBundlesAreReRead();
+        futures();
+        jsonCodec();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -236,6 +239,152 @@ public class SelfTest {
     }
 
     // ------------------------------------------------------------------
+
+    /// The vm/JavaAPI classes the backend API promotes beyond the CLDC set --
+    /// Future and what its get() throws, TimeUnit, Properties -- used exactly as
+    /// the backend reference documents them, on the translated runtime. They
+    /// compile against the JDK in every other test; this is where they have to
+    /// work on ParparVM.
+    /// What the build's generated JSON codecs call, on the translated runtime:
+    /// the typed reads, the refusal messages with their paths, and the dates.
+    private static void jsonCodec() throws Exception {
+        JsonCodec.Path root = JsonCodec.Path.ROOT;
+        check("codec: a whole number", "42", String.valueOf(JsonCodec.readLong(
+                Long.valueOf(42), root, "n", -1, Integer.MIN_VALUE, Integer.MAX_VALUE)));
+        check("codec: an integral double is a whole number", "3", String.valueOf(
+                JsonCodec.readLong(Double.valueOf(3.0), root, "n", -1, 0, 10)));
+        check("codec: out of range is refused with its path",
+                "$.items[2].n: expected a whole number from 0 to 10, got the number 11",
+                refusal(Long.valueOf(11), root.child("items").child(2), "n", -1));
+        check("codec: a fraction is refused, not cut short",
+                "$.n: expected a whole number from 0 to 10, got the number 2.5",
+                refusal(Double.valueOf(2.5), root, "n", -1));
+        check("codec: an element index in the path", "$[3]: expected a string, got true",
+                stringRefusal(Boolean.TRUE, root, null, 3));
+        check("codec: a date from milliseconds", "86400000", String.valueOf(
+                JsonCodec.readDate(Long.valueOf(86400000L), root, "d", -1).getTime()));
+        check("codec: an ISO date with Z", "86400000", String.valueOf(
+                JsonCodec.readDate("1970-01-02T00:00:00Z", root, "d", -1).getTime()));
+        check("codec: an ISO date with an offset and a fraction", "86399500", String.valueOf(
+                JsonCodec.readDate("1970-01-02T02:59:59.5+03:00", root, "d", -1).getTime()));
+        check("codec: a date alone is UTC midnight", "951782400000", String.valueOf(
+                JsonCodec.readDate("2000-02-29", root, "d", -1).getTime()));
+        check("codec: an impossible date is refused",
+                "$.d: expected a number or an ISO-8601 date, got a string",
+                dateRefusal("2001-02-29"));
+        ByteSink out = new ByteSink(16);
+        JsonCodec.writeDate(new java.util.Date(1234L), out);
+        check("codec: a date is written as milliseconds", "1234",
+                new String(out.bytes(), 0, out.length(), "UTF-8"));
+        check("codec: base64 reads back", "3", String.valueOf(
+                JsonCodec.readBytes("AQID", root, "b", -1).length));
+        check("codec: a cycle's message names the class", "true", String.valueOf(
+                JsonCodec.tooDeep("Order").getMessage().indexOf("Order") >= 0));
+    }
+
+    private static String refusal(Object json, JsonCodec.Path at, String name, int index) {
+        try {
+            JsonCodec.readLong(json, at, name, index, 0, 10);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
+    private static String stringRefusal(Object json, JsonCodec.Path at, String name, int index) {
+        try {
+            JsonCodec.readString(json, at, name, index);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
+    private static String dateRefusal(String value) {
+        try {
+            JsonCodec.readDate(value, JsonCodec.Path.ROOT, "d", -1);
+            return "accepted";
+        } catch (IllegalArgumentException err) {
+            return err.getMessage();
+        }
+    }
+
+    private static void futures() throws Exception {
+        java.util.concurrent.Future ready = com.codename1.backend.AsyncResult.of("ready");
+        check("future: a completed value", "ready", String.valueOf(ready.get()));
+        check("future: completed is done", "true", String.valueOf(ready.isDone()));
+        check("future: a timed get of a completed value", "ready",
+                String.valueOf(ready.get(1, java.util.concurrent.TimeUnit.SECONDS)));
+
+        com.codename1.backend.AsyncTask ran = new com.codename1.backend.AsyncTask(
+                "selftest.ran", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("ran");
+            }
+        };
+        com.codename1.backend.Tasks.platform(ran);
+        check("future: a task's result", "ran",
+                String.valueOf(ran.get(30, java.util.concurrent.TimeUnit.SECONDS)));
+
+        com.codename1.backend.AsyncTask broken = new com.codename1.backend.AsyncTask(
+                "selftest.broken", false) {
+            protected Object call() {
+                throw new IllegalStateException("broken");
+            }
+        };
+        com.codename1.backend.Tasks.platform(broken);
+        String cause = "no exception";
+        try {
+            broken.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException err) {
+            cause = err.getCause() == null ? "no cause" : err.getCause().getMessage();
+        }
+        check("future: a failure is the ExecutionException's cause", "broken", cause);
+
+        com.codename1.backend.AsyncTask cancelled = new com.codename1.backend.AsyncTask(
+                "selftest.cancelled", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("never");
+            }
+        };
+        check("future: cancel before it runs", "true", String.valueOf(cancelled.cancel(false)));
+        String thrown = "no exception";
+        try {
+            cancelled.get();
+        } catch (java.util.concurrent.CancellationException err) {
+            thrown = "cancelled";
+        }
+        check("future: get of a cancelled task", "cancelled", thrown);
+
+        com.codename1.backend.AsyncTask pending = new com.codename1.backend.AsyncTask(
+                "selftest.pending", false) {
+            protected Object call() {
+                return com.codename1.backend.AsyncResult.of("never");
+            }
+        };
+        String timedOut = "no exception";
+        try {
+            pending.get(50, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.TimeoutException err) {
+            timedOut = "timed out";
+        }
+        check("future: a timed get that runs out", "timed out", timedOut);
+
+        check("timeunit: seconds to millis", "2000",
+                String.valueOf(java.util.concurrent.TimeUnit.SECONDS.toMillis(2)));
+        check("timeunit: convert minutes to millis", "180000",
+                String.valueOf(java.util.concurrent.TimeUnit.MILLISECONDS.convert(3,
+                        java.util.concurrent.TimeUnit.MINUTES)));
+        check("timeunit: a conversion saturates", String.valueOf(Long.MAX_VALUE),
+                String.valueOf(java.util.concurrent.TimeUnit.DAYS.toMillis(Long.MAX_VALUE)));
+
+        java.util.Properties settings = new java.util.Properties();
+        settings.load(new java.io.ByteArrayInputStream(
+                "a=1\nb = two\n# a comment\n".getBytes("UTF-8")));
+        check("properties: a value", "1", settings.getProperty("a"));
+        check("properties: spaces around the separator", "two", settings.getProperty("b"));
+        check("properties: a default", "fallback", settings.getProperty("c", "fallback"));
+    }
 
     private static void threadLocalInitialization() {
         final int[] attempts = new int[1];
@@ -4271,6 +4420,333 @@ public class SelfTest {
                 "aaaaaa|x|6|POST", oneLateBodyRequest(true));
     }
 
+    /**
+     * An OUTBOUND wait on a virtual thread parks the virtual thread, not its host.
+     *
+     * <p>One host serves everything here (workerCount 1 is one host under virtual
+     * threads), so a handler blocked inside a read of a slow peer would stop every
+     * other request until the peer answered. That is what the outbound natives did
+     * until they parked: recv() on a blocking descriptor held the host, and there
+     * is one host per core. Each case below starts a slow outbound call on one
+     * request and times an unrelated request against it; the unrelated one must
+     * not wait for the slow one.
+     *
+     * <p>Covered: a raw Tcp read (the PostgreSQL and MySQL clients' path), an HTTP
+     * call through Web (libcurl), a TLS handshake that never finishes, and a read
+     * deadline, which must still fire -- a parked read no longer has SO_RCVTIMEO
+     * to end it, so the wait carries the deadline itself.
+     */
+    private static void anOutboundWaitLeavesTheHostFree() throws Exception {
+        if(!VirtualThread.supported()) {
+            note("outbound parking checks skipped: this runtime has no virtual threads");
+            return;
+        }
+        final int delay = 2500;
+        final ServerSocket slow = ServerSocket.bind("127.0.0.1", 0, 8);
+        final ServerSocket silent = ServerSocket.bind("127.0.0.1", 0, 8);
+        Thread slowPeer = servePeer(slow, delay, 2);
+        Thread silentPeer = servePeer(silent, -1, 2);
+        final String[] onVirtual = new String[1];
+        final int slowPort = slow.getPort();
+        final int silentPort = silent.getPort();
+        // A slow TLS peer, when the harness made a certificate for 127.0.0.1. A
+        // TLS server always runs on its pool, so it does not take the single
+        // virtual-thread slot the server under test needs.
+        final String certPath = System.getenv("CN1_SELFTEST_TLS_CERT");
+        String keyPath = System.getenv("CN1_SELFTEST_TLS_KEY");
+        HttpServer tlsPeer = null;
+        if(certPath != null && keyPath != null) {
+            tlsPeer = HttpServer.start("127.0.0.1", 0, 16, 2, new HttpServer.Handler() {
+                public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                    Thread.sleep(delay);
+                    return HttpServer.Response.text(200, "pong");
+                }
+            }, Tls.create(certPath, keyPath));
+        }
+        final int tlsPort = tlsPeer == null ? 0 : tlsPeer.getPort();
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                String path = request.getTarget();
+                if("/tcp".equals(path)) {
+                    onVirtual[0] = String.valueOf(VirtualThread.isVirtual());
+                    Tcp out = Tcp.connect("127.0.0.1", slowPort, 5000);
+                    try {
+                        byte[] ask = ("GET / HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+                                .getBytes("UTF-8");
+                        out.write(ask, 0, ask.length);
+                        ByteArrayOutputStream all = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[256];
+                        int n;
+                        while((n = out.read(chunk, 0, chunk.length)) > 0) {
+                            all.write(chunk, 0, n);
+                        }
+                        String text = new String(all.toByteArray(), "UTF-8");
+                        return HttpServer.Response.text(200, text.endsWith("pong") ? "pong" : text);
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/web".equals(path)) {
+                    Web.Result result = Web.get("http://127.0.0.1:" + slowPort + "/");
+                    return HttpServer.Response.text(200, result.getStatus() + ":"
+                            + result.getBodyAsString());
+                }
+                if("/tls".equals(path)) {
+                    Tcp out = Tcp.connect("127.0.0.1", silentPort, 5000);
+                    try {
+                        out.startTls("127.0.0.1");
+                        return HttpServer.Response.text(200, "handshook with nobody");
+                    } catch (IOException refused) {
+                        return HttpServer.Response.text(200, "refused");
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/tlsread".equals(path)) {
+                    // Verified against the peer's own certificate as the CA
+                    // bundle: a real chain and name check, not one switched off.
+                    Tcp out = Tcp.connect("127.0.0.1", tlsPort, 5000);
+                    try {
+                        out.startTls("127.0.0.1", certPath);
+                        byte[] ask = ("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                                + "Connection: close\r\n\r\n").getBytes("UTF-8");
+                        out.write(ask, 0, ask.length);
+                        ByteArrayOutputStream all = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[256];
+                        int n;
+                        while((n = out.read(chunk, 0, chunk.length)) > 0) {
+                            all.write(chunk, 0, n);
+                        }
+                        String text = new String(all.toByteArray(), "UTF-8");
+                        return HttpServer.Response.text(200, text.endsWith("pong") ? "pong" : text);
+                    } finally {
+                        out.close();
+                    }
+                }
+                if("/deadline".equals(path)) {
+                    Tcp out = Tcp.connect("127.0.0.1", silentPort, 5000);
+                    long started = System.currentTimeMillis();
+                    try {
+                        out.setReadTimeout(400);
+                        byte[] chunk = new byte[16];
+                        out.read(chunk, 0, chunk.length);
+                        return HttpServer.Response.text(200, "read something");
+                    } catch (IOException timedOut) {
+                        long spent = System.currentTimeMillis() - started;
+                        return HttpServer.Response.text(200, spent < 2000 ? "timed out"
+                                : "timed out after " + spent + "ms");
+                    } finally {
+                        out.close();
+                    }
+                }
+                return HttpServer.Response.text(200, "fast");
+            }
+        });
+        try {
+            int port = server.getPort();
+            String[] tcp = alongsideAFastRequest(port, "/tcp", delay);
+            check("a handler's outbound read runs on a virtual thread", "true", onVirtual[0]);
+            check("an outbound Tcp read returns what the peer sent", "pong", tcp[0]);
+            check("another request is served while a Tcp read waits", "free", tcp[1]);
+            String[] web = alongsideAFastRequest(port, "/web", delay);
+            check("an outbound Web call returns what the peer sent", "200:pong", web[0]);
+            check("another request is served while a Web call waits", "free", web[1]);
+            // The handshake budget is CN1_TLS_HANDSHAKE_MS, 1500 in this suite.
+            String[] tls = alongsideAFastRequest(port, "/tls", 1500);
+            check("a TLS handshake with a silent peer still gives up", "refused", tls[0]);
+            check("another request is served while a TLS handshake waits", "free", tls[1]);
+            check("a parked read still honours its read timeout", "timed out",
+                    httpGetBody("127.0.0.1", port, "/deadline"));
+            if(tlsPeer != null) {
+                String[] tlsRead = alongsideAFastRequest(port, "/tlsread", delay);
+                check("an outbound TLS read returns what the peer sent", "pong", tlsRead[0]);
+                check("another request is served while a TLS read waits", "free", tlsRead[1]);
+            } else {
+                note("outbound TLS read check skipped: CN1_SELFTEST_TLS_CERT and "
+                        + "CN1_SELFTEST_TLS_KEY name no certificate for a local peer");
+            }
+        } finally {
+            server.stop(2000);
+            if(tlsPeer != null) {
+                tlsPeer.stop(2000);
+            }
+            slow.close();
+            silent.close();
+        }
+        slowPeer.join(10000);
+        silentPeer.join(10000);
+    }
+
+    /**
+     * Starts `slowPath` on a thread of its own, waits until it is under way, then
+     * times a trivial request. Answers the slow request's body and "free" when the
+     * trivial one came back in well under `slowMillis`, or how long it took.
+     */
+    private static String[] alongsideAFastRequest(final int port, final String slowPath,
+                                                  int slowMillis) throws Exception {
+        final String[] slowBody = new String[1];
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    slowBody[0] = httpGetBody("127.0.0.1", port, slowPath);
+                } catch (Exception failed) {
+                    slowBody[0] = "failed: " + failed;
+                }
+            }
+        });
+        caller.start();
+        Thread.sleep(400);
+        long started = System.currentTimeMillis();
+        String fast = httpGetBody("127.0.0.1", port, "/fast");
+        long spent = System.currentTimeMillis() - started;
+        caller.join(20000);
+        String verdict = "fast".equals(fast) && spent < slowMillis / 2 ? "free"
+                : "waited " + spent + "ms for " + fast;
+        return new String[] {slowBody[0], verdict};
+    }
+
+    /**
+     * A peer for the outbound checks, on platform threads: accepts `connections`
+     * connections and, for each, reads the request and then waits `delayMillis`
+     * before answering "pong" as an HTTP response -- or, with a negative delay,
+     * never answers and holds the connection open for a while.
+     */
+    private static final Object PIN_LOCK = new Object();
+    private static final int[] PIN_INSIDE = new int[2];   // now, most at once
+
+    /// A virtual thread inside `synchronized` must not give up its host.
+    ///
+    /// Monitor ownership is the OS thread, and every virtual thread on a host
+    /// shares it. One that parked on a socket while holding a monitor let the next
+    /// virtual thread on that host through the reentrancy check and into the same
+    /// critical section -- two inside a synchronized block at once. Two requests
+    /// on a ONE-host server each wait on a slow socket inside one block; pinned,
+    /// never more than one is inside, and the second still completes after.
+    private static void aVirtualThreadHoldingAMonitorIsPinned() throws Exception {
+        if(!VirtualThread.supported()) {
+            note("pinning check skipped: this runtime has no virtual threads");
+            return;
+        }
+        final ServerSocket slow = ServerSocket.bind("127.0.0.1", 0, 8);
+        Thread peer = servePeer(slow, 600, 2);
+        final int slowPort = slow.getPort();
+        PIN_INSIDE[0] = 0;
+        PIN_INSIDE[1] = 0;
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                synchronized (PIN_LOCK) {
+                    PIN_INSIDE[0]++;
+                    if(PIN_INSIDE[0] > PIN_INSIDE[1]) {
+                        PIN_INSIDE[1] = PIN_INSIDE[0];
+                    }
+                    try {
+                        Tcp out = Tcp.connect("127.0.0.1", slowPort, 5000);
+                        try {
+                            byte[] ask = "GET / HTTP/1.1\r\nHost: x\r\n\r\n".getBytes("UTF-8");
+                            out.write(ask, 0, ask.length);
+                            byte[] chunk = new byte[256];
+                            while(out.read(chunk, 0, chunk.length) > 0) {
+                                // drain the slow answer
+                            }
+                        } finally {
+                            out.close();
+                        }
+                    } finally {
+                        PIN_INSIDE[0]--;
+                    }
+                }
+                return HttpServer.Response.text(200, "pong");
+            }
+        });
+        final String[] answers = new String[2];
+        try {
+            final int port = server.getPort();
+            Thread[] callers = new Thread[2];
+            for(int iter = 0 ; iter < 2 ; iter++) {
+                final int slot = iter;
+                callers[iter] = new Thread(new Runnable() {
+                    public void run() {
+                        try {
+                            answers[slot] = pinGet(port);
+                        } catch (Exception failed) {
+                            answers[slot] = "failed: " + failed;
+                        }
+                    }
+                });
+                callers[iter].start();
+            }
+            for(int iter = 0 ; iter < 2 ; iter++) {
+                callers[iter].join(20000);
+            }
+        } finally {
+            server.stop(2000);
+            slow.close();
+        }
+        peer.join(10000);
+        check("two virtual threads are never inside one monitor at once", "1",
+                String.valueOf(PIN_INSIDE[1]));
+        check("both requests that waited inside the monitor finish", "pong,pong",
+                answers[0] + "," + answers[1]);
+    }
+
+    private static String pinGet(int port) throws Exception {
+        Tcp conn = Tcp.connect("127.0.0.1", port, 15000);
+        try {
+            byte[] request = "GET /pin HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+                    .getBytes("UTF-8");
+            conn.write(request, 0, request.length);
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[1024];
+            int n;
+            while((n = conn.read(chunk, 0, chunk.length)) > 0) {
+                all.write(chunk, 0, n);
+            }
+            String text = new String(all.toByteArray(), "UTF-8");
+            int at = text.indexOf("\r\n\r\n");
+            return at < 0 ? text : text.substring(at + 4);
+        } finally {
+            conn.close();
+        }
+    }
+
+    private static Thread servePeer(final ServerSocket listener, final int delayMillis,
+                                    final int connections) {
+        Thread acceptor = new Thread(new Runnable() {
+            public void run() {
+                for(int iter = 0 ; iter < connections ; iter++) {
+                    final int client = listener.accept();
+                    if(client < 0) {
+                        return;
+                    }
+                    Thread one = new Thread(new Runnable() {
+                        public void run() {
+                            try {
+                                ServerSocket.setBlocking(client, true);
+                                if(delayMillis < 0) {
+                                    Thread.sleep(6000);
+                                    return;
+                                }
+                                byte[] request = new byte[1024];
+                                ServerSocket.read(client, request, 0, request.length);
+                                Thread.sleep(delayMillis);
+                                byte[] answer = ("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n"
+                                        + "Connection: close\r\n\r\npong").getBytes("UTF-8");
+                                ServerSocket.write(client, answer, 0, answer.length);
+                            } catch (Exception ignored) {
+                                // The caller gave up; nothing to report from here.
+                            } finally {
+                                ServerSocket.closeFd(client);
+                            }
+                        }
+                    });
+                    one.start();
+                }
+            }
+        });
+        acceptor.start();
+        return acceptor;
+    }
+
     private static String oneLateBodyRequest(boolean interleave) throws Exception {
         final String[] seen = new String[1];
         HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
@@ -5757,6 +6233,8 @@ public class SelfTest {
         anOutboundFragmentIsRefused();
         caseVariantHeadersSignAsOneField();
         aLateBodyIsNotServedAnotherConnectionsBytes();
+        anOutboundWaitLeavesTheHostFree();
+        aVirtualThreadHoldingAMonitorIsPinned();
         aFileBackedResponseClosesItsDescriptorWhenTheHeadFails();
         anEncodedMountPrefixIsTheSameMount();
         aMountDeclaredWithAnEscapeIsStillReachable();

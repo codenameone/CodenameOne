@@ -24,10 +24,11 @@ package com.codenameone.developerguide.backend;
 
 import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.Json;
 import com.codename1.backend.annotations.PostMapping;
 import com.codename1.backend.annotations.RequestMapping;
 import com.codename1.backend.annotations.RestController;
-import com.codename1.io.JSONParser;
+import com.codename1.backend.annotations.Value;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -57,11 +58,21 @@ public class PushFeedback {
                 throws Exception;
     }
 
-    /** Assigned once at start-up; there is no dependency injection here. */
-    static DeviceStore store;
+    private final DeviceStore store;
 
-    /** The signing secret shown in Push > Settings. Read it from configuration. */
-    private static final String SECRET = System.getenv("CN1_PUSH_CALLBACK_SECRET");
+    /** The signing secret shown in Push > Settings. */
+    private final String secret;
+
+    /**
+     * Both are injected: the store is your bean implementing DeviceStore, and
+     * the secret is read from cn1.push.callbackSecret, which the environment
+     * variable CN1_PUSH_CALLBACKSECRET overrides.
+     */
+    public PushFeedback(DeviceStore store,
+                        @Value("${cn1.push.callbackSecret}") String secret) {
+        this.store = store;
+        this.secret = secret;
+    }
 
     /** Reject a digest whose timestamp is older than this, to bound replay. */
     private static final long MAX_AGE_MS = 5 * 60 * 1000L;
@@ -69,13 +80,13 @@ public class PushFeedback {
     @PostMapping("/feedback")
     public HttpServer.Response feedback(HttpServer.Request request) throws Exception {
         String body = request.getBody();
-        if (!verified(request.getHeader("X-CN1-Signature"), body)) {
+        if (!verified(request.getHeader("X-CN1-Signature"), body, secret)) {
             // Anything but 2xx keeps the window at the sender and resends it,
             // which is what you want while a secret rotation is half-applied.
             return new HttpServer.Response(401, "text/plain",
                     "bad signature".getBytes(StandardCharsets.UTF_8));
         }
-        Map digest = JSONParser.parseJSON(body);
+        Map digest = Json.parseObject(body);
         List events = (List) digest.get("events");
         if (events != null) {
             for (Object entry : events) {
@@ -118,8 +129,9 @@ public class PushFeedback {
 
     // throws, because String.getBytes(Charset) is a CHECKED throw in the
     // ParparVM class library even though it is not one on a JVM.
-    private static boolean verified(String header, String body) throws Exception {
-        if (header == null || SECRET == null) {
+    private static boolean verified(String header, String body, String secret)
+            throws Exception {
+        if (header == null || secret == null || secret.length() == 0) {
             return false;
         }
         long timestamp = 0;
@@ -156,7 +168,7 @@ public class PushFeedback {
         // no JCE. equalsConstantTime is here for the same reason a hand-written
         // loop would be -- an early exit on the first differing byte lets a MAC
         // be forged one byte at a time.
-        byte[] expected = Crypto.hmacSha256(SECRET.getBytes(StandardCharsets.UTF_8),
+        byte[] expected = Crypto.hmacSha256(secret.getBytes(StandardCharsets.UTF_8),
                 (timestamp + "." + body).getBytes(StandardCharsets.UTF_8));
         return Crypto.equalsConstantTime(expected, decodeHex(provided));
     }

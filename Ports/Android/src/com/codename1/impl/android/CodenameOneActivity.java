@@ -128,10 +128,17 @@ public class CodenameOneActivity extends Activity {
 
 
     @Override
+    public void onConfigurationChanged(android.content.res.Configuration config) {
+        super.onConfigurationChanged(config);
+        com.codename1.ui.Display.getInstance().nativeThemeSettingsChanged();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
+        com.codename1.ui.Display.getInstance().nativeThemeSettingsChanged();
         if (isBillingEnabled() && getBillingSupport() != null) {
             billingSupport.consumeAndAcknowlegePurchases();
         }
