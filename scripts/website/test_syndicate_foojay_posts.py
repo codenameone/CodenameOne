@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from syndicate_blog_posts import Post, State, select_candidate
 from syndicate_foojay_posts import (
-    UPSTREAM, accepts, build_bundle, main, pr_result, read_image, submit_bundle,
+    UPSTREAM, accepts, build_bundle, fork_missing_upstream_workflow_commit, main, pr_result, read_image, submit_bundle,
 )
 
 FRIDAY = dt.date(2026, 9, 4)
@@ -183,12 +183,26 @@ class SubmissionTest(unittest.TestCase):
         result = submit_bundle(post(), files, 'writer/website', github)
         self.assertEqual('submitted', result['status'])
         writes = [call.args for call in github.api.call_args_list if len(call.args) > 1]
-        self.assertEqual(['blobs', 'blobs', 'trees', 'commits', 'refs', 'pulls'],
+        self.assertEqual(['merge-upstream', 'blobs', 'blobs', 'trees', 'commits', 'refs', 'pulls'],
                          [args[0].rsplit('/', 1)[1] for args in writes])
-        self.assertEqual('tree', writes[2][1]['base_tree'])
-        self.assertEqual(set(files), {entry['path'] for entry in writes[2][1]['tree']})
-        self.assertEqual(['base'], writes[3][1]['parents'])
-        self.assertEqual('refs/heads/cn1-syndication/friday', writes[4][1]['ref'])
+        self.assertEqual(('repos/writer/website/merge-upstream', {'branch': 'main'}), writes[0])
+        self.assertEqual('tree', writes[3][1]['base_tree'])
+        self.assertEqual(set(files), {entry['path'] for entry in writes[3][1]['tree']})
+        self.assertEqual(['base'], writes[4][1]['parents'])
+        self.assertEqual('refs/heads/cn1-syndication/friday', writes[5][1]['ref'])
+
+    def test_failed_fork_sync_does_not_block_submission(self):
+        github = self.fake()
+        submit_api = github.api.side_effect
+
+        def api(endpoint, payload=None, **kwargs):
+            if endpoint.endswith('/merge-upstream'):
+                raise RuntimeError('gh: Not Found (HTTP 404)')
+            return submit_api(endpoint, payload, **kwargs)
+        github.api.side_effect = api
+        files = {'draft/friday/index.md': b'article'}
+        result = submit_bundle(post(), files, 'writer/website', github)
+        self.assertEqual('submitted', result['status'])
         self.assertFalse(writes[-1][1]['draft'])
         self.assertEqual('writer:cn1-syndication/friday', writes[-1][1]['head'])
         self.assertIn(post().canonical_url, writes[-1][1]['body'])
@@ -274,6 +288,35 @@ class SubmissionTest(unittest.TestCase):
             bundle.assert_not_called()
             github.assert_not_called()
             self.assertFalse(path.exists())
+
+
+class ForkWorkflowDiagnosisTest(unittest.TestCase):
+    def _github(self, status: str | None) -> Mock:
+        def api(endpoint, payload=None, *, optional=False):
+            if "commits?path=.github/workflows" in endpoint:
+                return [] if status is None else [{"sha": "wf" * 20}]
+            if endpoint.startswith("repos/fork/website/commits/"):
+                return {"sha": "fork" * 10}
+            if "/compare/" in endpoint:
+                return {"status": status}
+            raise AssertionError(endpoint)
+        github = Mock()
+        github.api.side_effect = api
+        return github
+
+    def test_fork_behind_upstream_workflow_change_is_named(self) -> None:
+        head = {"default_branch": "main"}
+        for status in ("behind", "diverged"):
+            self.assertEqual("wf" * 20, fork_missing_upstream_workflow_commit(
+                self._github(status), "fork/website", head, "base"))
+
+    def test_fork_containing_workflow_change_is_not_blamed(self) -> None:
+        head = {"default_branch": "main"}
+        for status in ("ahead", "identical", None):
+            self.assertIsNone(fork_missing_upstream_workflow_commit(
+                self._github(status), "fork/website", head, "base"))
+        self.assertIsNone(fork_missing_upstream_workflow_commit(
+            self._github("behind"), "foojayio/website", head, "base"))
 
 
 if __name__ == '__main__':

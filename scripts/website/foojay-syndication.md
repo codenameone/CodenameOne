@@ -42,6 +42,15 @@ secrets are no longer used.
    upstream repository. Choose credentials that support the fork-to-upstream
    route; a token restricted to CN1 alone cannot do this. Keep the token out of
    command arguments and logs.
+4. Grant the token workflow permission too (fine-grained: Workflows read and
+   write; classic: the `workflow` scope). Before creating a submission branch
+   the script syncs the fork's default branch with upstream, because the
+   branch is built on upstream's head: when Foojay has edited
+   `.github/workflows` since the fork last synced, creating the branch adds
+   workflow files to the fork, and GitHub refuses that as a bare HTTP 404.
+   The sync needs the same permission. Without it the script names the
+   missing upstream commit; sync by hand with
+   `gh repo sync <owner>/website --source foojayio/website`.
 
 The script verifies write permission, fork ancestry, and the upstream author
 profile before creating a branch. A missing token fails an eligible CI

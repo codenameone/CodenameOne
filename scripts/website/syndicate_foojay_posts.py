@@ -181,6 +181,56 @@ def pr_result(pr: dict) -> dict:
     }
 
 
+def sync_fork(github: Any, head_repo: str, branch: str) -> bool:
+    """Fast-forward the fork's default branch to upstream before branching.
+
+    A submission branch is built on upstream's head, so a fork that lags an
+    upstream ``.github/workflows`` change cannot take the branch without
+    workflow permission (see ``fork_missing_upstream_workflow_commit``).
+    Syncing first keeps the fork current; it is a no-op when already in sync.
+    A failed sync (the same missing permission, or a fork with commits of its
+    own) is reported and the submission still proceeds -- it only fails if
+    the branch then really needs the missing commits.
+    """
+    if head_repo == UPSTREAM:
+        return True
+    try:
+        result = github.api(f"repos/{head_repo}/merge-upstream", {"branch": branch})
+    except Exception as err:  # noqa: BLE001
+        print(f"[foojay] WARNING: could not sync {head_repo}:{branch} with {UPSTREAM}: {err}",
+              file=sys.stderr)
+        return False
+    message = (result or {}).get("message") if isinstance(result, dict) else None
+    if message:
+        print(f"[foojay] {head_repo}: {message}")
+    return True
+
+
+def fork_missing_upstream_workflow_commit(github: Any, head_repo: str, head: dict,
+                                          base_sha: str) -> str | None:
+    """Return the newest upstream workflow commit the fork lacks, if any.
+
+    A branch on the fork points at a commit built on upstream's head; when the
+    fork has not synced past an upstream change to ``.github/workflows``,
+    creating that ref adds workflow files to the fork, which GitHub refuses
+    for a token without workflow permission -- reporting it as a plain 404.
+    That failed every daily run from 2026-09-25 after Foojay edited its
+    workflows on 09-22..24 while the fork sat at 09-18.
+    """
+    if head_repo == UPSTREAM:
+        return None
+    try:
+        latest = github.api(f"repos/{UPSTREAM}/commits?path=.github/workflows&sha={base_sha}&per_page=1")
+        if not latest:
+            return None
+        fork_branch = head.get("default_branch") or "main"
+        fork_head = github.api(f"repos/{head_repo}/commits/{fork_branch}")["sha"]
+        comparison = github.api(f"repos/{UPSTREAM}/compare/{latest[0]['sha']}...{fork_head}")
+    except Exception:  # noqa: BLE001 -- diagnosis only; the caller re-raises the original error
+        return None
+    return None if comparison.get("status") in ("ahead", "identical") else latest[0]["sha"]
+
+
 def submit_bundle(post: Post, files: dict[str, bytes], head_repo: str,
                   github: GitHub) -> dict:
     validate_slug(post.slug)
@@ -233,6 +283,8 @@ def submit_bundle(post: Post, files: dict[str, bytes], head_repo: str,
                 or any(item['status'] != 'added' for item in changed)):
             raise RuntimeError(f"Existing {branch} changes files outside the article bundle; review it before retrying")
     else:
+        # Every check has passed; sync only now so a refused submission writes nothing.
+        sync_fork(github, head_repo, head.get("default_branch") or base)
         entries = []
         for path, data in sorted(files.items()):
             blob = github.api(f"repos/{head_repo}/git/blobs", {
@@ -243,7 +295,20 @@ def submit_bundle(post: Post, files: dict[str, bytes], head_repo: str,
         new_commit = github.api(f"repos/{head_repo}/git/commits", {
             "message": f"Submit article: {post.title}", "tree": new_tree["sha"], "parents": [base_sha],
         })
-        github.api(f"repos/{head_repo}/git/refs", {"ref": f"refs/heads/{branch}", "sha": new_commit["sha"]})
+        try:
+            github.api(f"repos/{head_repo}/git/refs", {"ref": f"refs/heads/{branch}", "sha": new_commit["sha"]})
+        except RuntimeError as err:
+            missing = fork_missing_upstream_workflow_commit(github, head_repo, head, base_sha)
+            if missing:
+                raise RuntimeError(
+                    f"{head_repo} lacks upstream workflow change {missing[:10]}, so the new branch "
+                    "would add .github/workflows files to the fork; GitHub refuses that (as HTTP 404) "
+                    "unless the token has workflow permission, and the automatic sync failed too. "
+                    "Sync the fork "
+                    f"(gh repo sync {head_repo} --source {UPSTREAM}) or grant FOOJAY_GITHUB_TOKEN "
+                    "Workflows: write; see foojay-syndication.md"
+                ) from err
+            raise
     pr = github.api(f"repos/{UPSTREAM}/pulls", {
         "title": post.title, "head": f"{owner}:{branch}", "base": base, "draft": False,
         "body": (f"Submit **{post.title}** by Shai Almog for editorial review.\n\n"
