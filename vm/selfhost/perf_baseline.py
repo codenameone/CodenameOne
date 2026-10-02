@@ -562,6 +562,18 @@ def import_legacy(root, number, legacy, original=None, reason=None):
     current = load(root)['platforms']
     before = (original or {}).get('platforms')
     calibrate, rebaseline, notes, conflicts = {}, {}, [], []
+    # The old file also carried the policy (tolerance, floor). An overlay holds rows only, so
+    # a branch that changed the policy would otherwise import as "no change" and lose it once
+    # check() rejects the retired file. policy.json is one small file a pull request may edit
+    # directly, so the edit is refused here with that instruction rather than migrated.
+    if original is not None:
+        moved_policy = [name for name in ('tolerance', 'floor')
+                        if legacy.get(name) != original.get(name)]
+        if moved_policy:
+            raise BaselineError(
+                'the branch changed the gate policy (%s) in the old file; overlays carry rows '
+                'only. Make the same change in vm/selfhost/perf-baseline/policy.json in the '
+                'pull request, then import the rows again.' % ', '.join(moved_policy))
     if before is not None:
         # The old calibrator's --fresh dropped every row a run did not re-measure, so a
         # branch's file can DELETE rows. An overlay has no way to say that, and importing

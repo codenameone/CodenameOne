@@ -487,6 +487,17 @@ class OverlayTests(unittest.TestCase):
         finally:
             tree.close()
 
+    def test_import_legacy_refuses_policy_edits(self):
+        tree = BaselineTree(self.BASE)
+        try:
+            original = dict(POLICY, platforms={})
+            legacy = dict(POLICY, tolerance={'time': 0.2, 'memory': 0.15}, platforms={})
+            with self.assertRaises(baselines.BaselineError) as caught:
+                baselines.import_legacy(tree.root, 36, legacy, original, 'x')
+            self.assertIn('policy.json', str(caught.exception))
+        finally:
+            tree.close()
+
     def test_a_broken_policy_is_refused(self):
         import json
         for bad in ({'time': '0.15', 'memory': 0.15}, {'time': -0.1, 'memory': 0.15},
