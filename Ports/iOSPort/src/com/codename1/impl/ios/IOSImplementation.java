@@ -2125,8 +2125,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// the queue instead of adding to it. Components enqueued BEFORE this call
     /// still repaint redundantly; that is a real cost, and it is the trade the
     /// mode exists to make.
-    @Override
     private static int diagPaints;
+    @Override
     public void paintDirty() {
         boolean diag = diagPaints < 3 && hasPendingPaints();
         if (diag) { diagPaints++; System.out.println("BENCH:T paintDirty=" + System.currentTimeMillis()); }
