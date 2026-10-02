@@ -23,6 +23,10 @@ on:
       - 'maven/build-engine/**'
       - 'maven/cn1app-archetype/**'
       - 'scripts/flutter-bench/**'
+      # The regression gate's rules and CPU detection are the ParparVM gate's own
+      # (flutter_baseline.py runs vm/selfhost/perf_baseline.py with its own layout).
+      - 'vm/selfhost/perf_baseline.py'
+      - 'vm/selfhost/perf-gate.py'
       - '.github/workflows/flutter-bench.yml'
   schedule:
     # Nightly, so port status carries a current number and the PR runs have a
@@ -50,8 +54,9 @@ env:
   # without robotoCondensed and three studies stopped compiling.
   #
   # Bumping this is a deliberate act that re-baselines the comparison: expect
-  # every number to move, and re-record the baselines under
-  # scripts/flutter-bench/baselines in the same change.
+  # every start-up and memory ratio to move, and rebaseline them in the same
+  # change's own overlay (scripts/flutter-bench/flutter_baseline.py calibrate
+  # --pr N --reason "Flutter <version>" over every platform's baseline-*.json).
   FLUTTER_REF: '3.35.4'
 
 permissions:
@@ -197,6 +202,12 @@ jobs:
     needs: [framework, plan]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      # Which pull request's overlay (scripts/flutter-bench/baseline/pr/<N>.json) is
+      # this run's own: a stale own overlay is judged around, not refused, and the
+      # printed calibrate command names it. A dispatched run asks gh for the branch's.
+      CN1_PR_NUMBER: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
     strategy:
       # One platform failing must not hide the others: a benchmark that
       # publishes nothing because a single runner broke is worse than one that
@@ -381,9 +392,10 @@ jobs:
           # One line: the action runs each line of `script` in its own shell.
           script: scripts/flutter-bench/app/measure.sh android "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" "${{ runner.temp }}/bench-out"
 
-      # The result and the baseline recorded from it. The baseline is what a
-      # human commits to arm the gate, so it travels with the result rather than
-      # having to be re-derived.
+      # The result and the baseline candidate measured from it. The candidate is
+      # what `flutter_baseline.py calibrate --pr N` reads to write the pull
+      # request's overlay when a row moved, so it travels with the result rather
+      # than having to be re-derived.
       - name: Upload the result
         if: always()
         uses: actions/upload-artifact@v4
