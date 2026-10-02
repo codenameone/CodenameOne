@@ -325,6 +325,28 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(r['from']['time'], 1.0)
         self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.5)
 
+    def test_a_stale_own_rebaseline_is_rewritten_from_fresh_runs(self):
+        # pr/7 rebaselined quicksort from 1.0; another merged change has since moved it to
+        # 0.8, so pr/7 is stale and the gate judged this run without it.
+        moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
+        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        # The fresh run is inside 0.8's tolerance, so only staleness can make it rewrite.
+        overlay, rows = self.run_calibration([('linux-x64', {'quicksort': (0.82, 0.1)})],
+                                             existing=moved, overlays={7: mine})
+        r = overlay['rebaseline']['linux-x64']['quicksort']['all']
+        self.assertEqual(r['from'], {'time': 0.8, 'memory': 0.1})
+        self.assertEqual(rows['linux-x64']['quicksort']['all']['time'], 0.82)
+
+    def test_a_stale_row_the_runs_did_not_measure_is_reported(self):
+        moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}, 'recursion': {'all': row(1.0, 0.1)}}}
+        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        with self.assertRaises(SystemExit) as caught:
+            self.run_calibration([('linux-x64', {'recursion': (1.0, 0.1)})],
+                                 existing=moved, overlays={7: mine})
+        self.assertIn('quicksort', str(caught.exception))
+
     def test_a_row_this_pull_request_calibrated_stays_a_calibration(self):
         mine = {'pr': 7, 'calibrate': {'linux-x64@new': {'quicksort': {'all': row(1.0, 0.1, 1)}}}}
         overlay, _ = self.run_calibration([('linux-x64', {'quicksort': (1.5, 0.1)}, 'New')],
@@ -376,6 +398,23 @@ class OverlayTests(unittest.TestCase):
         overlay['rebaseline']['linux-x64@a']['quicksort']['all']['from']['tolerance'] = {'time': 0.4}
         rows, _ = self.resolve([(number, overlay)], base=retuned)
         self.assertEqual(rows['linux-x64@a']['quicksort']['all']['time'], 0.8)
+
+    def test_bad_values_are_baseline_errors_not_crashes(self):
+        number, overlay = self.rebase(12, 0.8)
+        overlay['rebaseline']['linux-x64@a']['quicksort']['all']['from']['time'] = 'fast'
+        with self.assertRaises(baselines.BaselineError):
+            baselines.validate_overlay(number, overlay, 'pr/12.json')
+        number, overlay = self.rebase(12, float('inf'))
+        with self.assertRaises(baselines.BaselineError):
+            baselines.validate_overlay(number, overlay, 'pr/12.json')
+
+    def test_wildly_disagreeing_calibrations_are_refused_not_combined(self):
+        overlays = [self.calib(12, 1.0), self.calib(13, 1.0), self.calib(14, 10.0)]
+        for n, o in overlays:
+            baselines.validate_overlay(n, o, 'pr/%d.json' % n)
+        with self.assertRaises(baselines.BaselineError) as caught:
+            baselines.resolve(self.BASE, overlays, POLICY['tolerance'])
+        self.assertIn('pr/14.json', str(caught.exception))
 
     def test_a_rebaseline_needs_a_reason_and_a_from(self):
         number, overlay = self.rebase(12, 0.8, reason='TODO')
@@ -542,6 +581,38 @@ class OverlayTests(unittest.TestCase):
             tree.close()
 
 
+class StaleOverlayGateTests(unittest.TestCase):
+    """perf-gate.py with this pull request's own overlay gone stale: it must still measure
+    (here it gets as far as looking for the binaries) and record why it will fail."""
+
+    def test_the_gate_measures_without_its_own_stale_overlay(self):
+        import json
+        import os
+        moved = {'linux-x64': {'quicksort': {'all': row(0.8, 0.1)}}}
+        mine = {'pr': 7, 'reason': 'first try', 'rebaseline': {'linux-x64': {'quicksort': {
+            'all': dict(row(0.7, 0.1), **{'from': {'time': 1.0, 'memory': 0.1}})}}}}
+        tree = BaselineTree(moved, {7: mine})
+        saved = os.environ.get('CN1_PR_NUMBER')
+        os.environ['CN1_PR_NUMBER'] = '7'
+        try:
+            out = tree.root.parent / 'results.json'
+            gate.main(['--baseline', str(tree.root), '--out', str(out), '--platform', 'linux-x64',
+                       '--binary', str(tree.root.parent / 'no-such-binary')])
+            report = json.loads(out.read_text())
+            self.assertIn('another merged change moved it first', report['stale_overlay'])
+            # It got past the baseline: what stopped it is the missing binary, not the overlay.
+            self.assertFalse(report['error'].startswith('perf-baseline'), report['error'])
+            text = gate.render_markdown(dict(report, error=None, results={}))
+            self.assertIn('perf-baseline/pr/7.json` is stale', text)
+            self.assertIn('**Result: stale overlay: re-measure required**', text)
+        finally:
+            if saved is None:
+                os.environ.pop('CN1_PR_NUMBER', None)
+            else:
+                os.environ['CN1_PR_NUMBER'] = saved
+            tree.close()
+
+
 class CheckTests(unittest.TestCase):
     """perf_baseline.py check --base: what a pull request may change."""
 
@@ -653,6 +724,13 @@ class VerdictStepTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn('IMPROVED', r.stdout)
         self.assertIn('perf-baseline/pr/5931.json', r.stdout)
+
+    def test_a_stale_overlay_fails_the_job(self):
+        r = self.verdict({'platform': 'linux-x64', 'pr': 7, 'labels': {},
+                          'results': {'quicksort': self.row('ok')}, 'regression': False,
+                          'stale_overlay': 'pr/7.json rebaselines ... moved it first'})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('pr/7.json is stale', r.stdout)
 
     def test_a_judged_run_passes(self):
         r = self.verdict({'platform': 'linux-x64', 'results': {'quicksort': self.row('ok')},

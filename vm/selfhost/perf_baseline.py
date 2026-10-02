@@ -126,23 +126,32 @@ def dump(value):
     return json.dumps(value, indent=1, sort_keys=True) + '\n'
 
 
-def _check_row(where, row, extra=()):
-    unknown = set(row) - ROW_FIELDS - set(extra)
-    if unknown:
-        raise BaselineError('%s: unknown field(s) %s' % (where, ', '.join(sorted(unknown))))
+def _number(value):
+    """A real, finite number: JSON's 1e999 parses to infinity, and a bool is an int."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _check_ratios(where, row):
     for metric in METRICS:
         value = row.get(metric)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not value > 0:
+        if not _number(value) or not value > 0:
             raise BaselineError('%s: %s must be a positive ratio, not %r' % (where, metric, value))
-    runs = row.get('runs')
-    if isinstance(runs, bool) or not isinstance(runs, int) or runs < 1:
-        raise BaselineError('%s: runs must be a positive integer, not %r' % (where, runs))
     tolerance = row.get('tolerance', {})
     if not isinstance(tolerance, dict) or set(tolerance) - set(METRICS):
         raise BaselineError('%s: tolerance must map time/memory to a fraction' % where)
     for metric, value in tolerance.items():
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value < 5:
+        if not _number(value) or not 0 < value < 5:
             raise BaselineError('%s: %s tolerance %r is not a fraction' % (where, metric, value))
+
+
+def _check_row(where, row, extra=()):
+    unknown = set(row) - ROW_FIELDS - set(extra)
+    if unknown:
+        raise BaselineError('%s: unknown field(s) %s' % (where, ', '.join(sorted(unknown))))
+    _check_ratios(where, row)
+    runs = row.get('runs')
+    if isinstance(runs, bool) or not isinstance(runs, int) or runs < 1:
+        raise BaselineError('%s: runs must be a positive integer, not %r' % (where, runs))
 
 
 def _rows(where, tree):
@@ -220,10 +229,10 @@ def validate_overlay(number, overlay, where):
         here = '%s rebaseline %s %s/%s' % (where, key, bench, cores)
         _check_row(here, row, extra=('from',))
         old = row.get('from')
-        if not isinstance(old, dict) or set(old) - {'tolerance'} != set(METRICS) or \
-                not isinstance(old.get('tolerance', {}), dict):
+        if not isinstance(old, dict) or set(old) - {'tolerance'} != set(METRICS):
             raise BaselineError('%s: "from" must give the time and memory baseline it '
                                 'replaces, and its tolerance if it had one' % here)
+        _check_ratios(here + ' from', old)
     if rebaselines:
         reason = overlay.get('reason')
         if not isinstance(reason, str) or not reason.strip() or reason.strip().upper().startswith('TODO'):
@@ -299,8 +308,13 @@ def resolve(base, overlays, tolerance=None):
             notes.append('%s %s/%s: already calibrated; the calibration in %s is superseded'
                          % (key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)))
             continue
-        rows.setdefault(key, {}).setdefault(bench, {})[cores] = _combine([r for _, r in entries],
-                                                                         tolerance)
+        combined = _combine([r for _, r in entries], tolerance)
+        # Calibrations of one CPU that disagree wildly combine into a tolerance past any
+        # sane fraction: a row that gates nothing, which the fold would only refuse after
+        # the fact. Refuse it here, naming the calibrations to re-measure.
+        _check_row('%s %s/%s as combined from %s' % (
+            key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)), combined)
+        rows.setdefault(key, {}).setdefault(bench, {})[cores] = combined
     rebaselines = {}
     for number, overlay in overlays:
         for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('rebaseline', {})):
@@ -327,10 +341,12 @@ def resolve(base, overlays, tolerance=None):
     return rows, notes
 
 
-def load(root=ROOT):
-    """Everything perf-gate.py needs: tolerance, floor and the resolved rows."""
+def load(root=ROOT, exclude=None):
+    """Everything perf-gate.py needs: tolerance, floor and the resolved rows. `exclude` leaves
+    one pull request's overlay out (see perf-gate.py: a stale overlay of one's own)."""
     policy = load_policy(root)
-    rows, notes = resolve(load_base(root), load_overlays(root), policy['tolerance'])
+    rows, notes = resolve(load_base(root), [o for o in load_overlays(root) if o[0] != exclude],
+                          policy['tolerance'])
     return {'tolerance': policy['tolerance'], 'floor': policy['floor'], 'platforms': rows,
             'notes': notes}
 

@@ -132,8 +132,20 @@ def main(argv=None):
     # What the gate judged against (this pull request's earlier rows included), and the
     # baseline as it stands without them -- which is what a rebaseline's "from" names,
     # since this run replaces this pull request's earlier rebaseline rather than stacking.
-    judged, _ = perf_baseline.resolve(base, overlays, tolerance)
     others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
+    try:
+        judged, _ = perf_baseline.resolve(base, overlays, tolerance)
+    except perf_baseline.BaselineError:
+        # This pull request's own overlay went stale (another merged change moved a row it
+        # rebaselines), and perf-gate.py then judged the run without it. Do the same, and
+        # rewrite every stale row below from these fresh runs -- which is the recovery the
+        # stale-overlay message asks for.
+        judged = others
+    stale = set()
+    for key, bench, cores, row in perf_baseline._rows('own', own.get('rebaseline', {})):
+        now = others.get(key, {}).get(bench, {}).get(cores)
+        if now is None or not perf_baseline._same(row['from'], now):
+            stale.add((key, bench, cores))
     runs = collect(args.results, set(args.only.split(',')) if args.only else None, judged)
 
     widest = defaultdict(float)   # (benchmark, metric) -> widest tolerance any row has
@@ -159,7 +171,7 @@ def main(argv=None):
                 values = metrics[metric]
                 if args.metric and metric != args.metric and not new_row:
                     continue
-                if not (args.all or new_row or any(
+                if not (args.all or new_row or (key, bench, cores) in stale or any(
                         perf_gate.verdict(v, current[metric],
                                           current.get('tolerance', {}).get(metric, tolerance[metric]),
                                           floor[metric]) != 'ok' for v in values)):
@@ -185,6 +197,12 @@ def main(argv=None):
                 row['from'] = perf_baseline.from_row(before)
                 rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = row
 
+    left = sorted(stale - {(k, b, c) for k, benches in rebaseline.items()
+                           for b, per in benches.items() for c in per})
+    if left:
+        raise SystemExit('These rows of pr/%d.json are stale and these runs did not measure '
+                         'them; pass runs that do: %s' % (number, ', '.join(
+                             '%s %s/%s' % row for row in left)))
     if not calibrate and not rebaseline:
         print('Every measured row is inside its tolerance; nothing to write.')
         return 0

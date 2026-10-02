@@ -84,6 +84,13 @@ if improved:
     print('Record the new baseline in %s:' % overlay)
     print(rebaseline)
     sys.exit(1)
+if report.get('stale_overlay'):
+    # Measured against the baseline without this pull request's overlay, because another
+    # merged change moved a row it rebaselines; the overlay has to be re-measured.
+    print('ParparVM performance gate: %s is stale: %s' % (overlay, report['stale_overlay']))
+    print('Re-measure it from this job\'s perf-results.json:')
+    print(rebaseline)
+    sys.exit(1)
 print('ParparVM performance gate: no regression on %s' % report['platform'])
 PY
 fi
