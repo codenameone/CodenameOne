@@ -75,6 +75,48 @@ class BehindFlutterGateTest(unittest.TestCase):
         report["behind"] = benchlib.check_behind(report)
         self.assertIn("BEHIND FLUTTER", benchlib.render_gate(report))
 
+class ReportOnlyHeadToHeadTest(unittest.TestCase):
+    """JavaScript reports a loss to Flutter without failing on it."""
+
+    def _losing(self):
+        report = _report({"install_bytes": 200}, {"install_bytes": 100})
+        report["compute"] = {"status": "measured",
+                             "verdict": benchlib.compute_verdict({"recursion": ("1", 300)},
+                                                                 {"recursion": ("1", 100)})}
+        return report
+
+    def test_javascript_is_report_only_and_says_why(self):
+        self.assertIn("javascript", benchlib.HEAD_TO_HEAD_REPORT_ONLY)
+        self.assertTrue(benchlib.HEAD_TO_HEAD_REPORT_ONLY["javascript"])
+
+    def test_a_javascript_loss_does_not_gate(self):
+        behind = benchlib.check_behind(self._losing())
+        self.assertEqual(2, len(behind), "the losses are still found and reported")
+        self.assertEqual([], benchlib.gating_behind("javascript", behind))
+
+    def test_every_other_platform_still_gates_on_a_loss(self):
+        behind = benchlib.check_behind(self._losing())
+        for platform in benchlib.PLATFORM_IDS:
+            if platform != "javascript":
+                self.assertEqual(behind, benchlib.gating_behind(platform, behind), platform)
+
+    def test_a_wrong_result_still_fails_on_javascript(self):
+        report = _report({"install_bytes": 50}, {"install_bytes": 100})
+        report["compute"] = {"status": "measured", "verdict": {
+            "failures": [{"side": "codenameone", "name": "recursion", "how": "wrong result"}]}}
+        gating = benchlib.gating_behind("javascript", benchlib.check_behind(report))
+        self.assertEqual(["recursion"], [f["failed"]["name"] for f in gating])
+
+    def test_the_gate_line_says_the_loss_is_not_gated(self):
+        report = self._losing()
+        report["gate"] = {"status": "armed"}
+        report["behind"] = benchlib.check_behind(report)
+        report["behind_accepted"] = benchlib.HEAD_TO_HEAD_REPORT_ONLY["javascript"]
+        line = benchlib.render_gate(report)
+        self.assertIn("BEHIND FLUTTER", line)
+        self.assertIn("reported, not gated", line)
+
+
 class ComputeTest(unittest.TestCase):
     """The VM-workload comparison: same checksum or no ratio, geomean gates."""
 
@@ -348,7 +390,7 @@ class GateArming(unittest.TestCase):
         report = dict(self._report(), gate={"status": "refused", "reason": "two overlays"})
         self.assertIn("NOT JUDGED", benchlib.render_gate(report))
 
-    def _main(self, rows):
+    def _main(self, rows, install=1000):
         import run_bench
         import flutter_baseline
         work = tempfile.mkdtemp()
@@ -358,7 +400,7 @@ class GateArming(unittest.TestCase):
                 open(os.path.join(root, "policy.json"), "w") as dst:
             dst.write(src.read())
         flutter_baseline.perf_baseline.write_base(root, rows)
-        report = self._report()
+        report = self._report(install)
 
         class Stub(object):
             id = "fake"
@@ -398,6 +440,22 @@ class GateArming(unittest.TestCase):
                 os.environ.pop("CN1_PR_NUMBER", None)
             else:
                 os.environ["CN1_PR_NUMBER"] = number
+
+    def test_a_report_only_platform_passes_a_loss_to_flutter(self):
+        # Larger than Flutter's 2000 bytes, but exactly on its own baseline row.
+        rows = {"fake": {"gallery": {"install_bytes": {"value": 3000, "runs": 1}}}}
+        code, written, _ = self._main(rows, install=3000)
+        self.assertEqual(1, code, "behind Flutter fails the gate on an ordinary platform")
+        saved = dict(benchlib.HEAD_TO_HEAD_REPORT_ONLY)
+        benchlib.HEAD_TO_HEAD_REPORT_ONLY["fake"] = "accepted for this test"
+        try:
+            code, written, _ = self._main(rows, install=3000)
+        finally:
+            benchlib.HEAD_TO_HEAD_REPORT_ONLY.clear()
+            benchlib.HEAD_TO_HEAD_REPORT_ONLY.update(saved)
+        self.assertEqual(0, code, "a report-only platform's loss is shown, not failed")
+        self.assertEqual(["install_bytes"], [f["metric"] for f in written["behind"]])
+        self.assertEqual("accepted for this test", written["behind_accepted"])
 
     def test_a_missing_row_fails_the_run_and_leaves_a_candidate(self):
         code, written, candidate = self._main({})

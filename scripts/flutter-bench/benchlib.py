@@ -916,6 +916,32 @@ def tally(reports):
 # The regression gate
 # ----------------------------------------------------------------------
 
+# Platforms where losing to Flutter is reported but does not fail the gate, each with
+# the reason the comment prints. Only the head-to-head comparison is relaxed: a
+# workload Codename One gets wrong or does not run still fails, and so does a move
+# outside this platform's regression baselines.
+#
+# JavaScript is the one platform where a loss to Flutter is currently accepted: the
+# browser runs Flutter's AOT-compiled Dart through dart2js/Wasm against our
+# bytecode-to-JavaScript translation, and closing the compute gap there is not this
+# benchmark's priority. It stays measured and shown so the gap remains visible.
+HEAD_TO_HEAD_REPORT_ONLY = {
+    "javascript": "a loss to Flutter on the web is currently accepted",
+}
+
+
+def gating_behind(platform_id, behind):
+    """The part of `behind` that fails the gate on `platform_id`.
+
+    Everywhere but a report-only platform that is all of it. On a report-only
+    platform it is only Codename One's own compute failures (a wrong or missing
+    result), which are a correctness defect rather than a loss on speed or size.
+    """
+    if platform_id not in HEAD_TO_HEAD_REPORT_ONLY:
+        return list(behind)
+    return [item for item in behind if item.get("failed")]
+
+
 def check_behind(report):
     """Every measured metric on which Codename One is BEHIND Flutter.
 
@@ -978,6 +1004,9 @@ def render_gate(report):
     behind = report.get("behind") or []
     lost = ("; **BEHIND FLUTTER** on %s" % ", ".join(item["label"] for item in behind)
             if behind else "")
+    accepted = report.get("behind_accepted")
+    if behind and accepted:
+        lost += " (reported, not gated: %s)" % accepted
     if gate.get("status") == "armed":
         findings = report.get("regressions") or []
         line = ("**Gate:** %s against `scripts/flutter-bench/baseline`%s."

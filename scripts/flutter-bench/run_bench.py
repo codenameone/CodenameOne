@@ -17,8 +17,10 @@ like a timing regression, and the cause was a stray simulator holding the
 machine at load 8.
 
 Exit status is 0 unless `--gate` was asked for and either Codename One is behind
-Flutter on a metric, or a metric moved past its row in scripts/flutter-bench/baseline
-(flutter_baseline.py) -- or has no row to be judged by.
+Flutter on a metric (except on a platform in benchlib.HEAD_TO_HEAD_REPORT_ONLY,
+where the loss is reported but only a wrong or missing compute result fails), or a
+metric moved past its row in scripts/flutter-bench/baseline (flutter_baseline.py)
+-- or has no row to be judged by.
 """
 
 import argparse
@@ -244,7 +246,10 @@ def main(argv=None):
         # loss that matched the baseline would otherwise pass as "no change".
         behind = benchlib.check_behind(report)
         report["behind"] = behind
-        findings = findings + behind
+        accepted = benchlib.HEAD_TO_HEAD_REPORT_ONLY.get(adapter.id)
+        if accepted:
+            report["behind_accepted"] = accepted
+        findings = findings + benchlib.gating_behind(adapter.id, behind)
 
     _write(args, report, [report])
     # Printed AFTER the gate is decided, so the job log carries the gate line

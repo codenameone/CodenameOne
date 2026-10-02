@@ -202,6 +202,11 @@ What is judged, per platform:
   metric with no row and a row whose metric the run did not produce.
 - **Only our own numbers are gated.** Flutter's enter only as the denominator
   of a ratio; a Flutter SDK that grows its build cannot fail a size row.
+- **JavaScript reports its losses to Flutter without failing on them.** It is the
+  one platform where a loss is currently accepted (`HEAD_TO_HEAD_REPORT_ONLY` in
+  `benchlib.py`): the comment still shows the comparison and marks it "reported,
+  not gated". A workload Codename One computes wrongly or does not run still
+  fails there, and so does a move outside JavaScript's own baseline rows.
 
 When the gate fails, the job prints (and the comment shows) the command that
 accepts the move. Download the leg's `baseline-<platform>.json` artifact and:
