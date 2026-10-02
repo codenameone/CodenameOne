@@ -111,7 +111,7 @@ var o = {};
         }
     };
 
-    o.downloadProject__java_lang_String_java_lang_String = function(fileName, dataUrl, callback) {
+    o.downloadProject__java_lang_String_java_lang_String_java_lang_String_java_lang_String = function(fileName, dataUrl, packageName, template, callback) {
         var anchor = null;
         try {
             var doc = window.document;
@@ -139,7 +139,14 @@ var o = {};
 
         try {
             if (window.parent && window.parent !== window && window.parent.postMessage) {
-                window.parent.postMessage({ type: "cn1-initializr-project-downloaded" }, "*");
+                // packageName/template feed the website's anonymous download
+                // beacon, which hashes the package name before anything leaves
+                // the browser (docs/website/assets/js/cn1-initializr-beacon.js).
+                window.parent.postMessage({
+                    type: "cn1-initializr-project-downloaded",
+                    packageName: packageName ? String(packageName) : "",
+                    template: template ? String(template) : ""
+                }, "*");
             }
         } catch (ignored) {
             // The download succeeded even if the optional embedding page is unavailable.

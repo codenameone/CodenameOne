@@ -58,9 +58,11 @@ function loadBridge(click) {
 
 function invokeDownload(state) {
   let result;
-  state.bridge.downloadProject__java_lang_String_java_lang_String(
+  state.bridge.downloadProject__java_lang_String_java_lang_String_java_lang_String_java_lang_String(
     "sample.zip",
     "data:application/octet-stream;base64,AA==",
+    "com.Example.MyApp",
+    "barebones",
     { complete(value) { result = value; } }
   );
   return result;
@@ -72,7 +74,11 @@ function invokeDownload(state) {
   assert.deepEqual(state.actions, ["append", "click", "remove", "post"]);
   assert.deepEqual(
     JSON.parse(JSON.stringify(state.posts)),
-    [{ type: "cn1-initializr-project-downloaded" }]
+    [{
+      type: "cn1-initializr-project-downloaded",
+      packageName: "com.Example.MyApp",
+      template: "barebones"
+    }]
   );
 }
 

@@ -158,6 +158,8 @@ body.cn1-initializr-page-body .main {
 }
 </style>
 
+{{- $cn1InitializrBeacon := resources.Get "js/cn1-initializr-beacon.js" | minify | fingerprint }}
+<script defer src="{{ $cn1InitializrBeacon.RelPermalink }}" integrity="{{ $cn1InitializrBeacon.Data.Integrity }}"></script>
 <script>
 (function () {
   var body = document.body;
@@ -233,9 +235,20 @@ body.cn1-initializr-page-body .main {
         window.requestAnimationFrame(function () {
           hideLoader();
         });
-      } else if (evt.data.type === "cn1-initializr-project-downloaded" &&
-                 window.cn1CrispEvents && window.cn1CrispEvents.initializrProjectDownloaded) {
-        window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+      } else if (evt.data.type === "cn1-initializr-project-downloaded") {
+        // Two independent reports per download; neither may block the other.
+        // The beacon is anonymous (a hash of the package name), so it is not
+        // tied to the Crisp consent banner the way the Crisp event is.
+        try {
+          if (window.cn1InitializrBeacon) {
+            window.cn1InitializrBeacon.send(evt.data.packageName, evt.data.template);
+          }
+        } catch (e) {
+          // Telemetry must never surface to the visitor.
+        }
+        if (window.cn1CrispEvents && window.cn1CrispEvents.initializrProjectDownloaded) {
+          window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+        }
       }
     });
   }
