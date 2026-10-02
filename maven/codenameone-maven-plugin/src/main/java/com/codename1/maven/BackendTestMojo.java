@@ -95,6 +95,10 @@ public class BackendTestMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.cflags")
     private String cflags;
 
+    /** Surefire's -Dtest, which selects the compiled run's classes as it selects the JVM run's. */
+    @Parameter(property = "test")
+    private String testSelection;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (!enabled || skip || skipTests) {
@@ -121,6 +125,7 @@ public class BackendTestMojo extends AbstractMojo {
     }
 
     private BackendTestPackager packager() {
+        final SurefireSelection selection = SurefireSelection.of(project, testSelection);
         BackendTestPackager p = new BackendTestPackager(
                 new MavenModuleHost(project, MavenLog.of(getLog()))) {
             @Override
@@ -166,6 +171,11 @@ public class BackendTestMojo extends AbstractMojo {
             @Override
             protected File testOutputDirectory() {
                 return new File(project.getBuild().getTestOutputDirectory());
+            }
+
+            @Override
+            protected boolean selectsTestClass(String binaryName) {
+                return selection.test(binaryName);
             }
         };
         p.strict(strict).timeoutSeconds(timeoutSeconds);

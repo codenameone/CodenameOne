@@ -43,7 +43,7 @@ import java.util.List;
 /// test classes so their injected fields are set without reflection. A project with
 /// no `@BackendTest` is left untouched.
 public final class ProcessTestAnnotationsAction implements Action<Task> {
-    private final Provider<File> mainClasses;
+    private final FileCollection mainClassDirs;
     private final Provider<File> testClasses;
     private final File stubDir;
     private final File projectDir;
@@ -51,10 +51,10 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
     private final Provider<String> encoding;
     private final FileCollection testClasspath;
 
-    public ProcessTestAnnotationsAction(Provider<File> mainClasses, Provider<File> testClasses, File stubDir,
+    public ProcessTestAnnotationsAction(FileCollection mainClassDirs, Provider<File> testClasses, File stubDir,
                                         File projectDir, Provider<List<String>> sourceRoots,
                                         Provider<String> encoding, FileCollection testClasspath) {
-        this.mainClasses = mainClasses;
+        this.mainClassDirs = mainClassDirs;
         this.testClasses = testClasses;
         this.stubDir = stubDir;
         this.projectDir = projectDir;
@@ -74,8 +74,9 @@ public final class ProcessTestAnnotationsAction implements Action<Task> {
             classpath.add(f.getAbsolutePath());
         }
         try {
-            int generated = BackendTests.process(mainClasses.get(), tests, stubDir, projectDir,
-                    new ArrayList<String>(sourceRoots.get()), encoding.get(), classpath, false,
+            int generated = BackendTests.process(new ArrayList<File>(mainClassDirs.getFiles()), tests, stubDir,
+                    projectDir,
+                    new ArrayList<String>(sourceRoots.get()), encoding.get(), classpath, false, null,
                     new GradleLog(task.getLogger()));
             if (generated > 0) {
                 task.getLogger().lifecycle("cn1: prepared " + generated + " backend test class(es)");

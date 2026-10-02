@@ -116,12 +116,17 @@ final class Compression {
     }
 
     /// Whether Accept-Encoding lists gzip with a quality above zero (RFC 9110
-    /// 12.5.3). `*` counts, as the specification says it does.
+    /// 12.5.3). An explicit gzip entry decides, wherever it sits in the list; `*`
+    /// counts only when gzip is not named. Returning at the first match let
+    /// `*;q=1, gzip;q=0` -- a client refusing gzip outright -- be sent gzip, and
+    /// `*;q=0, gzip` be refused it.
     static boolean acceptsGzip(HttpServer.Request request) {
         String accept = request.getHeader("Accept-Encoding");
         if (accept == null) {
             return false;
         }
+        int explicit = 0;     // 0 unnamed, 1 accepted, -1 refused
+        int wildcard = 0;
         int pos = 0;
         while (pos <= accept.length()) {
             int comma = accept.indexOf(',', pos);
@@ -129,16 +134,19 @@ final class Compression {
             String item = accept.substring(pos, end).trim();
             int semi = item.indexOf(';');
             String coding = (semi < 0 ? item : item.substring(0, semi)).trim();
-            if ("gzip".equalsIgnoreCase(coding) || "x-gzip".equalsIgnoreCase(coding)
-                    || "*".equals(coding)) {
-                return semi < 0 || !zeroQuality(item.substring(semi + 1));
+            boolean accepted = semi < 0 || !zeroQuality(item.substring(semi + 1));
+            if ("gzip".equalsIgnoreCase(coding) || "x-gzip".equalsIgnoreCase(coding)) {
+                // gzip and its x-gzip alias are one coding: either accepting it is enough.
+                explicit = accepted || explicit == 1 ? 1 : -1;
+            } else if ("*".equals(coding)) {
+                wildcard = accepted ? 1 : -1;
             }
             if (comma < 0) {
                 break;
             }
             pos = comma + 1;
         }
-        return false;
+        return explicit != 0 ? explicit == 1 : wildcard == 1;
     }
 
     private static boolean zeroQuality(String params) {

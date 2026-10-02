@@ -84,15 +84,22 @@ install_runtime() {
     return 0
   fi
   local digest stamp
+  # Every module the server's build reads: the runtime and its test support, and
+  # the plugin with the build engine and project model it delegates the annotation
+  # and test passes to. A module left out of this digest is one whose change the
+  # stamp hides, so the server builds with the stale copy from the local repository.
   digest="$(cd "$ROOT" && { find vm/backend/src vm/backend/impl vm/backend/native vm/backend/test \
       maven/backend maven/backend-test maven/codenameone-maven-plugin/src/main \
+      maven/build-engine/src/main maven/build-engine/pom.xml \
+      maven/project-model/src/main maven/project-model/pom.xml \
+      maven/codenameone-maven-plugin/pom.xml maven/pom.xml \
       -type f -not -path '*/target/*' -print 2>/dev/null; vm/backend/shared-sources.sh 2>/dev/null; } \
       | LC_ALL=C sort | tr '\n' '\0' | xargs -0 cat 2>/dev/null | cksum | awk '{print $1}')"
   stamp="$ROOT/maven/target/cn1ss-backend-installed-$digest"
   if [ -f "$stamp" ]; then
     return 0
   fi
-  log "installing codenameone-backend, codenameone-backend-test and the plugin from this checkout"
+  log "installing the backend runtime, its test support, the build engine and the plugin from this checkout"
   # The three modules alone first: a leg that built the app has installed the
   # plugin's other dependencies (core, the ports, parparvm) from this checkout
   # already, and rebuilding every port with -am would cost minutes for nothing.
@@ -101,10 +108,10 @@ install_runtime() {
       -DskipTests -Dmaven.javadoc.skip=true -Dmaven.source.skip=true
       -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true)
   if ! JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" \
-      -pl backend,backend-test,codenameone-maven-plugin >&2; then
+      -pl backend,backend-test,project-model,build-engine,codenameone-maven-plugin >&2; then
     log "the plugin's dependencies are not installed; building them too (-am)"
     JAVA_HOME="$(install_java_home)" "$(mvn_cmd)" "${install[@]}" \
-        -pl backend,backend-test,codenameone-maven-plugin -am >&2
+        -pl backend,backend-test,project-model,build-engine,codenameone-maven-plugin -am >&2
   fi
   mkdir -p "$(dirname "$stamp")"
   touch "$stamp"

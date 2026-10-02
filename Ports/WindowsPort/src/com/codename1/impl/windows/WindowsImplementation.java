@@ -2593,6 +2593,23 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
+        Object c = connect(url, read, write);
+        WindowsNative.httpSetConnectTimeout(((WindowsHttpConnection) c).peer, timeout);
+        return c;
+    }
+
+    @Override
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        WindowsNative.httpSetCustomMethod(((WindowsHttpConnection) connection).peer, method);
+    }
+
+    @Override
+    public void setReadTimeout(Object connection, int readTimeout) {
+        WindowsNative.httpSetReadTimeout(((WindowsHttpConnection) connection).peer, readTimeout);
+    }
+
+    @Override
     public void setHeader(Object connection, String key, String val) {
         WindowsNative.httpSetHeader(((WindowsHttpConnection) connection).peer, key, val);
     }
@@ -2687,7 +2704,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public int getResponseCode(Object connection) throws IOException {
-        return WindowsNative.httpResponseCode(((WindowsHttpConnection) connection).peer);
+        long peer = ((WindowsHttpConnection) connection).peer;
+        // A transfer that failed has no status; answering -1 made ConnectionRequest
+        // read an empty answer instead of reaching its error path.
+        String failure = WindowsNative.httpFailure(peer);
+        if (failure != null) {
+            throw new IOException(failure);
+        }
+        return WindowsNative.httpResponseCode(peer);
     }
 
     @Override

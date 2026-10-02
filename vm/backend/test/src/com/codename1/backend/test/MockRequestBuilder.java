@@ -159,10 +159,22 @@ public class MockRequestBuilder {
         if (body != null) {
             out.headers.put("Content-Length", String.valueOf(body.length));
         }
-        if (!out.headers.containsKey("Host")) {
+        // By name in any case: a test's .header("host", ...) is the Host the
+        // request carries, and the dispatch folds names, so a default added
+        // beside it under another spelling replaced it.
+        if (!containsName(out.headers, "Host")) {
             out.headers.put("Host", "localhost");
         }
         return out;
+    }
+
+    private static boolean containsName(Map headers, String name) {
+        for (Object key : headers.keySet()) {
+            if (name.equalsIgnoreCase(String.valueOf(key))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The body to send; a multipart builder assembles its own.

@@ -167,8 +167,10 @@ public class BackendConnectionRequestTest extends BackendClientTest {
         });
     }
 
-    /// A request that reads its answer whatever the status, and reports once.
-    abstract static class Probe extends ConnectionRequest {
+    /// A request that reads its answer whatever the status, and reports once. An
+    /// inner class, so a request that fails reports through the test instead of
+    /// throwing on a thread nothing catches -- which left the test hanging.
+    abstract class Probe extends ConnectionRequest {
         int code;
         byte[] data;
         String probeHeader;
@@ -231,7 +233,7 @@ public class BackendConnectionRequestTest extends BackendClientTest {
         protected abstract void answered();
 
         protected void failed(Exception err) {
-            throw new IllegalStateException("request to " + getUrl() + " failed: " + err);
+            failStep("request to " + getUrl() + " failed: " + err);
         }
     }
 }

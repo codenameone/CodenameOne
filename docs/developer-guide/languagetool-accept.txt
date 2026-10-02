@@ -785,3 +785,5 @@ libimobiledevice
 # The GNOME desktop's design language, which names the Linux desktop native
 # theme (Native-Themes.asciidoc).
 Adwaita
+Mockito
+Toolchain

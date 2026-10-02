@@ -167,7 +167,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null || req.getStatus() == 0 ){
-            System.out.println(req.getAllResponseHeaders());
+            System.out.println(allResponseHeaders());
             System.out.println(req.getStatusText());
             System.out.println("Failed to load url "+url);
             System.out.println("Status code was "+req.getStatus());
@@ -260,9 +260,25 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
      * connection callback, which aborted the request the app was waiting on.
      */
     private String allResponseHeaders() {
-        String headers = req == null ? null : req.getAllResponseHeaders();
+        String headers = req == null ? null : responseHeaders(req);
         return headers == null ? "" : headers;
     }
+
+    /**
+     * The XMLHttpRequest's getAllResponseHeaders(), called as the method it is.
+     *
+     * Not through {@link XMLHttpRequest#getAllResponseHeaders()}: the ParparVM
+     * JSO bridge maps every no-argument {@code getXxx()} on a JSObject
+     * interface to a read of the property {@code xxx}, so that call read
+     * {@code xhr.allResponseHeaders} -- a property no browser has -- and
+     * answered null for every response. Every getHeaderField() on the
+     * JavaScript port therefore answered null, whatever the server sent and
+     * whatever Access-Control-Expose-Headers allowed. A @JSBody runs its
+     * script verbatim, so the method is really invoked.
+     */
+    @JSBody(params={"xhr"}, script="return (xhr && typeof xhr.getAllResponseHeaders === 'function') "
+            + "? xhr.getAllResponseHeaders() : null;")
+    static native String responseHeaders(XMLHttpRequest xhr);
 
     public String[] getHeaderFieldNames() {
         List<String> out = new ArrayList<String>();

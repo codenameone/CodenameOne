@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -166,6 +167,56 @@ public class BackendTestGeneratorTest {
             assertTrue(expected.getMessage(), expected.getMessage().contains(
                     "could receive any of systemClock (com.example.SystemClock), other "
                     + "(com.example.Clock)"));
+        }
+    }
+
+    @Test
+    public void theCompiledRunnerRunsWhatJUnitWouldAndCanReachIt() throws Exception {
+        // A base class in another package: its package-private test and lifecycle
+        // method are reached through a generated helper in that package, and a
+        // test the subclass overrides without @Test is not a test any more.
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("base.Base", "package base;\n"
+                + "import org.junit.jupiter.api.*;\n"
+                + "public abstract class Base {\n"
+                + "    public static java.util.List<String> calls = new java.util.ArrayList<String>();\n"
+                + "    @BeforeEach void setUp() { calls.add(\"setUp\"); }\n"
+                + "    @Test void inherited() { calls.add(\"inherited\"); }\n"
+                + "    @Test public void overridden() { calls.add(\"base-overridden\"); }\n"
+                + "}\n");
+        t.put("t.SubTest", "package t;\n"
+                + "public class SubTest extends base.Base {\n"
+                + "    @Override public void overridden() { calls.add(\"not-a-test\"); }\n"
+                + "    @org.junit.jupiter.api.Test void own() { calls.add(\"own\"); }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        File tests = tmp.newFolder();
+        List<File> cp = new ArrayList<File>(classpath());
+        JavaSourceCompiler.compile(t, tests, cp);
+        List<String> elements = new ArrayList<String>();
+        elements.add(tests.getAbsolutePath());
+        for (File f : cp) {
+            elements.add(f.getAbsolutePath());
+        }
+        BackendTests.process(classes, tests, tmp.newFolder(), tmp.newFolder(),
+                Collections.<String>emptyList(), "UTF-8", elements, true, new SystemStreamLog());
+        assertTrue("a helper was generated in the base class's package",
+                new File(tests, "base/BaseCn1TestAccess.class").isFile());
+        List<java.net.URL> urls = new ArrayList<java.net.URL>();
+        urls.add(tests.toURI().toURL());
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(
+                urls.toArray(new java.net.URL[0]), getClass().getClassLoader());
+        try {
+            loader.loadClass("t.SubTestCn1TestRunner").getMethod("run").invoke(null);
+            @SuppressWarnings("unchecked")
+            List<String> calls = (List<String>) loader.loadClass("base.Base").getField("calls").get(null);
+            assertTrue(calls.toString(), calls.contains("inherited"));
+            assertTrue(calls.toString(), calls.contains("own"));
+            assertTrue(calls.toString(), calls.contains("setUp"));
+            assertFalse("an override without @Test ran as a test: " + calls,
+                    calls.contains("not-a-test") || calls.contains("base-overridden"));
+        } finally {
+            loader.close();
         }
     }
 

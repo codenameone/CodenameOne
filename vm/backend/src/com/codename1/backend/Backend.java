@@ -1054,6 +1054,15 @@ public final class Backend {
                     failed(request, attempted, startedMillis, err);
                     throw err;
                 }
+                if (response != null && (cors != null || compression != null)) {
+                    // A copy first. The handler may return one Response for every
+                    // request -- a static final constant -- and both policies write
+                    // into the object they are handed: compression replaced its body
+                    // with gzip for good, so the next client that never offered gzip
+                    // got it anyway, and CORS pinned the first allowed origin onto
+                    // it. withHeaders shares the map, and every write replaces it.
+                    response = response.withHeaders(response.extraHeaders);
+                }
                 if (cors != null) {
                     cors.decorate(request, response);
                 }
@@ -2091,7 +2100,11 @@ public final class Backend {
                         config.getInt(Config.DATASOURCE_BUSY_MILLIS, 5000),
                         config.getInt(Config.DATASOURCE_BORROW_MILLIS, 10000));
             }
-            boolean configured = config.get(Config.DATASOURCE_URL) != null;
+            // Resolves rather than get: a compiled-in ${DATABASE_URL} that this
+            // process does not set is not a database it was asked for, and a
+            // server that needs none starts. One that needs one fails below, in
+            // fromConfig, with the message naming the variable.
+            boolean configured = config.resolves(Config.DATASOURCE_URL);
             if (!configured && !handlersNeedADatabase && EntityManager.registered().length == 0) {
                 return null;
             }

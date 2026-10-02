@@ -36,6 +36,8 @@
 
 #include "cn1_windows.h"
 #include <winhttp.h>
+#include <stdio.h>
+#include <wchar.h>
 
 /*
  * A String[] return value needs the array class of java.lang.String; the
@@ -57,6 +59,21 @@ typedef struct {
     BYTE* pendingBody;
     DWORD pendingLen;
     DWORD pendingCap;
+    /* ConnectionRequest.setHttpMethod: PUT, PATCH, DELETE, HEAD... NULL for the
+     * GET or POST the post flag selects. */
+    WCHAR* verb;
+    /* Every header line added, so a request handle recreated for a new verb
+     * gets them again: ConnectionRequest sets the method AFTER the headers, and
+     * WinHTTP fixes the verb when the handle is opened. */
+    WCHAR** headers;
+    int headerCount;
+    int headerCap;
+    /* ConnectionRequest.setTimeout and setReadTimeout, in milliseconds; 0 keeps
+     * WinHTTP's default. */
+    int connectTimeout;
+    int readTimeout;
+    /* The WinHTTP error of a transfer that failed, 0 when the server answered. */
+    DWORD failure;
 } CN1Connection;
 
 /* ------------------------------------------------------------- internals */
@@ -69,7 +86,8 @@ typedef struct {
  */
 static BOOL cn1NetCreateRequest(CN1Connection* conn) {
     DWORD flags = conn->https ? WINHTTP_FLAG_SECURE : 0;
-    const WCHAR* verb = conn->post ? L"POST" : L"GET";
+    const WCHAR* verb = conn->verb != NULL ? conn->verb : (conn->post ? L"POST" : L"GET");
+    int i;
     if (conn->request != NULL) {
         WinHttpCloseHandle(conn->request);
         conn->request = NULL;
@@ -78,7 +96,14 @@ static BOOL cn1NetCreateRequest(CN1Connection* conn) {
                                        conn->path ? conn->path : L"/",
                                        NULL, WINHTTP_NO_REFERER,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
-    return conn->request != NULL;
+    if (conn->request == NULL) {
+        return FALSE;
+    }
+    for (i = 0; i < conn->headerCount; i++) {
+        WinHttpAddRequestHeaders(conn->request, conn->headers[i], (DWORD)-1L,
+                                 WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
+    }
+    return TRUE;
 }
 
 /*
@@ -96,6 +121,20 @@ static BOOL cn1NetEnsureSent(CN1Connection* conn) {
         return conn->responseReceived;
     }
     conn->sent = TRUE;
+    {
+        /* ConnectionRequest follows redirects itself, and only when asked to:
+         * WinHTTP's default of following them silently answered a request that
+         * set setFollowRedirects(false) with the redirect's target. */
+        DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+        WinHttpSetOption(conn->request, WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy));
+    }
+    if (conn->connectTimeout > 0 || conn->readTimeout > 0) {
+        /* WinHTTP's defaults: no resolve limit, 60s connect, 30s send and receive. */
+        WinHttpSetTimeouts(conn->request, 0,
+                           conn->connectTimeout > 0 ? conn->connectTimeout : 60000,
+                           30000,
+                           conn->readTimeout > 0 ? conn->readTimeout : 30000);
+    }
 
     ok = WinHttpSendRequest(conn->request,
                             WINHTTP_NO_ADDITIONAL_HEADERS, 0,
@@ -105,11 +144,13 @@ static BOOL cn1NetEnsureSent(CN1Connection* conn) {
                             conn->pendingLen,
                             0);
     if (!ok) {
+        conn->failure = GetLastError();
         cn1WindowsLog("cn1NetEnsureSent: WinHttpSendRequest failed");
         return FALSE;
     }
     ok = WinHttpReceiveResponse(conn->request, NULL);
     if (!ok) {
+        conn->failure = GetLastError();
         cn1WindowsLog("cn1NetEnsureSent: WinHttpReceiveResponse failed");
         return FALSE;
     }
@@ -279,6 +320,57 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetMethod___long_boolean(
     }
 }
 
+JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetCustomMethod___long_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+    CN1Connection* conn = (CN1Connection*)(intptr_t)__cn1Arg1;
+    WCHAR* verb;
+    UINT32 verbLen = 0;
+    if (conn == NULL || conn->sent || __cn1Arg2 == JAVA_NULL) {
+        return;
+    }
+    verb = cn1WinJavaStringToWide(threadStateData, __cn1Arg2, &verbLen);
+    if (verb == NULL) {
+        return;
+    }
+    free(conn->verb);
+    if (wcscmp(verb, L"GET") == 0 || wcscmp(verb, L"POST") == 0) {
+        free(verb);
+        conn->verb = NULL;
+    } else {
+        conn->verb = verb;
+    }
+    cn1NetCreateRequest(conn);
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetConnectTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    CN1Connection* conn = (CN1Connection*)(intptr_t)__cn1Arg1;
+    if (conn != NULL) {
+        conn->connectTimeout = __cn1Arg2 > 0 ? __cn1Arg2 : 0;
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetReadTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2) {
+    CN1Connection* conn = (CN1Connection*)(intptr_t)__cn1Arg1;
+    if (conn != NULL) {
+        conn->readTimeout = __cn1Arg2 > 0 ? __cn1Arg2 : 0;
+    }
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_httpFailure___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1) {
+    CN1Connection* conn = (CN1Connection*)(intptr_t)__cn1Arg1;
+    char message[64];
+    if (conn == NULL) {
+        return JAVA_NULL;
+    }
+    cn1NetEnsureSent(conn);
+    if (conn->failure == 0) {
+        return JAVA_NULL;
+    }
+    snprintf(message, sizeof(message), conn->failure == ERROR_WINHTTP_TIMEOUT
+             ? "the request timed out (WinHTTP error %lu)" : "the request failed (WinHTTP error %lu)",
+             (unsigned long)conn->failure);
+    return newStringFromCString(threadStateData, message);
+}
+
 JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetHeader___long_java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_OBJECT __cn1Arg2, JAVA_OBJECT __cn1Arg3) {
     CN1Connection* conn = (CN1Connection*)(intptr_t)__cn1Arg1;
     WCHAR* key;
@@ -310,7 +402,20 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_httpSetHeader___long_java_lan
         line[keyLen + 2 + valueLen] = 0;
         WinHttpAddRequestHeaders(conn->request, line, (DWORD)-1L,
                                  WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
-        free(line);
+        /* Kept, and owned, for a handle recreated for a new verb. */
+        if (conn->headerCount >= conn->headerCap) {
+            int cap = conn->headerCap > 0 ? conn->headerCap * 2 : 8;
+            WCHAR** grown = (WCHAR**)realloc(conn->headers, cap * sizeof(WCHAR*));
+            if (grown != NULL) {
+                conn->headers = grown;
+                conn->headerCap = cap;
+            }
+        }
+        if (conn->headerCount < conn->headerCap) {
+            conn->headers[conn->headerCount++] = line;
+        } else {
+            free(line);
+        }
     }
     free(key);
     free(value);
@@ -543,6 +648,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_httpClose___long(CODENAME_ONE
     free(conn->host);
     free(conn->path);
     free(conn->pendingBody);
+    free(conn->verb);
+    {
+        int i;
+        for (i = 0; i < conn->headerCount; i++) {
+            free(conn->headers[i]);
+        }
+        free(conn->headers);
+    }
     free(conn);
 }
 

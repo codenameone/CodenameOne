@@ -77,6 +77,7 @@ final class BackendSupport {
         // execution does.
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
+            backendSettingsInputs(project, compile, layout);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
@@ -92,6 +93,7 @@ final class BackendSupport {
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
+                    backendSettingsInputs(project, compile, layout);
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                             AppSupport.kotlinDestinationProvider(compile, layout), AppSupport.stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(),
@@ -130,25 +132,49 @@ final class BackendSupport {
         project.getDependencies().add("testRuntimeOnly", JUNIT_LAUNCHER);
         final SourceSet test = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets()
                 .getByName(SourceSet.TEST_SOURCE_SET_NAME);
-        project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class, compile -> {
-            final JavaCompile mainCompile = (JavaCompile) project.getTasks().getByName(main.getCompileJavaTaskName());
-            compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
-                    mainCompile.getDestinationDirectory().getAsFile(),
-                    compile.getDestinationDirectory().getAsFile(),
-                    new File(layout.buildDir(), "generated/sources/cn1-test-stubs"), layout.projectDir(),
-                    project.provider(() -> {
-                        List<String> roots = new ArrayList<String>(AppSupport.sourceRoots(main, layout));
-                        for (File dir : test.getJava().getSrcDirs()) {
-                            roots.add(dir.getAbsolutePath());
-                        }
-                        return roots;
-                    }),
-                    AppSupport.javaEncoding(project, main), compile.getClasspath()));
+        final Provider<List<String>> roots = project.provider(() -> {
+            List<String> all = new ArrayList<String>(AppSupport.sourceRoots(main, layout));
+            for (File dir : test.getJava().getSrcDirs()) {
+                all.add(dir.getAbsolutePath());
+            }
+            all.add(new File(layout.projectDir(), "src/test/kotlin").getAbsolutePath());
+            return all;
         });
+        final File stubs = new File(layout.buildDir(), "generated/sources/cn1-test-stubs");
+        project.getTasks().named(test.getCompileJavaTaskName(), JavaCompile.class, compile -> {
+            // The generated contexts embed application.properties and the profile's
+            // file, so a change to either alone must recompile and regenerate them.
+            backendSettingsInputs(project, compile, layout);
+            compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
+                    main.getOutput().getClassesDirs(), compile.getDestinationDirectory().getAsFile(),
+                    stubs, layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
+                    compile.getClasspath()));
+        });
+        // Kotlin tests: compileTestJava is NO-SOURCE for a Kotlin-only test tree, so
+        // the pass runs after compileTestKotlin too, over the Kotlin test output.
+        project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin ->
+                project.getTasks().named("compileTestKotlin").configure(compile -> {
+                    backendSettingsInputs(project, compile, layout);
+                    compile.doLast("processCn1TestAnnotations", new ProcessTestAnnotationsAction(
+                            main.getOutput().getClassesDirs(),
+                            AppSupport.kotlinDestinationProvider(compile, layout), stubs,
+                            layout.projectDir(), roots, AppSupport.javaEncoding(project, main),
+                            test.getCompileClasspath()));
+                }));
         project.getTasks().withType(org.gradle.api.tasks.testing.Test.class).configureEach(t -> {
             t.useJUnitPlatform();
             t.setForkEvery(1L);
         });
+    }
+
+    /// The backend's application.properties and profile files as inputs of
+    /// `compile`: the build compiles them into the server, and into each test's
+    /// context, so a settings-only edit must not leave the task up to date.
+    private static void backendSettingsInputs(Project project, org.gradle.api.Task compile, ProjectLayout layout) {
+        compile.getInputs().files(project.fileTree(layout.projectDir(), tree -> {
+            tree.include("application.properties", "application-*.properties");
+        })).withPropertyName("cn1BackendSettings")
+                .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE);
     }
 
     static List<String> split(String s) {

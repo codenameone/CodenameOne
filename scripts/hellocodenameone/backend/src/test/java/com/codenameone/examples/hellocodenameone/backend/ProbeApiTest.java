@@ -64,6 +64,20 @@ class ProbeApiTest {
     }
 
     @Test
+    void mockMvcReportsWhatTheWireCarries() throws Exception {
+        // A test's own lower-case Host is the Host the request carries; a default
+        // added beside it under another spelling used to replace it.
+        String echoed = mvc.perform(get("/api/echo").header("host", "api.example"))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(echoed.indexOf("api.example") >= 0, echoed);
+        assertTrue(echoed.indexOf("localhost") < 0, echoed);
+        // Content-Type is a header like any other, though the server keeps it apart.
+        mvc.perform(get("/api/hello/{name}", "Ada"))
+                .andExpect(header().exists("Content-Type"))
+                .andExpect(header().string("content-type", "text/plain; charset=utf-8"));
+    }
+
+    @Test
     void statusesAndRedirects() throws Exception {
         mvc.perform(get("/api/status/418")).andExpect(status().is(418))
                 .andExpect(content().string("status 418"));

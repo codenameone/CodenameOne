@@ -679,6 +679,17 @@ public final class WindowsNative {
 
     public static native void httpSetHeader(long connection, String key, String value);
 
+    /// A method other than the GET or POST [#httpSetMethod] selects.
+    public static native void httpSetCustomMethod(long connection, String method);
+
+    public static native void httpSetConnectTimeout(long connection, int millis);
+
+    public static native void httpSetReadTimeout(long connection, int millis);
+
+    /// Why the transfer failed -- refused, timed out, reset -- or null when the
+    /// server answered, whatever its status.
+    public static native String httpFailure(long connection);
+
     public static native int httpResponseCode(long connection);
 
     public static native String httpResponseMessage(long connection);

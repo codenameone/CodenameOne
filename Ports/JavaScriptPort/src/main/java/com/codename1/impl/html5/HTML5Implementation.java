@@ -12493,7 +12493,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         Uint8Array responseBytes = toResponseBytes(req);
         if (responseBytes == null) {
-            System.out.println(req.getAllResponseHeaders());
+            System.out.println(NetworkConnection.responseHeaders(req));
             System.out.println(req.getStatusText());
             System.out.println("Failed to load resource "+url);
             System.out.println("Status code was "+req.getStatus());

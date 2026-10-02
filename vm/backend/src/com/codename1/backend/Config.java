@@ -440,6 +440,33 @@ public final class Config {
         return new ArrayList(names);
     }
 
+    /// Whether `key` has a value: false when no layer sets it, or when what is set
+    /// refers to a variable this process does not have and gives no fallback.
+    ///
+    /// For a setting the server consults only to learn whether it was asked for --
+    /// the database, when no handler and no entity needs one. The committed
+    /// application.properties names production's database as `${DATABASE_URL}`,
+    /// and the build compiles that file into the binary; a server that needs no
+    /// database must still start where that variable is unset. Code that DOES
+    /// read the value gets the loud failure from [#get(String)], as before.
+    boolean resolves(String key) throws IOException {
+        if (raw(key) == null) {
+            return false;
+        }
+        try {
+            return get(key) != null;
+        } catch (UnsetReference unset) {
+            return false;
+        }
+    }
+
+    /// A `${NAME}` with no fallback whose variable is not set.
+    private static final class UnsetReference extends IOException {
+        UnsetReference(String message) {
+            super(message);
+        }
+    }
+
     /// The value as written, before any ${} in it is resolved.
     private String raw(String key) {
         String value = overrides.getProperty(key);
@@ -562,7 +589,7 @@ public final class Config {
                     // LOUDLY. Left alone, the caller opens a database named
                     // "${DATABASE_URL}" -- or, worse, a SQLite file by that name,
                     // which succeeds and is empty.
-                    throw new IOException(key + " refers to ${" + reference + "}, which is "
+                    throw new UnsetReference(key + " refers to ${" + reference + "}, which is "
                             + "not set in the environment or the configuration. Set it, or "
                             + "give it a fallback as ${" + reference + ":value}.");
                 }

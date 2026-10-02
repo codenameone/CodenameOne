@@ -111,7 +111,7 @@ public class ProbeApi {
         out.put("params", params);
         Map<String, Object> headers = new LinkedHashMap<String, Object>();
         String[] interesting = {"X-Test", "X-Other", "Accept", "Content-Type", "User-Agent",
-                "Authorization", "Accept-Encoding"};
+                "Authorization", "Accept-Encoding", "Host"};
         for (String h : interesting) {
             String v = request.getHeader(h);
             if (v != null) {

@@ -925,6 +925,35 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    /** The annotation-framework bootstraps a build can generate, in Executor's order. */
+    static final String[] ANNOTATION_BOOTSTRAPS = {"MapperBootstrap", "BinderBootstrap", "DaoBootstrap",
+        "RestClientBootstrap", "ProtoBootstrap", "GrpcClientBootstrap", "GraphQLClientBootstrap",
+        "IntentBootstrap", "TelemetryBootstrap"};
+
+    /** hellocodenameone-common's compiled classes, which the suite launchers are built against. */
+    static Path helloCommonClasses() {
+        return Paths.get("..", "..", "scripts", "hellocodenameone", "common", "target", "classes")
+                .normalize().toAbsolutePath();
+    }
+
+    /**
+     * Launcher lines instantiating the cn1app bootstraps present in {@code appClasses} --
+     * the typed {@code @RestClient}, {@code @Mapped}, {@code @Entity} and the rest -- as
+     * Executor.annotationFrameworksInstallSource writes them into a real build's stub. The
+     * suites build their own launchers, so without these the features compile in and do
+     * nothing: RestClients.create threw "No RestClient impl registered". Only those present,
+     * because a launcher naming an absent class does not compile.
+     */
+    static String annotationBootstrapLines(Path appClasses) {
+        StringBuilder sb = new StringBuilder();
+        for (String boot : ANNOTATION_BOOTSTRAPS) {
+            if (Files.exists(appClasses.resolve("cn1app/" + boot + ".class"))) {
+                sb.append("        new cn1app.").append(boot).append("();\n");
+            }
+        }
+        return sb.toString();
+    }
+
     /** Launcher main that drives the hellocodenameone Cn1ssDeviceRunner screenshot suite on the Windows port. */
     static String winHelloLauncherSource() {
         return "import com.codename1.ui.Display;\n" +
@@ -998,6 +1027,7 @@ class CleanTargetIntegrationTest {
                 // app's gradient/SVG/Button UIIDs on top. Without this the suite
                 // renders on the bare app theme (no component styling, no dark mode).
                 // initFirstTheme also sets the global Resources so getImage() works.
+                annotationBootstrapLines(helloCommonClasses()) +
                 "        com.codename1.ui.plaf.UIManager.initFirstTheme(\"/theme\");\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 // KotlinUiTest is registered as the prepended test exactly as the

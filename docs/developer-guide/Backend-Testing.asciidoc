@@ -264,6 +264,11 @@ and `@Tag`, `Assumptions`, and the `Assertions` methods: `assertEquals`,
 `assertInstanceOf`, `assertThrows`, `assertThrowsExactly`, `assertDoesNotThrow`,
 `assertAll` and `fail`.
 
+The compiled run picks the same test classes as the JVM run: under Maven, the
+ones Surefire's includes and excludes select (its defaults, unless the pom names
+others), or the ones `-Dtest` names; under Gradle, every test class. Tag
+selection isn't applied to it.
+
 The results go to `target/surefire-reports` as `TEST-<class>-compiled.xml`,
 beside the JVM run's reports, and a failed test fails the build.
 

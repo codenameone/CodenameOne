@@ -25,12 +25,14 @@
 
 #import <CommonCrypto/CommonDigest.h>
 
-@interface NetworkConnectionImpl : NSObject<NSURLConnectionDataDelegate> {
+@interface NetworkConnectionImpl : NSObject<NSURLConnectionDataDelegate, NSURLSessionDataDelegate> {
     NSMutableURLRequest *request;
     int contentLength;
     int responseCode;
     NSDictionary* allHeaderFields;
     NSURLConnection *connection;
+    // The watchOS and tvOS slices' transport; nil elsewhere.
+    NSURLSession *urlSession;
     int chunkedStreamingLen;
     NSString* sslCertificates;
     NSMutableArray* pendingData;

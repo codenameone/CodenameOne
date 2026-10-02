@@ -105,6 +105,8 @@ final class BackendTestGenerator {
     private final List<String> runners = new ArrayList<String>();
     /// Test classes a compiled run skips, and why.
     private final Map<String, String> skippedClasses = new TreeMap<String, String>();
+    /// Helper class -> method key -> source, for [#call].
+    private final Map<String, Map<String, String>> accessHelpers = new TreeMap<String, Map<String, String>>();
 
     /// One test class's configuration.
     private static final class Spec {
@@ -122,13 +124,19 @@ final class BackendTestGenerator {
     }
 
     private BackendTestGenerator(ProcessorContext ctx, Set<String> mainClasses,
-                                 Set<String> testClasses, File mainOut, boolean compiled) {
+                                 Set<String> testClasses, File mainOut, boolean compiled,
+                                 java.util.function.Predicate<String> selection) {
         this.ctx = ctx;
         this.mainClasses = mainClasses;
         this.testClasses = testClasses;
         this.mainOut = mainOut;
         this.compiled = compiled;
+        this.selection = selection;
     }
+
+    /// Which test classes, by binary name, the compiled run runs: the ones the JVM
+    /// run discovers, so the two runs exercise one set. Null runs every class.
+    private final java.util.function.Predicate<String> selection;
 
     /// Runs the test pass over `ctx`, whose class index holds both the
     /// application's classes and the test classes, and whose output directory is
@@ -137,8 +145,15 @@ final class BackendTestGenerator {
     /// @return the number of test classes it generated a context or runner for
     static int generate(ProcessorContext ctx, Set<String> mainClasses, Set<String> testClasses,
                         File mainOut, boolean compiled) throws ProcessingException {
+        return generate(ctx, mainClasses, testClasses, mainOut, compiled, null);
+    }
+
+    /// As above, with the compiled run limited to the test classes `selection` accepts.
+    static int generate(ProcessorContext ctx, Set<String> mainClasses, Set<String> testClasses,
+                        File mainOut, boolean compiled, java.util.function.Predicate<String> selection)
+            throws ProcessingException {
         BackendTestGenerator g = new BackendTestGenerator(ctx, mainClasses, testClasses, mainOut,
-                compiled);
+                compiled, selection);
         return g.run();
     }
 
@@ -177,10 +192,17 @@ final class BackendTestGenerator {
             }
             for (String name : new TreeSet<String>(testClasses)) {
                 AnnotatedClass cls = ctx.lookup(name);
-                if (cls != null && runner(cls, byTest.get(name))) {
+                if (cls == null || (selection != null && !selection.test(cls.getBinaryName()))) {
+                    // Not a class the JVM run discovers -- a helper with an @Test
+                    // method, an IntegrationSpec the includes leave out -- so not one
+                    // the compiled run runs either.
+                    continue;
+                }
+                if (runner(cls, byTest.get(name))) {
                     count++;
                 }
             }
+            accessHelperSources();
             sources.put(MAIN_CLASS, mainSource());
         }
         if (ctx.hasErrors() || sources.isEmpty()) {
@@ -450,6 +472,7 @@ final class BackendTestGenerator {
           .append("            throw new IllegalArgumentException(\"Not a ").append(testType)
           .append(": \" + test);\n        }\n");
         sb.append("        ").append(testType).append(" t = (").append(testType).append(") test;\n");
+        Set<String> injectedNames = new LinkedHashSet<String>();
         for (AnnotatedClass c : hierarchy(spec.test)) {
             for (FieldInfo f : c.getFields()) {
                 if (f.isStatic() || f.isFinal()) {
@@ -457,6 +480,17 @@ final class BackendTestGenerator {
                 }
                 String value = injection(spec, c, f);
                 if (value == null) {
+                    continue;
+                }
+                if (!injectedNames.add(f.getName())) {
+                    // The rule the main build applies to beans, for the same reason:
+                    // a field is injected through a public setter named after it, so
+                    // two of one name in a hierarchy are one virtual method -- the
+                    // subclass's field was set twice and the superclass's never.
+                    ctx.error(c, c.getSourceName() + "." + f.getName() + " has the name of "
+                            + "another injected field of " + spec.test.getSourceName()
+                            + "'s class hierarchy, and the build injects a field through a "
+                            + "setter named after it. Rename one.");
                     continue;
                 }
                 sb.append("        t.").append(BackendWeaver.INJECT_PREFIX).append(f.getName())
@@ -553,10 +587,21 @@ final class BackendTestGenerator {
         List<AnnotatedClass> chain = hierarchy(cls);
         List<MethodInfo> tests = new ArrayList<MethodInfo>();
         Set<String> seen = new LinkedHashSet<String>();
+        java.util.IdentityHashMap<MethodInfo, AnnotatedClass> owners =
+                new java.util.IdentityHashMap<MethodInfo, AnnotatedClass>();
         for (AnnotatedClass c : chain) {
             for (MethodInfo m : c.getMethods()) {
-                if (m.getAnnotation(JUNIT_TEST) != null && seen.add(m.getName() + m.getDescriptor())) {
-                    tests.add(m);
+                String signature = m.getName() + m.getDescriptor();
+                if (m.getAnnotation(JUNIT_TEST) != null) {
+                    if (seen.add(signature)) {
+                        tests.add(m);
+                        owners.put(m, c);
+                    }
+                } else if (hides(m)) {
+                    // An override without @Test is not a test, and it hides the
+                    // superclass's: JUnit runs neither. Collected anyway, the
+                    // generated call dispatched to the override.
+                    seen.add(signature);
                 }
             }
         }
@@ -600,12 +645,12 @@ final class BackendTestGenerator {
             runners.add(runnerBinary);
             return true;
         }
-        List<MethodInfo> beforeAll = lifecycle(chain, JUNIT_BEFORE_ALL, true, true);
-        List<MethodInfo> afterAll = lifecycle(chain, JUNIT_AFTER_ALL, true, false);
+        List<MethodInfo> beforeAll = lifecycle(chain, JUNIT_BEFORE_ALL, true, true, owners);
+        List<MethodInfo> afterAll = lifecycle(chain, JUNIT_AFTER_ALL, true, false, owners);
         sb.append("        boolean ready = true;\n");
         for (MethodInfo m : beforeAll) {
-            sb.append("        if (ready) {\n            try {\n                ").append(testType)
-              .append('.').append(m.getName()).append("();\n")
+            sb.append("        if (ready) {\n            try {\n                ")
+              .append(call(owners.get(m), m, pkg, testType)).append(";\n")
               .append("            } catch (Throwable err) {\n")
               .append("                com.codename1.impl.backend.test.TestRun.lifecycleFailed(CLS, ")
               .append(quote("@BeforeAll " + m.getName())).append(", err);\n")
@@ -628,14 +673,14 @@ final class BackendTestGenerator {
             index++;
         }
         for (MethodInfo m : afterAll) {
-            sb.append("        try {\n            ").append(testType).append('.').append(m.getName())
-              .append("();\n        } catch (Throwable err) {\n")
+            sb.append("        try {\n            ").append(call(owners.get(m), m, pkg, testType))
+              .append(";\n        } catch (Throwable err) {\n")
               .append("            com.codename1.impl.backend.test.TestRun.lifecycleFailed(CLS, ")
               .append(quote("@AfterAll " + m.getName())).append(", err);\n        }\n");
         }
         sb.append("    }\n\n");
-        List<MethodInfo> beforeEach = lifecycle(chain, JUNIT_BEFORE_EACH, false, true);
-        List<MethodInfo> afterEach = lifecycle(chain, JUNIT_AFTER_EACH, false, false);
+        List<MethodInfo> beforeEach = lifecycle(chain, JUNIT_BEFORE_EACH, false, true, owners);
+        List<MethodInfo> afterEach = lifecycle(chain, JUNIT_AFTER_EACH, false, false, owners);
         index = 0;
         for (MethodInfo m : tests) {
             checkCallable(cls, m, false);
@@ -652,15 +697,15 @@ final class BackendTestGenerator {
                         + ".acquire(context));\n");
             }
             for (MethodInfo b : beforeEach) {
-                sb.append("            test.").append(b.getName()).append("();\n");
+                sb.append("            ").append(call(owners.get(b), b, pkg, "test")).append(";\n");
             }
-            sb.append("            test.").append(m.getName()).append("();\n");
+            sb.append("            ").append(call(owners.get(m), m, pkg, "test")).append(";\n");
             sb.append("        } catch (Throwable err) {\n            failure = err;\n        }\n");
             if (!afterEach.isEmpty()) {
                 sb.append("        if (test != null) {\n");
                 for (MethodInfo a : afterEach) {
-                    sb.append("            try {\n                test.").append(a.getName())
-                      .append("();\n            } catch (Throwable err) {\n")
+                    sb.append("            try {\n                ").append(call(owners.get(a), a, pkg, "test"))
+                      .append(";\n            } catch (Throwable err) {\n")
                       .append("                if (failure == null) {\n")
                       .append("                    failure = err;\n                }\n")
                       .append("            }\n");
@@ -679,13 +724,23 @@ final class BackendTestGenerator {
     /// The lifecycle methods of a kind across the hierarchy: superclass first for
     /// a "before", subclass first for an "after", as JUnit orders them.
     private List<MethodInfo> lifecycle(List<AnnotatedClass> chain, String annotation,
-                                       boolean isStatic, boolean superFirst) {
+                                       boolean isStatic, boolean superFirst,
+                                       java.util.Map<MethodInfo, AnnotatedClass> owners) {
         List<MethodInfo> out = new ArrayList<MethodInfo>();
         Set<String> seen = new LinkedHashSet<String>();
         for (AnnotatedClass c : chain) {
             List<MethodInfo> level = new ArrayList<MethodInfo>();
             for (MethodInfo m : c.getMethods()) {
-                if (m.getAnnotation(annotation) != null && seen.add(m.getName() + m.getDescriptor())) {
+                if (m.getAnnotation(annotation) == null) {
+                    // As for tests: an unannotated override or hiding method is
+                    // what JUnit sees, and it is not a lifecycle method.
+                    if (hides(m)) {
+                        seen.add(m.getName() + m.getDescriptor());
+                    }
+                    continue;
+                }
+                if (seen.add(m.getName() + m.getDescriptor())) {
+                    owners.put(m, c);
                     if (m.isStatic() != isStatic) {
                         ctx.error(c, m.getName() + " is " + (isStatic ? "not " : "")
                                 + "static; " + annotation.substring(annotation.lastIndexOf('/') + 1,
@@ -704,6 +759,67 @@ final class BackendTestGenerator {
             }
         }
         return out;
+    }
+
+    /// Whether `m` hides an inherited method of the same signature from JUnit when
+    /// it carries no annotation of its own: any method but a private one or a
+    /// constructor.
+    private static boolean hides(MethodInfo m) {
+        return !m.isPrivate() && !m.isConstructor() && !m.isSynthetic();
+    }
+
+    /// The call to `m`, declared by `owner`, from a runner in package `runnerPkg`:
+    /// `target.m()`, or `Type.m()` for a static one. A method that is not public
+    /// and is declared in another package -- a JUnit base class's package-private
+    /// or protected test -- cannot be called from there, so it goes through a
+    /// helper generated in its own package; JUnit reaches it reflectively, which
+    /// the compiled run cannot.
+    private String call(AnnotatedClass owner, MethodInfo m, String runnerPkg, String target) {
+        String ownerPkg = packageOf(owner.getBinaryName());
+        if (m.isPublic() || ownerPkg.equals(runnerPkg)) {
+            return (m.isStatic() ? owner.getSourceName() : target) + "." + m.getName() + "()";
+        }
+        String helper = (ownerPkg.length() == 0 ? "" : ownerPkg + ".")
+                + owner.getBinaryName().substring(owner.getBinaryName().lastIndexOf('.') + 1)
+                        .replace('$', '_') + "Cn1TestAccess";
+        java.util.Map<String, String> calls = accessHelpers.get(helper);
+        if (calls == null) {
+            calls = new TreeMap<String, String>();
+            accessHelpers.put(helper, calls);
+        }
+        String body = m.isStatic()
+                ? "    public static void " + m.getName() + "() throws Throwable {\n        "
+                        + owner.getSourceName() + "." + m.getName() + "();\n    }\n"
+                : "    public static void " + m.getName() + "(" + owner.getSourceName()
+                        + " target) throws Throwable {\n        target." + m.getName() + "();\n    }\n";
+        calls.put(m.getName() + (m.isStatic() ? "/static" : ""), body);
+        return helper + "." + m.getName() + "(" + (m.isStatic() ? "" : target) + ")";
+    }
+
+    private static String packageOf(String binaryName) {
+        int dot = binaryName.lastIndexOf('.');
+        return dot < 0 ? "" : binaryName.substring(0, dot);
+    }
+
+    /// The access helpers [#call] asked for, as their sources.
+    private void accessHelperSources() {
+        for (java.util.Map.Entry<String, java.util.Map<String, String>> e : accessHelpers.entrySet()) {
+            String binary = e.getKey();
+            int dot = binary.lastIndexOf('.');
+            StringBuilder sb = new StringBuilder();
+            if (dot > 0) {
+                sb.append("package ").append(binary, 0, dot).append(";\n\n");
+            }
+            sb.append("// Calls the compiled test runners cannot make from their own package. Do not edit.\n");
+            sb.append("@com.codename1.backend.annotations.Generated\n");
+            sb.append("public final class ").append(binary.substring(dot + 1)).append(" {\n");
+            sb.append("    private ").append(binary.substring(dot + 1)).append("() {\n    }\n\n");
+            for (String body : e.getValue().values()) {
+                sb.append(body).append('\n');
+            }
+            sb.append("}\n");
+            sources.put(binary, sb.toString());
+        }
     }
 
     /// A test or lifecycle method the runner can call: not private, taking nothing.

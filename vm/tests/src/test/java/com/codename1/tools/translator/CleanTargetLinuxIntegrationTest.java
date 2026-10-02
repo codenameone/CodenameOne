@@ -84,6 +84,10 @@ class CleanTargetLinuxIntegrationTest {
                 // Install the transcoded SVG/Lottie registry before the first theme so
                 // url(*.svg) backgrounds resolve, then load the app theme.
                 "        try { com.codename1.generated.svg.SVGRegistry.installGlobal(); } catch (Throwable __svg) { __svg.printStackTrace(); }\n" +
+                // The generated annotation bootstraps (the typed REST client and the rest),
+                // as a real build's stub instantiates them; see annotationBootstrapLines.
+                CleanTargetIntegrationTest.annotationBootstrapLines(
+                        CleanTargetIntegrationTest.helloCommonClasses()) +
                 "        com.codename1.ui.plaf.UIManager.initFirstTheme(\"/theme\");\n" +
                 "        TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());\n" +
                 "        Cn1ssDeviceRunner.addTest(new com.codenameone.examples.hellocodenameone.tests.KotlinUiTest());\n" +

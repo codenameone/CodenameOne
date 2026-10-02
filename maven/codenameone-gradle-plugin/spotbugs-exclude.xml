@@ -23,13 +23,17 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
         <Field name="compileClasspath"/>
     </Match>
-    <!-- The same lazy, deliberately shared FileCollection: the test compile's
-         classpath, resolved only when the test pass runs. -->
+    <!-- The same lazy, deliberately shared FileCollections: the test compile's
+         classpath and the main source set's class directories, resolved only when
+         the test pass runs. -->
     <Match>
         <Class name="com.codename1.gradle.tasks.ProcessTestAnnotationsAction"/>
         <Method name="&lt;init&gt;"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
-        <Field name="testClasspath"/>
+        <Or>
+            <Field name="testClasspath"/>
+            <Field name="mainClassDirs"/>
+        </Or>
     </Match>
     <!-- The source set's classes directories, the same lazy, deliberately shared
          FileCollection: it names Kotlin's destination wherever the build put it,

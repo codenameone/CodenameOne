@@ -78,6 +78,13 @@ public abstract class BackendTestPackager extends BackendPackager {
     /// The test resources as the build tool processed them, or null.
     protected abstract File testOutputDirectory();
 
+    /// Whether the JVM run discovers the test class `binaryName`, so the compiled
+    /// run runs it too. Every class by default, as Gradle's JUnit Platform scan
+    /// finds them; the Maven goal answers with Surefire's includes and excludes.
+    protected boolean selectsTestClass(String binaryName) {
+        return true;
+    }
+
     /// Sets [#strict].
     public BackendTestPackager strict(boolean value) {
         this.strict = value;
@@ -158,7 +165,7 @@ public abstract class BackendTestPackager extends BackendPackager {
         List<String> cp = new ArrayList<String>(classpath);
         cp.add(javaApi.getAbsolutePath());
         BackendTests.process(classes, testClasses, new File(work, "test-stubs"),
-                host.baseDir(), roots, sourceEncoding(), cp, true, getLog());
+                host.baseDir(), roots, sourceEncoding(), cp, true, this::selectsTestClass, getLog());
         copyDirectory(testClasses, classes);
         // One main per translation: the app's generated entry point goes, and the
         // test runner's takes its place. No test calls it; a test starts the

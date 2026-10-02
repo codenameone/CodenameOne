@@ -41,9 +41,19 @@ import java.util.Map;
 /// Every call is asynchronous, so a test is a list of steps: each step sends one
 /// request and its callback checks the answer and moves on with [#proceed]. A
 /// synchronous call would block the EDT, which the browser port cannot do.
+///
+/// A step that never hears back FAILS, naming itself, after [#STEP_TIMEOUT_MILLIS].
+/// Without that, a request a port drops -- no callback of any kind -- left the
+/// suite's per-test timeout to report "timeout waiting for DONE", which says
+/// nothing about which request or why.
 public abstract class BackendClientTest extends BaseTest {
+    /// How long one step may wait for its answer. Under the runner's per-test
+    /// budget, and well over the slowest step (a deliberate four-second delay).
+    static final long STEP_TIMEOUT_MILLIS = 12000;
+
     private final List<Runnable> steps = new ArrayList<Runnable>();
     private int current = -1;
+    private java.util.Timer watchdog;
 
     /// The backend's base URL, with no trailing slash.
     public static String baseUrl() {
@@ -102,20 +112,58 @@ public abstract class BackendClientTest extends BaseTest {
         current++;
         Runnable next = current >= steps.size() ? null : steps.get(current);
         if (next == null) {
+            stopWatchdog();
             done();
             return;
         }
+        watch(current);
         try {
             next.run();
         } catch (Throwable err) {
+            stopWatchdog();
             fail("step " + (current + 1) + " threw " + err);
         }
+    }
+
+    /// Fails the test if step `step` is still the current one when its time is up.
+    private void watch(final int step) {
+        if (watchdog == null) {
+            watchdog = new java.util.Timer();
+        }
+        watchdog.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (!isFailed() && current == step) {
+                            stopWatchdog();
+                            fail(BackendClientTest.this.getClass().getName() + " step " + (step + 1)
+                                    + " got no answer in " + STEP_TIMEOUT_MILLIS + "ms: the request "
+                                    + "was dropped without a response or an error");
+                        }
+                    }
+                });
+            }
+        }, STEP_TIMEOUT_MILLIS);
+    }
+
+    private void stopWatchdog() {
+        if (watchdog != null) {
+            watchdog.cancel();
+            watchdog = null;
+        }
+    }
+
+    /// Fails the test, as [#fail] does, from any step's error path.
+    protected final void failStep(String message) {
+        stopWatchdog();
+        fail(getClass().getName() + " step " + (currentStep() + 1) + ": " + message);
     }
 
     /// Fails the test with `message` unless `condition` holds; true when it does.
     protected final boolean expect(boolean condition, String message) {
         if (!condition) {
-            fail(getClass().getName() + " step " + (currentStep() + 1) + ": " + message);
+            failStep(message);
         }
         return condition;
     }

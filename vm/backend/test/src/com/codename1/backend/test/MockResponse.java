@@ -35,7 +35,20 @@ public final class MockResponse {
     MockResponse(int status, String contentType, List headers, byte[] body) {
         this.status = status;
         this.contentType = contentType;
-        this.headers = headers;
+        // The server keeps a response's type apart from its other headers, but on
+        // the wire it is one header like the rest: getHeader("Content-Type"),
+        // header().exists and getHeaderNames all have to see it, or MockMvc
+        // reports a header absent that the real response carries.
+        List all = new ArrayList();
+        boolean typed = false;
+        for (Object entry : headers) {
+            typed |= "Content-Type".equalsIgnoreCase(((String[]) entry)[0]);
+        }
+        if (contentType != null && !typed) {
+            all.add(new String[] {"Content-Type", contentType});
+        }
+        all.addAll(headers);
+        this.headers = all;
         this.body = body == null ? new byte[0] : body;
     }
 

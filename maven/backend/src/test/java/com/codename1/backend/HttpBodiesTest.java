@@ -57,6 +57,17 @@ class HttpBodiesTest {
         }
     }
 
+    /// One Response for every request, as a handler with a constant answer returns.
+    private static final HttpServer.Response SHARED;
+
+    static {
+        StringBuilder sb = new StringBuilder();
+        for (int iter = 0 ; iter < 500 ; iter++) {
+            sb.append("{\"n\":").append(iter).append("},");
+        }
+        SHARED = HttpServer.Response.json(200, "[" + sb + "{}]");
+    }
+
     /// Echoes what the request arrived as: the content type, the body's length
     /// and form, its parts and parameters.
     private void start(Properties extra) throws Exception {
@@ -97,6 +108,9 @@ class HttpBodiesTest {
                         if (path.startsWith("/param")) {
                             return HttpServer.Response.text(200, request.param("a") + ","
                                     + request.param("b"));
+                        }
+                        if (path.startsWith("/shared")) {
+                            return SHARED;
                         }
                         if (path.startsWith("/big")) {
                             StringBuilder sb = new StringBuilder();
@@ -262,6 +276,40 @@ class HttpBodiesTest {
         c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/text").openConnection();
         c.setRequestProperty("Accept-Encoding", "gzip");
         assertNull(c.getHeaderField("Content-Encoding"), "a small body was compressed");
+
+        // An explicit gzip entry decides, wherever it sits; * counts only otherwise.
+        assertEquals(null, encodingFor("*;q=1, gzip;q=0"), "gzip was refused explicitly");
+        assertEquals("gzip", encodingFor("*;q=0, gzip"), "gzip was accepted explicitly");
+        assertEquals("gzip", encodingFor("br, *"), "* accepts gzip when it is not named");
+    }
+
+    @Test
+    @DisplayName("a Response the handler shares between requests is not changed by one of them")
+    void aSharedResponseIsCopiedBeforeThePolicies() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.server.compression.enabled", "true");
+        start(p);
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/shared")
+                .openConnection();
+        c.setRequestProperty("Accept-Encoding", "gzip");
+        assertEquals("gzip", c.getHeaderField("Content-Encoding"));
+        read(new GZIPInputStream(c.getInputStream()));
+        // The next client never offered gzip. Compression used to rewrite the
+        // shared object, so it got gzip anyway.
+        c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/shared").openConnection();
+        c.setRequestProperty("Accept-Encoding", "identity");
+        assertNull(c.getHeaderField("Content-Encoding"), "the shared response stayed gzipped");
+        String json = new String(read(c.getInputStream()), "UTF-8");
+        assertTrue(json.startsWith("[{\"n\":0}"), json);
+    }
+
+    private String encodingFor(String acceptEncoding) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/big")
+                .openConnection();
+        c.setRequestProperty("Accept-Encoding", acceptEncoding);
+        String encoding = c.getHeaderField("Content-Encoding");
+        read(c.getInputStream());
+        return encoding;
     }
 
     private HttpURLConnection post(String path, String type, byte[] body, String encoding)

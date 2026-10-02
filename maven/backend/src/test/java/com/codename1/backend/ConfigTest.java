@@ -127,6 +127,25 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("resolves: absent and unset-without-fallback are unset, a fallback resolves")
+    void resolvesTellsAskedForFromUnresolvable() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("cn1.test.a", "${CN1_TEST_NEVER_SET_VAR}");
+        p.setProperty("cn1.test.b", "${CN1_TEST_NEVER_SET_VAR:fallback}");
+        p.setProperty("cn1.test.c", "plain");
+        Config config = Config.of(p, "production");
+        assertFalse(config.resolves("cn1.test.absent"));
+        assertFalse(config.resolves("cn1.test.a"));
+        assertTrue(config.resolves("cn1.test.b"));
+        assertTrue(config.resolves("cn1.test.c"));
+        // get() still fails loudly for code that reads the value.
+        assertThrows(IOException.class, () -> config.get("cn1.test.a"));
+        // A malformed reference is not "unset": it still fails.
+        p.setProperty("cn1.test.d", "${UNCLOSED");
+        assertThrows(IOException.class, () -> config.resolves("cn1.test.d"));
+    }
+
+    @Test
     @DisplayName("a test's own settings win over the process, and only those")
     void testSettingsWinOverTheProcess() throws Exception {
         // What @BackendTest builds: a shell that exports PORT or DATABASE_URL

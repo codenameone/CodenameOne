@@ -5855,7 +5855,11 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
   }
   const out = jvm.newArray(encoded.length, "JAVA_BYTE", 1);
   for (let i = 0; i < encoded.length; i++) {
-    out[i] = encoded[i];
+    // Sign-extended: a Java byte[] holds -128..127, and BALOAD reads the slot as
+    // it is. The encoder's 0..255 left every non-ASCII byte of getBytes() a value
+    // no Java byte can have, so comparisons, checksums and "< 0" tests disagreed
+    // with every other platform.
+    out[i] = (encoded[i] << 24) >> 24;
   }
   return out;
 });

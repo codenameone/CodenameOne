@@ -55,11 +55,40 @@ public final class BackendTests {
                               List<String> sourceRoots, String encoding, List<String> classpath,
                               boolean compiled, Log log)
             throws BuildExecutionException, BuildFailureException {
-        Map<String, AnnotatedClass> main;
+        return process(mainClasses, testClasses, stubs, projectDir, sourceRoots, encoding, classpath,
+                compiled, null, log);
+    }
+
+    /// As above, with a compiled run limited to the test classes, by binary name,
+    /// that `selection` accepts -- the ones the build tool's JVM run discovers.
+    public static int process(File mainClasses, File testClasses, File stubs, File projectDir,
+                              List<String> sourceRoots, String encoding, List<String> classpath,
+                              boolean compiled, java.util.function.Predicate<String> selection, Log log)
+            throws BuildExecutionException, BuildFailureException {
+        return process(java.util.Collections.singletonList(mainClasses), testClasses, stubs, projectDir,
+                sourceRoots, encoding, classpath, compiled, selection, log);
+    }
+
+    /// As above, over every directory the application's classes were compiled into
+    /// -- a Gradle backend with Kotlin and Java sources has one per language, and
+    /// its beans may be in either.
+    public static int process(List<File> mainClassDirs, File testClasses, File stubs, File projectDir,
+                              List<String> sourceRoots, String encoding, List<String> classpath,
+                              boolean compiled, java.util.function.Predicate<String> selection, Log log)
+            throws BuildExecutionException, BuildFailureException {
+        Map<String, AnnotatedClass> main = new LinkedHashMap<String, AnnotatedClass>();
         Map<String, AnnotatedClass> tests;
+        // The main build's wiring record is in one of them; read from that one.
+        File mainClasses = mainClassDirs.isEmpty() ? testClasses : mainClassDirs.get(0);
         try {
-            main = mainClasses.isDirectory() ? ClassScanner.scan(mainClasses)
-                    : new LinkedHashMap<String, AnnotatedClass>();
+            for (File dir : mainClassDirs) {
+                if (dir.isDirectory()) {
+                    main.putAll(ClassScanner.scan(dir));
+                    if (new File(dir, RestControllerAnnotationProcessor.WIRING_RESOURCE).isFile()) {
+                        mainClasses = dir;
+                    }
+                }
+            }
             tests = ClassScanner.scan(testClasses);
         } catch (ProcessingException err) {
             throw new BuildExecutionException("Could not scan the compiled classes: "
@@ -77,7 +106,7 @@ public final class BackendTests {
         int count;
         try {
             count = BackendTestGenerator.generate(ctx, mainNames, tests.keySet(), mainClasses,
-                    compiled);
+                    compiled, selection);
         } catch (ProcessingException err) {
             throw new BuildExecutionException(err.getMessage(), err);
         }
