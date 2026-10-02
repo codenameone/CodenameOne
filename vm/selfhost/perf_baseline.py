@@ -61,6 +61,7 @@ import sys
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE / 'perf-baseline'
+LEGACY_FILE = 'vm/selfhost/perf-baseline.json'   # the retired single-file layout
 REPO = HERE.parents[1]
 METRICS = ('time', 'memory')
 KEY_RE = re.compile(r'^[a-z0-9]+-[a-z0-9]+(@[a-z0-9-]+)?$')
@@ -165,8 +166,18 @@ def _rows(where, tree):
 def load_policy(root=ROOT):
     policy = _read_json(Path(root) / 'policy.json')
     for name in ('tolerance', 'floor'):
-        if set(policy.get(name, {})) != set(METRICS):
+        values = policy.get(name)
+        if not isinstance(values, dict) or set(values) != set(METRICS):
             raise BaselineError('policy.json: %s must give time and memory' % name)
+        for metric, value in values.items():
+            # A pull request may edit the policy, so a value verdict() would choke on --
+            # or a negative tolerance, which inverts the gate -- is refused here, before
+            # ten minutes of measurement per platform consume it.
+            numeric = not isinstance(value, bool) and isinstance(value, (int, float))
+            if not numeric or not (value > 0 if name == 'tolerance' else value >= 0) or \
+                    not value < 5:
+                raise BaselineError('policy.json: %s %s %r is not a %s fraction' % (
+                    name, metric, value, 'positive' if name == 'tolerance' else 'non-negative'))
     return policy
 
 
@@ -225,23 +236,40 @@ def _same(a, b):
     return all(math.isclose(a[m], b[m], rel_tol=0, abs_tol=5e-4) for m in METRICS)
 
 
-def _combine(rows):
-    """Several branches calibrating the same new row: one calibration from all of them."""
+def _combine(rows, default=None):
+    """Several branches calibrating the same new row: one calibration from all of them.
+
+    The baseline is the median of their ratios, and the tolerance is wide enough that every
+    contributing row's own band (its ratio, plus or minus its tolerance, or `default`'s
+    where it gives none) still passes around that median. Keeping only the widest of the
+    rows' tolerances is not enough: calibrations at 1.0x and 2.0x, each at 15%, would fold
+    to 1.5x at 15%, which neither of the runs they came from passes. The median is not
+    weighted by `runs`: each overlay's row is already the median of its own runs, and
+    two branches meeting the same new CPU in the window before a fold are rare enough
+    that a plain median of the two is the honest summary."""
     if len(rows) == 1:
         return copy.deepcopy(rows[0])
+    default = default or {}
     combined = {m: round(statistics.median(r[m] for r in rows), 3) for m in METRICS}
     combined['runs'] = sum(r['runs'] for r in rows)
     tolerance = {}
-    for r in rows:
-        for metric, value in r.get('tolerance', {}).items():
-            tolerance[metric] = max(tolerance.get(metric, 0.0), value)
+    for metric in METRICS:
+        base = combined[metric]
+        need = 0.0
+        for r in rows:
+            own = r.get('tolerance', {}).get(metric, default.get(metric, 0.0))
+            need = max(need, own, r[metric] * (1 + own) / base - 1, 1 - r[metric] * (1 - own) / base)
+        need = round(math.ceil(need / 0.05 - 1e-9) * 0.05, 2)
+        if need > default.get(metric, 0.0):
+            tolerance[metric] = need
     if tolerance:
         combined['tolerance'] = tolerance
     return combined
 
 
-def resolve(base, overlays):
-    """The rows the gate judges against: base with every overlay applied.
+def resolve(base, overlays, tolerance=None):
+    """The rows the gate judges against: base with every overlay applied. `tolerance` is
+    the policy's global one, which a row without its own is judged by.
 
     Returns (rows, notes). Raises BaselineError for overlays that contradict each other or
     the base, naming the pull requests involved."""
@@ -256,7 +284,8 @@ def resolve(base, overlays):
             notes.append('%s %s/%s: already calibrated; the calibration in %s is superseded'
                          % (key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)))
             continue
-        rows.setdefault(key, {}).setdefault(bench, {})[cores] = _combine([r for _, r in entries])
+        rows.setdefault(key, {}).setdefault(bench, {})[cores] = _combine([r for _, r in entries],
+                                                                         tolerance)
     rebaselines = {}
     for number, overlay in overlays:
         for key, bench, cores, row in _rows('pr/%d.json' % number, overlay.get('rebaseline', {})):
@@ -287,7 +316,7 @@ def resolve(base, overlays):
 def load(root=ROOT):
     """Everything perf-gate.py needs: tolerance, floor and the resolved rows."""
     policy = load_policy(root)
-    rows, notes = resolve(load_base(root), load_overlays(root))
+    rows, notes = resolve(load_base(root), load_overlays(root), policy['tolerance'])
     return {'tolerance': policy['tolerance'], 'floor': policy['floor'], 'platforms': rows,
             'notes': notes}
 
@@ -308,13 +337,14 @@ def fold(root=ROOT):
     folded. Verifies the gate reads the same baseline afterwards."""
     root = Path(root)
     overlays = load_overlays(root)
-    before, _ = resolve(load_base(root), overlays)
+    tolerance = load_policy(root)['tolerance']
+    before, _ = resolve(load_base(root), overlays, tolerance)
     if not overlays:
         return []
     write_base(root, before)
     for number, _ in overlays:
         (root / 'pr' / ('%d.json' % number)).unlink()
-    after, _ = resolve(load_base(root), load_overlays(root))
+    after, _ = resolve(load_base(root), load_overlays(root), tolerance)
     if after != before:
         raise BaselineError('folding changed the resolved baseline; nothing may be committed')
     return [number for number, _ in overlays]
@@ -427,10 +457,20 @@ def changed_files(base_ref, root=ROOT):
     return [line[len(rel) + 1:] for line in out.stdout.splitlines() if line.strip()]
 
 
-def base_exists_at(ref, root=ROOT):
+def exists_at(ref, path, root=ROOT):
+    """Whether `path` (relative to root) exists in commit `ref`."""
     rel = Path(root).resolve().relative_to(REPO).as_posix()
-    return subprocess.run(['git', 'cat-file', '-e', '%s:%s/base' % (ref, rel)],
+    return subprocess.run(['git', 'cat-file', '-e', '%s:%s/%s' % (ref, rel, path)],
                           capture_output=True, cwd=str(REPO)).returncode == 0
+
+
+def legacy_touched(base_ref):
+    """Whether the pull request changed the retired single-file baseline."""
+    out = subprocess.run(['git', 'diff', '--name-only', '%s...HEAD' % base_ref, '--',
+                          LEGACY_FILE], capture_output=True, text=True, cwd=str(REPO))
+    if out.returncode != 0:
+        raise BaselineError('git diff against %s failed: %s' % (base_ref, out.stderr.strip()))
+    return bool(out.stdout.strip())
 
 
 def check(root=ROOT, base_ref=None, number=None):
@@ -451,19 +491,30 @@ def check(root=ROOT, base_ref=None, number=None):
             return problems + [str(error)]
         # The change that introduced this layout creates base/; that is the one pull
         # request allowed to, and it is recognisable by base/ not existing before it.
-        migrating = not base_exists_at(base_ref, root)
+        migrating = not exists_at(base_ref, 'base', root)
         for path in changed:
             if path.startswith('base/') and not migrating:
                 problems.append('%s changed: base/ is written only by the nightly fold. Put the '
                                 'rows in pr/<this pull request>.json instead '
                                 '(calibrate-perf-baseline.py --pr N writes it).' % path)
-            elif path.startswith('pr/') and number is not None and path != 'pr/%d.json' % number:
+            elif path.startswith('pr/') and number is not None and path != 'pr/%d.json' % number \
+                    and not exists_at(base_ref, path, root):
+                # An overlay already on the base branch belongs to a MERGED pull request, and
+                # editing or deleting it is how master is repaired: two pull requests can each
+                # pass while rebaselining the same row (neither sees the other's unmerged
+                # overlay), and once both merge, resolve() and the fold both refuse master
+                # until one of them is changed. Only another OPEN pull request's overlay --
+                # one this branch would be inventing -- is off limits.
                 problems.append('%s changed: a pull request writes only its own overlay, '
-                                'pr/%d.json' % (path, number))
+                                'pr/%d.json, or repairs one already merged' % (path, number))
+        if not migrating and legacy_touched(base_ref):
+            # A branch from before this layout that resolves its merge conflict by keeping
+            # the old file would pass every other check, and the gate -- which reads only
+            # perf-baseline/ -- would silently ignore the rows it meant to add.
+            problems.append('%s changed: that file is retired and nothing reads it. Convert '
+                            'the branch\'s edits with `perf_baseline.py import-legacy --pr N '
+                            '--ref <branch>` and delete it.' % LEGACY_FILE)
     return problems
-
-
-LEGACY_FILE = 'vm/selfhost/perf-baseline.json'
 
 
 def _git_show(ref, path):
@@ -496,7 +547,7 @@ def import_legacy(root, number, legacy, original=None, reason=None):
     rows it has become rebaselines from their current value. Returns (path or None, notes)."""
     current = load(root)['platforms']
     before = (original or {}).get('platforms')
-    calibrate, rebaseline, notes = {}, {}, []
+    calibrate, rebaseline, notes, conflicts = {}, {}, [], []
     for key, bench, cores, row in _rows('the branch perf-baseline.json', legacy.get('platforms', {})):
         _check_row('%s %s/%s' % (key, bench, cores), row)
         if before is not None and before.get(key, {}).get(bench, {}).get(cores) == row:
@@ -510,15 +561,54 @@ def import_legacy(root, number, legacy, original=None, reason=None):
             # two calibrations of one CPU, and the one already in the tree stands.
             notes.append('%s %s/%s: calibrated on master too; master\'s row stands'
                          % (key, bench, cores))
-        elif existing != row:
-            if before is not None and old is not None and old != existing:
-                notes.append('%s %s/%s was also changed on master since the branch point; '
-                             'check the imported value' % (key, bench, cores))
-            moved = dict(row, **{'from': {m: existing[m] for m in METRICS}})
-            rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = moved
+        else:
+            merged = row if old is None else _merge_fields(old, row, existing,
+                                                           '%s %s/%s' % (key, bench, cores),
+                                                           conflicts)
+            if merged is not None and merged != existing:
+                moved = dict(merged, **{'from': {m: existing[m] for m in METRICS}})
+                rebaseline.setdefault(key, {}).setdefault(bench, {})[cores] = moved
+    if conflicts:
+        raise BaselineError('the branch and master both changed these fields since the branch '
+                            'point, differently; re-measure them on top of master instead of '
+                            'importing:\n  ' + '\n  '.join(conflicts))
     if not calibrate and not rebaseline:
         return None, notes
     return write_overlay(root, number, calibrate, rebaseline, reason), notes
+
+
+def _flat(row):
+    flat = {f: row[f] for f in ('time', 'memory', 'runs')}
+    for metric, value in row.get('tolerance', {}).items():
+        flat['tolerance.' + metric] = value
+    return flat
+
+
+def _merge_fields(old, branch, master, where, conflicts):
+    """Three-way merge of one row, field by field: the branch's value where only the
+    branch changed it, master's everywhere else. Copying the branch's whole row would
+    silently revert whatever master changed in the same row since the branch point -- a
+    tolerance master added for time, say, under a branch that only re-measured memory."""
+    o, b, m = _flat(old), _flat(branch), _flat(master)
+    merged = {}
+    for field in sorted(set(o) | set(b) | set(m)):
+        ov, bv, mv = o.get(field), b.get(field), m.get(field)
+        if bv == ov:
+            value = mv
+        elif mv in (ov, bv):
+            value = bv
+        else:
+            conflicts.append('%s %s: branch %r, master %r (was %r)' % (where, field, bv, mv, ov))
+            continue
+        if value is not None:
+            merged[field] = value
+    if any(c.startswith(where + ' ') for c in conflicts):
+        return None
+    row = {f: merged[f] for f in ('time', 'memory', 'runs')}
+    tolerance = {f.split('.', 1)[1]: v for f, v in merged.items() if f.startswith('tolerance.')}
+    if tolerance:
+        row['tolerance'] = tolerance
+    return row
 
 
 def main(argv=None):

@@ -120,8 +120,8 @@ def main(argv=None):
     # What the gate judged against (this pull request's earlier rows included), and the
     # baseline as it stands without them -- which is what a rebaseline's "from" names,
     # since this run replaces this pull request's earlier rebaseline rather than stacking.
-    judged, _ = perf_baseline.resolve(base, overlays)
-    others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number])
+    judged, _ = perf_baseline.resolve(base, overlays, tolerance)
+    others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
     runs = collect(args.results, set(args.only.split(',')) if args.only else None)
 
     widest = defaultdict(float)   # (benchmark, metric) -> widest tolerance any row has

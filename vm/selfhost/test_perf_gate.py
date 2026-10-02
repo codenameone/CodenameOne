@@ -369,7 +369,20 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(rows_ab, rows_ba)
         combined = rows_ab['linux-x64@b']['quicksort']['all']
         self.assertEqual((combined['time'], combined['runs']), (1.1, 3))
-        self.assertEqual(combined['tolerance'], {'time': 0.3})
+        # Wide enough for 1.0x +/- 30% around the 1.1x median: down to 0.7x is -36%.
+        self.assertEqual(combined['tolerance'], {'time': 0.4})
+
+    def test_combined_calibrations_still_pass_the_runs_they_came_from(self):
+        tol = POLICY['tolerance']
+        a, b = self.calib(12, 1.0), self.calib(15, 2.0)
+        for n, o in (a, b):
+            baselines.validate_overlay(n, o, 'pr/%d.json' % n)
+        rows, _ = baselines.resolve(self.BASE, [a, b], tol)
+        r = rows['linux-x64@b']['quicksort']['all']
+        self.assertEqual(r['time'], 1.5)
+        for ratio in (1.0, 2.0, 1.0 * 0.85, 2.0 * 1.15):
+            self.assertEqual(gate.verdict(ratio, r['time'], r['tolerance']['time']), 'ok', ratio)
+        self.assertNotIn('memory', r.get('tolerance', {}))   # 0.2 and 0.2: the global 15%
 
     def test_a_calibration_of_an_existing_row_is_superseded_not_fatal(self):
         rows, notes = self.resolve([self.calib(12, 9.9, key='linux-x64@a')])
@@ -410,6 +423,35 @@ class OverlayTests(unittest.TestCase):
         for key in data['platforms']:
             self.assertRegex(key, baselines.KEY_RE)
 
+    def test_import_legacy_keeps_what_master_changed_in_the_same_row(self):
+        # master added a time tolerance after the branch point; the branch re-measured RAM.
+        tree = BaselineTree({'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, time=0.4)}}})
+        try:
+            original = dict(POLICY, platforms={'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1)}}})
+            legacy = dict(POLICY, platforms={'linux-x64@a': {'quicksort': {'all': row(1.0, 0.3)}}})
+            baselines.import_legacy(tree.root, 33, legacy, original, 'ram re-measured')
+            r = tree.overlay(33)['rebaseline']['linux-x64@a']['quicksort']['all']
+            self.assertEqual((r['memory'], r['tolerance']), (0.3, {'time': 0.4}))
+            # Both sides changing the SAME field differently is refused, not guessed.
+            clash = dict(POLICY, platforms={'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, time=0.2)}}})
+            with self.assertRaises(baselines.BaselineError) as caught:
+                baselines.import_legacy(tree.root, 34, clash, original, 'x')
+            self.assertIn('tolerance.time', str(caught.exception))
+        finally:
+            tree.close()
+
+    def test_a_broken_policy_is_refused(self):
+        import json
+        for bad in ({'time': '0.15', 'memory': 0.15}, {'time': -0.1, 'memory': 0.15},
+                    {'time': 0, 'memory': 0.15}):
+            tree = BaselineTree()
+            try:
+                (tree.root / 'policy.json').write_text(json.dumps(dict(POLICY, tolerance=bad)))
+                with self.assertRaises(baselines.BaselineError):
+                    baselines.load_policy(tree.root)
+            finally:
+                tree.close()
+
     def test_import_legacy_takes_only_the_branchs_own_edits(self):
         tree = BaselineTree({'linux-x64@a': {'quicksort': {'all': row(1.0, 0.1, memory=0.3)},
                                              'recursion': {'all': row(2.0, 0.1)}}})
@@ -445,14 +487,26 @@ class OverlayTests(unittest.TestCase):
 class CheckTests(unittest.TestCase):
     """perf_baseline.py check --base: what a pull request may change."""
 
-    def check(self, changed, number=31, migrating=False):
-        originals = baselines.changed_files, baselines.base_exists_at
+    def check(self, changed, number=31, migrating=False, merged=(), legacy=False):
+        originals = baselines.changed_files, baselines.exists_at, baselines.legacy_touched
         baselines.changed_files = lambda base_ref, root=None: changed
-        baselines.base_exists_at = lambda ref, root=None: not migrating
+        baselines.exists_at = lambda ref, path, root=None: (
+            not migrating if path == 'base' else path in merged)
+        baselines.legacy_touched = lambda base_ref: legacy
         try:
             return baselines.check(baselines.ROOT, 'base-sha', number)
         finally:
-            baselines.changed_files, baselines.base_exists_at = originals
+            baselines.changed_files, baselines.exists_at, baselines.legacy_touched = originals
+
+    def test_a_merged_overlay_may_be_repaired(self):
+        # Two merged pull requests that rebaselined one row leave master unresolvable;
+        # editing or deleting one of their overlays is the fix, and must pass.
+        self.assertEqual(self.check(['pr/30.json'], merged=('pr/30.json',)), [])
+
+    def test_the_retired_file_is_refused(self):
+        problems = self.check([], legacy=True)
+        self.assertEqual(len(problems), 1)
+        self.assertIn('import-legacy', problems[0])
 
     def test_the_migration_that_creates_base_may(self):
         self.assertEqual(self.check(['base/linux-x64@a.json'], migrating=True), [])

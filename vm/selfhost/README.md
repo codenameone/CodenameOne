@@ -140,8 +140,10 @@ No pull request edits `perf-baseline/base/`. The nightly `fold` job in
 `.github/workflows/perf-baseline.yml` moves merged overlays there. The one-file layout
 this replaced made unrelated branches conflict on every merge; `perf_baseline.py`
 explains how overlays combine and when two of them are a real conflict. A branch still
-carrying edits to the old `perf-baseline.json` converts them with
-`perf_baseline.py import-legacy --pr N --reason "..." <its old perf-baseline.json>`.
+carrying edits to the old `perf-baseline.json` converts them, from a checkout of this
+layout, with `perf_baseline.py import-legacy --pr N --reason "..." --ref origin/<branch>`.
+It reads the branch's copy and the copy at its merge base, so only the branch's own edits
+are imported.
 
 The Port Status page's ParparVM vs JDK 25 table is rendered from these same rows
 (`perf_baseline.py summary`, run by `scripts/website/build.sh`).
