@@ -998,6 +998,7 @@ extern void CN1MacRefreshModifiers(void);
 /// enough to cover a normal first frame on a slow machine.
 static void CN1MacServeFirstFrameBeforeRun(void) {
     extern BOOL cn1MacFirstFramePresented;
+    if (getenv("CN1_DIAG_NO_EARLY_FRAME") != NULL) { return; } /* DIAG A/B switch */
     CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 0.75;
     while (!cn1MacFirstFramePresented) {
         CFTimeInterval left = deadline - CFAbsoluteTimeGetCurrent();

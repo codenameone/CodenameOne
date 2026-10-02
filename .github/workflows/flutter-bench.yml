@@ -136,8 +136,30 @@ jobs:
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -pl dart-runtime,flutter-runtime
 
+      # DIAGNOSTIC BRANCH ONLY: the 09-27 tree, for a same-runner A/B.
+      - name: Check out the old tree (diag)
+        uses: actions/checkout@v4
+        with:
+          ref: 83f09b3263
+          path: old-src
+
+      - name: Build the old framework (diag)
+        run: |
+          ln -sfn /opt/cn1-binaries "$GITHUB_WORKSPACE/cn1-binaries"
+          cd old-src/maven
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2-old" \
+              -pl core,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2-old" \
+              -pl dart-runtime,flutter-runtime
+
       - name: Pack the repository
-        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2
+        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2 m2-old
 
       - name: Upload the repository
         uses: actions/upload-artifact@v4
@@ -340,6 +362,28 @@ jobs:
           grep '^cn1='     "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
           grep '^flutter=' "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
 
+      - name: Check out the old tree (diag)
+        if: ${{ matrix.platform == 'macos' }}
+        uses: actions/checkout@v4
+        with:
+          ref: 83f09b3263
+          path: old-src
+
+      - name: Build the old application (diag)
+        id: buildold
+        if: ${{ matrix.platform == 'macos' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          old-src/scripts/flutter-bench/app/prepare.sh \
+              --work "${RUNNER_TEMP}/fbench-old" \
+              --maven-repo "${GITHUB_WORKSPACE}/m2-old"
+          old-src/scripts/flutter-bench/app/build_apps.sh \
+              --work "${RUNNER_TEMP}/fbench-old" \
+              --platform macos \
+              --maven-repo "${GITHUB_WORKSPACE}/m2-old" | tee "${RUNNER_TEMP}/paths-old.txt"
+          grep '^cn1=' "${RUNNER_TEMP}/paths-old.txt" >> "$GITHUB_OUTPUT"
+
       # Every leg runs the same measure.sh; the legs differ only in what wraps it.
       #
       # Linux runs under Xvfb because both applications are GTK programs that
@@ -362,6 +406,23 @@ jobs:
           $prefix scripts/flutter-bench/app/measure.sh "${{ matrix.platform }}" \
               "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" \
               "${RUNNER_TEMP}/bench-out"
+
+      # DIAGNOSTIC BRANCH ONLY: interleaved A/B on this one runner.
+      - name: A/B cold start (diag)
+        if: ${{ always() && matrix.platform == 'macos' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          CN1_STARTUP_PHASES: "1"
+          BENCH_SETTLE: "3"
+        run: |
+          arms=(--arm "head=codenameone:${{ steps.build.outputs.cn1 }}"
+                --arm "headNoEarly=codenameone:${{ steps.build.outputs.cn1 }}:CN1_DIAG_NO_EARLY_FRAME=1")
+          if [ -n "${{ steps.buildold.outputs.cn1 }}" ]; then
+            arms+=(--arm "old0927=codenameone:${{ steps.buildold.outputs.cn1 }}")
+          fi
+          arms+=(--arm "flutter=flutter:${{ steps.build.outputs.flutter }}")
+          python3 scripts/flutter-bench/diag_ab.py --rounds 12 "${arms[@]}"
 
       # DIAGNOSTIC BRANCH ONLY: Time Profiler traces of both launches.
       - name: Profile launches (diag)
