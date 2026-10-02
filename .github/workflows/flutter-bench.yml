@@ -140,7 +140,7 @@ jobs:
       - name: Check out the old tree (diag)
         uses: actions/checkout@v4
         with:
-          ref: 83f09b3263
+          ref: 83f09b3263d0b0e9a14f8d1453cfdc6cfd94930d
           path: old-src
 
       - name: Build the old framework (diag)
@@ -366,7 +366,7 @@ jobs:
         if: ${{ matrix.platform == 'macos' }}
         uses: actions/checkout@v4
         with:
-          ref: 83f09b3263
+          ref: 83f09b3263d0b0e9a14f8d1453cfdc6cfd94930d
           path: old-src
 
       - name: Build the old application (diag)
