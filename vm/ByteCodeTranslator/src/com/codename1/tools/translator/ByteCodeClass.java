@@ -1849,7 +1849,9 @@ public class ByteCodeClass {
                     // each on the right thread.
                     if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
                         b.append("    [NSApplication sharedApplication];\n");
+                        b.append("    cn1StartupPhase(\"sharedApplication\");\n");
                         b.append("    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];\n");
+                        b.append("    cn1StartupPhase(\"activationPolicy\");\n");
                         b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");

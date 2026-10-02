@@ -17684,6 +17684,49 @@ void cn1StartupPhase(const char* name) {
     fprintf(stderr, "BENCH:PHASE-AT %-28s %8.1f ms\n", name, cn1MillisSinceProcessStart());
     fflush(stderr);
 }
+
+static double cn1DiagStartMs = -1;
+static double cn1DiagNow(void) {
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    double n = now.tv_sec * 1000.0 + now.tv_usec / 1000.0;
+    if (cn1DiagStartMs < 0) {
+        cn1DiagStartMs = n - cn1MillisSinceProcessStart();
+    }
+    return n - cn1DiagStartMs;
+}
+static const char* cn1DiagBase(const char* f) {
+    const char* s = strrchr(f, '/');
+    return s ? s + 1 : f;
+}
+void cn1DiagDispatchSync(dispatch_queue_t q, const char* f, int l, dispatch_block_t b) {
+    if (!cn1StartupPhasesOn() || q != dispatch_get_main_queue()) {
+        (dispatch_sync)(q, b);
+        return;
+    }
+    double t0 = cn1DiagNow();
+    __block double t1 = 0;
+    (dispatch_sync)(q, ^{ t1 = cn1DiagNow(); b(); });
+    double t2 = cn1DiagNow();
+    if (t0 < 4000 && t2 - t0 > 1.0) {
+        fprintf(stderr, "BENCH:SYNC %s:%d at=%.1f wait=%.1f run=%.1f\n", cn1DiagBase(f), l, t0, t1 - t0, t2 - t1);
+    }
+}
+void cn1DiagDispatchAsync(dispatch_queue_t q, const char* f, int l, dispatch_block_t b) {
+    if (!cn1StartupPhasesOn() || q != dispatch_get_main_queue()) {
+        (dispatch_async)(q, b);
+        return;
+    }
+    double t0 = cn1DiagNow();
+    (dispatch_async)(q, ^{
+        double s = cn1DiagNow();
+        b();
+        double e = cn1DiagNow();
+        if (s < 4000 && e - s > 1.0) {
+            fprintf(stderr, "BENCH:ASYNC %s:%d queued=%.1f start=%.1f run=%.1f\n", cn1DiagBase(f), l, t0, s, e - s);
+        }
+    });
+}
 #else
 void cn1StartupPhase(const char* name) { }
 #endif

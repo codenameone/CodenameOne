@@ -260,6 +260,7 @@ static CGFloat cn1MacContentHeightPoints(void) {
                                               styleMask:style
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
+    cn1StartupPhase("bw.windowAlloc");
     ((CN1MacWindow *)_window).cn1AcceptsKey = YES;
     // Remembers where the user left it between launches. One line, and its
     // absence is the kind of thing that makes an app feel unfinished.
@@ -307,9 +308,12 @@ static CGFloat cn1MacContentHeightPoints(void) {
     }
     _window.title = name != nil ? name : @"";
 
+    cn1StartupPhase("bw.observers");
     _renderingView = [[METALView alloc] initWithFrame:frame];
+    cn1StartupPhase("bw.metalView");
     _renderingView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _window.contentView = _renderingView;
+    cn1StartupPhase("bw.contentView");
     // The shared Apple code converts between Codename One's device pixels and
     // AppKit's points through this global. It is initialised to one and set on
     // iOS from the screen scale; without setting it here every peer component
@@ -331,8 +335,10 @@ static CGFloat cn1MacContentHeightPoints(void) {
             && fixedW.doubleValue > 0 && fixedH.doubleValue > 0) {
         [self setFixedContentSize:NSMakeSize(fixedW.doubleValue, fixedH.doubleValue)];
     }
+    cn1StartupPhase("bw.sized");
     [_window center];
     [_window makeKeyAndOrderFront:nil];
+    cn1StartupPhase("bw.orderFront");
     [_window makeFirstResponder:_renderingView];
     // The window is created from the application's own thread rather than in
     // response to a user action, so nothing has asked the window server to put

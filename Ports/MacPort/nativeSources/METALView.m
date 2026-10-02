@@ -405,6 +405,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     if (device == nil) {
         device = MTLCreateSystemDefaultDevice();
         ownsDevice = YES;
+        cn1StartupPhase("mtl.device");
     }
     // Nothing to configure on the layer: it is a plain CALayer and the surface
     // carries the pixel format and the colour space. See makeBackingLayer.

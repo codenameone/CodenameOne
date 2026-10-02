@@ -4695,4 +4695,13 @@ extern struct elementStruct* cn1PopMany(CODENAME_ONE_THREAD_STATE, int count, st
 extern struct clazz class__java_lang_Class;
 extern struct clazz ClazzClazz;
 
+#if defined(__APPLE__)
+/* DIAGNOSTIC BRANCH ONLY: report every main-queue hop during start-up. */
+#include <dispatch/dispatch.h>
+extern void cn1DiagDispatchSync(dispatch_queue_t q, const char* f, int l, dispatch_block_t b);
+extern void cn1DiagDispatchAsync(dispatch_queue_t q, const char* f, int l, dispatch_block_t b);
+#define dispatch_sync(q, ...) cn1DiagDispatchSync((q), __FILE__, __LINE__, __VA_ARGS__)
+#define dispatch_async(q, ...) cn1DiagDispatchAsync((q), __FILE__, __LINE__, __VA_ARGS__)
+#endif
+
 #endif //__CN1GLOBALS__
