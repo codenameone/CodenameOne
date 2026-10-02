@@ -1850,7 +1850,6 @@ public class ByteCodeClass {
                     if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
                         b.append("    [NSApplication sharedApplication];\n");
                         b.append("    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];\n");
-                        b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
                         // OPEN QUESTION, INHERITED AND DELIBERATELY NOT ANSWERED HERE.
@@ -1895,6 +1894,16 @@ public class ByteCodeClass {
                         // still links and keeps the queued build in CN1MacInstallAppDelegate.
                         b.append("    { extern void CN1MacBuildMainWindowBeforeRun(void) __attribute__((weak_import));\n");
                         b.append("      if (CN1MacBuildMainWindowBeforeRun) CN1MacBuildMainWindowBeforeRun(); }\n");
+                        // The menu bar, AFTER the window and its first frame rather than
+                        // before everything. Building it is 17-22ms of main thread on the
+                        // benchmark runner (the first separator item loads the system
+                        // symbol-image catalog), and in front of the window build it delayed
+                        // both the window and the dispatch of the VM boot above by that much.
+                        // A menu bar only has to exist before the user can reach it, which is
+                        // once [NSApp run] starts taking events -- still after this line.
+                        // CN1MacInstallMainMenu is idempotent, so an application that
+                        // published menu commands in the meantime keeps them.
+                        b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    [NSApp run];\n}\n\n");
                     } else {
                         b.append("    ");

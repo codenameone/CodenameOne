@@ -204,7 +204,50 @@ static NSMenuItem *cn1MakeCommandItem(NSString *label, int keyChar, int modifier
 #endif
 }
 
+/// Commands published before the first frame, and whether that hold is over.
+/// Main thread only, like everything that touches the menu.
+static NSArray *cn1PendingStartupRows = nil;
+static BOOL cn1StartupMenuReleased = NO;
+
+static void cn1ApplyMenuCommands(NSArray *rows);
+
 void CN1MacHostSetMenuCommands(NSArray *rows) {
+    // Held until the first frame is on screen. A Form's commands are published
+    // as it is shown, which at launch is while the main thread is still serving
+    // the first frame before [NSApp run] -- and applying them builds the whole
+    // menu bar first (CN1MacInstallMainMenu), 10-20ms of main thread in front of
+    // the frame the user is waiting for on the benchmark runner. Nobody can open
+    // a menu before [NSApp run] takes events, so only the latest set is kept and
+    // CN1MacReleaseStartupMenu applies it once the frame is out.
+    if (!cn1StartupMenuReleased) {
+#ifndef CN1_USE_ARC
+        [cn1PendingStartupRows release];
+        cn1PendingStartupRows = [rows retain];
+#else
+        cn1PendingStartupRows = rows;
+#endif
+        return;
+    }
+    cn1ApplyMenuCommands(rows);
+}
+
+void CN1MacReleaseStartupMenu(void) {
+    if (cn1StartupMenuReleased) {
+        return;
+    }
+    cn1StartupMenuReleased = YES;
+    CN1MacInstallMainMenu();
+    if (cn1PendingStartupRows != nil) {
+        NSArray *rows = cn1PendingStartupRows;
+        cn1PendingStartupRows = nil;
+        cn1ApplyMenuCommands(rows);
+#ifndef CN1_USE_ARC
+        [rows release];
+#endif
+    }
+}
+
+static void cn1ApplyMenuCommands(NSArray *rows) {
 #ifndef CN1_USE_ARC
     [cn1MenuRows release];
     cn1MenuRows = [rows retain];
