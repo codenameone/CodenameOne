@@ -295,15 +295,14 @@ still fail to start.
 
 IMPORTANT: A packaged server has no management code at all unless its build asks
 for it. The generated entry point is the only code that names the endpoints, and
-it names them only when the build sees `@EnableManagement` on a class, or
-`cn1.management.enabled=true` in `application.properties` or a profile's file.
-Without either, the translator leaves the endpoints out of the binary, so there's
+it names them only when the build sees `cn1.management.enabled=true` in
+`application.properties` or a profile's file. Without it, the translator leaves the endpoints out of the binary, so there's
 no `/manage` to find or to misconfigure, whatever profile the server later runs
 under. The development run through `cn1:backend` always builds them in.
 
-[source,java]
+[source,properties]
 ----
-include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/beans/OpsSettings.java[tag=backend-enable-management,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/backend-observability.properties[tag=backend-observability-properties-001,indent=0]
 ----
 
 A server built with them can still turn them off at start-up with
@@ -321,5 +320,4 @@ counter, so `http.server.request.duration` is scraped as
 `http_server_request_duration`.
 
 The management endpoints are served before the application's routes, so a
-catch-all route can't answer them. A running server's managed beans are also
-available to code: inject `Backend` and call its `getManagedBeans()`.
+catch-all route can't answer them.

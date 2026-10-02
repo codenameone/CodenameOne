@@ -22,6 +22,10 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendConnectionRequestTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendRestTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTransferTest;
+import com.codenameone.examples.hellocodenameone.tests.backend.BackendTypedClientTest;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
@@ -525,6 +529,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            // The app's networking APIs against the CI's own backend
+            // (scripts/hellocodenameone/backend), served by the same process that
+            // receives these screenshots: Rest, the generated @RestClient,
+            // ConnectionRequest, MultipartRequest, downloads and gzip.
+            // Assertion-only.
+            new BackendRestTest(),
+            new BackendTypedClientTest(),
+            new BackendConnectionRequestTest(),
+            new BackendTransferTest(),
             // The contact picker's request contract, and the only thing in
             // this suite that references com.codename1.contacts.ContactPicker
             // -- which is what makes the iOS build compile and link its

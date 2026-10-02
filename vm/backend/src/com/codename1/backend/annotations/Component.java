@@ -41,9 +41,6 @@ import java.lang.annotation.Target;
 ///     public long now() { return System.currentTimeMillis(); }
 /// }
 /// ```
-///
-/// [Service] and [Repository] mean the same thing and exist so a class can say
-/// which layer it belongs to, as they do in Spring.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Component {

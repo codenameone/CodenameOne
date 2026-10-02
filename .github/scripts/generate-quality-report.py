@@ -29,6 +29,9 @@ SOURCE_BASES = [
     Path("vm/backend/src"),
     Path("vm/backend/impl/javase"),
     Path("vm/backend/impl/parparvm"),
+    # maven/backend-test, built the same way from vm/backend/test.
+    Path("vm/backend/test/src"),
+    Path("vm/backend/test/javase"),
 ]
 
 DEFAULT_REPORT_TITLE = "✅ Continuous Quality Report"

@@ -67,6 +67,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The test support the test pass generates code against, so the
+             generator's tests can start a generated context and run a test. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-backend-test</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- The backend's JVM database driver, so the bean tests can run the
              generated wiring of a transactional service against a real SQLite. -->
         <dependency>

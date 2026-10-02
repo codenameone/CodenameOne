@@ -41,7 +41,7 @@ import com.codename1.backend.Reactor;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
-import com.codename1.backend.JsonCodec;
+import com.codename1.impl.backend.JsonCodec;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
 import com.codename1.backend.StaticFiles;
@@ -316,7 +316,7 @@ public class SelfTest {
         check("future: a timed get of a completed value", "ready",
                 String.valueOf(ready.get(1, java.util.concurrent.TimeUnit.SECONDS)));
 
-        com.codename1.backend.AsyncTask ran = new com.codename1.backend.AsyncTask(
+        com.codename1.impl.backend.AsyncTask ran = new com.codename1.impl.backend.AsyncTask(
                 "selftest.ran", false) {
             protected Object call() {
                 return com.codename1.backend.AsyncResult.of("ran");
@@ -326,7 +326,7 @@ public class SelfTest {
         check("future: a task's result", "ran",
                 String.valueOf(ran.get(30, java.util.concurrent.TimeUnit.SECONDS)));
 
-        com.codename1.backend.AsyncTask broken = new com.codename1.backend.AsyncTask(
+        com.codename1.impl.backend.AsyncTask broken = new com.codename1.impl.backend.AsyncTask(
                 "selftest.broken", false) {
             protected Object call() {
                 throw new IllegalStateException("broken");
@@ -341,7 +341,7 @@ public class SelfTest {
         }
         check("future: a failure is the ExecutionException's cause", "broken", cause);
 
-        com.codename1.backend.AsyncTask cancelled = new com.codename1.backend.AsyncTask(
+        com.codename1.impl.backend.AsyncTask cancelled = new com.codename1.impl.backend.AsyncTask(
                 "selftest.cancelled", false) {
             protected Object call() {
                 return com.codename1.backend.AsyncResult.of("never");
@@ -356,7 +356,7 @@ public class SelfTest {
         }
         check("future: get of a cancelled task", "cancelled", thrown);
 
-        com.codename1.backend.AsyncTask pending = new com.codename1.backend.AsyncTask(
+        com.codename1.impl.backend.AsyncTask pending = new com.codename1.impl.backend.AsyncTask(
                 "selftest.pending", false) {
             protected Object call() {
                 return com.codename1.backend.AsyncResult.of("never");

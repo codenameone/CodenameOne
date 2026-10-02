@@ -29,27 +29,23 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.TreeSet;
 
-/// The settings annotations -- `@ServerConfig`, `@SessionConfig`,
-/// `@DataSourceConfig`, `@StaticFilesConfig`, `@EnableManagement`,
-/// `@EnableMcpServer` and the exporter settings on `@OpenTelemetry` -- turned
-/// into what the generated entry point passes the runtime: key and value pairs
-/// for the bottom layer of its configuration, and whether to link the
-/// management and MCP endpoints at all.
+/// What the generated entry point passes the runtime about its settings: the
+/// module's `application.properties`, compiled in as the bottom layer of its
+/// configuration, the exporter settings on `@OpenTelemetry`, and whether to link
+/// the management and MCP endpoints at all.
 ///
-/// Every attribute is one `cn1.*` key, so an annotation is a compiled-in
-/// `application.properties` line and nothing more: the files and the environment
-/// still override it, and a key the runtime would refuse is refused here first,
-/// where the message can name the class.
+/// Compiling the file in is what lets a native binary run with nothing beside
+/// it -- a container built FROM SCRATCH has no file next to the binary -- while a
+/// file or the environment present at run time still overrides every key, since
+/// the compiled layer sits under both. Only the base file is compiled: a profile
+/// file describes a different deployment, and baking `application-dev.properties`
+/// into a production binary would make the dev settings its defaults.
 final class BackendSettings {
-    private static final String PKG = "Lcom/codename1/backend/annotations/";
-    static final String SERVER = PKG + "ServerConfig;";
-    static final String SESSION = PKG + "SessionConfig;";
-    static final String DATA_SOURCE = PKG + "DataSourceConfig;";
-    static final String STATIC_FILES = PKG + "StaticFilesConfig;";
-    static final String ENABLE_MANAGEMENT = PKG + "EnableManagement;";
-    static final String ENABLE_MCP = PKG + "EnableMcpServer;";
-
+    /// The owner recorded for a key the properties file set.
+    private static final String FILE = "application.properties";
     /// Key and value pairs, in the order they were found.
     final Map<String, String> values = new LinkedHashMap<String, String>();
     /// Which class set each key, for a conflict's message.
@@ -65,10 +61,18 @@ final class BackendSettings {
         this.ctx = ctx;
     }
 
-    /// Reads every settings annotation in the module, reporting conflicts and
-    /// values the runtime would refuse through `ctx`.
+    /// Reads the module's `application.properties` and the settings on
+    /// `@OpenTelemetry`, reporting conflicts through `ctx`.
     static BackendSettings resolve(ProcessorContext ctx) {
         BackendSettings out = new BackendSettings(ctx);
+        Properties file = RestControllerAnnotationProcessor.baseApplicationProperties(ctx);
+        if (file != null) {
+            // Sorted, so the generated entry point is the same on every build.
+            for (String key : new TreeSet<String>(file.stringPropertyNames())) {
+                out.values.put(key, file.getProperty(key));
+                out.owners.put(key, FILE);
+            }
+        }
         for (AnnotatedClass cls : ctx.getClassIndex().values()) {
             // The orphan rule every other annotation gets: a class whose source
             // was deleted left its .class behind and must not keep a setting.
@@ -80,8 +84,13 @@ final class BackendSettings {
         }
         out.management |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
                 "cn1.management.enabled");
-        out.mcp |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx,
-                "cn1.mcp.enabled");
+        // Moving the endpoint or naming its origins is asking for it; the
+        // endpoint's own default -- on when the server has a tool to serve --
+        // still decides whether it answers.
+        out.mcp |= RestControllerAnnotationProcessor.applicationPropertyTrue(ctx, "cn1.mcp.enabled")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx, "cn1.mcp.path")
+                || RestControllerAnnotationProcessor.applicationPropertyKnown(ctx,
+                        "cn1.mcp.allowedOrigins");
         return out;
     }
 
@@ -96,67 +105,7 @@ final class BackendSettings {
     }
 
     private void read(AnnotatedClass cls) {
-        AnnotationValues a = cls.getClassAnnotation(SERVER);
-        if (a != null) {
-            port(cls, a);
-            positive(cls, a, "workers", "cn1.server.workers");
-            positive(cls, a, "backlog", "cn1.server.backlog");
-            nonNegative(cls, a, "shutdownTimeoutMillis", "cn1.server.shutdownTimeoutMillis");
-        }
-        a = cls.getClassAnnotation(SESSION);
-        if (a != null) {
-            oneOf(cls, a, "store", "cn1.session.store", "memory", "db");
-            nonNegative(cls, a, "timeoutSeconds", "cn1.session.timeout");
-            string(cls, a, "cookie", "cn1.session.cookie");
-            oneOf(cls, a, "sameSite", "cn1.session.same-site", "Lax", "Strict", "None");
-            oneOf(cls, a, "secure", "cn1.session.secure", "auto", "true", "false");
-            string(cls, a, "namespace", "cn1.session.namespace");
-        }
-        a = cls.getClassAnnotation(DATA_SOURCE);
-        if (a != null) {
-            string(cls, a, "url", "cn1.datasource.url");
-            positive(cls, a, "poolSize", "cn1.datasource.pool.size");
-            nonNegative(cls, a, "borrowTimeoutMillis", "cn1.datasource.pool.borrowTimeoutMillis");
-            nonNegative(cls, a, "busyTimeoutMillis", "cn1.datasource.busyTimeoutMillis");
-        }
-        a = cls.getClassAnnotation(STATIC_FILES);
-        if (a != null) {
-            string(cls, a, "root", "cn1.static.root");
-            path(cls, a, "prefix", "cn1.static.prefix");
-            string(cls, a, "index", "cn1.static.index");
-            string(cls, a, "cacheControl", "cn1.static.cacheControl");
-        }
-        a = cls.getClassAnnotation(ENABLE_MANAGEMENT);
-        if (a != null) {
-            management = true;
-            set(cls, "cn1.management.enabled", "true");
-            path(cls, a, "path", "cn1.management.path");
-        }
-        a = cls.getClassAnnotation(ENABLE_MCP);
-        if (a != null) {
-            // Linked, not forced on: the endpoint's own default -- on when the
-            // server has a tool to serve -- still decides, as without the
-            // annotation.
-            mcp = true;
-            path(cls, a, "path", "cn1.mcp.path");
-            List<String> origins = strings(a.get("allowedOrigins"));
-            if (!origins.isEmpty()) {
-                StringBuilder joined = new StringBuilder();
-                for (String o : origins) {
-                    if (o.indexOf(',') >= 0) {
-                        ctx.error(cls, "@EnableMcpServer allowedOrigins names \"" + o
-                                + "\"; an origin has no comma in it. List each one separately.");
-                        return;
-                    }
-                    if (joined.length() > 0) {
-                        joined.append(',');
-                    }
-                    joined.append(o);
-                }
-                set(cls, "cn1.mcp.allowedOrigins", joined.toString());
-            }
-        }
-        a = cls.getClassAnnotation(RestControllerAnnotationProcessor.OPEN_TELEMETRY);
+        AnnotationValues a = cls.getClassAnnotation(RestControllerAnnotationProcessor.OPEN_TELEMETRY);
         if (a != null) {
             string(cls, a, "endpoint", "cn1.otel.endpoint");
             oneOf(cls, a, "protocol", "cn1.otel.protocol", "http/protobuf", "http/json");
@@ -170,19 +119,6 @@ final class BackendSettings {
         if (v.length() > 0) {
             set(cls, key, v);
         }
-    }
-
-    private void path(AnnotatedClass cls, AnnotationValues a, String attribute, String key) {
-        String v = a.getStringOrDefault(attribute, "").trim();
-        if (v.length() == 0) {
-            return;
-        }
-        if (!v.startsWith("/")) {
-            ctx.error(cls, "@" + simpleName(a) + " " + attribute + " is \"" + v
-                    + "\"; a path starts with /.");
-            return;
-        }
-        set(cls, key, v);
     }
 
     private void oneOf(AnnotatedClass cls, AnnotationValues a, String attribute, String key,
@@ -205,47 +141,14 @@ final class BackendSettings {
                 + list + ".");
     }
 
-    private void port(AnnotatedClass cls, AnnotationValues a) {
-        int v = a.getIntOrDefault("port", -1);
-        if (v == -1) {
-            return;
-        }
-        if (v < 0 || v > 65535) {
-            ctx.error(cls, "@ServerConfig port is " + v + "; a port is 0 to 65535.");
-            return;
-        }
-        set(cls, "cn1.server.port", String.valueOf(v));
-    }
-
-    private void positive(AnnotatedClass cls, AnnotationValues a, String attribute, String key) {
-        int v = a.getIntOrDefault(attribute, -1);
-        if (v == -1) {
-            return;
-        }
-        if (v < 1) {
-            ctx.error(cls, "@" + simpleName(a) + " " + attribute + " is " + v
-                    + "; it must be at least 1.");
-            return;
-        }
-        set(cls, key, String.valueOf(v));
-    }
-
-    private void nonNegative(AnnotatedClass cls, AnnotationValues a, String attribute, String key) {
-        int v = a.getIntOrDefault(attribute, -1);
-        if (v == -1) {
-            return;
-        }
-        if (v < 0) {
-            ctx.error(cls, "@" + simpleName(a) + " " + attribute + " is " + v
-                    + "; it can't be negative.");
-            return;
-        }
-        set(cls, key, String.valueOf(v));
-    }
-
     /// One key, from one class. Two classes giving the same key different values
-    /// is refused rather than resolved by scan order, which nobody can see.
+    /// is refused rather than resolved by scan order, which nobody can see. A key
+    /// `application.properties` already sets keeps the file's value: the file
+    /// overrides an annotation at run time too, so the build agrees with it.
     private void set(AnnotatedClass cls, String key, String value) {
+        if (FILE.equals(owners.get(key))) {
+            return;
+        }
         String existing = values.get(key);
         if (existing != null && !existing.equals(value)) {
             ctx.error(cls, key + " is set to \"" + value + "\" here and to \"" + existing
@@ -260,17 +163,5 @@ final class BackendSettings {
         String d = a.getDescriptor();
         int slash = d.lastIndexOf('/');
         return d.substring(slash + 1, d.length() - 1);
-    }
-
-    private static List<String> strings(Object value) {
-        List<String> out = new ArrayList<String>();
-        if (value instanceof List) {
-            for (Object o : (List<?>) value) {
-                if (o instanceof String && ((String) o).trim().length() > 0) {
-                    out.add(((String) o).trim());
-                }
-            }
-        }
-        return out;
     }
 }

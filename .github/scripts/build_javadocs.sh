@@ -155,6 +155,13 @@ rm -rf "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc" "$CN1_DIR/backend-javado
 mkdir -p "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc"
 cp -r "$BACKEND_DIR/src/." "$BACKEND_STAGE/"
 cp -r "$BACKEND_DIR/impl/parparvm/." "$BACKEND_STAGE/"
+# The test library, codenameone-backend-test: its public package is the API a
+# backend's tests are written against, so it is documented here. Its translation
+# stubs stand in for the JUnit extension, and the JUnit subset it compiles against
+# is on the source path only, to resolve @ExtendWith -- JUnit is not ours to
+# document.
+cp -r "$BACKEND_DIR/test/src/." "$BACKEND_STAGE/"
+cp -r "$BACKEND_DIR/test/parparvm/." "$BACKEND_STAGE/"
 while IFS= read -r shared; do
   rel="${shared#"$CN1_DIR/src/"}"
   mkdir -p "$BACKEND_STAGE/$(dirname "$rel")"
@@ -201,7 +208,7 @@ python3 "$ROOT_DIR/scripts/check-backend-jdk-surface.py"
   --add-script "$ROOT_DIR/maven/javadoc-resources/highlight.min.js" \
   --add-script "$ROOT_DIR/maven/javadoc-resources/javadoc-highlight-init.js" \
   --release 8 \
-  -sourcepath "$BACKEND_STAGE:$ROOT_DIR/Ports/CLDC11/src:$ROOT_DIR/vm/JavaAPI/src" \
+  -sourcepath "$BACKEND_STAGE:$ROOT_DIR/Ports/CLDC11/src:$ROOT_DIR/vm/JavaAPI/src:$BACKEND_DIR/test/junit-shim" \
   -Xdoclint:all,-missing \
   -Xmaxerrs 10000 \
   -Xmaxwarns 10000 \
@@ -220,8 +227,17 @@ if [ -e "$CN1_DIR/dist/backend-javadoc/com/codename1/impl" ]; then
   echo "Backend JavaDoc generated com.codename1.impl output; the internal package must stay excluded." >&2
   exit 1
 fi
+"$ROOT_DIR/scripts/check-backend-javadoc-internals.sh" "$CN1_DIR/dist/backend-javadoc" html
 # The shared classes are the point of staging the core sources at all; a run
 # that lost them would publish a backend ORM with no Session to call.
+if [ ! -f "$CN1_DIR/dist/backend-javadoc/com/codename1/backend/test/BackendTest.html" ]; then
+  echo "Backend JavaDoc is missing the test library, com.codename1.backend.test; aborting." >&2
+  exit 1
+fi
+if [ -e "$CN1_DIR/dist/backend-javadoc/org/junit" ]; then
+  echo "Backend JavaDoc documented the JUnit subset; it is on the source path only." >&2
+  exit 1
+fi
 if [ ! -f "$CN1_DIR/dist/backend-javadoc/com/codename1/orm/session/Session.html" ]; then
   echo "Backend JavaDoc is missing the shared com.codename1.orm.session classes; aborting." >&2
   exit 1

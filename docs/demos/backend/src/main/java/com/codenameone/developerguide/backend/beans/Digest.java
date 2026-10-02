@@ -23,12 +23,12 @@
 package com.codenameone.developerguide.backend.beans;
 
 import com.codename1.backend.Tasks;
+import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
-import com.codename1.backend.annotations.Service;
 import com.codename1.backend.annotations.ThreadKind;
 
 // tag::backend-scheduled-config[]
-@Service
+@Component
 public class Digest {
     @Scheduled(cron = "${digest.cron:0 0 7 * * MON-FRI}", zone = "America/New_York")
     public void weekdayMorning() {

@@ -127,6 +127,26 @@ class ConfigTest {
     }
 
     @Test
+    @DisplayName("a test's own settings win over the process, and only those")
+    void testSettingsWinOverTheProcess() throws Exception {
+        // What @BackendTest builds: a shell that exports PORT or DATABASE_URL
+        // must not move a test off the free port or the in-memory database it
+        // asked for.
+        System.setProperty(Config.SERVER_PORT, "9999");
+        System.setProperty(Config.DATASOURCE_URL, "postgres://prod/db");
+        Properties mine = new Properties();
+        mine.setProperty(Config.SERVER_PORT, "0");
+        Config config = Config.overriding(mine, "test")
+                .withCompiledDefaults(new String[] {"cn1.test.value", "compiled"});
+        assertEquals(0, config.getInt(Config.SERVER_PORT, 8080));
+        // A key the test does not name falls through to the usual layers.
+        assertEquals("postgres://prod/db", config.get(Config.DATASOURCE_URL));
+        assertEquals("compiled", config.get("cn1.test.value"));
+        assertTrue(config.keys().contains(Config.SERVER_PORT), String.valueOf(config.keys()));
+        assertTrue(config.isDevelopmentProfile());
+    }
+
+    @Test
     @DisplayName("no files at all is a configuration, not a failure")
     void missingFilesAreNotAnError(@TempDir File dir) throws Exception {
         // The normal shape of a FROM scratch container: there is nothing next to

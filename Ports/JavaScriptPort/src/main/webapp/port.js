@@ -5738,7 +5738,7 @@ function resolveBaseTestFromRunnable(runnable) {
 // The JS port runs in a Web Worker, which has no DOM but does have WebSocket.
 // Every screenshot funnels through emitCn1ssChunks(); rather than chunk the
 // PNG as base64 over the console (rate-limited, log-scraped on the host), we
-// ship it straight to Cn1ssScreenshotServer over a browser WebSocket -- the
+// ship it straight to the cn1ss test server over a browser WebSocket -- the
 // same single pipeline the native ports use via the core WebSocket. The
 // browser handles RFC6455 framing, so we just send a META text frame followed
 // by the binary PNG, matching what the server parses. The server replies with
@@ -5824,7 +5824,7 @@ function cn1ssWsSendNow(test, bytes) {
     return false;
   }
   try {
-    // META is a JSON object (Cn1ssScreenshotServer.parseMeta expects JSON,
+    // META is a JSON object (the server's Cn1ssEndpoint parses it as JSON,
     // matching the native ports' Cn1ssWebSocketSink). The hash is omitted --
     // the server computes its own for dedup and only flags a mismatch when an
     // expected hash is supplied; png_bytes lets it catch a truncated transfer.
@@ -5867,7 +5867,7 @@ function cn1ssWsSend(base64, test) {
 }
 
 // Single screenshot transport for the JS port: ship the captured PNG to the
-// host-side Cn1ssScreenshotServer over the worker WebSocket. The function is
+// host-side cn1ss test server over the worker WebSocket. The function is
 // still named emitCn1ssChunks (and still takes a base64 PNG) because the DOM /
 // host-canvas capture paths -- emitCurrentFormScreenshotDom, emitChannelFastJs
 // -- feed it a base64 data-URL payload; we decode and send it as one binary

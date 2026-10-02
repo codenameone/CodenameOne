@@ -361,26 +361,15 @@ class CleanTargetLinuxIntegrationTest {
             elf = buildHelloCodenameOneElf();
         }
 
-        // Compile + start the shared cn1ss WebSocket screenshot server.
+        // Start the CI test server: screenshots in over the websocket, REST out.
         List<CompilerHelper.CompilerConfig> configs = new ArrayList<>();
         for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
             configs.addAll(CompilerHelper.getAvailableCompilers(v));
         }
         CompilerHelper.CompilerConfig jdk = configs.get(0);
-        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
-                .normalize().toAbsolutePath();
-        Path serverClasses = Files.createTempDirectory("cn1ss-server");
-        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
-                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile:\n"
-                + CompilerHelper.getLastErrorLog());
-
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-linux-out");
-        String javaBin = jdk.jdkHome.resolve("bin").resolve("java").toString();
-        Process server = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
-                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString())
-                .redirectErrorStream(true).start();
+        Process server = Cn1ssTestServer.processBuilder(jdk.jdkHome, port, outDir).start();
         Process app = null;
         try {
             final CountDownLatch ready = new CountDownLatch(1);
@@ -390,14 +379,14 @@ class CleanTargetLinuxIntegrationTest {
                     String line;
                     while ((line = r.readLine()) != null) {
                         synchronized (serverLog) { serverLog.append(line).append('\n'); }
-                        if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                        if (line.contains(Cn1ssTestServer.READY)) { ready.countDown(); }
                     }
                 } catch (IOException ignore) {
                 }
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(30, TimeUnit.SECONDS), "cn1ss server should start listening");
+            assertTrue(ready.await(900, TimeUnit.SECONDS), "cn1ss server should start listening");
 
             ProcessBuilder appPb = new ProcessBuilder(elf.toAbsolutePath().toString());
             appPb.directory(elf.getParent().toFile());

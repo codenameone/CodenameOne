@@ -387,7 +387,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -DbackendAnalysis \
-            -pl android,ios,codenameone-maven-plugin,backend,backend-parparvm -am verify
+            -pl android,ios,codenameone-maven-plugin,backend,backend-test,backend-parparvm -am verify
       - name: Type-check the SQLCipher-backed database package
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -602,7 +602,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -621,7 +621,8 @@ jobs:
             "ios:maven/ios/target" \
             "bytecode-translator:vm/ByteCodeTranslator/target" \
             "maven-plugin:maven/codenameone-maven-plugin/target" \
-            "backend:maven/backend/target"; do
+            "backend:maven/backend/target" \
+            "backend-test:maven/backend-test/target"; do
             label="${entry%%:*}"
             dir="${entry#*:}"
             for filename in spotbugsXml.xml spotbugs.xml; do
@@ -639,6 +640,12 @@ jobs:
           fi
           if [ -f maven/backend/target/pmd.xml ]; then
             cp maven/backend/target/pmd.xml quality-artifacts/static-analysis/pmd-backend.xml
+          fi
+          if [ -f maven/backend-test/target/pmd.xml ]; then
+            cp maven/backend-test/target/pmd.xml quality-artifacts/static-analysis/pmd-backend-test.xml
+          fi
+          if [ -f maven/backend-test/target/checkstyle-result.xml ]; then
+            cp maven/backend-test/target/checkstyle-result.xml quality-artifacts/static-analysis/checkstyle-backend-test.xml
           fi
           if [ -f maven/backend-parparvm/target/pmd.xml ]; then
             cp maven/backend-parparvm/target/pmd.xml quality-artifacts/static-analysis/pmd-backend-parparvm.xml
@@ -741,16 +748,16 @@ jobs:
       - name: Generate quality report summary
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-parparvm/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools:backend
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools:backend:backend-test
           # PMD and Checkstyle run on the core and on the backend runtime, and each
           # must produce its report: without one, the forbidden-rule gate below it
           # has nothing to read and passes.
-          QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend:backend-parparvm
-          QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend
+          QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend:backend-test:backend-parparvm
+          QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend:backend-test
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}

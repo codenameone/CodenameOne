@@ -1265,7 +1265,7 @@ class CleanTargetIntegrationTest {
     /**
      * Full native-Windows screenshot suite over the cn1ss WebSocket: builds the
      * hellocodenameone exe (the same one scripts/windows/run-hello.bat runs),
-     * starts a Cn1ssScreenshotServer on 8765 (the port the device runner defaults
+     * starts the CI test server on 8765 (the port the device runner defaults
      * to), launches the exe, and waits for the CN1SS:SUITE:FINISHED marker on its
      * stdout before tearing the process down. Asserts the suite finished and that
      * a healthy number of PNGs landed. This is the CI counterpart of run-hello.bat.
@@ -1303,27 +1303,15 @@ class CleanTargetIntegrationTest {
                     + " (" + Files.size(performanceBinary) + " bytes)");
         }
 
-        // Compile the shared cn1ss screenshot server with an available JDK.
+        // Start the CI test server with an available JDK: screenshots in, REST out.
         java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
         for (String v : new String[] { "17", "21", "25", "11", "1.8" }) {
             configs.addAll(CompilerHelper.getAvailableCompilers(v));
         }
         CompilerHelper.CompilerConfig jdk = configs.get(0);
-        Path serverSrc = Paths.get("..", "..", "scripts", "common", "java", "Cn1ssScreenshotServer.java")
-                .normalize().toAbsolutePath();
-        Path serverClasses = Files.createTempDirectory("cn1ss-server");
-        assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
-                "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
-
-        // The device runner defaults to ws://127.0.0.1:8765 (Cn1ssDeviceRunnerHelper).
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-hello-out");
-        String javaBin = jdk.jdkHome.resolve("bin").resolve(CompilerHelper.executableName("java")).toString();
-        ProcessBuilder serverPb = new ProcessBuilder(javaBin, "-cp", serverClasses.toString(),
-                "Cn1ssScreenshotServer", "--port", String.valueOf(port), "--out", outDir.toString());
-        serverPb.redirectErrorStream(true);
-        Process server = serverPb.start();
+        Process server = Cn1ssTestServer.processBuilder(jdk.jdkHome, port, outDir).start();
         Process app = null;
         try {
             final java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(1);
@@ -1335,7 +1323,7 @@ class CleanTargetIntegrationTest {
                         String line;
                         while ((line = r.readLine()) != null) {
                             synchronized (serverLog) { serverLog.append(line).append('\n'); }
-                            if (line.contains("CN1SS_SERVER_PORT")) { ready.countDown(); }
+                            if (line.contains(Cn1ssTestServer.READY)) { ready.countDown(); }
                         }
                     } catch (IOException ignore) {
                     }
@@ -1343,7 +1331,7 @@ class CleanTargetIntegrationTest {
             });
             sreader.setDaemon(true);
             sreader.start();
-            assertTrue(ready.await(30, java.util.concurrent.TimeUnit.SECONDS),
+            assertTrue(ready.await(900, java.util.concurrent.TimeUnit.SECONDS),
                     "cn1ss server should start listening");
 
             // Launch the suite exe and watch its stdout for the end marker. The

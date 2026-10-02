@@ -23,26 +23,50 @@
 package java.lang;
 
 public class AssertionError extends Error {
+    // Every constructor used to have an empty body, so the message -- the one
+    // thing an assertion failure says -- was dropped on every translated target,
+    // and a failing assert reported only its class. The JDK's rules: an Object
+    // message is its String value, and a Throwable one is also the cause.
     public AssertionError() {
         super();
     }
+
     public AssertionError(String detailMessage) {
+        super(detailMessage);
     }
-    
+
     public AssertionError(Object detailMessage) {
+        super(String.valueOf(detailMessage));
+        if (detailMessage instanceof Throwable) {
+            initCause((Throwable) detailMessage);
+        }
     }
 
-    public AssertionError(boolean detailMessage) {}
+    public AssertionError(boolean detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
 
-    public AssertionError(char detailMessage) {}
+    public AssertionError(char detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
 
-    public AssertionError(int detailMessage) {}
-    
-    public AssertionError(long detailMessage) {}
-    
-    public AssertionError(float detailMessage) {}
-    
-    public AssertionError(double detailMessage) {}
-    
-    public AssertionError(String message, Throwable cause) {}
+    public AssertionError(int detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
+
+    public AssertionError(long detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
+
+    public AssertionError(float detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
+
+    public AssertionError(double detailMessage) {
+        super(String.valueOf(detailMessage));
+    }
+
+    public AssertionError(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

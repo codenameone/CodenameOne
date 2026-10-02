@@ -273,7 +273,7 @@ build_javadocs_for_site() {
     --url-root /backend/javadoc/ \
     --counterpart-root /javadoc/ \
     --shared-sources "${REPO_ROOT}/Ports/CLDC11/src" \
-    -sourcepath "${backend_sources}:${REPO_ROOT}/Ports/CLDC11/src" \
+    -sourcepath "${backend_sources}:${REPO_ROOT}/Ports/CLDC11/src:${REPO_ROOT}/vm/backend/test/junit-shim" \
     -quiet \
     -protected \
     "@${backend_argfile}"
@@ -286,6 +286,7 @@ build_javadocs_for_site() {
     echo "Hugo backend API generation emitted com.codename1.impl; the internal package must stay excluded." >&2
     exit 1
   fi
+  "${REPO_ROOT}/scripts/check-backend-javadoc-internals.sh" "${backend_content_dir}" md
   # Every page of this reference must say it is the backend's. A page that came
   # out labelled as the client API is the confusion this split exists to stop,
   # and it would look entirely normal on the site.

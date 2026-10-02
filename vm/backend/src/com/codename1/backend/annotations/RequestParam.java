@@ -27,7 +27,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Binds a query parameter to this parameter.
+/// Binds a request parameter to this parameter: the query string's value, or,
+/// when the query has none, a field of the form the body carries --
+/// `application/x-www-form-urlencoded`, or a `multipart/form-data` part that is
+/// not a file. That is what a servlet container and Spring read, and what an HTML
+/// form posts. A file part is bound with [RequestPart].
 ///
 /// A missing value binds to the default below, or to null when the parameter is
 /// not required. It is never a server error unless `required` says so.

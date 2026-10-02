@@ -239,6 +239,19 @@ jobs:
           test -f "$CN1_CROSS_EXE_OUT"
           ls -l "$CN1_CROSS_EXE_OUT"
 
+      # The CI test server (scripts/hellocodenameone/backend) the suite streams its
+      # screenshots to and drives its networking tests against, as a runnable copy
+      # the Windows job runs with plain java: that job has a JDK and no Maven
+      # repository with the backend in it. Built here, where the plugin and the
+      # backend runtime are a Maven install away.
+      - name: Build the test server
+        env:
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          bash scripts/ci/retry.sh scripts/hellocodenameone/backend/server.sh dist "$GITHUB_WORKSPACE/artifacts/cn1ss-server"
+          test -f "$GITHUB_WORKSPACE/artifacts/cn1ss-server/classes/META-INF/cn1-backend-main"
+
       - name: Upload cross-built suite exe
         uses: actions/upload-artifact@v4
         with:
@@ -247,6 +260,7 @@ jobs:
           path: |
             artifacts/WinHelloMain.exe
             artifacts/WinHelloMain.pdb
+            artifacts/cn1ss-server/**
           if-no-files-found: error
           retention-days: 1
 
@@ -260,8 +274,9 @@ jobs:
         uses: actions/checkout@v4
 
       # Only a JDK is needed here: with CN1_PREBUILT_EXE set the capture test
-      # neither translates nor builds -- it just compiles the Java cn1ss server,
-      # launches the prebuilt exe and collects the PNGs it streams. No MSVC /
+      # neither translates nor builds -- it runs the test server the cross-build
+      # job built (CN1SS_SERVER_DIST), launches the prebuilt exe and collects the
+      # PNGs it streams. No MSVC /
       # Ninja / clang. windows-latest ships the WebView2 Evergreen runtime the
       # BrowserComponent peer loads at activation.
       - name: Set up JDK 17
@@ -292,6 +307,7 @@ jobs:
         shell: pwsh
         env:
           CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
           CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw

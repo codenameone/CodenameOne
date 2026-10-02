@@ -70,9 +70,9 @@ flowchart TD
 
 The metadata identifies the capture. The binary message carries the image. An acknowledgment tells the runner when it can proceed. That exercises text and binary messages, connection lifetime, and the application-level ordering we actually depend on.
 
-The current receiver is [Cn1ssScreenshotServer in the backend demo tree](https://github.com/codenameone/CodenameOne/blob/master/vm/backend/demo/cn1ss/com/demo/Cn1ssScreenshotServer.java). [The runner helper](https://github.com/codenameone/CodenameOne/blob/master/scripts/lib/cn1ss.sh) selects the transport implementation. We retain the earlier standalone server for the native Windows screenshot path, which doesn't use this backend arm.
+The current receiver is [Cn1ssEndpoint in the sample application's backend](https://github.com/codenameone/CodenameOne/blob/master/scripts/hellocodenameone/backend/src/main/java/com/codenameone/examples/hellocodenameone/backend/Cn1ssEndpoint.java). The same backend serves the REST endpoints the app's networking tests call, and [the runner helper](https://github.com/codenameone/CodenameOne/blob/master/scripts/lib/cn1ss.sh) starts it for every screenshot leg, including the native Windows and Linux ones.
 
-That scope matters. We are using the backend in our primary screenshot infrastructure; we haven't replaced every host-side test tool. The benefit is still direct: fixes to the public WebSocket implementation are exercised by a workload producing artifacts we inspect.
+The benefit is direct: fixes to the public WebSocket implementation are exercised by a workload producing artifacts we inspect.
 
 ## A connection holds resources longer than a request
 

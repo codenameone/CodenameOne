@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /// Simple version of filter input stream
+@com.codename1.impl.SharedWithBackend
 public class FilterInputStream extends InputStream {
     protected InputStream in;
 

@@ -80,6 +80,14 @@ public final class HttpServer {
         private String target;
         private String version;
         private String body;
+        /// A body whose Content-Type is not text, as it arrived (after any
+        /// Content-Encoding); null for a text body, which [#body] holds. See
+        /// [#getBodyBytes].
+        private byte[] bodyBytes;
+        /// [#getBodyBytes] of a text body, encoded once on first ask.
+        private byte[] encodedBody;
+        /// The parts of a multipart body, split on first ask; see [#getParts].
+        private List parts;
         /// The connection this request arrived on; null for HTTP/2, see respond.
         private Conn conn;
         /// The bytes the header block was read from.
@@ -126,7 +134,7 @@ public final class HttpServer {
         /// This request's session once looked up; see [#getSession(boolean)].
         private HttpSession session;
         private boolean sessionResolved;
-        /// The request's `@RequestScope` beans, by the slot the build gave each.
+        /// The request's request-scoped beans, by the slot the build gave each.
         private Object[] scopedBeans;
 
         Request(String method, String target, String version, byte[] raw, int[] slices,
@@ -554,6 +562,9 @@ public final class HttpServer {
             this.raw = null;
             this.slices = null;
             this.body = null;
+            this.bodyBytes = null;
+            this.encodedBody = null;
+            this.parts = null;
             this.headers = null;
             this.session = null;
             this.sessionResolved = false;
@@ -572,7 +583,7 @@ public final class HttpServer {
         /// The session this request belongs to: the one its cookie names, or, with
         /// `create` set and no valid cookie, a new one the response will
         /// send a cookie for. Null when there is none and `create` is false.
-        /// See [Sessions] for the cookie and where sessions are kept.
+        /// See [HttpSession] for the cookie and where sessions are kept.
         public HttpSession getSession(boolean create) {
             if (sessionResolved && session != null && !session.isValid()) {
                 // Invalidated earlier in this request: it is not the session any
@@ -631,9 +642,9 @@ public final class HttpServer {
             return endedSessions;
         }
 
-        /// This request's `@RequestScope` beans, grown to hold at least
+        /// This request's request-scoped beans, grown to hold at least
         /// `count`. Called by generated code.
-        public Object[] scopedBeans(int count) {
+        Object[] scopedBeans(int count) {
             if (scopedBeans == null || scopedBeans.length < count) {
                 Object[] grown = new Object[count];
                 if (scopedBeans != null) {
@@ -658,6 +669,14 @@ public final class HttpServer {
             this.body = value;
         }
 
+        /// The body as [#bodyContent] decided it: text, or bytes, never both.
+        void setBody(String text, byte[] binary) {
+            this.body = text;
+            this.bodyBytes = binary;
+            this.encodedBody = null;
+            this.parts = null;
+        }
+
         void reset(Conn conn, String method, String target, String version, byte[] raw,
                    int[] slices, int headerCount, String body,
                    int targetStart, int targetLength) {
@@ -669,6 +688,9 @@ public final class HttpServer {
             this.slices = slices;
             this.headerCount = headerCount;
             this.body = body;
+            this.bodyBytes = null;
+            this.encodedBody = null;
+            this.parts = null;
             this.headers = null;
             this.targetStart = targetStart;
             this.targetLength = targetLength;
@@ -690,6 +712,13 @@ public final class HttpServer {
         /// For HTTP/2, whose headers arrive already decoded from the HPACK state --
         /// there is no request buffer to slice into, so the map IS the
         /// representation and every lookup below falls back to it.
+        /// The same, for a body [#bodyContent] has already split into text or bytes.
+        Request(String method, String target, String version, Map headers, String body,
+                byte[] binary) {
+            this(method, target, version, headers, body);
+            this.bodyBytes = binary;
+        }
+
         Request(String method, String target, String version, Map headers, String body) {
             // pathLength is NOT set here, and does not need to be: it carries a
             // field initializer (= -1) and javac copies those into every
@@ -933,8 +962,167 @@ public final class HttpServer {
             return found;
         }
 
+        /// The body as text, or null when the request has none.
+        ///
+        /// A text body -- any Content-Type that is not binary, or none -- was
+        /// checked to be UTF-8 when it arrived, and a request whose body was not is
+        /// answered 400 before any handler runs. A binary body (an upload, a
+        /// `multipart/form-data` form) is read with [#getBodyBytes]; asking for it
+        /// as text throws rather than handing a handler characters the client never
+        /// sent.
         public String getBody() {
+            if (body == null && bodyBytes != null) {
+                if (!Utf8.isValid(bodyBytes, 0, bodyBytes.length)) {
+                    throw new IllegalStateException("The request body is binary ("
+                            + getHeader("Content-Type") + "); read it with getBodyBytes()");
+                }
+                try {
+                    body = new String(bodyBytes, "UTF-8");
+                } catch (java.io.UnsupportedEncodingException err) {
+                    throw new IllegalStateException(err.toString(), err);
+                }
+            }
             return body;
+        }
+
+        /// The body as bytes, or null when the request has none: a binary body as
+        /// it arrived -- decompressed when the client sent it gzip encoded -- and a
+        /// text body as its UTF-8. The array is the request's; copy it to keep it
+        /// beyond the handler.
+        public byte[] getBodyBytes() {
+            if (bodyBytes != null) {
+                return bodyBytes;
+            }
+            if (body == null) {
+                return null;
+            }
+            if (encodedBody == null) {
+                encodedBody = Response.bytes(body);
+            }
+            return encodedBody;
+        }
+
+        /// The parts of a `multipart/form-data` body, in order; an empty list
+        /// when the body is not one. Throws IllegalArgumentException for a body
+        /// that says it is multipart and is not well formed, which a generated
+        /// router answers with a 400.
+        public List getParts() {
+            if (parts == null) {
+                String boundary = Multipart.boundary(getHeader("Content-Type"));
+                byte[] data = boundary == null ? null : getBodyBytes();
+                parts = data == null ? new ArrayList() : Multipart.parse(data, boundary);
+            }
+            return parts;
+        }
+
+        /// The first part named `name`, or null.
+        public Part getPart(String name) {
+            for (Object each : getParts()) {
+                Part p = (Part) each;
+                if (name != null && name.equals(p.getName())) {
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        /// A request parameter, as `@RequestParam` reads it and as a servlet
+        /// container does: the query string first, then the fields of a form body
+        /// -- `application/x-www-form-urlencoded`, or the parts of a
+        /// `multipart/form-data` one that are not files. Null when neither has it.
+        /// A malformed multipart body has no fields here; [#getParts] reports why.
+        public String param(String name) {
+            String query = queryParam(name);
+            if (query != null || name == null) {
+                return query;
+            }
+            String type = getHeader("Content-Type");
+            if (Multipart.isForm(type)) {
+                return Multipart.formValue(getBody(), name);
+            }
+            if (Multipart.boundary(type) != null) {
+                Part p;
+                try {
+                    p = getPart(name);
+                } catch (IllegalArgumentException malformed) {
+                    return null;
+                }
+                return p == null || p.getFilename() != null ? null : p.getText();
+            }
+            return null;
+        }
+    }
+
+    /// One part of a `multipart/form-data` request body: a form field, or an
+    /// uploaded file when it has a filename.
+    public static final class Part {
+        private final String name;
+        private final String filename;
+        private final String contentType;
+        private final Map headers;
+        private final byte[] data;
+
+        Part(String name, String filename, String contentType, Map headers, byte[] data) {
+            this.name = name;
+            this.filename = filename;
+            this.contentType = contentType;
+            this.headers = headers;
+            this.data = data;
+        }
+
+        /// The field name from its Content-Disposition, or null.
+        public String getName() {
+            return name;
+        }
+
+        /// The uploaded file's name as the client gave it, or null for a plain
+        /// field. Never use it as a path: it is whatever the client sent.
+        public String getFilename() {
+            return filename;
+        }
+
+        /// The part's Content-Type, or null when it declared none.
+        public String getContentType() {
+            return contentType;
+        }
+
+        /// One of the part's own headers, by a name in any case; or null.
+        public String getHeader(String headerName) {
+            if (headerName == null) {
+                return null;
+            }
+            java.util.Iterator it = headers.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry e = (Map.Entry) it.next();
+                if (headerName.equalsIgnoreCase((String) e.getKey())) {
+                    return (String) e.getValue();
+                }
+            }
+            return null;
+        }
+
+        /// The part's content length in bytes.
+        public int getSize() {
+            return data.length;
+        }
+
+        /// The part's content. The array is the part's; copy it to change it.
+        public byte[] getBytes() {
+            return data;
+        }
+
+        /// The part's content as UTF-8 text. Throws IllegalStateException when it
+        /// is not valid UTF-8 -- a binary upload -- rather than returning
+        /// replacement characters the client never sent.
+        public String getText() {
+            if (!Utf8.isValid(data, 0, data.length)) {
+                throw new IllegalStateException("Part \"" + name + "\" is not UTF-8 text");
+            }
+            try {
+                return new String(data, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                throw new IllegalStateException(err.toString(), err);
+            }
         }
     }
 
@@ -1102,6 +1290,45 @@ public final class HttpServer {
             copy.put(name, value);
             extraHeaders = copy;
             return this;
+        }
+
+        /// Whether a header of this name, in any case, has been set.
+        boolean hasHeader(String name) {
+            return headerValue(name) != null;
+        }
+
+        /// The value set for a header of this name, in any case, or null.
+        String headerValue(String name) {
+            if (extraHeaders == null) {
+                return null;
+            }
+            java.util.Iterator it = extraHeaders.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry e = (Map.Entry) it.next();
+                if (name.equalsIgnoreCase(String.valueOf(e.getKey())) && e.getValue() != null) {
+                    return String.valueOf(e.getValue());
+                }
+            }
+            return null;
+        }
+
+        /// Adds `token` to a comma-separated header such as Vary, keeping what is
+        /// there, and setting it under the name it already has.
+        void appendToken(String name, String token) {
+            String key = name;
+            String existing = null;
+            if (extraHeaders != null) {
+                java.util.Iterator it = extraHeaders.entrySet().iterator();
+                while (it.hasNext()) {
+                    Map.Entry e = (Map.Entry) it.next();
+                    if (name.equalsIgnoreCase(String.valueOf(e.getKey()))) {
+                        key = String.valueOf(e.getKey());
+                        existing = e.getValue() == null ? null : String.valueOf(e.getValue());
+                    }
+                }
+            }
+            header(key, existing == null || existing.trim().length() == 0 ? token
+                    : existing + ", " + token);
         }
 
         private static byte[] bytes(String s) {
@@ -4678,11 +4905,23 @@ public final class HttpServer {
     }
 
     /// A malformed request that deserves a specific status before the close.
+    /// The status a refusal from [#bodyContent] carries, or 400 for any other
+    /// failure; for code outside this class, which cannot name ProtocolException.
+    static int refusalStatus(IOException refused) {
+        return refused instanceof ProtocolException ? ((ProtocolException) refused).status : 400;
+    }
+
     private static final class ProtocolException extends IOException {
         final int status;
 
         ProtocolException(int status, String message) {
             super(message);
+            this.status = status;
+        }
+
+        ProtocolException(int status, String message, Throwable cause) {
+            super(message);
+            initCause(cause);
             this.status = status;
         }
     }
@@ -5869,24 +6108,37 @@ public final class HttpServer {
                     continue;
                 }
                 byte[] h2RequestBody = stream.getBody();
-                if (h2RequestBody != null && h2RequestBody.length > 0
-                        && !Utf8.isValid(h2RequestBody, 0, h2RequestBody.length)) {
-                    // Decided here rather than in getBodyAsString, because this is
-                    // where a status code can be produced: the decoder has no way
-                    // to answer 400, and returning null there would have made a
-                    // malformed body indistinguishable from an absent one.
-                    if (!h2.respond(stream.getId(), 400, "text/plain", new ArrayList(),
-                            asciiBytes("the request body is not valid UTF-8"))) {
-                        // The explanation is itself a body, and under a full
-                        // process budget respond() takes nothing and says so. This
-                        // path ignored that and moved on, so the stream was left
-                        // unanswered until the connection timed out -- a client
-                        // that sent bad bytes under load simply hung. The status
-                        // still has to arrive; only the sentence is optional.
-                        h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
+                // The body read through the same decision HTTP/1 makes -- gzip,
+                // then text or bytes by Content-Type -- so a handler cannot tell
+                // which protocol carried it. Decided here rather than in
+                // getBodyAsString, because this is where a status code can be
+                // produced: the decoder has no way to answer 400, and returning
+                // null there would have made a malformed body indistinguishable
+                // from an absent one.
+                String h2Text = null;
+                byte[] h2Binary = null;
+                if (h2RequestBody != null && h2RequestBody.length > 0) {
+                    Object[] content;
+                    try {
+                        content = bodyContent(new Request(stream.getMethod(), stream.getPath(),
+                                "HTTP/2", headers, null), h2RequestBody, 0, h2RequestBody.length);
+                    } catch (ProtocolException refused) {
+                        if (!h2.respond(stream.getId(), refused.status, "text/plain",
+                                new ArrayList(), asciiBytes(refused.getMessage()))) {
+                            // The explanation is itself a body, and under a full
+                            // process budget respond() takes nothing and says so.
+                            // Ignoring that left the stream unanswered until the
+                            // connection timed out -- a client that sent bad bytes
+                            // under load simply hung. The status still has to
+                            // arrive; only the sentence is optional.
+                            h2.respond(stream.getId(), refused.status, "text/plain",
+                                    new ArrayList(), null);
+                        }
+                        requestsServed.incrementAndGet();
+                        continue;
                     }
-                    requestsServed.incrementAndGet();
-                    continue;
+                    h2Text = (String) content[0];
+                    h2Binary = (byte[]) content[1];
                 }
                 if (!targetDecodesToUtf8(stream.getPath())) {
                     // The same rule the HTTP/1 request line takes, because the
@@ -5933,7 +6185,7 @@ public final class HttpServer {
                     continue;
                 }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
-                        "HTTP/2", headers, stream.getBodyAsString());
+                        "HTTP/2", headers, h2Text, h2Binary);
                 Response response;
                 inFlightRequests.incrementAndGet();
                 SERVING_FD.set(Integer.valueOf(fd));
@@ -7482,15 +7734,17 @@ public final class HttpServer {
         }
 
         String body = null;
+        byte[] binary = null;
         if (chunked) {
             byte[] decoded = readChunked(conn, scratch);
             if (decoded == null) {
                 return null;
             }
-            if (decoded.length > 0 && !Utf8.isValid(decoded, 0, decoded.length)) {
-                throw new ProtocolException(400, "the request body is not valid UTF-8");
+            if (decoded.length > 0) {
+                Object[] content = bodyContent(request, decoded, 0, decoded.length);
+                body = (String) content[0];
+                binary = (byte[]) content[1];
             }
-            body = decoded.length == 0 ? null : new String(decoded, "UTF-8");
         } else if (contentLength != null) {
             // Already refused above if it was malformed or too large, which has to
             // happen before an Expect is answered rather than here.
@@ -7498,18 +7752,9 @@ public final class HttpServer {
                 return null;
             }
             if (declaredLength > 0) {
-                // Checked before it is decoded. new String replaces a malformed
-                // sequence with U+FFFD rather than failing, so without this the
-                // handler is handed text the client never sent -- and whatever
-                // validated it validated the replacement. Note the query-string
-                // decoder above does the same thing with percent-decoded bytes;
-                // that one is left alone deliberately, because refusing a query
-                // parameter is a different policy from refusing a body, and no
-                // report has been made against it.
-                if (!Utf8.isValid(conn.buffer, conn.pos, declaredLength)) {
-                    throw new ProtocolException(400, "the request body is not valid UTF-8");
-                }
-                body = new String(conn.buffer, conn.pos, declaredLength, "UTF-8");
+                Object[] content = bodyContent(request, conn.buffer, conn.pos, declaredLength);
+                body = (String) content[0];
+                binary = (byte[]) content[1];
                 conn.pos += declaredLength;
             }
         }
@@ -7518,7 +7763,7 @@ public final class HttpServer {
         // to a handler -- so neither one mutates anything a handler can see, and
         // "immutable to its handler" is preserved either way. The slices and the
         // array are shared, not copied.
-        if (body == null) {
+        if (body == null && binary == null) {
             return request;
         }
         // THE BODY ONLY. This used to re-point the whole request -- every field
@@ -7535,8 +7780,122 @@ public final class HttpServer {
         // getHeader answered null against a request whose own head was still
         // perfectly intact 82 bytes away. Nothing else changed between the parse
         // and here, so nothing else needs assigning.
-        request.setBody(body);
+        request.setBody(body, binary);
         return request;
+    }
+
+    /// What a request body becomes for its handler: `{text, null}` or
+    /// `{null, bytes}`.
+    ///
+    /// A `Content-Encoding: gzip` body is inflated first, to at most
+    /// MAX_BODY_BYTES -- the limit a plain body has, so compression cannot carry
+    /// a larger one past it. Any other coding is a 415: decoding it is the
+    /// server's job, and handing a handler bytes it cannot read is not.
+    ///
+    /// Then the Content-Type decides. A text body -- `text/*`, JSON, XML, a
+    /// urlencoded form, or no type at all -- is checked to be UTF-8 before it is
+    /// decoded: new String replaces a malformed sequence with U+FFFD rather than
+    /// failing, so without the check the handler is handed text the client never
+    /// sent, and whatever validated it validated the replacement. Anything else
+    /// is binary -- an image, `application/octet-stream`, a
+    /// `multipart/form-data` upload -- and is kept as bytes, unchecked, for
+    /// getBodyBytes(). Note the query-string decoder does the same thing with
+    /// percent-decoded bytes; that one is left alone deliberately, because
+    /// refusing a query parameter is a different policy from refusing a body.
+    ///
+    /// Shared by HTTP/1.1 and HTTP/2, so both protocols give a handler the same
+    /// body for the same request.
+    static Object[] bodyContent(Request request, byte[] data, int offset, int length)
+            throws ProtocolException {
+        String coding = request.getHeader("Content-Encoding");
+        if (coding != null) {
+            coding = coding.trim();
+            if ("gzip".equalsIgnoreCase(coding) || "x-gzip".equalsIgnoreCase(coding)) {
+                data = gunzip(data, offset, length);
+                offset = 0;
+                length = data.length;
+            } else if (coding.length() > 0 && !"identity".equalsIgnoreCase(coding)) {
+                throw new ProtocolException(415, "unsupported Content-Encoding");
+            }
+        }
+        if (isBinaryType(request.getHeader("Content-Type"))) {
+            byte[] copy = new byte[length];
+            System.arraycopy(data, offset, copy, 0, length);
+            return new Object[] {null, copy};
+        }
+        if (!Utf8.isValid(data, offset, length)) {
+            throw new ProtocolException(400, "the request body is not valid UTF-8");
+        }
+        try {
+            return new Object[] {new String(data, offset, length, "UTF-8"), null};
+        } catch (java.io.UnsupportedEncodingException err) {
+            throw new ProtocolException(500, err.toString(), err);
+        }
+    }
+
+    /// Whether a Content-Type names a body that is not text. Text is `text/*`,
+    /// JSON and XML (with their `+json`/`+xml` suffixes), a urlencoded form,
+    /// JavaScript and GraphQL; a missing type is text too, which is what every
+    /// body was before binary ones were kept. Compared without case folding,
+    /// since a media type is ASCII by specification and toLowerCase() is not.
+    static boolean isBinaryType(String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int semi = contentType.indexOf(';');
+        String type = (semi < 0 ? contentType : contentType.substring(0, semi)).trim();
+        if (type.length() == 0 || type.regionMatches(true, 0, "text/", 0, 5)) {
+            return false;
+        }
+        if ("application/json".equalsIgnoreCase(type)
+                || "application/xml".equalsIgnoreCase(type)
+                || "application/x-www-form-urlencoded".equalsIgnoreCase(type)
+                || "application/javascript".equalsIgnoreCase(type)
+                || "application/graphql".equalsIgnoreCase(type)) {
+            return false;
+        }
+        return !(endsWithIgnoreCase(type, "+json") || endsWithIgnoreCase(type, "+xml"));
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(), suffix, 0,
+                        suffix.length());
+    }
+
+    /// Inflates a gzip body, refusing one that grows past MAX_BODY_BYTES (413) or
+    /// is not gzip at all (400).
+    static byte[] gunzip(byte[] data, int offset, int length) throws ProtocolException {
+        ByteSink out = new ByteSink(Math.max(256, Math.min(length * 4, MAX_BODY_BYTES)));
+        com.codename1.io.gzip.GZIPInputStream in = null;
+        try {
+            in = new com.codename1.io.gzip.GZIPInputStream(
+                    new java.io.ByteArrayInputStream(data, offset, length));
+            byte[] chunk = new byte[8192];
+            while (true) {
+                int n = in.read(chunk, 0, chunk.length);
+                if (n < 0) {
+                    break;
+                }
+                if (out.length() + n > MAX_BODY_BYTES) {
+                    throw new ProtocolException(413, "request body too large once decompressed");
+                }
+                out.put(chunk, 0, n);
+            }
+        } catch (ProtocolException err) {
+            throw err;
+        } catch (IOException err) {
+            throw new ProtocolException(400, "the request body is not valid gzip", err);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // In memory; nothing to release.
+                }
+            }
+        }
+        return usedBytes(out);
     }
 
     /// Decodes a chunked body: a size in hex, CRLF, that many bytes, CRLF, until a

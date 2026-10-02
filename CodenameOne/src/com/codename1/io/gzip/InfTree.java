@@ -34,6 +34,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package com.codename1.io.gzip;
 
+@com.codename1.impl.SharedWithBackend
 final class InfTree {
 
     static final int fixed_bl = 9;

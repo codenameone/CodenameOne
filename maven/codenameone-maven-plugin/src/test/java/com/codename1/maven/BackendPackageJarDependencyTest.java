@@ -210,7 +210,7 @@ class BackendPackageJarDependencyTest {
     private static List<String> stage(List<String> classpath, File staged, File natives)
             throws Exception {
         BackendPackageMojo mojo = new BackendPackageMojo();
-        Method stageClasses = BackendPackageMojo.class.getDeclaredMethod(
+        Method stageClasses = AbstractBackendNativeMojo.class.getDeclaredMethod(
                 "stageDependencyClasses", List.class, File.class, File.class);
         stageClasses.setAccessible(true);
         Object out = stageClasses.invoke(mojo, classpath, staged, natives);

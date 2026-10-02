@@ -1,0 +1,183 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.backend;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/// Cross-origin resource sharing for the application's routes, from `cn1.cors.*`.
+///
+/// Off unless `cn1.cors.allowedOrigins` names something, because the default a
+/// browser applies -- no cross-origin reads -- is the safe one and turning it off
+/// is a decision. A page served from one origin calling the API on another (a
+/// web app on its own port, a CDN in front of a separate API host) needs it on.
+///
+/// A preflight is answered only when no handler answered the OPTIONS request
+/// itself, so an endpoint with an origin policy of its own -- the MCP endpoint --
+/// keeps it. An ordinary response gains the headers only when its handler set no
+/// `Access-Control-Allow-Origin` of its own.
+final class Cors {
+    static final String ALLOWED_ORIGINS = "cn1.cors.allowedOrigins";
+    static final String ALLOWED_METHODS = "cn1.cors.allowedMethods";
+    static final String ALLOWED_HEADERS = "cn1.cors.allowedHeaders";
+    static final String EXPOSED_HEADERS = "cn1.cors.exposedHeaders";
+    static final String ALLOW_CREDENTIALS = "cn1.cors.allowCredentials";
+    static final String MAX_AGE = "cn1.cors.maxAgeSeconds";
+
+    private final List origins;
+    private final boolean anyOrigin;
+    private final String methods;
+    private final String headers;
+    private final String exposed;
+    private final boolean credentials;
+    private final int maxAge;
+
+    private Cors(List origins, String methods, String headers, String exposed,
+                 boolean credentials, int maxAge) {
+        this.origins = origins;
+        this.anyOrigin = origins.contains("*");
+        this.methods = methods;
+        this.headers = headers;
+        this.exposed = exposed;
+        this.credentials = credentials;
+        this.maxAge = maxAge;
+    }
+
+    /// The configured policy, or null when CORS is off.
+    static Cors fromConfig(Config config) throws IOException {
+        String listed = config.get(ALLOWED_ORIGINS, null);
+        if (listed == null || listed.trim().length() == 0) {
+            return null;
+        }
+        List origins = new ArrayList();
+        int pos = 0;
+        while (pos <= listed.length()) {
+            int comma = listed.indexOf(',', pos);
+            int end = comma < 0 ? listed.length() : comma;
+            String origin = listed.substring(pos, end).trim();
+            if (origin.length() > 0) {
+                // An origin is scheme://host[:port] with nothing after it; a trailing
+                // slash never matches what a browser sends, so it is refused here
+                // rather than leaving a policy that silently allows no one.
+                if (!"*".equals(origin) && (origin.endsWith("/") || origin.indexOf("://") < 0)) {
+                    throw new IOException(ALLOWED_ORIGINS + " names \"" + origin + "\"; an origin "
+                            + "is scheme://host[:port], with no path");
+                }
+                origins.add(origin);
+            }
+            if (comma < 0) {
+                break;
+            }
+            pos = comma + 1;
+        }
+        boolean credentials = config.getBoolean(ALLOW_CREDENTIALS, false);
+        if (credentials && origins.contains("*")) {
+            // Browsers refuse a credentialed response that allows every origin, so
+            // the combination is a policy that cannot work as written.
+            throw new IOException(ALLOW_CREDENTIALS + "=true needs " + ALLOWED_ORIGINS
+                    + " to list the origins; a browser refuses credentials with *");
+        }
+        return new Cors(origins,
+                config.get(ALLOWED_METHODS, "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"),
+                config.get(ALLOWED_HEADERS, "*"),
+                config.get(EXPOSED_HEADERS, ""),
+                credentials,
+                config.getInt(MAX_AGE, 1800));
+    }
+
+    /// Whether `origin` may read responses.
+    boolean allows(String origin) {
+        if (origin == null) {
+            return false;
+        }
+        if (anyOrigin) {
+            return true;
+        }
+        for (Object listed : origins) {
+            if (origin.equalsIgnoreCase((String) listed)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The answer to a preflight no handler took, or null when `request` is not
+    /// one. A preflight from an origin the policy does not list is a 403.
+    HttpServer.Response preflight(HttpServer.Request request) {
+        if (!"OPTIONS".equals(request.getMethod())) {
+            return null;
+        }
+        String origin = request.getHeader("Origin");
+        String asked = request.getHeader("Access-Control-Request-Method");
+        if (origin == null || asked == null) {
+            return null;
+        }
+        if (!allows(origin)) {
+            return HttpServer.Response.text(403, "origin not allowed");
+        }
+        HttpServer.Response response = HttpServer.Response.empty(204, null, null);
+        allowOrigin(response, origin);
+        response.header("Access-Control-Allow-Methods", methods);
+        String requested = request.getHeader("Access-Control-Request-Headers");
+        if ("*".equals(headers.trim())) {
+            // With credentials "*" is a literal header name to a browser, so the
+            // headers actually requested are echoed instead; without them it is a
+            // wildcard and echoing is equivalent.
+            if (requested != null && requested.length() > 0) {
+                response.header("Access-Control-Allow-Headers", requested);
+            }
+        } else {
+            response.header("Access-Control-Allow-Headers", headers);
+        }
+        response.header("Access-Control-Max-Age", String.valueOf(maxAge));
+        return response;
+    }
+
+    /// Adds the headers a browser reads to a response for an allowed origin.
+    void decorate(HttpServer.Request request, HttpServer.Response response) {
+        String origin = request.getHeader("Origin");
+        if (response == null || origin == null || !allows(origin)
+                || response.hasHeader("Access-Control-Allow-Origin")) {
+            return;
+        }
+        allowOrigin(response, origin);
+        if (exposed.trim().length() > 0) {
+            response.header("Access-Control-Expose-Headers", exposed);
+        }
+    }
+
+    private void allowOrigin(HttpServer.Response response, String origin) {
+        // The origin itself rather than "*" whenever the answer depends on it, and
+        // Vary so a cache does not hand one origin's answer to another.
+        if (anyOrigin && !credentials) {
+            response.header("Access-Control-Allow-Origin", "*");
+        } else {
+            response.header("Access-Control-Allow-Origin", origin);
+            response.appendToken("Vary", "Origin");
+        }
+        if (credentials) {
+            response.header("Access-Control-Allow-Credentials", "true");
+        }
+    }
+}

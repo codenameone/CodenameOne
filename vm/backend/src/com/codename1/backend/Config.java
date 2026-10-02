@@ -68,12 +68,16 @@ import java.util.Properties;
 ///
 /// 5. `application.properties`;
 ///
-/// 6. what the build compiled in from the settings annotations --
-///   `@ServerConfig`, `@SessionConfig` and the rest of
-///   `com.codename1.backend.annotations` -- so a file or the environment can
-///   still change anything the source says;
+/// 6. the module's `application.properties` as the build compiled it into the
+///   server, so a binary with no file beside it still has the committed
+///   settings, and a file or the environment can still change any of them;
 ///
 /// 7. the default the caller passed in.
+///
+/// A test started by `@BackendTest` adds one layer above all of these: the
+/// settings the test itself names. A test that asks for a free port or an
+/// in-memory database gets one even in a shell that exports `PORT` or
+/// `DATABASE_URL`.
 ///
 /// A value may reference an environment variable as `${NAME}` or
 /// `${NAME:fallback}`. That resolution happens when the value is READ
@@ -96,6 +100,9 @@ public final class Config {
 
     /// The port to listen on. Also read from PORT.
     public static final String SERVER_PORT = "cn1.server.port";
+    /// The address to listen on: `127.0.0.1` for this machine only. Unset, the
+    /// server listens on every interface.
+    public static final String SERVER_ADDRESS = "cn1.server.address";
     /// The listen backlog.
     public static final String SERVER_BACKLOG = "cn1.server.backlog";
     /// The size of the request thread pool.
@@ -168,6 +175,7 @@ public final class Config {
     private final Properties profileFile;
     private final Properties baseFile;
     private final Properties compiled;
+    private final Properties overrides;
     private final String profile;
     private final List loadedFrom;
 
@@ -177,6 +185,12 @@ public final class Config {
 
     private Config(Properties baseFile, Properties profileFile, Properties compiled,
                    String profile, List loadedFrom) {
+        this(baseFile, profileFile, compiled, new Properties(), profile, loadedFrom);
+    }
+
+    private Config(Properties baseFile, Properties profileFile, Properties compiled,
+                   Properties overrides, String profile, List loadedFrom) {
+        this.overrides = overrides;
         this.baseFile = baseFile;
         this.profileFile = profileFile;
         this.compiled = compiled;
@@ -187,7 +201,7 @@ public final class Config {
     /// This configuration over a bottom layer of compiled-in values: pairs of
     /// key and value, in that order, which every other layer overrides. The
     /// generated entry point passes what the settings annotations say.
-    public Config withCompiledDefaults(String[] keysAndValues) {
+    Config withCompiledDefaults(String[] keysAndValues) {
         if (keysAndValues == null || keysAndValues.length == 0) {
             return this;
         }
@@ -199,7 +213,7 @@ public final class Config {
         for (int iter = 0 ; iter < keysAndValues.length ; iter += 2) {
             merged.setProperty(keysAndValues[iter], keysAndValues[iter + 1]);
         }
-        return new Config(baseFile, profileFile, merged, profile, loadedFrom);
+        return new Config(baseFile, profileFile, merged, overrides, profile, loadedFrom);
     }
 
     /// Reads the configuration for this process: the active profile, then the two
@@ -250,6 +264,19 @@ public final class Config {
     public static Config of(Properties values, String profile) {
         Properties empty = new Properties();
         return new Config(values == null ? empty : values, empty,
+                profile == null || profile.length() == 0 ? "default" : profile,
+                new ArrayList());
+    }
+
+    /// A configuration whose `values` win over every other layer, the process
+    /// environment included: what a test names for itself. Reached through
+    /// `BackendAccess` by the test support, and by nothing a server runs.
+    static Config overriding(Properties values, String profile) {
+        Properties top = new Properties();
+        if (values != null) {
+            top.putAll(values);
+        }
+        return new Config(new Properties(), new Properties(), new Properties(), top,
                 profile == null || profile.length() == 0 ? "default" : profile,
                 new ArrayList());
     }
@@ -398,6 +425,10 @@ public final class Config {
         while (e.hasMoreElements()) {
             names.add(e.nextElement());
         }
+        e = overrides.propertyNames();
+        while (e.hasMoreElements()) {
+            names.add(e.nextElement());
+        }
         e = baseFile.propertyNames();
         while (e.hasMoreElements()) {
             names.add(e.nextElement());
@@ -411,7 +442,11 @@ public final class Config {
 
     /// The value as written, before any ${} in it is resolved.
     private String raw(String key) {
-        String value = fromProcess(key);
+        String value = overrides.getProperty(key);
+        if (value != null) {
+            return value;
+        }
+        value = fromProcess(key);
         if (value != null) {
             return value;
         }

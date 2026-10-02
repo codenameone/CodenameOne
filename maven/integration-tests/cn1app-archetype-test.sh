@@ -73,6 +73,26 @@ if [ ! -f "backend/target/classes/$ROUTER_DIR/BackendWiring.class" ]; then
   exit 1
 fi
 
+# The sample tests, on the JVM. Counted from the reports rather than trusted from
+# the exit status: a surefire that found no provider runs zero tests and succeeds,
+# which is exactly how the root pom's client-test provider once swallowed them.
+mvn -pl backend -Dcodename1.platform=backend test
+backend_tests_ran() {
+  local suffix="$1" total=0 count
+  for report in backend/target/surefire-reports/TEST-*"$suffix".xml; do
+    [ -f "$report" ] || continue
+    count="$(sed -n 's/.*<testsuite[^>]* tests="\([0-9]*\)".*/\1/p' "$report" | head -1)"
+    total=$((total + ${count:-0}))
+  done
+  echo "$total"
+}
+JVM_TESTS="$(backend_tests_ran Test)"
+if [ "$JVM_TESTS" -lt 3 ]; then
+  echo "the backend's sample tests did not run on the JVM (counted $JVM_TESTS)" >&2
+  exit 1
+fi
+echo "the backend's sample tests ran on the JVM: $JVM_TESTS"
+
 # `cn1:backend-package` -- the goal that turns the module above into a native
 # binary -- ON A JDK THAT IS NOT 8, with JDK_8_HOME deliberately unset.
 #
@@ -136,7 +156,7 @@ else
     fi
     sleep 1
   done
-  # The route that goes through an injected @Service, while the binary still runs.
+  # The route that goes through an injected @Component, while the binary still runs.
   GREETING="$(curl -s --max-time 5 "http://127.0.0.1:$BACKEND_PORT/greet/archetype" || true)"
   kill -9 $BACKEND_PID 2>/dev/null || true
   trap 'set_auto_bundle_pref false' EXIT
@@ -151,4 +171,15 @@ else
     exit 1
   fi
   echo "the packaged backend answered /healthz"
+  kill -9 $BACKEND_PID 2>/dev/null || true
+
+  # The same tests translated into a native test binary, on the same JDK.
+  env -u JDK_8_HOME JAVA_HOME="$BACKEND_PACKAGE_JDK" \
+    mvn -pl backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true
+  COMPILED_TESTS="$(backend_tests_ran -compiled)"
+  if [ "$COMPILED_TESTS" -lt 3 ]; then
+    echo "the backend's sample tests did not run compiled (counted $COMPILED_TESTS)" >&2
+    exit 1
+  fi
+  echo "the backend's sample tests ran compiled: $COMPILED_TESTS"
 fi

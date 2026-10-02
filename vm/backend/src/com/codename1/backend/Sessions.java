@@ -22,6 +22,7 @@
  */
 package com.codename1.backend;
 
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,7 +47,7 @@ import com.codename1.backend.sql.Dialect;
 /// Nothing here runs for a request that does not ask for its session: the
 /// cookie is parsed on the first `getSession`, and a request that never
 /// calls it costs one field check when it ends.
-public final class Sessions {
+final class Sessions {
     private String cookieName = "CN1SESSION";
     private int timeoutSeconds = 1800;
     private String sameSite = "Lax";
@@ -54,9 +55,9 @@ public final class Sessions {
     private SessionStore store = new Memory();
     private long lastPurge;
     private static final long PURGE_INTERVAL = 60000L;
-    /// Runs the destroy methods of @SessionScope beans; null without an application.
-    private final Backend.Application application;
-    /// The @SessionScope beans of every session that has any, by session id.
+    /// Runs the destroy methods of session-scoped beans; null without an application.
+    private final com.codename1.impl.backend.BackendApplication application;
+    /// The session-scoped beans of every session that has any, by session id.
     /// Kept here rather than trusted to the store: a database store hands back a
     /// NEW HttpSession on every request, so beans living only on that object
     /// would be built again per request and never destroyed.
@@ -72,7 +73,7 @@ public final class Sessions {
         this(null);
     }
 
-    Sessions(Backend.Application application) {
+    Sessions(com.codename1.impl.backend.BackendApplication application) {
         this.application = application;
     }
 
@@ -89,7 +90,7 @@ public final class Sessions {
     ///
     /// - `application`: destroys the session-scoped beans, or null
     public static Sessions configure(Config config, boolean tls, DataSource pool,
-                                     Backend.Application application) throws IOException {
+                                     com.codename1.impl.backend.BackendApplication application) throws IOException {
         Sessions out = new Sessions(application);
         out.cookieName = config.get("cn1.session.cookie", "CN1SESSION");
         if (!isToken(out.cookieName)) {

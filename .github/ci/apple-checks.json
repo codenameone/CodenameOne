@@ -43,7 +43,7 @@
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
-      "vm/backend/demo/cn1ss/**",
+      "scripts/hellocodenameone/backend/**",
       "scripts/lib/cn1ss.sh"
     ],
     "push": [
@@ -89,7 +89,7 @@
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
-      "vm/backend/demo/cn1ss/**",
+      "scripts/hellocodenameone/backend/**",
       "scripts/lib/cn1ss.sh"
     ]
   },
@@ -230,7 +230,7 @@
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
       "!docs/**",
-      "vm/backend/demo/cn1ss/**"
+      "scripts/hellocodenameone/backend/**"
     ],
     "push": [
       ".github/workflows/scripts-mac-catalyst.yml",
@@ -258,7 +258,7 @@
       "!maven/cn1-applovin/**",
       "!maven/cn1-unity-levelplay/**",
       "!maven/core-unittests/**",
-      "vm/backend/demo/cn1ss/**"
+      "scripts/hellocodenameone/backend/**"
     ]
   }
 }
