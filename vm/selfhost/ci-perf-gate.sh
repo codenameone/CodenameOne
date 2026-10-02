@@ -73,7 +73,12 @@ if missing or report.get('calibration'):
     print('ParparVM performance gate: NO BASELINE on %s for %s (runner CPU: %s).'
           % (report['platform'], key, report.get('cpu', 'unknown')))
     print('Add it to %s from this job\'s perf-results.json:' % overlay)
-    print('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s perf-results.json' % number)
+    # The calibrator processes the whole file, so if this run ALSO moved a row past its
+    # tolerance it writes that rebaseline too -- and refuses without a reason for it.
+    if moved('improved'):
+        print(rebaseline)
+    else:
+        print('  python3 vm/selfhost/calibrate-perf-baseline.py --pr %s perf-results.json' % number)
     print(json.dumps({key: report.get('calibration') or sorted(missing)}, indent=1))
     sys.exit(1)
 improved = moved('improved')

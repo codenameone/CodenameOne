@@ -565,7 +565,9 @@ def render_markdown(report):
                   'commit it with this pull request:'
                   % (count, '' if count == 1 else 's', target, 'it' if count == 1 else 'them',
                      overlay_name(report)), '',
-                  '```', fix_command(report, False), '```',
+                  # The calibrator takes the whole file: if this run also moved a row,
+                  # that rebaseline needs a reason or the command is refused.
+                  '```', fix_command(report, bool(regressions or improvements)), '```',
                   '', '<details><summary>The rows it will add</summary>', '',
                   '```json', json.dumps({target: report['calibration']}, indent=1),
                   '```', '', '</details>']

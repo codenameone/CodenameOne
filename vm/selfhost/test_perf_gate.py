@@ -109,6 +109,15 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn('pr/<PR number>.json', text)
         self.assertIn('calibrate-perf-baseline.py --pr <PR number> perf-results.json', text)
 
+    def test_a_calibration_beside_an_improvement_asks_for_a_reason(self):
+        r = report({'quicksort': {'all': (metric(1.3, None, 'uncalibrated'),
+                                          metric(0.9, None, 'uncalibrated'))},
+                    'recursion': {'all': (metric(0.7, 1.0, 'improved'), metric(0.5, 0.5, 'ok'))}})
+        r['calibration'] = {'quicksort': {'all': {'time': 1.3, 'memory': 0.9}}}
+        text = gate.render_markdown(r)
+        self.assertNotIn('--pr <PR number> perf-results.json', text)
+        self.assertIn('--reason', text.split('No baseline for')[1].split('</details>')[0])
+
     def test_an_incomplete_gate_says_so(self):
         text = gate.render_markdown(report({}, error='stale native build'))
         self.assertIn('could not complete', text)
@@ -799,6 +808,14 @@ class VerdictStepTests(unittest.TestCase):
                           'stale_overlay': 'pr/7.json rebaselines ... moved it first'})
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn('pr/7.json is stale', r.stdout)
+
+    def test_a_calibration_with_a_moved_row_asks_for_a_reason(self):
+        results = {'quicksort': self.row('uncalibrated'), 'recursion': self.row('improved')}
+        r = self.verdict({'platform': 'linux-x64', 'pr': 7, 'labels': {}, 'results': results,
+                          'calibration': {'quicksort': {'all': {'time': 1.0, 'memory': 0.5}}},
+                          'regression': False})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('--reason', r.stdout)
 
     def test_a_judged_run_passes(self):
         r = self.verdict({'platform': 'linux-x64', 'results': {'quicksort': self.row('ok')},
