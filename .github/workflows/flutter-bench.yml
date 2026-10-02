@@ -136,8 +136,30 @@ jobs:
               -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
               -pl dart-runtime,flutter-runtime
 
+      # DIAGNOSTIC BRANCH ONLY: the PR head without these fixes, for a same-runner A/B.
+      - name: Check out the old tree (diag)
+        uses: actions/checkout@v4
+        with:
+          ref: 1b36753c18de2df25bcc82bd686a243dcac1b50c
+          path: old-src
+
+      - name: Build the old framework (diag)
+        run: |
+          ln -sfn /opt/cn1-binaries "$GITHUB_WORKSPACE/cn1-binaries"
+          cd old-src/maven
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2-old" \
+              -pl core,dart-transpiler,codenameone-maven-plugin,cn1app-archetype -am
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Plocal-dev-javase \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2-old" \
+              -pl dart-runtime,flutter-runtime
+
       - name: Pack the repository
-        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2
+        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2 m2-old
 
       - name: Upload the repository
         uses: actions/upload-artifact@v4
@@ -340,6 +362,28 @@ jobs:
           grep '^cn1='     "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
           grep '^flutter=' "${RUNNER_TEMP}/paths.txt" >> "$GITHUB_OUTPUT"
 
+      - name: Check out the old tree (diag)
+        if: ${{ matrix.platform == 'macos' }}
+        uses: actions/checkout@v4
+        with:
+          ref: 1b36753c18de2df25bcc82bd686a243dcac1b50c
+          path: old-src
+
+      - name: Build the old application (diag)
+        id: buildold
+        if: ${{ matrix.platform == 'macos' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          old-src/scripts/flutter-bench/app/prepare.sh \
+              --work "${RUNNER_TEMP}/fbench-old" \
+              --maven-repo "${GITHUB_WORKSPACE}/m2-old" > "${RUNNER_TEMP}/old-prepare.log" 2>&1
+          old-src/scripts/flutter-bench/app/build_apps.sh \
+              --work "${RUNNER_TEMP}/fbench-old" \
+              --platform macos \
+              --maven-repo "${GITHUB_WORKSPACE}/m2-old" > "${RUNNER_TEMP}/paths-old.txt" 2> "${RUNNER_TEMP}/old-build.log"
+          grep '^cn1=' "${RUNNER_TEMP}/paths-old.txt" >> "$GITHUB_OUTPUT"
+
       # Every leg runs the same measure.sh; the legs differ only in what wraps it.
       #
       # Linux runs under Xvfb because both applications are GTK programs that
@@ -358,6 +402,26 @@ jobs:
           $prefix scripts/flutter-bench/app/measure.sh "${{ matrix.platform }}" \
               "${{ steps.build.outputs.cn1 }}" "${{ steps.build.outputs.flutter }}" \
               "${RUNNER_TEMP}/bench-out"
+
+      # DIAGNOSTIC BRANCH ONLY: interleaved A/B on this one runner.
+      - name: A/B cold start (diag)
+        if: ${{ always() && matrix.platform == 'macos' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/traces"
+          python3 scripts/flutter-bench/diag_ab.py --rounds 15 \
+              --arm "fixed=codenameone:${{ steps.build.outputs.cn1 }}" \
+              --arm "prHead=codenameone:${{ steps.buildold.outputs.cn1 }}" \
+              --arm "flutter=flutter:${{ steps.build.outputs.flutter }}" 2>&1 | tee "${RUNNER_TEMP}/traces/ab.txt"
+
+      - name: Upload A/B (diag)
+        if: ${{ always() && matrix.platform == 'macos' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-ab
+          path: ${{ runner.temp }}/traces/ab.txt
+          retention-days: 3
 
       # Android needs a device. A hosted runner has none, so the adapter found no
       # emulator and recorded the whole platform as unavailable after building
