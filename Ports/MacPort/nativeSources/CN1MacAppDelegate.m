@@ -660,6 +660,10 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
 // paint path reads, and it has to be right from the first frame.
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    // Normally a no-op: CN1MacBuildMainWindowBeforeRun released it before
+    // [NSApp run]. This is the backstop for a generated main that never calls
+    // that, so held menu commands cannot stay held for good.
+    CN1MacReleaseStartupMenu();
     // Installed unconditionally, and this early. A scheduled notification is
     // delivered through this delegate whether it fires while the application is
     // frontmost or the user opens it from Notification Center, so without it a
@@ -1032,10 +1036,13 @@ void CN1MacBuildMainWindowBeforeRun(void) {
     cn1StartupPhase("buildWindowBeforeRun");
     (void)[CN1MacHost sharedHost].renderingView;
     CN1MacServeFirstFrameBeforeRun();
+    // The menu bar and any commands held back while the frame was served.
+    CN1MacReleaseStartupMenu();
 }
 
-/// Installs the delegate and the menu bar. Called from the generated main,
-/// before [NSApp run].
+/// Installs the delegate. Called from the generated main, before [NSApp run]; the
+/// menu bar is built later, once the first frame is out (see the generated main
+/// and CN1MacReleaseStartupMenu).
 void CN1MacInstallAppDelegate(void) {
     static CN1MacAppDelegate *delegate = nil;
     if (delegate == nil) {
