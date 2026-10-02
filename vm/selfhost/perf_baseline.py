@@ -313,7 +313,11 @@ def resolve(base, overlays, tolerance=None):
         combined = _combine([r for _, r in entries], tolerance)
         # Calibrations of one CPU that disagree wildly combine into a tolerance past any
         # sane fraction: a row that gates nothing, which the fold would only refuse after
-        # the fact. Refuse it here, naming the calibrations to re-measure.
+        # the fact. Refuse it here, naming the calibrations. There is deliberately no
+        # automatic recovery (the calibrator does not rewrite a pull request's calibrate
+        # entry when this fires): one CPU measured an order of magnitude apart by runs of
+        # the same code is a broken measurement, and the fix is to delete that entry from
+        # the pr/<number>.json this message names, not to re-measure around it.
         _check_row('%s %s/%s as combined from %s' % (
             key, bench, cores, ', '.join('pr/%d.json' % n for n, _ in entries)), combined)
         rows.setdefault(key, {}).setdefault(bench, {})[cores] = combined

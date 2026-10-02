@@ -142,6 +142,10 @@ def main(argv=None):
     # What the gate judged against (this pull request's earlier rows included), and the
     # baseline as it stands without them -- which is what a rebaseline's "from" names,
     # since this run replaces this pull request's earlier rebaseline rather than stacking.
+    # This raises when another overlay chains its rebaseline ON TOP of this pull request's
+    # (its "from" is our value), and that is deliberate rather than a gap: re-measuring a
+    # link something else was measured on would move the value that later link starts
+    # from and make IT stale. Recalibrate a pull request nothing has built on yet.
     others, _ = perf_baseline.resolve(base, [o for o in overlays if o[0] != number], tolerance)
     try:
         judged, _ = perf_baseline.resolve(base, overlays, tolerance)
